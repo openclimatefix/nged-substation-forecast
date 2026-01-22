@@ -2,6 +2,11 @@
 
 TODO(Jack): Adapt the OCF template README for this project :)
 
+## Development
+
+This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/workspaces): A single
+repo which contains multiple Python packages.
+
 ---
 
 *Part of the [Open Climate Fix](https://github.com/orgs/openclimatefix/people) community.*

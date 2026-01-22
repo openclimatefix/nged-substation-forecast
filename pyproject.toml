@@ -30,6 +30,12 @@ dev = [
 [project.urls]
 repository = "https://github.com/openclimatefix/nged-substation-forecasting"
 
+# --- UV WORKSPACE CONFIG ---
+# See: https://docs.astral.sh/uv/concepts/projects/workspaces
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
 # --- LINTING AND TYPING CONFIGURATION --- #
 
 # Ruff configuration
