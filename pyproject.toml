@@ -18,6 +18,10 @@ classifiers = [
 dependencies = [
     "dagster>=1.12.11",
     "dagster-webserver>=1.12.11",
+    "polars>=1.0.0",
+    "requests>=2.31.0",
+    "data-nged",
+    "contracts",
 ]
 
 [build-system]
@@ -43,6 +47,10 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 [tool.uv.workspace]
 members = ["packages/*"]
 
+[tool.uv.sources]
+data-nged = { workspace = true }
+contracts = { workspace = true }
+
 # --- DAGSTER ---
 
 [tool.dagster]
@@ -63,29 +71,6 @@ registry_modules = [
 # * See https://beta.ruff.rs/docs/
 [tool.ruff]
 line-length = 100
-
-[tool.ruff.lint]
-select = [
-    "F",   # pyflakes
-    "E",   # pycodestyle
-    "W",   # whitespace and newlines
-    "I",   # isort
-    "UP",  # modernize
-    "ANN", # flake8 type annotations
-    "S",   # flake8 bandit
-    "B",   # flake8 bugbear
-    "C4",  # flake8 comprehensions
-    "COM", # flake8 commas
-    "T20", # flake8 print
-    "SIM", # flake8 simplify
-    "ARG", # flake8 unused arguments
-    "DTZ", # flake8 datetimes
-    "Q",   # flake8 quotes
-    "TCH", # flake8 typecheck
-    "D",   # pydocstyle
-    "RUF", # ruff-specific rules
-]
-fixable = ["ALL"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
