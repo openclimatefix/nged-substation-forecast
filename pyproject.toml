@@ -31,6 +31,7 @@ dev = [
 	"ruff>=0.14.13",
 	"ty>=0.0.13",
 	"unittest-xml-reporting>=4.0.0",
+    "dagster-dg-cli",
 ]
 
 [project.urls]
@@ -42,8 +43,19 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 [tool.uv.workspace]
 members = ["packages/*"]
 
+# --- DAGSTER ---
+
 [tool.dagster]
 module_name = "nged_substation_forecast.definitions"
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "nged_substation_forecast"
+registry_modules = [
+    "nged_substation_forecast.components.*",
+]
 
 # --- LINTING AND TYPING CONFIGURATION --- #
 

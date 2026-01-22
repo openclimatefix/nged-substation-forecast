@@ -1,14 +1,15 @@
 """Dagster definitions for the NGED substation forecast project."""
 
-from dagster import Definitions, asset
+from pathlib import Path
+
+from dagster import Definitions, definitions, load_from_defs_folder
 
 
-@asset
-def my_first_asset() -> list[int]:
-    """A simple asset to verify Dagster setup."""
-    return [1, 2, 3]
+@definitions
+def defs() -> Definitions:
+    """Load all Dagster definitions from the defs folder.
 
-
-defs = Definitions(
-    assets=[my_first_asset],
-)
+    Returns:
+        Definitions: The combined Dagster definitions.
+    """
+    return load_from_defs_folder(path_within_project=Path(__file__).parent)
