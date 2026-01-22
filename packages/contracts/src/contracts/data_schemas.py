@@ -15,8 +15,10 @@ class SubstationMeasurement(pt.Model):
 
     substation_id: str
     timestamp: datetime
-    mw: float | None = None
-    mvar: float | None = None
+    # Primary substations usually have flows in the tens of MW.
+    # We'll set a loose range for now to catch extreme errors.
+    mw: float | None = pt.Field(None, ge=-1000, le=1000)
+    mvar: float | None = pt.Field(None, ge=-1000, le=1000)
 
 
 class SubstationMetadata(pt.Model):
@@ -24,7 +26,7 @@ class SubstationMetadata(pt.Model):
 
     substation_id: str
     substation_name: str
-    latitude: float | None = None
-    longitude: float | None = None
-    voltage: float | None = None
+    latitude: float | None = pt.Field(None, ge=49, le=61)  # UK latitude range
+    longitude: float | None = pt.Field(None, ge=-9, le=2)  # UK longitude range
+    voltage: float | None = pt.Field(None, ge=0, le=400)
     region: str | None = None
