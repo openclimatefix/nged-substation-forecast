@@ -16,24 +16,16 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-    "loguru >= 0.7.3",
 ]
 
 [dependency-groups]
 dev = [
-    # Testing
-    "pytest",
-    "unittest-xml-reporting",
-    # Linting and type checking
-    "ty",
-    "ruff",
-    "pre-commit",
+	"pre-commit>=4.5.1",
+	"pytest>=9.0.2",
+	"ruff>=0.14.13",
+	"ty>=0.0.13",
+	"unittest-xml-reporting>=4.0.0",
 ]
-
-
-[build-system]
-requires = ["uv_build>=0.9.21,<0.10.0"]
-build-backend = "uv_build"
 
 [project.urls]
 repository = "https://github.com/openclimatefix/nged-substation-forecasting"
