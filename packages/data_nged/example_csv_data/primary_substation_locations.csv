@@ -1,0 +1,2073 @@
+Substation Number,Substation Name,Substation Type,Easting,Northing,Latitude,Longitude
+437640,Sawles Road,Primary Substation,201505.0,51769.0,50.332246,-4.790508
+939482,Jlr Whitley,Primary Substation,435152.0,276176.0,52.382453,-1.484983
+883362,Watnall 33 11kv S Stn,Primary Substation,450410.0,345863.0,53.007689,-1.250182
+930072,Polesworth 33 11kv S Stn,Primary Substation,426309.0,302088.0,52.615901,-1.612862
+318110,Liverton Farm 33kv Solar Park,Primary Substation,303567.0,82890.0,50.637622,-3.365094
+947000,Brackley 11kv,Primary Substation,458659.0,239324.0,52.049168,-1.146035
+920024,Mansfield St 33 11kv S Stn,Primary Substation,458745.0,304922.0,52.63883,-1.13333
+920028,Jupiter 33 11kv S Stn,Primary Substation,456654.0,303532.0,52.626566,-1.164464
+926144,Hockley Farm Road 33 11kv S Stn,Primary Substation,455087.0,303957.0,52.630547,-1.18754
+920041,South Croxton 33 11kv S Stn,Primary Substation,467752.0,311480.0,52.696736,-0.998888
+164210,Bath University 33,Primary Substation,377243.0,164260.0,51.376873,-2.328378
+560158,Llangewydd,Primary Substation,289088.0,180529.0,51.51271,-3.599756
+210490,Luckwell Bridge,Primary Substation,290745.0,138775.0,51.137731,-3.563073
+210390,Culmhead,Primary Substation,322100.0,116208.0,50.939955,-3.110134
+210050,Lydeard St Lawrence Primary,Primary Substation,313341.0,131916.0,51.07993,-3.238525
+182983,Portishead Ashlands,Primary Substation,348327.0,176963.0,51.489192,-2.745659
+162406,Peasedown,Primary Substation,370089.0,157672.0,51.317304,-2.430604
+930062,Lutterworth 33 11kv S Stn,Primary Substation,453329.0,284463.0,52.455482,-1.216636
+938836,Rugby Gateway,Primary Substation,450980.0,278727.0,52.404152,-1.252074
+930088,Middlefield 33 11kv S Stn,Primary Substation,442518.0,295569.0,52.556273,-1.374304
+880038,Sibthorpe 33 11kv S Stn,Primary Substation,475560.0,345294.0,52.999622,-0.875551
+920021,Brush 33/11kv,Primary Substation,454482.0,320757.0,52.781628,-1.1937
+930095,Alliance And Leicester 33 11kv S Stn,Primary Substation,453822.0,298671.0,52.583159,-1.207087
+900036,Wragby 33 11kv S Stn,Primary Substation,512923.0,377968.0,53.286634,-0.307525
+890089,Halfway 33 11kv S Stn,Primary Substation,443908.0,381457.0,53.3282,-1.342202
+940051,West Haddon 33 11kv S Stn,Primary Substation,465106.0,273409.0,52.354845,-1.045496
+890025,Moorgreen 33 11kv S Stn,Primary Substation,447359.0,347556.0,53.023185,-1.295399
+930092,Coalville 11kv S Stn,Primary Substation,445555.0,310310.0,52.688537,-1.327485
+930105,Bruntingthorpe 33 11kv S Stn,Primary Substation,460116.0,288258.0,52.488891,-1.116088
+940049,Daventry 11kv S Stn,Primary Substation,457786.0,262756.0,52.25991,-1.154784
+890040,Clipstone 11kv S Stn,Primary Substation,460031.0,363547.0,53.165642,-1.103505
+890033,Annesley (Kirkby) 11kv S Stn,Primary Substation,450674.0,354908.0,53.088964,-1.244828
+921092,Irthlingborough 11kv S Stn,Primary Substation,494559.0,269990.0,52.319833,-0.61411
+930096,Whetstone 33 11kv S Stn,Primary Substation,455360.0,296991.0,52.567903,-1.18467
+890087,Wessington 33 11kv S Stn,Primary Substation,438090.0,358028.0,53.118052,-1.432342
+890086,Somercotes 33 11kv S Stn,Primary Substation,442109.0,354415.0,53.085275,-1.372769
+161641,Shepton Mallet,Primary Substation,361953.0,143829.0,51.192345,-2.545867
+161315,Paulton,Primary Substation,364586.0,156952.0,51.310514,-2.509491
+330041,Central Intake,Primary Substation,245079.0,55434.0,50.37827,-4.180277
+330020,Alma Road,Primary Substation,247022.0,56088.0,50.384656,-4.153237
+181230,Chew Stoke,Primary Substation,355702.0,163884.0,51.372216,-2.637805
+180471,Bournville,Primary Substation,332832.0,159143.0,51.327344,-2.965434
+180006,Congresbury,Primary Substation,344229.0,164382.0,51.375681,-2.80269
+260570,Georgeham,Primary Substation,247806.0,141344.0,51.150999,-4.177514
+260430,Heddon Cross,Primary Substation,264860.0,128192.0,51.037084,-3.928895
+260250,Barnstaple Quay,Primary Substation,255642.0,133227.0,51.080096,-4.062291
+437550,Polzeath,Primary Substation,197107.0,78437.0,50.570285,-4.866674
+437210,Wadebridge,Primary Substation,200633.0,72931.0,50.522053,-4.81399
+340035,Laywell Brixham,Primary Substation,291785.0,54960.0,50.384466,-3.52354
+340026,Upton Valley,Primary Substation,291355.0,64412.0,50.469359,-3.532327
+340018,Higher Woodway,Primary Substation,294133.0,74611.0,50.561556,-3.496093
+330037,Plymstock South,Primary Substation,250708.0,52544.0,50.353753,-4.10002
+540241,Mill St Tonyrefail,Primary Substation,301025.0,188032.0,51.582368,-3.429898
+520162,Llanrhidian,Primary Substation,249418.0,192052.0,51.607064,-4.17598
+550090,Brynmawr,Primary Substation,319115.0,211559.0,51.796758,-3.174341
+182570,Churchill Gate 33/11,Primary Substation,344812.0,160183.0,51.337976,-2.793676
+930057,Gaydon 33 11kv S Stn,Primary Substation,435281.0,256078.0,52.201766,-1.485186
+210100,Millfield,Primary Substation,349664.0,135958.0,51.120626,-2.720605
+880037,Caythorpe 33 11kv S Stn,Primary Substation,467767.0,346001.0,53.007018,-0.991502
+457480,St Neot,Primary Substation,219114.0,67389.0,50.478261,-4.550868
+457260,Callington,Primary Substation,235591.0,69756.0,50.504387,-4.319893
+437570,Fowey,Primary Substation,211702.0,52411.0,50.341362,-4.647716
+437400,Mevagissey,Primary Substation,200694.0,46656.0,50.286053,-4.799189
+437350,Blackpool,Primary Substation,198702.0,53350.0,50.345504,-4.830687
+417600,Truro Treyew Road,Primary Substation,181596.0,44245.0,50.257641,-5.065496
+417320,Constantine 33kv,Primary Substation,172455.0,29773.0,50.124231,-5.184872
+417150,Hayle,Primary Substation,155367.0,38114.0,50.192312,-5.428868
+417090,St Buryan,Primary Substation,140409.0,26624.0,50.082815,-5.63018
+417040,Geevor,Primary Substation,137651.0,34060.0,50.148343,-5.67376
+310049,Haven Road,Primary Substation,292047.0,91975.0,50.717279,-3.530597
+310043,Ottery St Mary,Primary Substation,309337.0,94822.0,50.745823,-3.286453
+310038,Exmouth Works,Primary Substation,300645.0,81380.0,50.623555,-3.405996
+310032,Tiverton Junction,Primary Substation,302960.0,111697.0,50.896505,-3.381282
+310026,Pinhoe,Primary Substation,295808.0,94250.0,50.738417,-3.477984
+310018,Bridge Mills,Primary Substation,297657.0,101271.0,50.801854,-3.453745
+310012,Newton St Cyres,Primary Substation,289465.0,98477.0,50.775241,-3.56911
+210160,Bath Road Primary,Primary Substation,331438.0,138546.0,51.141999,-2.981488
+600273,Tenby,Primary Substation,212716.0,200498.0,51.671905,-4.709947
+900034,Lincoln No 2 11kv S Stn,Primary Substation,498789.0,371147.0,53.228162,-0.52159
+940053,Earls Barton 33 11kv S Stn,Primary Substation,484689.0,263470.0,52.26284,-0.760513
+850011,Stoke Chp,Primary Substation,387003.0,343237.0,52.986287,-2.195063
+870047,Castle Donington 33 11kv S Stn,Primary Substation,443085.0,327258.0,52.8411,-1.3618
+930059,Princethorpe 33 11kv S Stn,Primary Substation,439997.0,270430.0,52.330467,-1.414489
+670101,Stratford 66/11kv,Primary Substation,417761.0,255201.0,52.194721,-1.741595
+530252,Usk,Primary Substation,336597.0,202286.0,51.715653,-2.919184
+850006,Hookgate 33/11kv,Primary Substation,374558.0,335143.0,52.913072,-2.379798
+670087,Bloxham 66/11kv,Primary Substation,442190.0,237200.0,52.031569,-1.386433
+680045,Newcastle 33/11kv,Primary Substation,383858.0,348119.0,53.030077,-2.242155
+890098,Staveley Works 33kv S Stn,Primary Substation,442755.0,374923.0,53.269557,-1.36039
+850009,Gnosall 33/11kv,Primary Substation,382722.0,320551.0,52.782226,-2.257618
+670091,Stow 66/11kv,Primary Substation,415918.0,225120.0,51.924324,-1.769949
+670098,Bevington 66/11kv,Primary Substation,403954.0,252813.0,52.173522,-1.943614
+720001,B R  Trackside 25kv S Stn,Primary Substation,404603.0,287684.0,52.487,-1.9337
+670112,Bodenham 66/11kv,Primary Substation,353811.0,250288.0,52.148894,-2.676485
+670096,Hereford North 66/11kv,Primary Substation,351134.0,242048.0,52.074578,-2.71442
+840003,Worfield 33/11kv,Primary Substation,377285.0,297239.0,52.572452,-2.336609
+790028,Princess Royal 33/11kv,Primary Substation,361335.0,206375.0,51.754663,-2.561574
+790026,Bilson 33/11kv,Primary Substation,364952.0,213898.0,51.822556,-2.509939
+790019,Wyelands 33kv,Primary Substation,360301.0,217625.0,51.855734,-2.577845
+840025,Spring Gardens 33/11kv,Primary Substation,350168.0,313868.0,52.720124,-2.739228
+670115,Droitwich 66/11kv,Primary Substation,388465.0,264011.0,52.274095,-2.17049
+670083,Tewkesbury 66/11kv,Primary Substation,388915.0,231990.0,51.986203,-2.16284
+670104,Strensham 66/11kv,Primary Substation,390487.0,241077.0,52.06793,-2.140205
+940052,Bugbrooke 33/11kv,Primary Substation,468501.0,257867.0,52.214727,-0.99881
+940069,Shenley Wood 33 11kv S Stn,Primary Substation,482803.0,236317.0,52.019054,-0.794746
+910058,Leadenham 33 11kv S Stn,Primary Substation,495493.0,350804.0,53.045958,-0.577
+890055,Bevercotes 33 11kv S Stn,Primary Substation,469475.0,374383.0,53.261891,-0.959911
+890068,Millclose 33 11kv S Stn,Primary Substation,425771.0,362355.0,53.15769,-1.616051
+890074,Matlock 33 11kv S Stn,Primary Substation,430142.0,360281.0,53.138819,-1.550879
+890064,Flagg 33 11kv S Stn,Primary Substation,414660.0,368717.0,53.215288,-1.781924
+890066,Eyam 33 11kv S Stn,Primary Substation,421895.0,375955.0,53.2801,-1.673087
+900019,Wrangle 33 11kv S Stn,Primary Substation,542229.0,351445.0,53.041331,0.120006
+900018,Warth Lane 33 11kv S Stn,Primary Substation,554394.0,363132.0,53.142939,0.30691
+930080,Gipsy Lane 33 11kv S Stn,Primary Substation,437885.0,289436.0,52.501482,-1.443333
+900015,Chapel St Leonards 33 11kv S Stn,Primary Substation,554692.0,372338.0,53.225537,0.315828
+870044,Chaddesden 33 11kv S Stn,Primary Substation,437682.0,336527.0,52.924815,-1.440941
+890076,Belper 33 11kv S Stn,Primary Substation,435210.0,346615.0,53.015661,-1.476615
+910047,Asfordby 11kv S Stn,Primary Substation,472323.0,320936.0,52.7811,-0.9292
+870015,Eagle Centre 33/11kv,Primary Substation,435630.0,335930.0,52.919579,-1.471527
+910046,West Deeping 33 11kv S Stn,Primary Substation,511261.0,309481.0,52.671591,-0.355987
+930028,Hawkesmill Lane 33/6.6kv,Primary Substation,429975.0,282879.0,52.443018,-1.560441
+900038,Woodhall Spa 33 11kv S Stn,Primary Substation,517797.0,361986.0,53.141983,-0.240344
+870017,Melbourne 33/11kv,Primary Substation,438273.0,323678.0,52.809274,-1.433655
+850008,Market Drayton 33/11kv,Primary Substation,367687.0,333940.0,52.901897,-2.48185
+670119,Redditch North 66/11kv,Primary Substation,403459.0,268360.0,52.313306,-1.950698
+670085,Moreton 66/11kv,Primary Substation,420581.0,232923.0,51.994335,-1.701678
+900011,Fernwood 33 11kv S Stn,Primary Substation,482080.0,350145.0,53.042251,-0.777191
+840020,Roushill 33/11kv,Primary Substation,349191.0,312701.0,52.709543,-2.75351
+770004,Star Aluminium 33/11kv,Primary Substation,372692.0,292029.0,52.525413,-2.403947
+750004,Cleobury Mortimer 33/11kv,Primary Substation,367050.0,275491.0,52.376419,-2.485479
+940063,Roade 33 11kv S Stn,Primary Substation,475973.0,251079.0,52.152733,-0.890972
+939424,Wellesbourne,Primary Substation,427209.0,255543.0,52.197412,-1.603335
+670151,Hereford Central 66/11kv,Primary Substation,351012.0,240359.0,52.059392,-2.715957
+920066,Astrazeneca 33/11kv,Primary Substation,452899.0,321552.0,52.788922,-1.217039
+920049,Corby Central 33/11kv,Primary Substation,490176.0,289792.0,52.498543,-0.673065
+880031,Calverton 33 11kv S Stn,Primary Substation,460239.0,350365.0,53.04714,-1.102863
+874558,Burton 11kv,Primary Substation,425454.0,324315.0,52.815746,-1.623772
+900022,Mount Bridge Boston 33 11kv S Stn,Primary Substation,533427.0,343181.0,52.969356,-0.014602
+600124,Fishguard,Primary Substation,196014.0,235308.0,51.978653,-4.971672
+560024,Llynfi,Primary Substation,288436.0,187122.0,51.571845,-3.611242
+510190,Northcote St.,Primary Substation,318803.0,177524.0,51.490761,-3.170954
+930104,Worthington 33 11kv S Stn,Primary Substation,441958.0,320745.0,52.782627,-1.379367
+790002,Tuffley 33/11kv,Primary Substation,382049.0,215460.0,51.837405,-2.261967
+880030,Sneinton 33/11kv,Primary Substation,458390.0,339430.0,52.94905,-1.132427
+870022,Heanor 11kv S Stn,Primary Substation,442873.0,347319.0,53.021423,-1.362306
+890082,Denby 33 11kv S Stn,Primary Substation,438343.0,346636.0,53.015635,-1.429915
+880020,Wollaton Road 33 11kv S Stn,Primary Substation,454939.0,340121.0,52.955625,-1.183666
+890080,Staveley 11kv S Stn,Primary Substation,441114.0,374652.0,53.267259,-1.385029
+890058,Tuxford 33 11kv S Stn,Primary Substation,473370.0,371391.0,53.234469,-0.902219
+907000,Lincoln Local No4 11kv S Stn,Primary Substation,498774.0,371144.0,53.228138,-0.521815
+940067,Campbell Park 33 11kv S Stn,Primary Substation,486212.0,239970.0,52.051379,-0.744161
+898500,Erin Road 33 11kv S Stn,Primary Substation,444587.0,373579.0,53.257326,-1.333111
+875136,Infinity Park 33 11 Kv S Stn,Primary Substation,436192.0,331430.0,52.879091,-1.463668
+926100,Rockingham Data Centre 11kv,Primary Substation,491697.0,291845.0,52.51675,-0.650101
+670100,Leominster 66/11kv,Primary Substation,348129.0,259239.0,52.228854,-2.760891
+930101,Ashby De La Zouch 33/11kv,Primary Substation,435132.0,317996.0,52.758401,-1.480854
+890093,Bolsover 11kv S Stn,Primary Substation,445122.0,371172.0,53.235646,-1.325432
+890078,Walton 33 11kv S Stn,Primary Substation,435748.0,368970.0,53.216566,-1.466114
+890054,Bilsthorpe 33 11kv S Stn,Primary Substation,466117.0,362085.0,53.151782,-1.012787
+890048,Thoresby 33 11kv S Stn,Primary Substation,464174.0,367287.0,53.198773,-1.040794
+890037,Crown Farm 33 11kv S Stn,Primary Substation,456480.0,361500.0,53.147631,-1.156989
+890030,Skegby Lane 33 11kv S Stn,Primary Substation,452445.0,360385.0,53.138021,-1.217495
+880011,Hucknall 33 11kv S Stn,Primary Substation,453825.0,349640.0,53.041306,-1.198664
+930087,Tournament Fields 33/11kv S Stn,Primary Substation,426640.0,263084.0,52.265235,-1.611082
+930051,Banbury Road 33 11kv S Stn,Primary Substation,429799.0,262290.0,52.257926,-1.564851
+930034,University Of Warwick 33 11kv S Stn,Primary Substation,429735.0,276319.0,52.384058,-1.564553
+736181,Sandwell Power,Primary Substation,398704.0,294040.0,52.544179,-2.020556
+736180,Wednesbury Power,Primary Substation,398706.0,294044.0,52.544215,-2.020527
+917678,Raf Cranwell High G Facility,Primary Substation,502172.0,348663.0,53.025486,-0.478086
+690074,Raunds 33kv,Primary Substation,499005.0,272882.0,52.345041,-0.548053
+930047,Walsgrave 33 11kv S Stn,Primary Substation,437748.0,280969.0,52.425368,-1.446307
+870032,Station Street 33 11kv S Stn,Primary Substation,424896.0,323021.0,52.804149,-1.63215
+890075,Goitside 6 6kv S Stn,Primary Substation,437159.0,370868.0,53.233538,-1.444764
+114389,Cotham Primary,Primary Substation,358402.0,173661.0,51.460327,-2.60017
+946268,Tattenhoe Primary,Primary Substation,482750.0,234254.0,52.000527,-0.796016
+560322,Llandarcy,Primary Substation,272019.0,196187.0,51.649818,-3.851315
+210180,Periton,Primary Substation,295509.0,145639.0,51.200321,-3.497002
+160390,Twerton,Primary Substation,372473.0,164743.0,51.381004,-2.396943
+870053,Gresley 11kv S Stn,Primary Substation,427806.0,317955.0,52.758468,-1.589414
+790029,Rotol 33/11kv,Primary Substation,387817.0,222167.0,51.897863,-2.178478
+670143,Dymock 66/11kv,Primary Substation,369234.0,230325.0,51.970498,-2.449286
+930107,Magna Park 33 11kv S Stn,Primary Substation,451032.0,283740.0,52.44921,-1.250546
+670139,Bustleholm 11kv Switch House,Primary Substation,402679.0,295110.0,52.553794,-1.961934
+730000,Galton Junction B R  25kv S Stn,Primary Substation,401515.0,289286.0,52.5014,-1.9791
+890099,Sherwood Park 33/11kv,Primary Substation,449611.0,352882.0,53.070853,-1.26101
+930042,Dillotford Ave 33 11kv S Stn,Primary Substation,433672.0,276824.0,52.38838,-1.506661
+930049,Ryton 33/11kv,Primary Substation,437663.0,274555.0,52.367714,-1.448276
+930066,Brownsover 33/11kv,Primary Substation,450787.0,276833.0,52.387135,-1.255197
+930050,Kenilworth 33 11kv S Stn,Primary Substation,428401.0,271097.0,52.337184,-1.584592
+930054,Wise Street 33 11kv S Stn,Primary Substation,431968.0,265141.0,52.283444,-1.532806
+160739,Whatley Quarry,Primary Substation,372991.0,147843.0,51.229072,-2.388219
+890056,Farnsfield 33 11kv S Stn,Primary Substation,465485.0,356868.0,53.104971,-1.023299
+735832,I54 Business Park 33/11kv,Primary Substation,390491.0,303651.0,52.630496,-2.141941
+795870,Javelin Park Efw,Primary Substation,379922.0,210459.0,51.792378,-2.292546
+530294,Newhouse Primary S/S,Primary Substation,353832.0,191672.0,51.621905,-2.668313
+530214,Ringland Newport,Primary Substation,334713.0,187995.0,51.586961,-2.943778
+550060,Abertillery,Primary Substation,321680.0,203857.0,51.727879,-3.135416
+550203,Pentrebach,Primary Substation,305642.0,204327.0,51.729631,-3.367687
+520329,Portable Swbd No3,Primary Substation,267681.0,198226.0,51.667138,-3.914751
+560103,Commercial St Neath,Primary Substation,275100.0,197583.0,51.663057,-3.807305
+520129,Gethin Street Swansea,Primary Substation,265175.0,192849.0,51.618213,-3.948892
+520274,Swansea Trading Estate,Primary Substation,262467.0,196032.0,51.646168,-3.989234
+590153,Llandovery,Primary Substation,276125.0,233752.0,51.988317,-3.805447
+945675,Maxwell House Data Centre 33/11kv,Primary Substation,486780.0,234530.0,52.002384,-0.737258
+880019,Bulwell 33 11kv S Stn,Primary Substation,453868.0,345302.0,53.002311,-1.198745
+510238,Taff Bank,Primary Substation,318096.0,175371.0,51.471295,-3.180634
+510064,Ashgrove,Primary Substation,315687.0,180596.0,51.517902,-3.216559
+510152,Llandough,Primary Substation,316740.0,172656.0,51.44669,-3.199512
+510199,Penarth,Primary Substation,317604.0,170895.0,51.430986,-3.186672
+510144,Highmead,Primary Substation,313665.0,176089.0,51.47709,-3.244589
+840021,Harlescott 33/11kv,Primary Substation,350893.0,315919.0,52.738627,-2.728802
+670097,Evesham 66/11kv,Primary Substation,404688.0,245749.0,52.109998,-1.932976
+890047,Rufford 33 11kv S Stn,Primary Substation,459660.0,360462.0,53.137956,-1.109627
+670094,Long Marston 66/11kv,Primary Substation,415008.0,244938.0,52.102534,-1.78232
+770005,Kinver 33/11kv,Primary Substation,385521.0,282573.0,52.44089,-2.214444
+745828,Rock Farm Ess,Primary Substation,353169.0,274729.0,52.368565,-2.689266
+930103,Hinckley 11kv S Stn,Primary Substation,441137.0,292535.0,52.529105,-1.395047
+940057,Abington 33/11kv,Primary Substation,476802.0,261677.0,52.247889,-0.876458
+756542,Larport Farm Bess,Primary Substation,357491.0,239794.0,52.05484,-2.621393
+417080,Penzance Heamoor,Primary Substation,146207.0,31818.0,50.131942,-5.55275
+520142,Hendy,Primary Substation,258091.0,203480.0,51.712,-4.055466
+880027,Arnold 33/11kv,Primary Substation,458868.0,345959.0,53.007691,-1.124128
+910036,Grantham South 11kv S Stn,Primary Substation,491717.0,334957.0,52.904198,-0.637793
+114434,Western Approach,Primary Substation,355078.0,183542.0,51.54892,-2.649283
+890060,Misterton 33 11kv S Stn,Primary Substation,476903.0,393684.0,53.434313,-0.843895
+890050,Checkerhouse 11kv S Stn,Primary Substation,466994.0,379372.0,53.307038,-0.996048
+890044,Manton 33 11kv S Stn,Primary Substation,460362.0,377923.0,53.29482,-1.095837
+930073,Wood End 33/11 Kv,Primary Substation,425181.0,298367.0,52.582501,-1.6298
+930071,Tamworth Grid 11kv S Stn,Primary Substation,423334.0,301267.0,52.608653,-1.656855
+920062,Raunds 11kv,Primary Substation,498986.0,272866.0,52.344901,-0.548337
+920060,Little Irchester 33 11kv S Stn,Primary Substation,490162.0,266312.0,52.287515,-0.679584
+920056,Rushden 33 11kv S Stn,Primary Substation,495765.0,267279.0,52.295259,-0.597193
+920051,Oakley 33/11kv,Primary Substation,486335.0,285926.0,52.464418,-0.730631
+940054,Northampton West 11kv S Stn,Primary Substation,474307.0,261398.0,52.245723,-0.913072
+910039,Melton Mowbray 11kv S Stn,Primary Substation,476365.0,319131.0,52.764357,-0.869689
+946045,Northampton East 11kv S Stn,Primary Substation,479492.0,261210.0,52.243301,-0.837175
+920009,Pytchley Road 33 11kv S Stn,Primary Substation,487186.0,275978.0,52.374881,-0.720698
+930081,Langdale Drive 33 11kv S Stn,Primary Substation,438328.0,292607.0,52.529948,-1.436443
+880035,Colwick 33 11kv S Stn,Primary Substation,461880.0,340750.0,52.960524,-1.080226
+590161,Llanllwni,Primary Substation,246850.0,241152.0,52.047503,-4.234771
+900006,Sleaford Road Boston 33 11kv S Stn,Primary Substation,532158.0,344121.0,52.978114,-0.033102
+910024,Donington 33 11kv S Stn,Primary Substation,521870.0,336880.0,52.915491,-0.188961
+780000,Stadco 33kv S Stn,Primary Substation,382401.0,218843.0,51.867832,-2.257032
+670142,Pattingham 33/11kv,Primary Substation,382559.0,299163.0,52.589952,-2.258893
+778960,Drayton Farm North 66/11kv,Primary Substation,415645.0,255398.0,52.196556,-1.772542
+840014,Madeley 33/11kv,Primary Substation,369417.0,305982.0,52.650669,-2.45351
+790025,Hammerley Down 33/11kv,Primary Substation,371024.0,191978.0,51.625807,-2.420013
+850024,Cheadle 33/11kv,Primary Substation,399788.0,342677.0,52.981413,-2.004621
+850022,Congleton 33/11kv,Primary Substation,386476.0,362946.0,53.163438,-2.203748
+900037,Metheringham 33 11kv S Stn,Primary Substation,506518.0,360958.0,53.135118,-0.409248
+900031,Ruston & Hornsby 33/6.6kv,Primary Substation,496743.0,370776.0,53.225204,-0.55234
+900029,North Hykeham 33 11kv S Stn,Primary Substation,493661.0,367079.0,53.192534,-0.599573
+910050,Stamford 11kv S Stn,Primary Substation,503483.0,307100.0,52.651724,-0.471716
+910029,Crowland 33 11kv S Stn,Primary Substation,524210.0,311115.0,52.683462,-0.163956
+910022,Kirton 33 11kv S Stn,Primary Substation,530684.0,337822.0,52.921894,-0.057579
+840017,Malehurst 33/11kv,Primary Substation,338495.0,306218.0,52.650159,-2.910592
+940060,Kingsthorpe 33 11kv S Stn,Primary Substation,475129.0,263564.0,52.265081,-0.900539
+580308,Llanfyrnach,Primary Substation,222268.0,230995.0,51.948938,-4.587613
+940043,Fox Milne 33 11kv S Stn,Primary Substation,488782.0,239679.0,52.048358,-0.706768
+890046,Warsop 33 11kv S Stn,Primary Substation,457501.0,369184.0,53.216585,-1.140346
+930036,Coventry Colliery 33/11kv,Primary Substation,432296.0,284325.0,52.455886,-1.526157
+670103,Hereford South 66/11kv,Primary Substation,351651.0,237028.0,52.029503,-2.706165
+900025,Swinderby 33 11kv S Stn,Primary Substation,486143.0,364140.0,53.167392,-0.712857
+670113,St Weonards 66/11kv,Primary Substation,349973.0,223727.0,51.909769,-2.728678
+340022,Blackawton,Primary Substation,280448.0,51152.0,50.348028,-3.681723
+729001,Washwood Heath B R  25kv S Stn,Primary Substation,409768.0,288984.0,52.4986,-1.8576
+900028,Doddington Park 33 11kv S Stn,Primary Substation,492564.0,368558.0,53.206017,-0.615559
+160060,Park Street,Primary Substation,374531.0,165789.0,51.390505,-2.367452
+910031,Cranwell 33 11kv S Stn,Primary Substation,500787.0,349888.0,53.036757,-0.498346
+910057,Uppingham 33 11kv S Stn,Primary Substation,486867.0,300516.0,52.595472,-0.718992
+770002,Stockton 33/11kv,Primary Substation,371346.0,267052.0,52.300795,-2.421652
+930078,Arley 33 11kv S Stn,Primary Substation,428921.0,289467.0,52.502308,-1.575377
+520209,Pontyates,Primary Substation,246450.0,208340.0,51.7526,-4.225974
+930044,Copsewood 33 11kv S Stn,Primary Substation,436556.0,278490.0,52.403172,-1.464105
+850016,Endon 33/11kv,Primary Substation,393128.0,352584.0,53.070423,-2.104029
+840008,Easthope 33/11kv,Primary Substation,356912.0,295100.0,52.552005,-2.636935
+850020,Cheddleton 33/11kv,Primary Substation,397696.0,352688.0,53.071398,-2.035854
+890039,Lime Tree Place 33 11kv S Stn,Primary Substation,454209.0,360797.0,53.141557,-1.191059
+870035,Trent Alloys 33 11kv S Stn,Primary Substation,429432.9604211775,328172.33924944623,52.850252,-1.56439
+930058,Harbury 11kv S Stn,Primary Substation,438982.0,258943.0,52.227274,-1.430707
+778880,Hartlebury Efw,Primary Substation,385937.0,269861.0,52.326619,-2.207786
+910017,Wardentree Park 33 11kv S Stn,Primary Substation,525851.0,325630.0,52.813507,-0.13413
+940040,Newton Road 33 11kv S Stn,Primary Substation,485720.0,233185.0,51.990459,-0.753031
+417010,Camborne Treswithian,Primary Substation,163120.0,41253.0,50.223657,-5.322401
+930063,English Electric 33/11kv,Primary Substation,449793.0,276109.0,52.380718,-1.269908
+670107,Arley 33kv Switching Site,Primary Substation,378188.0,280956.0,52.4261,-2.3222
+680061,Rugeley Town 132/11kv,Primary Substation,404489.0,317422.0,52.75436,-1.934943
+930099,Barwell 33 11kv S Stn,Primary Substation,444926.0,298551.0,52.582877,-1.338386
+670111,Presteigne 66/11kv,Primary Substation,332664.0,263446.0,52.264994,-2.988122
+870026,Rocester 33 11kv S Stn,Primary Substation,410137.0,339208.0,52.950136,-1.850591
+930037,Holyhead Road 33 11kv S Stn,Primary Substation,431152.0,280010.0,52.41717,-1.543392
+939668,Whitley South Idno Primary,Primary Substation,434941.0,275090.0,52.3727,-1.4882
+670136,Erdington 11kv,Primary Substation,411799.0,290583.0,52.512977,-1.827585
+417100,Perranporth,Primary Substation,175516.0,51638.0,50.321748,-5.15505
+113760,Bradley Stoke,Primary Substation,361302.0,183302.0,51.547221,-2.559495
+520100,Clase,Primary Substation,265635.0,198243.0,51.666803,-3.944326
+670120,Ipsley 66/11kv,Primary Substation,405931.0,266450.0,52.296105,-1.91447
+910033,Ruskington 33 11kv S Stn,Primary Substation,507341.0,350898.0,53.044549,-0.400293
+890031,Sutton Junction 33 11kv S Stn,Primary Substation,451528.0,358804.0,53.1239,-1.231454
+210140,Exebridge,Primary Substation,292903.0,125102.0,51.015233,-3.528184
+210500,Staplegrove,Primary Substation,321524.0,125723.0,51.02544,-3.120389
+210040,Priorswood,Primary Substation,323556.0,125744.0,51.025894,-3.091425
+850015,Knypersley 33/11kv,Primary Substation,388144.0,355739.0,53.098695,-2.178531
+939062,Wood Lane 33 11kv S Stn,Primary Substation,436855.0,295097.0,52.552442,-1.45788
+340025,Lawes Bridge,Primary Substation,290023.0,66151.0,50.484744,-3.551601
+250320,Penn Cross,Primary Substation,334718.0,94425.0,50.745667,-2.926686
+610077,Brecon,Primary Substation,304588.0,228139.0,51.943491,-3.389519
+920050,Hazelwood 33/11kv,Primary Substation,487488.0,288294.0,52.485526,-0.713043
+510086,Broad St.Barry,Primary Substation,311613.0,167989.0,51.403959,-3.272103
+939800,Birch Coppice 33 11kv S Stn,Primary Substation,425559.0,299442.0,52.592139,-1.624139
+330044,Tamar Pumping Stn,Primary Substation,243655.0,72399.0,50.530338,-4.207376
+939305,Jaguar Land Rover,Primary Substation,435798.0,255199.0,52.193831,-1.477714
+850017,Froghall 33/11kv,Primary Substation,402547.0,347247.0,53.022497,-1.963494
+530099,Chepstow,Primary Substation,353577.0,193962.0,51.642482,-2.672301
+880023,East Leake 33 11kv S Stn,Primary Substation,455230.0,327680.0,52.843771,-1.181444
+930098,Mantle Lane 33 11kv S Stn,Primary Substation,442299.0,314505.0,52.726504,-1.375109
+670116,Kenswick 66/11kv,Primary Substation,378870.0,258928.0,52.228102,-2.310791
+437440,St Mawgan,Primary Substation,186707.0,62959.0,50.427569,-5.004491
+260230,Ilfracombe,Primary Substation,252612.0,146599.0,51.19948,-4.110998
+510230,St Mellons,Primary Substation,323320.0,181810.0,51.529922,-3.10684
+510310,Wood Street,Primary Substation,318297.0,176101.0,51.477886,-3.17791
+210380,Wellington Town,Primary Substation,314051.0,120627.0,50.978553,-3.225716
+920047,Market Harborough 33 11kv S Stn,Primary Substation,474637.0,287416.0,52.479532,-0.902446
+930039,Dunlop 33/6.6kv,Primary Substation,433256.0,282275.0,52.437408,-1.512233
+930043,Gulson Road 33 6 6kv S Stn,Primary Substation,434724.0,278972.0,52.407616,-1.490982
+940058,Banbury Lane 33 11kv S Stn,Primary Substation,472134.0,258002.0,52.215477,-0.945616
+260410,Lynton,Primary Substation,270988.0,148540.0,51.221371,-3.848828
+580072,Blaenporth,Primary Substation,227196.0,248890.0,52.111223,-4.525027
+330026,Old Laira Road,Primary Substation,249494.0,55889.0,50.383506,-4.118411
+890065,Bakewell 33 11kv S Stn,Primary Substation,420848.0,368877.0,53.21652,-1.68925
+930076,Atherstone 33 11kv S Stn,Primary Substation,430630.0,298644.0,52.58471,-1.549362
+890091,Westhorpe 33 11kv S Stn,Primary Substation,445641.0,379331.0,53.308945,-1.316489
+880036,Cotgrave 33 11kv S Stn,Primary Substation,465254.0,336715.0,52.923867,-1.030815
+850012,Goldenhill Bank 33/11kv,Primary Substation,384911.0,353990.0,53.082891,-2.226731
+850004,High Offley 33/11kv,Primary Substation,378505.0,326103.0,52.831992,-2.320505
+850007,Hinstock 33/11kv,Primary Substation,369725.0,326690.0,52.836836,-2.450876
+910055,Oakham 11kv S Stn,Primary Substation,487374.0,308612.0,52.668153,-0.70937
+930032,Coventry South 11kv S Stn,Primary Substation,431459.0,278749.0,52.405808,-1.538997
+930053,Campion Hills 33 11kv S Stn,Primary Substation,433106.99541859503,266592.27016381815,52.296466,-1.515967
+890017,Daneshill Generation 33kv S/Stn,Primary Substation,467576.0,386857.0,53.374243,-0.985721
+930097,Nailstone 33 11kv S Stn,Primary Substation,443257.0126463773,308924.2968659875,52.676302,-1.361661
+779986,Bishampton Solar,Primary Substation,399945.0,251423.0,52.161,-2.0022
+510119,Ely,Primary Substation,315157.0,176792.0,51.483635,-3.22328
+181414,Easton-In-Gordano,Primary Substation,352041.0,174942.0,51.47134,-2.691896
+540094,Caerphilly,Primary Substation,315834.0,187286.0,51.578071,-3.216044
+890038,Worksop West 33 11kv S Stn,Primary Substation,457508.0,380112.0,53.314811,-1.138254
+899100,33kv Highgrounds Generation,Primary Substation,456895.0,379494.0,53.309323,-1.147565
+540306,Maerdy,Primary Substation,297227.0,199137.0,51.681502,-3.487957
+900040,Lincoln No 5 11kv S Stn,Primary Substation,499040.0,371267.0,53.229194,-0.517794
+796025,Lower Strensham Pv,Primary Substation,390333.0,240864.0,52.066012,-2.142446
+330027,Prince Rock,Primary Substation,249857.0,54140.0,50.367871,-4.11261
+670117,Lower Chadnor 66/11kv,Primary Substation,342485.0,252681.0,52.16934,-2.8424
+750002,Tenbury 33/11kv,Primary Substation,359622.0,268942.0,52.317047,-2.593798
+870033,Ravensdale Park 33 11kv S Stn,Primary Substation,426962.0,344878.0,53.000525,-1.599699
+210470,Burnham,Primary Substation,331132.0,149270.0,51.238377,-2.987922
+670164,Croome Airfield Pv,Primary Substation,389609.0,242881.0,52.0841,-2.1531
+310062,Exeter Msa,Primary Substation,296640.0,91670.0,50.7154,-3.4655
+939735,Welsh Road Bascote,Primary Substation,438554.0,263725.0,52.270293,-1.436428
+875353,Dove Valley Primary,Primary Substation,420754.0,332311.0,52.8878,-1.693
+182982,Westwick,Primary Substation,337683.0,161598.0,51.349969,-2.896252
+856920,Longton 132/33kv,Primary Substation,391151.0,341934.0,52.974659,-2.133239
+870031,Hatton 33 11kv S Stn,Primary Substation,421533.0,329643.0,52.863811,-1.681599
+946704,Northampton Gateway Primary Substation,Primary Substation,474737.0,254535.0,52.184,-0.9083
+160423,Midsomer Norton,Primary Substation,366324.0,154721.0,51.29056,-2.484346
+880021,Nottingham North 11kv S Stn,Primary Substation,455602.0,342666.0,52.978432,-1.173362
+900032,Anderson Lane 33 11kv S Stn,Primary Substation,497576.0,372723.0,53.242548,-0.539272
+590451,Manweb Source (Rhydlydian),Primary Substation,262450.0,275010.0,52.3558,-4.0212
+260440,Tinkers Cross,Primary Substation,264608.0,110885.0,50.881483,-3.926043
+680072,Dunsford Road Pv Scheme,Primary Substation,441913.0,357132.0,53.1097,-1.3753
+210190,Alcombe,Primary Substation,297752.0,145523.0,51.199675,-3.464862
+183262,Temp Gas Lane 33/11kv,Primary Substation,346870.0,176473.0,51.4846,-2.7666
+946775,Adstock Solar Farm,Primary Substation,475524.0,229819.0,51.961678,-0.902241
+927001,Hayfield 33/11kv,Primary Substation,490211.0,276879.0,52.3825,-0.676
+930102,Moira 33 11kv S Stn,Primary Substation,430271.0,316016.0,52.740888,-1.553068
+920036,Highfields 33 11kv S Stn,Primary Substation,459567.0,303893.0,52.6295,-1.121369
+110772,Lockleaze,Primary Substation,360579.0,176376.0,51.484894,-2.56914
+560193,Ogmore Vale,Primary Substation,293197.0,191082.0,51.60836,-3.543763
+940050,Weedon 33 11kv S Stn,Primary Substation,462858.0,260048.0,52.235004,-1.080986
+870049,Little Hallam 33 11kv S Stn,Primary Substation,446514.0,340501.0,52.959845,-1.309009
+113429,British Gas Hallen,Primary Substation,354701.0,181348.0,51.52916,-2.654424
+510121,Fairwater,Primary Substation,313854.0,177921.0,51.493587,-3.242316
+510178,Morlanga,Primary Substation,309271.0,176930.0,51.483961,-3.308058
+550149,Lady Windsor,Primary Substation,306268.0,194010.0,51.63701,-3.355852
+590180,Nantgaredig,Primary Substation,249226.0,220730.0,51.864671,-4.191183
+457270,Gunnislake,Primary Substation,242414.0,71372.0,50.520786,-4.224438
+930091,Bardon 33 11kv S Stn,Primary Substation,444158.0,313123.0,52.713938,-1.347775
+940062,Wootton 33 11kv S Stn,Primary Substation,477027.0,256982.0,52.205647,-0.874245
+940066,Denton 33 11kv S Stn,Primary Substation,483687.0,258433.0,52.217719,-0.776437
+890072,Wingerworth 33/11kv,Primary Substation,438850.0,367940.0,53.207091,-1.419788
+890081,Robert Hyde 33/11kv,Primary Substation,438852.0,370575.0,53.230775,-1.419438
+840004,Shifnal 33/11kv,Primary Substation,374510.0,307608.0,52.66555,-2.378356
+840024,Rowton 33/11kv,Primary Substation,336493.0,311913.0,52.701117,-2.94128
+840005,Priestweston 33/11kv,Primary Substation,329142.0,298084.0,52.575906,-3.047073
+520070,Bishopston,Primary Substation,258321.0,189644.0,51.587738,-4.046531
+840006,Leebotwood 33/11kv,Primary Substation,348167.0,298126.0,52.578433,-2.766371
+340016,Kingsbridge,Primary Substation,273371.0,44428.0,50.286106,-3.778884
+111481,Keynsham East,Primary Substation,365870.0,168272.0,51.412374,-2.492161
+182000,Frys Hill Radio Station,Primary Substation,343558.037,155696.008,51.2975,-2.811
+930025,Coventry West 6 6kv S Stn,Primary Substation,426955.0,278298.0,52.402002,-1.605237
+340012,Mortonhampstead,Primary Substation,275303.0,85761.0,50.658061,-3.765568
+880012,Beeston 33/11kv,Primary Substation,452856.0,337283.0,52.930334,-1.21513
+900007,Marsh Lane 33 11kv S Stn,Primary Substation,533509.0,342352.0,52.961888,-0.013723
+890083,Eckington 33 11kv S Stn,Primary Substation,442331.0,378666.0,53.303233,-1.36625
+790013,Camp 33/11kv,Primary Substation,391113.0,209796.0,51.7867,-2.130255
+930094,Caterpillar Desford 33/11kv,Primary Substation,447822.0,301642.0,52.610425,-1.295203
+910042,Tunnel Bank Bourne 33 11kv S Stn,Primary Substation,510458.0,319129.0,52.758451,-0.364618
+310028,Sowton,Primary Substation,296569.0,92892.0,50.726336,-3.466822
+340024,Barton.,Primary Substation,291156.0,66635.0,50.489307,-3.535777
+250350,Dowlish Ford,Primary Substation,335823.0,113291.0,50.91543,-2.914335
+113373,Feeder Rd 11kv,Primary Substation,360725.0,172585.0,51.450819,-2.566615
+112130,Winterbourne,Primary Substation,364522.0,180738.0,51.524384,-2.512798
+310060,Exeter Science Park,Primary Substation,297008.0,93850.0,50.735036,-3.460872
+530226,St Arvans,Primary Substation,350719.0,197998.0,51.678524,-2.71417
+113339,Kingsweston,Primary Substation,352634.0,179384.0,51.511327,-2.683956
+330012,Weston Mill,Primary Substation,245857.0,58199.0,50.403323,-4.170478
+920065,Park Farm 33 11kv S Stn,Primary Substation,486098.0,267552.0,52.299311,-0.738832
+690060,Willesley 33 11kv S Stn,Primary Substation,433872.0,315162.0,52.733007,-1.49982
+850019,Tean 33/11kv,Primary Substation,400747.0,340131.0,52.958526,-1.990342
+310023,Tiverton Moorhayes,Primary Substation,296057.0,114093.0,50.9168,-3.4801
+350016,Northam,Primary Substation,245167.0,129269.0,51.041788,-4.210024
+181360,Weston Central,Primary Substation,331871.0,161199.0,51.345714,-2.979618
+180820,Weston-In-Gordano,Primary Substation,344782.0,174195.0,51.463961,-2.796278
+160355,Entry Hill,Primary Substation,374729.0,162487.0,51.360825,-2.36437
+113369,Filton Dc,Primary Substation,360330.0,179112.0,51.509476,-2.573034
+111800,Mangotsfield,Primary Substation,365787.0,176497.0,51.486322,-2.494152
+310031,Topsham,Primary Substation,296644.0,88223.0,50.6844,-3.4645
+600231,St Twynells,Primary Substation,195347.0,197558.0,51.639446,-4.959068
+580247,Trevaughan,Primary Substation,240223.0,220833.0,51.86309,-4.32187
+550267,Aberdare,Primary Substation,299713.0,202699.0,51.713977,-3.453037
+550244,Tredegar,Primary Substation,314451.0,208819.0,51.771425,-3.241279
+560253,Victoria Road,Primary Substation,275581.0,189925.0,51.594333,-3.797631
+560150,Litchard,Primary Substation,290887.0,181702.0,51.523603,-3.574207
+870040,Normanton 33 11kv S Stn,Primary Substation,434243.0,333645.0,52.899129,-1.492395
+870034,Bretby 33/11kv,Primary Substation,428752.0,321810.0,52.7931,-1.5751
+590052,Aberaeron,Primary Substation,245976.0,261850.0,52.233202,-4.25689
+310037,Withycombe Raleigh,Primary Substation,301527.0,82360.0,50.632515,-3.393792
+310044,Core Hill,Primary Substation,312049.0,89897.0,50.701962,-3.246834
+310057,Dunkeswell 33/11kv,Primary Substation,314497.0,107044.0,50.856498,-3.216171
+111158,Clifton,Primary Substation,357562.0,173143.0,51.455607,-2.612197
+940025,Secklow Gate 33 11kv S Stn,Primary Substation,486086.0,238845.0,52.041278,-0.746281
+940041,Newport Pagnell 33 11kv S Stn,Primary Substation,487418.0,242724.0,52.075935,-0.725875
+940070,Kingston 33/11kv,Primary Substation,490127.0,238910.0,52.04123,-0.687363
+930100,Osbaston 33 11kv S Stn,Primary Substation,442220.0,303665.0,52.629064,-1.37767
+417780,Mullion,Primary Substation,170248.0,18422.0,50.021449,-5.208889
+417540,Camborne Holmans,Primary Substation,165385.0,40069.0,50.213929,-5.28997
+417140,Truro Shortlanesend,Primary Substation,181361.0,46513.0,50.277921,-5.070098
+330042,Langage,Primary Substation,256770.0,55959.0,50.385953,-4.016164
+330019,Elim Terrace,Primary Substation,248256.0,56476.0,50.388463,-4.136049
+340032,Torwood,Primary Substation,292260.0,63510.0,50.461418,-3.519319
+340023,Dawlish,Primary Substation,295297.0,76530.0,50.579018,-3.480205
+940032,Silverstone 33 11kv S Stn,Primary Substation,466505.0,242268.0,52.074748,-1.031067
+870045,Osmaston Road 33/6.6kv,Primary Substation,436143.0,334664.0,52.908165,-1.464038
+898163,Bentinck Generation 33kv,Primary Substation,449001.0,355153.0,53.091322,-1.269769
+890090,Meadow Lane 33 11kv S Stn,Primary Substation,441895.0,356299.0,53.102226,-1.375719
+340021,Totnes Primary,Primary Substation,280205.0,60893.0,50.435552,-3.688245
+870013,Barton Under Needwood 33 11kv S Stn,Primary Substation,420043.0,317897.0,52.75828,-1.704447
+880014,Lenton 33/11kv,Primary Substation,454610.0,338825.0,52.944019,-1.18878
+880040,St Anns 33 11kv S Stn,Primary Substation,457667.0,340358.0,52.95747,-1.143021
+880029,Mapperley 33/11kv,Primary Substation,458469.0,341808.0,52.970425,-1.130823
+930026,Courtaulds 33/6.6kv,Primary Substation,433753.0,280928.0,52.425269,-1.505058
+930079,Newdigate 33 11kv S Stn,Primary Substation,434111.0,287691.0,52.486044,-1.499105
+930074,Whittleford 33/11kv,Primary Substation,433009.0,292203.0,52.526672,-1.514886
+920035,Syston 33 11kv S Stn,Primary Substation,463545.0,311928.0,52.701272,-1.061059
+920016,Wellingborough 11kv,Primary Substation,489823.0,266854.0,52.292442,-0.684408
+920055,Oundle 33 11kv S Stn,Primary Substation,503760.0,289702.0,52.495331,-0.473064
+940021,Pineham 33 11kv S Stn,Primary Substation,471310.0,258267.0,52.217966,-0.957619
+940064,Wellingborough Road 33 11kv S Stn,Primary Substation,478507.0,262161.0,52.25199,-0.851377
+940047,Braunston Road 33 11kv S Stn,Primary Substation,456395.0,262890.0,52.26125,-1.17514
+940036,Wolverton 33/11kv,Primary Substation,480845.0,241200.0,52.063234,-0.82212
+930038,Holbrook Lane 33/6.6kv,Primary Substation,433606.0,282077.0,52.435598,-1.507105
+910041,Easton 33/11kv,Primary Substation,493917.0,326545.0,52.828223,-0.607517
+910023,Spalding Park Road 33 11kv S Stn,Primary Substation,524535.0,323637.0,52.795896,-0.154404
+910043,Old Dalby 33 11kv S Stn,Primary Substation,468526.0,322764.0,52.798061,-0.985084
+910048,Market Overton 33 11kv S Stn,Primary Substation,490084.0,318732.0,52.75866,-0.666538
+690059,Warwick 11kv S Stn,Primary Substation,429964.0,265447.0,52.286317,-1.562154
+330011,Tavistock,Primary Substation,247034.0,74975.0,50.554391,-4.160795
+910037,Westborough 33 11kv S Stn,Primary Substation,484766.0,344969.0,52.995325,-0.738496
+900016,Spilsby 33 11kv S Stn,Primary Substation,540779.0,365576.0,53.168661,0.104584
+417130,St Ives,Primary Substation,150918.0,38264.0,50.191811,-5.491174
+310024,Cullompton,Primary Substation,301330.0,107593.0,50.859334,-3.403344
+340011,Chudleigh Knighton,Primary Substation,285040.0,77757.0,50.588117,-3.625392
+940065,Boothville 33 11kv S Stn,Primary Substation,478027.0,264354.0,52.27177,-0.857901
+520360,Swansea North Local,Primary Substation,264317.0,200184.0,51.683923,-3.96412
+600184,Nevern,Primary Substation,208469.0,238955.0,52.015838,-4.792597
+520250,Uplands Swansea,Primary Substation,264078.0,192897.0,51.618389,-3.964747
+520258,West Cross,Primary Substation,261465.0,189635.0,51.58844,-4.001175
+610154,Llandrindod Wells,Primary Substation,305356.0,261428.0,52.242831,-3.387604
+890071,Hopton 33 11kv S Stn,Primary Substation,426233.0,354707.0,53.088904,-1.609765
+890059,Southwell 33 11kv S Stn,Primary Substation,471026.0,353906.0,53.077643,-0.941203
+890051,Ollerton 33 11kv S Stn,Primary Substation,465356.0,366886.0,53.195034,-1.023185
+890041,Blidworth 33 11kv S Stn,Primary Substation,457411.0,354951.0,53.088679,-1.14424
+890095,Biwater 33 11kv S Stn,Primary Substation,439841.0,364280.0,53.17412,-1.405406
+910030,Whaplode Drove 33 11kv S Stn,Primary Substation,531741.0,312913.0,52.69783,-0.051899
+910049,Regent Street 33 11kv S Stn,Primary Substation,475693.0,319044.0,52.763679,-0.879666
+880009,Toton 11kv S Stn,Primary Substation,449579.0,335743.0,52.916803,-1.264111
+880024,Clifton 33 11kv S Stn,Primary Substation,455364.0,334397.0,52.904141,-1.178315
+880033,Keyworth 33 11kv S Stn,Primary Substation,462038.0,330579.0,52.869097,-1.079828
+560220,Schwyll,Primary Substation,288820.0,176988.0,51.480829,-3.602494
+920026,Beaumont Leys 33/11kv,Primary Substation,457282.0,308314.0,52.669484,-1.154358
+920061,Harrold 33 11kv S Stn,Primary Substation,495441.0,257382.0,52.206365,-0.604735
+181346,Compton Martin 33/11kv S/S,Primary Substation,354422.0,158653.0,51.325082,-2.655521
+180173,Blagdon 33/11kv S/S,Primary Substation,350287.0,160029.0,51.337107,-2.715051
+890085,Clowne 33 11kv S Stn,Primary Substation,450732.0,376043.0,53.278931,-1.240615
+330018,Alexandra Road,Primary Substation,248448.0,58799.0,50.409389,-4.134288
+940038,Portway 33 11kv S Stn,Primary Substation,485022.0,239245.0,52.045037,-0.761691
+920040,Leicester East 6 6kv S Stn,Primary Substation,460915.0,303964.0,52.629989,-1.101443
+920034,Thurmaston 33 11kv S Stn,Primary Substation,461364.0,307805.0,52.664463,-1.094097
+920030,Leicester North 11kv S Stn,Primary Substation,458049.0,305806.0,52.646859,-1.143458
+876000,East Midlands Gateway Primary Substation 33/11kv,Primary Substation,446869.0,327023.0,52.8387,-1.3057
+670102,Brotheridge Green 66/11kv,Primary Substation,382134.0,241516.0,52.071678,-2.262083
+920043,Kibworth 11kv S Stn,Primary Substation,466340.0,293729.0,52.537348,-1.02335
+920038,Stoneygate 33 6 6kv S Stn,Primary Substation,460940.0,302435.0,52.616242,-1.101355
+920032,Redcross Street 33 11kv S Stn,Primary Substation,458409.0,304393.0,52.63412,-1.138387
+920031,Braunstone 33 11kv S Stn,Primary Substation,456806.0,301718.0,52.610236,-1.16253
+350018,Bideford Main,Primary Substation,245764.0,125878.0,51.011483,-4.200079
+850003,Hill Chorlton 33/11kv,Primary Substation,380121.0,339463.0,52.95215,-2.29734
+850013,Talke 33/11kv,Primary Substation,382464.0,353942.0,53.082384,-2.263259
+940028,Brackley Town 33 11kv S Stn,Primary Substation,459256.0,236889.0,52.027206,-1.137751
+350014,Holsworthy,Primary Substation,234043.0,103238.0,50.804802,-4.356719
+350019,Hatherleigh,Primary Substation,253906.0,104100.0,50.817892,-4.075375
+330032,Newton Ferrers,Primary Substation,255882.0,49507.0,50.327739,-4.026176
+161701,Newbury,Primary Substation,369931.0,150081.0,51.249041,-2.43223
+790016,Elton 33/11kv,Primary Substation,369589.0,213732.0,51.821327,-2.442649
+910018,Grantham North 11kv S Stn,Primary Substation,491022.0,338654.0,52.937549,-0.647088
+540120,Energlyn 33kv,Primary Substation,314207.0,188927.0,51.592577,-3.239919
+670086,Bishops Cleeve 66/11kv,Primary Substation,394679.0,227653.0,51.947296,-2.078839
+890094,Danesmoor 33 11kv S Stn,Primary Substation,440589.0,363109.0,53.163538,-1.394364
+750003,Craven Arms 33/11kv,Primary Substation,343580.0,282905.0,52.441146,-2.831467
+938993,Courthouse Green 33/6.6kv,Primary Substation,435159.0,281489.0,52.430215,-1.484324
+340038,Salcombe 340038,Primary Substation,273370.0,38735.0,50.234931,-3.776992
+900020,Stickney 33 11kv S Stn,Primary Substation,535345.0,356541.0,53.088904,0.01954
+160415,Chewton Mendip,Primary Substation,360670.0,152687.0,51.271908,-2.565199
+920023,Lero 33 6 6kv S Stn,Primary Substation,459129.0,305571.0,52.644631,-1.12754
+770001,Wribbenhall 33/11kv,Primary Substation,379164.0,276426.0,52.385431,-2.307576
+910034,New Beacon Road Grantham 33 11kv S Stn,Primary Substation,492280.0,335974.0,52.91325,-0.629136
+910021,Sleaford 11kv S Stn,Primary Substation,507198.0,344996.0,52.991554,-0.404397
+340013,Ashburton,Primary Substation,276525.0,70399.0,50.520237,-3.74318
+940071,Eldergate 33 11kv S Stn,Primary Substation,484356.0,238758.0,52.04077,-0.771519
+940037,Marlborough Street 33/11kv,Primary Substation,485182.0,241151.0,52.062154,-0.758884
+940029,Buckingham 33 11kv S Stn,Primary Substation,470410.0,233579.0,51.99615,-0.975886
+940026,Thenford 33 11kv S Stn,Primary Substation,452115.0,242439.0,52.077815,-1.240977
+900039,Tattershall 33 11kv S Stn,Primary Substation,519044.0,355844.0,53.086522,-0.223987
+850005,Cotes Heath 33/11kv,Primary Substation,383418.0,334920.0,52.911425,-2.248035
+940014,Steeple Claydon 33 11kv S Stn,Primary Substation,469462.0,226139.0,51.929398,-0.991194
+114741,Patchway,Primary Substation,361129.0,180478.0,51.521813,-2.561673
+113180,Keynsham West,Primary Substation,364888.0,168461.0,51.414014,-2.506299
+870048,Ilkeston 33 11kv S Stn,Primary Substation,445459.0,342282.0,52.9759,-1.3245
+870042,Morley 33/11kv,Primary Substation,439471.0,341386.0,52.9684,-1.4137
+870028,Marchington 33 11kv S Stn,Primary Substation,413382.0,331316.0,52.879113,-1.802617
+890088,Ripley 33 11kv S Stn,Primary Substation,439879.0,351324.0,53.057653,-1.406443
+920022,Quorn 33 11kv S Stn,Primary Substation,455861.0,317174.0,52.749272,-1.173867
+210080,Somerton,Primary Substation,348164.0,129047.0,51.058352,-2.741055
+900013,Horncastle 33 11kv S Stn,Primary Substation,526140.0,370680.0,53.218191,-0.11226
+930048,Claverdon 33 11kv S Stn,Primary Substation,420885.0,264356.0,52.276918,-1.69533
+900017,Ingoldmells 33 11kv S Stn,Primary Substation,555894.0,367326.0,53.18018,0.331358
+210010,Taunton Local,Primary Substation,322887.0,124818.0,51.01748,-3.100765
+180003,Gas Lane,Primary Substation,346875.0,176502.0,51.484903,-2.7665
+113193,Bishopsworth,Primary Substation,357845.0,168607.0,51.414845,-2.607583
+110375,Woodland Way,Primary Substation,364218.0,174771.0,51.470706,-2.516573
+417120,Roseland,Primary Substation,187521.0,37383.0,50.198167,-4.978651
+310014,Cowley Road,Primary Substation,291322.0,93970.0,50.735077,-3.541451
+310013,Lapford,Primary Substation,272745.0,107475.0,50.852685,-3.80925
+210110,Edgarley,Primary Substation,352911.0,138041.0,51.139622,-2.674488
+260580,Aaronsons,Primary Substation,268598.0,126485.0,51.022619,-3.874993
+260480,Fremington,Primary Substation,249743.0,131905.0,51.066687,-4.145904
+550182,Nantwen,Primary Substation,309391.0,200974.0,51.70012,-3.312547
+520207,Pontardawe,Primary Substation,272065.0,203843.0,51.718629,-3.853459
+210070,Wiveliscombe,Primary Substation,308335.0,127065.0,51.03555,-3.308738
+940072,Brackmills 33 11kv S Stn,Primary Substation,477519.0,259071.0,52.224355,-0.866555
+870014,Trent Lane 33 11kv S Stn,Primary Substation,444181.0,328284.0,52.8502,-1.3454
+857183,Chatterley Whitfield Stor 33kv,Primary Substation,388206.0,353340.0,53.077132,-2.177516
+940068,Crick 33 11kv S Stn,Primary Substation,456993.0,273012.0,52.352178,-1.164669
+310061,Hill Barton Primary,Primary Substation,300458.0,91251.0,50.712273,-3.411298
+920058,Cannon Street 33 11kv S Stn,Primary Substation,489474.0,268274.0,52.305252,-0.689147
+560055,Aberpergwm,Primary Substation,286837.0,205780.0,51.739215,-3.640349
+520211,Ravenhill,Primary Substation,263665.0,195991.0,51.646083,-3.971914
+520233,Strand Swansea,Primary Substation,265799.0,193333.0,51.62272,-3.940071
+520284,Jersey Marine,Primary Substation,270522.0,193396.0,51.624394,-3.871907
+530071,Blaenavon,Primary Substation,324358.0,208531.0,51.770273,-3.097668
+610133,Glasbury,Primary Substation,317916.0,238065.0,52.034842,-3.19805
+610107,Crickhowell,Primary Substation,322411.0,219348.0,51.867252,-3.128306
+530177,Monmouth,Primary Substation,349780.0,212093.0,51.805158,-2.729799
+560079,Bridgend Trading Estate,Primary Substation,291351.0,179422.0,51.503202,-3.566811
+560075,Boverton,Primary Substation,298358.0,168556.0,51.406833,-3.46276
+540174,Middle Fan,Primary Substation,299420.0,197645.0,51.668498,-3.455818
+560105,Cowbridge,Primary Substation,299585.0,174723.0,51.462483,-3.446883
+540255,Wattstown,Primary Substation,302277.0,193752.0,51.634002,-3.413431
+540128,Gas Yard,Primary Substation,307388.0,190339.0,51.604188,-3.338701
+550183,Nelson,Primary Substation,310560.0,194938.0,51.646051,-3.294089
+510218,Sanatorium,Primary Substation,316012.0,176268.0,51.479053,-3.210845
+540263,Ynysfeio,Primary Substation,294623.0,197908.0,51.669982,-3.525236
+510223,Ship Hill Barry,Primary Substation,310651.0,167058.0,51.395439,-3.285695
+600279,Milford Haven,Primary Substation,190027.0,206161.0,51.7147,-5.041
+600173,Merlins Bridge,Primary Substation,194813.0,214554.0,51.791859,-4.976786
+550111,Cwmfelinfach,Primary Substation,318341.0,191704.0,51.618156,-3.180904
+510148,Ironbridge,Primary Substation,313241.0,181726.0,51.527698,-3.252081
+550287,Swansea Road Merthyr,Primary Substation,303528.0,206900.0,51.752407,-3.399001
+560053,Abercrave,Primary Substation,283515.0,212058.0,51.794955,-3.690545
+560265,Ynys Street,Primary Substation,277163.0,190229.0,51.597422,-3.774911
+520217,Lime Street Gorseinon,Primary Substation,259183.0,198634.0,51.668735,-4.037715
+550179,Mountain Ash,Primary Substation,305112.0,198717.0,51.679125,-3.37383
+510160,Llanishen,Primary Substation,316526.0,182170.0,51.532194,-3.204844
+510108,Crwys Road,Primary Substation,318125.0,178237.0,51.497063,-3.180882
+510069,Birchgrove,Primary Substation,316911.0,181533.0,51.526515,-3.199145
+510104,Court Road Barry,Primary Substation,312377.0,168752.0,51.410946,-3.261312
+540234,Trethomas,Primary Substation,319098.0,189206.0,51.595819,-3.169395
+550061,Abertysswg,Primary Substation,312729.0,205740.0,51.743482,-3.265455
+590246,Tregaron,Primary Substation,267771.0,259139.0,52.214512,-3.936894
+590151,Llandeilo,Primary Substation,263330.0,223999.0,51.897689,-3.987784
+210150,Watchfield,Primary Substation,335004.0,147106.0,51.219377,-2.932073
+210200,Wellington Primary,Primary Substation,312551.0,122119.0,50.991734,-3.247432
+210210,Bowhays Cross,Primary Substation,306428.0,140841.0,51.159075,-3.339503
+210560,Holford,Primary Substation,316423.0,141765.0,51.16894,-3.196825
+250280,Axminster,Primary Substation,329971.0,98379.0,50.780664,-2.994711
+250290,East Chinnock Primary,Primary Substation,349103.0,113208.0,50.916011,-2.725433
+250300,Martock,Primary Substation,345826.0,119067.0,50.968393,-2.772918
+250310,Colyford,Primary Substation,325573.0,92782.0,50.729793,-3.055948
+250330,Waterlake Primary,Primary Substation,333195.0,105810.0,50.847869,-2.950344
+250340,Bridport,Primary Substation,346388.0,93390.0,50.737567,-2.761147
+250360,Chard,Primary Substation,332709.0,108623.0,50.873104,-2.957764
+250370,Crewkerne,Primary Substation,344889.0,109485.0,50.882147,-2.784809
+250400,Montacute,Primary Substation,351155.0,117541.0,50.955149,-2.696828
+250530,Coker,Primary Substation,353361.0,112984.0,50.914357,-2.664838
+250620,Beaminster,Primary Substation,346505.0,101691.0,50.812209,-2.760699
+113884,Abbeywood Primary,Primary Substation,361152.0,178647.0,51.505353,-2.561139
+169999,Meb Source Dummy,Primary Substation,375000.0,164000.0,51.3744,-2.3606
+520248,Tumble,Primary Substation,253965.0,212298.0,51.790173,-4.11885
+590156,Llanfihangel Ystrad,Primary Substation,252479.0,255336.0,52.176462,-4.158901
+520187,New Lodge,Primary Substation,246090.0,201176.0,51.688137,-4.228017
+520286,Kidwelly,Primary Substation,242021.0,207401.0,51.74293,-4.289668
+580296,Cwmffrwd,Primary Substation,241728.0,217612.0,51.834583,-4.298557
+580228,St Clears,Primary Substation,227906.0,219196.0,51.8447,-4.4998
+590206,Pont Ar Annell,Primary Substation,266165.0,238647.0,52.029989,-3.95232
+580078,Bridell,Primary Substation,217730.0,242446.0,52.050311,-4.659662
+600017,Haverfordwest Power Stn,Primary Substation,195743.0,215709.0,51.80257,-4.964001
+600232,Steynton,Primary Substation,191620.0,207675.0,51.728924,-5.018892
+182736,Bristol International Airport,Primary Substation,350928.0,164823.0,51.380266,-2.706514
+182768,Stancombe Quarry,Primary Substation,350266.0,168857.0,51.416477,-2.716592
+580272,Cardigan,Primary Substation,218395.0,246155.0,52.083839,-4.651949
+113983,Cribbs Causeway,Primary Substation,358834.0,181279.0,51.528852,-2.594843
+600200,Penblewin,Primary Substation,211904.0,217474.0,51.824102,-4.730865
+550208,Pontllanffraith,Primary Substation,318004.0,196598.0,51.6621,-3.186919
+510096,Canton,Primary Substation,316519.0,176933.0,51.485115,-3.203704
+510141,Heath,Primary Substation,316941.0,179425.0,51.50757,-3.198215
+920059,Thrapston 33 11kv S Stn,Primary Substation,498689.0,278099.0,52.391994,-0.551157
+210450,Curry Mallet,Primary Substation,333808.0,121299.0,50.987212,-2.944453
+114260,Broadweir Primary,Primary Substation,359584.0,173560.0,51.459505,-2.583146
+114258,Astra Zeneca,Primary Substation,354378.0,183340.0,51.547048,-2.659347
+600076,Brawdy,Primary Substation,187008.0,225514.0,51.887338,-5.096538
+540240,Tonypandy,Primary Substation,299427.0,193221.0,51.628726,-3.454443
+590157,Llangadog,Primary Substation,269378.0,228851.0,51.9427,-3.9018
+540106,Creigiau,Primary Substation,308577.0,181635.0,51.526152,-3.319271
+610277,Rhayader,Primary Substation,297681.0,268171.0,52.302057,-3.502018
+520225,Sketty Park,Primary Substation,262155.0,192745.0,51.616555,-3.992445
+580262,Whitland,Primary Substation,221164.0,217833.0,51.830368,-4.596832
+520137,Gwaun Cae Gurwen,Primary Substation,271286.0,211746.0,51.789469,-3.867658
+600271,St Davids,Primary Substation,176189.0,225385.0,51.88195,-5.253417
+510219,Sandon St.,Primary Substation,318909.0,176395.0,51.480618,-3.169167
+520307,Cross Hands,Primary Substation,257015.0,211776.0,51.786271,-4.074444
+530095,Caldicot,Primary Substation,347875.0,188145.0,51.589674,-2.753828
+510115,Cyncoed,Primary Substation,319494.0,180590.0,51.518413,-3.161704
+510198,Park Lane,Primary Substation,318601.0,176786.0,51.484088,-3.173692
+520299,Maesarddafen,Primary Substation,253034.0,199793.0,51.677572,-4.127063
+210130,Nether Stowey,Primary Substation,321391.0,139409.0,51.148464,-3.125267
+600188,Neyland,Primary Substation,195308.0,206237.0,51.717362,-4.96472
+600085,Broadfield,Primary Substation,213184.0,203773.0,51.701474,-4.704941
+520317,Swansea Waterfront,Primary Substation,267221.0,193173.0,51.621611,-3.91948
+437470,Dairy Crest Davidstow,Primary Substation,213854.0,86764.0,50.650677,-4.634617
+530056,Abersychan,Primary Substation,326438.0,203077.0,51.721522,-3.066374
+610092,Builth Wells,Primary Substation,306264.0,251704.0,52.15558,-3.371616
+560191,Nottage,Primary Substation,281934.0,178293.0,51.491169,-3.702054
+560025,Cefn Gwrgan,Primary Substation,278241.0,186796.0,51.566795,-3.758166
+600229,St Florence,Primary Substation,207771.154,201610.516,51.6802,-4.782
+560256,Wern,Primary Substation,273648.0,194394.0,51.634074,-3.827134
+520127,Garngoch,Primary Substation,260458.0,197848.0,51.661985,-4.018973
+520197,Pantyffynon,Primary Substation,262241.0,210904.0,51.779748,-3.998382
+520259,Westfa,Primary Substation,252936.0,202272.0,51.699819,-4.129526
+520172,Meinciau,Primary Substation,245332.0,210211.0,51.769103,-4.243
+580276,Newcastle Emlyn South,Primary Substation,230547.0,240374.0,52.035768,-4.47191
+580201,Pendine,Primary Substation,226211.0,208440.0,51.747582,-4.518957
+520251,Upper Bank,Primary Substation,266730.0,195339.0,51.640968,-3.927394
+210120,Colley Lane,Primary Substation,330916.0,136056.0,51.11954,-2.988471
+210060,Bridgwater Local,Primary Substation,329596.0,137202.0,51.129692,-3.007552
+210030,Creech St Michael,Primary Substation,328142.0,124578.0,51.016012,-3.025814
+417560,Probus 33,Primary Substation,189874.0,48400.0,50.297957,-4.951835
+417580,Penzance Causewayhead,Primary Substation,147126.0,30469.0,50.120225,-5.539022
+417590,St Agnes,Primary Substation,172205.0,49026.0,50.297024,-5.199911
+417680,Twelveheads.,Primary Substation,176632.0,42228.0,50.237663,-5.133838
+417690,Newlyn,Primary Substation,145452.0,29371.0,50.109663,-5.561661
+417760,Isles Of Scilly,Primary Substation,90727.0,10452.0,49.914018,-6.309752
+437190,St Austell,Primary Substation,201753.0,53830.0,50.350851,-4.788112
+437220,Newquay Trevemper,Primary Substation,181862.0,59781.0,50.397266,-5.070761
+437230,Bodmin,Primary Substation,206121.0,67364.0,50.473881,-4.733781
+437360,Bugle,Primary Substation,201533.0,59363.0,50.400477,-4.794121
+437370,Drinnick.,Primary Substation,195655.0,55324.0,50.36218,-4.874531
+437380,Fraddon,Primary Substation,191321.0,56945.0,50.375222,-4.936274
+437390,Lostwithiel,Primary Substation,211135.0,60295.0,50.412021,-4.659629
+437410,Davidstow,Primary Substation,215069.0,87250.0,50.65543,-4.617692
+437420,Delabole,Primary Substation,208243.0,84359.0,50.627244,-4.712664
+437430,Padstow,Primary Substation,190848.0,72427.0,50.514101,-4.951566
+437450,St Tudy,Primary Substation,207166.0,74171.0,50.5354,-4.7226
+260240,Roundswell,Primary Substation,254245.0,131393.0,51.063262,-4.081481
+260220,Braunton,Primary Substation,249617.0,137283.0,51.114985,-4.149936
+457620,Laneast,Primary Substation,224509.0,82793.0,50.618309,-4.482168
+457470,Pensilva,Primary Substation,229068.0,70310.0,50.507496,-4.412048
+457300,Looe,Primary Substation,223513.0,52589.0,50.34663,-4.481969
+457290,Liskeard,Primary Substation,226054.0,63892.0,50.448943,-4.451526
+417340,Mousehole,Primary Substation,146227.0,26467.0,50.083921,-5.548922
+457280,Saltash Whity Cross,Primary Substation,239495.0,60504.0,50.422332,-4.260916
+457240,Torpoint Antony,Primary Substation,239476.0,54230.0,50.365938,-4.258501
+437720,Trebal,Primary Substation,203778.0,56460.0,50.375155,-4.761054
+437670,Par Harbour,Primary Substation,207255.0,52808.0,50.343498,-4.71034
+437610,Newquay Trencreek Ln,Primary Substation,182899.0,61485.0,50.412936,-5.057172
+437490,St Columb Major,Primary Substation,192895.0,63947.0,50.438667,-4.918036
+437460,Lanreath,Primary Substation,216347.0,56413.0,50.378793,-4.584448
+457250,Launceston,Primary Substation,233437.0,83681.0,50.628903,-4.356474
+417330,St Keverne,Primary Substation,176221.0,21730.0,50.053442,-5.127554
+417310,Devoran,Primary Substation,178979.0,40036.0,50.218869,-5.099699
+417180,Falmouth Docks,Primary Substation,181736.0,32361.0,50.150966,-5.056705
+330029,Linketty Lane,Primary Substation,253326.0,56385.0,50.388924,-4.064742
+330028,Torycombe,Primary Substation,256348.0,61300.0,50.433853,-4.024142
+330025,Eggbuckland,Primary Substation,250089.0,57909.0,50.401812,-4.110855
+330024,Longbridge,Primary Substation,252002.0,56926.0,50.393463,-4.083568
+330023,Southway,Primary Substation,249590.0,61542.0,50.434334,-4.119328
+330017,Merrivale,Primary Substation,247026.0,59427.0,50.414664,-4.154542
+330038,Ernesettle B & S,Primary Substation,244764.0,60595.0,50.424567,-4.186838
+330016,Yelverton,Primary Substation,252519.0,68240.0,50.495274,-4.080756
+330031,Stentaway,Primary Substation,251852.0,53831.0,50.365609,-4.084457
+330030,Ivybridge,Primary Substation,263278.0,55993.0,50.387809,-3.924688
+330022,Buckwell Street,Primary Substation,248130.0,54487.0,50.370555,-4.137017
+330021,Armada Street,Primary Substation,248332.0,55175.0,50.376791,-4.134456
+330015,Newport Street,Primary Substation,246236.0,54353.0,50.36885,-4.163575
+330014,Adelaide Road,Primary Substation,247349.0,54443.0,50.369949,-4.147972
+330013,St Levan Road,Primary Substation,245826.0,56200.0,50.38535,-4.170093
+260260,South Molton,Primary Substation,271933.0,126876.0,51.026877,-3.827606
+330039,North Intake,Primary Substation,245054.0,56397.0,50.386917,-4.181026
+340015,South Brent,Primary Substation,270477.0,60368.0,50.428766,-3.824973
+417170,Penryn,Primary Substation,177953.0,35523.0,50.177952,-5.111431
+417160,Falmouth Bickland Hl,Primary Substation,178638.0,33217.0,50.157496,-5.1005
+417110,Redruth,Primary Substation,169757.0,43543.0,50.246841,-5.230889
+417070,Marazion,Primary Substation,152583.0,32037.0,50.136598,-5.463852
+417060,Wheal Reeth,Primary Substation,159072.0,30581.0,50.126195,-5.372279
+417050,Helston,Primary Substation,166402.0,28567.0,50.111057,-5.268676
+330040,Lifton,Primary Substation,239627.0,85161.0,50.643934,-4.269672
+417030,Lanner,Primary Substation,172002.0,39295.0,50.209561,-5.196899
+340014,Buckfastleigh,Primary Substation,274656.0,66123.0,50.481404,-3.768095
+457530,Torpoint Town,Primary Substation,242684.0,55429.0,50.37758,-4.213932
+457520,Saltash Dunheved Rd,Primary Substation,242586.0,58925.0,50.408979,-4.216775
+340041,Stokenham,Primary Substation,280335.0,43219.0,50.276692,-3.680794
+340040,Modbury,Primary Substation,265376.0,51928.0,50.351757,-3.893724
+340030,Dartmouth,Primary Substation,286152.0,51141.0,50.349061,-3.601584
+417020,Camborne Carn Brea,Primary Substation,166164.0,41693.0,50.228819,-5.280071
+210090,North Street Langport,Primary Substation,342101.0,127042.0,51.039744,-2.827236
+260270,Great Torrington,Primary Substation,250355.0,119703.0,50.957205,-4.132143
+260550,Bratton Fleming,Primary Substation,264594.0,137952.0,51.124743,-3.936347
+350022,Ashwater,Primary Substation,238611.0,96231.0,50.743132,-4.288869
+350024,Morwenstow,Primary Substation,224066.0,114525.0,50.903258,-4.503601
+350050,Okehampton,Primary Substation,258921.0,95035.0,50.737668,-4.000735
+340042,Paignton 33/11kv S/S,Primary Substation,287145.0,59211.0,50.421808,-3.590058
+110641,Bedminster,Primary Substation,358635.0,171600.0,51.441814,-2.596575
+110644,Eastville,Primary Substation,361853.0,174529.0,51.468375,-2.550594
+110803,Cairns Road,Primary Substation,358179.0,175672.0,51.478392,-2.603618
+110804,St Pauls Bsp 11kv,Primary Substation,359627.0,173562.0,51.459526,-2.582527
+112272,Whitchurch,Primary Substation,361146.0,168212.0,51.41153,-2.560076
+112389,Stoke Bishop,Primary Substation,356194.0,176243.0,51.483375,-2.63227
+113277,Avonmouth Docks,Primary Substation,351457.0,178596.0,51.504143,-2.700807
+113368,Avonmouth Primary,Primary Substation,351741.0,178681.0,51.50494,-2.696727
+113371,Bower Ashton,Primary Substation,356529.0,171473.0,51.440514,-2.626858
+113374,Feeder Road B,Primary Substation,360698.0,172533.0,51.45035,-2.566998
+113720,Hewlett Packard,Primary Substation,361497.0,178238.0,51.501699,-2.556124
+160050,Oldfield Park,Primary Substation,373686.0,163962.0,51.374033,-2.379457
+160389,Batheaston,Primary Substation,376538.0,166511.0,51.397084,-2.338653
+182150,Royal Portbury Dock,Primary Substation,349904.0,177126.0,51.49079,-2.72297
+181425,East Brent,Primary Substation,335276.0,153553.0,51.27737,-2.929346
+181345,Cheddar,Primary Substation,345494.0,153151.0,51.274827,-2.782796
+181216,Lypstone Farm,Primary Substation,336278.0,161754.0,51.351215,-2.916451
+181000,Nailsea,Primary Substation,347590.0,169986.0,51.426386,-2.755236
+180952,Winscombe,Primary Substation,341821.0,158039.0,51.31841,-2.836258
+350021,Whiddon Down,Primary Substation,268280.0,92606.0,50.718037,-3.867312
+180198,Clevedon,Primary Substation,341620.0,170717.0,51.432374,-2.841215
+180017,Axbridge,Primary Substation,343199.0,154370.0,51.285562,-2.815901
+164016,Combe Park,Primary Substation,373056.0,166103.0,51.39326,-2.388673
+162344,Foxhills,Primary Substation,368854.0,154539.0,51.289068,-2.44805
+161823,Evercreech,Primary Substation,364415.0,138780.0,51.147109,-2.510134
+161532,High Littleton,Primary Substation,365259.0,159160.0,51.330408,-2.500052
+160824,Wells,Primary Substation,354724.0,145519.0,51.207016,-2.64952
+180092,Weston Locking Rd,Primary Substation,333468.0,161201.0,51.34593,-2.956693
+350017,Park Lane,Primary Substation,245320.0,127246.0,51.023659,-4.20698
+350015,East Curry,Primary Substation,229117.0,93055.0,50.711872,-4.421839
+350013,Shebbear,Primary Substation,245417.0,110301.0,50.871417,-4.198411
+310036,Marsh Green,Primary Substation,304740.0,94158.0,50.739126,-3.351419
+310035,Woodbury,Primary Substation,300077.0,86228.0,50.667051,-3.415333
+310034,Clyst Honiton,Primary Substation,298883.0,93157.0,50.729135,-3.434121
+310033,Burlescombe,Primary Substation,306863.0,117220.0,50.946799,-3.327212
+310030,Exminster,Primary Substation,294537.0,87319.0,50.675871,-3.494007
+310029,Heavitree,Primary Substation,294899.0,92300.0,50.720724,-3.490305
+310039,Budleigh Salterton,Primary Substation,305835.0,82062.0,50.630549,-3.33282
+310025,Tiverton South,Primary Substation,295577.0,112109.0,50.898919,-3.486346
+310020,Athelstan Road,Primary Substation,292664.0,92679.0,50.723713,-3.522065
+310017,St Thomas,Primary Substation,290949.0,92244.0,50.719492,-3.546224
+310016,Folly Bridge,Primary Substation,281719.0,98821.0,50.776804,-3.679031
+310015,Crediton,Primary Substation,282465.0,100351.0,50.790708,-3.668945
+310011,Witheridge,Primary Substation,280245.0,112973.0,50.903706,-3.704558
+260590,Rock Park,Primary Substation,256211.0,131820.0,51.067595,-4.053622
+310022,Marsh Barton,Primary Substation,292149.0,90746.0,50.706249,-3.528793
+260420,Middle Barlington,Primary Substation,255575.0,116468.0,50.929466,-4.056587
+310040,East Budleigh,Primary Substation,306207.0,84940.0,50.656483,-3.328292
+310042,Honiton Heathfield,Primary Substation,315092.0,99775.0,50.791225,-3.206034
+350012,Stratton,Primary Substation,223613.0,106104.0,50.827467,-4.505975
+350011,Clovelly,Primary Substation,231341.0,123248.0,50.983801,-4.404275
+340039,Bovey Tracey,Primary Substation,281207.0,78337.0,50.592563,-3.6797
+340034,Colley End,Primary Substation,288578.0,61082.0,50.438902,-3.57045
+340033,Hollicombe,Primary Substation,289564.0,62712.0,50.453742,-3.557052
+340029,Churston,Primary Substation,288854.0,57071.0,50.402896,-3.565376
+310041,Offwell,Primary Substation,318856.0,100128.0,50.794947,-3.152723
+340027,Marldon,Primary Substation,286857.0,62744.0,50.453513,-3.595178
+340019,Newton Abbot Main,Primary Substation,286770.0,71678.0,50.533809,-3.599113
+340017,Teignmouth Gasworks,Primary Substation,292701.0,73035.0,50.547127,-3.515848
+310056,Hemyock,Primary Substation,312130.0,114003.0,50.918706,-3.251467
+310048,Countess Wear,Primary Substation,294629.0,90196.0,50.701751,-3.493527
+310046,Sidmouth Town,Primary Substation,312610.0,88415.0,50.688732,-3.238541
+310045,Newton Poppleford,Primary Substation,308918.0,89749.0,50.700158,-3.291136
+340020,Bradley Lane,Primary Substation,285397.0,71223.0,50.529451,-3.618338
+520330,Portable Swbd No4,Primary Substation,268355.0,200688.0,51.689418,-3.905942
+560093,Caerau Primary,Primary Substation,286260.0,195108.0,51.643175,-3.645219
+870043,Allenton 33 11kv S Stn,Primary Substation,436893.0,333091.0,52.893983,-1.453065
+940023,Fen Farm 33 11kv S Stn,Primary Substation,490838.0,238171.0,52.034471,-0.677196
+790010,Cherington 33/11kv,Primary Substation,389970.0,197384.0,51.675074,-2.146463
+870046,Spondon 11kv S Stn,Primary Substation,440564.0,334548.0,52.906816,-1.398321
+870050,Long Eaton 33 11kv S Stn,Primary Substation,448875.0,333642.0,52.898,-1.2749
+940022,Hanslope Park 33 11kv S Stn,Primary Substation,481889.0,246042.0,52.106604,-0.805733
+870041,Sinfin Lane 33 11kv S Stn,Primary Substation,435464.0,332399.0,52.887859,-1.47438
+870051,Sandiacre 33 11kv S Stn,Primary Substation,447388.0,336348.0,52.9224,-1.2966
+670105,Great Alne 66/11kv,Primary Substation,412995.0,259589.0,52.234303,-1.811153
+670124,Four Ashes 33/11kv,Primary Substation,392193.0,308748.0,52.676344,-2.116917
+670126,Ross 66/11kv,Primary Substation,359553.0,225000.0,51.921993,-2.589573
+330047,Langage Energy Centre,Primary Substation,257167.0,56275.0,50.38889,-4.010704
+670106,Pontrilas 66/11kv,Primary Substation,340112.0,227497.0,51.942694,-2.872668
+790017,Stowfield 33/11kv,Primary Substation,358863.0,217517.0,51.854668,-2.59871
+670122,Albrighton 33/11kv,Primary Substation,383204.0,304425.0,52.637276,-2.249642
+870039,Darley Abbey 33 11kv S Stn,Primary Substation,434657.0,338634.0,52.943957,-1.48571
+870038,Mackworth 33 11kv S Stn,Primary Substation,432364.0,336032.0,52.920702,-1.52009
+930086,Churchover 33/11kv,Primary Substation,449553.0,279962.0,52.415385,-1.272865
+870027,Church St 33 11kv S Stn,Primary Substation,409457.0,333579.0,52.899539,-1.860873
+880013,Bilborough 33 11kv S Stn,Primary Substation,452937.0,340796.0,52.961902,-1.213353
+880010,Chilwell 33 11kv S Stn,Primary Substation,451925.0,335645.0,52.915692,-1.22924
+890023,Sheepbridge 11/6 6kv S/Stn,Primary Substation,437287.0,374945.0,53.270166,-1.44237
+670110,Woofferton 66/11kv,Primary Substation,350530.0,267939.0,52.307294,-2.72702
+530333,Rogerstone Primary,Primary Substation,325492.0,189525.0,51.599561,-3.077173
+870029,Wellington St 33 11kv S Stn,Primary Substation,423501.0,322818.0,52.802378,-1.652856
+310058,North Tawton,Primary Substation,265214.0,101352.0,50.795948,-3.913924
+164170,Dorchester St - New,Primary Substation,375156.0,164372.0,51.377792,-2.35837
+870030,Ashbourne 33 11kv S Stn,Primary Substation,419448.0,346345.0,53.014045,-1.711573
+870036,Derby 11kv S Stn,Primary Substation,435306.0,336609.0,52.925713,-1.476272
+670109,Madley 66/11kv,Primary Substation,341894.0,237896.0,52.036368,-2.848513
+890021,Pinxton 11kv S Stn,Primary Substation,446765.0,356721.0,53.105616,-1.302926
+870037,Woodville 33/11kv,Primary Substation,431684.0,319679.0,52.773753,-1.531786
+670108,Bromyard 66/11kv,Primary Substation,365896.0,254348.0,52.186274,-2.500284
+790018,Bixhead 33/11kv,Primary Substation,359276.0,210962.0,51.795765,-2.591941
+890097,Bolsover 33kv S Stn,Primary Substation,445115.0,371136.0,53.235323,-1.325542
+920013,Kettering North 33 11kv S Stn,Primary Substation,486106.0,281562.0,52.425231,-0.735124
+930084,Interlink Park 33 11kv S Stn,Primary Substation,444265.0,311459.0,52.698972,-1.346415
+930070,Tamworth Town 11kv S Stn,Primary Substation,421236.0,303906.0,52.632462,-1.687668
+930069,Coton Road 33/6.6kv,Primary Substation,436281.0,291653.0,52.521521,-1.46672
+930068,Apollo 33 11kv S Stn,Primary Substation,419723.0,304572.0,52.638506,-1.709997
+930067,Hillmorton 33 11kv S Stn,Primary Substation,453185.0,274619.0,52.367006,-1.220317
+930065,Union Street 33 11kv S Stn,Primary Substation,450105.0,274844.0,52.369318,-1.265514
+930064,Rugby 11kv S Stn,Primary Substation,450360.0,276903.0,52.387804,-1.26146
+930077,Nuneaton 11kv S Stn,Primary Substation,434835.0,290598.0,52.512131,-1.48814
+930060,Southam 33 11kv S Stn,Primary Substation,441684.0,264073.0,52.273194,-1.390519
+930055,Lawford 33 11kv S Stn,Primary Substation,448557.0,275513.0,52.375471,-1.288151
+930061,Ansty 33 11kv S Stn,Primary Substation,440868.0,281516.0,52.430071,-1.40036
+930046,Coventry North 11kv S Stn,Primary Substation,436285.0,284126.0,52.453847,-1.467478
+930045,Whitley 11kv S Stn,Primary Substation,435272.0,277399.0,52.39344,-1.483092
+930041,Spon Street 33/6.6kv,Primary Substation,432919.0,279099.0,52.408868,-1.517502
+930040,Sandy Lane 33 6 6kv S Stn,Primary Substation,433309.0,280125.0,52.418077,-1.511667
+930056,Lockheed 33 11kv S Stn,Primary Substation,431468.0,263877.0,52.27211,-1.540252
+670088,Alderton 66/11kv,Primary Substation,400230.0,232580.0,51.99162,-1.998075
+670089,Broadway 66/11kv,Primary Substation,410009.0,239629.0,52.054907,-1.855457
+111935,Almondsbury,Primary Substation,360612.0,183605.0,51.5499,-2.569476
+670099,Peterchurch 66/11kv,Primary Substation,334652.0,238645.0,52.042284,-2.95423
+790009,Dudbridge 33/11kv,Primary Substation,383657.0,204666.0,51.740407,-2.238117
+670095,Pershore 66/11kv,Primary Substation,393408.0,248492.0,52.134638,-2.097739
+670093,Shipston 66/11kv,Primary Substation,424582.0,242439.0,52.079726,-1.642726
+930083,Coventry Arena 33 11kv S Stn,Primary Substation,434539.0,283674.0,52.449897,-1.493217
+670092,Wormington 66/11kv,Primary Substation,404927.0,236671.0,52.02838,-1.929614
+790008,Alveston 33/11kv,Primary Substation,364024.0,188538.0,51.594473,-2.520777
+850014,Scot Hay 33/11kv,Primary Substation,380546.0,347163.0,53.021381,-2.291481
+900012,Trusthorpe 33 11kv S Stn,Primary Substation,550892.0,383400.0,53.325994,0.264186
+900014,Alford 33 11kv S Stn,Primary Substation,546106.0,375315.0,53.254706,0.188667
+670090,Epwell 66/11kv,Primary Substation,436113.0,241477.0,52.070439,-1.474559
+790007,Commercial Road 132/33/11kv,Primary Substation,382889.0,218491.0,51.864683,-2.249927
+900021,Langrick 33 11kv S Stn,Primary Substation,525911.0,347752.0,53.012239,-0.124674
+850002,Bearstone 33/11kv,Primary Substation,372424.0,338972.0,52.947385,-2.411857
+790005,Brockworth 33/11kv,Primary Substation,388624.0,216314.0,51.845257,-2.166555
+900009,Beevor Street 33 11kv S Stn,Primary Substation,496723.0,370786.0,53.225298,-0.552637
+930035,Courthouse Green 33/6 6kv S Stn,Primary Substation,435161.0,281499.0,52.430305,-1.484294
+880015,Cinderhill 33 11kv S Stn,Primary Substation,453682.0,343729.0,52.988182,-1.201777
+880017,North Wilford 33 11kv S Stn,Primary Substation,456321.0,337839.0,52.93498,-1.163492
+890049,Misson 33 11kv S Stn,Primary Substation,468561.0,395109.0,53.448278,-0.969127
+890045,Budby 33 11kv S Stn,Primary Substation,460373.0,370244.0,53.225803,-1.097127
+890043,Kilton Rd 33 11kv S Stn,Primary Substation,459326.0,379438.0,53.308553,-1.111096
+840013,Bayston Hill 33/11kv,Primary Substation,348601.0,309006.0,52.676274,-2.761663
+930089,Sapcote 33 11kv S Stn,Primary Substation,450650.0,293445.0,52.536486,-1.254693
+890042,Holme Carr 33 11kv S Stn,Primary Substation,455731.0,379928.0,53.313347,-1.164956
+890052,Hallcroft Rd 33 11kv S Stn,Primary Substation,469608.0,382563.0,53.335389,-0.956127
+890036,Mansfield 11kv S Stn,Primary Substation,453619.0,362415.0,53.15615,-1.199608
+840016,Leaton 33/11kv,Primary Substation,361230.0,311806.0,52.702506,-2.575222
+920018,British Gypsum 33/11kv,Primary Substation,459537.0,316419.0,52.742094,-1.119551
+930093,Desford 33 11kv S Stn,Primary Substation,449397.0,304900.0,52.639571,-1.27146
+920019,Shepshed 33 11kv S Stn,Primary Substation,448343.0,319422.0,52.770202,-1.284904
+920020,Loughborough 11kv S Stn,Primary Substation,453413.0,321308.0,52.786687,-1.209457
+920025,Mountsorrel 33 11kv S Stn,Primary Substation,458697.0,314386.0,52.723921,-1.132355
+890035,Acreage Lane 33 11kv S Stn,Primary Substation,452988.0,366770.0,53.195356,-1.208324
+920017,Wigston Magna 33 11kv S Stn,Primary Substation,460941.0,298957.0,52.58498,-1.10198
+890053,Ordsall Road 33/11kv,Primary Substation,470065.0,380077.0,53.312978,-0.949814
+890057,North Wheatley 33/11kv,Primary Substation,474445.0,386727.0,53.372153,-0.882525
+840012,Sankey 33/11kv,Primary Substation,367655.0,312592.0,52.709985,-2.48022
+840009,Newport 33/11kv,Primary Substation,373454.0,318660.0,52.764849,-2.394867
+840007,Bishops Castle 33/11kv,Primary Substation,332574.0,288650.0,52.491545,-2.994519
+770003,Quatt 33/11kv,Primary Substation,374772.0,287068.0,52.480906,-2.372912
+670121,Knighton 66/11kv,Primary Substation,329110.0,271488.0,52.336835,-3.041885
+510327,Heath Hospital Primary,Primary Substation,317233.0,179323.0,51.506705,-3.193985
+840010,Donnington 33/11kv,Primary Substation,370803.0,314405.0,52.726463,-2.433788
+670118,Redditch South 66/11kv,Primary Substation,403666.0,265587.0,52.288366,-1.947691
+790012,Naishcombe Hill 33/11kv,Primary Substation,370423.0,173922.0,51.463432,-2.427171
+840002,Halesfield 33/11kv,Primary Substation,370779.0,304866.0,52.640712,-2.433279
+680060,Hortonwood 132/11kv,Primary Substation,367061.0,313599.0,52.719002,-2.489113
+790011,Cowhorn 33/11kv,Primary Substation,366944.0,172062.0,51.446515,-2.477074
+670114,Kington 66/11kv,Primary Substation,331277.0,257618.0,52.212426,-3.007269
+890062,Woodbeck 33 11kv S Stn,Primary Substation,477805.0,378528.0,53.297987,-0.834045
+890061,Carlton On Trent 33 11kv S Stn,Primary Substation,479398.0,364204.0,53.169014,-0.813713
+920027,Groby Road 33 11kv S Stn,Primary Substation,456053.0,306225.0,52.650826,-1.172885
+880016,Boots 33/11kv,Primary Substation,454698.0,336616.0,52.924154,-1.187842
+920029,Birstall 33/11kv,Primary Substation,458965.0,308358.0,52.6697,-1.129466
+890034,Shirebrook 33 11kv S Stn,Primary Substation,450593.0,366851.0,53.196317,-1.244156
+850010,Eccleshall 33/11kv,Primary Substation,382922.0,328392.0,52.852727,-2.255065
+880026,Marlborough Road 33/11kv,Primary Substation,458221.0,343999.0,52.990145,-1.134122
+790015,Berkeley 33/11kv,Primary Substation,367764.0,200470.0,51.701989,-2.467892
+890063,Hindlow 33/11kv,Primary Substation,409814.0,368304.0,53.211695,-1.854505
+890067,Longcliffe 33 11kv S Stn,Primary Substation,422921.0,355350.0,53.094844,-1.65917
+890069,Robin Hood 33 11kv S Stn,Primary Substation,428118.0,371934.0,53.243665,-1.580113
+840023,Broseley 33/11kv,Primary Substation,367288.0,301533.0,52.610541,-2.484551
+890070,Sheffield Road 33 11 6 6kv S Stn,Primary Substation,438427.0,372521.0,53.248297,-1.42557
+880025,Castle Road 33 11kv S Stn,Primary Substation,457096.0,339458.0,52.949441,-1.151678
+880022,Talbot St 33 11kv S Stn,Primary Substation,456914.0,340185.0,52.955995,-1.154259
+880018,Ratcliffe On Soar 33 11kv S Stn,Primary Substation,449825.0,329586.0,52.861429,-1.261393
+890077,Ambergate 33/11kv,Primary Substation,434786.0,351871.0,53.062934,-1.48237
+890079,Queens Park 33 11kv S Stn,Primary Substation,438061.0,370859.0,53.233385,-1.431253
+890084,Grassmoor 33 11kv S Stn,Primary Substation,441253.0,367148.0,53.199791,-1.383914
+890073,Cromford 33 11kv S Stn,Primary Substation,429226.0,356200.0,53.102187,-1.564942
+790014,Mitcheldean 33/11kv,Primary Substation,365752.0,217863.0,51.858254,-2.498727
+880028,West Bridgford 33 11kv S Stn,Primary Substation,457933.0,336774.0,52.925227,-1.139701
+880032,Willoughby 11kv S Stn,Primary Substation,462678.0,325773.0,52.825825,-1.071244
+890032,Craggs Lane 33 11kv S Stn,Primary Substation,453470.0,375557.0,53.274285,-1.199638
+890029,Teversal 33/11kv,Primary Substation,447472.0,361530.0,53.148769,-1.291657
+920037,Salutation 33/6.6kv,Primary Substation,461067.0,305844.0,52.64687,-1.09885
+890028,Westwood 33 11kv S Stn,Primary Substation,446019.0,351289.0,53.056855,-1.314844
+920039,Wigston 11kv S Stn,Primary Substation,458125.0,298048.0,52.577117,-1.143696
+840019,Dothill 33/11kv,Primary Substation,364002.0,313360.0,52.716658,-2.534372
+890027,Huthwaite 33 11kv S Stn,Primary Substation,447549.0,359171.0,53.127568,-1.290854
+890026,Blackwell 33 11kv S Stn,Primary Substation,444006.0,357816.0,53.115683,-1.343985
+880039,Bingham 33 11kv S Stn,Primary Substation,470947.0,339596.0,52.94904,-0.945521
+920042,Thurnby 33 11kv S Stn,Primary Substation,464221.0,304547.0,52.634848,-1.052492
+920044,Hamilton 33 11kv S Stn,Primary Substation,462431.0,307219.0,52.659065,-1.078433
+840018,Berrington 33/11kv,Primary Substation,353761.0,307788.0,52.665791,-2.685181
+840022,Weir Hill 33/11kv,Primary Substation,351529.0,312115.0,52.704491,-2.718821
+880034,Gedling 33 11kv S Stn,Primary Substation,461140.0,343485.0,52.985191,-1.090725
+310059,Sowton B,Primary Substation,296563.0,92885.0,50.7263,-3.4669
+920033,Leicester 11kv S Stn,Primary Substation,458193.0,303227.0,52.623662,-1.141784
+930033,Courthouse Green 33/11kv S Stn,Primary Substation,435166.0,281524.0,52.430529,-1.484217
+900023,Great Hale 33 11kv S Stn,Primary Substation,514613.0,342634.0,52.968797,-0.294801
+930031,Cox Street 33 6 6kv S Stn,Primary Substation,433969.0,279204.0,52.409757,-1.502056
+940031,Towcester 33 11kv S Stn,Primary Substation,469950.0,247851.0,52.124511,-0.979666
+940027,Woodford Halse 33 11kv S Stn,Primary Substation,454271.0,253136.0,52.17378,-1.207818
+670133,Newent 66/11kv,Primary Substation,373957.0,225672.0,51.928898,-2.380183
+790023,Mead Lane 33/11kv,Primary Substation,362961.0,201899.0,51.714531,-2.537541
+790022,Netherhills 33/11kv,Primary Substation,376599.0,207131.0,51.762318,-2.3405
+850029,Simplex 33/11kv,Primary Substation,394875.0,341000.0,52.966313,-2.077768
+850028,Leek 33/11kv,Primary Substation,397918.0,356110.0,53.102159,-2.032564
+850026,Cauldon 33/11kv,Primary Substation,407731.0,349331.0,53.041173,-1.886161
+790021,Dursley 33/11kv,Primary Substation,376059.0,199177.0,51.690772,-2.347774
+680062,Stafford South 11kv,Primary Substation,392881.0,321876.0,52.794369,-2.107031
+850021,Cauldon Cement 33kv,Primary Substation,408382.0,349635.0,53.043896,-1.876444
+850018,Kingsley Holt 33/11kv,Primary Substation,402157.0,345760.0,53.009123,-1.969317
+900035,Fiskerton 33 11kv S Stn,Primary Substation,505848.0,372430.0,53.238341,-0.415448
+900033,Waddington 33 11kv S Stn,Primary Substation,497965.0,365214.0,53.17501,-0.535747
+900030,Rookery Lane 33/11kv,Primary Substation,496175.0,369094.0,53.210193,-0.561352
+900027,South Carlton 33 11kv S Stn,Primary Substation,495059.0,376047.0,53.272873,-0.575984
+900026,Hawton 11kv S Stn,Primary Substation,480184.0,350975.0,53.049998,-0.805257
+437830,Callywith,Primary Substation,208552.0,67910.0,50.47959,-4.699843
+670129,Ledbury 66/11kv,Primary Substation,370829.0,238786.0,52.046643,-2.426792
+900024,Newark Junction 33 11kv S Stn,Primary Substation,480575.0,354130.0,53.078294,-0.798637
+910056,Empingham 33/11kv,Primary Substation,495072.0,308080.0,52.662078,-0.595724
+940033,Wicken 33 11kv S Stn,Primary Substation,475214.0,239428.0,52.048098,-0.904646
+910054,Tinwell Road Ketton 33 11kv S Stn,Primary Substation,498686.0,305447.0,52.637771,-0.543094
+940034,Kiln Farm 33 11kv S Stn,Primary Substation,480638.0,239648.0,52.049314,-0.825504
+940039,Childs Way 33 11kv S Stn,Primary Substation,484840.0,237965.0,52.03356,-0.764661
+920057,Sharnbrook 33 11kv S Stn,Primary Substation,498090.0,259869.0,52.228252,-0.565263
+920054,Burton Latimer 33 11kv S Stn,Primary Substation,488941.0,274790.0,52.363913,-0.69524
+920053,Corby No2 11kv S Stn,Primary Substation,490498.0,289084.0,52.492127,-0.668516
+920052,Earlstrees 33 11kv S Stn,Primary Substation,488533.0,291163.0,52.511143,-0.696896
+920048,Desborough 33 11kv S Stn,Primary Substation,480637.0,283722.0,52.445487,-0.815012
+920046,Farndon Road 33 11kv S Stn,Primary Substation,472544.0,286485.0,52.471446,-0.93346
+920045,Field Street 33 11kv S Stn,Primary Substation,486591.0,279132.0,52.403314,-0.728622
+940061,Northampton 11kv S Stn,Primary Substation,476515.0,259568.0,52.228963,-0.881138
+940059,Campbell Street 33/11kv,Primary Substation,475431.0,261156.0,52.243386,-0.896652
+940056,Chapel Brampton 33 11kv S Stn,Primary Substation,473272.0,266334.0,52.290221,-0.927158
+114391,Emersons Green,Primary Substation,367243.0,177792.0,51.498052,-2.473305
+210020,Trull,Primary Substation,321398.0,123090.0,51.001742,-3.121613
+181817,Wedmore,Primary Substation,343743.0,148132.0,51.229522,-2.807118
+210460,Shapwick,Primary Substation,341568.0,137574.0,51.134385,-2.836544
+160811,Dinder,Primary Substation,359172.0,145524.0,51.207392,-2.585854
+940055,Ellesmere Avenue 33 11kv S Stn,Primary Substation,473067.0,260994.0,52.242249,-0.931317
+940048,Welton 33 11kv S Stn,Primary Substation,459461.0,267838.0,52.305406,-1.129352
+940046,Wavendon Gate 33 11kv S Stn,Primary Substation,490112.0,237003.0,52.024082,-0.688084
+940045,Olney 33 11kv S Stn,Primary Substation,488264.0,251409.0,52.153873,-0.711285
+940044,Victoria Road 33 11kv S Stn,Primary Substation,488072.0,234048.0,51.997849,-0.718566
+940042,Bletchley 11kv S Stn,Primary Substation,486282.0,235575.0,52.011855,-0.744248
+940035,Winslow 33 11kv S Stn,Primary Substation,476803.0,228739.0,51.951806,-0.883872
+910053,Wittering 33 11kv S Stn,Primary Substation,505769.0,302685.0,52.611609,-0.43935
+840011,Snedshill 33/11kv,Primary Substation,370205.0,310203.0,52.688657,-2.44226
+910027,Long Sutton 33 11kv S Stn,Primary Substation,542667.0,322189.0,52.778403,0.113698
+910026,Holbeach 33 11kv S Stn,Primary Substation,536869.0,326308.0,52.816907,0.029522
+790004,Oxbridge 33/11kv,Primary Substation,368255.0,181581.0,51.532178,-2.459069
+930027,London Road 33 6 6kv S Stn,Primary Substation,434018.0,278526.0,52.40365,-1.501405
+910028,Spalding Clay Lake 11kv S Stn,Primary Substation,525367.0,321169.0,52.77353,-0.143016
+910032,Bourne 11kv S Stn,Primary Substation,509105.0,319918.0,52.765816,-0.384397
+910035,Billingborough 33 11kv S Stn,Primary Substation,510087.0,334297.0,52.894823,-0.365005
+910040,Skillington 33 11kv S Stn,Primary Substation,489297.0,324650.0,52.811976,-0.676583
+910044,Holwell 33 11kv S Stn,Primary Substation,472965.0,320290.0,52.775243,-0.91981
+910045,Market Deeping 33 11kv S Stn,Primary Substation,514947.0,310300.0,52.678181,-0.301201
+910051,Ketton Cement 33/11kv,Primary Substation,498565.0,305936.0,52.642188,-0.544736
+910038,Bottesford 33 11kv S Stn,Primary Substation,479770.0,337678.0,52.930565,-0.814707
+910025,Dowsby Fen 33 11kv S Stn,Primary Substation,516181.0,329321.0,52.848831,-0.276221
+930030,Torrington Avenue 33 11kv S Stn,Primary Substation,429248.0,278025.0,52.39943,-1.571559
+910052,Exton 33 11kv S Stn,Primary Substation,491180.0,310667.0,52.685996,-0.652537
+930029,Jaguar Browns Lane 33/11kv,Primary Substation,430283.0,282301.0,52.437814,-1.555962
+680010,Pinxton 132kv S Stn,Bulk Supply Point,446777.0,356738.0,53.105767,-1.302744
+530023,Llantarnam,Bulk Supply Point,329760.0,192858.0,51.630082,-3.016233
+670165,Bromford Bsp,Bulk Supply Point,416549.0,290869.0,52.515426,-1.75758
+550026,Mountain Ash Grid,Bulk Supply Point,305312.0,197495.0,51.668166,-3.370607
+680054,Burslem 132/11kv,Bulk Supply Point,386542.0,350434.0,53.050979,-2.202232
+520041,Ystradgynlais Grid,Bulk Supply Point,279036.0,208561.0,51.762582,-3.754238
+550202,Pengam Grid Bsp,Bulk Supply Point,315882.0,197513.0,51.67,-3.2178
+930011,Harbury 33kv S Stn,Bulk Supply Point,438835.0,259023.0,52.228003,-1.432849
+870010,Gresley 33kv S Stn,Bulk Supply Point,427804.0,318025.0,52.759088,-1.589438
+340004,Totnes Bsp,Bulk Supply Point,277476.0,61956.0,50.444544,-3.727002
+690015,Coventry West 132kv S Stn,Bulk Supply Point,426974.0,278180.0,52.400931,-1.604967
+690027,Wigston 132kv (M42) 132kv S Stn,Bulk Supply Point,458074.0,298109.0,52.577661,-1.144438
+690036,Spalding 132/33kv,Bulk Supply Point,525503.0,321101.0,52.772887,-0.141027
+690042,Hawton 132kv S Stn,Bulk Supply Point,480205.0,351060.0,53.050768,-0.804923
+510088,Barry Grid,Bulk Supply Point,311152.0,170060.0,51.422511,-3.279247
+920007,Corby 33kv S/S,Bulk Supply Point,490502.0,289065.0,52.491956,-0.668462
+690049,Irthlingborough 132/33/11kv,Bulk Supply Point,494542.0,269956.0,52.31953,-0.614369
+910004,Stamford 33kv S Stn,Bulk Supply Point,503520.0,307096.0,52.651699,-0.47117
+407450,St Tudy Bsp,Bulk Supply Point,207157.0,74171.0,50.535374,-4.722707
+690034,Asfordby 132kv S Stn,Bulk Supply Point,472328.0,320962.0,52.781369,-0.929103
+182373,Churchill Bsp 132kv,Bulk Supply Point,345225.0,162439.0,51.358309,-2.788082
+680038,Goitside 132kv S Stn,Bulk Supply Point,437187.0,370812.0,53.233024,-1.444351
+690043,Boston 132kv S Stn,Bulk Supply Point,533401.0,342860.0,52.966478,-0.015121
+690057,Lincoln Main/No.1/No.5 132/33/11kv,Bulk Supply Point,498998.0,371217.0,53.228761,-0.518438
+930013,Coventry Central 33kv S Stn,Bulk Supply Point,433587.0,280336.0,52.419948,-1.507559
+690035,Stamford 132/33kv,Bulk Supply Point,503579.0,307107.0,52.651769,-0.470296
+875000,Burton 33kv,Bulk Supply Point,425518.0,324487.0,52.817298,-1.622809
+340003,Torquay Bsp,Bulk Supply Point,290565.0,66555.0,50.488477,-3.544082
+560292,Waterton Industrial Grid,Bulk Supply Point,293592.0,179059.0,51.500365,-3.534423
+310005,Sowton Bsp,Bulk Supply Point,296659.0,92980.0,50.727152,-3.465572
+510009,Cardiff West Grid,Bulk Supply Point,316052.0,175348.0,51.470797,-3.21005
+850001,Longton 132/33/11kv,Bulk Supply Point,391148.0,341929.0,52.974614,-2.133284
+928000,Irthlingborough 33kv S Stn,Bulk Supply Point,494569.0,269931.0,52.319301,-0.61398
+670077,Solihull 132/11kv,Bulk Supply Point,415087.0,279734.0,52.415356,-1.779623
+675348,Cambridge Arms 132kv,Bulk Supply Point,373804.0,204868.0,51.741838,-2.380826
+670024,Wolverhampton 132/33/11kv,Bulk Supply Point,392400.0,298187.0,52.581407,-2.113609
+670059,Elmdon 132/11kv,Bulk Supply Point,419681.0,283876.0,52.452447,-1.711838
+680050,Whitfield 132/33/11kv,Bulk Supply Point,388172.0,353583.0,53.079315,-2.178033
+550013,Ebbw Vale,Bulk Supply Point,317550.0,208191.0,51.766254,-3.196228
+113372,Feeder Road 33kv,Bulk Supply Point,360735.0,172485.0,51.449921,-2.56646
+670056,Coseley 132/11kv,Bulk Supply Point,393910.0,294962.0,52.552434,-2.091264
+590020,Lampeter Grid,Bulk Supply Point,256894.0,246229.0,52.095798,-4.090548
+670046,Bentley 132/11kv,Bulk Supply Point,398946.0,298202.0,52.581595,-2.017003
+690044,Bourne 132kv S Stn,Bulk Supply Point,509121.0,319865.0,52.765336,-0.384177
+690068,Sleaford Rep 132kv,Bulk Supply Point,508691.0,345990.0,53.000176,-0.381816
+530027,Newport East,Bulk Supply Point,331916.0,188065.0,51.58725,-2.984156
+114259,Seabank Bsp,Bulk Supply Point,353559.0,182222.0,51.536929,-2.671004
+930020,Coalville 33kv S Stn,Bulk Supply Point,445586.0,310300.0,52.688444,-1.327028
+680019,Toton 132kv S Stn,Bulk Supply Point,449500.0,335721.0,52.916613,-1.265289
+211693,Dunwear Bsp,Bulk Supply Point,332258.0,135984.0,51.1191,-2.9693
+670058,Eastern Avenue 132/11kv,Bulk Supply Point,384597.0,217471.0,51.855571,-2.225077
+670081,Tewkesbury Grid 132/11kv,Bulk Supply Point,391211.0,233717.0,52.001771,-2.129452
+900002,Lincoln No 1 33kv S Stn,Bulk Supply Point,498971.0,371180.0,53.228425,-0.518854
+690081,Stony Stratford 132kv B,Bulk Supply Point,477861.0,236147.0,52.0182,-0.8668
+680015,Nottingham East 132/33kv,Bulk Supply Point,460384.0,341242.0,52.965117,-1.102417
+670050,Bournville 132/11kv,Bulk Supply Point,405157.0,281145.0,52.428232,-1.925598
+670048,Black Lake 132/11kv,Bulk Supply Point,399702.0,292597.0,52.531199,-2.005838
+260006,Fullabrook Windfarm,Bulk Supply Point,252079.0,136307.0,51.106864,-4.114396
+550011,Crumlin,Bulk Supply Point,320040.0,197964.0,51.674674,-3.157802
+330003,Plymouth Bsp,Bulk Supply Point,249938.0,54283.0,50.369186,-4.11153
+330002,Milehouse Bsp,Bulk Supply Point,246701.0,56020.0,50.383961,-4.157721
+407020,Camborne Bsp,Bulk Supply Point,166251.0,41802.0,50.229832,-5.278921
+540910,Energlyn,Bulk Supply Point,314280.0,188968.0,51.592957,-3.238876
+870012,Derby 33kv S Stn,Bulk Supply Point,435294.0,336655.0,52.926127,-1.476446
+898978,Tiln Farm 132kv,Bulk Supply Point,470852.0,384214.0,53.350062,-0.93708
+670047,Birchfield Lane 132/11kv,Bulk Supply Point,398574.0,288392.0,52.493404,-2.022447
+457710,Landulph Bsp,Bulk Supply Point,240928.0,62773.0,50.443102,-4.241722
+417500,Rame Bsp,Bulk Supply Point,172719.0,33514.0,50.157932,-5.18341
+164087,Bath (Dolemeads) 132,Bulk Supply Point,375471.0,164481.0,51.378786,-2.353852
+690041,Grantham 132/33kv,Bulk Supply Point,494991.0,337340.0,52.925045,-0.588435
+670043,Hams Hall South 132/11kv,Bulk Supply Point,419260.0,291983.0,52.525343,-1.717567
+670039,Selly Oak 132kv,Bulk Supply Point,404324.0,282990.0,52.444826,-1.937826
+670020,Tividale 132/11kv,Bulk Supply Point,396489.0,291419.0,52.520606,-2.053189
+670023,Wednesfield 132/11kv,Bulk Supply Point,395329.0,300183.0,52.599384,-2.070411
+670026,Woodside 132/11kv,Bulk Supply Point,392168.0,288015.0,52.48995,-2.116789
+680043,Uttoxeter 132/33kv,Bulk Supply Point,409728.0,334582.0,52.90855,-1.856815
+680024,Ketley 132/33/11kv,Bulk Supply Point,367402.0,310848.0,52.694293,-2.483791
+200433,Winterbourne Abbas Bsp Dummy,Bulk Supply Point,362662.0,90573.0,50.7135,-2.5302
+910009,Spalding Clay Lake 33kv S Stn,Bulk Supply Point,525385.0,321119.0,52.773076,-0.142768
+200435,Yeovil Bsp Dummy,Bulk Supply Point,357564.0,116843.0,50.9494,-2.6055
+670041,Bordesley 132/11kv,Bulk Supply Point,408300.0,286309.0,52.474618,-1.879248
+910007,Oakham 33kv S Stn,Bulk Supply Point,487359.0,308635.0,52.668362,-0.709586
+437730,St Austell Bsp,Bulk Supply Point,201590.0,54356.0,50.355521,-4.790678
+680011,Annesley 132kv S Stn,Bulk Supply Point,450761.0,354788.0,53.087886,-1.243548
+870004,Burton South 33kv S Stn,Bulk Supply Point,423968.0,319505.0,52.772576,-1.646171
+670076,Smethwick 132/25kv & 132/11kv,Bulk Supply Point,402212.0,290016.0,52.508001,-1.968854
+680040,Winster 132/33kv,Bulk Supply Point,424219.0,358858.0,53.126329,-1.639524
+890009,Whitwell 33kv S Stn,Bulk Supply Point,451652.0,375860.0,53.277197,-1.226849
+670051,Chad Valley 132/11kv,Bulk Supply Point,403289.0,286212.0,52.473798,-1.953023
+680052,Boothen 132/33/11kv,Bulk Supply Point,387953.0,344364.0,52.99644,-2.180954
+940011,Wellingborough 33kv S Stn,Bulk Supply Point,489807.0,266822.0,52.292157,-0.684651
+680046,Whitfield 132kv Switching Site,Bulk Supply Point,388382.0,353781.0,53.0811,-2.174905
+550288,Rassau West 132/11kv S/S,Bulk Supply Point,314820.0,211858.0,51.798808,-3.23668
+670128,Kingstanding 132/11kv,Bulk Supply Point,408264.0,295354.0,52.555932,-1.879557
+680036,Heanor 132kv S Stn,Bulk Supply Point,442816.0,347353.0,53.021742,-1.363151
+680022,Nottingham North 132kv S Stn,Bulk Supply Point,455601.0,342728.0,52.978989,-1.173366
+900005,Skegness 33kv S Stn,Bulk Supply Point,551350.0,362823.0,53.141036,0.261293
+680018,Mansfield 132/33/11kv,Bulk Supply Point,453722.0,362327.0,53.155358,-1.198083
+870007,Heanor 33kv S Stn,Bulk Supply Point,442850.0,347312.0,53.021362,-1.362649
+670138,Bartley Green 132/11kv,Bulk Supply Point,401038.0,282623.0,52.441533,-1.986172
+417740,Truro Bsp,Bulk Supply Point,180335.0,47324.0,50.284814,-5.084947
+670045,Banbury 132/11kv,Bulk Supply Point,445641.0,241525.0,52.070169,-1.335557
+690016,Tamworth 132kv S Stn,Bulk Supply Point,423379.0,301247.0,52.608472,-1.656192
+550452,Rassau Unit 18 132kv,Bulk Supply Point,315056.0,212363.0,51.803374,-3.233382
+520045,Gowerton East Grid,Bulk Supply Point,260787.0,196090.0,51.646271,-4.013524
+310002,Tiverton Bsp,Bulk Supply Point,303001.0,111689.0,50.89644,-3.380697
+690011,Tamworth Town 132kv S Stn,Bulk Supply Point,421265.0,303913.0,52.632524,-1.687239
+310003,Exeter Main Bsp,Bulk Supply Point,300983.0,97286.0,50.766608,-3.405488
+690078,Branston Solar 132kv,Bulk Supply Point,502358.0,365613.0,53.17776,-0.469919
+310001,Exeter City Bsp,Bulk Supply Point,292227.0,91451.0,50.712593,-3.527894
+890016,Goitside 33kv S Stn,Bulk Supply Point,437229.0,370903.0,53.233839,-1.443711
+680017,Worksop 132kv S Stn,Bulk Supply Point,460065.0,379198.0,53.306313,-1.100052
+340001,Newton Abbot Bsp (Forde Road),Bulk Supply Point,287083.0,71496.0,50.532224,-3.594643
+910008,Sleaford 33kv S Stn,Bulk Supply Point,507128.0,345012.0,52.991703,-0.405435
+457510,St Germans Bsp,Bulk Supply Point,231554.0,60346.0,50.418678,-4.372534
+530449,Glan Llyn,Bulk Supply Point,336757.0,187248.0,51.58047,-2.914144
+350001,Pyworthy Bsp,Bulk Supply Point,230423.0,102207.0,50.794481,-4.40757
+260467,Barnstaple Bsp,Bulk Supply Point,256200.0,131878.0,51.068104,-4.053793
+690026,Leicester Grid (M63) 132kv S Stn,Bulk Supply Point,458242.0,303152.0,52.622983,-1.141073
+690028,Kibworth (M46) 132kv S Stn,Bulk Supply Point,466217.0,293735.0,52.537425,-1.025162
+200210,Bowhays Cross Bsp,Bulk Supply Point,306414.0,140802.0,51.158727,-3.339696
+210448,Street Bsp,Bulk Supply Point,347473.0,137260.0,51.132126,-2.752111
+690075,East Claydon 33kv,Bulk Supply Point,475166.0,226080.0,51.928118,-0.908267
+690037,Sleaford 132kv S Stn,Bulk Supply Point,507057.0,344970.0,52.991348,-0.406505
+260465,East Yelland Bsp,Bulk Supply Point,247994.0,132187.0,51.068765,-4.170968
+690077,Cotham Grange Pv,Bulk Supply Point,479121.0,348591.0,53.02874,-0.821695
+680026,Meaford C 132/33/11kv,Bulk Supply Point,388837.0,337141.0,52.931522,-2.167532
+670014,Worcester 132/11kv,Bulk Supply Point,383959.0,254910.0,52.192152,-2.236094
+680031,Spondon 'B' 132/33/11kv,Bulk Supply Point,440554.0,334466.0,52.90608,-1.39848
+690053,Northampton East 132/33/11kv,Bulk Supply Point,479533.0,261166.0,52.24289,-0.836585
+210444,Bridgwater Grid Bsp,Bulk Supply Point,332505.0,135926.0,51.118561,-2.965747
+680032,Chesterfield 33kv,Bulk Supply Point,441028.0,369983.0,53.225291,-1.386918
+113450,St Pauls Bsp 132kv,Bulk Supply Point,359605.0,173578.0,51.459677,-2.582846
+600448,Rhoscrowther,Bulk Supply Point,190442.0,202471.0,51.681751,-5.032795
+113370,Lockleaze Bsp 132kv,Bulk Supply Point,360532.0,176418.0,51.485268,-2.569822
+250437,Woodcote Bsp,Bulk Supply Point,335169.0,99086.0,50.787636,-2.921117
+182372,Weston Bsp 132kv,Bulk Supply Point,333534.0,161173.0,51.345677,-2.95574
+680048,Forsbrook 132/33kv,Bulk Supply Point,397160.0,342546.0,52.980228,-2.043761
+930008,Whitley 33kv S Stn,Bulk Supply Point,435301.0,277412.0,52.393555,-1.482664
+670071,Perry Barr 132/11kv,Bulk Supply Point,407169.0,292160.0,52.527225,-1.895775
+310006,Marsh Barton Power Station,Bulk Supply Point,292513.0,90813.0,50.706919,-3.523659
+690013,Coventry Central 132kv S Stn,Bulk Supply Point,433610.0,280405.0,52.420576,-1.507214
+670055,Copt Heath 132/11kv,Bulk Supply Point,417211.0,278866.0,52.407499,-1.74844
+670072,Rednal 132/11kv,Bulk Supply Point,401356.0,277678.0,52.397076,-1.981512
+670061,Highters Heath 132/11kv,Bulk Supply Point,408982.0,278541.0,52.404773,-1.869414
+670075,Shirley 132/11kv,Bulk Supply Point,413319.0,277553.0,52.395794,-1.805703
+670074,Selly Oak 132/11kv Transformer Site,Bulk Supply Point,404402.0,282954.0,52.444501,-1.936679
+680059,Stagefields 132/11kv (Reporting),Bulk Supply Point,388741.0,346229.0,53.013222,-2.169279
+670013,Hereford 132/66kv,Bulk Supply Point,357611.0,239831.0,52.055191,-2.619648
+930018,Pailton 33kv S Stn,Bulk Supply Point,449296.0,282569.0,52.438834,-1.27626
+680009,Burton South 132kv S Stn,Bulk Supply Point,423964.0,319527.0,52.772774,-1.646229
+670079,Stourport 132/66/33/11kv,Bulk Supply Point,381787.0,271204.0,52.33857,-2.268752
+690020,Warwick 132kv S Stn,Bulk Supply Point,429665.0,265464.0,52.286468,-1.566536
+880004,Toton 33kv S Stn,Bulk Supply Point,449575.0,335747.0,52.916831,-1.26417
+690012,Coventry North 132/33/11kv,Bulk Supply Point,436262.0,284029.0,52.452977,-1.467827
+880002,Nottingham East 33kv S Stn,Bulk Supply Point,460389.0,341301.0,52.965646,-1.102317
+890006,Clipstone 33kv S Stn,Bulk Supply Point,460045.0,363566.0,53.16582,-1.103292
+890007,Annesley 33kv S Stn,Bulk Supply Point,450631.0,354916.0,53.08904,-1.245469
+670063,Kidderminster 132/33/11kv,Bulk Supply Point,383067.0,276202.0,52.383543,-2.25022
+890008,Mansfield 33kv S Stn,Bulk Supply Point,453640.0,362414.0,53.156148,-1.199294
+680013,Checkerhouse 132kv S Stn,Bulk Supply Point,466911.0,379330.0,53.30668,-0.997302
+680023,Nottingham 132kv S Stn,Bulk Supply Point,456397.0,337517.0,52.932078,-1.162417
+670064,Ludlow 132/66/33/11kv,Bulk Supply Point,353232.0,274499.0,52.366493,-2.688309
+670015,Ryeford 132/33/11kv,Bulk Supply Point,381287.0,204543.0,51.739217,-2.272434
+680055,Cannock 132/11kv,Bulk Supply Point,398851.0,309454.0,52.682747,-2.018448
+670016,Walsall 132kv/33kv,Bulk Supply Point,400075.0,300063.0,52.598326,-2.000341
+680016,Whitwell 132/33kv,Bulk Supply Point,451650.0,375818.0,53.27682,-1.226885
+680025,Ironbridge 132/33kv,Bulk Supply Point,365645.0,304079.0,52.633335,-2.509079
+690010,Harbury 132kv S Stn,Bulk Supply Point,438870.0,259004.0,52.227821,-1.432339
+930012,Coventry South 33kv S Stn,Bulk Supply Point,431460.0,278750.0,52.405817,-1.538982
+930009,Coventry North 33kv S Stn,Bulk Supply Point,436272.0,284126.0,52.453857,-1.46767
+670060,Halesowen 132/11kv,Bulk Supply Point,396986.0,284039.0,52.454263,-2.045795
+210612,Taunton Main Bsp,Bulk Supply Point,319247.0,124866.0,51.017411,-3.152657
+690058,Lincoln Local/No.2 132/11kv,Bulk Supply Point,498734.0,371166.0,53.228343,-0.522407
+670031,Lydney 132/33kv,Bulk Supply Point,362996.0,204363.0,51.736686,-2.537297
+670080,Sutton Coldfield 132/11kv,Bulk Supply Point,412755.0,296143.0,52.562939,-1.813287
+680058,Stafford 132/25/11kv,Bulk Supply Point,391869.0,323660.0,52.8104,-2.122084
+670025,Wolverhampton West 132/33kv & 33/11kv,Bulk Supply Point,387530.0,297355.0,52.573828,-2.185449
+690006,Bradwell Abbey 132kv S Stn,Bulk Supply Point,482626.0,239707.0,52.049561,-0.796507
+690008,Corby 132kv S Stn,Bulk Supply Point,490382.0,288993.0,52.491337,-0.670248
+670012,Castle Meads 132/33kv,Bulk Supply Point,382401.0,218843.0,51.867832,-2.257032
+670140,Chelmsley Wood 132/11kv,Bulk Supply Point,418010.0,286936.0,52.480014,-1.736262
+670137,Boughton Road 132/11kv,Bulk Supply Point,412292.0,285203.0,52.464601,-1.820517
+930004,Nuneaton 33kv S Stn,Bulk Supply Point,434825.0,290539.0,52.511601,-1.488294
+930005,Tamworth Town 33kv S Stn,Bulk Supply Point,421225.0,303892.0,52.632337,-1.687831
+890011,Worksop 33kv S Stn,Bulk Supply Point,459990.0,379227.0,53.306582,-1.101172
+930007,Warwick 33kv S Stn,Bulk Supply Point,429714.0,265387.0,52.285782,-1.565824
+890015,Staveley 33kv S Stn,Bulk Supply Point,441091.0,374634.0,53.267099,-1.385376
+870011,Stanton 33kv S Stn,Bulk Supply Point,446340.0,339174.0,52.947923,-1.311788
+910010,South Holland 33kv S Stn,Bulk Supply Point,537198.0,319622.0,52.756758,0.0316
+930006,Rugby 33kv S Stn,Bulk Supply Point,450348.0,276971.0,52.388425,-1.261626
+880005,Nottingham North 33kv S Stn,Bulk Supply Point,455609.0,342689.0,52.978638,-1.173253
+880003,Nottingham 33kv S Stn,Bulk Supply Point,456413.0,337570.0,52.932543,-1.16217
+910006,Melton Mowbray 33kv S Stn,Bulk Supply Point,476358.0,319177.0,52.764771,-0.869782
+920006,Leicester 33kv S Stn,Bulk Supply Point,458209.0,303172.0,52.623166,-1.141557
+940008,Daventry 33kv S Stn,Bulk Supply Point,457788.0,262708.0,52.25947,-1.154763
+910005,Bourne 33kv S Stn,Bulk Supply Point,509106.0,319905.0,52.765708,-0.384386
+890014,Alfreton 33kv S Stn,Bulk Supply Point,441276.0,357071.0,53.109204,-1.384865
+670154,Oldbury B 33kv,Bulk Supply Point,398338.0,288953.0,52.498446,-2.025926
+690022,Loughborough 132kv S Stn,Bulk Supply Point,453408.0,321357.0,52.787128,-1.209524
+690023,Leicester North 132kv S Stn,Bulk Supply Point,458089.0,305819.0,52.646981,-1.142865
+690024,Coalville 132kv Kv S Stn,Bulk Supply Point,445564.0,310336.0,52.688761,-1.327349
+690025,Leicester East 132/33/6.6kv,Bulk Supply Point,460931.0,303980.0,52.630122,-1.101204
+690055,Northampton 132kv S Stn,Bulk Supply Point,476509.0,259646.0,52.229665,-0.881222
+790001,Lydney 33/11kv,Bulk Supply Point,363042.0,204356.0,51.736644,-2.536631
+670032,Castle Bromwich 132/11kv,Bulk Supply Point,414931.0,292118.0,52.526691,-1.781367
+670033,Hams Hall A 33kv S Stn,Bulk Supply Point,419213.0,291881.0,52.524427,-1.718266
+670034,Erdington 132/11kv,Bulk Supply Point,411780.0,290602.0,52.513139,-1.827864
+670037,Bushbury B-C 132/33kv & 132/11kv,Bulk Supply Point,392480.0,304072.0,52.634313,-2.112564
+670038,Winson Green 132/11kv,Bulk Supply Point,404994.0,287743.0,52.48754,-1.927899
+670042,Chipping Sodbury 132/33/11kv,Bulk Supply Point,371527.0,183911.0,51.553302,-2.41209
+680051,Rugeley 132kv Switching Site,Bulk Supply Point,406103.0,317339.0,52.753598,-1.911031
+670049,Longbridge 132/11kv,Bulk Supply Point,401876.0,277657.0,52.396886,-1.97387
+670054,Chester Street 132/11kv,Bulk Supply Point,408176.0,288716.0,52.496259,-1.881016
+680053,Burntwood 132/11kv,Bulk Supply Point,403626.0,309179.0,52.680274,-1.947818
+670052,Cheapside 132/11kv,Bulk Supply Point,407735.0,286120.0,52.472927,-1.887571
+670053,Cheltenham 132/66/11kv,Bulk Supply Point,391811.0,223409.0,51.909104,-2.120463
+520038,Trostre Grid,Bulk Supply Point,252658.0,199538.0,51.675181,-4.132386
+670057,Dudley 132/11kv,Bulk Supply Point,393376.0,289956.0,52.507424,-2.099038
+670062,Hinksford 132/33kv 132/11kv & 33/11kv,Bulk Supply Point,386941.0,289836.0,52.506228,-2.193841
+680056,Lichfield 132/11kv,Bulk Supply Point,412429.0,311196.0,52.698268,-1.817535
+670066,Marle Hill 132/66/11kv,Bulk Supply Point,394438.0,223598.0,51.910845,-2.082278
+670068,Montpellier 132/11kv,Bulk Supply Point,394298.0,221617.0,51.893024,-2.08428
+690072,Carlton Park 132/11kv,Bulk Supply Point,453661.0,298810.0,52.584415,-1.20944
+680042,Stanton 132/33kv,Bulk Supply Point,446269.0,339217.0,52.948316,-1.312839
+680033,Burton 132kv,Bulk Supply Point,425481.0,324407.0,52.816572,-1.623365
+670069,Nechells West 132/25kv & 132/11kv,Bulk Supply Point,409759.0,289890.0,52.506787,-1.857665
+680057,Newcastle 132/11kv,Bulk Supply Point,383851.0,348003.0,53.029034,-2.242253
+550018,Hirwaun Grid,Bulk Supply Point,294052.0,205926.0,51.741939,-3.535929
+550012,Dowlais Grid,Bulk Supply Point,307200.0,209258.0,51.774224,-3.346453
+550901,Merthyr East Grid,Bulk Supply Point,306232.0,207459.0,51.757892,-3.359993
+670070,Ocker Hill B 132/33kv & 132/11kv,Bulk Supply Point,397567.0,293734.0,52.541415,-2.03732
+690054,Northampton West 132/33/11kv,Bulk Supply Point,474252.0,261370.0,52.24547,-0.913869
+690051,Wellingborough 132/33kv,Bulk Supply Point,489730.0,266786.0,52.291846,-0.68579
+690047,Brackley 132kv S Stn,Bulk Supply Point,458656.0,239316.0,52.049097,-1.14608
+920001,Kibworth 33kv S Stn,Bulk Supply Point,466320.0,293710.0,52.537179,-1.023648
+920004,Leicester East 33kv S Stn,Bulk Supply Point,460929.0,303959.0,52.629933,-1.101237
+690029,Hinckley 132kv S Stn,Bulk Supply Point,441061.0,292520.0,52.528967,-1.396169
+680028,Buxton 33kv,Bulk Supply Point,407723.0,375460.0,53.276044,-1.885644
+680029,Derby South 132kv S Stn,Bulk Supply Point,436363.0,332202.0,52.886019,-1.461042
+870005,Derby South 33kv S Stn,Bulk Supply Point,436320.0,332280.0,52.886732,-1.461672
+870006,Spondon B 33kv S Stn,Bulk Supply Point,440555.0,334507.0,52.906449,-1.39846
+870009,Uttoxeter 33kv S Stn,Bulk Supply Point,409702.0,334547.0,52.908236,-1.857202
+680034,Burnaston 132/11kv,Bulk Supply Point,428808.0,330876.0,52.874565,-1.573432
+680037,Alfreton 132/33kv,Bulk Supply Point,441268.0,357067.0,53.109169,-1.384985
+680039,Staveley 132kv S Stn,Bulk Supply Point,441054.0,374638.0,53.267129,-1.38593
+680044,Kidsgrove B.R.,Bulk Supply Point,386171.0,353785.0,53.081083,-2.207912
+690030,Skegness 132kv S Stn,Bulk Supply Point,551295.0,362741.0,53.140315,0.260432
+690031,Grantham North 132/25/11kv,Bulk Supply Point,491050.0,338704.0,52.937994,-0.646657
+680049,Stafford South 132/11kv,Bulk Supply Point,392951.0,321823.0,52.793893,-2.105992
+690039,Bourne West 132/25kv,Bulk Supply Point,506739.0,319240.0,52.760195,-0.419669
+900003,Hawton 33kv S Stn,Bulk Supply Point,480199.0,351040.0,53.05058,-0.805017
+690040,South Holland 132/33kv,Bulk Supply Point,537218.0,319635.0,52.756879,0.031902
+670019,Timberdine 132/11kv,Bulk Supply Point,386058.0,252181.0,52.167674,-2.205275
+670021,Upton Warren 132/66/11kv,Bulk Supply Point,393569.0,267952.0,52.309601,-2.095764
+670022,Warndon 132/11kv,Bulk Supply Point,386874.0,257754.0,52.217798,-2.193562
+670027,Summer Lane 132/11kv,Bulk Supply Point,406977.0,287777.0,52.487834,-1.898696
+940005,Stony Stratford 33kv S Stn,Bulk Supply Point,477856.0,236170.0,52.018448,-0.866869
+940006,Bradwell Abbey 33kv S Stn,Bulk Supply Point,482605.0,239714.0,52.049618,-0.796812
+940009,Northampton 33kv S Stn,Bulk Supply Point,476354.0,259713.0,52.230289,-0.883462
+920008,Kettering 33kv S Stn,Bulk Supply Point,485948.0,278966.0,52.401923,-0.738113
+940012,Northampton West 33kv S Stn,Bulk Supply Point,474288.0,261392.0,52.245663,-0.913337
+940013,Bletchley 33kv S Stn,Bulk Supply Point,486304.0,235536.0,52.01151,-0.743937
+690046,Bletchley 132/33/11kv,Bulk Supply Point,486350.0,235472.0,52.010919,-0.743283
+690050,Kettering 132kv S Stn,Bulk Supply Point,485938.0,278869.0,52.401062,-0.738285
+600042,Milford Haven Grid,Bulk Supply Point,194839.0,208146.0,51.734322,-4.972624
+530900,Newport West,Bulk Supply Point,330442.0,185876.0,51.56739,-3.004994
+162633,Radstock Bsp 132kv,Bulk Supply Point,364670.0,154734.0,51.290567,-2.508066
+910003,Grantham 33kv S Stn,Bulk Supply Point,494965.0,337263.0,52.924367,-0.588844
+560047,Margam Grid,Bulk Supply Point,278348.0,186831.0,51.567143,-3.756623
+920005,Wigston 33kv S Stn,Bulk Supply Point,458101.0,298105.0,52.577631,-1.14404
+930019,Hinckley 33kv S Stn,Bulk Supply Point,441123.0,292508.0,52.528864,-1.395257
+670200,Hockley 132/11kv,Bulk Supply Point,406868.0,287927.0,52.489183,-1.900298
+920003,Leicester North 33kv S Stn,Bulk Supply Point,458062.0,305798.0,52.646786,-1.143267
+690033,Melton Mowbray 132/33/11kv,Bulk Supply Point,476406.0,319196.0,52.764935,-0.869067
+670078,Sparkbrook 132/11kv,Bulk Supply Point,409687.0,284898.0,52.461902,-1.858869
+407380,Fraddon Bsp,Bulk Supply Point,191299.0,57022.0,50.375906,-4.93663
+510008,Cardiff North Grid,Bulk Supply Point,317280.0,181425.0,51.525608,-3.193802
+690073,Lincoln No.2 33kv,Bulk Supply Point,498967.0,371202.0,53.228623,-0.518907
+330001,Ernesettle Bsp,Bulk Supply Point,244684.0,60430.0,50.423063,-4.187895
+520301,Portable Swbd No1 - Cardiff East,Bulk Supply Point,259025.0,203529.0,51.712679,-4.041977
+530941,Magor Grid,Bulk Supply Point,341595.0,187224.0,51.580786,-2.844328
+510908,Grangetown Grid,Bulk Supply Point,317226.0,174608.0,51.464309,-3.192978
+560912,Pencoed Grid,Bulk Supply Point,296912.0,181501.0,51.522927,-3.487322
+510928,Rodmills,Bulk Supply Point,320872.0,176336.0,51.480366,-3.140893
+510911,Rover Way Grid,Bulk Supply Point,321064.0,175612.0,51.473884,-3.137966
+560004,Bridgend Grid,Bulk Supply Point,290537.0,181122.0,51.518318,-3.579065
+510902,Trowbridge 132/11 Kv S/S,Bulk Supply Point,323896.0,179847.0,51.512344,-3.098114
+600014,Golden Hill Grid,Bulk Supply Point,199086.0,202376.0,51.684058,-4.907879
+600043,Robeston (Amoco) Grid,Bulk Supply Point,188914.0,209124.0,51.740912,-5.058895
+920002,Loughborough 33kv S Stn,Bulk Supply Point,453397.0,321299.0,52.786608,-1.209696
+113572,Bradley Stoke Bsp,Bulk Supply Point,361302.0,183446.0,51.548511,-2.559507
+670073,Rushall 132/11kv,Bulk Supply Point,402133.0,300097.0,52.598628,-1.969957
+890013,Winster 33kv S Stn,Bulk Supply Point,424203.0,358854.0,53.126294,-1.639763
+670040,Ladywood 132/11kv,Bulk Supply Point,405811.0,286566.0,52.47696,-1.915888
+520002,Ammanford Grid,Bulk Supply Point,260016.0,210155.0,51.772463,-4.03031
+690063,North Greetwell 132kv Switching Station,Bulk Supply Point,500844.0,374135.0,53.254625,-0.489873
+310007,North Tawton Bsp,Bulk Supply Point,265201.0,101398.0,50.796349,-3.914125
+540903,Nantgarw Grid,Bulk Supply Point,312150.0,185742.0,51.563629,-3.268808
+690064,Hatton Gas Compressor 132kv,Bulk Supply Point,517815.0,376246.0,53.270099,-0.234817
+113449,Feeder Road 132kv,Bulk Supply Point,360937.0,172367.0,51.448874,-2.56354
+104098,Norrington Bsp,Bulk Supply Point,388296.0,165065.0,51.384449,-2.169602
+330045,Plymouth Bsp 33,Bulk Supply Point,249861.0,54125.0,50.367738,-4.112548
+560050,Fords Grid Bridgend,Bulk Supply Point,293511.0,178443.0,51.494819,-3.535414
+670030,Kitts Green 132/11kv,Bulk Supply Point,415087.0,287375.0,52.484057,-1.779281
+690067,Pailton 132kv S Stn,Bulk Supply Point,449302.0,282596.0,52.439085,-1.276167
+690021,Middlemarsh 132kv S Stn,Bulk Supply Point,553376.0,365077.0,53.160702,0.292634
+530001,Abergavenny,Bulk Supply Point,330290.0,216158.0,51.839617,-3.013252
+540270,Talbot Green Grid,Bulk Supply Point,303824.0,184422.0,51.550404,-3.388525
+930010,Tamworth 33kv S Stn,Bulk Supply Point,423409.0,301209.0,52.608129,-1.655752
+560005,Briton Ferry Grid,Bulk Supply Point,273971.0,193416.0,51.625358,-3.822118
+690048,Corby North 132/33kv,Bulk Supply Point,489635.0,291013.0,52.509615,-0.680703
+940010,Northampton East 33kv S Stn,Bulk Supply Point,479515.0,261211.0,52.243307,-0.836838
+690017,Rugby 132/33/11kv,Bulk Supply Point,450279.0,276965.0,52.388369,-1.262641
+510059,East Aberthaw,Bulk Supply Point,303548.0,167418.0,51.397511,-3.387857
+680020,Staythorpe B 132kv Switching Station,Bulk Supply Point,476190.0,354018.0,53.077939,-0.864107
+510006,Cardiff Central Grid,Bulk Supply Point,319326.0,176142.0,51.478403,-3.163106
+670065,Lye 132/11kv,Bulk Supply Point,391812.0,284736.0,52.460466,-2.12195
+113367,Avonmouth Bsp,Bulk Supply Point,352887.0,178433.0,51.502798,-2.680184
+510909,Sully Grid,Bulk Supply Point,314736.0,168935.0,51.412942,-3.227445
+530110,Cwmbran,Bulk Supply Point,329192.0,195483.0,51.6536,-3.024969
+670067,Malvern 132/11kv,Bulk Supply Point,379278.0,247733.0,52.127462,-2.30413
+530907,Pontypool North Grid,Bulk Supply Point,330852.0,202280.0,51.71492,-3.002327
+520037,Tir John Grid,Bulk Supply Point,268714.0,193538.0,51.625242,-3.898063
+520291,Morriston Grid,Bulk Supply Point,267681.0,198226.0,51.667138,-3.914751
+600319,South Hook,Bulk Supply Point,187663.0,206771.0,51.719307,-5.075565
+540913,Pontyclun Primary,Bulk Supply Point,303084.0,182128.0,51.529666,-3.398562
+560290,Boc Margam,Bulk Supply Point,278981.0,185798.0,51.557994,-3.747148
+900004,Boston 33kv S Stn,Bulk Supply Point,533469.0,342854.0,52.966407,-0.014111
+690038,Oakham 132kv S Stn,Bulk Supply Point,487300.0,308623.0,52.668264,-0.710461
+690032,Grantham South 132/11kv,Bulk Supply Point,491679.0,334931.0,52.903971,-0.638365
+910011,Bytham 25kv S Stn,Bulk Supply Point,501767.0,317407.0,52.744682,-0.493888
+590021,Llanarth Grid,Bulk Supply Point,241369.0,256987.0,52.1882,-4.322012
+310004,Exmouth Bsp,Bulk Supply Point,301072.0,82273.0,50.631656,-3.4002
+930014,Coventry West 33kv S Stn,Bulk Supply Point,426975.0,278279.0,52.40183,-1.604945
+690018,Nuneaton 132/33/11kv,Bulk Supply Point,434833.0,290510.0,52.51134,-1.488179
+600016,Haverfordwest Grid,Bulk Supply Point,197881.0,216098.0,51.80684,-4.933263
+690014,Coventry South 132/33/11kv,Bulk Supply Point,431436.0,278682.0,52.405207,-1.539341
+930016,Whitley 132kv S Stn,Bulk Supply Point,435342.0,277436.0,52.393768,-1.482059
+510905,Cardiff South Bsp,Bulk Supply Point,319846.0,174707.0,51.4656,-3.1553
+690045,Stony Stratford 132kv S Stn,Bulk Supply Point,477825.0,236193.0,52.018659,-0.867315
+407150,Hayle Bsp,Bulk Supply Point,155342.0,38261.0,50.19363,-5.429313
+890010,Checkerhouse 33kv S Stn,Bulk Supply Point,467018.0,379413.0,53.307404,-0.99568
+580031,Rhos Grid,Bulk Supply Point,237986.0,236807.0,52.005951,-4.361856
+680012,Clipstone 132/33/11kv,Bulk Supply Point,460065.0,363623.0,53.16633,-1.102982
+680021,Retford 132/25kv,Bulk Supply Point,469270.0,381436.0,53.325296,-0.961448
+182800,Portishead New Bsp,Bulk Supply Point,348426.0,177006.0,51.489587,-2.744239
+580010,Carmarthen Grid,Bulk Supply Point,237766.0,219226.0,51.847944,-4.356766
+680035,Gresley 132kv S Stn,Bulk Supply Point,427744.0,317986.0,52.758741,-1.59033
+680041,Derby 132kv S Stn,Bulk Supply Point,435311.0,336646.0,52.926045,-1.476194
+680030,Spondon A 132kv,Bulk Supply Point,440345.0,334365.0,52.905188,-1.401599
+330006,Plympton Bsp,Bulk Supply Point,257070.0,54450.0,50.372464,-4.011373
+680027,Barlaston 132kv,Bulk Supply Point,388844.0,336323.0,52.924169,-2.167399
+680014,Willoughby 132/33/11kv,Bulk Supply Point,462708.0,325854.0,52.82655,-1.070783
+670028,Hall Green 132/11kv,Bulk Supply Point,410820.0,282568.0,52.440934,-1.842268
+880006,Willoughby 33kv S Stn,Bulk Supply Point,462645.0,325785.0,52.825928,-1.071731
+340002,Paignton Bsp,Bulk Supply Point,287179.0,59198.0,50.421698,-3.589575
+520302,Portable Swbd No2 - Cardiff East,Bulk Supply Point,259075.0,203582.0,51.713159,-4.041275
+600040,Waterston Grid,Bulk Supply Point,193837.0,205542.0,51.710583,-4.985573
+530028,Newport South,Bulk Supply Point,333020.0,185810.0,51.56711,-2.967793
+530196,Panteg 132/11kv,Bulk Supply Point,329811.0,198440.0,51.680267,-3.016615
+530034,Sudbrook,Bulk Supply Point,350803.0,187774.0,51.586612,-2.711515
+690052,Daventry 132/33/11kv,Bulk Supply Point,457835.0,262748.0,52.259824,-1.154068
+520036,Swansea West Grid,Bulk Supply Point,262931.0,193972.0,51.627769,-3.981726
+520022,Llanelli Grid,Bulk Supply Point,249775.0,199868.0,51.677381,-4.17419
+106009,Iron Acton  S.G.P.,Super Grid Substation,366828.0,185864.0,51.570604,-2.480046
+680068,Stoke Bardolph 400/132kv,Super Grid Substation,463879.0,340725.0,52.960065,-1.050476
+206008,Bridgwater  S.G.P.,Super Grid Substation,332321.0,135895.0,51.118261,-2.968369
+540039,Upper Boat,Super Grid Substation,310234.0,187180.0,51.576253,-3.296809
+406003,Landulph  S.G.P.,Super Grid Substation,240906.0,63005.0,50.445181,-4.242131
+560030,Pyle Grid,Super Grid Substation,282694.0,183075.0,51.534297,-3.692696
+306005,Exeter Main  S.G.P.,Super Grid Substation,301049.0,97416.0,50.767788,-3.404587
+188213,Sandford 132kv Sgp,Super Grid Substation,341670.0,160477.0,51.340323,-2.838824
+206001,Alverdiscott  S.G.P.,Super Grid Substation,250223.0,125190.0,51.006477,-4.136284
+306004,Abham  S.G.P.,Super Grid Substation,277365.0,65079.0,50.472593,-3.729588
+690061,East Claydon 132kv S Stn,Super Grid Substation,475234.0,225987.0,51.927273,-0.907298
+406002,Indian Queens Sgp,Super Grid Substation,194086.0,59234.0,50.396747,-4.898699
+670006,Willenhall 132/11kv,Super Grid Substation,396084.0,297744.0,52.577464,-2.059235
+670008,Port Ham 132kv,Super Grid Substation,381831.0,219217.0,51.871177,-2.26533
+520485,Llandyfaelog Supergrid,Super Grid Substation,241772.0,213490.0,51.7976,-4.296
+206006,Axminster  S.G.P.,Super Grid Substation,334950.0,99032.0,50.787117,-2.924214
+106010,Melksham S.G.P,Super Grid Substation,389634.0,166109.0,51.393862,-2.150406
+520035,Swansea North Grid,Super Grid Substation,264549.0,200099.0,51.68322,-3.960739
+690005,Walpole 132kv S Stn,Super Grid Substation,548603.0,316734.0,52.727802,0.199163
+670004,Bustleholm 132kv National Grid Site,Super Grid Substation,402642.0,295024.0,52.553021,-1.962481
+670005,Oldbury 132kv National Grid Site,Super Grid Substation,398606.0,289027.0,52.499112,-2.021979
+690004,Enderby 132kv S Stn,Super Grid Substation,453279.0,300342.0,52.598231,-1.214825
+670011,Kitwell 132kv National Grid Site,Super Grid Substation,399229.0,281550.0,52.431887,-2.012782
+670010,Ocker Hill C 132kv National Grid Site,Super Grid Substation,398005.0,293838.0,52.542352,-2.030862
+670007,Nechells East 132kv National Grid Site,Super Grid Substation,410320.0,289965.0,52.507442,-1.849397
+510049,Aberthaw Power Station,Super Grid Substation,302544.0,166477.0,51.38888,-3.402025
+680067,Cellarhead 132kv,Super Grid Substation,394357.0,349347.0,53.04134,-2.085629
+680005,Drakelow 275/132kv,Super Grid Substation,423758.0,319602.0,52.773457,-1.649277
+680000,Ironbridge 400/132kv,Super Grid Substation,365610.0,304000.0,52.632623,-2.509588
+670003,Feckenham 66/11kv,Super Grid Substation,402025.0,261642.0,52.252917,-1.971771
+690002,Coventry 275/132kv,Super Grid Substation,436529.0,284340.0,52.455755,-1.463865
+680004,Shrewsbury 132/33kv,Super Grid Substation,353251.0,312618.0,52.709173,-2.69341
+550906,Rassau G.S.P.,Super Grid Substation,315477.0,212860.0,51.807915,-3.227392
+680066,Bushbury D 132kv National Grid Site,Super Grid Substation,392364.0,304342.0,52.636738,-2.114284
+560015,Grange,Super Grid Substation,278497.0,186040.0,51.560053,-3.754204
+114023,Seabank Sgp,Super Grid Substation,353647.0,182235.0,51.537053,-2.669737
+680007,Chesterfield 275/132kv (Ngt),Super Grid Substation,441044.0,369969.0,53.225164,-1.38668
+680001,Staythorpe C 132kv Switching Station,Super Grid Substation,476100.0,353909.0,53.076963,-0.865476
+530046,Uskmouth,Super Grid Substation,332336.0,183683.0,51.547906,-2.97725
+670002,Bishops Wood 275/132kv,Super Grid Substation,383522.0,268358.0,52.313039,-2.243147
+670001,Iron Acton Supergrid 132kv,Super Grid Substation,366697.0,185716.0,51.569266,-2.481922
+670009,Penn 132kv National Grid Site,Super Grid Substation,385976.0,295446.0,52.556628,-2.208297
+690003,Bicker Fen 132kv,Super Grid Substation,519662.0,338602.0,52.931459,-0.221146
+206007,Taunton S.G.P.,Super Grid Substation,319143.0,124982.0,51.018439,-3.154166
+690001,Berkswell 275/132kv,Super Grid Substation,426379.0,276621.0,52.386945,-1.613835
+680008,Rugeley 132kv National Grid,Super Grid Substation,406016.0,317394.0,52.754094,-1.912319
+510007,Cardiff East Grid,Super Grid Substation,320722.0,178219.0,51.497272,-3.143476
+600029,Pembroke Power Station,Super Grid Substation,193620.0,202405.0,51.682336,-4.986853
+680006,Willington 132kv S Stn,Super Grid Substation,430480.0,328868.0,52.856414,-1.548779
+690007,Grendon 400/132kv,Super Grid Substation,487107.0,261352.0,52.243426,-0.725638
+680002,Ratcliffe On Soar 132kv S Stn,Super Grid Substation,450421.0,329837.0,52.86363,-1.252503
+890003,West Burton 132kv S Stn,Super Grid Substation,479482.0,385512.0,53.360493,-0.80714
+720004,Lea Marston 132kv National Grid Site,Super Grid Substation,419892.0,292233.0,52.5276,-1.7082
+437750,Treningle Switch Stn,Ehv Switching Station,204452.0,65505.0,50.456628,-4.756302
+437790,St Breock Wind Farm,Ehv Switching Station,197502.0,69047.0,50.486083,-4.856003
+417820,Four Burrows Windfarm,Ehv Switching Station,176810.0,48444.0,50.293558,-5.135012
+210260,Bradon Farm Generator,Ehv Switching Station,336181.0,119907.0,50.974956,-2.910405
+210999,R.O.F. Power House,Ehv Switching Station,333050.0,141931.0,51.172615,-2.95908
+182332,Brent Knoll 33 Sw Stn,Ehv Switching Station,335776.0,151711.0,51.260866,-2.921848
+590298,Dyffryn Brodyn,Ehv Switching Station,222013.0,226906.0,51.912122,-4.589203
+520145,Waunarlwydd,Ehv Switching Station,260709.0,196531.0,51.65021,-4.014824
+610297,Bryn Titli W/Farm,Ehv Switching Station,296615.0,272563.0,52.341328,-3.518997
+590170,Manoravon Pump Sta,Ehv Switching Station,265759.0,223954.0,51.8979,-3.9525
+520147,Inco Europe South,Ehv Switching Station,269500.0,201043.0,51.692867,-3.889519
+898326,Bilsthorpe Solar Dummy,Ehv Switching Station,465822.0,361172.0,53.143613,-1.017385
+795720,Actree Solar Fm 33kv,Ehv Switching Station,371165.0,198070.0,51.680588,-2.418481
+520316,Swansea University,Ehv Switching Station,263185.0,191805.0,51.608359,-3.97721
+417670,St Day Landfill,Ehv Switching Station,174632.0,41406.0,50.229522,-5.161351
+590304,Llyn Brianne,Ehv Switching Station,279158.0,248289.0,52.11963,-3.766447
+530914,Simms Metals,132kv Switching Station,331608.0,186061.0,51.569196,-2.98821
+437150,Bears Down Wind Farm,Ehv Switching Station,190809.0,67653.0,50.471212,-4.949442
+560311,South Cornelly,Ehv Switching Station,282148.0,180062.0,51.507104,-3.699565
+350025,Forestmoor Windfarm,Ehv Switching Station,229975.0,113312.0,50.894125,-4.41908
+520318,Pwllfa Gwatkin,Ehv Switching Station,269977.0,208574.0,51.760657,-3.885435
+330046,Chelson 33kv Generator,Ehv Switching Station,250803.0,54887.0,50.374835,-4.099615
+580315,Blaen Bowi,Ehv Switching Station,233027.0,235880.0,51.996144,-4.433597
+560324,Boc Biomass,Ehv Switching Station,279134.0,186209.0,51.561711,-3.745084
+670017,Bushbury A 132kv Switching Site,132kv Switching Station,392402.0,304153.0,52.63504,-2.113718
+946100,Brackley 33kv,Ehv Switching Station,458699.0,239319.0,52.04911,-1.145452
+940017,Shanks & Mcewan Generation,Ehv Switching Station,468874.0,224484.0,51.914584,-1.000075
+790003,Wapley 33kv,Ehv Switching Station,371420.0,179337.0,51.512171,-2.41326
+920010,Wykes Generation 33kv,Ehv Switching Station,496188.0,263705.0,52.263064,-0.59201
+920011,Weldon Shanks Generation 33kv,Ehv Switching Station,492354.0,288602.0,52.487493,-0.641321
+930021,Rugby Portland Cement 33kv,Ehv Switching Station,448629.0,275751.0,52.377604,-1.287059
+930082,Coventry Waste Reduction 33kv,Ehv Switching Station,434757.0,277682.0,52.396017,-1.49063
+910015,Deeping St Nicholas 33kv Wind Generation,Ehv Switching Station,520494.0,315390.0,52.722712,-0.217333
+940020,Bletchley Landfill 33kv,Ehv Switching Station,484942.0,232017.0,51.980089,-0.764647
+870016,Bombardier 33kv,Ehv Switching Station,436304.0,334279.0,52.904702,-1.461687
+940024,Petsoe Manor 33kv Wind Farm Generation,Ehv Switching Station,491190.0,249350.0,52.134892,-0.669081
+890022,Lindhurst 33kv Wind Farm Dummy,Ehv Switching Station,457972.0,358099.0,53.116903,-1.135298
+880042,London Road Heat Stn,Ehv Switching Station,457841.0,339430.0,52.94911,-1.140597
+114393,Staplehill Sw. Station,Ehv Switching Station,365874.0,176287.0,51.484439,-2.492879
+540332,Ferndale Windfarm,Ehv Switching Station,299342.0,195985.0,51.653564,-3.456467
+258019,Beechgrove Fm 33kv Solar Park,Ehv Switching Station,334925.0,99290.0,50.789443,-2.924614
+358017,East Langford 33kv Solar Park,Ehv Switching Station,228426.0,110465.0,50.868094,-4.439746
+418008,Churchtown Farm 33kv Solar Park,Ehv Switching Station,160039.0,40554.0,50.216125,-5.365076
+600323,Withyhedges Landfill,Ehv Switching Station,197345.0,221509.0,51.855241,-4.944196
+415927,Goonhilly Wind Farm,Ehv Switching Station,170776.0,20629.0,50.041464,-5.202848
+920063,Corby North 33kv S Stn,Ehv Switching Station,489740.0,291030.0,52.509751,-0.679152
+560331,Maesgwyn 132kv Wind Farm,132kv Switching Station,286489.0,208909.0,51.767266,-3.646406
+340043,Heathfield 33kv Landfill,Ehv Switching Station,286166.0,76140.0,50.573802,-3.608997
+162888,Shooters Bottom Windfarm,Ehv Switching Station,359469.0,150793.0,51.254794,-2.582199
+863413,Heywood Grange Pv Farm,Ehv Switching Station,396429.0,344940.0,53.001743,-2.054676
+875036,Green Lane Marchinton Pv,Ehv Switching Station,414625.0,330981.0,52.876079,-1.784148
+898432,Lodge Farm Solar Dummy,Ehv Switching Station,441848.0,370363.0,53.228642,-1.374587
+670152,Wickhamford 66kv,Ehv Switching Station,404986.0,239903.0,52.057446,-1.928708
+550403,Dowlais Stor East,Ehv Switching Station,307883.0,208921.0,51.771298,-3.336467
+735840,Union Road Generation 33kv,Ehv Switching Station,398325.0,290764.0,52.514718,-2.026127
+168104,New Row Farm 33kv Solar Park,Ehv Switching Station,362524.0,144484.0,51.198276,-2.537763
+680069,Loscoe 132kv Switching Station,132kv Switching Station,442391.0,348314.0,53.030414,-1.36936
+926220,Ragdale Pv Solar Park,Ehv Switching Station,465736.0,320430.0,52.777429,-1.026925
+898460,The Breck Solar 33kv Dummy,Ehv Switching Station,442493.0,376201.0,53.281065,-1.364148
+778160,Rotherdale Farm Pv 66kv,Ehv Switching Station,396578.0,250664.0,52.154194,-2.051448
+520374,Brynteg Pv Generation,Ehv Switching Station,249307.0,203410.0,51.709084,-4.182478
+438020,Bodiniel 33kv Solar Park,Ehv Switching Station,206089.0,68626.0,50.485207,-4.734886
+905191,Croft End Solar Farm,Ehv Switching Station,549724.0,363231.0,53.14516,0.237194
+118115,Northwood 33 Kv Solar Park,Ehv Switching Station,363371.0,182503.0,51.540171,-2.529572
+520345,Ffos Las Pv Generation,Ehv Switching Station,243779.0,205539.0,51.726701,-4.263387
+520346,Pont Andrew Pv Generation,Ehv Switching Station,252738.0,210651.0,51.775056,-4.135929
+218019,Somerton Door 33kv Solar Park,Ehv Switching Station,347172.0,130313.0,51.069636,-2.755393
+114756,Severnside Energy Recovery Centre,132kv Switching Station,353896.0,182631.0,51.540625,-2.666199
+939003,Swinford Wind Farm,Ehv Switching Station,456325.0,281709.0,52.430426,-1.173015
+600350,Jordanston Farm Pv Generation,Ehv Switching Station,206917.0,201142.0,51.675724,-4.794062
+905663,Burton Pedwardine Solar Park 1,Ehv Switching Station,510787.0,343440.0,52.976834,-0.35147
+580383,Crugmore 33kv Solar Park,Ehv Switching Station,220682.0,247006.0,52.092228,-4.619056
+917543,Nowhere Farm Pv,Ehv Switching Station,527617.0,337954.0,52.923816,-0.103119
+898371,Cobb Farm Solar Generation Dummy,Ehv Switching Station,474889.0,368826.0,53.211214,-0.880067
+917647,Mill Farm Solar Boothby Great Wood,Ehv Switching Station,494806.0,331012.0,52.868211,-0.593029
+438099,Kerriers 33kv Solar Park,Ehv Switching Station,200208.0,63915.0,50.440916,-4.815166
+939140,Atherstone Solar Farm 33kv,Ehv Switching Station,429690.0,301540.0,52.610798,-1.562973
+318118,Francis Court Farm 33kv Solar Park,Ehv Switching Station,296613.0,97976.0,50.772048,-3.467627
+188150,Wick Farm 33kv Solar Park,Ehv Switching Station,331609.0,154229.0,51.283019,-2.98204
+560408,Rosedew 33kv Solar  Farm,Ehv Switching Station,297959.0,167593.0,51.398102,-3.468219
+418101,Nanteague 33kv Solar Park,Ehv Switching Station,179523.0,49699.0,50.305844,-5.09772
+418102,Goonhilly 33kv Solar Park,Ehv Switching Station,170484.0,20492.0,50.040129,-5.206831
+946139,Hartwell Road 33kv,Ehv Switching Station,479179.0,249070.0,52.134225,-0.84459
+946174,Mount Mill Solar Park 33kv,Ehv Switching Station,475672.0,238584.0,52.040456,-0.898148
+875065,Holtwood Farm Solar Park,Ehv Switching Station,413217.0,332746.0,52.891972,-1.805011
+268008,Week Farm 33kv Solar Park,Ehv Switching Station,251392.0,119272.0,50.953601,-4.117212
+580394,Red Court Solar Farm,Ehv Switching Station,237680.0,219257.0,51.848198,-4.358028
+926096,Wymeswold 33kv,Ehv Switching Station,458290.0,322595.0,52.797752,-1.136923
+438059,Langunnett Farm 33kv Solar Park,Ehv Switching Station,215647.0,57904.0,50.391969,-4.595028
+258127,Hurcott 33kv Solar Park,Ehv Switching Station,339058.0,115902.0,50.939258,-2.86876
+318090,Till House 33kv Solar Park,Ehv Switching Station,301317.0,96872.0,50.762943,-3.400642
+898344,Welbeck Solar Farm Dummy,Ehv Switching Station,459875.0,371405.0,53.236285,-1.104367
+218009,Culmhead 33kv Solar Park,Ehv Switching Station,321072.0,114814.0,50.927292,-3.12446
+118157,Oakham Farm Solar Park,Ehv Switching Station,359973.0,183346.0,51.547525,-2.578664
+907556,Branston South Solar Farm,Ehv Switching Station,503229.0,365659.0,53.178006,-0.456877
+258062,Newlands Farm 33kv Solar Park,Ehv Switching Station,333159.0,97902.0,50.776752,-2.949412
+875089,Drakelow Renewable Energy Centre,Ehv Switching Station,423286.0,319782.0,52.775095,-1.65626
+795669,Hall Farm Pv Awre 33kv,Ehv Switching Station,369374.0,208323.0,51.772685,-2.445289
+520371,Penycae Solar Farm,Ehv Switching Station,259986.0,211608.0,51.785513,-4.031332
+917515,The Grange Windfarm 33kv,Ehv Switching Station,545992.0,319248.0,52.751096,0.161646
+600357,Liddestone Ridge Pv Generation,Ehv Switching Station,189915.0,206574.0,51.718393,-5.042893
+418108,Four Burrows Blackdown Solar Park,Ehv Switching Station,175751.0,47939.0,50.288616,-5.149556
+779071,Astley Solar Farm 33kv,Ehv Switching Station,377369.0,285569.0,52.467545,-2.334571
+268078,Luscott Barton 33kv Solar Park,Ehv Switching Station,251976.0,136835.0,51.111582,-4.116083
+418141,Burthy 33kv Solar Park,Ehv Switching Station,190622.0,55850.0,50.365131,-4.945485
+550400,Pen Y Cymoedd Wind Farm,Ehv Switching Station,290591.0,202257.0,51.708298,-3.584882
+114652,Avonmouth Biogas,Ehv Switching Station,352361.0,179374.0,51.511222,-2.687897
+550384,Aberaman Industrial No1,Ehv Switching Station,302117.0,200787.0,51.697217,-3.417715
+550390,Hill Solar Farm,Ehv Switching Station,319302.0,192241.0,51.623122,-3.16715
+318137,Bystock Farm 33kv Solar Park,Ehv Switching Station,302324.0,84309.0,50.650172,-3.38304
+168138,Pylle 33kv Solar Park,Ehv Switching Station,362975.0,138834.0,51.147503,-2.530725
+550377,Cwm Cae Singrug 33kv Solar Park,Ehv Switching Station,319655.0,193935.0,51.6384,-3.162441
+906126,Leverton Solar Park,Ehv Switching Station,538495.0,349365.0,53.023634,0.063459
+856887,Lower Newton Solar Farm 33kv,Ehv Switching Station,398843.0,338623.0,52.944969,-2.01868
+118117,Marksbury 33kv Solar Park,Ehv Switching Station,365062.0,161445.0,51.350941,-2.503105
+418060,Little Trevease Farm 33kv Solar Fm,Ehv Switching Station,172483.0,32893.0,50.152259,-5.186343
+168001,Shooters Bottom 33kv Solar Park,Ehv Switching Station,359098.0,150052.0,51.248095,-2.58743
+510428,Whitton Mawr Solar Park,Ehv Switching Station,308390.0,172532.0,51.444285,-3.319601
+510429,Barry Dock Biomass,Ehv Switching Station,312676.0,167704.0,51.401571,-3.256755
+348176,Place Barton Farm 33kv Solar Park,Ehv Switching Station,275834.0,52243.0,50.35688,-3.746902
+338177,Cattedown 33kv Stor Generator,Ehv Switching Station,249798.0,54207.0,50.368467,-4.113466
+550418,Rassau Industrial Estate Stor,Ehv Switching Station,315133.0,212055.0,51.800626,-3.23219
+883570,Private Road No5 Colwick Stor,Ehv Switching Station,462530.0,340383.0,52.957159,-1.070621
+926349,Irchester Road Switching Station,Ehv Switching Station,492050.0,263949.0,52.265964,-0.652557
+268000,Bratton Fleming 33kv Solar Park,Ehv Switching Station,265800.0,138279.0,51.12796,-3.919246
+268002,West Hill 33kv Solar Farm,Ehv Switching Station,250301.0,140608.0,51.14505,-4.14155
+898555,Bilsthorpe P V Generation,Ehv Switching Station,464132.0,359469.0,53.128513,-1.042987
+926263,Kelmarsh Wind Farm Generation,Ehv Switching Station,471990.0,279125.0,52.405373,-0.943198
+358116,Northmoor 132kv Solar Park,132kv Switching Station,227001.0,97474.0,50.750946,-4.45385
+875141,Taylor Lane 33kv Stor,Ehv Switching Station,442647.0,347510.0,53.0232,-1.3656
+898284,Little Morton Solar Farm Dummy,Ehv Switching Station,466973.0,379255.0,53.305999,-0.996388
+600367,Fenton Farm Pv Generation,Ehv Switching Station,198798.0,217336.0,51.818296,-4.9207
+874972,Smith Hall Farm Solar Plant,Ehv Switching Station,426568.0,346232.0,53.012716,-1.605459
+458128,Newton Barton 33kv Solar Park,Ehv Switching Station,235908.0,66597.0,50.47609,-4.314039
+520435,Brechfa Forest West Wind Farm,132kv Switching Station,248808.0,231103.0,51.95776,-4.201805
+756593,Witches Solar Park 66kv,Ehv Switching Station,353705.0,230502.0,51.971,-2.675345
+560420,Llynfi Afan Wind Farm,Ehv Switching Station,288597.0,193358.0,51.627915,-3.610902
+118179,Lockleaze 33kv Battery Storage,Ehv Switching Station,360429.0,176406.0,51.485153,-2.571304
+550437,Pen Bryn Oer Windfarm,Ehv Switching Station,311939.0,209347.0,51.77579,-3.277809
+520438,Mynydd Y Gwair Wind Farm,132kv Switching Station,263823.0,207751.0,51.751802,-3.974232
+580380,Llwyndu Solar Farm,Ehv Switching Station,227179.0,248758.0,52.110032,-4.525208
+188124,Hawkers Farm 33kv Solar Park,Ehv Switching Station,346898.0,147596.0,51.225015,-2.761859
+348134,Parkview 33kv Solar Park,Ehv Switching Station,276333.0,68741.0,50.505293,-3.745337
+418125,Pencoose 33kv Solar Park,Ehv Switching Station,172887.0,37990.0,50.198189,-5.183735
+520427,Gowerton 33kv Stor,Ehv Switching Station,260699.0,196443.0,51.649417,-4.014933
+338169,Tamerton Bridge 33kv Stor Generator,Ehv Switching Station,244791.0,60353.0,50.422399,-4.186358
+945510,Beachampton Solar Farm Pv 33kv,Ehv Switching Station,477967.0,236127.0,52.018046,-0.865261
+358167,Dunsland Cross 33kv Wind Farm,Ehv Switching Station,240850.0,103241.0,50.806739,-4.260197
+510439,Broad Street Swg Site,Ehv Switching Station,311573.0,167924.0,51.403377,-3.272662
+883330,Willoughby Stor 33kv Generation,Ehv Switching Station,462662.0,325806.0,52.826115,-1.071475
+560421,Mynydd Yr Aber Windfarm,Ehv Switching Station,294073.0,191356.0,51.610989,-3.531201
+510399,Sully Stor,Ehv Switching Station,314588.0,168784.0,51.411562,-3.229536
+939301,Fosse Way Radford Semele Solar Farm,Ehv Switching Station,435383.0,262042.0,52.255376,-1.483071
+530415,Manor Farm Solar Park,Ehv Switching Station,336583.0,215321.0,51.832835,-2.921757
+188168,Wick Farm West 33kv Solar Park,Ehv Switching Station,331615.0,154223.0,51.282957,-2.981953
+926406,Meadow Farm Solar,Ehv Switching Station,474047.0,290242.0,52.505014,-0.910504
+946329,Olney Hyde Farm Solar 33kv,Ehv Switching Station,488432.0,253923.0,52.176443,-0.708176
+600431,North Tenement Solar Park,Ehv Switching Station,194266.0,212362.0,51.771976,-4.983407
+875086,Trafalgar Park Gas Peaking S15,Ehv Switching Station,435468.0,332826.0,52.891688,-1.474274
+550436,Crumlin Stor,Ehv Switching Station,319966.0,197985.0,51.674861,-3.158877
+840844,Hayford Solar Farm 33kv,Ehv Switching Station,336368.0,310351.0,52.687063,-2.942827
+550402,Hafod Y Dafal Solar Park,Ehv Switching Station,320013.0,203718.0,51.726403,-3.159515
+560347,Briton Ferry Stor Generation,Ehv Switching Station,273917.0,193325.0,51.624527,-3.822864
+438092,Outlands Wood 33kv Solar Park,Ehv Switching Station,206272.0,68553.0,50.484603,-4.732271
+418046,Causilgey 33kv Solar Farm,Ehv Switching Station,178243.0,47473.0,50.285372,-5.114364
+358064,Rexon Cross Farm 33kv Solar Park,Ehv Switching Station,242401.0,89752.0,50.685952,-4.232427
+358076,Foxcombe 33kv Solar Park,Ehv Switching Station,238211.0,102857.0,50.802558,-4.29745
+540412,Tonypandy Stor 33kv Generation,Ehv Switching Station,299423.0,193230.0,51.628806,-3.454504
+530413,Traston Road Stor,Ehv Switching Station,333080.0,185746.0,51.56655,-2.966915
+418049,Higher Tregarne 33kv Solar Farm,Ehv Switching Station,176600.0,30453.0,50.131914,-5.127377
+438051,Ninnis 33kv Solar Farm,Ehv Switching Station,198016.0,51128.0,50.325311,-4.839126
+458052,Trequite 33kv Solar Farm,Ehv Switching Station,231773.0,61085.0,50.42539,-4.369786
+670141,Four Ashes E F W 33kv,Ehv Switching Station,392311.0,308338.0,52.672669,-2.115162
+945977,Watford Lodge Windfarm 33kv,Ehv Switching Station,460432.0,270546.0,52.329643,-1.114627
+945978,Winwick Wind Farm 33kv,Ehv Switching Station,464009.0,274741.0,52.366947,-1.061347
+795644,Cambridge Solar Power 33kv,Ehv Switching Station,375245.0,204471.0,51.738334,-2.359928
+338120,Balls Wood 33kv Solar Park,Ehv Switching Station,255895.0,53274.0,50.361608,-4.027435
+348121,Rydon Farm 33kv Solar Park,Ehv Switching Station,284361.0,68786.0,50.507331,-3.632192
+188122,Iwood Lane 33kv Solar Park,Ehv Switching Station,344921.0,162428.0,51.35818,-2.792446
+168105,Pitts Farm 33kv Solar Park,Ehv Switching Station,359202.0,145731.0,51.20926,-2.585447
+898308,Welbeck Colliery Solar Generation 33kv,Ehv Switching Station,456998.0,369755.0,53.22178,-1.147761
+946154,Gawcott Fields Solar Park 33kv,Ehv Switching Station,468665.0,232497.0,51.986642,-1.001514
+926184,Airfield Farm Wind Farm,Ehv Switching Station,494832.0,260200.0,52.231797,-0.612856
+333718,Faraday Road 33kv Stor Generator,Ehv Switching Station,249924.0,54168.0,50.36814,-4.11168
+560336,Baglan Bay Pv Generation,Ehv Switching Station,273252.0,191980.0,51.612282,-3.831978
+580337,Whitland Solar Park,Ehv Switching Station,218533.0,217971.0,51.83075,-4.635043
+540338,Maerdy Windfarm,Ehv Switching Station,295606.0,200986.0,51.697822,-3.511948
+258065,Parsonage Barn 33kv Solar Park,Ehv Switching Station,337776.0,116354.0,50.943176,-2.887081
+418069,Penare Farm 33kv Solar Farm,Ehv Switching Station,181010.0,49252.0,50.30238,-5.076612
+600370,Yerbeston Gate Solar Farm,Ehv Switching Station,207041.0,209108.0,51.747305,-4.796683
+520388,Blaenlleidi Wind Farm,Ehv Switching Station,251124.0,207922.0,51.750107,-4.158144
+841751,Pitchford Solar Farm 33kv,Ehv Switching Station,351661.0,302832.0,52.621058,-2.715503
+946213,Emberton Pv 33kv,Ehv Switching Station,489896.0,249343.0,52.135041,-0.687983
+318146,Coombe Farm 33kv Solar Park,Ehv Switching Station,301502.0,85061.0,50.656803,-3.394864
+898324,Moat Farm Solar Farm,Ehv Switching Station,466794.0,385076.0,53.358336,-0.997849
+898435,West End Farm Solar Generation Dummy,Ehv Switching Station,477050.0,378780.0,53.300353,-0.84531
+218032,Tonedale Farm 33kv Solar Park,Ehv Switching Station,312199.0,120927.0,50.980965,-3.252157
+946271,Thornborough Grounds Pv 33kv,Ehv Switching Station,473691.0,234775.0,52.006476,-0.92785
+907058,Boston Biomass Generation,Ehv Switching Station,534020.0,342216.0,52.960538,-0.006176
+795655,Upper Huntingford Solar Farm 33kv,Ehv Switching Station,372086.0,193781.0,51.642081,-2.404816
+939263,Lindridge Farm Solar Park,Ehv Switching Station,446021.0,305165.0,52.642249,-1.321308
+530406,Lower Hse Solar Park,Ehv Switching Station,334892.0,204328.0,51.733806,-2.944242
+458162,Trerule 33kv Solar Park,Ehv Switching Station,232512.0,58321.0,50.400765,-4.358157
+418163,Nancrossa 33kv Solar Park,Ehv Switching Station,172865.0,33494.0,50.157808,-5.181357
+898475,Littlewood Farm Pv,Ehv Switching Station,453337.0,365152.0,53.180788,-1.203369
+946140,Eakley Lanes North Pv 33kv,Ehv Switching Station,481456.0,251210.0,52.15313,-0.810818
+946141,Eakley Lanes South Pv 33kv,Ehv Switching Station,481652.0,250626.0,52.147851,-0.808094
+946176,Homestead Solar Park 33kv,Ehv Switching Station,474024.0,245811.0,52.105635,-0.920612
+790024,Coaley 33kv,Ehv Switching Station,375142.0,201662.0,51.713083,-2.361218
+183126,Wick Farm 33kv Switch Room,Ehv Switching Station,331611.0,154229.0,51.283019,-2.982011
+218016,Watchfield Lawn 33kv Solar Park,Ehv Switching Station,334209.0,147830.0,51.225795,-2.943587
+946180,Handley Park Solar Park 33kv,Ehv Switching Station,467334.0,246036.0,52.10852,-1.01823
+318172,Sharland Farm 33kv Solar Park,Ehv Switching Station,275036.0,105355.0,50.8341,-3.776
+348175,Old Stone Farm 33kv Solar Park,Ehv Switching Station,281968.0,51640.0,50.352731,-3.660522
+938992,Low Spinney Wind Farm 33kv,Ehv Switching Station,455981.0,289310.0,52.4988,-1.1768
+795731,Yorkley Solar Farm,Ehv Switching Station,363302.0,204965.0,51.742128,-2.53293
+268005,Beaford 33kv Solar Farm,Ehv Switching Station,256845.0,115569.0,50.921704,-4.03816
+268004,Horsacott 33kv Solar Farm,Ehv Switching Station,252118.0,131541.0,51.064038,-4.111873
+875157,Breach Farm 33kv,Ehv Switching Station,426407.0,319021.0,52.768111,-1.610058
+923189,Burton Wold Wind Farm South,Ehv Switching Station,491505.0,273678.0,52.353497,-0.657899
+946270,Manor Farm Pv Horton 33kv,Ehv Switching Station,483574.0,253466.0,52.173091,-0.779314
+795721,Bristol Road 33kv,Ehv Switching Station,381998.0,215894.0,51.841305,-2.26273
+510366,Peakgen Barry Stor,Ehv Switching Station,314641.0,168744.0,51.41121,-3.228765
+926186,New Albion Wind Farm,Ehv Switching Station,484785.0,283994.0,52.447296,-0.75393
+795658,Ring O Bells 33kv Solar Farm,Ehv Switching Station,372491.0,177035.0,51.491526,-2.397647
+318155,Red Hill 33kv Solar Park,Ehv Switching Station,308867.0,118104.0,50.955067,-3.298901
+560363,Loughor 33kv Solar Park,Ehv Switching Station,302538.0,167268.0,51.395995,-3.402332
+883447,Redfield Road 1 Stor,Ehv Switching Station,455345.0,337756.0,52.934335,-1.178026
+900008,Bambers Farm 33kv Wind Generation,Ehv Switching Station,549157.0,382676.0,53.319973,0.237816
+939242,Fields Farm Southam Solar Farm,Ehv Switching Station,440406.0,260999.0,52.245654,-1.409615
+258130,Hurcott 33kv Regulator,Ehv Switching Station,338396.0,113992.0,50.922014,-2.877858
+550376,Mynydd Y Bwllfa Wind Farm,132kv Switching Station,296076.0,204464.0,51.729178,-3.506189
+883456,Shelton Lodge Solar Generation,Ehv Switching Station,476850.0,339549.0,52.947806,-0.857695
+218005,Woolavington 33kv Solar Park,Ehv Switching Station,335335.0,142850.0,51.181141,-2.926565
+458082,Trehawke Farm 33kv Solar Park,Ehv Switching Station,231068.0,62112.0,50.434415,-4.380165
+258083,Higher Berechapel Farm 33kv,Ehv Switching Station,339695.0,105532.0,50.846084,-2.85798
+745501,High Point Solar Pv 33kv,Ehv Switching Station,366623.0,270945.0,52.335525,-2.491298
+357304,Canworthy 132kv Solar Park,132kv Switching Station,222566.0,93311.0,50.712216,-4.514652
+946198,Littlewood Farm Solar 33kv,Ehv Switching Station,482340.0,247167.0,52.116658,-0.798878
+926300,Wide Lane Wymeswold Solar Farm,Ehv Switching Station,462666.0,323183.0,52.802538,-1.071918
+560440,Afan Way Stor Generation,Ehv Switching Station,275584.0,189802.0,51.593229,-3.797544
+510398,Jesus College Solar Park,Ehv Switching Station,309036.0,169503.0,51.417161,-3.309529
+338028,Warleigh Barton 33kv Solar Park,Ehv Switching Station,245580.0,60936.0,50.427846,-4.1755
+927000,Chelveston Energy Park 33kv,Ehv Switching Station,500631.0,268857.0,52.308572,-0.525396
+358057,Bradford Manor 33kv Solar Park,Ehv Switching Station,228116.0,100803.0,50.781187,-4.439615
+795484,Tower Hill Solar Farm 33kv,Ehv Switching Station,367209.0,189058.0,51.599344,-2.474848
+210438,Puriton Sw Stn Branch Joint,Ehv Switching Station,331739.0,141399.0,51.1677,-2.9777
+875043,Moat Farm Draycott-In-The-Clay Solar Site,Ehv Switching Station,415673.0,330747.0,52.873937,-1.768588
+530404,Oak Grove Farm Solar Generation,Ehv Switching Station,349519.0,190019.0,51.606673,-2.73037
+841546,Condover Solar Farm,Ehv Switching Station,350947.0,307098.0,52.659341,-2.726684
+530169,Malpas Switching Site,132kv Switching Station,330080.0,190185.0,51.606083,-3.011076
+520339,Cefn Betingau Solar Pv Generation,Ehv Switching Station,266332.0,201220.0,51.693729,-3.935399
+520340,Clawdd Ddu Pv Generation,Ehv Switching Station,259897.0,209365.0,51.765337,-4.031716
+218018,Tengore Lane 33kv Solar Park,Ehv Switching Station,344717.0,127449.0,51.043653,-2.78999
+726003,Bloxwich Ess 33kv,Ehv Switching Station,399473.0,299070.0,52.589399,-2.009227
+736183,Hinksford Farm Generation,Ehv Switching Station,386997.0,289830.0,52.506167,-2.193016
+168000,Whitchurch Farm 33kv Solar Park,Ehv Switching Station,363582.0,152263.0,51.268289,-2.523415
+458097,North Wayton 33kv Solar Park,Ehv Switching Station,241279.0,63128.0,50.446397,-4.236934
+898478,Oxcroft Solar Farm,Ehv Switching Station,446883.0,374102.0,53.261829,-1.298621
+318173,Stoneshill 33kv Solar Park,Ehv Switching Station,302689.0,109744.0,50.8789,-3.3846
+358056,Higher North Beer Farm Solar Park,Ehv Switching Station,230071.0,92163.0,50.704145,-4.407923
+926142,The Ridge Solar Park,Ehv Switching Station,488947.0,265663.0,52.281879,-0.697563
+438148,Denzell Downs 33kv Wind Farm,Ehv Switching Station,189796.0,67259.0,50.467311,-4.963476
+841865,Sheriffhales Solar Farm 33kv,Ehv Switching Station,374816.0,312505.0,52.709585,-2.374208
+258174,Axe View 33kv Solar Farm,Ehv Switching Station,333034.0,102042.0,50.813971,-2.951941
+318165,Water Lane 33kv Stor Generator,Ehv Switching Station,292569.0,90909.0,50.707784,-3.522894
+218041,Montys Farm 33kv Solar Park,Ehv Switching Station,318191.0,126603.0,51.032877,-3.168101
+118166,Lawrence Weston 33kv Solar Park,Ehv Switching Station,353850.0,178838.0,51.506518,-2.666364
+520365,Pentre Farm Pv Generation,Ehv Switching Station,253581.0,208867.0,51.759245,-4.122966
+510407,Derwyn Solar Park,Ehv Switching Station,307965.0,169007.0,51.412529,-3.324797
+560419,Newton Down Windfarm,Ehv Switching Station,284572.0,179782.0,51.505086,-3.664552
+939476,Hill Farm Battery Generation,Ehv Switching Station,437412.0,314271.0,52.724765,-1.447499
+898563,Bolsover Moor Quarry Pv Solar Farm,Ehv Switching Station,449770.0,371858.0,53.241398,-1.255694
+939417,Baddesley 33kv Energy Park,Ehv Switching Station,428252.0,297353.0,52.573236,-1.584564
+258153,Crewkerne 33kv Solar Park,Ehv Switching Station,346077.0,111027.0,50.896125,-2.768152
+874992,Rolleston Park Solar Farm,Ehv Switching Station,421337.0,327260.0,52.842398,-1.684665
+188112,Carditch Drove 33kv Solar Park,Ehv Switching Station,342773.0,161409.0,51.348806,-2.823141
+418158,Carnemough Farm 33kv Solar Park,Ehv Switching Station,192052.0,52060.0,50.331598,-4.923314
+898340,Eakring Solar Farm Dummy,Ehv Switching Station,465873.0,362160.0,53.152495,-1.016419
+875155,Nottingham Road Stor,Ehv Switching Station,449332.0,333965.0,52.9008,-1.2681
+458147,Wilton Farm 33kv Wind Farm,Ehv Switching Station,231056.0,58683.0,50.403601,-4.378789
+875166,Twin Oaks,Ehv Switching Station,412797.0,333164.0,52.895749,-1.811237
+318161,Makro Exeter 33kv Stor Generator,Ehv Switching Station,293162.0,89554.0,50.695712,-3.514107
+358068,Crinacott Farm 33kv Solar Park,Ehv Switching Station,230702.0,101649.0,50.78956,-4.403353
+358080,Derriton Fields 33kv Solar Park,Ehv Switching Station,233092.0,102694.0,50.799638,-4.369953
+258023,Wyld Meadow 33kv Solar Park,Ehv Switching Station,334561.0,98542.0,50.782667,-2.929644
+168106,Dinder Fm 33kv Solar Park,Ehv Switching Station,359158.0,145589.0,51.20798,-2.58606
+670084,Abson 33 Kv S/S,Ehv Switching Station,371095.0,175651.0,51.479013,-2.41764
+939300,Victoria Road Pv Ellistown,Ehv Switching Station,444451.0,310457.0,52.68995,-1.343797
+917670,French Farm Wind Farm,Ehv Switching Station,528579.0,309151.0,52.664798,-0.100129
+917673,Equitix Esi Chp Notts,Ehv Switching Station,465277.0,327821.0,52.843916,-1.032269
+338190,Newton Downs 33kv Solar Park,Ehv Switching Station,255636.0,49714.0,50.329548,-4.029709
+550375,Hendre Fawr Solar Farm,Ehv Switching Station,290667.0,205991.0,51.741873,-3.584956
+939150,Prestop Fm Burton Rd Ashby,Ehv Switching Station,433924.0,317361.0,52.75278,-1.498823
+898347,Tiln Farm Solar Generation,Ehv Switching Station,471510.0,383716.0,53.345498,-0.927309
+358129,Walland Farm 33kv Solar Park,Ehv Switching Station,235295.0,122033.0,50.974032,-4.347443
+348131,Coombeshead Farm 33kv Solar Park,Ehv Switching Station,274870.0,55884.0,50.389413,-3.761659
+841517,Wrockwardine Solar Farm 33kv,Ehv Switching Station,361029.0,311899.0,52.703318,-2.578207
+348132,Ashcombe 33kv Solar Park,Ehv Switching Station,291721.0,77879.0,50.590492,-3.531086
+520386,Rhyd Y Pandy Solar Park,Ehv Switching Station,265899.0,201600.0,51.697026,-3.941795
+600387,Haverfordwest Solar Park,Ehv Switching Station,197831.0,216606.0,51.811392,-4.934284
+453150,Wilton Wind&Solar 33kv Switching Stn Branch Joint,Ehv Switching Station,231349.0,58583.0,50.402786,-4.374621
+841809,Sundorne Solar Farm 33kv,Ehv Switching Station,352198.0,315263.0,52.732847,-2.70938
+560379,Court Coleman Pv Generation,Ehv Switching Station,288217.0,181873.0,51.524614,-3.612726
+590424,Nanthenfoel Solar Park,Ehv Switching Station,254350.0,252286.0,52.149557,-4.130249
+795794,Sudmeadow Road Stor Generation,Ehv Switching Station,381904.0,218554.0,51.865218,-2.264235
+550433,Rhigos Road Gas Generation,Ehv Switching Station,294320.0,206182.0,51.744291,-3.532127
+550343,Hirwaun Stor Generation,Ehv Switching Station,293748.0,206157.0,51.743958,-3.540401
+945726,Turweston Airfield Solar Farm 33kv,Ehv Switching Station,461046.0,238759.0,52.043832,-1.111332
+898350,Thoresby Solar Farm Dummy,Ehv Switching Station,461016.0,370882.0,53.231464,-1.087375
+560372,Margam Biomass Generation,132kv Switching Station,278894.0,186375.0,51.563161,-3.748602
+906537,Grange Farm Solar Kirkby On Bain 33kv,Ehv Switching Station,523107.0,362092.0,53.141736,-0.160962
+939156,Elms Farm Southam Solar Farm,Ehv Switching Station,438112.0,257995.0,52.218812,-1.44355
+338133,Newnham Farm 33kv Solar Park,Ehv Switching Station,255996.0,58588.0,50.409383,-4.028053
+898483,Retford Road Solar Generation Dummy,Ehv Switching Station,464290.0,385890.0,53.365953,-1.035301
+348103,Bidwell 33kv Solar Park,Ehv Switching Station,277365.0,61633.0,50.441617,-3.728459
+550409,Pen Rhiw Caradog 33kv Pv Generation,Ehv Switching Station,304533.0,197805.0,51.670829,-3.381952
+530414,Rhewl Farm Solar Park,Ehv Switching Station,349520.0,192912.0,51.632693,-2.730781
+736099,Wolverhampton Power 33kv,Ehv Switching Station,392757.0,298275.0,52.582203,-2.108342
+857114,Staunch Standby Generation 33kv,Ehv Switching Station,383660.0,348443.0,53.032992,-2.245124
+779493,Upper Meadowly Pv Farm 33kv,Ehv Switching Station,366541.0,292580.0,52.530013,-2.494675
+910016,Redhouse Farm Wind Farm Gedney 33kv,Ehv Switching Station,542173.0,328828.0,52.838174,0.109265
+910019,Bicker Fen Wind Generation 33kv,Ehv Switching Station,519524.0,339236.0,52.937187,-0.222965
+946091,Yelvertoft Wind Farm 33kv,Ehv Switching Station,457754.0,274755.0,52.367767,-1.153198
+520348,Tir John Stor Generation,Ehv Switching Station,268810.0,193632.0,51.626118,-3.896713
+600349,Wear Point Wind Farm,Ehv Switching Station,194249.0,204552.0,51.701845,-4.979034
+218043,Halse 33kv Solar Farm,Ehv Switching Station,315796.0,128314.0,51.047913,-3.202647
+898541,Hermitage Lane Generation,Ehv Switching Station,452456.0,359816.0,53.132906,-1.217423
+745465,Henley Solar Farm,Ehv Switching Station,345748.0,288529.0,52.491929,-2.800494
+897792,Low Farm Ad Dummy,Ehv Switching Station,469812.0,385645.0,53.363052,-0.952385
+438084,Garlenick 33kv Wind Farm,Ehv Switching Station,194781.0,49040.0,50.30543,-4.883378
+438087,Carloggas Farm 33kv Solar Park,Ehv Switching Station,195637.0,54329.0,50.353242,-4.87424
+550378,Hendai 33kv Solar Farm,Ehv Switching Station,311942.0,197886.0,51.67276,-3.274864
+218047,Park Wall 33kv Disconnectable Branch Joint,Ehv Switching Station,332060.0,135926.0,51.118513,-2.972097
+458109,Otterham 132kv Wind Farm,132kv Switching Station,215868.0,90246.0,50.682598,-4.607893
+458142,Wilton Farm 33kv Solar Park,Ehv Switching Station,231354.0,58592.0,50.402869,-4.374558
+670170,Troughton Farm 132kv,132kv Switching Station,391505.0,228719.0,51.95684,-2.125044
+939208,Pebble Hall Generation,Ehv Switching Station,466162.0,284508.0,52.454485,-1.027803
+945674,Roade Wind Farm 33kv,Ehv Switching Station,477947.0,252291.0,52.163352,-0.861848
+118093,Avonmouth Wind Farm,Ehv Switching Station,353261.0,182005.0,51.534945,-2.675271
+188123,Ashlawn Farm 33kv Solar Park,Ehv Switching Station,337025.0,151316.0,51.257454,-2.90388
+898482,Twin Yards Solar Farm,Ehv Switching Station,445738.0,357880.0,53.116122,-1.3181
+798100,Says Farm Pv 33kv,Ehv Switching Station,369123.0,180697.0,51.524278,-2.446478
+906972,Hawton Wind Farm,Ehv Switching Station,479725.0,349450.0,53.03637,-0.812479
+438171,Bodwen Solar Farm,Ehv Switching Station,202998.0,60519.0,50.411354,-4.774139
+218004,Grange Farm 33kv Solar Park,Ehv Switching Station,314397.0,124103.0,51.009849,-3.221604
+218000,New Rendy Farm 33kv Solar Farm,Ehv Switching Station,315970.0,123838.0,51.007699,-3.199126
+906124,Whitecross Lane Solar Park Burton Pedwardine,Ehv Switching Station,510473.0,343479.0,52.977258,-0.356145
+458145,Wilton 33kv Switching Station,Ehv Switching Station,231470.0,60265.0,50.4179,-4.3737
+930090,Gec Test Bed Whetstone 33kv,Ehv Switching Station,455564.0,296473.0,52.563217,-1.181748
+917757,Mill Farm Battery Storage,Ehv Switching Station,495022.0,348485.0,53.025203,-0.584706
+520373,Saron Solar Farm,Ehv Switching Station,260700.0,212801.0,51.79642,-4.021472
+590282,W G W B Towy Intake,Ehv Switching Station,248604.0,220329.0,51.8609,-4.200034
+350023,Roadford,Ehv Switching Station,242026.0,89987.0,50.687955,-4.237831
+520381,Abergelli Pv Generation,Ehv Switching Station,265020.0,201981.0,51.700236,-3.954659
+560382,Cenin Energy Park,Ehv Switching Station,284150.0,180158.0,51.50839,-3.670763
+438156,West Carclaze 33kv Solar Park,Ehv Switching Station,201945.0,54941.0,50.360887,-4.786001
+946165,Lilbourne Wind Farm 33kv,Ehv Switching Station,456649.0,277288.0,52.390651,-1.168998
+520334,Western Coal,Ehv Switching Station,286817.0,206116.0,51.742231,-3.640748
+898357,Walkers Wood Solar Farm Dummy,Ehv Switching Station,466873.0,379518.0,53.308366,-0.997833
+560361,Treguff Farm Pv Generation,Ehv Switching Station,302205.0,171104.0,51.430413,-3.408173
+560359,Garn Farm 33kv Solar Park,Ehv Switching Station,303335.0,173561.0,51.452702,-3.392596
+520392,Gelliwern Isaf Pv Gen,Ehv Switching Station,262447.0,201603.0,51.696222,-3.991723
+600352,Rudbaxton Pv Generation,Ehv Switching Station,196958.0,220989.0,51.850422,-4.949502
+550416,Bargoed Solar Park,Ehv Switching Station,309536.0,205552.0,51.741294,-3.31164
+118180,Old Green 132kv Generation Station,132kv Switching Station,364965.0,184689.0,51.559926,-2.506808
+840698,Battlefield Generation 33kv,Ehv Switching Station,350984.0,316350.0,52.742518,-2.727519
+939122,Hall Farm Newbold Verdon,Ehv Switching Station,443184.0,303263.0,52.625375,-1.363481
+348027,Marley Thatch Farm 33kv Solar Park,Ehv Switching Station,272671.0,60220.0,50.427907,-3.794049
+218017,Redlands Farm 33kv Solar Park,Ehv Switching Station,342940.0,135435.0,51.115292,-2.816598
+438024,Woodland Barton 33kv Solar Park,Ehv Switching Station,200731.0,61925.0,50.423219,-4.806752
+438025,Luxulyan 33kv Solar Park,Ehv Switching Station,204425.0,59360.0,50.40142,-4.753476
+358159,Denbrook 33kv Wind Farm,Ehv Switching Station,268944.0,100012.0,50.78476,-3.86055
+438038,Winnards Perch 33kv Solar Farm,Ehv Switching Station,192457.0,66848.0,50.464568,-4.925803
+438039,Penhale 33kv Solar Farm,Ehv Switching Station,195134.0,71529.0,50.507552,-4.890701
+898444,Averill Solar Farm,Ehv Switching Station,440487.0,361437.0,53.148526,-1.3961
+520396,Brynwhilach Solar Park,Ehv Switching Station,264578.0,200312.0,51.685141,-3.960403
+437200,St Blazey Switch Stn 33kv,Ehv Switching Station,206469.0,54047.0,50.35437,-4.722013
+438040,Trekenning Farm 33kv Solar Park,Ehv Switching Station,192374.0,62371.0,50.424329,-4.92449
+118183,Rockingham 33kv Generation Station,Ehv Switching Station,352680.0,180391.0,51.520384,-2.683435
+348182,Alders Way 33kv Stor,Ehv Switching Station,287200.0,59362.0,50.423176,-3.589329
+118184,Viridor 33kv Waste To Energy Gen,Ehv Switching Station,353624.0,181762.0,51.532795,-2.670005
+550441,Beaufort Power Stor,Ehv Switching Station,314281.0,211800.0,51.798204,-3.24448
+550442,Brecon Power Stor,Ehv Switching Station,315689.0,212597.0,51.805582,-3.224261
+898663,Asher Lane 33kv Stor,Ehv Switching Station,439374.0,351802.0,53.061996,-1.413919
+917778,North Rauceby 33kv Switching Station,Ehv Switching Station,502567.0,346192.0,53.003198,-0.472984
+610443,Bryn Blaen Wind Farm Generation,Ehv Switching Station,296573.0,272527.0,52.340997,-3.519602
+210815,Fideoak 33kv Battery,Ehv Switching Station,318998.0,125066.0,51.019183,-3.156251
+670035,University Of Birmingham 132/11kv,132kv Switching Station,404548.0,283354.0,52.448096,-1.934526
+218045,Hele Manor Stor 33kv,Ehv Switching Station,318889.0,124784.0,51.016623,-3.157742
+580328,Blaengwen Windfarm,132kv Switching Station,245705.0,232850.0,51.972593,-4.247712
+600364,Tiers Cross Solar Park,132kv Switching Station,190304.0,208792.0,51.738453,-5.038606
+348045,Hatchlands Farm 33kv Solar Park,Ehv Switching Station,273707.0,59500.0,50.421668,-3.779228
+560358,Llandarcy Stor Generation,Ehv Switching Station,271815.0,196193.0,51.649816,-3.854264
+560405,Stormy Down Solar Park,Ehv Switching Station,284610.0,180537.0,51.511882,-3.664262
+348111,Yonder Parks 33kv Solar Park,Ehv Switching Station,283065.0,52265.0,50.358569,-3.645304
+458058,Trefinnick Farm 33kv Solar Park,Ehv Switching Station,233743.0,74068.0,50.54261,-4.347853
+438107,Victoria 33kv Wind Farm,Ehv Switching Station,199942.0,62025.0,50.423849,-4.817899
+438011,Manor Farm 33kv Solar Park,Ehv Switching Station,198784.0,52208.0,50.335266,-4.828926
+926237,Chelveston Solar Park,Ehv Switching Station,500663.0,268846.0,52.308467,-0.52493
+338151,Portworthy Dams 33kv Solar Park,Ehv Switching Station,256282.0,60933.0,50.430529,-4.024929
+358022,Eastacombe Fm 33kv Solar Park,Ehv Switching Station,235550.0,99677.0,50.77324,-4.333753
+590444,Ystradffin Hydro Generation,Ehv Switching Station,277560.0,245900.0,52.09781,-3.788915
+438094,St Stephen 33kv Solar Park,Ehv Switching Station,193508.0,54953.0,50.358109,-4.904475
+268001,Knockworthy 33kv Solar Park,Ehv Switching Station,251235.0,122872.0,50.985907,-4.120907
+358067,Willsland 33kv Solar Park,Ehv Switching Station,250798.0,103986.0,50.816075,-4.119418
+268113,Capelands Farm 33kv Solar Park,Ehv Switching Station,266250.0,138966.0,51.134245,-3.913074
+210270,Huntworth Generator,Ehv Switching Station,330876.0,135340.0,51.113107,-2.988905
+358114,East Youlstone 33kv Windfarm,Ehv Switching Station,228127.0,115876.0,50.916619,-4.446538
+358160,Ashwater 33kv Solar Park,Ehv Switching Station,237766.0,97646.0,50.755603,-4.301453
+218071,Aller Court 33kV Solar Farm,Ehv Switching Station,338985.0,129161.0,51.058465,-2.872032
+900010,The Hollies Wind Farm 33kv,Ehv Switching Station,549748.0,362901.0,53.142189,0.237399
+906387,Fiskerton Solar Farm,Ehv Switching Station,504973.0,372970.0,53.243358,-0.428376
+118154,Chelwood 33kv Solar Park,Ehv Switching Station,364367.0,161127.0,51.348039,-2.513052
+210540,Quartley,Ehv Switching Station,298497.0,125326.0,51.018254,-3.448528
+916813,Ermine Farm Solar Farm 33kv,Ehv Switching Station,500737.0,346760.0,53.008649,-0.500067
+690071,Old Dalby Lodge Wind Farm,Ehv Switching Station,465383.0,324098.0,52.81044,-1.03144
+258073,Stonebarrow Farm 33kv Solar Park,Ehv Switching Station,335256.0,98904.0,50.786009,-2.919851
+358074,Pitworthy 33kv Solar Park,Ehv Switching Station,228781.0,104933.0,50.818489,-4.432118
+268091,Cleave Farm 33kv Solar Park,Ehv Switching Station,249813.0,124915.0,51.003908,-4.14201
+883465,Stragglethorpe Road Pv Solar Park 33kv,Ehv Switching Station,463790.0,337302.0,52.92931,-1.052473
+348178,Barton Hill 33kv Stor Generator,Ehv Switching Station,290508.0,66452.0,50.487541,-3.544855
+458095,Trewidland Farm 33kv Solar Park,Ehv Switching Station,226143.0,59400.0,50.408601,-4.44819
+458048,Higher Trevartha 33kv Solar Farm,Ehv Switching Station,227919.0,64264.0,50.452827,-4.425452
+690069,Clay Lake Generation 33kv,Ehv Switching Station,525416.0,321284.0,52.77456,-0.142246
+670153,Garreg Lwyd Wind Farm 66kv,Ehv Switching Station,313415.0,279962.0,52.410751,-3.274386
+210600,Blackditch,Ehv Switching Station,332532.0,142944.0,51.18167,-2.966679
+218040,Withy Drove 33kv Solar Park,Ehv Switching Station,332601.0,143437.0,51.186111,-2.965785
+218002,Park Wall 33kv Solar Park,Ehv Switching Station,332081.0,135949.0,51.118718,-2.971808
+560342,Pantywal Windfarm,Ehv Switching Station,295450.0,191564.0,51.613116,-3.511384
+438066,Hewas 33kv Solar Farm,Ehv Switching Station,192042.0,53501.0,50.344546,-4.92425
+218075,Whitley Farm 33kv Solar Farm,Ehv Switching Station,344609.0,137056.0,51.130021,-2.793006
+670161,Air Liquide Station Road,132kv Switching Station,420042.0,290982.0,52.516325,-1.706101
+560417,Mynydd Brombil Windfarm,Ehv Switching Station,278946.0,188884.0,51.585712,-3.748717
+898436,Arkwright Solar,Ehv Switching Station,443757.0,372303.0,53.245926,-1.345727
+925737,Burton Wold North,Ehv Switching Station,492744.0,275976.0,52.373942,-0.639079
+418096,Gover Park 33kv Solar Park,Ehv Switching Station,172162.0,48321.0,50.290674,-5.200088
+268136,Bommertown 33kv Solar Park,Ehv Switching Station,282241.0,125597.0,51.017587,-3.680273
+580314,Parc Cynog W/Farm,Ehv Switching Station,225753.0,209499.0,51.756952,-4.526116
+580432,Bryncyrnau Isaf Solar Park,Ehv Switching Station,242926.0,217395.0,51.832971,-4.281086
+458013,Howton Farm 33kv Solar Park,Ehv Switching Station,237282.0,63275.0,50.446622,-4.293246
+458047,Ford Farm 33kv Solar Park,Ehv Switching Station,231240.0,66304.0,50.47214,-4.379635
+260180,Darracott Moor Windfarm,Ehv Switching Station,251381.0,121376.0,50.972505,-4.118229
+338181,Sherford Idno Connection,Ehv Switching Station,254157.0,54306.0,50.370454,-4.052254
+920012,Burton Wold Wind Farm Generation 33kv,Ehv Switching Station,491553.0,274710.0,52.362764,-0.656914
+520423,Cockett Valley Solar Park,Ehv Switching Station,261101.0,195024.0,51.636782,-4.008569
+926264,Higham Ferrers Switching Station,Ehv Switching Station,496573.0,268672.0,52.307637,-0.58495
+939146,Babelake St Packington 33kv,Ehv Switching Station,435602.0,312680.0,52.710585,-1.474469
+218039,Tricky Warren 33kv Switching Station,Ehv Switching Station,321329.0,115620.0,50.9346,-3.121
+510401,Llancadle 33kv Solar Park,Ehv Switching Station,303140.0,168669.0,51.408686,-3.394062
+188139,Rookery Farm 33kv Solar Park,Ehv Switching Station,340520.0,161726.0,51.351424,-2.855541
+875073,Derby Waste Sinfin Lane,Ehv Switching Station,435116.0,332976.0,52.893068,-1.47949
+458030,Haye Lane 33kv Solar Park,Ehv Switching Station,235243.0,70303.0,50.509213,-4.325038
+438018,Rockhead Wind Farm,Ehv Switching Station,208236.0,84345.0,50.627114,-4.71275
+457810,Cold Northcott Wind Farm,Ehv Switching Station,221174.0,85851.0,50.644757,-4.53074
+926202,Pipewell Road Pv,Ehv Switching Station,481612.0,283788.0,52.445936,-0.800654
+946060,Whittlebury Road Pv 33kv,Ehv Switching Station,467988.0,245355.0,52.102318,-1.008818
+600393,Oak Cottage Solar Farm,Ehv Switching Station,203456.0,217326.0,51.819855,-4.853202
+850027,British Industrial Sand 33kv,Ehv Switching Station,404557.0,345672.0,53.008317,-1.93355
+258063,Cricket St Thomas 33kv Solar Park,Ehv Switching Station,336179.0,108733.0,50.874488,-2.908474
+251499,Stone Barrow Disconnectable Branch Joint,Ehv Switching Station,335209.0,98927.0,50.7862,-2.9205
+348077,Hazard Farm 33kv Solar Park,Ehv Switching Station,274962.0,59498.0,50.421919,-3.76157
+600355,Hoplass Solar Farm,Ehv Switching Station,191921.0,201211.0,51.670997,-5.010682
+600385,Yerbeston Chapel Hill Solar Park,Ehv Switching Station,195949.0,197997.0,51.643607,-4.950637
+600391,Little Neath Solar Farm,Ehv Switching Station,191717.0,200480.0,51.664349,-5.013206
+946276,Brafield On The Green Pv 33kv,Ehv Switching Station,482409.0,257132.0,52.206218,-0.795455
+218061,Cobbs Cross Solar Farm,Ehv Switching Station,327430.0,135483.0,51.113957,-3.038153
+670029,Dunlop 132kv,132kv Switching Station,413032.0,290264.0,52.510073,-1.809429
+268007,Kingsland Barton 33kv Solar Park,Ehv Switching Station,269245.0,126029.0,51.018661,-3.865615
+550354,Dowlais Stor West,Ehv Switching Station,307876.0,208915.0,51.771252,-3.336567
+540295,Taff Ely Windfarm,Ehv Switching Station,298575.0,186447.0,51.567695,-3.464788
+357295,Galsworthy 132kv Wind Farm,132kv Switching Station,240901.0,114550.0,50.90837,-4.264392
+520410,Mynydd Y Gwrhyd Wind Farm,Ehv Switching Station,272658.0,210705.0,51.780429,-3.847395
+540426,Berthllwyd Solar Park Generation,Ehv Switching Station,307243.0,188120.0,51.584218,-3.340207
+310047,Winslakefoot,Ehv Switching Station,281925.0,93693.0,50.730751,-3.674465
+550313,Aberaman Park,Ehv Switching Station,302251.0,200837.0,51.69768,-3.415791
+898530,Garnham Close Stor,Ehv Switching Station,442557.0,355001.0,53.090507,-1.366004
+114059,Rolls Royce Filton 132kv S/S,132kv Switching Station,360937.0,181103.0,51.527429,-2.56451
+218021,Higher Bye Farm 33kv Solar Park,Ehv Switching Station,305049.0,142236.0,51.171397,-3.359585
+560397,Pantymoch Solar Farm,Ehv Switching Station,277764.0,190514.0,51.600105,-3.766337
+218025,Puriton Landfill 33kv Solar Park,Ehv Switching Station,331502.0,141808.0,51.171334,-2.981196
+550422,Waun Y Pound Stor,Ehv Switching Station,315762.0,210503.0,51.78677,-3.222693
+883349,Lodge Farm Solar Park,Ehv Switching Station,477992.0,341496.0,52.96514,-0.840235
+318026,Burrowton Farm 33kv Solar Park,Ehv Switching Station,300808.0,97226.0,50.766048,-3.407952
+338185,Marlands Fields Creacombe 33kv Solar Park,Ehv Switching Station,259155.0,50145.0,50.334275,-3.980461
+510447,Trident Park 33kv Waste Management,Ehv Switching Station,320284.0,175438.0,51.472219,-3.149155
+318164,Great Houndbeare 33kv Solar Park,Ehv Switching Station,304805.0,93284.0,50.73127,-3.350272
+906775,Canopus Solar Farm,Ehv Switching Station,530573.0,347637.0,53.010099,-0.055275
+520451,Afon Lan Solar Park,Ehv Switching Station,266336.0,201218.0,51.693704,-3.935335
+560454,Baglan Paper Mill,Ehv Switching Station,273800.0,192982.0,51.621418,-3.82443
+333743,Ernesettle Lane 33kv Stor Generator,Ehv Switching Station,244750.0,60338.0,50.422253,-4.186929
+907362,Manor Farm Pv,Ehv Switching Station,546741.0,363392.0,53.1474,0.1927
+418186,Hayle 33kv Switching Station,Ehv Switching Station,155288.0,38154.0,50.1926,-5.43
+875396,Smart Parc Idno,Ehv Switching Station,439536.0,334741.0,52.9086,-1.4136
+530455,Traston Road Battery,Ehv Switching Station,333074.0,185651.0,51.56569,-2.96698
+670148,Barton Abrasives 33kv Switching Site,Ehv Switching Station,398212.0,292967.0,52.534522,-2.027805
+188140,Towerhead Farm 33kv Solar Park,Ehv Switching Station,340712.0,159644.0,51.332726,-2.852437
+218020,Tricky Warren 33kv Solar Park,Ehv Switching Station,321219.0,115666.0,50.934972,-3.122553
+268212,Lower Litchardon 132kv Solar Farm,132kv Switching Station,251333.0,129527.0,51.045737,-4.122254
+348210,Torquay 33kv Battery Storage,Ehv Switching Station,290539.0,66416.0,50.4872,-3.5444
+218220,Church Path 33kv Solar Park,Ehv Switching Station,339164.0,129017.0,51.057198,-2.869454
+756696,Dormington Solar Farm,Ehv Switching Station,357359.0,239670.0,52.0537,-2.6233
+690070,Bowbridge Generation Stor 33kv,Ehv Switching Station,479953.0,351078.0,53.050958,-0.808677
+907213,Airfield Fiskerton Solar 33kv,Ehv Switching Station,504987.0,372934.0,53.243,-0.4282
+118209, Feeder Road 33kv Battery Storage,Ehv Switching Station,360834.0,172222.0,51.4476,-2.565
+690080,Ingleberry Road,132kv Switching Station,448288.0,318208.0,52.7593,-1.2859
+526954,Hopkins Farm Solar,Ehv Switching Station,259820.0,109740.0,50.8701,-3.9936
+218060,Horsey Level 33kv Solar Park,Ehv Switching Station,331722.0,139807.0,51.153361,-2.977669
+999001,Emergency 33kv Board,Ehv Switching Station,429710.0,265382.0,52.2857,-1.5659
+540425,St Peters Church Wind Farm,Ehv Switching Station,299356.0,185985.0,51.563673,-3.453391
+418070,Tregassow 33kv Solar Farm,Ehv Switching Station,185380.0,49303.0,50.304451,-5.015366
+418126,Garvinack Farm 33kv Solar Park,Ehv Switching Station,177286.0,48407.0,50.293404,-5.128329
+358224,Derril Water Solar Farm,Ehv Switching Station,229984.0,101759.0,50.7903,-4.4136
+690079,Newhurst Erf,132kv Switching Station,448943.0,317885.0,52.7563,-1.2762
+680071,Clifton Fairham Idno 132/11kv,132kv Switching Station,455295.0,332814.0,52.889911,-1.179609
+690000,Desford Road Bess,132kv Switching Station,452820.0,300245.0,52.5974,-1.2216
+863412,Moneystone Quarry Pv Farm,Ehv Switching Station,404568.0,345741.0,53.008937,-1.933385
+118225,Hunstrete 33kv Solar Park,Ehv Switching Station,365990.0,106120.0,50.8535,-2.4846
+560411,Maesgwyn 33kv Wind Farm,Ehv Switching Station,287166.0,208835.0,51.766729,-3.636578
+118206,Hallen 33kv Battery,Ehv Switching Station,354367.0,181177.0,51.5276,-2.659219
+530450,Llanwern 132kv Solar Park,132kv Switching Station,337577.0,185317.0,51.563201,-2.901968
+917592,Copley Farm Solar Generation,Ehv Switching Station,484950.0,347624.0,53.019157,-0.735058
+939896,Streetfield Farm Solar Farm Spv112,Ehv Switching Station,450304.0,282587.0,52.438913,-1.26143
+690082,Crick Solar 132kv,132kv Switching Station,458288.0,274602.0,52.3663,-1.1454
+946854,Bourton Road Pv,Ehv Switching Station,471065.0,233516.0,51.9955,-0.9664
+218050,West Holcombe 33kv Solar Park,Ehv Switching Station,298483.0,125268.0,51.0177,-3.4487
+779441,Howard Road Stor Redditch,Ehv Switching Station,406159.0,265818.0,52.290421,-1.911138
+907700,Low Farm Pv Friskney,132kv Switching Station,545354.0,357860.0,53.0981,0.1695
+520312,Crymlyn Burrows,Ehv Switching Station,270103.0,193493.0,51.62516,-3.877992
+938364,Newbold Pacey Solar Farm,Ehv Switching Station,429108.0,256832.0,52.2089,-1.5755
+898795,Weighbridge Road Generation,Ehv Switching Station,452896.0,366814.0,53.195761,-1.209693
+418200,Ventonteague Wind Turbine,Ehv Switching Station,183066.0,53389.0,50.340301,-5.050155
+883854,Nottingham Island Idno,Ehv Switching Station,458335.0,339275.0,52.9477,-1.1333
+938179,Harborough Fields Farm,Ehv Switching Station,450354.0,280204.0,52.417478,-1.261053
+939666,School Farm Churchover Solar Farm 33kv,Ehv Switching Station,452465.0,281320.0,52.427312,-1.229842
+418029,Hope 33kv Solar Park,Ehv Switching Station,159770.0,39881.0,50.209987,-5.36841
+188187,Langford Sofisi 33kv,Ehv Switching Station,345766.0,160925.0,51.344749,-2.780096
+348201,Noss Dart Marina,Ehv Switching Station,288256.0,52883.0,50.365125,-3.572541
+540461,Tynycoed Solar,Ehv Switching Station,301181.0,186070.0,51.5648,-3.4271
+318207,Two Post Cross 33kv Solar Park,Ehv Switching Station,267760.0,95610.0,50.7449,-3.8758
+926431,Gypsum Solar Farm,Ehv Switching Station,459767.0,316180.0,52.73992,-1.116188
+926855,Magna Park Corby,Ehv Switching Station,491581.0,288428.0,52.486055,-0.652753
+917884,White Cross Lane Sleaford,Ehv Switching Station,509120.0,343498.0,52.9777,-0.3763
+318098,Cullompton 33kv Solar Park,Ehv Switching Station,301792.0,103749.0,50.824856,-3.39575
+917964,Gorse Lane Solar,Ehv Switching Station,507563.0,342044.0,52.9649,-0.3999
+946240,Greatmoor Efw Calvert 33kv,Ehv Switching Station,470376.0,222430.0,51.895932,-0.97866
+946713,Potash Farm 50mw,Ehv Switching Station,477762.0,236120.0,52.018,-0.8682
+946714,Potash Farm 30mw,Ehv Switching Station,477770.0,236114.0,52.018,-0.8681
+417800,Carland Cross Wind Farm,Ehv Switching Station,184132.0,54707.0,50.352529,-5.035952
+438010,Trenouth Farm 33kv Solar Park,Ehv Switching Station,190992.0,70314.0,50.495176,-4.948354
+550434,Manmoel Solar Park,Ehv Switching Station,319468.0,200852.0,51.700562,-3.16674
+318219,Niro 33kv Solar Farm,Ehv Switching Station,330514.0,9389.0,49.9805,-2.9706
+899900,Inkersall Grange Solar 132kv,132kv Switching Station,462548.0,359957.0,53.1331,-1.0666
+510362,Sutton Farm Solar Park,Ehv Switching Station,307853.0,169711.0,51.418839,-3.326591
+333760,Hemerdon Mine,Ehv Switching Station,257006.0,59173.0,50.414888,-4.014071
+939807,Mercia Park Idno,Ehv Switching Station,429699.0,309497.0,52.682331,-1.562124
+907186,Battery Lane Bess,Ehv Switching Station,533445.0,342501.0,52.963242,-0.014614
+520344,Waunarlwydd Stor Generation,Ehv Switching Station,260615.0,196437.0,51.649351,-4.016145
+899200,Inkersall Farm Pv,Ehv Switching Station,442648.0,372775.0,53.250259,-1.362282
+188208,Bowerhouse 33kv Pv,Ehv Switching Station,340678.0,161757.0,51.351723,-2.85327
+418135,Roskrow Barton 33kv Solar Park,Ehv Switching Station,176527.0,35455.0,50.176801,-5.131328
+898949,Newtonwood Farm,132kv Switching Station,445444.0,360454.0,53.139283,-1.322129
+520471,Bryn Y Rhyd Solar,Ehv Switching Station,259764.0,208442.0,51.757,-4.0333
+540478,Church Village D&R Customer Dummy,Ehv Switching Station,312346.0,178910.0,51.5022,-3.2643
+736422,Idno Bickley Solar,Ehv Switching Station,382585.0,301720.0,52.6129,-2.2587
+510493,Sss Tremorfa,Ehv Switching Station,320840.0,176280.0,51.4799,-3.1414
+670173,Crimscote Solar,Ehv Switching Station,421668.0,247050.0,52.1213,-1.685
+680074,Halloughton Solar,132kv Switching Station,486533.0,351985.0,53.0581,-0.7103
+520395,Carn Nicholas Solar Farm,Ehv Switching Station,268681.0,193539.0,51.625243,-3.89854
+938400,Eastfield Solar Farm 33kv,Ehv Switching Station,438048.0,260507.0,52.2414,-1.4442
+938474,Feldon Vale Pv,Ehv Switching Station,439008.0,256416.0,52.2046,-1.4306
+520341,Betws Wind Farm,132kv Switching Station,265556.0,210146.0,51.773743,-3.950065
+904540,Efw Paving Way Generation,Ehv Switching Station,493048.0,367760.0,53.198761,-0.608547
+795651,Upper Wick Solar Farm 33kv,Ehv Switching Station,372228.0,196487.0,51.666418,-2.40298
+874987,Aston House Solar Farm 33kv,Ehv Switching Station,417400.0,331404.0,52.879799,-1.742895
+917574,Horsemoor Drove Solar 33kv,Ehv Switching Station,539053.0,319043.0,52.751083,0.058823
+883446,Langar Solar Switch Room,Ehv Switching Station,470650.0,334159.0,52.900213,-0.951122
+917572,Decoy Farm Generation,Ehv Switching Station,526142.0,312774.0,52.697922,-0.134757
+875119,Dayfields Farm Pv,Ehv Switching Station,422820.0,347524.0,53.024501,-1.66123
+438149,Cornwall Energy Recovery Centre,132kv Switching Station,194578.0,57075.0,50.377528,-4.890605
+907046,Leverton Battery Storage,Ehv Switching Station,496554.0,375329.0,53.266152,-0.553792
+906936,Lincoln Farm Solar Park,Ehv Switching Station,547887.0,362609.0,53.140086,0.209464
+418041,Fourburrows Pendown,Ehv Switching Station,176625.0,49464.0,50.302644,-5.138217
+765590,Northwick 66kv Generation,Ehv Switching Station,413698.0,235743.0,52.0199,-1.801811
+856916,Swancote Ad Generation 33kv,Ehv Switching Station,374511.0,293645.0,52.540028,-2.377261
+883503,Redfield Road 2 Stor,Ehv Switching Station,455330.0,337738.0,52.934175,-1.178252
+917435,Deepdale Solar Farm,Ehv Switching Station,507697.0,349271.0,53.029867,-0.395542
+926242,Glebe Farm Solar Park,Ehv Switching Station,496486.0,262621.0,52.253269,-0.587955
+926308,Sywell Pv,Ehv Switching Station,483881.0,268459.0,52.307806,-0.771109
+875067,Drakelow Solar Farm,Ehv Switching Station,422578.0,320065.0,52.777669,-1.666736
+318152,Batsworthy Cross 33kv Wind Farm,Ehv Switching Station,281405.0,121527.0,50.980833,-3.690856
+114632,Hewlett Packard 33kv Switching Station,Ehv Switching Station,360807.0,178135.0,51.5007,-2.5661
+540335,Mynydd Portref Windfarm,Ehv Switching Station,299125.0,185965.0,51.563452,-3.456716
+520326,Felindre Pmg Station,Ehv Switching Station,265125.0,209812.0,51.770638,-3.956178
+348033,Slade Farm 33kv Solar Park,Ehv Switching Station,274323.0,45667.0,50.297447,-3.76594
+318035,Ayshford Court Farm 33kv Solar Park,Ehv Switching Station,305187.0,115196.0,50.928322,-3.350535
+418034,Higher Trenhayle Farm Solar Park,Ehv Switching Station,158421.0,36383.0,50.178034,-5.385058
+438036,Middle Treworder Farm 33kv Solar Pk,Ehv Switching Station,201492.0,73158.0,50.524384,-4.802016
+438037,Rew Farm 33kv Solar Park,Ehv Switching Station,208956.0,61747.0,50.424354,-4.691009
+898181,Stonish Hill Wind Farm 33kv,Ehv Switching Station,466170.0,362067.0,53.151614,-1.011998
+946411,Lyon Road Generation,Ehv Switching Station,486703.0,234794.0,52.004778,-0.738313
+560320,Ffynnon Oer Wind Farm,Ehv Switching Station,277760.0,190489.0,51.599884,-3.766379
+530316,British Energy Newport South,Ehv Switching Station,333035.0,185709.0,51.566203,-2.967557
+600351,West Farm Pv Generation,Ehv Switching Station,199639.0,204100.0,51.699737,-4.900881
+550321,Trecatti Generation,Ehv Switching Station,308602.0,207805.0,51.761394,-3.325756
+318226,Tale Lane 132kv Solar Bess,132kv Switching Station,304191.0,102882.0,50.8175,-3.3615
+946783,Milton Keynes East Idno,Ehv Switching Station,489277.0,241101.0,52.0611,-0.6992
+258221,Beavor Grange 33kv Solar Farm,Ehv Switching Station,332773.0,98218.0,50.779558,-2.954944
+670167,Berkeley Heath Bess,132kv Switching Station,371142.0,198347.0,51.6831,-2.4188
+670166,Giffords Way,132kv Switching Station,400372.0,289976.0,52.5076,-1.996
+898776,Back Lane Battery,Ehv Switching Station,441821.0,369813.0,53.223701,-1.375063
+680073,Crifton Lodge Solar 132kv,132kv Switching Station,464132.0,359456.0,53.128396,-1.04299
+550488,Enviroparks,Ehv Switching Station,229394.0,220667.0,51.8584,-4.4789
+510487,Coedriglan,132kv Switching Station,330998.0,117385.0,50.9517,-2.9837
+540490,Cwarrau Mawr,Ehv Switching Station,331355.0,118929.0,50.9656,-2.979
+437340,Connon Bridge Landfill,Ehv Switching Station,217840.0,62448.0,50.433477,-4.566401

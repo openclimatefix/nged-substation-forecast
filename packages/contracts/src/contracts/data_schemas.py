@@ -3,26 +3,25 @@
 from datetime import datetime
 
 import patito as pt
+import polars as pl
 
 
-class SubstationMeasurement(pt.Model):
+class SubstationFlows(pt.Model):
     """A single measurement from a substation."""
 
-    substation_id: str
     substation_name: str
     timestamp: datetime
+
     # Primary substations usually have flows in the tens of MW.
     # We'll set a loose range for now to catch extreme errors.
-    mw: float | None = pt.Field(None, ge=-1000, le=1000)
-    mvar: float | None = pt.Field(None, ge=-1000, le=1000)
+    # If we want to reduce storage space we could store kW and kVAr as Int16.
+    MW: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
+    MVAr: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
-class SubstationMetadata(pt.Model):
+class SubstationLocation(pt.Model):
     """Metadata for a substation."""
 
-    substation_id: str
     substation_name: str
-    latitude: float | None = pt.Field(None, ge=49, le=61)  # UK latitude range
-    longitude: float | None = pt.Field(None, ge=-9, le=2)  # UK longitude range
-    voltage: float | None = pt.Field(None, ge=0, le=400)
-    region: str | None = None
+    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
+    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
