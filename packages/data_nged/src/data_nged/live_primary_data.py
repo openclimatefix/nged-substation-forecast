@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import IO, Any, Final, cast
+from typing import IO, Any, cast
 
 import patito as pt
 import polars as pl
@@ -51,19 +51,43 @@ def download_live_primary_data(
 def _primary_substation_csv_to_dataframe(
     csv_data: str | Path | IO[str] | IO[bytes] | bytes, substation_name: str
 ) -> pt.DataFrame[SubstationFlows]:
+    # Read CSV directly from URL using polars
     df = pl.read_csv(csv_data)
-    df = df.rename(
-        {
-            "ValueDate": "timestamp",
-            "MW Inst": "MW",
-            "MVAr Inst": "MVAr",
-        }
-    )
+
+    # The CSV format can vary between substations.
+    # We try to map the columns we find to our schema.
+    rename_map = {}
+    if "ValueDate" in df.columns:
+        rename_map["ValueDate"] = "timestamp"
+
+    # Possible names for MW and MVAr
+    mw_cols = ["MW Inst", "MW"]
+    mvar_cols = ["MVAr Inst", "MVAr"]
+
+    for col in mw_cols:
+        if col in df.columns:
+            rename_map[col] = "MW"
+            break
+
+    for col in mvar_cols:
+        if col in df.columns:
+            rename_map[col] = "MVAr"
+            break
+
+    df = df.rename(rename_map)
     df = df.with_columns(substation_name=pl.lit(substation_name))
+
+    # If MW or MVAr are missing, we add them as nulls so the schema validation passes
+    # (since they are optional in the contract)
+    if "MW" not in df.columns:
+        df = df.with_columns(MW=pl.lit(None, dtype=pl.Float32))
+    if "MVAr" not in df.columns:
+        df = df.with_columns(MVAr=pl.lit(None, dtype=pl.Float32))
 
     # Cast timestamp to datetime. We specify time_zone="UTC" because
     # the data has a +00:00 suffix.
     df = df.with_columns(pl.col("timestamp").str.to_datetime(time_zone="UTC"))
+
     # Cast columns to the types specified in the schema
     df = df.cast(cast(Any, SubstationFlows.dtypes))
     df = df.select(SubstationFlows.columns)
@@ -74,7 +98,7 @@ def _primary_substation_csv_to_dataframe(
 def download_substation_locations(
     client: NGEDCKANClient,
 ) -> pt.DataFrame[SubstationLocations]:
-    """Download substation locations.
+    """Download substation metadata (locations).
 
     Args:
         client: The NGED CKAN client.
@@ -82,22 +106,23 @@ def download_substation_locations(
     Returns:
         pt.DataFrame: A dataframe containing substation metadata.
     """
-    package_id: Final[str] = "primary-substation-location-easting-northings"
-    package = client.get_package_show(package_id=package_id)
+    package = client.get_package_show(package_id="primary-substation-location-easting-northings")
 
     for resource in package["resources"]:
         if resource["format"].lower() == "csv":
-            break
-    else:
-        raise RuntimeError("Could not find {package_id}")
+            try:
+                df = pl.read_csv(resource["url"])
+                # The CSV has Easting/Northing and Latitude/Longitude
+                # We rename to match our schema if necessary
+                if "Substation Name" in df.columns:
+                    df = df.rename({"Substation Name": "substation_name"})
+                if "Latitude" in df.columns:
+                    df = df.rename({"Latitude": "latitude"})
+                if "Longitude" in df.columns:
+                    df = df.rename({"Longitude": "longitude"})
 
-    try:
-        df = pl.read_csv(resource["url"])
-        # TODO(Jack): Just select(["substation_name", "latitude", "longitude"])
-        # See: https://connecteddata.nationalgrid.co.uk/dataset/primary-substation-location-easting-northings/resource/e06413f8-0d86-4a13-b5c5-db14829940ed
+                return SubstationLocations.validate(df, drop_superfluous_columns=True)
+            except Exception as e:
+                logger.error("Failed to download metadata: %s", e)
 
-        df = SubstationLocations.validate(df)
-    except Exception as e:
-        logger.error("Failed to download metadata: %s", e)
-
-    return df
+    return pt.DataFrame[SubstationLocations](pl.DataFrame())

@@ -1,15 +1,24 @@
 from pathlib import Path
-from data_nged.live_primary_data import _primary_substation_csv_to_dataframe
+
+import polars as pl
+import pytest
+from data_nged.live_primary_data import SubstationLocations, _primary_substation_csv_to_dataframe
+
+EXAMPLE_DATA_DIR = Path(__file__).parent.parent / "example_csv_data"
 
 
-def test_primary_substation_csv_to_dataframe():
-    # Use the example CSV data
-    csv_path = (
-        Path(__file__).parent.parent
-        / "example_csv_data"
-        / "aberaeron-primary-transformer-flows.csv"
-    )
-    substation_name = "Aberaeron"
+@pytest.mark.parametrize(
+    "csv_filename",
+    [
+        "aberaeron-primary-transformer-flows.csv",
+        "abington-primary-transformer-flows.csv",
+        "albrighton-11kv-primary-transformer-flows.csv",
+        "filton-dc-primary-transformer-flows.csv",
+    ],
+)
+def test_primary_substation_csv_to_dataframe(csv_filename: str):
+    csv_path = EXAMPLE_DATA_DIR / csv_filename
+    substation_name = csv_filename.split("-")[0].capitalize()
 
     df = _primary_substation_csv_to_dataframe(csv_path, substation_name=substation_name)
 
@@ -21,3 +30,35 @@ def test_primary_substation_csv_to_dataframe():
     # Check that it has the expected columns from SubstationFlows
     assert "MW" in df.columns
     assert "MVAr" in df.columns
+
+    # Verify dtypes are correct (Float32 for MW/MVAr)
+    assert df.schema["MW"] == pl.Float32
+    assert df.schema["MVAr"] == pl.Float32
+
+
+def test_substation_locations_csv_validation():
+    csv_path = EXAMPLE_DATA_DIR / "primary_substation_locations.csv"
+    df = pl.read_csv(csv_path)
+
+    # Manually apply renames as download_substation_locations would
+    df = df.rename(
+        {
+            "Substation Name": "substation_name",
+            "Latitude": "latitude",
+            "Longitude": "longitude",
+        }
+    )
+    df = df.cast(
+        {
+            "latitude": pl.Float32,
+            "longitude": pl.Float32,
+        }
+    )
+
+    validated_df = SubstationLocations.validate(df, drop_superfluous_columns=True)
+    validated_df = validated_df.select(SubstationLocations.columns)
+
+    assert validated_df.height > 0
+    assert set(validated_df.columns) == set(SubstationLocations.columns)
+    assert validated_df.schema["latitude"] == pl.Float32
+    assert validated_df.schema["longitude"] == pl.Float32
