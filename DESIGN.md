@@ -82,15 +82,16 @@ models, comparing the models, and pushing models into production.
 
 - This git repo is a `uv` workspace.
 - `Dagster` to manage the *entire* pipeline (from data ingest to training ML models to running ML
-models in production)
+models in production).
 - `MLFlow` to track ML experiments.
 - `PyTorch` with `PyTorch geometric`
 - `Polars` for working with tabular data.
 - `Xarray` and `Zarr` for pulling NWP data from Dynamical.org.
-- `Patito` for defining data contracts (or another tool if more appropriate)
+- `Patito` for defining data contracts (or another tool if more appropriate).
 - `Altair` for visualisation.
-- `Marimo` for data exploration and outputting apps for allowing NGED to visualise the data.
-- `Sentry.io` for observability
+- `Marimo` for interactive data exploration and building web apps for data visualisation.
+- `Sentry.io` for observability.
+- `obstore` for IO.
 
 
 # Data engineering
