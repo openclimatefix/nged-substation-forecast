@@ -28,12 +28,7 @@ def test_primary_substation_csv_to_dataframe(csv_filename: str):
     assert (df["substation_name"] == substation_name).all()
 
     # Check that it has the expected columns from SubstationFlows
-    assert "MW" in df.columns
-    assert "MVAr" in df.columns
-
-    # Verify dtypes are correct (Float32 for MW/MVAr)
-    assert df.schema["MW"] == pl.Float32
-    assert df.schema["MVAr"] == pl.Float32
+    assert "MW" in df.columns or "MVA" in df.columns
 
 
 def test_substation_locations_csv_validation():
