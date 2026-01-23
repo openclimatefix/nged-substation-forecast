@@ -85,6 +85,12 @@ def __read_primary_substation_csv(
     # West Midlands (e.g. Albrighton): ValueDate, Amps,                 MVA, MVAr,      MW,      Volts
     # South Wales   (e.g. Aberaeron) : ValueDate, Current Inst, Derived MVA, MVAr Inst, MW Inst, Volts Inst
     # South West    (e.g. Filton Dc) : ValueDate, Current Inst,              MVAr Inst, MW Inst, Volts Inst
+    # New format    (e.g. Regent St) : site, time, unit, value
+    if "unit" in df.columns and "value" in df.columns:
+        if not (df["unit"] == "MVA").all():
+            raise ValueError(f"Unexpected unit in CSV: {df['unit'].unique().to_list()}")
+        df = df.rename({"time": "timestamp", "value": "MVA"}, strict=False)
+
     df = df.rename(
         {"ValueDate": "timestamp", "MW Inst": "MW", "MVAr Inst": "MVAr", "Derived MVA": "MVA"},
         strict=False,

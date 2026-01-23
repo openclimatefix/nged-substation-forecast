@@ -14,6 +14,7 @@ EXAMPLE_DATA_DIR = Path(__file__).parent.parent / "example_csv_data"
         "abington-primary-transformer-flows.csv",
         "albrighton-11kv-primary-transformer-flows.csv",
         "filton-dc-primary-transformer-flows.csv",
+        "regent-street.csv",
     ],
 )
 def test_primary_substation_csv_to_dataframe(csv_filename: str):
