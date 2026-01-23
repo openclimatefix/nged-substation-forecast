@@ -1,5 +1,6 @@
 """Dagster assets for NGED data."""
 
+import functools
 from pathlib import Path
 
 import requests
@@ -31,27 +32,43 @@ class ParquetConfig(Config):
     output_path: str = "~/data/NGED/parquet"
 
 
+NGED_REGIONS = [
+    "live-primary-data---south-wales",
+    "live-primary-data---south-west",
+    "live-primary-data---west-midlands",
+    "live-primary-data---east-midlands",
+]
+
+
+def _fetch_substation_resource_dict() -> dict[str, str]:
+    """Fetch all substation resources from CKAN and return as a name->url mapping."""
+    client = NGEDCKANClient()
+    substation_name_to_url: dict[str, str] = {}
+    for region in NGED_REGIONS:
+        resources = get_substation_resource_urls(client, region)
+        substation_name_to_url.update(resources)
+    return substation_name_to_url
+
+
+@functools.cache
 def _get_all_substation_names() -> list[str]:
     """Helper to fetch all substation names for partition definition."""
-    regions = [
-        "live-primary-data---south-wales",
-        "live-primary-data---south-west",
-        "live-primary-data---west-midlands",
-        "live-primary-data---east-midlands",
-    ]
-    client = NGEDCKANClient()
-    names = set()
-    for region in regions:
-        try:
-            resources = get_substation_resource_urls(client, region)
-            for r in resources:
-                names.add(r.substation_name)
-        except Exception:
-            pass
-    return sorted(list(names)) if names else ["Placeholder"]
+    mapping = _fetch_substation_resource_dict()
+    return sorted(list(mapping.keys()))
 
 
 substation_partitions = StaticPartitionsDefinition(_get_all_substation_names())
+
+
+@asset(group_name="nged")
+def fetch_substation_resource_urls() -> dict[str, str]:
+    """Mapping of substation names to their CKAN CSV URLs.
+
+    This asset is non-partitioned and fetches all URLs from CKAN in a single pass.
+    Downstream partitioned assets use this mapping to find their specific URLs
+    without re-querying CKAN for every partition.
+    """
+    return _fetch_substation_resource_dict()
 
 
 @asset(
@@ -59,33 +76,14 @@ substation_partitions = StaticPartitionsDefinition(_get_all_substation_names())
     group_name="nged",
     retry_policy=RetryPolicy(max_retries=3, delay=10),
 )
-def live_primary_flows_csv(
+def download_csv(
     context: AssetExecutionContext,
     config: RawCSVConfig,
+    fetch_substation_resource_urls: dict[str, str],
 ) -> None:
     """Download CSV from CKAN. Save CSV to disk."""
     substation_name = context.partition_key
-    client = NGEDCKANClient()
-    regions = [
-        "live-primary-data---south-wales",
-        "live-primary-data---south-west",
-        "live-primary-data---west-midlands",
-        "live-primary-data---east-midlands",
-    ]
-
-    # Find the specific URL for this partition
-    url = None
-    for region in regions:
-        resources = get_substation_resource_urls(client, region)
-        for r in resources:
-            if r.substation_name == substation_name:
-                url = r.url
-                break
-        if url:
-            break
-
-    if not url:
-        raise ValueError(f"URL not found for substation {substation_name}")
+    url = fetch_substation_resource_urls[substation_name]
 
     dest_path = Path(config.raw_data_path).expanduser() / f"{substation_name}.csv"
     dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,9 +97,9 @@ def live_primary_flows_csv(
 @asset(
     partitions_def=substation_partitions,
     group_name="nged",
-    deps=[live_primary_flows_csv],
+    deps=[download_csv],
 )
-def live_primary_flows_parquet(
+def convert_csv_to_parquet(
     context: AssetExecutionContext,
     config: ParquetConfig,
 ) -> None:

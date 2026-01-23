@@ -13,31 +13,22 @@ from .ckan_client import NGEDCKANClient
 logger = logging.getLogger(__name__)
 
 
-class SubstationResource(pt.Model):
-    """A resource for a single substation."""
-
-    substation_name: str
-    url: str
-
-
 def get_substation_resource_urls(
     client: NGEDCKANClient,
     package_name: str,
-) -> list[SubstationResource]:
-    """Get the URLs for all substation resources in a package."""
+) -> dict[str, str]:
+    """Get the URLs for all substation resources in a package. Return mapping from name->url"""
     package = client.get_package_show(package_name)
     resources = package.get("resources", [])
 
-    substation_resources = []
+    substation_resources = {}
     for resource in resources:
         url = resource.get("url")
         resource_format = resource.get("format", "")
         if resource_format.lower() == "csv" and url and not url.startswith("redacted"):
             # Extract substation name from resource name
             substation_name = resource["name"].replace(" Primary Transformer Flows", "")
-            substation_resources.append(
-                SubstationResource(substation_name=substation_name, url=url)
-            )
+            substation_resources[substation_name] = url
 
     return substation_resources
 
