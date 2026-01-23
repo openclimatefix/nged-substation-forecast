@@ -34,7 +34,14 @@ This project uses `uv` for dependency management and task execution.
 - **Python Version**: Use Python 3.14+.
 - **Type Hints**: All function signatures **must** use expressive type hints for all arguments and return types. Use `typing` and `collections.abc` as needed.
 - **Modularity**: Keep logic in small, focused packages under `packages/`. The main app in `src/` should primarily handle orchestration.
+- **Small functions**: Prefer small function bodies that do one, well-defined thing.
 - **Minimalism**: Re-use existing tools (Polars, Xarray, Dagster) instead of reinventing logic.
+- **Comments**: Do not remove existing comments unless they are misleading or out of date. Only add
+  new comments if you're doing something that isn't obvious from the code. Write self-documenting
+  code, and assume the reader is fluent in Python.
+- **Tests**: Unit tests should each be a short, simple function. For each function in the main code,
+  there should be at least one test function that tests the "happy path", and one test function for
+  each of the main "unhappy" paths.
 
 ### Formatting & Linting (Ruff)
 - **Line Length**: 100 characters.
@@ -78,3 +85,5 @@ This project uses `uv` for dependency management and task execution.
 - Ensure `uv run ty check` passes for any new code.
 - When adding new functionality, consider if it belongs in a new or existing package within `packages/`.
 - Refer to `DESIGN.md` for the long-term architectural vision and ultimate aims of the project.
+- Refer to `README.md` and `DESIGN.md` files within each child `packages/*` for package-specific
+  guidance.
