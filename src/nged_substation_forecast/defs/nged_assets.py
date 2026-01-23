@@ -15,7 +15,7 @@ from dagster import (
     asset,
 )
 from data_nged.ckan_client import NGEDCKANClient
-from data_nged.live_primary_data import download_live_primary_data
+from data_nged.live_primary_data import SubstationDownloadResult, download_live_primary_data
 
 
 class NgedLivePrimaryDataConfig(Config):
@@ -27,75 +27,62 @@ class NgedLivePrimaryDataConfig(Config):
 def _download_and_validate_region(
     context: AssetExecutionContext, package_id: str
 ) -> Iterable[AssetObservation | AssetCheckResult | Output[pl.DataFrame]]:
-    """Download data for a region and yield outputs, observations and checks.
-
-    This function is a "helper generator." It contains the heavy lifting for all four NGED license regions:
-         1.  It downloads the data.
-         2.  It iterates through every substation and yields an AssetObservation (metadata about that specific substation).
-         3.  It yields an AssetCheckResult (telling Dagster if the whole region's data is healthy).
-         4.  Finally, it yields an Output (the actual DataFrame).
-
-    """
+    """Download data for a region and yield outputs, observations and checks."""
     client = NGEDCKANClient()
-    df_data: tuple[pl.DataFrame, dict[str, str]] = download_live_primary_data(client, package_id)
-    df, download_errors = df_data
 
-    substation_integrity_passed = True
-    failed_substations: list[str] = list(download_errors.keys())
+    dfs: list[pl.DataFrame] = []
+    all_errors: dict[str, list[str]] = {}  # maps from substation_name to list of error strings.
+    total_count: int = 0
 
-    if failed_substations:
-        substation_integrity_passed = False
-
-    # Partition by substation to check each individually
-    for substation_name, substation_df in df.partition_by("substation_name", as_dict=True).items():
-        # Use our contract's integrity check (re-using code from contracts)
-        integrity_errors = SubstationFlows.check_integrity(substation_df)
-
-        passed = len(integrity_errors) == 0
-        if not passed:
-            substation_integrity_passed = False
-            failed_substations.append(str(substation_name))
-
-        # Yield observation for this substation
-        yield AssetObservation(
-            asset_key=context.asset_key,
-            metadata={
-                "substation": str(substation_name),
-                "passed": passed,
-                "validation_errors": MetadataValue.json(integrity_errors)
-                if integrity_errors
-                else "None",
-                "row_count": len(substation_df),
-                "latest_timestamp": str(substation_df["timestamp"].max())
-                if not substation_df.is_empty()
-                else "N/A",
-            },
+    try:
+        substation_results: Iterable[SubstationDownloadResult] = download_live_primary_data(
+            client, package_id
         )
 
-    # Yield download errors as observations too
-    for substation_name, error_msg in download_errors.items():
-        yield AssetObservation(
-            asset_key=context.asset_key,
-            metadata={
-                "substation": substation_name,
-                "passed": False,
-                "error": f"Download failed: {error_msg}",
-            },
-        )
+        for substation_result in substation_results:
+            total_count += 1
+
+            metadata = {
+                "substation": substation_result.substation_name,
+                "passed": len(substation_result.errors) == 0,
+                # The following attributes will be updated later in the code if appropriate:
+                "validation_errors": "None",
+                "row_count": 0,
+                "first_timestamp": "N/A",
+                "last_timestamp": "N/A",
+            }
+
+            if substation_result.df is not None and not substation_result.df.is_empty():
+                dfs.append(substation_result.df)
+                metadata["first_timestamp"] = str(substation_result.df["timestamp"].min())
+                metadata["last_timestamp"] = str(substation_result.df["timestamp"].max())
+                metadata["row_count"] = substation_result.df.height
+
+            if substation_result.errors:
+                all_errors[substation_result.substation_name] = substation_result.errors
+                metadata["validation_errors"] = MetadataValue.json(substation_result.errors)
+
+            yield AssetObservation(asset_key=context.asset_key, metadata=metadata)
+    except Exception as e:
+        context.log.error(f"Failed to fetch package {package_id}: {e}")
+        all_errors["_package_fetch"] = [str(e)]
 
     # Yield the overall integrity check for the asset
     yield AssetCheckResult(
         check_name="substation_integrity",
-        passed=substation_integrity_passed,
+        passed=len(all_errors) == 0,
         metadata={
-            "total_substations": (len(df["substation_name"].unique()) if not df.is_empty() else 0)
-            + len(download_errors),
-            "failed_count": len(failed_substations),
-            "failed_substations": MetadataValue.json(failed_substations[:100]),
+            "total_substations": total_count,
+            "failed_count": len(all_errors),
+            "errors_by_substation": MetadataValue.json(all_errors),
         },
     )
 
-    yield Output(df)
+    if not dfs:
+        context.log.warning(f"No data found for region {package_id}. Yielding empty DataFrame.")
+        yield Output(pl.DataFrame(schema=SubstationFlows.dtypes))
+    else:
+        yield Output(pl.concat(dfs, how="diagonal"))
 
 
 @asset(
@@ -171,5 +158,4 @@ def nged_live_primary_data(
     context.log.info(f"Saving {len(df)} rows to {config.output_path} partitioned by month")
 
     # Save to Parquet. Polars can use obstore under the hood for cloud storage
-    # when the appropriate dependencies are installed.
-    df.write_parquet(config.output_path, partition_by="month", compression="zstd")
+    df.write_parquet(config.output_path, partition_by="month")

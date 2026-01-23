@@ -2,7 +2,7 @@ from pathlib import Path
 
 import polars as pl
 import pytest
-from data_nged.live_primary_data import SubstationLocations, _read_primary_substation_csv
+from data_nged.live_primary_data import SubstationLocations, __read_primary_substation_csv
 
 EXAMPLE_DATA_DIR = Path(__file__).parent.parent / "example_csv_data"
 
@@ -20,7 +20,7 @@ def test_primary_substation_csv_to_dataframe(csv_filename: str):
     csv_path = EXAMPLE_DATA_DIR / csv_filename
     substation_name = csv_filename.split("-")[0].capitalize()
 
-    df = _read_primary_substation_csv(csv_path, substation_name=substation_name)
+    df = __read_primary_substation_csv(csv_path, substation_name=substation_name)
 
     assert df.height > 0
     assert "substation_name" in df.columns

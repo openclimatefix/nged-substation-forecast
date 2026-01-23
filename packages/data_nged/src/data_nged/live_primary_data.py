@@ -1,6 +1,8 @@
 """Logic for downloading Live Primary Data from NGED."""
 
 import logging
+from collections.abc import Iterable
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO
 
@@ -13,57 +15,59 @@ from .ckan_client import NGEDCKANClient
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class SubstationDownloadResult:
+    """The result of downloading and validating a single substation."""
+
+    substation_name: str
+    df: pt.DataFrame[SubstationFlows] | None = None
+    errors: list[str] = field(default_factory=list)
+
+
 def download_live_primary_data(
     client: NGEDCKANClient,
     package_name: str,
-) -> tuple[pl.DataFrame, dict[str, str]]:
+) -> Iterable[SubstationDownloadResult]:
     """Download all live primary data for a given region (package).
 
     Args:
         client: The NGED CKAN client.
         package_name: The name of the package (e.g., "live-primary-data---south-wales").
 
-    Returns:
-        tuple[pl.DataFrame, dict[str, str]]: A tuple of (dataframe, errors).
-            The dataframe contains the combined data for all successful substations.
-            The errors dict maps substation names to error messages.
+    Yields:
+        SubstationDownloadResult: The result for each substation.
     """
     package = client.get_package_show(package_name)
-    dfs = []
-    errors = {}
+    resources = package.get("resources", [])
+    logger.info("Found %d resources in package %s", len(resources), package_name)
 
-    # We might want to parallelize this, but let's start simple.
-    for resource in package["resources"]:
+    for resource in resources:
         url = resource.get("url")
-        if resource["format"].lower() == "csv" and url and not url.startswith("redacted"):
+        resource_format = resource.get("format", "")
+        if resource_format.lower() == "csv" and url and not url.startswith("redacted"):
             # Extract substation name from resource name
-            # Resource name is typically "Substation Name Primary Transformer Flows"
             substation_name = resource["name"].replace(" Primary Transformer Flows", "")
 
             try:
-                df = _read_primary_substation_csv(url, substation_name=substation_name)
+                df = __read_primary_substation_csv(url, substation_name=substation_name)
+                yield SubstationDownloadResult(
+                    substation_name=substation_name,
+                    df=df,
+                )
             except Exception as e:
-                # Record error and continue with other resources
-                logger.error("Failed to download resource %s: %s", resource["name"], e)
-                errors[substation_name] = str(e)
-            else:
-                dfs.append(df)
-
-    if not dfs:
-        return pl.DataFrame(schema=SubstationFlows.dtypes), errors
-
-    df = pl.concat(dfs, how="diagonal")
-    # Ensure all columns from the schema are present (as nulls if missing)
-    for col, dtype in SubstationFlows.dtypes.items():
-        if col not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=dtype).alias(col))
-        else:
-            df = df.with_columns(pl.col(col).cast(dtype))
-
-    return df.select(SubstationFlows.columns), errors
+                logger.error(
+                    "Failed to download or validate resource %s from %s: %s",
+                    resource["name"],
+                    url,
+                    e,
+                )
+                yield SubstationDownloadResult(
+                    substation_name=substation_name,
+                    errors=[str(e)],
+                )
 
 
-def _read_primary_substation_csv(
+def __read_primary_substation_csv(
     csv_data: str | Path | IO[str] | IO[bytes] | bytes, substation_name: str
 ) -> pt.DataFrame[SubstationFlows]:
     df: pl.DataFrame = pl.read_csv(csv_data)
@@ -82,8 +86,8 @@ def _read_primary_substation_csv(
     df = df.with_columns(pl.col("timestamp").str.to_datetime(time_zone="UTC"))
     columns = set(SubstationFlows.columns).intersection(df.columns)
     df = df.select(columns)
+
     # Cast to ensure consistency with the schema
-    # We use a loop or map to avoid ambiguity in types if dict doesn't match Schema exactly
     for col in columns:
         df = df.with_columns(pl.col(col).cast(SubstationFlows.dtypes[col]))
 
@@ -93,31 +97,23 @@ def _read_primary_substation_csv(
 def download_substation_locations(
     client: NGEDCKANClient,
 ) -> pt.DataFrame[SubstationLocations]:
-    """Download substation metadata (locations).
-
-    Args:
-        client: The NGED CKAN client.
-
-    Returns:
-        pt.DataFrame: A dataframe containing substation metadata.
-    """
+    """Download substation metadata (locations)."""
     package = client.get_package_show(package_id="primary-substation-location-easting-northings")
 
     for resource in package["resources"]:
         if resource["format"].lower() == "csv":
             try:
                 df = pl.read_csv(resource["url"])
-                # The CSV has Easting/Northing and Latitude/Longitude
-                # We rename to match our schema if necessary
-                if "Substation Name" in df.columns:
-                    df = df.rename({"Substation Name": "substation_name"})
-                if "Latitude" in df.columns:
-                    df = df.rename({"Latitude": "latitude"})
-                if "Longitude" in df.columns:
-                    df = df.rename({"Longitude": "longitude"})
-
+                df = df.rename(
+                    {
+                        "Substation Name": "substation_name",
+                        "Latitude": "latitude",
+                        "Longitude": "longitude",
+                    },
+                    strict=False,
+                )
                 return SubstationLocations.validate(df, drop_superfluous_columns=True)
             except Exception as e:
                 logger.error("Failed to download metadata: %s", e)
 
-    return pt.DataFrame[SubstationLocations](pl.DataFrame())
+    return pt.DataFrame[SubstationLocations](pl.DataFrame(schema=SubstationLocations.dtypes))
