@@ -1,8 +1,7 @@
 """Data schemas for the NGED substation forecast project."""
 
-from datetime import datetime
 from collections.abc import Sequence
-from typing import Any, cast
+from datetime import datetime
 
 import patito as pt
 import polars as pl
@@ -41,15 +40,12 @@ class SubstationFlows(pt.Model):
             raise ValueError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
             )
-        return cast(
-            pt.DataFrame["SubstationFlows"],
-            super().validate(
-                dataframe=dataframe,
-                columns=columns,
-                allow_missing_columns=allow_missing_columns,
-                allow_superfluous_columns=allow_superfluous_columns,
-                drop_superfluous_columns=drop_superfluous_columns,
-            ),
+        return super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
         )
 
 
