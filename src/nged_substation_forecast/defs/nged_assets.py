@@ -7,7 +7,6 @@ from dagster import (
     AssetExecutionContext,
     AssetObservation,
     Config,
-    ConfigurableResource,
     RetryPolicy,
     StaticPartitionsDefinition,
     asset,
@@ -17,16 +16,6 @@ from data_nged.live_primary_data import (
     get_substation_resource_urls,
     read_primary_substation_csv,
 )
-
-
-class NGEDCKANResource(ConfigurableResource):
-    """Resource for NGED's CKAN API."""
-
-    base_url: str | None = None
-
-    def get_client(self) -> NGEDCKANClient:
-        """Get the NGED CKAN client."""
-        return NGEDCKANClient(base_url=self.base_url)
 
 
 class RawCSVConfig(Config):
@@ -64,25 +53,19 @@ def _get_all_substation_names() -> list[str]:
 
 substation_partitions = StaticPartitionsDefinition(_get_all_substation_names())
 
-ckan = NGEDCKANResource()
-
-# Built-in retry policy for network-dependent assets
-network_retry_policy = RetryPolicy(max_retries=3, delay=10)
-
 
 @asset(
     partitions_def=substation_partitions,
     group_name="nged",
-    retry_policy=network_retry_policy,
+    retry_policy=RetryPolicy(max_retries=3, delay=10),
 )
 def live_primary_flows_csv(
     context: AssetExecutionContext,
-    ckan: NGEDCKANResource,
     config: RawCSVConfig,
 ) -> None:
     """Download CSV from CKAN. Save CSV to disk."""
     substation_name = context.partition_key
-    client = ckan.get_client()
+    client = NGEDCKANClient()
     regions = [
         "live-primary-data---south-wales",
         "live-primary-data---south-west",
