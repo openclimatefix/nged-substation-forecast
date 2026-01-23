@@ -111,7 +111,7 @@ def convert_csv_to_parquet(
     df = read_primary_substation_csv(csv_path, substation_name=substation_name)
 
     if df.is_empty():
-        return
+        raise ValueError(f"Empty dataframe after reading {csv_path} for {substation_name=}")
 
     output_path = (
         Path(config.output_path).expanduser()
@@ -119,7 +119,7 @@ def convert_csv_to_parquet(
         / "data.parquet"
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df.sort("timestamp").write_parquet(output_path)
+    df.sort("timestamp").write_parquet(output_path, compression="zstd")
 
     context.log_event(
         AssetObservation(

@@ -65,10 +65,8 @@ def read_primary_substation_csv(
     df = df.with_columns(pl.col("timestamp").str.to_datetime(time_zone="UTC"))
     columns = set(SubstationFlows.columns).intersection(df.columns)
     df = df.select(columns)
-
-    # Cast to ensure consistency with the schema
-    for col in columns:
-        df = df.with_columns(pl.col(col).cast(SubstationFlows.dtypes[col]))
+    dtypes = {col: SubstationFlows.dtypes[col] for col in columns}
+    df = df.cast(dtypes)
 
     return SubstationFlows.validate(df, allow_missing_columns=True)
 
