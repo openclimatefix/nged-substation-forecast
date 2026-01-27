@@ -1,6 +1,7 @@
 # /// script
 # dependencies = [
 #     "ckanapi==4.9",
+#     "data_nged",
 #     "httpx==0.28.1",
 #     "marimo",
 #     "polars==1.37.1",
@@ -9,6 +10,8 @@
 #     "requests==2.32.5",
 # ]
 # requires-python = ">=3.14"
+# [tool.uv.sources]
+# data_nged = { path = "./packages/data_nged", editable = true }
 # ///
 
 import marimo
@@ -19,57 +22,47 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
-    import marimo as mo
-    from dotenv import load_dotenv
-    import os
-    import ckanapi
-    from typing import Final
     import logging
+    from pathlib import Path
+    from typing import Final
+
     import polars as pl
-    from pathlib import PurePosixPath, Path
-    import httpx
-    from rapidfuzz import process, fuzz
+    from rapidfuzz import fuzz, process
+
+    from data_nged.ckan_client import NGEDCKANClient
 
     logging.basicConfig(level=logging.DEBUG)
     log = logging.getLogger(__name__)
-
-    load_dotenv()
-    return Final, Path, ckanapi, fuzz, httpx, log, os, pl, process
+    return NGEDCKANClient, Path, fuzz, log, pl, process
 
 
 @app.cell
-def _(Final, os):
-    API_KEY: Final[str] = os.environ["NGED_CKAN_TOKEN"]
-    HEADERS: Final[dict] = {"Authorization": API_KEY}
-    return API_KEY, HEADERS
+def _(NGEDCKANClient):
+    ckan_client = NGEDCKANClient()
+    return (ckan_client,)
 
 
 @app.cell
-def _(API_KEY: "Final[str]", HEADERS: "Final[dict]", ckanapi, httpx, pl):
-    # Get the Primary substation locations. This is also used as the authoritative list of primary substation names.
+def _():
+    # TODO: Move this string processing code into python
+    return
+
+
+@app.cell
+def _(ckan_client, pl):
+    # Get locations of Primary substations. This is also used as the authoritative list of primary substation names.
     def get_primary_substation_locations():
-        with ckanapi.RemoteCKAN("https://connecteddata.nationalgrid.co.uk", apikey=API_KEY) as nged_ckan:
-            # TODO we should be able to directly get the single dataset:
-            # https://connecteddata.nationalgrid.co.uk/dataset/primary-substation-location-easting-northings
-            ckan_response = nged_ckan.action.resource_search(query="name:Primary Substation Location")
-        assert ckan_response["count"] == 1
-        ckan_result = ckan_response["results"][0]
-        assert ckan_result["format"].upper() == "CSV"
-        url = ckan_result["url"]
-        http_response = httpx.get(url, headers=HEADERS)
-        http_response.raise_for_status()
-        locations = pl.read_csv(http_response.content)
-        locations = locations.filter(pl.col("Substation Type").str.to_lowercase().str.contains("primary"))
+        locations = ckan_client.get_primary_substation_locations()
         return locations.with_columns(
             name_filtered=(
-                pl.col("Substation Name")
-                .str.replace_all("\d{2,}(?i)kv", "")
+                pl.col("substation_name")
+                .str.replace_all(r"\d{2,}(?i)kv", "")
                 .str.replace_all("/", "", literal=True)
                 .str.replace_all("132", "")
                 .str.replace_all("66", "")
                 .str.replace_all("33", "")
                 .str.replace_all("11", "")
-                .str.replace_all("6\.6(?i)kv", "")
+                .str.replace_all(r"6\.6(?i)kv", "")
                 .str.replace_all("Primary", "")
                 .str.replace_all("S Stn", "")
                 .str.replace_all("  ", " ")
@@ -85,40 +78,47 @@ def _(API_KEY: "Final[str]", HEADERS: "Final[dict]", ckanapi, httpx, pl):
 
 
 @app.cell
-def _(API_KEY: "Final[str]", ckanapi, log):
-    def package_search(query: str) -> list[dict]:
-        with ckanapi.RemoteCKAN("https://connecteddata.nationalgrid.co.uk", apikey=API_KEY) as nged_ckan:
-            json_response = nged_ckan.action.package_search(q=query)
-        results: list[dict] = json_response["results"]
-        log.debug("%d results found from CKAN 'package_search?q=%s'", len(results), query)
-        resources = []
-        for result in results:
-            resources.extend(result["resources"])
-        return resources
+def _(pl, primary_substation_locations):
+    primary_substation_locations.filter(pl.col("substation_name") == "Park Lane")
+    return
 
 
-    def extract_substation_names(resources: list[dict]) -> list[str]:
-        names: list[str] = []
-        for resource in resources:
-            name = resource["name"]
-            name = name.replace(" Transformer Flows", "")
-            name = name.replace(" 11kV", "").replace(" 11Kv", "")  # Historical data
-            name = name.replace(" Primary", "")  # Live data
-            names.append(name)
-        return names
-    return extract_substation_names, package_search
+@app.function
+def extract_substation_names(resources: list[dict]) -> list[str]:
+    names: list[str] = []
+    for resource in resources:
+        name = resource["name"]
+        name = name.replace(" Transformer Flows", "")
+        name = name.replace(" 11kV", "").replace(" 11Kv", "")  # Historical data
+        name = name.replace(" Primary", "")  # Live data
+        names.append(name)
+    return names
 
 
 @app.cell
-def _(extract_substation_names, package_search, pl):
-    names_historical = extract_substation_names(package_search('title:"primary transformer flows"'))
+def _(ckan_client):
+    historical_resources = ckan_client.get_resources_for_historical_primary_substation_flows()
+    historical_resources
+    return (historical_resources,)
+
+
+@app.cell
+def _(historical_resources, pl):
+    names_historical = extract_substation_names(historical_resources)
     pl.Series(name="names_historical", values=names_historical)
     return (names_historical,)
 
 
 @app.cell
-def _(extract_substation_names, package_search, pl):
-    names_live = extract_substation_names(package_search('title:"live primary"'))
+def _(ckan_client):
+    live_resources = ckan_client.get_resources_for_live_primary_substation_flows()
+    live_resources
+    return (live_resources,)
+
+
+@app.cell
+def _(live_resources, pl):
+    names_live = extract_substation_names(live_resources)
     pl.Series(name="names_live", values=names_live)
     return (names_live,)
 
@@ -175,10 +175,18 @@ def _(fuzz, names_live, primary_substation_locations, process):
 
     def match(name: str) -> list[Match]:
         matches: list = process.extract(
-            name, choices=primary_substation_locations["name_filtered"].to_list(), scorer=fuzz.WRatio, limit=3
+            name,
+            choices=primary_substation_locations["name_filtered"].to_list(),
+            scorer=fuzz.WRatio,
+            limit=3,
         )
         return [
-            Match(string=m[0], score=m[1], full_name=primary_substation_locations["Substation Name"][m[2]]) for m in matches
+            Match(
+                string=m[0],
+                score=m[1],
+                full_name=primary_substation_locations["Substation Name"][m[2]],
+            )
+            for m in matches
         ]
 
 
@@ -205,7 +213,7 @@ def _(pl, resources):
 
 
 @app.cell(disabled=True)
-def _(API_KEY: "Final[str]", Path, log, requests, resources):
+def _(API_KEY, Path, log, requests, resources):
     filtered_resources = list(filter(lambda r: r["format"] == "CSV", resources))
 
     log.debug("%d resources before filtering. %d after filtering", len(resources), len(filtered_resources))

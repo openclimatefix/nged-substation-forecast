@@ -7,6 +7,11 @@ dependencies = [
     "contracts",
     "requests>=2.31.0",
     "polars>=1.0.0",
+    "dotenv>=0.9.9",
+    "httpx>=0.28.1",
+    "ckanapi>=4.9",
+    "patito>=0.8.5",
+    "pydantic>=2.12.5",
 ]
 
 [build-system]
