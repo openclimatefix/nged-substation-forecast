@@ -15,6 +15,11 @@ To run Dagster:
 1. `uv run dg dev`
 1. Open http://localhost:3000 in your browser to see the project.
 
+NGED CKAN API token:
+1. Log in to NGED's Connected Data platform.
+1. Go to "User Profile" -> API Tokens -> Create API token -> Copy your API token
+1. Paste your API token into `.env` after `NGED_CKAN_TOKEN=`.
+
 ---
 
 *Part of the [Open Climate Fix](https://github.com/orgs/openclimatefix/people) community.*

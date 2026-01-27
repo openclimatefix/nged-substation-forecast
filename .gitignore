@@ -16,3 +16,4 @@ __marimo__/
 
 # Dagster
 .tmp_dagster_home_*
+.env
