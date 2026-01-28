@@ -18,6 +18,8 @@ log = logging.getLogger(__name__)
 
 NGED_CKAN_TOKEN_ENV_KEY: Final[str] = "NGED_CKAN_TOKEN"
 
+# TODO(Jack): Replace `CKANResourceList` with a Pydantic model, but only define the fields we care
+# about.
 CKANResourceList = list[dict[str, Any]]
 
 
