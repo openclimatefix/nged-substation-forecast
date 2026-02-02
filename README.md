@@ -1,5 +1,13 @@
 # NGED substation forecast
 
+[![ease of contribution: hard](https://img.shields.io/badge/ease%20of%20contribution:%20hard-bb2629)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
+
+To external contributors: Please note that this repo holds the very-early-stage research code for a new
+project, and there will be a lot of code churn over the next few months. As such, this repo isn't
+suitable for external contributions at the moment, sorry.
+
+---
+
 TODO(Jack): Adapt the OCF template README for this project :)
 
 ## Development
