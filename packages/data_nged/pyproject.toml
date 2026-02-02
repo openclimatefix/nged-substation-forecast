@@ -10,7 +10,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "httpx>=0.28.1",
     "ckanapi>=4.9",
-    "patito>=0.8.5",
+    "patito",
     "pydantic>=2.12.5",
 ]
 

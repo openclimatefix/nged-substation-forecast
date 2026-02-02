@@ -8,10 +8,8 @@ import polars as pl
 
 
 class SubstationFlows(pt.Model):
-    """A single measurement from a substation."""
-
     substation_name: str = pt.Field(dtype=pl.Categorical)
-    timestamp: datetime = pt.Field(dtype=pl.Datetime)
+    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
     # Primary substations usually have flows in the tens of MW.
     # We'll set a loose range for now to catch extreme errors.
@@ -50,8 +48,14 @@ class SubstationFlows(pt.Model):
 
 
 class SubstationLocations(pt.Model):
-    """Metadata for a substation."""
+    # NGED has 192,000 substations.
+    substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
 
-    substation_name: str
+    # The min and max string lengths are actually 3 and 48 chars, respectively.
+    # Note that there are two "Park Lane" substations, with different locations and different
+    # substation numbers.
+    substation_name: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
+
+    substation_type: str = pt.Field(dtype=pl.Categorical)
     latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range

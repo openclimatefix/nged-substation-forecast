@@ -18,6 +18,7 @@ classifiers = [
 dependencies = [
     "dagster>=1.12.11",
     "dagster-webserver>=1.12.11",
+    "patito",
     "polars>=1.0.0",
     "requests>=2.31.0",
     "data-nged",
@@ -51,6 +52,8 @@ members = ["packages/*"]
 [tool.uv.sources]
 data-nged = { workspace = true }
 contracts = { workspace = true }
+# TODO: Remove the line below if/when patito merges Jack's PR: https://github.com/JakobGM/patito/pull/161
+patito = { git = "https://github.com/JackKelly/patito.git", branch = "use-validated-dataframe" }
 
 # --- DAGSTER ---
 

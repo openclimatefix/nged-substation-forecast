@@ -8,19 +8,17 @@ import httpx
 import patito as pt
 import polars as pl
 from ckanapi import RemoteCKAN
+from contracts.data_schemas import SubstationLocations
 from dotenv import load_dotenv
 
-from data_nged.schemas import PackageSearchResult, RawSubstationLocations
+from data_nged.schemas import CKANResource, PackageSearchResult
 
 from .utils import change_dataframe_column_names_to_snake_case, find_one_match
 
 log = logging.getLogger(__name__)
 
+# The name of the environment variable that holds the NGED CKAN TOKEN.
 NGED_CKAN_TOKEN_ENV_KEY: Final[str] = "NGED_CKAN_TOKEN"
-
-# TODO(Jack): Replace `CKANResourceList` with a Pydantic model, but only define the fields we care
-# about.
-CKANResourceList = list[dict[str, Any]]
 
 
 class NGEDCKANClient:
@@ -43,7 +41,7 @@ class NGEDCKANClient:
                     " environment variable. See the README for more info."
                 )
 
-    def get_primary_substation_locations(self) -> pt.DataFrame[RawSubstationLocations]:
+    def get_primary_substation_locations(self) -> pt.DataFrame[SubstationLocations]:
         with RemoteCKAN(self.base_url, apikey=self.api_key) as nged_ckan:
             ckan_response = nged_ckan.action.resource_search(
                 query="name:Primary Substation Location"
@@ -58,17 +56,26 @@ class NGEDCKANClient:
         locations = locations.filter(
             pl.col("substation_type").str.to_lowercase().str.contains("primary")
         )
-        return RawSubstationLocations.validate(locations)
+        locations = locations.cast(SubstationLocations.dtypes)
+        return SubstationLocations.validate(locations, drop_superfluous_columns=True)
 
-    def get_resources_for_historical_primary_substation_flows(self) -> CKANResourceList:
+    def download_resource(self, resource: CKANResource) -> bytes:
+        http_response = httpx.get(str(resource.url), headers=self._auth_headers)
+        http_response.raise_for_status()
+        return http_response.content
+
+    def get_resources_for_historical_primary_substation_flows(self) -> list[CKANResource]:
         return self.get_resources_for_package('title:"primary transformer flows"')
 
-    def get_resources_for_live_primary_substation_flows(self) -> CKANResourceList:
+    def get_resources_for_live_primary_substation_flows(self) -> list[CKANResource]:
         return self.get_resources_for_package('title:"live primary"')
 
-    def get_resources_for_package(self, query: str) -> CKANResourceList:
+    def get_resources_for_package(self, query: str) -> list[CKANResource]:
         package_search_result = self.package_search(query)
-        return _extract_resources_from_package_search_result(package_search_result)
+        resources = []
+        for result in package_search_result.results:
+            resources.extend(result.resources)
+        return [CKANResource.model_validate(resource) for resource in resources]
 
     def package_search(self, query: str) -> PackageSearchResult:
         with RemoteCKAN(self.base_url, apikey=self.api_key) as nged_ckan:
@@ -82,12 +89,3 @@ class NGEDCKANClient:
     @property
     def _auth_headers(self) -> dict[str, str]:
         return dict(Authorization=self.api_key)
-
-
-def _extract_resources_from_package_search_result(
-    package_search_result: PackageSearchResult,
-) -> CKANResourceList:
-    resources = []
-    for result in package_search_result.results:
-        resources.extend(result["resources"])
-    return resources
