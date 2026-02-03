@@ -12,6 +12,7 @@ dependencies = [
     "ckanapi>=4.9",
     "patito",
     "pydantic>=2.12.5",
+    "rapidfuzz>=3.14.3",
 ]
 
 [build-system]

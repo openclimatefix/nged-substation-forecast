@@ -49,7 +49,7 @@ are 100% certain they are wrong! This is the law!
 - **Quotes**: Use **double quotes** (`"`) for strings.
 - **Docstrings**: Use **Google convention** for docstrings.
 - **Imports**: Sorted automatically by `ruff` (isort rules).
-- **Naming**: 
+- **Naming**:
     - Variables/Functions: `snake_case`
     - Classes: `PascalCase`
     - Constants: `UPPER_SNAKE_CASE`

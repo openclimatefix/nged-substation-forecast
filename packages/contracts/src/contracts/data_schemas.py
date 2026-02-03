@@ -8,7 +8,6 @@ import polars as pl
 
 
 class SubstationFlows(pt.Model):
-    substation_name: str = pt.Field(dtype=pl.Categorical)
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
     # Primary substations usually have flows in the tens of MW.
