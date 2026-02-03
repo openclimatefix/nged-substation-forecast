@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import datetime, timedelta
 from typing import Any, Final
 
 import httpx
@@ -55,18 +56,30 @@ class NgedCkanClient:
         return http_response.content
 
     def get_csv_resources_for_historical_primary_substation_flows(self) -> list[CkanResource]:
-        return self.get_csv_resources_for_package('title:"primary transformer flows"')
+        return self.get_csv_resources_for_package(
+            'title:"primary transformer flows"', max_age=timedelta(days=2)
+        )
 
     def get_csv_resources_for_live_primary_substation_flows(self) -> list[CkanResource]:
-        return self.get_csv_resources_for_package('title:"live primary"')
+        return self.get_csv_resources_for_package('title:"live primary"', max_age=timedelta(days=2))
 
-    def get_csv_resources_for_package(self, query: str) -> list[CkanResource]:
+    def get_csv_resources_for_package(
+        self, query: str, max_age: timedelta | None = None
+    ) -> list[CkanResource]:
         package_search_result = self.package_search(query)
         resources = []
         for result in package_search_result.results:
             resources.extend(result.resources)
         resources = [CkanResource.model_validate(resource) for resource in resources]
-        return [r for r in resources if r.format == "CSV" and r.size > 100]
+        resources = [r for r in resources if r.format == "CSV" and r.size > 100]
+        resources = remove_duplicate_names(resources)
+
+        if max_age:
+            # A handful of "live" resources haven't been updated for months. Let's ignore the old ones.
+            min_modification_dt = datetime.now() - max_age
+            resources = [r for r in resources if r.last_modified >= min_modification_dt]
+
+        return resources
 
     def package_search(self, query: str) -> PackageSearchResult:
         api_key = get_nged_ckan_token_from_env()
@@ -94,3 +107,14 @@ def get_nged_ckan_token_from_env() -> str:
             f"You must set {NGED_CKAN_TOKEN_ENV_KEY} in your .env file or in an"
             " environment variable. See the README for more info."
         )
+
+
+def remove_duplicate_names(resources: list[CkanResource]) -> list[CkanResource]:
+    names = set()
+    de_duped_resources = []
+    for r in resources:
+        if r.name not in names:
+            de_duped_resources.append(r)
+            names.add(r.name)
+
+    return de_duped_resources

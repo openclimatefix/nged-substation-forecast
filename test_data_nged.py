@@ -18,9 +18,15 @@ app = marimo.App(width="full")
 @app.cell
 def _():
     from data_nged.ckan_client import NgedCkanClient
+    from data_nged.schemas import CkanResource
     from data_nged.process_flows import process_live_primary_substation_flows
     import polars as pl
-    return NgedCkanClient, pl, process_live_primary_substation_flows
+    return (
+        CkanResource,
+        NgedCkanClient,
+        pl,
+        process_live_primary_substation_flows,
+    )
 
 
 @app.cell
@@ -42,14 +48,34 @@ def _(nged_ckan):
 
 
 @app.cell
-def _(resources):
-    [print(f"{{'name': '{r.name}', 'url': '{r.url}'}},") for r in resources[:5]]
+def _():
     return
 
 
 @app.cell
-def _(nged_ckan, pl, resources):
-    df = pl.read_csv(nged_ckan.download_resource(resources[0]))
+def _(pl, resources):
+    rdf = pl.DataFrame(resources)
+    rdf
+    return (rdf,)
+
+
+app._unparsable_cell(
+    r"""
+    CkanResource.
+    """,
+    name="_"
+)
+
+
+@app.cell
+def _(CkanResource, rdf):
+    CkanResource.validate_model(rdf.filter(rdf["name"].is_duplicated())[0].to_dict())
+    return
+
+
+@app.cell
+def _(CkanResource, nged_ckan, pl, rdf):
+    df = pl.read_csv(nged_ckan.download_resource(CkanResource.validate_model(rdf.filter(rdf["name"].is_duplicated())[0].to_dict())))
     df
     return
 
