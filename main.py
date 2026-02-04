@@ -42,7 +42,7 @@ def _(PurePosixPath, ckan, join_location_table_to_live_primaries, pl):
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
 
     joined = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
-    joined = joined.filter(pl.col("simple_name").is_in(["Albrighton", "Alderton", "Alveston", "Bayston Hill", "Bearstone"]))
+    # joined = joined.filter(pl.col("simple_name").is_in(["Albrighton", "Alderton", "Alveston", "Bayston Hill", "Bearstone"]))
     joined = joined.with_columns(
         parquet_filename=pl.col("url").map_elements(
             lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
@@ -57,7 +57,14 @@ def _(Final, alt, data, joined, mo):
     # Define the Base Map (Optional but recommended for context)
     # We use a simple background of the world or specific region
     countries = alt.topo_feature(data.world_110m.url, "countries")
-    map_background = alt.Chart(countries).mark_geoshape(fill="#f0f0f0", stroke="white")
+
+    # URL for UK Local Authority Districts (Medium Resolution)
+    uk_url = "https://raw.githubusercontent.com/martinjc/UK-GeoJSON/master/json/administrative/gb/lad.json"
+    #map_background = alt.Chart(alt.Data(url=uk_url, format=alt.DataFormat(type="json"))).mark_geoshape(
+    map_background = alt.Chart(countries).mark_geoshape(
+        fill="#f0f0f0", stroke="white"
+    )
+
 
     SUBSTATION_NAME_COL: Final[str] = "simple_name"
 
@@ -65,13 +72,13 @@ def _(Final, alt, data, joined, mo):
 
     substation_points = (
         alt.Chart(joined)
-        .mark_circle(size=100, color="teal")
+        .mark_circle(size=30, color="teal")
         .encode(
             longitude="longitude:Q",
             latitude="latitude:Q",
-            tooltip=[SUBSTATION_NAME_COL, "latitude", "longitude"],
+            tooltip=["substation_name_in_location_table", "latitude", "longitude"],
             opacity=alt.condition(select_substation, alt.value(1), alt.value(0.2)),
-            color=alt.condition(select_substation, alt.value("teal"), alt.value("lightgray")),
+            color=alt.condition(select_substation, alt.value("teal"), alt.value("gray")),
         )
     ).add_params(select_substation)
 
@@ -79,7 +86,7 @@ def _(Final, alt, data, joined, mo):
         "mercator",
         scale=3000,  # Zoom level (high for local data)
         center=[-1, 52.5],  # Center on your data
-    )
+    ).interactive()
 
     # Create the Marimo UI Element
     # This renders the chart and makes it reactive
@@ -106,15 +113,20 @@ def _(BASE_PARQUET_PATH: "Final[Path]", alt, joined, map_widget, mo, pl):
         # Note: Altair v6 + Polars is very fast here
         filtered_demand = pl.read_parquet(BASE_PARQUET_PATH / parquet_filename)
 
+        power_column = "MW" if "MW" in filtered_demand else "MVA"
+
         # Create Time Series Chart
         ts_chart = (
             alt.Chart(filtered_demand)
             .mark_line()
             .encode(
-                x="timestamp:T", y=alt.Y("MW:Q", title="Demand (MW)"), color=alt.value("teal"), tooltip=["timestamp", "MW"]
+                x="timestamp:T",
+                y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
+                color=alt.value("teal"),
+                tooltip=["timestamp", power_column],
             )
             .properties(
-                title=f"{parquet_filename}",
+                title=selected_df["substation_name_in_location_table"][0],
                 height=300,
                 width="container",  # Fill available width
             )
