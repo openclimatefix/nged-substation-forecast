@@ -14,8 +14,11 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Environment variables & secrets
+.env
+
 # Dagster
 .tmp_dagster_home_*
-.env
 data/
+# `history/` is defined in `storage:sqlite:base_dir` in `$DAGSTER_HOME/dagster.yaml`
 history/
