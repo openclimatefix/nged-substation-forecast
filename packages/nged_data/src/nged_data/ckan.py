@@ -24,6 +24,7 @@ BASE_CKAN_URL: Final[str] = "https://connecteddata.nationalgrid.co.uk"
 
 
 def get_primary_substation_locations() -> pt.DataFrame[SubstationLocations]:
+    """Note that 'Park Lane' appears twice (with different substation numbers)."""
     api_key = get_nged_ckan_token_from_env()
     with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
         ckan_response = nged_ckan.action.resource_search(query="name:Primary Substation Location")
