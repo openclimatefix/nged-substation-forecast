@@ -1,14 +1,13 @@
 """Dagster assets for NGED data."""
 
-from datetime import timedelta
 from pathlib import Path, PurePosixPath
+from typing import Final
 
 import polars as pl
 from dagster import (
     AddDynamicPartitionsRequest,
     AssetExecutionContext,
     Config,
-    DailyPartitionsDefinition,
     DefaultSensorStatus,
     DynamicPartitionsDefinition,
     MultiPartitionKey,
@@ -26,10 +25,10 @@ from nged_data.process_flows import process_live_primary_substation_flows
 
 # Define Partitions
 # We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
-daily_def = DailyPartitionsDefinition(start_date="2026-02-03", timezone="UTC", end_offset=1)
-substations_def = DynamicPartitionsDefinition(name="substations")
+last_modified_dates_def = DynamicPartitionsDefinition(name="last_modified_dates")
+substation_names_def = DynamicPartitionsDefinition(name="substation_names")
 composite_def = MultiPartitionsDefinition(
-    {"last_modified_date": daily_def, "substation": substations_def}
+    {"last_modified_date": last_modified_dates_def, "substation_name": substation_names_def}
 )
 
 
@@ -42,7 +41,7 @@ def live_primary_csv(context: AssetExecutionContext, config: CkanCsvConfig) -> P
     # Retrieve the keys
     partition = composite_def.get_partition_key_from_str(context.partition_key).keys_by_dimension
     last_modified_date_str = partition["last_modified_date"]
-    substation_name = partition["substation"]
+    substation_name = partition["substation_name"]
     csv_filename = PurePosixPath(config.url).name
 
     context.log.info(f"Downloading {substation_name} from {config.url}")
@@ -88,13 +87,16 @@ download_live_primary_csvs = define_asset_job(
 )
 
 
+_SECONDS_IN_AN_HOUR: Final[int] = 60 * 60
+
+
 @sensor(
     job=download_live_primary_csvs,
     default_status=DefaultSensorStatus.RUNNING,
-    minimum_interval_seconds=round(timedelta(days=1).total_seconds()),
+    minimum_interval_seconds=_SECONDS_IN_AN_HOUR * 6,
 )
 def live_primaries_sensor(context: SensorEvaluationContext) -> SensorResult:
-    # Retrieve the full list of primary substations and URLs of CSVs
+    # Retrieve the full list of primary substation_names and URLs of CSVs
     ckan = NgedCkanClient()
     ckan_resources = ckan.get_csv_resources_for_live_primary_substation_flows()
 
@@ -107,14 +109,16 @@ def live_primaries_sensor(context: SensorEvaluationContext) -> SensorResult:
     ]
     ckan_resources = [r for r in ckan_resources if r.name in selected_for_testing]
 
-    run_requests = []
+    run_requests: list[RunRequest] = []
+    substation_names: set[str] = set()
+    last_modified_date_strings: set[str] = set()
     for resource in ckan_resources:
         substation_name = resource.name
         csv_url = str(resource.url)
         last_modified_date_str = resource.last_modified.strftime("%Y-%m-%d")
 
         partition_key = MultiPartitionKey(
-            {"last_modified_date": last_modified_date_str, "substation": substation_name}
+            {"last_modified_date": last_modified_date_str, "substation_name": substation_name}
         )
 
         run_requests.append(
@@ -131,13 +135,19 @@ def live_primaries_sensor(context: SensorEvaluationContext) -> SensorResult:
             )
         )
 
-    substation_names = [resource.name for resource in ckan_resources]
+        substation_names.add(substation_name)
+        last_modified_date_strings.add(last_modified_date_str)
+
     return SensorResult(
         dynamic_partitions_requests=[
             AddDynamicPartitionsRequest(
-                partitions_def_name="substations",
-                partition_keys=substation_names,
-            )
+                partitions_def_name="substation_names",
+                partition_keys=sorted(substation_names),
+            ),
+            AddDynamicPartitionsRequest(
+                partitions_def_name="last_modified_dates",
+                partition_keys=sorted(last_modified_date_strings),
+            ),
         ],
         run_requests=run_requests,
     )
