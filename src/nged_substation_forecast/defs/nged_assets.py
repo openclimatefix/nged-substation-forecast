@@ -20,7 +20,7 @@ from dagster import (
     define_asset_job,
     sensor,
 )
-from nged_data.ckan_client import NgedCkanClient, httpx_get_with_auth
+from nged_data import ckan
 from nged_data.process_flows import process_live_primary_substation_flows
 
 # Define Partitions
@@ -47,7 +47,7 @@ def live_primary_csv(context: AssetExecutionContext, config: CkanCsvConfig) -> P
     context.log.info(f"Downloading {substation_name} from {config.url}")
 
     # Get CSV from CKAN
-    response = httpx_get_with_auth(config.url)
+    response = ckan.httpx_get_with_auth(config.url)
     response.raise_for_status()
 
     # Save CSV file to disk
@@ -97,7 +97,6 @@ _SECONDS_IN_AN_HOUR: Final[int] = 60 * 60
 )
 def live_primaries_sensor(context: SensorEvaluationContext) -> SensorResult:
     # Retrieve the full list of primary substation_names and URLs of CSVs
-    ckan = NgedCkanClient()
     ckan_resources = ckan.get_csv_resources_for_live_primary_substation_flows()
 
     selected_for_testing = [  # TODO(Jack): Remove these after testing!
