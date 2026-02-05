@@ -91,7 +91,7 @@ def package_search(query: str) -> PackageSearchResult:
 def httpx_get_with_auth(url: str, **kwargs) -> httpx.Response:
     api_key = get_nged_ckan_token_from_env()
     auth_headers = {"Authorization": api_key}
-    return httpx.get(url=url, headers=auth_headers, **kwargs)
+    return httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
 
 
 def get_nged_ckan_token_from_env() -> str:

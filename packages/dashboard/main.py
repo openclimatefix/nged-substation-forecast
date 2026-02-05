@@ -17,7 +17,6 @@ def _():
 
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
-
     return (
         Final,
         Path,
@@ -98,7 +97,6 @@ def _(set_selected_index):
         new_index = change.get("new")
         if new_index is not None:
             set_selected_index(new_index.get("selected_index"))
-
     return (on_map_click,)
 
 
@@ -172,7 +170,7 @@ def _(
                 )
                 .properties(
                     title=selected_df["substation_name_in_location_table"].item(),
-                    height=500,
+                    height=300,
                     width="container",  # Fill available width
                 )
             )
