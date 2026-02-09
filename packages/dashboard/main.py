@@ -61,14 +61,19 @@ def _(sdf, set_clicked_coords):
         radius_units="meters",
     )
 
-    _m = lonboard.Map(layers=[layer])
-    _m.on_click(set_clicked_coords)
-    _m
-    return (layer,)
+    m = lonboard.Map(layers=[layer])
+    m.on_click(set_clicked_coords)
+    return layer, m
 
 
 @app.cell
-def _(get_clicked_coords, joined, layer):
+def _():
+    refresh = mo.ui.refresh(default_interval="1s")
+    return (refresh,)
+
+
+@app.cell
+def _(get_clicked_coords, joined, layer, m, refresh):
     _needs_to_refresh = get_clicked_coords()
 
     if layer.selected_index is None:
@@ -88,18 +93,13 @@ def _(get_clicked_coords, joined, layer):
             right_pane = mo.md("e")
         else:
             power_column = "MW" if "MW" in filtered_demand else "MVA"
-
-            # Create Time Series Chart
             right_pane = (
                 alt.Chart(filtered_demand)
                 .mark_line()
                 .encode(
                     x=alt.X(
                         "timestamp:T",
-                        axis=alt.Axis(
-                            format="%H:%M %b %d",
-                            # labelAngle=-45,  # Tilting labels often helps clarity
-                        ),
+                        axis=alt.Axis(format="%H:%M %b %d"),
                     ),
                     y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
                     color=alt.value("teal"),
@@ -112,16 +112,8 @@ def _(get_clicked_coords, joined, layer):
                 )
             )
 
-    dashboard = mo.vstack(
-        [get_clicked_coords(), layer.selected_index, right_pane], heights=[1, 1, 4]
-    )  # , gap="2rem")
+    dashboard = mo.vstack([m, right_pane, refresh], heights=[4, 4, 1])
     dashboard
-    return
-
-
-@app.cell
-def _(layer):
-    layer.selected_index
     return
 
 
