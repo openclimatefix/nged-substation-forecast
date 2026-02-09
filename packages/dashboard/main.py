@@ -29,7 +29,6 @@ def _():
     joined = join_location_table_to_live_primaries(
         live_primaries=_live_primaries, locations=_locations
     )
-    # joined = joined.filter(pl.col("simple_name").is_in(["Albrighton", "Alderton", "Alveston", "Bayston Hill", "Bearstone"]))
     joined = joined.with_columns(
         parquet_filename=pl.col("url").map_elements(
             lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
@@ -48,54 +47,31 @@ def _(joined):
 
 @app.cell
 def _():
-    get_selected_index, set_selected_index = mo.state(None)
-    return get_selected_index, set_selected_index
+    get_clicked_coords, set_clicked_coords = mo.state((-1, -1), allow_self_loops=True)
+    return get_clicked_coords, set_clicked_coords
 
 
 @app.cell
-def _():
-    refresh = mo.ui.refresh(default_interval="1s")
-    return (refresh,)
-
-
-@app.cell
-def _(set_selected_index):
-    # --- THE BRIDGE ---
-    # Define a callback that runs whenever the layer's 'selected_index' changes
-    def on_map_click(change: dict):
-        # change['new'] contains the integer index of the clicked point
-        new_index = change.get("new")
-        if new_index is not None:
-            set_selected_index(new_index.get("selected_index"))
-
-    return (on_map_click,)
-
-
-@app.cell
-def _(on_map_click, sdf):
+def _(sdf, set_clicked_coords):
     layer = sdf.spatial.to_scatterplotlayer(
-        pickable=True,  # enables the selection events
-        auto_highlight=True,  # provides immediate visual feedback on hover
+        pickable=True,
         # Styling
         fill_color=[0, 128, 255],
         radius=1000,
         radius_units="meters",
     )
 
-    # Attach the callback to the layer
-    layer.observe(on_map_click)
-
-    # Create and display the map
-    m = lonboard.Map(layers=[layer])
-    return (m,)
+    _m = lonboard.Map(layers=[layer])
+    _m.on_click(set_clicked_coords)
+    _m
+    return (layer,)
 
 
 @app.cell
-def _(get_selected_index, joined, m, refresh):
-    # Retrieve the current selection
-    selected_idx = get_selected_index()
+def _(get_clicked_coords, joined, layer):
+    _needs_to_refresh = get_clicked_coords()
 
-    if selected_idx is None:
+    if layer.selected_index is None:
         right_pane = mo.md(
             """
             ### Select a Substation
@@ -103,7 +79,7 @@ def _(get_selected_index, joined, m, refresh):
             """
         )
     else:
-        selected_df = joined[selected_idx]
+        selected_df = joined[layer.selected_index]
         parquet_filename = selected_df["parquet_filename"].item()
 
         try:
@@ -136,8 +112,16 @@ def _(get_selected_index, joined, m, refresh):
                 )
             )
 
-    dashboard = mo.vstack([m, right_pane, refresh], heights=[4, 4, 1])  # , gap="2rem")
+    dashboard = mo.vstack(
+        [get_clicked_coords(), layer.selected_index, right_pane], heights=[1, 1, 4]
+    )  # , gap="2rem")
     dashboard
+    return
+
+
+@app.cell
+def _(layer):
+    layer.selected_index
     return
 
 

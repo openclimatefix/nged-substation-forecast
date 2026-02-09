@@ -577,8 +577,16 @@ dependencies = [
     { name = "altair" },
     { name = "lonboard" },
     { name = "marimo" },
+    { name = "nged-data" },
     { name = "polars" },
     { name = "spatial-polars" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pre-commit" },
+    { name = "ruff" },
+    { name = "ty" },
 ]
 
 [package.metadata]
@@ -586,8 +594,16 @@ requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
     { name = "lonboard", specifier = ">=0.13.0" },
     { name = "marimo", specifier = ">=0.19.7" },
+    { name = "nged-data", editable = "packages/nged_data" },
     { name = "polars", specifier = ">=1.37.1" },
     { name = "spatial-polars", specifier = ">=0.2.3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "ruff", specifier = ">=0.15.0" },
+    { name = "ty", specifier = ">=0.0.15" },
 ]
 
 [[package]]
@@ -1460,7 +1476,7 @@ wheels = [
 [[package]]
 name = "notebooks"
 version = "0.1.0"
-source = { editable = "packages/notebooks" }
+source = { virtual = "packages/notebooks" }
 dependencies = [
     { name = "altair" },
     { name = "marimo" },
