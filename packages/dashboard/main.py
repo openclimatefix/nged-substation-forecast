@@ -23,6 +23,8 @@ with app.setup:
 
 @app.cell
 def _():
+    # TODO: Dagster should grab the latest locations (only when it updates)
+    #       and store the locations locally.
     _locations = ckan.get_primary_substation_locations()
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
 
