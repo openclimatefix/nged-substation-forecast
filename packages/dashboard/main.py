@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.8"
+__generated_with = "0.19.9"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -11,7 +11,7 @@ with app.setup:
     from pathlib import PurePosixPath, Path
 
     import lonboard
-    import geopandas as gpd
+    from spatial_polars import SpatialFrame
 
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
@@ -40,26 +40,10 @@ def _():
 
 @app.cell
 def _(joined):
-    # TODO(Jack): *Surely* there must be a more elegant way to get lat and lon points into lonboard,
-    # without having to go via Pandas and GeoPandas?
-    # I've asked for help: https://github.com/developmentseed/lonboard/issues/1098
-    # In that issue, I've also sketched out some ideas of how to skip Pandas & GeoPandas.
-    pandas_df = joined.select(
-        [
-            "substation_number",
-            "latitude",
-            "longitude",
-            "parquet_filename",
-            "substation_name_in_location_table",
-        ]
-    ).to_pandas()
-
-    gdf = gpd.GeoDataFrame(
-        pandas_df,
-        geometry=gpd.points_from_xy(pandas_df["longitude"], pandas_df["latitude"]),
-        crs="EPSG:4326",  # Defines the coordinate system as standard Lat/Lon
+    sdf = SpatialFrame.from_point_coords(
+        joined, x_col="longitude", y_col="latitude", crs="EPSG:4326"
     )
-    return (gdf,)
+    return (sdf,)
 
 
 @app.cell
@@ -88,14 +72,13 @@ def _(set_selected_index):
 
 
 @app.cell
-def _(gdf, on_map_click):
-    layer = lonboard.ScatterplotLayer.from_geopandas(
-        gdf,
+def _(on_map_click, sdf):
+    layer = sdf.spatial.to_scatterplotlayer(
         pickable=True,  # enables the selection events
         auto_highlight=True,  # provides immediate visual feedback on hover
         # Styling
-        get_fill_color=[0, 128, 255],
-        get_radius=1000,
+        fill_color=[0, 128, 255],
+        radius=1000,
         radius_units="meters",
     )
 
