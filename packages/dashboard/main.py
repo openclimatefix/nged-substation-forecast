@@ -10,7 +10,7 @@ with app.setup:
     from typing import Final
     from pathlib import PurePosixPath, Path
 
-    import lonboard
+    from ipydeck import Deck, Layer, ViewState
     from spatial_polars import SpatialFrame
 
     from nged_data import ckan
@@ -39,6 +39,11 @@ def _():
 
 
 @app.cell
+def _():
+    return
+
+
+@app.cell
 def _(joined):
     sdf = SpatialFrame.from_point_coords(
         joined, x_col="longitude", y_col="latitude", crs="EPSG:4326"
@@ -47,15 +52,32 @@ def _(joined):
 
 
 @app.cell
-def _():
-    get_selected_index, set_selected_index = mo.state(None)
-    return get_selected_index, set_selected_index
+def _(sdf):
+    layers = [
+        Layer(
+            type="ScatterPlotLayer",
+            data=sdf,
+        )
+    ]
+
+    view_state = ViewState(
+        latitude=49.254, longitude=-123.13, zoom=11, max_zoom=16, pitch=45, bearing=0
+    )
+
+    deck = Deck(
+        layers=layers,
+        initial_view_state=view_state,
+        map_style="light",
+    )
+
+    deck
+    return
 
 
 @app.cell
 def _():
-    refresh = mo.ui.refresh(default_interval="1s")
-    return (refresh,)
+    get_selected_index, set_selected_index = mo.state(None)
+    return get_selected_index, set_selected_index
 
 
 @app.cell
@@ -72,7 +94,7 @@ def _(set_selected_index):
 
 
 @app.cell
-def _(on_map_click, sdf):
+def _(lonboard, on_map_click, sdf):
     layer = sdf.spatial.to_scatterplotlayer(
         pickable=True,  # enables the selection events
         auto_highlight=True,  # provides immediate visual feedback on hover
