@@ -48,37 +48,25 @@ def _(joined):
 
 
 @app.cell
-def _():
-    get_clicked_coords, set_clicked_coords = mo.state((-1, -1), allow_self_loops=True)
-    return get_clicked_coords, set_clicked_coords
-
-
-@app.cell
-def _(sdf, set_clicked_coords):
+def _(sdf):
     layer = sdf.spatial.to_scatterplotlayer(
         pickable=True,
+        auto_highlight=True,  # TODO: Get auto_highlighting and fill_color working!
         # Styling
         fill_color=[0, 128, 255],
+        highlight_color=[0, 255, 255],
         radius=1000,
         radius_units="meters",
     )
 
-    m = lonboard.Map(layers=[layer])
-    m.on_click(set_clicked_coords)
-    return layer, m
+    map = lonboard.Map(layers=[layer])
+    layer_widget = mo.ui.anywidget(layer)
+    return layer_widget, map
 
 
 @app.cell
-def _():
-    refresh = mo.ui.refresh(default_interval="1s")
-    return (refresh,)
-
-
-@app.cell
-def _(get_clicked_coords, joined, layer, m, refresh):
-    _needs_to_refresh = get_clicked_coords()
-
-    if layer.selected_index is None:
+def _(joined, layer_widget, map):
+    if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
             ### Select a Substation
@@ -86,7 +74,7 @@ def _(get_clicked_coords, joined, layer, m, refresh):
             """
         )
     else:
-        selected_df = joined[layer.selected_index]
+        selected_df = joined[layer_widget.selected_index]
         parquet_filename = selected_df["parquet_filename"].item()
 
         try:
@@ -114,7 +102,7 @@ def _(get_clicked_coords, joined, layer, m, refresh):
                 )
             )
 
-    dashboard = mo.vstack([m, right_pane, refresh], heights=[4, 4, 1])
+    dashboard = mo.vstack([map, right_pane], heights=[4, 4])
     dashboard
     return
 
