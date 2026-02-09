@@ -28,9 +28,7 @@ def _():
     _locations = ckan.get_primary_substation_locations()
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
 
-    joined = join_location_table_to_live_primaries(
-        live_primaries=_live_primaries, locations=_locations
-    )
+    joined = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
     joined = joined.with_columns(
         parquet_filename=pl.col("url").map_elements(
             lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
@@ -41,23 +39,24 @@ def _():
 
 @app.cell
 def _(joined):
-    sdf = SpatialFrame.from_point_coords(
-        joined, x_col="longitude", y_col="latitude", crs="EPSG:4326"
-    )
+    sdf = SpatialFrame.from_point_coords(joined, x_col="longitude", y_col="latitude", crs="EPSG:4326")
     return (sdf,)
 
 
 @app.cell
 def _(sdf):
+    # Docs: https://atl2001.github.io/spatial_polars/SpatialFrame/#spatial_polars.spatialframe.SpatialFrame.to_scatterplotlayer
     layer = sdf.spatial.to_scatterplotlayer(
         pickable=True,
-        auto_highlight=True,  # TODO: Get auto_highlighting and fill_color working!
+        auto_highlight=True,
         # Styling
-        fill_color=[0, 128, 255],
-        highlight_color=[0, 255, 255],
         radius=1000,
         radius_units="meters",
+        stroked=False,
     )
+
+    # https://developmentseed.org/lonboard/latest/api/layers/scatterplot-layer/
+    layer.get_fill_color = [0, 128, 255]
 
     map = lonboard.Map(layers=[layer])
     layer_widget = mo.ui.anywidget(layer)
