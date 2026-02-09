@@ -47,4 +47,4 @@ def process_live_primary_substation_flows(csv_path: Path) -> pt.DataFrame[Substa
     try:
         return SubstationFlows.validate(df, allow_missing_columns=True)
     except Exception as e:
-        raise RuntimeError(f"First rows in the CSV, before processing: {first_orig_rows}") from e
+        raise RuntimeError(f"First rows in {csv_path}, before processing: {first_orig_rows}") from e
