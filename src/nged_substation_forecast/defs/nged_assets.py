@@ -1,27 +1,18 @@
 """Dagster assets for NGED data."""
 
 from pathlib import Path, PurePosixPath
-from typing import Final
 
 import polars as pl
 from dagster import (
-    AddDynamicPartitionsRequest,
     AssetExecutionContext,
-    Config,
-    DefaultSensorStatus,
     DynamicPartitionsDefinition,
-    MultiPartitionKey,
     MultiPartitionsDefinition,
-    RunConfig,
-    RunRequest,
-    SensorEvaluationContext,
-    SensorResult,
     asset,
     define_asset_job,
-    sensor,
 )
 from nged_data import ckan
 from nged_data.process_flows import process_live_primary_substation_flows
+from nged_data.schemas import CkanResource
 
 # Define Partitions
 # We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
@@ -32,29 +23,76 @@ composite_def = MultiPartitionsDefinition(
 )
 
 
-class CkanCsvConfig(Config):
-    url: str
+def _json_filename_for_ckan_resource(last_modified_date: str, substation_name: str) -> Path:
+    # TODO(Jack): Data path should be configurable.
+    return (
+        Path("data")
+        / "NGED"
+        / "raw"
+        / "live_primary_flows"
+        / last_modified_date
+        / f"{substation_name} CKAN Resource.json"
+    )
 
 
-@asset(partitions_def=composite_def)
-def live_primary_csv(context: AssetExecutionContext, config: CkanCsvConfig) -> Path:
+def _local_csv_filename(last_modified_date: str, substation_name: str) -> Path:
+    # TODO(Jack): Data path should be configurable.
+    return (
+        Path("data")
+        / "NGED"
+        / "raw"
+        / "live_primary_flows"
+        / last_modified_date
+        / f"{substation_name}.csv"
+    )
+
+
+@asset
+def list_resources_for_live_primaries(context: AssetExecutionContext):
+    substation_names: set[str] = set()
+    last_modified_date_strings: set[str] = set()
+    for resource in ckan.get_csv_resources_for_live_primary_substation_flows():
+        last_modified_date_str = resource.last_modified.strftime("%Y-%m-%d")
+        last_modified_date_strings.add(last_modified_date_str)
+        substation_names.add(resource.name)
+
+        # Save JSON representation of CKAN Resource:
+        json_string = resource.model_dump_json()
+        json_path = _json_filename_for_ckan_resource(last_modified_date_str, resource.name)
+        json_path.write_text(json_string)
+
+    # Update dynamic partitions
+    context.instance.add_dynamic_partitions("substation_names", substation_names)
+    context.instance.add_dynamic_partitions("last_modified_dates", last_modified_date_strings)
+
+
+@asset(partitions_def=composite_def, deps=[list_resources_for_live_primaries])
+def live_primary_csv(context: AssetExecutionContext) -> Path:
     # Retrieve the keys
     partition = composite_def.get_partition_key_from_str(context.partition_key).keys_by_dimension
     last_modified_date_str = partition["last_modified_date"]
     substation_name = partition["substation_name"]
-    csv_filename = PurePosixPath(config.url).name
 
-    context.log.info(f"Downloading {substation_name} from {config.url}")
+    # Load JSON representation of CKAN resource to get the CSV filename
+    json_filename = _json_filename_for_ckan_resource(last_modified_date_str, substation_name)
+    context.log.info(f"Loading {json_filename}...")
+    json_text = json_filename.read_text()
+    resource = CkanResource.model_validate_json(json_text)
 
     # Get CSV from CKAN
-    response = ckan.httpx_get_with_auth(config.url)
+    csv_url = str(resource.url)
+    context.log.info(f"Downloading CSV for {substation_name} from {resource.url}")
+    response = ckan.httpx_get_with_auth(csv_url)
     response.raise_for_status()
 
     # Save CSV file to disk
     # TODO(Jack): Don't save here? Instead, return the CSV file and let an IO manager save it??
-    dst_full_path = Path(
+    # TODO(Jack): Data path should be configurable.
+    csv_filename = PurePosixPath(csv_url).name
+    dst_full_path = (
         Path("data") / "NGED" / "raw" / "live_primary_flows" / last_modified_date_str / csv_filename
     )
+
     dst_full_path.parent.mkdir(exist_ok=True, parents=True)
     dst_full_path.write_bytes(response.content)
 
@@ -64,6 +102,7 @@ def live_primary_csv(context: AssetExecutionContext, config: CkanCsvConfig) -> P
 @asset(partitions_def=composite_def)
 def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path) -> None:
     df_of_new_data = process_live_primary_substation_flows(live_primary_csv)
+    # TODO(Jack): Data path should be configurable.
     parquet_path = (
         Path("data")
         / "NGED"
@@ -77,76 +116,14 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
     else:
         parquet_path.parent.mkdir(exist_ok=True, parents=True)
         merged_df = df_of_new_data
+    # TODO(Jack): More efficient strategy: If the parquet exists, then copy the new df to only
+    # contain rows not in the old df, de-dupe the cropped new df, and append.
     merged_df = merged_df.unique(subset="timestamp")
     merged_df = merged_df.sort(by="timestamp")
     merged_df.write_parquet(parquet_path, compression="zstd")
 
 
 update_live_primary_flows = define_asset_job(
-    name="update_live_primary_flows", selection=[live_primary_csv, live_primary_parquet]
+    name="update_live_primary_flows",
+    selection=[list_resources_for_live_primaries, live_primary_csv, live_primary_parquet],
 )
-
-
-_SECONDS_IN_AN_HOUR: Final[int] = 60 * 60
-
-
-@sensor(
-    job=update_live_primary_flows,
-    default_status=DefaultSensorStatus.RUNNING,
-    minimum_interval_seconds=_SECONDS_IN_AN_HOUR * 6,
-)
-def live_primaries_sensor(context: SensorEvaluationContext) -> SensorResult:
-    # Retrieve the full list of primary substation_names and URLs of CSVs
-    ckan_resources = ckan.get_csv_resources_for_live_primary_substation_flows()
-
-    # selected_for_testing = [  # TODO(Jack): Remove these after testing!
-    #     "Albrighton 11Kv Primary Transformer Flows",
-    #     "Alderton 11Kv Primary Transformer Flows",
-    #     "Alveston 11Kv Primary Transformer Flows",
-    #     "Bayston Hill 11Kv Primary Transformer Flows",
-    #     "Bearstone 11Kv Primary Transformer Flows",
-    # ]
-    # ckan_resources = [r for r in ckan_resources if r.name in selected_for_testing]
-    #
-    run_requests: list[RunRequest] = []
-    substation_names: set[str] = set()
-    last_modified_date_strings: set[str] = set()
-    for resource in ckan_resources:
-        substation_name = resource.name
-        csv_url = str(resource.url)
-        last_modified_date_str = resource.last_modified.strftime("%Y-%m-%d")
-
-        partition_key = MultiPartitionKey(
-            {"last_modified_date": last_modified_date_str, "substation_name": substation_name}
-        )
-
-        run_requests.append(
-            RunRequest(
-                # This unique run_key prevents the sensor from triggering duplicate
-                # runs for the same data on every tick.
-                run_key=f"{last_modified_date_str}|{substation_name}",
-                partition_key=partition_key,
-                run_config=RunConfig(ops={"live_primary_csv": CkanCsvConfig(url=csv_url)}),
-                tags={
-                    "nged/substation_name": substation_name,
-                    "nged/substation_type": "primary",
-                },
-            )
-        )
-
-        substation_names.add(substation_name)
-        last_modified_date_strings.add(last_modified_date_str)
-
-    return SensorResult(
-        dynamic_partitions_requests=[
-            AddDynamicPartitionsRequest(
-                partitions_def_name="substation_names",
-                partition_keys=sorted(substation_names),
-            ),
-            AddDynamicPartitionsRequest(
-                partitions_def_name="last_modified_dates",
-                partition_keys=sorted(last_modified_date_strings),
-            ),
-        ],
-        run_requests=run_requests,
-    )
