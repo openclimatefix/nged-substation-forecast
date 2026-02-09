@@ -11,7 +11,7 @@ with app.setup:
     from pathlib import PurePosixPath, Path
 
     import lonboard
-    from spatial_polars import SpatialFrame
+    import geoarrow.pyarrow as ga
 
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
@@ -41,6 +41,16 @@ def _():
 
 @app.cell
 def _(joined):
+    ga.point().from_geobuffers(
+        validity=None,
+        x=joined["longitude"].to_arrow(),
+        y=joined["latitude"].to_arrow(),
+    )
+    return
+
+
+@app.cell
+def _(SpatialFrame, joined):
     sdf = SpatialFrame.from_point_coords(
         joined, x_col="longitude", y_col="latitude", crs="EPSG:4326"
     )
