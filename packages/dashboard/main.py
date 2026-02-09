@@ -52,7 +52,7 @@ def _(sdf):
         # Styling
         radius=1000,
         radius_units="meters",
-        stroked=False,
+        stroked=False,  # No outline.
     )
 
     # https://developmentseed.org/lonboard/latest/api/layers/scatterplot-layer/
