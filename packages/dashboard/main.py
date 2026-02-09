@@ -11,7 +11,7 @@ with app.setup:
     from pathlib import PurePosixPath, Path
 
     import lonboard
-    import geoarrow.pyarrow as ga
+    import geoarrow as ga
 
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
@@ -40,12 +40,13 @@ def _():
 
 
 @app.cell
+def _():
+    return
+
+
+@app.cell
 def _(joined):
-    ga.point().from_geobuffers(
-        validity=None,
-        x=joined["longitude"].to_arrow(),
-        y=joined["latitude"].to_arrow(),
-    )
+    ga.rust.core.points(joined["longitude", "latitude"].to_numpy())
     return
 
 
