@@ -37,6 +37,7 @@ class SubstationFlows(pt.Model):
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
             raise ValueError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
+                f" {dataframe.columns=}, {dataframe.height=}"
             )
         return super().validate(
             dataframe=dataframe,

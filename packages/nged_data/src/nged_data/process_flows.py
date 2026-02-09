@@ -1,19 +1,14 @@
-import logging
 from pathlib import Path
-from typing import IO
 
 import patito as pt
 import polars as pl
 from contracts.data_schemas import SubstationFlows
 
-logger = logging.getLogger(__name__)
 
-
-def process_live_primary_substation_flows(
-    csv_data: str | Path | IO[str] | IO[bytes] | bytes,
-) -> pt.DataFrame[SubstationFlows]:
+def process_live_primary_substation_flows(csv_path: Path) -> pt.DataFrame[SubstationFlows]:
     """Read a primary substation CSV and validate it against the schema."""
-    df: pl.DataFrame = pl.read_csv(csv_data)
+    df: pl.DataFrame = pl.read_csv(csv_path)
+    first_orig_rows = df.head()
 
     # The CSV column names vary between NGED license areas:
     # East Midlands (e.g. Abington)  : ValueDate,                       MVA,                     Volts
@@ -49,4 +44,7 @@ def process_live_primary_substation_flows(
     df = df.cast({col: SubstationFlows.dtypes[col] for col in columns})
     df = df.sort("timestamp")
 
-    return SubstationFlows.validate(df, allow_missing_columns=True)
+    try:
+        return SubstationFlows.validate(df, allow_missing_columns=True)
+    except Exception as e:
+        raise RuntimeError(f"First rows in the CSV, before processing: {first_orig_rows}") from e
