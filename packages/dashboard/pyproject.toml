@@ -10,7 +10,15 @@ dependencies = [
     "marimo>=0.19.7",
     "polars>=1.37.1",
     "spatial-polars>=0.2.3",
+    "nged-data",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.15.0",
+    "ty>=0.0.15",
 ]
 
 [tool.uv.sources]
-notebooks = { workspace = true }
+nged-data = { workspace = true }
