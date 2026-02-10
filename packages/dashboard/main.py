@@ -8,7 +8,7 @@ with app.setup:
     from typing import Final
 
     import altair as alt
-    import geoarrow.pyarrow as geo_pa
+    import geoarrow.pyarrow as geo_pyarrow
     import pyarrow
     import lonboard
     import marimo as mo
@@ -41,7 +41,7 @@ def _():
 def _(df):
     # Create arrow table
     geo_array = (
-        geo_pa.point()
+        geo_pyarrow.point()
         .with_crs("epsg:4326")
         .from_geobuffers(
             None,
