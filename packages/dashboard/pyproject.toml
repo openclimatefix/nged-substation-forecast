@@ -10,8 +10,8 @@ dependencies = [
     "marimo>=0.19.7",
     "polars>=1.37.1",
     "nged-data",
-    "geoarrow-rust-core>=0.6.1",
     "pyarrow>=23.0.0",
+    "geoarrow-pyarrow>=0.2.0",
 ]
 
 [dependency-groups]

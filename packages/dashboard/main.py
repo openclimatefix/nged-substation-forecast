@@ -8,7 +8,8 @@ with app.setup:
     from typing import Final
 
     import altair as alt
-    import geoarrow as ga
+    import geoarrow.pyarrow as geo_pa
+    import pyarrow
     import lonboard
     import marimo as mo
     import polars as pl
@@ -27,48 +28,42 @@ def _():
     _locations = ckan.get_primary_substation_locations()
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
 
-    joined = join_location_table_to_live_primaries(
-        live_primaries=_live_primaries, locations=_locations
-    )
-    joined = joined.with_columns(
+    df = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
+    df = df.with_columns(
         parquet_filename=pl.col("url").map_elements(
             lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
         )
     )
-    return (joined,)
+    return (df,)
 
 
 @app.cell
-def _(joined):
-    geo_array = ga.rust.core.points(
-        [
-            joined["longitude"].cast(pl.Float64).to_arrow(),
-            joined["latitude"].cast(pl.Float64).to_arrow(),
-        ],
-        crs="epsg:4326",
+def _(df):
+    # Create arrow table
+    geo_array = (
+        geo_pa.point()
+        .with_crs("epsg:4326")
+        .from_geobuffers(
+            None,
+            df["longitude"].cast(pl.Float64).to_numpy(),
+            df["latitude"].cast(pl.Float64).to_numpy(),
+        )
     )
 
-    # joined.select(
-    #    pl.struct(["longitude", "latitude"], schema={"longitude": pl.Float64, "latitude": pl.Float64}).map_batches(
-    #        lambda combined: ga.rust.core.points(
-    #            [
-    #                combined.struct.field("longitude").to_arrow(),
-    #                combined.struct.field("latitude").to_arrow(),
-    #            ]
-    #        ),
-    #        return_dtype=pl.Object,
-    #    )
-    # )
-
-    print(geo_array[0])
-    return (geo_array,)
+    arrow_table = pyarrow.table(
+        {
+            "geometry": geo_array,
+            "name": df["substation_name_in_location_table"],
+            "number": df["substation_number"],
+        },
+    )
+    return (arrow_table,)
 
 
 @app.cell
-def _(geo_array):
-    # lonboard.ScatterplotLayer(pl.Series(name="geometry", values=geo_array).to_frame())
+def _(arrow_table):
     layer = lonboard.ScatterplotLayer(
-        geo_array,
+        arrow_table,
         pickable=True,
         auto_highlight=True,
         # Styling
@@ -77,18 +72,16 @@ def _(geo_array):
         radius_units="meters",
         stroked=False,  # No outline.
     )
-    return (layer,)
 
-
-@app.cell
-def _(layer):
     map = lonboard.Map(layers=[layer])
-    layer_widget = mo.ui.anywidget(layer)
+
+    # Enable reactivity in Marimo:
+    layer_widget = mo.ui.anywidget(layer)  # type: ignore[invalid-argument-type]
     return layer_widget, map
 
 
 @app.cell
-def _(joined, layer_widget, map):
+def _(df, layer_widget, map):
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
@@ -97,13 +90,13 @@ def _(joined, layer_widget, map):
             """
         )
     else:
-        selected_df = joined[layer_widget.selected_index]
+        selected_df = df[layer_widget.selected_index]
         parquet_filename = selected_df["parquet_filename"].item()
 
         try:
             filtered_demand = pl.read_parquet(BASE_PARQUET_PATH / parquet_filename)
-        except Exception:
-            right_pane = mo.md("e")
+        except Exception as e:
+            right_pane = mo.md(f"{e}")
         else:
             power_column = "MW" if "MW" in filtered_demand else "MVA"
             right_pane = (
