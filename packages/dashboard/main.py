@@ -4,15 +4,14 @@ __generated_with = "0.19.9"
 app = marimo.App(width="full")
 
 with app.setup:
+    from pathlib import Path, PurePosixPath
+    from typing import Final
+
+    import altair as alt
+    import geoarrow as ga
+    import lonboard
     import marimo as mo
     import polars as pl
-    import altair as alt
-    from typing import Final
-    from pathlib import PurePosixPath, Path
-
-    import lonboard
-    import geoarrow as ga
-
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -51,45 +50,28 @@ def _(joined):
 
 
 @app.cell
-def _(SpatialFrame, joined):
-    sdf = SpatialFrame.from_point_coords(
-        joined, x_col="longitude", y_col="latitude", crs="EPSG:4326"
-    )
-    return (sdf,)
-
-
-@app.cell
-def _():
-    get_clicked_coords, set_clicked_coords = mo.state((-1, -1), allow_self_loops=True)
-    return get_clicked_coords, set_clicked_coords
-
-
-@app.cell
-def _(sdf, set_clicked_coords):
+def _(sdf):
+    # Docs: https://atl2001.github.io/spatial_polars/SpatialFrame/#spatial_polars.spatialframe.SpatialFrame.to_scatterplotlayer
     layer = sdf.spatial.to_scatterplotlayer(
         pickable=True,
+        auto_highlight=True,
         # Styling
-        fill_color=[0, 128, 255],
         radius=1000,
         radius_units="meters",
+        stroked=False,  # No outline.
     )
 
-    m = lonboard.Map(layers=[layer])
-    m.on_click(set_clicked_coords)
-    return layer, m
+    # https://developmentseed.org/lonboard/latest/api/layers/scatterplot-layer/
+    layer.get_fill_color = [0, 128, 255]
+
+    map = lonboard.Map(layers=[layer])
+    layer_widget = mo.ui.anywidget(layer)
+    return layer_widget, map
 
 
 @app.cell
-def _():
-    refresh = mo.ui.refresh(default_interval="1s")
-    return (refresh,)
-
-
-@app.cell
-def _(get_clicked_coords, joined, layer, m, refresh):
-    _needs_to_refresh = get_clicked_coords()
-
-    if layer.selected_index is None:
+def _(joined, layer_widget, map):
+    if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
             ### Select a Substation
@@ -97,7 +79,7 @@ def _(get_clicked_coords, joined, layer, m, refresh):
             """
         )
     else:
-        selected_df = joined[layer.selected_index]
+        selected_df = joined[layer_widget.selected_index]
         parquet_filename = selected_df["parquet_filename"].item()
 
         try:
@@ -125,7 +107,7 @@ def _(get_clicked_coords, joined, layer, m, refresh):
                 )
             )
 
-    dashboard = mo.vstack([m, right_pane, refresh], heights=[4, 4, 1])
+    dashboard = mo.vstack([map, right_pane], heights=[4, 4])
     dashboard
     return
 

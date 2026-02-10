@@ -22,7 +22,7 @@ class PackageSearchInnerResult(BaseModel):
 
 
 class CkanResource(BaseModel):
-    # The fields listed below are just the ones we care about, not al
+    # The fields listed below are just the ones we care about, not an
     # exhaustive list of all the fields returned by CKAN!
     model_config = ConfigDict(extra="allow")
 
