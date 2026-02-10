@@ -2,6 +2,7 @@
 
 from pathlib import Path, PurePosixPath
 
+import nged_data
 import polars as pl
 from dagster import (
     AssetExecutionContext,
@@ -11,8 +12,6 @@ from dagster import (
     define_asset_job,
 )
 from nged_data import ckan
-from nged_data.process_flows import process_live_primary_substation_flows
-from nged_data.schemas import CkanResource
 
 # Define Partitions
 # We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
@@ -77,7 +76,7 @@ def live_primary_csv(context: AssetExecutionContext) -> Path:
     json_filename = _json_filename_for_ckan_resource(last_modified_date_str, substation_name)
     context.log.info(f"Loading {json_filename}...")
     json_text = json_filename.read_text()
-    resource = CkanResource.model_validate_json(json_text)
+    resource = nged_data.CkanResource.model_validate_json(json_text)
 
     # Get CSV from CKAN
     csv_url = str(resource.url)
@@ -92,7 +91,6 @@ def live_primary_csv(context: AssetExecutionContext) -> Path:
     dst_full_path = (
         Path("data") / "NGED" / "raw" / "live_primary_flows" / last_modified_date_str / csv_filename
     )
-
     dst_full_path.parent.mkdir(exist_ok=True, parents=True)
     dst_full_path.write_bytes(response.content)
 
@@ -101,7 +99,7 @@ def live_primary_csv(context: AssetExecutionContext) -> Path:
 
 @asset(partitions_def=composite_def)
 def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path) -> None:
-    df_of_new_data = process_live_primary_substation_flows(live_primary_csv)
+    df_of_new_data = nged_data.process_live_primary_substation_flows(live_primary_csv)
     # TODO(Jack): Data path should be configurable.
     parquet_path = (
         Path("data")
