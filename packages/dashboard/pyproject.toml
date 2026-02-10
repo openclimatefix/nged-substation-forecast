@@ -9,8 +9,9 @@ dependencies = [
     "lonboard>=0.13.0",
     "marimo>=0.19.7",
     "polars>=1.37.1",
-    "spatial-polars>=0.2.3",
     "nged-data",
+    "pyarrow>=23.0.0",
+    "geoarrow-pyarrow>=0.2.0",
 ]
 
 [dependency-groups]
