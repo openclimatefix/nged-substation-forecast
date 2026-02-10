@@ -1,5 +1,6 @@
 """Dagster assets for NGED data."""
 
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 import nged_data
@@ -112,7 +113,7 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
     )
     if parquet_path.exists():
         old_df = pl.scan_parquet(parquet_path)
-        last_timestamp = old_df.select(pl.max("timestamp")).item()
+        last_timestamp: datetime = old_df.select(pl.max("timestamp")).collect().item()
         new_df = (
             new_df.filter(pl.col("timestamp") > last_timestamp)
             .unique(subset="timestamp")
