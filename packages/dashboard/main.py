@@ -39,31 +39,49 @@ def _():
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
 def _(joined):
-    ga.rust.core.points(joined["longitude", "latitude"].to_numpy())
-    return
+    geo_array = ga.rust.core.points(
+        [
+            joined["longitude"].cast(pl.Float64).to_arrow(),
+            joined["latitude"].cast(pl.Float64).to_arrow(),
+        ],
+        crs="epsg:4326",
+    )
+
+    # joined.select(
+    #    pl.struct(["longitude", "latitude"], schema={"longitude": pl.Float64, "latitude": pl.Float64}).map_batches(
+    #        lambda combined: ga.rust.core.points(
+    #            [
+    #                combined.struct.field("longitude").to_arrow(),
+    #                combined.struct.field("latitude").to_arrow(),
+    #            ]
+    #        ),
+    #        return_dtype=pl.Object,
+    #    )
+    # )
+
+    print(geo_array[0])
+    return (geo_array,)
 
 
 @app.cell
-def _(sdf):
-    # Docs: https://atl2001.github.io/spatial_polars/SpatialFrame/#spatial_polars.spatialframe.SpatialFrame.to_scatterplotlayer
-    layer = sdf.spatial.to_scatterplotlayer(
+def _(geo_array):
+    # lonboard.ScatterplotLayer(pl.Series(name="geometry", values=geo_array).to_frame())
+    layer = lonboard.ScatterplotLayer(
+        geo_array,
         pickable=True,
         auto_highlight=True,
         # Styling
-        radius=1000,
+        get_fill_color=[0, 128, 255],
+        get_radius=1000,
         radius_units="meters",
         stroked=False,  # No outline.
     )
+    return (layer,)
 
-    # https://developmentseed.org/lonboard/latest/api/layers/scatterplot-layer/
-    layer.get_fill_color = [0, 128, 255]
 
+@app.cell
+def _(layer):
     map = lonboard.Map(layers=[layer])
     layer_widget = mo.ui.anywidget(layer)
     return layer_widget, map
