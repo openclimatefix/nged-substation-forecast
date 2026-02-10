@@ -101,7 +101,7 @@ def live_primary_csv(context: AssetExecutionContext) -> Path:
 
 @asset(partitions_def=composite_def)
 def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path) -> None:
-    new_df = nged_data.process_live_primary_substation_flows(live_primary_csv).lazy()
+    new_df = nged_data.process_live_primary_substation_flows(live_primary_csv)
     # TODO(Jack): Data path should be configurable.
     # TODO(Jack): Parquets should use Hive partitioning & be partitioned by month & substation num.
     parquet_path = (
@@ -112,8 +112,8 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
         / live_primary_csv.with_suffix(".parquet").name
     )
     if parquet_path.exists():
-        old_df = pl.scan_parquet(parquet_path)
-        last_timestamp: datetime = old_df.select(pl.max("timestamp")).collect().item()
+        old_df = pl.read_parquet(parquet_path)
+        last_timestamp: datetime = old_df.select("timestamp").max().item()
         new_df = (
             new_df.filter(pl.col("timestamp") > last_timestamp)
             .unique(subset="timestamp")
@@ -124,7 +124,7 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
         # TODO: Remove this mkdir line, and use `sink_parquet(mkdir=True)` when that API stabilises.
         parquet_path.parent.mkdir(exist_ok=True, parents=True)
         merged_df = new_df
-    merged_df.sink_parquet(parquet_path, compression="zstd")
+    merged_df.write_parquet(parquet_path, compression="zstd")
 
 
 update_live_primary_flows = define_asset_job(
