@@ -58,6 +58,7 @@ def list_resources_for_live_primaries(context: AssetExecutionContext):
         # Save JSON representation of CKAN Resource:
         json_string = resource.model_dump_json()
         json_path = _json_filename_for_ckan_resource(last_modified_date_str, resource.name)
+        json_path.parent.mkdir(parents=True, exist_ok=True)
         json_path.write_text(json_string)
 
     # Update dynamic partitions
@@ -99,8 +100,9 @@ def live_primary_csv(context: AssetExecutionContext) -> Path:
 
 @asset(partitions_def=composite_def)
 def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path) -> None:
-    df_of_new_data = nged_data.process_live_primary_substation_flows(live_primary_csv)
+    new_df = nged_data.process_live_primary_substation_flows(live_primary_csv).lazy()
     # TODO(Jack): Data path should be configurable.
+    # TODO(Jack): Parquets should use Hive partitioning & be partitioned by month & substation num.
     parquet_path = (
         Path("data")
         / "NGED"
@@ -109,16 +111,19 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
         / live_primary_csv.with_suffix(".parquet").name
     )
     if parquet_path.exists():
-        df_of_old_data = pl.read_parquet(parquet_path)
-        merged_df = pl.concat((df_of_old_data, df_of_new_data), how="vertical")
+        old_df = pl.scan_parquet(parquet_path)
+        last_timestamp = old_df.select(pl.max("timestamp")).item()
+        new_df = (
+            new_df.filter(pl.col("timestamp") > last_timestamp)
+            .unique(subset="timestamp")
+            .sort(by="timestamp")
+        )
+        merged_df = old_df.merge_sorted(new_df, key="timestamp")
     else:
+        # TODO: Remove this mkdir line, and use `sink_parquet(mkdir=True)` when that API stabilises.
         parquet_path.parent.mkdir(exist_ok=True, parents=True)
-        merged_df = df_of_new_data
-    # TODO(Jack): More efficient strategy: If the parquet exists, then copy the new df to only
-    # contain rows not in the old df, de-dupe the cropped new df, and append.
-    merged_df = merged_df.unique(subset="timestamp")
-    merged_df = merged_df.sort(by="timestamp")
-    merged_df.write_parquet(parquet_path, compression="zstd")
+        merged_df = new_df
+    merged_df.sink_parquet(parquet_path, compression="zstd")
 
 
 update_live_primary_flows = define_asset_job(

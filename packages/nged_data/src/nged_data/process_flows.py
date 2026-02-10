@@ -7,7 +7,7 @@ from contracts.data_schemas import SubstationFlows
 
 def process_live_primary_substation_flows(csv_path: Path) -> pt.DataFrame[SubstationFlows]:
     """Read a primary substation CSV and validate it against the schema."""
-    df: pl.DataFrame = pl.read_csv(csv_path)
+    df = pl.read_csv(csv_path)
     first_orig_rows = df.head()
 
     # The CSV column names vary between NGED license areas:
