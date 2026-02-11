@@ -1462,7 +1462,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "ruff", specifier = ">=0.14.13" },
-    { name = "ty", specifier = ">=0.0.13" },
+    { name = "ty", specifier = ">=0.0.16" },
     { name = "unittest-xml-reporting", specifier = ">=4.0.0" },
 ]
 
