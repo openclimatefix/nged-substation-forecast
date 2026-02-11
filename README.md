@@ -33,11 +33,26 @@ Optional: To allow Dagster to remember its state after you shut it down:
     ```
 3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
 
-NGED CKAN API token:
-1. Log in to NGED's Connected Data platform.
-1. Go to "User Profile" -> API Tokens -> Create API token -> Copy your API token (if you need more
-   help then see [NGED's docs for getting an API
-   token](https://connecteddata.nationalgrid.co.uk/api-guidance#api-tokens).)
+## Environment variables
+
+This code expects the following environment variables to be set. For example, you could put these
+into a `.env` file:
+
+```env
+# A token for NGED's Connected Data portal: https://connecteddata.nationalgrid.co.uk
+NGED_CKAN_TOKEN=
+
+# NGED's AWS S3 bucket containing their data
+NGED_S3_BUCKET_URL=https://
+NGED_S3_BUCKET_ACCESS_KEY=
+NGED_S3_BUCKET_SECRET=
+```
+
+### NGED CKAN API token:
+1. Log in to [NGED's Connected Data](https://connecteddata.nationalgrid.co.uk) platform.
+1. Click on your username (top right), and go to "User Profile" -> API Tokens -> Create API token
+   -> Copy your API token. If you need more help then see [NGED's docs for getting an API
+   token](https://connecteddata.nationalgrid.co.uk/api-guidance#api-tokens).
 1. Paste your API token into `.env` after `NGED_CKAN_TOKEN=`.
 
 ---
