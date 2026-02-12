@@ -31,7 +31,7 @@ class SubstationFlows(pt.Model):
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["SubstationFlows"]:
+    ) -> pt.DataFrame["SubstationFlows"]:  # type: ignore[invalid-method-override]
         """Validate the given dataframe, ensuring either MW or MVA is present."""
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
             raise ValueError(
