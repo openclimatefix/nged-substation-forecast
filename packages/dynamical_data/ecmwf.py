@@ -47,15 +47,15 @@ def _():
 
 @app.cell
 def _(ds):
-    ds["temperature_2m"].sel(init_time="2026-02-11T00", lead_time="12h", ensemble_member=1).plot()
+    ds["temperature_2m"].sel(init_time="2026-02-12T00", lead_time="12h", ensemble_member=1).plot()
     return
 
 
 @app.cell
 def _(ds):
     ds_for_london = (
-        ds["temperature_2m"]
-        .sel(init_time="2026-02-11T00")
+        ds["wind_v_100m"]
+        .sel(init_time="2026-02-12T00")
         .sel(latitude=51.51, longitude=0.13, method="nearest")  # London
     ).load()
     return (ds_for_london,)
@@ -87,8 +87,8 @@ def _(ds_for_london):
         linewidth=1,
     )
 
-    ax.set_title("ECMWF ENS: Temperature for London")  # , loc='left', fontweight='bold')
-    ax.set_ylabel("Temperature (C)")
+    ax.set_title("ECMWF ENS: Wind for London")  # , loc='left', fontweight='bold')
+    ax.set_ylabel("wind")
     ax.set_xlabel("Valid time (day of month)")
     ax.grid(True, linestyle="--", alpha=0.5)
 
