@@ -1,12 +1,13 @@
 import marimo
 
-__generated_with = "0.19.9"
+__generated_with = "0.19.11"
 app = marimo.App(width="full")
 
 with app.setup:
     import marimo as mo
     import xarray as xr
     import icechunk
+    from datetime import datetime, time, date
 
     import matplotlib.pyplot as plt
 
@@ -46,19 +47,27 @@ def _():
 
 
 @app.cell
-def _(ds):
-    ds["temperature_2m"].sel(init_time="2026-02-12T00", lead_time="12h", ensemble_member=1).plot()
+def _():
+    INIT_TIME = datetime.combine(date.today(), time())
+    INIT_TIME
+    return (INIT_TIME,)
+
+
+@app.cell
+def _(INIT_TIME, ds):
+    ds["temperature_2m"].sel(init_time=INIT_TIME, lead_time="12h", ensemble_member=1).plot()
     return
 
 
 @app.cell
-def _(ds):
+def _(INIT_TIME, ds):
+    var_name = "temperature_2m"
     ds_for_london = (
-        ds["wind_v_100m"]
-        .sel(init_time="2026-02-12T00")
+        ds[var_name]
+        .sel(init_time=INIT_TIME)
         .sel(latitude=51.51, longitude=0.13, method="nearest")  # London
     ).load()
-    return (ds_for_london,)
+    return ds_for_london, var_name
 
 
 @app.cell
@@ -68,7 +77,7 @@ def _(ds_for_london):
 
 
 @app.cell
-def _(ds_for_london):
+def _(ds_for_london, var_name):
     smoothed = (
         ds_for_london.swap_dims({"lead_time": "valid_time"})
         .resample(valid_time="1h")
@@ -87,17 +96,12 @@ def _(ds_for_london):
         linewidth=1,
     )
 
-    ax.set_title("ECMWF ENS: Wind for London")  # , loc='left', fontweight='bold')
-    ax.set_ylabel("wind")
+    ax.set_title(f"ECMWF ENS: {var_name} for London")  # , loc='left', fontweight='bold')
+    ax.set_ylabel(var_name)
     ax.set_xlabel("Valid time (day of month)")
     ax.grid(True, linestyle="--", alpha=0.5)
 
     fig
-    return
-
-
-@app.cell
-def _():
     return
 
 
