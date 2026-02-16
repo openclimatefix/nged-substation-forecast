@@ -16,6 +16,7 @@ dependencies = [
     "marimo>=0.19.9",
     "matplotlib>=3.10.8",
     "polars>=1.38.1",
+    "polars-h3>=0.6.1",
     "requests>=2.32.5",
     "ruff>=0.15.1",
     "scipy>=1.17.0",  # Only required for smoothing matplotlib. TODO(Jack): Remove!
