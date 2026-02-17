@@ -13,6 +13,9 @@ with app.setup:
     from typing import Final
     from lonboard import Map, H3HexagonLayer
 
+    import xarray as xr
+    import icechunk
+
 
 @app.cell(hide_code=True)
 def _():
@@ -91,18 +94,16 @@ def _(df):
 
 @app.cell
 def _(df_with_children):
-    # --- 3. The "Coordinate Lookup" Step ---
     # Instead of spatial join, we compute the NWP Key mathematically
     GRID_SIZE = 0.25
 
     # TODO: Need to think if ECMWF's grid boxes are centered on these coords, and how that interacts with our code below:
 
     df_with_grid_x_y = df_with_children.with_columns(
-        # MATHEMATICAL MAPPING: Round down to nearest 0.25 degree
-        # This effectively bins every child into an NWP box
-        h3_res7_grid_cell=pl.struct(
-            y=(plh3.cell_to_lat("h3_res7") / GRID_SIZE).floor().cast(pl.Int64),
-            x=(plh3.cell_to_lng("h3_res7") / GRID_SIZE).floor().cast(pl.Int64),
+        # Bin every child into an NWP box by snapping to the nearest 0.25 degree
+        nwp_grid_box=pl.struct(
+            nwp_lat=(plh3.cell_to_lat("h3_res7") / GRID_SIZE).floor() * GRID_SIZE,
+            nwp_lng=(plh3.cell_to_lng("h3_res7") / GRID_SIZE).floor() * GRID_SIZE,
         ),
     )
 
@@ -114,25 +115,69 @@ def _(df_with_children):
 def _(df_with_grid_x_y):
     df_with_counts = (
         df_with_grid_x_y.group_by("h3_index")
-        .agg(grid_cell_counts=pl.col("h3_res7_grid_cell").value_counts())
+        .agg(grid_cell_counts=pl.col("nwp_grid_box").value_counts())
         .with_columns(
             total=pl.col("grid_cell_counts").list.agg(pl.element().struct.field("count").sum())
         )
         .explode("grid_cell_counts")
         .unnest("grid_cell_counts")
+        .unnest("nwp_grid_box")
         .with_columns(propotion=pl.col.count / pl.col.total)
     )
     df_with_counts
+    return (df_with_counts,)
 
-    # TODO:
-    # 1. Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
-    # 2. Multiply `proportion` with each NWP value.
-    # 3. Groupby h3_index, and sum each NWP value column
+
+@app.cell
+def _(df_with_counts):
+    nwp_lat_and_lngs = (
+        df_with_counts.select("nwp_lat", "nwp_lng")
+        .unique(subset=["nwp_lat", "nwp_lng"])
+        .sort(by=["nwp_lat", "nwp_lng"])
+    )
+    nwp_lat_and_lngs
+    return (nwp_lat_and_lngs,)
+
+
+@app.cell
+def _():
+    storage = icechunk.s3_storage(
+        bucket="dynamical-ecmwf-ifs-ens",
+        prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+        region="us-west-2",
+        anonymous=True,
+    )
+    repo = icechunk.Repository.open(storage)
+    session = repo.readonly_session("main")
+
+    # Load dataset lazily (metadata only)
+    ds = xr.open_zarr(session.store, chunks=None)
+
+    ds
+    return (ds,)
+
+
+@app.cell
+def _(ds, nwp_lat_and_lngs):
+    ds["temperature_2m"].sel(
+        latitude=xr.DataArray(
+            nwp_lat_and_lngs["nwp_lat"], dims="points"
+        ),  # Note: Max -> Min order for ECMWF
+        longitude=xr.DataArray(nwp_lat_and_lngs["nwp_lng"], dims="points"),
+    ).isel(
+        ensemble_member=0,
+        init_time=0,
+        lead_time=0,
+    )
     return
 
 
 @app.cell
 def _():
+    # TODO:
+    # 1. Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
+    # 2. Multiply `proportion` with each NWP value.
+    # 3. Groupby h3_index, and sum each NWP value column
     return
 
 

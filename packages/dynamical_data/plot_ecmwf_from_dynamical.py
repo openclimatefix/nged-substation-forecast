@@ -61,7 +61,7 @@ def _(INIT_TIME, ds):
 
 @app.cell
 def _(INIT_TIME, ds):
-    var_name = "temperature_2m"
+    var_name = "downward_short_wave_radiation_flux_surface"
     ds_for_london = (
         ds[var_name]
         .sel(init_time=INIT_TIME)
@@ -86,7 +86,7 @@ def _(ds_for_london, var_name):
 
     fig, ax = plt.subplots(figsize=(15, 6))
 
-    smoothed.plot.line(
+    ds_for_london.plot.line(
         ax=ax,
         x="valid_time",
         hue="ensemble_member",
@@ -102,6 +102,17 @@ def _(ds_for_london, var_name):
     ax.grid(True, linestyle="--", alpha=0.5)
 
     fig
+    return (smoothed,)
+
+
+@app.cell
+def _(smoothed):
+    smoothed
+    return
+
+
+@app.cell
+def _():
     return
 
 
