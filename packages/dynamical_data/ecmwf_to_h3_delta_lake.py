@@ -125,18 +125,7 @@ def _(df_with_grid_x_y):
         .with_columns(propotion=pl.col.count / pl.col.total)
     )
     df_with_counts
-    return (df_with_counts,)
-
-
-@app.cell
-def _(df_with_counts):
-    nwp_lat_and_lngs = (
-        df_with_counts.select("nwp_lat", "nwp_lng")
-        .unique(subset=["nwp_lat", "nwp_lng"])
-        .sort(by=["nwp_lat", "nwp_lng"])
-    )
-    nwp_lat_and_lngs
-    return (nwp_lat_and_lngs,)
+    return
 
 
 @app.cell
@@ -154,30 +143,19 @@ def _():
     ds = xr.open_zarr(session.store, chunks=None)
 
     ds
-    return (ds,)
-
-
-@app.cell
-def _(ds, nwp_lat_and_lngs):
-    ds["temperature_2m"].sel(
-        latitude=xr.DataArray(
-            nwp_lat_and_lngs["nwp_lat"], dims="points"
-        ),  # Note: Max -> Min order for ECMWF
-        longitude=xr.DataArray(nwp_lat_and_lngs["nwp_lng"], dims="points"),
-    ).isel(
-        ensemble_member=0,
-        init_time=0,
-        lead_time=0,
-    )
     return
 
 
 @app.cell
 def _():
     # TODO:
-    # 1. Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
-    # 2. Multiply `proportion` with each NWP value.
-    # 3. Groupby h3_index, and sum each NWP value column
+    # - Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
+    # - Convert to numpy array
+    # - Flatten numpy array
+    # - Put into Polars DataFrame with appropriate lat and lng (perhaps by flattening the cropped xarray coords arrays?)
+    # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
+    # - Multiply `proportion` with each NWP value.
+    # - Groupby h3_index, and sum each NWP value column
     return
 
 
