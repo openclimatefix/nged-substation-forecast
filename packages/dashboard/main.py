@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.9"
+__generated_with = "0.19.11"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -16,6 +16,7 @@ with app.setup:
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
+    # TODO(Jack): This path should be configured once for the entire uv workspace.
     BASE_PARQUET_PATH: Final[Path] = Path(
         "~/dev/python/nged-substation-forecast/data/NGED/parquet/live_primary_flows"
     ).expanduser()
@@ -116,10 +117,10 @@ def _(df, layer_widget, map):
                     height=300,
                     width="container",  # Fill available width
                 )
+                .interactive()
             )
 
-    dashboard = mo.vstack([map, right_pane], heights=[4, 4])
-    dashboard
+    mo.vstack([map, right_pane])
     return
 
 
