@@ -12,6 +12,7 @@ with app.setup:
     import shapely.wkt
     from typing import Final
     from lonboard import Map, H3HexagonLayer
+    import numpy as np
 
     import xarray as xr
     import icechunk
@@ -122,10 +123,10 @@ def _(df_with_grid_x_y):
         .explode("grid_cell_counts")
         .unnest("grid_cell_counts")
         .unnest("nwp_grid_box")
-        .with_columns(propotion=pl.col.count / pl.col.total)
+        .with_columns(proportion=pl.col.count / pl.col.total)
     )
     df_with_counts
-    return
+    return (df_with_counts,)
 
 
 @app.cell
@@ -143,19 +144,137 @@ def _():
     ds = xr.open_zarr(session.store, chunks=None)
 
     ds
-    return
+    return (ds,)
 
 
 @app.cell
 def _():
     # TODO:
+    # - Optimise: Load a Zarr chunk at a time, and then convert that chunk to a DataFrame. Each ECMWF chunk contains 1 init time, all lead times, and all ens members.
+    return
+
+
+@app.cell
+def _(df_with_counts):
+    min_lat, max_lat, min_lng, max_lng = df_with_counts.select(
+        min_lat=pl.col("nwp_lat").min(),
+        max_lat=pl.col("nwp_lat").max(),
+        min_lng=pl.col("nwp_lng").min(),
+        max_lng=pl.col("nwp_lng").max(),
+    )
+    return max_lat, max_lng, min_lat, min_lng
+
+
+@app.cell
+def _(ds, max_lat, max_lng, min_lat, min_lng):
     # - Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
+    ds_cropped = ds.sel(
+        # Latitude coords are in _descending_ order or the Northern hemisphere!
+        latitude=slice(max_lat.item(), min_lat.item()),
+        longitude=slice(min_lng.item(), max_lng.item()),
+    )
+
+    ds_cropped
+    return (ds_cropped,)
+
+
+@app.cell
+def _(ds_cropped):
     # - Convert to numpy array
     # - Flatten numpy array
+    flat_array = (
+        ds_cropped["temperature_2m"]
+        .isel(init_time=-1, lead_time=0, ensemble_member=0)
+        .values.ravel()
+    )
+    flat_array
+    return (flat_array,)
+
+
+@app.cell
+def _(ds_cropped):
     # - Put into Polars DataFrame with appropriate lat and lng (perhaps by flattening the cropped xarray coords arrays?)
+    lat_grid, lon_grid = np.meshgrid(
+        ds_cropped.latitude.values, ds_cropped.longitude.values, indexing="ij"
+    )
+    lat_grid
+    return lat_grid, lon_grid
+
+
+@app.cell
+def _(flat_array, lat_grid, lon_grid):
+    df_nwp = pl.DataFrame(
+        {"temperature_2m": flat_array, "longitude": lon_grid.ravel(), "latitude": lat_grid.ravel()}
+    )
+    df_nwp
+    return (df_nwp,)
+
+
+@app.cell
+def _(df_nwp, df_with_counts):
     # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
+    joined = df_with_counts.join(
+        df_nwp,
+        left_on=["nwp_lng", "nwp_lat"],
+        right_on=["longitude", "latitude"],
+    )
+    joined
+    return (joined,)
+
+
+@app.cell
+def _(joined):
     # - Multiply `proportion` with each NWP value.
     # - Groupby h3_index, and sum each NWP value column
+    df_of_h3_and_temperature = (
+        joined.with_columns(temperature_2m=pl.col("temperature_2m") * pl.col("proportion"))
+        .group_by("h3_index")
+        .agg(pl.col("temperature_2m").sum())
+    )
+    df_of_h3_and_temperature
+    return (df_of_h3_and_temperature,)
+
+
+@app.cell
+def _():
+    from lonboard.colormap import apply_continuous_cmap
+
+    return (apply_continuous_cmap,)
+
+
+@app.cell
+def _(df_of_h3_and_temperature):
+    temperature = df_of_h3_and_temperature["temperature_2m"]
+    min_bound = temperature.min()
+    max_bound = temperature.max() - min_bound
+
+    normalized = (temperature - min_bound) / max_bound
+    normalized
+    return (normalized,)
+
+
+@app.cell
+def _():
+    from palettable.matplotlib import Viridis_20
+
+    return (Viridis_20,)
+
+
+@app.cell
+def _(Viridis_20, apply_continuous_cmap, df_of_h3_and_temperature, normalized):
+    Map(
+        H3HexagonLayer(
+            df_of_h3_and_temperature,
+            get_hexagon=df_of_h3_and_temperature["h3_index"],
+            get_fill_color=apply_continuous_cmap(normalized, Viridis_20, alpha=0.7),
+            opacity=0.8,
+        )
+    )
+    return
+
+
+@app.cell
+def _():
     return
 
 

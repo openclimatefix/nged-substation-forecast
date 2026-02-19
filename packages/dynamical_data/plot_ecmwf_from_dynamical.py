@@ -54,8 +54,8 @@ def _():
 
 
 @app.cell
-def _(INIT_TIME, ds):
-    ds["temperature_2m"].sel(init_time=INIT_TIME, lead_time="12h", ensemble_member=1).plot()
+def _(ds):
+    ds["temperature_2m"].isel(init_time=-1, lead_time=0, ensemble_member=0).plot(cmap="viridis")
     return
 
 

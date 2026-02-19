@@ -15,6 +15,7 @@ dependencies = [
     "lonboard>=0.14.0",
     "marimo>=0.19.9",
     "matplotlib>=3.10.8",
+    "palettable>=3.3.3",
     "polars>=1.38.1",
     "polars-h3>=0.6.1",
     "requests>=2.32.5",
