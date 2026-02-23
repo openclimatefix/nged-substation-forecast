@@ -1,21 +1,21 @@
 import marimo
 
-__generated_with = "0.19.11"
+__generated_with = "0.20.2"
 app = marimo.App(width="full")
 
 with app.setup:
-    import marimo as mo
-    import polars as pl
+    from typing import Final
+
     import h3.api.numpy_int as h3
+    import icechunk
+    import marimo as mo
+    import numpy as np
+    import polars as pl
     import polars_h3 as plh3
     import shapely.geometry
     import shapely.wkt
-    from typing import Final
-    from lonboard import Map, H3HexagonLayer
-    import numpy as np
-
     import xarray as xr
-    import icechunk
+    from lonboard import H3HexagonLayer, Map
 
 
 @app.cell(hide_code=True)
@@ -52,7 +52,7 @@ def _(file_contents):
 @app.cell
 def _(shape):
     # Which H3 resolution to use?
-    # ECMWF ENS has a res of 0.25°.
+    # ECMWF ENS has a horizontal resolutions of 0.25°.
     # For GB, a 0.25° grid box is approx 28 km north-south (lat) x 16 km east-west (lon) ~= 450 km².
     # H3 average hexagon areas (from https://h3geo.org/docs/core-library/restable/#average-area-in-km2):
     #   res 4 = 1,770 km² (far too coarse).
@@ -62,16 +62,13 @@ def _(shape):
     cells = h3.geo_to_cells(shape, res=H3_RES)
 
     df = pl.DataFrame({"h3_index": list(cells)}, schema={"h3_index": pl.UInt64}).sort("h3_index")
-    df
-    return H3_RES, df
 
-
-@app.cell
-def _(H3_RES: Final[int], df):
     # Verify we caught the Isles of Scilly:
     _scilly_hex = h3.latlng_to_cell(lat=49.9, lng=-6.3, res=H3_RES)
     assert _scilly_hex in df["h3_index"]
-    return
+
+    df
+    return (df,)
 
 
 @app.cell
@@ -140,18 +137,13 @@ def _():
     repo = icechunk.Repository.open(storage)
     session = repo.readonly_session("main")
 
-    # Load dataset lazily (metadata only)
-    ds = xr.open_zarr(session.store, chunks=None)
+    ds = xr.open_zarr(
+        session.store,
+        chunks=None,  # Don't use dask.
+    )
 
     ds
     return (ds,)
-
-
-@app.cell
-def _():
-    # TODO:
-    # - Optimise: Load a Zarr chunk at a time, and then convert that chunk to a DataFrame. Each ECMWF chunk contains 1 init time, all lead times, and all ens members.
-    return
 
 
 @app.cell
@@ -167,12 +159,12 @@ def _(df_with_counts):
 
 @app.cell
 def _(ds, max_lat, max_lng, min_lat, min_lng):
-    # - Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
+    # Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
     ds_cropped = ds.sel(
         # Latitude coords are in _descending_ order or the Northern hemisphere!
         latitude=slice(max_lat.item(), min_lat.item()),
         longitude=slice(min_lng.item(), max_lng.item()),
-    )
+    ).isel(init_time=-1)
 
     ds_cropped
     return (ds_cropped,)
@@ -180,59 +172,85 @@ def _(ds, max_lat, max_lng, min_lat, min_lng):
 
 @app.cell
 def _(ds_cropped):
-    # - Convert to numpy array
-    # - Flatten numpy array
-    flat_array = (
-        ds_cropped["temperature_2m"]
-        .isel(init_time=-1, lead_time=0, ensemble_member=0)
-        .values.ravel()
-    )
-    flat_array
-    return (flat_array,)
+    # Load the data from one
+
+    import concurrent.futures
+
+    def download_array(var_name: str) -> dict[str, xr.DataArray]:
+        return {var_name: ds_cropped[var_name].compute()}
+
+    data_arrays: dict[str, xr.DataArray] = {}
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(download_array, name) for name in ds_cropped.data_vars]
+        for future in concurrent.futures.as_completed(futures):
+            data_arrays.update(future.result())
+    return (data_arrays,)
 
 
 @app.cell
-def _(ds_cropped):
-    # - Put into Polars DataFrame with appropriate lat and lng (perhaps by flattening the cropped xarray coords arrays?)
+def _(data_arrays: dict[str, xr.DataArray]):
+    loaded_ds = xr.Dataset(data_arrays)
+    del data_arrays
+    loaded_ds
+    return (loaded_ds,)
+
+
+@app.cell
+def _(df_with_counts, ds_cropped, loaded_ds):
+    # Put into Polars DataFrame with appropriate lat and lng
     lat_grid, lon_grid = np.meshgrid(
-        ds_cropped.latitude.values, ds_cropped.longitude.values, indexing="ij"
+        loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
     )
-    lat_grid
-    return lat_grid, lon_grid
+
+    dfs = []
+
+    for lead_time in loaded_ds.lead_time.values:
+        for ensemble_member in loaded_ds.ensemble_member.values:
+            loaded_cropped_ds = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
+            nwp_data = {
+                var_name: var_array.values.ravel()
+                for var_name, var_array in loaded_cropped_ds.items()
+            }
+            nwp_data.update(
+                {
+                    "longitude": lon_grid.ravel(),
+                    "latitude": lat_grid.ravel(),
+                }
+            )
+            _nwp_df = pl.DataFrame(nwp_data)
+
+            # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
+            joined = df_with_counts.join(
+                _nwp_df,
+                left_on=["nwp_lng", "nwp_lat"],
+                right_on=["longitude", "latitude"],
+            )
+
+            # - Multiply `proportion` with each NWP value.
+            # - Groupby h3_index, and sum each NWP value column
+            nwp_var_names = loaded_cropped_ds.data_vars
+            joined = (
+                joined.with_columns(pl.col(nwp_var_names) * pl.col("proportion"))
+                .group_by("h3_index")
+                .agg(pl.col(nwp_var_names).sum())
+                .cast({var_name: pl.Float32 for var_name in nwp_var_names})
+                .with_columns(
+                    lead_time=pl.duration(seconds=lead_time / np.timedelta64(1, "s")),
+                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
+                    init_time=pl.lit(ds_cropped.init_time.values),
+                )
+            )
+
+            dfs.append(joined)
+    return (dfs,)
 
 
 @app.cell
-def _(flat_array, lat_grid, lon_grid):
-    df_nwp = pl.DataFrame(
-        {"temperature_2m": flat_array, "longitude": lon_grid.ravel(), "latitude": lat_grid.ravel()}
-    )
-    df_nwp
-    return (df_nwp,)
-
-
-@app.cell
-def _(df_nwp, df_with_counts):
-    # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
-    joined = df_with_counts.join(
-        df_nwp,
-        left_on=["nwp_lng", "nwp_lat"],
-        right_on=["longitude", "latitude"],
-    )
-    joined
-    return (joined,)
-
-
-@app.cell
-def _(joined):
-    # - Multiply `proportion` with each NWP value.
-    # - Groupby h3_index, and sum each NWP value column
-    df_of_h3_and_temperature = (
-        joined.with_columns(temperature_2m=pl.col("temperature_2m") * pl.col("proportion"))
-        .group_by("h3_index")
-        .agg(pl.col("temperature_2m").sum())
-    )
-    df_of_h3_and_temperature
-    return (df_of_h3_and_temperature,)
+def _(dfs):
+    nwp_df = pl.concat(dfs)
+    nwp_df = nwp_df.sort(by=["ensemble_member", "h3_index", "lead_time"])
+    nwp_df
+    return (nwp_df,)
 
 
 @app.cell
@@ -243,33 +261,48 @@ def _():
 
 
 @app.cell
-def _(df_of_h3_and_temperature):
-    temperature = df_of_h3_and_temperature["temperature_2m"]
+def _(nwp_df):
+    selection = nwp_df.filter(
+        pl.col.ensemble_member == 0, pl.col.lead_time == pl.duration(days=4.5)
+    )
+
+    temperature = selection["temperature_2m"]
     min_bound = temperature.min()
     max_bound = temperature.max() - min_bound
 
     normalized = (temperature - min_bound) / max_bound
-    normalized
-    return (normalized,)
+    return normalized, selection
 
 
 @app.cell
 def _():
-    from palettable.matplotlib import Viridis_20
+    from palettable.matplotlib import Viridis_20  # type: ignore[unresolved-import]
 
     return (Viridis_20,)
 
 
 @app.cell
-def _(Viridis_20, apply_continuous_cmap, df_of_h3_and_temperature, normalized):
+def _(Viridis_20, apply_continuous_cmap, normalized, selection):
     Map(
         H3HexagonLayer(
-            df_of_h3_and_temperature,
-            get_hexagon=df_of_h3_and_temperature["h3_index"],
+            selection,
+            get_hexagon=selection["h3_index"],
             get_fill_color=apply_continuous_cmap(normalized, Viridis_20, alpha=0.7),
             opacity=0.8,
         )
     )
+    return
+
+
+@app.cell
+def _(nwp_df):
+    nwp_df.write_parquet("nwp.parquet", compression="zstd", compression_level=10)
+    return
+
+
+@app.cell
+def _(selection):
+    selection
     return
 
 
