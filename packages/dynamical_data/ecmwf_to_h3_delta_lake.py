@@ -158,99 +158,97 @@ def _(df_with_counts):
 
 
 @app.cell
-def _(ds, max_lat, max_lng, min_lat, min_lng):
-    # Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
-    ds_cropped = ds.sel(
-        # Latitude coords are in _descending_ order or the Northern hemisphere!
-        latitude=slice(max_lat.item(), min_lat.item()),
-        longitude=slice(min_lng.item(), max_lng.item()),
-    ).isel(init_time=-1)
-
-    ds_cropped
-    return (ds_cropped,)
-
-
-@app.cell
-def _(ds_cropped):
-    # Load the data from one
-
+def _(df_with_counts, ds, max_lat, max_lng, min_lat, min_lng):
     import concurrent.futures
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
-    data_arrays: dict[str, xr.DataArray] = {}
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(download_array, name) for name in ds_cropped.data_vars]
-        for future in concurrent.futures.as_completed(futures):
-            data_arrays.update(future.result())
-    return (data_arrays,)
+    for init_time in ds.init_time.values:
+        print(init_time)
 
+        # Crop the NWP data spatially using the min & max lats and lngs from the Polars H3 dataframe.
+        ds_cropped = ds.sel(
+            # Latitude coords are in _descending_ order or the Northern hemisphere!
+            latitude=slice(max_lat.item(), min_lat.item()),
+            longitude=slice(min_lng.item(), max_lng.item()),
+            init_time=init_time,
+        )
 
-@app.cell
-def _(data_arrays: dict[str, xr.DataArray]):
-    loaded_ds = xr.Dataset(data_arrays)
-    del data_arrays
-    loaded_ds
-    return (loaded_ds,)
+        data_arrays: dict[str, xr.DataArray] = {}
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(download_array, name) for name in ds_cropped.data_vars]
+            for future in concurrent.futures.as_completed(futures):
+                data_arrays.update(future.result())
 
+        loaded_ds = xr.Dataset(data_arrays)
+        del data_arrays
+        loaded_ds
 
-@app.cell
-def _(df_with_counts, ds_cropped, loaded_ds):
-    # Put into Polars DataFrame with appropriate lat and lng
-    lat_grid, lon_grid = np.meshgrid(
-        loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
-    )
+        # TODO: Don't compute this every loop
+        lat_grid, lon_grid = np.meshgrid(
+            loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
+        )
 
-    dfs = []
+        dfs = []
 
-    for lead_time in loaded_ds.lead_time.values:
-        for ensemble_member in loaded_ds.ensemble_member.values:
-            loaded_cropped_ds = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
-            nwp_data = {
-                var_name: var_array.values.ravel()
-                for var_name, var_array in loaded_cropped_ds.items()
-            }
-            nwp_data.update(
-                {
-                    "longitude": lon_grid.ravel(),
-                    "latitude": lat_grid.ravel(),
-                }
-            )
-            _nwp_df = pl.DataFrame(nwp_data)
-
-            # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
-            joined = df_with_counts.join(
-                _nwp_df,
-                left_on=["nwp_lng", "nwp_lat"],
-                right_on=["longitude", "latitude"],
-            )
-
-            # - Multiply `proportion` with each NWP value.
-            # - Groupby h3_index, and sum each NWP value column
-            nwp_var_names = loaded_cropped_ds.data_vars
-            joined = (
-                joined.with_columns(pl.col(nwp_var_names) * pl.col("proportion"))
-                .group_by("h3_index")
-                .agg(pl.col(nwp_var_names).sum())
-                .cast({var_name: pl.Float32 for var_name in nwp_var_names})
-                .with_columns(
-                    lead_time=pl.duration(seconds=lead_time / np.timedelta64(1, "s")),
-                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
-                    init_time=pl.lit(ds_cropped.init_time.values),
+        for lead_time in loaded_ds.lead_time.values:
+            for ensemble_member in loaded_ds.ensemble_member.values:
+                loaded_cropped_ds = loaded_ds.sel(
+                    lead_time=lead_time, ensemble_member=ensemble_member
                 )
-            )
+                nwp_data = {
+                    var_name: var_array.values.ravel()
+                    for var_name, var_array in loaded_cropped_ds.items()
+                }
+                nwp_data.update(
+                    {
+                        "longitude": lon_grid.ravel(),
+                        "latitude": lat_grid.ravel(),
+                    }
+                )
+                _nwp_df = pl.DataFrame(nwp_data)
 
-            dfs.append(joined)
-    return (dfs,)
+                # - Join h3_res7_grid_cell with the actual NWP data, to end up with a dataframe that has `proportion` and the raw NWP value
+                joined = df_with_counts.join(
+                    _nwp_df,
+                    left_on=["nwp_lng", "nwp_lat"],
+                    right_on=["longitude", "latitude"],
+                )
+
+                # - Multiply `proportion` with each NWP value.
+                # - Groupby h3_index, and sum each NWP value column
+                nwp_var_names: list[str] = list(loaded_cropped_ds.data_vars.keys())  # type: ignore[invalid-assignment]
+                joined = (
+                    joined.with_columns(pl.col(nwp_var_names) * pl.col("proportion"))
+                    .group_by("h3_index")
+                    .agg(pl.col(nwp_var_names).sum())
+                    .cast({var_name: pl.Float32 for var_name in nwp_var_names})
+                    .with_columns(
+                        lead_time=pl.duration(seconds=lead_time / np.timedelta64(1, "s")),
+                        ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
+                        init_time=pl.lit(init_time),
+                    )
+                )
+
+                dfs.append(joined)
+
+        nwp_df = pl.concat(dfs)
+        nwp_df = nwp_df.sort(by=["ensemble_member", "h3_index", "lead_time"])
+
+        nwp_df.write_parquet(
+            f"data/{np.datetime_as_string(init_time, unit='h')}.parquet",
+            compression="zstd",
+            compression_level=10,
+        )
+    return loaded_cropped_ds, nwp_df
 
 
 @app.cell
-def _(dfs):
-    nwp_df = pl.concat(dfs)
-    nwp_df = nwp_df.sort(by=["ensemble_member", "h3_index", "lead_time"])
-    nwp_df
-    return (nwp_df,)
+def _(loaded_cropped_ds):
+    keys = loaded_cropped_ds.data_vars.keys()
+    type(keys)
+    return
 
 
 @app.cell
@@ -291,12 +289,6 @@ def _(Viridis_20, apply_continuous_cmap, normalized, selection):
             opacity=0.8,
         )
     )
-    return
-
-
-@app.cell
-def _(nwp_df):
-    nwp_df.write_parquet("nwp.parquet", compression="zstd", compression_level=10)
     return
 
 
