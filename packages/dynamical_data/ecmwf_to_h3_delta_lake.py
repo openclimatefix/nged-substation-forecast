@@ -216,14 +216,22 @@ def _(df_with_counts, ds, max_lat, max_lng, min_lat, min_lng):
                     right_on=["longitude", "latitude"],
                 )
 
-                # - Multiply `proportion` with each NWP value.
-                # - Groupby h3_index, and sum each NWP value column
-                nwp_var_names: list[str] = list(loaded_cropped_ds.data_vars.keys())  # type: ignore[invalid-assignment]
+                all_nwp_vars: list[str] = list(loaded_cropped_ds.data_vars.keys())  # type: ignore[invalid-assignment]
+
+                # We need to handle categorical values differently:
+                categorical_nwp_vars = ["categorical_precipitation_type_surface"]
+                numeric_nwp_vars = [var for var in all_nwp_vars if var not in categorical_nwp_vars]
+
+                dtypes = {numeric_nwp_var: pl.Float32 for numeric_nwp_var in numeric_nwp_vars}
+                dtypes.update(
+                    {categorical_nwp_var: pl.UInt8 for categorical_nwp_var in categorical_nwp_vars}
+                )
+
                 joined = (
-                    joined.with_columns(pl.col(nwp_var_names) * pl.col("proportion"))
+                    joined.with_columns(pl.col(numeric_nwp_vars) * pl.col("proportion"))
                     .group_by("h3_index")
-                    .agg(pl.col(nwp_var_names).sum())
-                    .cast({var_name: pl.Float32 for var_name in nwp_var_names})
+                    .agg(pl.col(numeric_nwp_vars).sum(), pl.col(categorical_nwp_vars).mode())
+                    .cast(dtypes)
                     .with_columns(
                         lead_time=pl.duration(seconds=lead_time / np.timedelta64(1, "s")),
                         ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
@@ -236,12 +244,35 @@ def _(df_with_counts, ds, max_lat, max_lng, min_lat, min_lng):
         nwp_df = pl.concat(dfs)
         nwp_df = nwp_df.sort(by=["ensemble_member", "h3_index", "lead_time"])
 
+        break  # TODO(Jack) REMOVE THIS!
+
         nwp_df.write_parquet(
             f"data/{np.datetime_as_string(init_time, unit='h')}.parquet",
             compression="zstd",
             compression_level=10,
+            statistics="full",
         )
     return (nwp_df,)
+
+
+@app.cell
+def _():
+    d = {"a": 1}
+    d.update({"b": 2})
+    d
+    return
+
+
+@app.cell
+def _(nwp_var_names):
+    nwp_var_names.remove("categorical_precipitation_type_surface")
+    return
+
+
+@app.cell
+def _(nwp_var_names):
+    nwp_var_names
+    return
 
 
 @app.cell
