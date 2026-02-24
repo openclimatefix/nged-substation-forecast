@@ -241,14 +241,7 @@ def _(df_with_counts, ds, max_lat, max_lng, min_lat, min_lng):
             compression="zstd",
             compression_level=10,
         )
-    return loaded_cropped_ds, nwp_df
-
-
-@app.cell
-def _(loaded_cropped_ds):
-    keys = loaded_cropped_ds.data_vars.keys()
-    type(keys)
-    return
+    return (nwp_df,)
 
 
 @app.cell
