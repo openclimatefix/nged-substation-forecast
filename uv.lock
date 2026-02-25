@@ -15,6 +15,7 @@ members = [
     "nged-data",
     "nged-substation-forecast",
     "notebooks",
+    "xgboost-forecaster",
 ]
 
 [[package]]
@@ -3145,6 +3146,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/0f/03/e3353b72e518574b3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/92/545eb2ca17fc0e05456728d7e4378bfee48d66433ae3b7e71948e46826fb/xarray-2026.2.0-py3-none-any.whl", hash = "sha256:e927d7d716ea71dea78a13417970850a640447d8dd2ceeb65c5687f6373837c9", size = 1405358, upload-time = "2026-02-13T22:20:47.847Z" },
 ]
+
+[[package]]
+name = "xgboost-forecaster"
+version = "0.1.0"
+source = { editable = "packages/xgboost_forecaster" }
 
 [[package]]
 name = "yarl"
