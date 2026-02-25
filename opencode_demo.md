@@ -1,5 +1,5 @@
 Please implement a simple XGBoost model to forecast the power flowing through NGED's primary
-electricity substations.
+electricity substations. Please put your implementation in @packages/xgboost_forecaster/.
 
 ECMWF ensemble weather forecasts can be found in @packages/dynamical_data/data/. These are in tabular
 format, using H3 resolution 5 discrete spatial index.
