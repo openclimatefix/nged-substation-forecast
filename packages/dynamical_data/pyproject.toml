@@ -1,0 +1,35 @@
+[project]
+name = "dynamical-data"
+version = "0.1.0"
+description = "Download & process NWPs from Dynamical.org"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "altair>=6.0.0",
+    "deltalake>=1.4.2",
+    "h3>=4.4.2",
+    "icechunk>=1.1.18",
+    "lonboard>=0.14.0",
+    "marimo>=0.19.9",
+    "matplotlib>=3.10.8",
+    "palettable>=3.3.3",
+    "polars>=1.38.1",
+    "polars-h3>=0.6.1",
+    "requests>=2.32.5",
+    "ruff>=0.15.1",
+    "scipy>=1.17.0",  # Only required for smoothing matplotlib. TODO(Jack): Remove!
+    "shapely>=2.1.2",
+    "xarray>=2026.1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]

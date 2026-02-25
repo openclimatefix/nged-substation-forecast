@@ -3,6 +3,7 @@
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 
+import dagster as dg
 import nged_data
 import polars as pl
 from dagster import (
@@ -130,4 +131,5 @@ def live_primary_parquet(context: AssetExecutionContext, live_primary_csv: Path)
 update_live_primary_flows = define_asset_job(
     name="update_live_primary_flows",
     selection=[list_resources_for_live_primaries, live_primary_csv, live_primary_parquet],
+    executor_def=dg.in_process_executor,
 )
