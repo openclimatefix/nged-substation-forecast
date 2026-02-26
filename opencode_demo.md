@@ -13,3 +13,6 @@ You can find how to get the the lat/lngs of each substation by looking at the da
 Please train a very simple model on a handful of substations. Please check that the substation data
 looks sane. Please write the code to match up the substation lat/lns with the H3 indicies in the
 ECMWF data.
+
+Please note that the power data only goes back a few weeks, even though the weather data goes back
+2 years.
