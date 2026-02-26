@@ -61,14 +61,49 @@ def load_substation_power(parquet_filename: str) -> pl.DataFrame:
         ]
     ).drop_nulls()
 
+    # Sanity check: Check if data gets "stuck" (identical values for too long)
+    # If we have more than 6 identical consecutive values (30 mins at 5-min res), mark as suspect.
+    # We'll just filter out substations that have long streaks of identical values in the training set.
+    streaks = df.with_columns(
+        is_new_streak=(pl.col("power_mw") != pl.col("power_mw").shift(1)).fill_null(True)
+    ).with_columns(streak_id=pl.col("is_new_streak").cum_sum())
+
+    max_streak = streaks.group_by("streak_id").len().select(pl.col("len").max()).item()
+
+    if max_streak > 12:  # 1 hour of identical values
+        log.warning(
+            f"Substation data in {parquet_filename} looks 'stuck' (max streak: {max_streak})"
+        )
+        return pl.DataFrame()
+
     return df
 
 
-def load_weather_data(h3_indices: list[int], start_date: str, end_date: str) -> pl.DataFrame:
-    """Load weather data for specific H3 cells and date range, averaging ensembles."""
+def load_weather_data(
+    h3_indices: list[int],
+    start_date: str,
+    end_date: str,
+    init_time: datetime | None = None,
+    average_ensembles: bool = True,
+    upsample_to_5min: bool = True,
+) -> pl.DataFrame:
+    """Load weather data for specific H3 cells and date range.
+
+    Args:
+        h3_indices: List of H3 cells to load.
+        start_date: Start date string (YYYY-MM-DD).
+        end_date: End date string (YYYY-MM-DD).
+        init_time: If provided, only load this specific initialization time.
+        average_ensembles: If True, average across all ensemble members.
+        upsample_to_5min: If True, upsample the hourly weather data to 5-minutely.
+    """
     # We'll load all files between start and end date
     files = sorted(BASE_WEATHER_PATH.glob("*.parquet"))
     relevant_files = [f for f in files if start_date <= f.stem.split("T")[0] <= end_date]
+
+    if init_time:
+        init_str = init_time.strftime("%Y-%m-%dT%H")
+        relevant_files = [f for f in relevant_files if f.stem == init_str]
 
     if not relevant_files:
         log.warning(f"No weather files found for range {start_date} to {end_date}")
@@ -91,61 +126,145 @@ def load_weather_data(h3_indices: list[int], start_date: str, end_date: str) -> 
         timestamp=(pl.col("init_time") + pl.col("lead_time")).cast(pl.Datetime("us", "UTC"))
     )
 
-    # Average across ensemble members
-    numeric_cols = [
+    # Variables to keep
+    nwp_vars = [
         col
         for col in weather.columns
         if weather[col].dtype in [pl.Float32, pl.Float64]
         and col not in ["timestamp", "h3_index", "lead_time"]
     ]
 
-    weather = weather.group_by(["h3_index", "timestamp"]).agg(
-        [pl.col(c).mean() for c in numeric_cols]
-    )
+    group_cols = ["h3_index", "timestamp"]
+    if not average_ensembles:
+        group_cols.append("ensemble_member")
+
+    if average_ensembles:
+        weather = weather.group_by(group_cols).agg([pl.col(c).mean() for c in nwp_vars])
+    else:
+        # Keep ensemble members separate
+        weather = weather.select(group_cols + nwp_vars)
+
+    if upsample_to_5min:
+        # Create a full 5-minute grid for the time range
+        ts_min = weather["timestamp"].min()
+        ts_max = weather["timestamp"].max()
+        if ts_min is not None and ts_max is not None:
+            time_grid = (
+                pl.datetime_range(ts_min, ts_max, interval="5m", time_zone="UTC", eager=True)
+                .alias("timestamp")
+                .to_frame()
+            )
+
+            # We'll join each group to the time grid and interpolate
+            # This is more robust than map_groups for multi-column grouping
+            group_cols = ["h3_index"]
+            if "ensemble_member" in weather.columns:
+                group_cols.append("ensemble_member")
+
+            # Get unique groups
+            groups = weather.select(group_cols).unique()
+
+            upsampled_parts = []
+            for group in groups.iter_rows(named=True):
+                group_df = weather.filter(*[pl.col(k) == v for k, v in group.items()]).sort(
+                    "timestamp"
+                )
+
+                # Join grid and interpolate
+                upsampled = time_grid.join(group_df, on="timestamp", how="left")
+
+                # Fill group columns and interpolate numeric vars
+                upsampled = upsampled.with_columns(
+                    [pl.lit(v).alias(k) for k, v in group.items()]
+                ).interpolate()
+
+                upsampled_parts.append(upsampled)
+
+            weather = pl.concat(upsampled_parts)
 
     return weather
 
 
-def prepare_training_data(substation_name: str, metadata: pl.DataFrame) -> pl.DataFrame:
-    """Join power and weather data for a single substation and add features."""
-    sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == substation_name)
-    if sub_meta.is_empty():
-        raise ValueError(f"Substation {substation_name} not found in metadata")
+def prepare_training_data(
+    substation_names: list[str], metadata: pl.DataFrame, use_lags: bool = True
+) -> pl.DataFrame:
+    """Join power and weather data for multiple substations and add features.
 
-    h3_index = sub_meta["h3_index"][0]
-    parquet_file = sub_meta["parquet_filename"][0]
+    Args:
+        substation_names: List of substation names.
+        metadata: Substation metadata.
+        use_lags: If True, adds 7-day and 14-day lagged power features.
+    """
+    all_subs_data = []
 
-    power = load_substation_power(parquet_file)
+    for sub_name in substation_names:
+        sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == sub_name)
+        if sub_meta.is_empty():
+            log.warning(f"Substation {sub_name} not found in metadata")
+            continue
 
-    power_min = cast(datetime, power["timestamp"].min())
-    power_max = cast(datetime, power["timestamp"].max())
+        h3_index = sub_meta["h3_index"][0]
+        sub_id = sub_meta["substation_number"][0]
+        parquet_file = sub_meta["parquet_filename"][0]
 
-    if power_min is None or power_max is None:
-        raise ValueError(f"No power data found for substation {substation_name}")
+        power = load_substation_power(parquet_file)
+        if power.is_empty():
+            continue
 
-    end_date = power_max.strftime("%Y-%m-%d")
+        if use_lags:
+            # Robust time-based lags: join power with itself at offsets
+            power_lag_7d = power.select(
+                [
+                    (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
+                    pl.col("power_mw").alias("power_mw_lag_7d"),
+                ]
+            )
+            power_lag_14d = power.select(
+                [
+                    (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
+                    pl.col("power_mw").alias("power_mw_lag_14d"),
+                ]
+            )
+            power = power.join(power_lag_7d, on="timestamp", how="left").join(
+                power_lag_14d, on="timestamp", how="left"
+            )
 
-    # We need weather data that covers the power data period.
-    weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
-    weather = load_weather_data([h3_index], weather_start, end_date)
+        power_min = cast(datetime, power["timestamp"].min())
+        power_max = cast(datetime, power["timestamp"].max())
 
-    if weather.is_empty():
-        raise ValueError(f"No weather data found for substation {substation_name} at H3 {h3_index}")
+        if power_min is None or power_max is None:
+            continue
 
-    # Join on timestamp
-    data = power.join(weather, on="timestamp", how="inner")
+        end_date = power_max.strftime("%Y-%m-%d")
+        weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
 
-    if data.is_empty():
-        log.warning(f"No overlapping data for {substation_name}.")
+        weather = load_weather_data(
+            [h3_index],
+            weather_start,
+            end_date,
+            average_ensembles=True,
+            upsample_to_5min=True,
+        )
+
+        if weather.is_empty():
+            continue
+
+        # Join on timestamp
+        sub_data = power.join(weather, on="timestamp", how="inner")
+
+        if not sub_data.is_empty():
+            # Add substation ID and temporal features
+            sub_data = sub_data.with_columns(
+                [
+                    pl.lit(sub_id).alias("substation_id").cast(pl.Int32),
+                    pl.col("timestamp").dt.hour().alias("hour"),
+                    pl.col("timestamp").dt.weekday().alias("day_of_week"),
+                    pl.col("timestamp").dt.month().alias("month"),
+                ]
+            )
+            all_subs_data.append(sub_data)
+
+    if not all_subs_data:
         return pl.DataFrame()
 
-    # Temporal features
-    data = data.with_columns(
-        [
-            pl.col("timestamp").dt.hour().alias("hour"),
-            pl.col("timestamp").dt.weekday().alias("day_of_week"),
-            pl.col("timestamp").dt.month().alias("month"),
-        ]
-    )
-
-    return data
+    return pl.concat(all_subs_data, how="diagonal")

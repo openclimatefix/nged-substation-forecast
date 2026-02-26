@@ -3237,6 +3237,7 @@ name = "xgboost-forecaster"
 version = "0.1.0"
 source = { editable = "packages/xgboost_forecaster" }
 dependencies = [
+    { name = "altair" },
     { name = "contracts" },
     { name = "h3" },
     { name = "matplotlib" },
@@ -3251,6 +3252,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
     { name = "h3", specifier = ">=4.4.2" },
     { name = "matplotlib", specifier = ">=3.10.8" },

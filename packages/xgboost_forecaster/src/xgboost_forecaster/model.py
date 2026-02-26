@@ -27,15 +27,26 @@ def train_model(
         time_split: If True, uses the last `test_size` fraction of data for testing (preserving time order).
         **xgb_params: Additional XGBoost parameters.
     """
-
     # Simple feature selection: numeric columns except timestamp and target
     features = [
         col
         for col in data.columns
-        if col not in ["timestamp", target_col]
+        if col not in ["timestamp", target_col, "ensemble_member", "h3_index"]
         and data[col].dtype
-        in [pl.Float32, pl.Float64, pl.Int32, pl.Int64, pl.UInt32, pl.UInt64, pl.Int8, pl.UInt8]
+        in [
+            pl.Float32,
+            pl.Float64,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt32,
+            pl.UInt64,
+            pl.Int8,
+            pl.UInt8,
+        ]
     ]
+
+    # Drop rows with nulls (e.g. from lags)
+    data = data.drop_nulls(subset=features + [target_col])
 
     if time_split:
         # Sort by timestamp and split
@@ -79,16 +90,18 @@ def train_model(
         "y_test": y_test,
         "y_pred": y_pred,
         "test_timestamps": test_timestamps,
+        "features": features,
     }
 
-    log.info(f"Model trained. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}")
+    log.info(
+        f"Model trained on {len(X_train)} rows. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}"
+    )
 
     return model, metrics
 
 
-def predict(model: xgb.XGBRegressor, data: pl.DataFrame) -> pl.Series:
+def predict(model: xgb.XGBRegressor, data: pl.DataFrame, features: list[str]) -> pl.Series:
     """Run inference using a trained model."""
-    features = model.get_booster().feature_names
     X = data.select(features).to_pandas()
     preds = model.predict(X)
     return pl.Series("predictions", preds)

@@ -18,6 +18,7 @@ dependencies = [
     "pyarrow>=23.0.1",
     "pandas>=3.0.1",
     "matplotlib>=3.10.8",
+    "altair>=6.0.0",
 ]
 
 [build-system]
