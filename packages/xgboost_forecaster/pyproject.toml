@@ -17,6 +17,7 @@ dependencies = [
     "nged-data",
     "pyarrow>=23.0.1",
     "pandas>=3.0.1",
+    "matplotlib>=3.10.8",
 ]
 
 [build-system]

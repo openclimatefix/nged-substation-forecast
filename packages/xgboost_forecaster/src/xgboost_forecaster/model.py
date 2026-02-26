@@ -12,9 +12,21 @@ log = logging.getLogger(__name__)
 
 
 def train_model(
-    data: pl.DataFrame, target_col: str = "power_mw", test_size: float = 0.2, **xgb_params: Any
-) -> tuple[xgb.XGBRegressor, dict[str, float]]:
-    """Train an XGBoost model and return it along with performance metrics."""
+    data: pl.DataFrame,
+    target_col: str = "power_mw",
+    test_size: float = 0.2,
+    time_split: bool = False,
+    **xgb_params: Any,
+) -> tuple[xgb.XGBRegressor, dict[str, Any]]:
+    """Train an XGBoost model and return it along with performance metrics.
+
+    Args:
+        data: Input polars DataFrame.
+        target_col: Target variable name.
+        test_size: Fraction of data for testing.
+        time_split: If True, uses the last `test_size` fraction of data for testing (preserving time order).
+        **xgb_params: Additional XGBoost parameters.
+    """
 
     # Simple feature selection: numeric columns except timestamp and target
     features = [
@@ -25,12 +37,26 @@ def train_model(
         in [pl.Float32, pl.Float64, pl.Int32, pl.Int64, pl.UInt32, pl.UInt64, pl.Int8, pl.UInt8]
     ]
 
-    X = data.select(features).to_pandas()
-    y = data.select(target_col).to_pandas()
+    if time_split:
+        # Sort by timestamp and split
+        data_sorted = data.sort("timestamp")
+        split_idx = int(len(data_sorted) * (1 - test_size))
 
-    # Time-based split would be better, but for a "simple" model we'll use random split for now
-    # as per "simple model" instruction.
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+        train_df = data_sorted[:split_idx]
+        test_df = data_sorted[split_idx:]
+
+        X_train = train_df.select(features).to_pandas()
+        y_train = train_df.select(target_col).to_pandas()
+        X_test = test_df.select(features).to_pandas()
+        y_test = test_df.select(target_col).to_pandas()
+        test_timestamps = test_df["timestamp"]
+    else:
+        X = data.select(features).to_pandas()
+        y = data.select(target_col).to_pandas()
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=42
+        )
+        test_timestamps = None
 
     params = {
         "n_estimators": 100,
@@ -50,9 +76,12 @@ def train_model(
     metrics = {
         "mae": float(mean_absolute_error(y_test, y_pred)),
         "rmse": mse**0.5,
+        "y_test": y_test,
+        "y_pred": y_pred,
+        "test_timestamps": test_timestamps,
     }
 
-    log.info(f"Model trained. Metrics: {metrics}")
+    log.info(f"Model trained. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}")
 
     return model, metrics
 

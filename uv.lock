@@ -3239,6 +3239,7 @@ source = { editable = "packages/xgboost_forecaster" }
 dependencies = [
     { name = "contracts" },
     { name = "h3" },
+    { name = "matplotlib" },
     { name = "nged-data" },
     { name = "pandas" },
     { name = "polars" },
@@ -3252,6 +3253,7 @@ dependencies = [
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
     { name = "h3", specifier = ">=4.4.2" },
+    { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "nged-data", editable = "packages/nged_data" },
     { name = "pandas", specifier = ">=3.0.1" },
     { name = "polars", specifier = ">=1.0.0" },

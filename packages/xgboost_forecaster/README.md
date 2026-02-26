@@ -19,13 +19,15 @@ uv sync
 
 ## Usage
 
-### Running the Demo
+### Generating Plots
 
-The demo script trains models for 5 random substations and prints sanity checks and performance metrics:
+You can also generate a plot of the forecast vs actual ground truth for a specific substation:
 
 ```bash
-uv run python packages/xgboost_forecaster/examples/train_demo.py
+uv run python packages/xgboost_forecaster/examples/plot_forecast.py
 ```
+
+This will save a PNG file (e.g., `forecast_Lawford_33_11kv_S_Stn.png`) in the current directory.
 
 ### Programmatic Usage
 
