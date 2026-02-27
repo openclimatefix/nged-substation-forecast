@@ -42,6 +42,7 @@ def train_model(
             pl.UInt64,
             pl.Int8,
             pl.UInt8,
+            pl.Int16,
         ]
     ]
 
@@ -70,16 +71,20 @@ def train_model(
         test_timestamps = None
 
     params = {
-        "n_estimators": 100,
+        "n_estimators": 300,
         "max_depth": 6,
         "learning_rate": 0.1,
         "objective": "reg:squarederror",
         "n_jobs": -1,
+        "early_stopping_rounds": 10,
+        "tree_method": "hist",  # Memory efficient
     }
     params.update(xgb_params)
 
     model = xgb.XGBRegressor(**params)
-    model.fit(X_train, y_train)
+    # Fit with a validation set for early stopping
+    # We use X_test/y_test as eval_set because it's already split
+    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
 
     y_pred = model.predict(X_test)
 
@@ -94,7 +99,7 @@ def train_model(
     }
 
     log.info(
-        f"Model trained on {len(X_train)} rows. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}"
+        f"Model trained on {len(X_train)} rows. Best iteration: {model.get_booster().best_iteration}. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}"
     )
 
     return model, metrics

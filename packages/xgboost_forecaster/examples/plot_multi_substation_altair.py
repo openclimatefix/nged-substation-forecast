@@ -54,9 +54,11 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     log.info(f"Using NWP initialization: {latest_init_time}")
     forecast_end_time = latest_init_time + timedelta(days=7)
 
-    # 1. Train ONE global model for all 5 substations
+    # 1. Train ONE global model for all 5 substations using "mean" selection for training
     log.info("Preparing training data for global model...")
-    all_train_data = prepare_training_data(sample_subs, metadata, use_lags=True)
+    all_train_data = prepare_training_data(
+        sample_subs, metadata, use_lags=True, member_selection="mean"
+    )
 
     if all_train_data.is_empty():
         log.error("Global training data is empty.")
@@ -81,7 +83,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         sub_id = sub_meta["substation_number"][0]
         parquet_file = sub_meta["parquet_filename"][0]
 
-        # Historical power for lags (5-min res)
+        # Historical power for lags (now 30-min res)
         power_full = load_substation_power(parquet_file)
         if power_full.is_empty():
             log.warning(f"Skipping {sub_name} due to lack of sane power data.")
@@ -89,14 +91,13 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
 
         power_full = power_full.sort("timestamp")
 
-        # Weather ensemble (upsampled to 5-min)
+        # Weather ensemble (upsampled to 30-min)
         weather_ensemble = load_weather_data(
             [h3_index],
             start_date=latest_init_time.strftime("%Y-%m-%d"),
             end_date=all_train_data["timestamp"].max().strftime("%Y-%m-%d"),
             init_time=latest_init_time,
             average_ensembles=False,
-            upsample_to_5min=True,
         )
 
         if weather_ensemble.is_empty():
@@ -111,10 +112,9 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
             start_date=(latest_init_time - timedelta(days=15)).strftime("%Y-%m-%d"),
             end_date=latest_init_time.strftime("%Y-%m-%d"),
             average_ensembles=True,
-            upsample_to_5min=True,
         )
 
-        # Historical power for lags (5-min res)
+        # Historical power for lags (30-min res)
         # We must strictly only use power data from BEFORE latest_init_time for prediction lags
         power_for_lags = power_full.filter(pl.col("timestamp") <= latest_init_time)
 
