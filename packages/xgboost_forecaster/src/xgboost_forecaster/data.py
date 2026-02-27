@@ -207,7 +207,7 @@ def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
 def add_weather_features(
     weather: pl.DataFrame, history: pl.DataFrame | None = None
 ) -> pl.DataFrame:
-    """Add lags and trends to weather data."""
+    """Add lags, trends, and physical features like windchill to weather data."""
     if history is not None:
         full_weather = (
             pl.concat(
@@ -222,6 +222,58 @@ def add_weather_features(
         )
     else:
         full_weather = weather
+
+    # Add physical features (wind speed, wind direction, and windchill)
+    # We do this on the 'weather' dataframe. If it's uint8, we descale first.
+    def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
+        target_df = df
+        is_scaled = df["temperature_2m"].dtype == pl.UInt8
+
+        if is_scaled:
+            params = load_scaling_params()
+            descale_cols = ["temperature_2m", "wind_u_10m", "wind_v_10m"]
+            descale_exprs = get_scaling_expressions(
+                params.filter(pl.col("col_name").is_in(descale_cols)), reverse=True
+            )
+            # Use a temporary df for calculations to avoid overwriting uint8 cols in the original
+            phys_df = df.select(["timestamp"] + descale_cols).with_columns(descale_exprs)
+        else:
+            phys_df = df
+
+        # Wind speed in m/s
+        # Wind direction in degrees (0-360)
+        import numpy as np
+
+        phys_df = phys_df.with_columns(
+            wind_speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt(),
+            wind_direction_10m=(
+                pl.arctan2(pl.col("wind_u_10m"), pl.col("wind_v_10m")) * 180 / np.pi + 180
+            ),
+        )
+
+        # Wind speed in km/h for windchill formula
+        # Windchill formula: 13.12 + 0.6215*T - 11.37*V^0.16 + 0.3965*T*V^0.16
+        v_kmh = pl.col("wind_speed_10m") * 3.6
+        temp = pl.col("temperature_2m")
+
+        phys_df = phys_df.with_columns(
+            windchill=(
+                13.12 + 0.6215 * temp - 11.37 * (v_kmh**0.16) + 0.3965 * temp * (v_kmh**0.16)
+            ).cast(pl.Float32)
+        )
+
+        # Join back to original df
+        return df.with_columns(
+            [
+                phys_df["wind_speed_10m"].cast(pl.Float32),
+                phys_df["wind_direction_10m"].cast(pl.Float32),
+                phys_df["windchill"].cast(pl.Float32),
+            ]
+        )
+
+    weather = add_physical_features(weather)
+    if history is not None:
+        full_weather = add_physical_features(full_weather)
 
     def get_lagged_view(df: pl.DataFrame, offset: timedelta, suffix: str) -> pl.DataFrame:
         lagged = df.select(

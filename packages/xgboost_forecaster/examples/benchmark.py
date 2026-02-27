@@ -1,4 +1,4 @@
-"""Benchmark script to measure XGBoost model performance."""
+"""Benchmark script to measure XGBoost model performance with various feature sets."""
 
 import logging
 import random
@@ -16,7 +16,11 @@ log.setLevel(logging.INFO)
 
 
 def run_benchmark(
-    label: str, num_subs: int = 10, member_selection: str = "mean", scale_to_uint8: bool = True
+    label: str,
+    num_subs: int = 10,
+    member_selection: str = "mean",
+    scale_to_uint8: bool = True,
+    exclude_features: list[str] | None = None,
 ):
     metadata = get_substation_metadata()
     available_subs = metadata["substation_name_in_location_table"].to_list()
@@ -38,7 +42,7 @@ def run_benchmark(
     )
     train_data = train_all.filter(pl.col("timestamp") < test_start_time)
 
-    # Prepare test data (Always use same scaling as training for consistency)
+    # Prepare test data
     print(f"Loading test data (scale_to_uint8={scale_to_uint8})...")
     test_all = prepare_training_data(
         sample_subs, metadata, use_lags=True, member_selection="mean", scale_to_uint8=scale_to_uint8
@@ -49,8 +53,33 @@ def run_benchmark(
         print(f"{label}: Insufficient split data")
         return
 
-    # Train model
-    model, metrics = train_model(train_data, time_split=False)
+    # Filter features if requested
+    # We first get all available columns that would be used as features
+    target_col = "power_mw"
+    potential_features = [
+        col
+        for col in train_data.columns
+        if col not in ["timestamp", target_col, "ensemble_member", "h3_index"]
+        and train_data[col].dtype
+        in [
+            pl.Float32,
+            pl.Float64,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt32,
+            pl.UInt64,
+            pl.Int8,
+            pl.UInt8,
+            pl.Int16,
+        ]
+    ]
+
+    features = potential_features
+    if exclude_features:
+        features = [f for f in features if f not in exclude_features]
+
+    # Train with selected features
+    model, metrics = train_model(train_data.select(features + [target_col]), time_split=False)
     features = metrics["features"]
 
     # Evaluate on test set
@@ -65,7 +94,7 @@ def run_benchmark(
     rmse = mean_squared_error(y_test, y_pred) ** 0.5
 
     print(f"--- {label} ---")
-    print(f"Features: {features}")
+    print(f"Features ({len(features)}): {features}")
     print(f"MAE: {mae:.4f}")
     print(f"RMSE: {rmse:.4f}")
     print(f"Train samples: {len(train_data)}")
@@ -81,6 +110,54 @@ if __name__ == "__main__":
 
     # Map modes
     member_map = {"Baseline": "mean", "Single": "single", "Exploded": "all"}
-
     selection = member_map.get(mode, "mean")
-    run_benchmark(mode, num_subs=num_subs, member_selection=selection, scale_to_uint8=scale)
+
+    # Experiment modes
+    if mode == "Pure-Baseline":
+        run_benchmark(
+            mode,
+            num_subs=num_subs,
+            member_selection=selection,
+            scale_to_uint8=scale,
+            exclude_features=["wind_speed_10m", "wind_direction_10m", "windchill"],
+        )
+    elif mode == "WindChill-Only":
+        run_benchmark(
+            mode,
+            num_subs=num_subs,
+            member_selection=selection,
+            scale_to_uint8=scale,
+            exclude_features=["wind_speed_10m", "wind_direction_10m"],
+        )
+    elif mode == "WindSpeed-Only":
+        run_benchmark(
+            mode,
+            num_subs=num_subs,
+            member_selection=selection,
+            scale_to_uint8=scale,
+            exclude_features=["windchill", "wind_direction_10m"],
+        )
+    elif mode == "WindSpeed-Direction":
+        run_benchmark(
+            mode,
+            num_subs=num_subs,
+            member_selection=selection,
+            scale_to_uint8=scale,
+            exclude_features=[
+                "wind_u_10m",
+                "wind_v_10m",
+                "wind_u_100m",
+                "wind_v_100m",
+                "windchill",
+            ],
+        )
+    elif mode == "WindAll-Polar":
+        run_benchmark(
+            mode,
+            num_subs=num_subs,
+            member_selection=selection,
+            scale_to_uint8=scale,
+            exclude_features=["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"],
+        )
+    else:
+        run_benchmark(mode, num_subs=num_subs, member_selection=selection, scale_to_uint8=scale)
