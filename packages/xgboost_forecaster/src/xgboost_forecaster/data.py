@@ -185,6 +185,78 @@ def load_weather_data(
     return weather
 
 
+def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
+    """Add cyclical and standard temporal features to a dataframe with a timestamp column."""
+    return df.with_columns(
+        [
+            # Cyclical Hour (24h)
+            (pl.col("timestamp").dt.hour() * 2 * 3.14159 / 24).sin().alias("hour_sin"),
+            (pl.col("timestamp").dt.hour() * 2 * 3.14159 / 24).cos().alias("hour_cos"),
+            # Cyclical Day of Year (365.25d)
+            (pl.col("timestamp").dt.ordinal_day() * 2 * 3.14159 / 365.25)
+            .sin()
+            .alias("day_of_year_sin"),
+            (pl.col("timestamp").dt.ordinal_day() * 2 * 3.14159 / 365.25)
+            .cos()
+            .alias("day_of_year_cos"),
+            # Keep day of week as it's useful for work/weekend patterns
+            pl.col("timestamp").dt.weekday().alias("day_of_week"),
+        ]
+    )
+
+
+def add_weather_features(
+    weather: pl.DataFrame, history: pl.DataFrame | None = None
+) -> pl.DataFrame:
+    """Add lags and trends to weather data.
+
+    If history is provided, lags are calculated using history + weather.
+    Otherwise, they are calculated from weather alone (suitable for training).
+    """
+    if history is not None:
+        full_weather = (
+            pl.concat([history, weather.select(history.columns)])
+            .unique("timestamp")
+            .sort("timestamp")
+        )
+    else:
+        full_weather = weather
+
+    # 7d and 14d lags
+    weather_lag_7d = full_weather.select(
+        [
+            (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
+            pl.col("temperature_2m").alias("temperature_2m_lag_7d"),
+            pl.col("downward_short_wave_radiation_flux_surface").alias("sw_radiation_lag_7d"),
+        ]
+    )
+    weather_lag_14d = full_weather.select(
+        [
+            (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
+            pl.col("temperature_2m").alias("temperature_2m_lag_14d"),
+            pl.col("downward_short_wave_radiation_flux_surface").alias("sw_radiation_lag_14d"),
+        ]
+    )
+    # 6h trend
+    weather_trend_6h = full_weather.select(
+        [
+            (pl.col("timestamp") + timedelta(hours=6)).alias("timestamp"),
+            pl.col("temperature_2m").alias("temperature_2m_6h_ago"),
+        ]
+    )
+
+    # Join features back to the original weather dataframe
+    weather = (
+        weather.join(weather_lag_7d, on="timestamp", how="left")
+        .join(weather_lag_14d, on="timestamp", how="left")
+        .join(weather_trend_6h, on="timestamp", how="left")
+    )
+
+    return weather.with_columns(
+        temp_trend_6h=(pl.col("temperature_2m") - pl.col("temperature_2m_6h_ago"))
+    )
+
+
 def prepare_training_data(
     substation_names: list[str], metadata: pl.DataFrame, use_lags: bool = True
 ) -> pl.DataFrame:
@@ -249,19 +321,16 @@ def prepare_training_data(
         if weather.is_empty():
             continue
 
+        # Add weather lags and trends
+        weather = add_weather_features(weather)
+
         # Join on timestamp
         sub_data = power.join(weather, on="timestamp", how="inner")
 
         if not sub_data.is_empty():
             # Add substation ID and temporal features
-            sub_data = sub_data.with_columns(
-                [
-                    pl.lit(sub_id).alias("substation_id").cast(pl.Int32),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("day_of_week"),
-                    pl.col("timestamp").dt.month().alias("month"),
-                ]
-            )
+            sub_data = sub_data.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
+            sub_data = add_temporal_features(sub_data)
             all_subs_data.append(sub_data)
 
     if not all_subs_data:

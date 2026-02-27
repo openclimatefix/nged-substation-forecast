@@ -3,11 +3,14 @@
 import logging
 import random
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
 import altair as alt
 import polars as pl
 from xgboost_forecaster.data import (
     BASE_WEATHER_PATH,
+    add_temporal_features,
+    add_weather_features,
     get_substation_metadata,
     load_substation_power,
     load_weather_data,
@@ -47,6 +50,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         log.error("No suitable NWP initialization found.")
         return
 
+    latest_init_time = cast(datetime, latest_init_time)
     log.info(f"Using NWP initialization: {latest_init_time}")
     forecast_end_time = latest_init_time + timedelta(days=7)
 
@@ -101,6 +105,15 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
             )
             continue
 
+        # Load historical weather for lags (averaged)
+        weather_history = load_weather_data(
+            [h3_index],
+            start_date=(latest_init_time - timedelta(days=15)).strftime("%Y-%m-%d"),
+            end_date=latest_init_time.strftime("%Y-%m-%d"),
+            average_ensembles=True,
+            upsample_to_5min=True,
+        )
+
         # Historical power for lags (5-min res)
         # We must strictly only use power data from BEFORE latest_init_time for prediction lags
         power_for_lags = power_full.filter(pl.col("timestamp") <= latest_init_time)
@@ -118,20 +131,18 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
             ]
         )
 
-        # Prepare prediction features
+        # 1. Add weather features (trends/lags) using history
+        weather_ensemble = add_weather_features(weather_ensemble, history=weather_history)
+
+        # 2. Join weather ensemble with power lags
         pred_data = weather_ensemble.join(lag_table_7d, on="timestamp", how="inner").join(
             lag_table_14d, on="timestamp", how="left"
         )
 
+        # 3. Add temporal features and final cleanup
         pred_data = (
-            pred_data.with_columns(
-                [
-                    pl.lit(sub_id).alias("substation_id").cast(pl.Int32),
-                    pl.col("timestamp").dt.hour().alias("hour"),
-                    pl.col("timestamp").dt.weekday().alias("day_of_week"),
-                    pl.col("timestamp").dt.month().alias("month"),
-                ]
-            )
+            pred_data.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
+            .pipe(add_temporal_features)
             .filter(pl.col("timestamp") <= forecast_end_time)
             .drop_nulls(subset=features)
         )
