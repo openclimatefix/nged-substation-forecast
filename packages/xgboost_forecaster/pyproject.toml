@@ -1,0 +1,26 @@
+[project]
+name = "xgboost-forecaster"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "xgboost>=2.1.0",
+    "scikit-learn>=1.5.0",
+    "polars>=1.0.0",
+    "polars-h3>=0.6.1",
+    "h3>=4.4.2",
+    "contracts",
+    "nged-data",
+    "pyarrow>=23.0.1",
+    "pandas>=3.0.1",
+    "matplotlib>=3.10.8",
+    "altair>=6.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
