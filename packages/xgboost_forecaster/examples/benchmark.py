@@ -15,7 +15,9 @@ log = logging.getLogger("benchmark")
 log.setLevel(logging.INFO)
 
 
-def run_benchmark(label: str, num_subs: int = 10, member_selection: str = "mean"):
+def run_benchmark(
+    label: str, num_subs: int = 10, member_selection: str = "mean", scale_to_uint8: bool = True
+):
     metadata = get_substation_metadata()
     available_subs = metadata["substation_name_in_location_table"].to_list()
 
@@ -26,15 +28,21 @@ def run_benchmark(label: str, num_subs: int = 10, member_selection: str = "mean"
     test_start_time = datetime(2026, 2, 17, tzinfo=timezone.utc)
 
     # Prepare training data
-    print(f"Loading training data ({member_selection})...")
+    print(f"Loading training data ({member_selection}, scale_to_uint8={scale_to_uint8})...")
     train_all = prepare_training_data(
-        sample_subs, metadata, use_lags=True, member_selection=member_selection
+        sample_subs,
+        metadata,
+        use_lags=True,
+        member_selection=member_selection,
+        scale_to_uint8=scale_to_uint8,
     )
     train_data = train_all.filter(pl.col("timestamp") < test_start_time)
 
-    # Prepare test data (Always use mean for evaluation consistency)
-    print("Loading test data...")
-    test_all = prepare_training_data(sample_subs, metadata, use_lags=True, member_selection="mean")
+    # Prepare test data (Always use same scaling as training for consistency)
+    print(f"Loading test data (scale_to_uint8={scale_to_uint8})...")
+    test_all = prepare_training_data(
+        sample_subs, metadata, use_lags=True, member_selection="mean", scale_to_uint8=scale_to_uint8
+    )
     test_data = test_all.filter(pl.col("timestamp") >= test_start_time)
 
     if train_data.is_empty() or test_data.is_empty():
@@ -69,9 +77,10 @@ def run_benchmark(label: str, num_subs: int = 10, member_selection: str = "mean"
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "Baseline"
     num_subs = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+    scale = False if len(sys.argv) > 3 and sys.argv[3].lower() == "false" else True
 
     # Map modes
     member_map = {"Baseline": "mean", "Single": "single", "Exploded": "all"}
 
     selection = member_map.get(mode, "mean")
-    run_benchmark(mode, num_subs=num_subs, member_selection=selection)
+    run_benchmark(mode, num_subs=num_subs, member_selection=selection, scale_to_uint8=scale)

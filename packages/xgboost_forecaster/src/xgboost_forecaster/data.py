@@ -268,8 +268,17 @@ def prepare_training_data(
     metadata: pl.DataFrame,
     use_lags: bool = True,
     member_selection: str = "mean",
+    scale_to_uint8: bool = True,
 ) -> pl.DataFrame:
-    """Join power and weather data for multiple substations and add features."""
+    """Join power and weather data for multiple substations and add features.
+
+    Args:
+        substation_names: List of substation names.
+        metadata: Substation metadata.
+        use_lags: If True, adds 7-day and 14-day lagged power features.
+        member_selection: "mean" (ensemble average), "single" (member 0), or "all" (exploded).
+        scale_to_uint8: If True, scale weather variables to UInt8.
+    """
     all_subs_data = []
 
     for sub_name in substation_names:
@@ -317,7 +326,7 @@ def prepare_training_data(
             weather_start,
             end_date,
             average_ensembles=(member_selection == "mean"),
-            scale_to_uint8=True,
+            scale_to_uint8=scale_to_uint8,
         )
 
         if weather.is_empty():
