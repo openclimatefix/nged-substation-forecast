@@ -95,7 +95,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         weather_ensemble = load_weather_data(
             [h3_index],
             start_date=latest_init_time.strftime("%Y-%m-%d"),
-            end_date=all_train_data["timestamp"].max().strftime("%Y-%m-%d"),
+            end_date=cast(datetime, all_train_data["timestamp"].max()).strftime("%Y-%m-%d"),
             init_time=latest_init_time,
             average_ensembles=False,
         )

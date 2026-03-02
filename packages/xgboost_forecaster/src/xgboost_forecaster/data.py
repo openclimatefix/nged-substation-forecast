@@ -226,7 +226,6 @@ def add_weather_features(
     # Add physical features (wind speed, wind direction, and windchill)
     # We do this on the 'weather' dataframe. If it's uint8, we descale first.
     def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
-        target_df = df
         is_scaled = df["temperature_2m"].dtype == pl.UInt8
 
         if is_scaled:

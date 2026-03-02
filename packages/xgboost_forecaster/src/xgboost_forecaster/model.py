@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-import xgboost as xgb
+from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.model_selection import train_test_split
 import polars as pl
@@ -17,7 +17,7 @@ def train_model(
     test_size: float = 0.2,
     time_split: bool = False,
     **xgb_params: Any,
-) -> tuple[xgb.XGBRegressor, dict[str, Any]]:
+) -> tuple[XGBRegressor, dict[str, Any]]:
     """Train an XGBoost model and return it along with performance metrics.
 
     Args:
@@ -81,7 +81,7 @@ def train_model(
     }
     params.update(xgb_params)
 
-    model = xgb.XGBRegressor(**params)
+    model = XGBRegressor(**params)
     # Fit with a validation set for early stopping
     # We use X_test/y_test as eval_set because it's already split
     model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
@@ -105,7 +105,7 @@ def train_model(
     return model, metrics
 
 
-def predict(model: xgb.XGBRegressor, data: pl.DataFrame, features: list[str]) -> pl.Series:
+def predict(model: XGBRegressor, data: pl.DataFrame, features: list[str]) -> pl.Series:
     """Run inference using a trained model."""
     X = data.select(features).to_pandas()
     preds = model.predict(X)
