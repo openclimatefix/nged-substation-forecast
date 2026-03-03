@@ -4,7 +4,13 @@ import polars as pl
 from pathlib import Path
 
 # Load scaling params from the provided CSV
-SCALING_PARAMS_PATH = Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
+import os
+
+SCALING_PARAMS_PATH = Path(
+    os.getenv(
+        "XGBOOST_SCALING_PARAMS_PATH", "packages/dynamical_data/scaling/ecmwf_scaling_params.csv"
+    )
+)
 
 
 def load_scaling_params() -> pl.DataFrame:
@@ -13,7 +19,9 @@ def load_scaling_params() -> pl.DataFrame:
         alt_path = Path("packages/xgboost_forecaster/scaling_params.csv")
         if not alt_path.exists():
             # If it still doesn't exist, we might be in trouble, but let's try to find it
-            raise FileNotFoundError(f"Scaling params not found at {SCALING_PARAMS_PATH}")
+            raise FileNotFoundError(
+                f"Scaling params not found at {SCALING_PARAMS_PATH}. Please set the XGBOOST_SCALING_PARAMS_PATH environment variable."
+            )
         return pl.read_csv(alt_path)
     return pl.read_csv(SCALING_PARAMS_PATH)
 

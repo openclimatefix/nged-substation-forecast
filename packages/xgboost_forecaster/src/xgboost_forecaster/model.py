@@ -1,112 +1,134 @@
-"""XGBoost model training and inference."""
+"""XGBoost model wrapper for substation forecasting."""
 
 import logging
-from typing import Any
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, Self
 
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.model_selection import train_test_split
 import polars as pl
+import xgboost as xgb
 
 log = logging.getLogger(__name__)
 
 
-def train_model(
-    data: pl.DataFrame,
-    target_col: str = "power_mw",
-    test_size: float = 0.2,
-    time_split: bool = False,
-    **xgb_params: Any,
-) -> tuple[XGBRegressor, dict[str, Any]]:
-    """Train an XGBoost model and return it along with performance metrics.
+class XGBoostForecaster:
+    """Wrapper around XGBoost for substation-level forecasting."""
 
-    Args:
-        data: Input polars DataFrame.
-        target_col: Target variable name.
-        test_size: Fraction of data for testing.
-        time_split: If True, uses the last `test_size` fraction of data for testing (preserving time order).
-        **xgb_params: Additional XGBoost parameters.
-    """
-    # Simple feature selection: numeric columns except timestamp and target
-    features = [
-        col
-        for col in data.columns
-        if col not in ["timestamp", target_col, "ensemble_member", "h3_index"]
-        and data[col].dtype
-        in [
-            pl.Float32,
-            pl.Float64,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt32,
-            pl.UInt64,
-            pl.Int8,
-            pl.UInt8,
-            pl.Int16,
-        ]
-    ]
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        """Initialize the forecaster with optional XGBoost parameters.
 
-    # Drop rows with nulls (e.g. from lags)
-    data = data.drop_nulls(subset=features + [target_col])
+        Args:
+            params: Dictionary of XGBoost parameters.
+        """
+        self.params = params or self.get_default_params()
+        self.model: xgb.XGBRegressor | None = None
+        self.feature_names: Sequence[str] | None = None
 
-    if time_split:
-        # Sort by timestamp and split
-        data_sorted = data.sort("timestamp")
-        split_idx = int(len(data_sorted) * (1 - test_size))
+    @staticmethod
+    def get_default_params() -> dict[str, Any]:
+        """Returns a dictionary of default XGBoost parameters."""
+        return {
+            "n_estimators": 300,
+            "max_depth": 6,
+            "learning_rate": 0.1,
+            "objective": "reg:squarederror",
+            "n_jobs": -1,
+            "tree_method": "hist",
+            "random_state": 42,
+        }
 
-        train_df = data_sorted[:split_idx]
-        test_df = data_sorted[split_idx:]
+    def train(
+        self,
+        df: pl.DataFrame,
+        target_col: str = "power_mw",
+        feature_cols: list[str] | None = None,
+        eval_set: list[tuple[pl.DataFrame, pl.Series]] | None = None,
+    ) -> None:
+        """Train the XGBoost model.
 
-        X_train = train_df.select(features).to_pandas()
-        y_train = train_df.select(target_col).to_pandas()
-        X_test = test_df.select(features).to_pandas()
-        y_test = test_df.select(target_col).to_pandas()
-        test_timestamps = test_df["timestamp"]
-    else:
-        X = data.select(features).to_pandas()
-        y = data.select(target_col).to_pandas()
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42
+        Args:
+            df: Training data as a Polars DataFrame.
+            target_col: Name of the target column.
+            feature_cols: List of feature column names. If None, uses all except target.
+            eval_set: Optional list of (X, y) tuples for early stopping.
+        """
+        if feature_cols is None:
+            feature_cols = [c for c in df.columns if c != target_col and c != "timestamp"]
+
+        self.feature_names = feature_cols
+        X = df.select(feature_cols).to_numpy()
+        y = df.select(target_col).to_numpy().flatten()
+
+        xgb_eval_set = None
+        if eval_set:
+            xgb_eval_set = []
+            for X_eval_df, y_eval_series in eval_set:
+                xgb_eval_set.append(
+                    (X_eval_df.select(feature_cols).to_numpy(), y_eval_series.to_numpy())
+                )
+
+        self.model = xgb.XGBRegressor(**self.params)
+        self.model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
+
+    def predict(self, df: pl.DataFrame) -> pl.Series:
+        """Make predictions using the trained model.
+
+        Args:
+            df: Input data as a Polars DataFrame.
+
+        Returns:
+            Polars Series of predictions.
+
+        Raises:
+            ValueError: If the model has not been trained yet.
+        """
+        if self.model is None or self.feature_names is None:
+            raise ValueError("Model must be trained before calling predict.")
+
+        X = df.select(self.feature_names).to_numpy()
+        preds = self.model.predict(X)
+        return pl.Series("predictions", preds)
+
+    def save(self, path: Path) -> None:
+        """Save the model and metadata to a file.
+
+        Args:
+            path: Path to save the model to.
+        """
+        if self.model is None:
+            raise ValueError("No model to save.")
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.model.save_model(path)
+        # We could also save feature names separately if needed,
+        # but XGBoost models often store them if passed during fit.
+
+    @classmethod
+    def load(cls, path: Path) -> Self:
+        """Load a model from a file.
+
+        Args:
+            path: Path to the saved model.
+
+        Returns:
+            An instance of XGBoostForecaster with the loaded model.
+        """
+        instance = cls()
+        instance.model = xgb.XGBRegressor()
+        instance.model.load_model(path)
+        # Note: feature_names might need to be recovered if not stored in the model
+        try:
+            instance.feature_names = instance.model.get_booster().feature_names
+        except Exception:
+            instance.feature_names = None
+        return instance
+
+    def get_feature_importance(self) -> pl.DataFrame:
+        """Get feature importance as a Polars DataFrame."""
+        if self.model is None or self.feature_names is None:
+            raise ValueError("Model must be trained.")
+
+        importance = self.model.feature_importances_
+        return pl.DataFrame({"feature": self.feature_names, "importance": importance}).sort(
+            "importance", descending=True
         )
-        test_timestamps = None
-
-    params = {
-        "n_estimators": 300,
-        "max_depth": 6,
-        "learning_rate": 0.1,
-        "objective": "reg:squarederror",
-        "n_jobs": -1,
-        "early_stopping_rounds": 10,
-        "tree_method": "hist",  # Memory efficient
-    }
-    params.update(xgb_params)
-
-    model = XGBRegressor(**params)
-    # Fit with a validation set for early stopping
-    # We use X_test/y_test as eval_set because it's already split
-    model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
-
-    y_pred = model.predict(X_test)
-
-    mse = float(mean_squared_error(y_test, y_pred))
-    metrics = {
-        "mae": float(mean_absolute_error(y_test, y_pred)),
-        "rmse": mse**0.5,
-        "y_test": y_test,
-        "y_pred": y_pred,
-        "test_timestamps": test_timestamps,
-        "features": features,
-    }
-
-    log.info(
-        f"Model trained on {len(X_train)} rows. Best iteration: {model.get_booster().best_iteration}. MAE={metrics['mae']:.4f}, RMSE={metrics['rmse']:.4f}"
-    )
-
-    return model, metrics
-
-
-def predict(model: XGBRegressor, data: pl.DataFrame, features: list[str]) -> pl.Series:
-    """Run inference using a trained model."""
-    X = data.select(features).to_pandas()
-    preds = model.predict(X)
-    return pl.Series("predictions", preds)

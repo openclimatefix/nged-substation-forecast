@@ -1,13 +1,18 @@
 """Benchmark script to measure XGBoost model performance with various feature sets."""
 
 import logging
+import math
 import random
 import sys
 from datetime import datetime, timezone
+from typing import cast
 
 import polars as pl
-from xgboost_forecaster.data import get_substation_metadata, prepare_training_data
-from xgboost_forecaster.model import train_model
+from xgboost_forecaster import (
+    XGBoostForecaster,
+    get_substation_metadata,
+    prepare_training_data,
+)
 
 # Configure logging to only show warnings/errors except for our results
 logging.basicConfig(level=logging.WARNING)
@@ -40,6 +45,10 @@ def run_benchmark(
         member_selection=member_selection,
         scale_to_uint8=scale_to_uint8,
     )
+    if train_all.is_empty():
+        print(f"{label}: No training data")
+        return
+
     train_data = train_all.filter(pl.col("timestamp") < test_start_time)
 
     # Prepare test data
@@ -47,6 +56,10 @@ def run_benchmark(
     test_all = prepare_training_data(
         sample_subs, metadata, use_lags=True, member_selection="mean", scale_to_uint8=scale_to_uint8
     )
+    if test_all.is_empty():
+        print(f"{label}: No test data")
+        return
+
     test_data = test_all.filter(pl.col("timestamp") >= test_start_time)
 
     if train_data.is_empty() or test_data.is_empty():
@@ -54,24 +67,12 @@ def run_benchmark(
         return
 
     # Filter features if requested
-    # We first get all available columns that would be used as features
     target_col = "power_mw"
     potential_features = [
         col
         for col in train_data.columns
-        if col not in ["timestamp", target_col, "ensemble_member", "h3_index"]
-        and train_data[col].dtype
-        in [
-            pl.Float32,
-            pl.Float64,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt32,
-            pl.UInt64,
-            pl.Int8,
-            pl.UInt8,
-            pl.Int16,
-        ]
+        if col not in ["timestamp", target_col, "ensemble_member", "h3_index", "substation_name"]
+        and train_data[col].dtype.is_numeric()
     ]
 
     features = potential_features
@@ -79,19 +80,16 @@ def run_benchmark(
         features = [f for f in features if f not in exclude_features]
 
     # Train with selected features
-    model, metrics = train_model(train_data.select(features + [target_col]), time_split=False)
-    features = metrics["features"]
+    forecaster = XGBoostForecaster()
+    forecaster.train(train_data, target_col=target_col, feature_cols=features)
 
     # Evaluate on test set
-    X_test = test_data.select(features).to_pandas()
-    y_test = test_data.select("power_mw").to_pandas()
+    preds = forecaster.predict(test_data)
+    y_test = test_data[target_col]
 
-    y_pred = model.predict(X_test)
-
-    from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = mean_squared_error(y_test, y_pred) ** 0.5
+    mae = (y_test - preds).abs().mean()
+    mean_sq_err = (y_test - preds).pow(2).mean()
+    rmse = math.sqrt(cast(float, mean_sq_err)) if mean_sq_err is not None else 0.0
 
     print(f"--- {label} ---")
     print(f"Features ({len(features)}): {features}")

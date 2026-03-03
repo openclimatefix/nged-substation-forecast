@@ -1,27 +1,40 @@
 """Data loading and preprocessing for XGBoost forecasting."""
 
+import dataclasses
 import logging
+import os
 from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
-from typing import Final, cast
+from typing import cast
 
 import h3.api.numpy_int as h3
 import polars as pl
 from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
+
+from xgboost_forecaster.features import add_temporal_features, add_weather_features
 from xgboost_forecaster.scaling import get_scaling_expressions, load_scaling_params
 
 log = logging.getLogger(__name__)
 
-# TODO: Configure these paths via a shared config/env.
-BASE_POWER_PATH: Final[Path] = Path("data/NGED/parquet/live_primary_flows")
-BASE_WEATHER_PATH: Final[Path] = Path("packages/dynamical_data/data")
-H3_RES: Final[int] = 5
-RESOLUTION: Final[str] = "30m"
+
+@dataclasses.dataclass
+class DataConfig:
+    """Configuration for data loading and preprocessing."""
+
+    base_power_path: Path = Path(
+        os.getenv("XGBOOST_POWER_PATH", "data/NGED/parquet/live_primary_flows")
+    )
+    base_weather_path: Path = Path(
+        os.getenv("XGBOOST_WEATHER_PATH", "packages/dynamical_data/data")
+    )
+    h3_res: int = 5
+    resolution: str = "30m"
 
 
-def get_substation_metadata() -> pl.DataFrame:
+def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     """Join substation locations with their live flow parquet filenames."""
+    config = config or DataConfig()
     locations = ckan.get_primary_substation_locations()
     live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
 
@@ -30,7 +43,7 @@ def get_substation_metadata() -> pl.DataFrame:
     # Add H3 index based on lat/lng
     df = df.with_columns(
         h3_index=pl.struct(["latitude", "longitude"]).map_elements(
-            lambda x: h3.latlng_to_cell(x["latitude"], x["longitude"], H3_RES),
+            lambda x: h3.latlng_to_cell(x["latitude"], x["longitude"], config.h3_res),
             return_dtype=pl.UInt64,
         ),
         parquet_filename=pl.col("url").map_elements(
@@ -41,15 +54,16 @@ def get_substation_metadata() -> pl.DataFrame:
     # Only return substations we have local power data for
     df = df.filter(
         pl.col("parquet_filename").map_elements(
-            lambda f: (BASE_POWER_PATH / f).exists(), return_dtype=pl.Boolean
+            lambda f: (config.base_power_path / f).exists(), return_dtype=pl.Boolean
         )
     )
     return df
 
 
-def load_substation_power(parquet_filename: str) -> pl.DataFrame:
+def load_substation_power(parquet_filename: str, config: DataConfig | None = None) -> pl.DataFrame:
     """Load, validate and downsample power data for a single substation."""
-    path = BASE_POWER_PATH / parquet_filename
+    config = config or DataConfig()
+    path = config.base_power_path / parquet_filename
     if not path.exists():
         raise FileNotFoundError(f"Power data not found at {path}")
 
@@ -70,23 +84,10 @@ def load_substation_power(parquet_filename: str) -> pl.DataFrame:
     if df.is_empty():
         return df
 
-    # Sanity check: Check if data gets "stuck" (identical values for too long)
-    streaks = df.with_columns(
-        is_new_streak=(pl.col("power_mw") != pl.col("power_mw").shift(1)).fill_null(True)
-    ).with_columns(streak_id=pl.col("is_new_streak").cum_sum())
-
-    max_streak = streaks.group_by("streak_id").len().select(pl.col("len").max()).item()
-
-    if max_streak > 24:  # 2 hours of identical values (at 5min resolution)
-        log.warning(
-            f"Substation data in {parquet_filename} looks 'stuck' (max streak: {max_streak})"
-        )
-        return pl.DataFrame()
-
-    # Downsample to 30-minutely (period ending)
-    df = df.group_by_dynamic("timestamp", every="30m", closed="right", label="right").agg(
-        pl.col("power_mw").mean()
-    )
+    # Downsample to target resolution (period ending)
+    df = df.group_by_dynamic(
+        "timestamp", every=config.resolution, closed="right", label="right"
+    ).agg(pl.col("power_mw").mean())
 
     return df
 
@@ -95,14 +96,16 @@ def load_weather_data(
     h3_indices: list[int],
     start_date: str,
     end_date: str,
+    config: DataConfig | None = None,
     init_time: datetime | None = None,
     average_ensembles: bool = True,
-    resample_to: str = RESOLUTION,
+    resample_to: str = "30m",
     scale_to_uint8: bool = True,
 ) -> pl.DataFrame:
     """Load weather data for specific H3 cells and date range."""
+    config = config or DataConfig()
     # We'll load all files between start and end date
-    files = sorted(BASE_WEATHER_PATH.glob("*.parquet"))
+    files = sorted(config.base_weather_path.glob("*.parquet"))
     relevant_files = [f for f in files if start_date <= f.stem.split("T")[0] <= end_date]
 
     if init_time:
@@ -184,214 +187,94 @@ def load_weather_data(
     return weather
 
 
-def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
-    """Add cyclical and standard temporal features to a dataframe with a timestamp column."""
-    return df.with_columns(
-        [
-            # Cyclical Hour (24h)
-            (pl.col("timestamp").dt.hour() * 2 * 3.14159 / 24).sin().alias("hour_sin"),
-            (pl.col("timestamp").dt.hour() * 2 * 3.14159 / 24).cos().alias("hour_cos"),
-            # Cyclical Day of Year (365.25d)
-            (pl.col("timestamp").dt.ordinal_day() * 2 * 3.14159 / 365.25)
-            .sin()
-            .alias("day_of_year_sin"),
-            (pl.col("timestamp").dt.ordinal_day() * 2 * 3.14159 / 365.25)
-            .cos()
-            .alias("day_of_year_cos"),
-            # Keep day of week as it's useful for work/weekend patterns
-            pl.col("timestamp").dt.weekday().alias("day_of_week"),
-        ]
-    )
-
-
-def add_weather_features(
-    weather: pl.DataFrame, history: pl.DataFrame | None = None
+def prepare_data_for_substation(
+    sub_name: str,
+    metadata: pl.DataFrame,
+    config: DataConfig | None = None,
+    use_lags: bool = True,
+    member_selection: str = "mean",
+    scale_to_uint8: bool = True,
 ) -> pl.DataFrame:
-    """Add lags, trends, and physical features like windchill to weather data."""
-    if history is not None:
-        full_weather = (
-            pl.concat(
-                [
-                    history.select(pl.all().exclude("ensemble_member")),
-                    weather.select(pl.all().exclude("ensemble_member")),
-                ],
-                how="diagonal",
-            )
-            .unique("timestamp")
-            .sort("timestamp")
-        )
-    else:
-        full_weather = weather
+    """Load and join data for a single substation."""
+    config = config or DataConfig()
+    sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == sub_name)
+    if sub_meta.is_empty():
+        log.warning(f"Substation {sub_name} not found in metadata")
+        return pl.DataFrame()
 
-    # Add physical features (wind speed, wind direction, and windchill)
-    # We do this on the 'weather' dataframe. If it's uint8, we descale first.
-    def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
-        is_scaled = df["temperature_2m"].dtype == pl.UInt8
+    h3_index = sub_meta["h3_index"][0]
+    sub_id = sub_meta["substation_number"][0]
+    parquet_file = sub_meta["parquet_filename"][0]
 
-        if is_scaled:
-            params = load_scaling_params()
-            descale_cols = ["temperature_2m", "wind_u_10m", "wind_v_10m"]
-            descale_exprs = get_scaling_expressions(
-                params.filter(pl.col("col_name").is_in(descale_cols)), reverse=True
-            )
-            # Use a temporary df for calculations to avoid overwriting uint8 cols in the original
-            phys_df = df.select(["timestamp"] + descale_cols).with_columns(descale_exprs)
-        else:
-            phys_df = df
+    power = load_substation_power(parquet_file, config)
+    if power.is_empty():
+        return pl.DataFrame()
 
-        # Wind speed in m/s
-        # Wind direction in degrees (0-360)
-        import numpy as np
-
-        phys_df = phys_df.with_columns(
-            wind_speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt(),
-            wind_direction_10m=(
-                pl.arctan2(pl.col("wind_u_10m"), pl.col("wind_v_10m")) * 180 / np.pi + 180
-            ),
-        )
-
-        # Wind speed in km/h for windchill formula
-        # Windchill formula: 13.12 + 0.6215*T - 11.37*V^0.16 + 0.3965*T*V^0.16
-        v_kmh = pl.col("wind_speed_10m") * 3.6
-        temp = pl.col("temperature_2m")
-
-        phys_df = phys_df.with_columns(
-            windchill=(
-                13.12 + 0.6215 * temp - 11.37 * (v_kmh**0.16) + 0.3965 * temp * (v_kmh**0.16)
-            ).cast(pl.Float32)
-        )
-
-        # Join back to original df
-        return df.with_columns(
+    if use_lags:
+        # Add power lags
+        power_lag_7d = power.select(
             [
-                phys_df["wind_speed_10m"].cast(pl.Float32),
-                phys_df["wind_direction_10m"].cast(pl.Float32),
-                phys_df["windchill"].cast(pl.Float32),
+                (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
+                pl.col("power_mw").alias("power_mw_lag_7d"),
             ]
         )
-
-    weather = add_physical_features(weather)
-    if history is not None:
-        full_weather = add_physical_features(full_weather)
-
-    def get_lagged_view(df: pl.DataFrame, offset: timedelta, suffix: str) -> pl.DataFrame:
-        lagged = df.select(
+        power_lag_14d = power.select(
             [
-                (pl.col("timestamp") + offset).alias("timestamp"),
-                pl.col("temperature_2m").alias(f"temperature_2m_{suffix}"),
-                pl.col("downward_short_wave_radiation_flux_surface").alias(
-                    f"sw_radiation_{suffix}"
-                ),
+                (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
+                pl.col("power_mw").alias("power_mw_lag_14d"),
             ]
-            + ([pl.col("ensemble_member")] if "ensemble_member" in df.columns else [])
         )
-        return lagged
-
-    weather_lag_7d = get_lagged_view(full_weather, timedelta(days=7), "lag_7d")
-    weather_lag_14d = get_lagged_view(full_weather, timedelta(days=14), "lag_14d")
-    weather_trend_6h = full_weather.select(
-        [
-            (pl.col("timestamp") + timedelta(hours=6)).alias("timestamp"),
-            pl.col("temperature_2m").alias("temperature_2m_6h_ago"),
-        ]
-        + ([pl.col("ensemble_member")] if "ensemble_member" in full_weather.columns else [])
-    )
-
-    join_on = ["timestamp"]
-    if "ensemble_member" in weather.columns and "ensemble_member" in weather_lag_7d.columns:
-        join_on.append("ensemble_member")
-
-    weather = (
-        weather.join(weather_lag_7d, on=join_on, how="left")
-        .join(weather_lag_14d, on=join_on, how="left")
-        .join(weather_trend_6h, on=join_on, how="left")
-    )
-
-    return weather.with_columns(
-        temp_trend_6h=(
-            pl.col("temperature_2m").cast(pl.Int16) - pl.col("temperature_2m_6h_ago").cast(pl.Int16)
+        power = power.join(power_lag_7d, on="timestamp", how="left").join(
+            power_lag_14d, on="timestamp", how="left"
         )
+
+    power_min = cast(datetime, power["timestamp"].min())
+    power_max = cast(datetime, power["timestamp"].max())
+
+    if power_min is None or power_max is None:
+        return pl.DataFrame()
+
+    end_date = power_max.strftime("%Y-%m-%d")
+    weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
+
+    weather = load_weather_data(
+        [h3_index],
+        weather_start,
+        end_date,
+        config,
+        average_ensembles=(member_selection == "mean"),
+        scale_to_uint8=scale_to_uint8,
     )
+    if weather.is_empty():
+        return pl.DataFrame()
+
+    if member_selection == "single":
+        weather = weather.filter(pl.col("ensemble_member") == 0)
+
+    weather = add_weather_features(weather)
+    sub_data = power.join(weather, on="timestamp", how="inner")
+
+    if not sub_data.is_empty():
+        sub_data = sub_data.with_columns(
+            pl.lit(sub_id).alias("substation_id").cast(pl.Int32),
+            pl.lit(sub_name).alias("substation_name"),
+        )
+        sub_data = add_temporal_features(sub_data)
+
+    return sub_data
 
 
 def prepare_training_data(
     substation_names: list[str],
     metadata: pl.DataFrame,
-    use_lags: bool = True,
-    member_selection: str = "mean",
-    scale_to_uint8: bool = True,
+    config: DataConfig | None = None,
+    **kwargs,
 ) -> pl.DataFrame:
-    """Join power and weather data for multiple substations and add features.
-
-    Args:
-        substation_names: List of substation names.
-        metadata: Substation metadata.
-        use_lags: If True, adds 7-day and 14-day lagged power features.
-        member_selection: "mean" (ensemble average), "single" (member 0), or "all" (exploded).
-        scale_to_uint8: If True, scale weather variables to UInt8.
-    """
+    """Join power and weather data for multiple substations and add features."""
     all_subs_data = []
-
     for sub_name in substation_names:
-        sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == sub_name)
-        if sub_meta.is_empty():
-            log.warning(f"Substation {sub_name} not found in metadata")
-            continue
-
-        h3_index = sub_meta["h3_index"][0]
-        sub_id = sub_meta["substation_number"][0]
-        parquet_file = sub_meta["parquet_filename"][0]
-
-        power = load_substation_power(parquet_file)
-        if power.is_empty():
-            continue
-
-        if use_lags:
-            power_lag_7d = power.select(
-                [
-                    (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
-                    pl.col("power_mw").alias("power_mw_lag_7d"),
-                ]
-            )
-            power_lag_14d = power.select(
-                [
-                    (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
-                    pl.col("power_mw").alias("power_mw_lag_14d"),
-                ]
-            )
-            power = power.join(power_lag_7d, on="timestamp", how="left").join(
-                power_lag_14d, on="timestamp", how="left"
-            )
-
-        power_min = cast(datetime, power["timestamp"].min())
-        power_max = cast(datetime, power["timestamp"].max())
-
-        if power_min is None or power_max is None:
-            continue
-
-        end_date = power_max.strftime("%Y-%m-%d")
-        weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
-
-        weather = load_weather_data(
-            [h3_index],
-            weather_start,
-            end_date,
-            average_ensembles=(member_selection == "mean"),
-            scale_to_uint8=scale_to_uint8,
-        )
-
-        if weather.is_empty():
-            continue
-
-        if member_selection == "single":
-            weather = weather.filter(pl.col("ensemble_member") == 0)
-
-        weather = add_weather_features(weather)
-        sub_data = power.join(weather, on="timestamp", how="inner")
-
+        sub_data = prepare_data_for_substation(sub_name, metadata, config, **kwargs)
         if not sub_data.is_empty():
-            sub_data = sub_data.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
-            sub_data = add_temporal_features(sub_data)
             all_subs_data.append(sub_data)
 
     if not all_subs_data:

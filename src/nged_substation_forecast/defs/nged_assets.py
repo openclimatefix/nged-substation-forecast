@@ -64,8 +64,8 @@ def list_resources_for_live_primaries(context: AssetExecutionContext):
         json_path.write_text(json_string)
 
     # Update dynamic partitions
-    context.instance.add_dynamic_partitions("substation_names", substation_names)
-    context.instance.add_dynamic_partitions("last_modified_dates", last_modified_date_strings)
+    context.instance.add_dynamic_partitions("substation_names", list(substation_names))
+    context.instance.add_dynamic_partitions("last_modified_dates", list(last_modified_date_strings))
 
 
 @asset(partitions_def=composite_def, deps=[list_resources_for_live_primaries])

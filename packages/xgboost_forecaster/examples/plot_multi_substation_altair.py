@@ -7,16 +7,15 @@ from typing import cast
 
 import altair as alt
 import polars as pl
-from xgboost_forecaster.data import (
-    BASE_WEATHER_PATH,
-    add_temporal_features,
-    add_weather_features,
+from xgboost_forecaster import (
+    DataConfig,
+    XGBoostForecaster,
     get_substation_metadata,
     load_substation_power,
     load_weather_data,
     prepare_training_data,
 )
-from xgboost_forecaster.model import predict, train_model
+from xgboost_forecaster.features import add_temporal_features, add_weather_features
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +26,8 @@ log = logging.getLogger(__name__)
 
 def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     log.info("Fetching substation metadata...")
-    metadata = get_substation_metadata()
+    config = DataConfig()
+    metadata = get_substation_metadata(config)
 
     # Randomly select substations
     available_subs = metadata["substation_name_in_location_table"].to_list()
@@ -38,7 +38,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     test_start_time = datetime(2026, 2, 17, tzinfo=timezone.utc)
 
     # Find latest NWP run before test period
-    weather_files = sorted(BASE_WEATHER_PATH.glob("*.parquet"))
+    weather_files = sorted(config.base_weather_path.glob("*.parquet"))
     latest_init_time = None
     for f in reversed(weather_files):
         file_init_time = datetime.strptime(f.stem, "%Y-%m-%dT%H").replace(tzinfo=timezone.utc)
@@ -54,7 +54,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     log.info(f"Using NWP initialization: {latest_init_time}")
     forecast_end_time = latest_init_time + timedelta(days=7)
 
-    # 1. Train ONE global model for all 5 substations using "mean" selection for training
+    # 1. Train ONE global model for all 5 substations
     log.info("Preparing training data for global model...")
     all_train_data = prepare_training_data(
         sample_subs, metadata, use_lags=True, member_selection="mean"
@@ -70,8 +70,9 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     log.info(
         f"Training global model on {train_data.height} samples across {len(sample_subs)} substations..."
     )
-    model, model_meta = train_model(train_data, time_split=False)
-    features = model_meta["features"]
+    forecaster = XGBoostForecaster()
+    forecaster.train(train_data)
+    feature_names = forecaster.feature_names
 
     # 2. Generate forecasts for each substation and ensemble member
     all_plot_data = []
@@ -83,39 +84,38 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         sub_id = sub_meta["substation_number"][0]
         parquet_file = sub_meta["parquet_filename"][0]
 
-        # Historical power for lags (now 30-min res)
-        power_full = load_substation_power(parquet_file)
+        # Historical power for lags
+        power_full = load_substation_power(parquet_file, config)
         if power_full.is_empty():
             log.warning(f"Skipping {sub_name} due to lack of sane power data.")
             continue
 
         power_full = power_full.sort("timestamp")
 
-        # Weather ensemble (upsampled to 30-min)
+        # Weather ensemble
         weather_ensemble = load_weather_data(
             [h3_index],
             start_date=latest_init_time.strftime("%Y-%m-%d"),
             end_date=cast(datetime, all_train_data["timestamp"].max()).strftime("%Y-%m-%d"),
+            config=config,
             init_time=latest_init_time,
             average_ensembles=False,
         )
 
         if weather_ensemble.is_empty():
-            log.warning(
-                f"Skipping {sub_name} due to lack of weather data for selected initialization."
-            )
+            log.warning(f"Skipping {sub_name} due to lack of weather data.")
             continue
 
-        # Load historical weather for lags (averaged)
+        # Load historical weather for lags
         weather_history = load_weather_data(
             [h3_index],
             start_date=(latest_init_time - timedelta(days=15)).strftime("%Y-%m-%d"),
             end_date=latest_init_time.strftime("%Y-%m-%d"),
+            config=config,
             average_ensembles=True,
         )
 
-        # Historical power for lags (30-min res)
-        # We must strictly only use power data from BEFORE latest_init_time for prediction lags
+        # Power for lags
         power_for_lags = power_full.filter(pl.col("timestamp") <= latest_init_time)
 
         lag_table_7d = power_for_lags.select(
@@ -131,20 +131,20 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
             ]
         )
 
-        # 1. Add weather features (trends/lags) using history
+        # Add weather features
         weather_ensemble = add_weather_features(weather_ensemble, history=weather_history)
 
-        # 2. Join weather ensemble with power lags
+        # Join weather ensemble with power lags
         pred_data = weather_ensemble.join(lag_table_7d, on="timestamp", how="inner").join(
             lag_table_14d, on="timestamp", how="left"
         )
 
-        # 3. Add temporal features and final cleanup
+        # Add temporal features
         pred_data = (
             pred_data.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
             .pipe(add_temporal_features)
             .filter(pl.col("timestamp") <= forecast_end_time)
-            .drop_nulls(subset=features)
+            .drop_nulls(subset=feature_names)
         )
 
         if pred_data.is_empty():
@@ -154,7 +154,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         ensemble_members = pred_data["ensemble_member"].unique().sort()
         for member in ensemble_members:
             member_data = pred_data.filter(pl.col("ensemble_member") == member).sort("timestamp")
-            preds = predict(model, member_data, features)
+            preds = forecaster.predict(member_data)
 
             member_plot_df = member_data.select(["timestamp"]).with_columns(
                 power_mw=preds,
@@ -186,26 +186,22 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     # 3. Create Altair Chart
     log.info("Generating Altair visualization...")
 
-    # Base chart with data
     base = (
         alt.Chart(plot_df)
         .encode(x=alt.X("timestamp:T", title="Time"), y=alt.Y("power_mw:Q", title="Power (MW)"))
         .properties(width=800, height=200)
     )
 
-    # Ensemble lines (thin, transparent)
     ensemble_lines = (
         base.transform_filter(alt.datum.type == "forecast")
         .mark_line(strokeWidth=0.5, opacity=0.3)
         .encode(color=alt.value("skyblue"), detail="member")
     )
 
-    # Ground truth line (thick)
     actual_line = base.transform_filter(alt.datum.type == "actual").mark_line(
         strokeWidth=2, color="black"
     )
 
-    # Combined chart with faceting
     chart = (
         (ensemble_lines + actual_line)
         .facet(row=alt.Row("substation:N", title="Substation"))
@@ -216,13 +212,6 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     filename = "multi_substation_altair.json"
     chart.save(filename)
     log.info(f"Altair chart saved to {filename}")
-
-    # Also try to save as html for easier viewing
-    try:
-        chart.save("multi_substation_altair.html")
-        log.info("Altair chart also saved to multi_substation_altair.html")
-    except Exception as e:
-        log.warning(f"Could not save as HTML: {e}")
 
 
 if __name__ == "__main__":
