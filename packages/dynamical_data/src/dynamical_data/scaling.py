@@ -34,12 +34,12 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
         )
 
         if buffered_range == 0.0:
-            expr = pl.lit(0, dtype=pl.Int16).alias(col_name)
+            expr = pl.lit(0, dtype=pl.UInt8).alias(col_name)
         else:
             expr = (
                 (((clipped_col - buffered_min) / buffered_range) * 255)
                 .round()
-                .cast(pl.Int16)
+                .cast(pl.UInt8)
                 .alias(col_name)
             )
 
@@ -47,7 +47,7 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
 
     # Handle categorical separately if present
     if "categorical_precipitation_type_surface" in df.columns:
-        exprs.append(pl.col("categorical_precipitation_type_surface").round().cast(pl.Int16))
+        exprs.append(pl.col("categorical_precipitation_type_surface").round().cast(pl.UInt8))
 
     return df.with_columns(exprs)
 

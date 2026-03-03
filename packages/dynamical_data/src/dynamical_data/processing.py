@@ -191,7 +191,7 @@ def process_ecmwf_dataset(
                         nwp_init_time + lead_time.astype("timedelta64[s]").item()
                     ).cast(pl.Datetime("us", "UTC")),
                     init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
-                    ensemble_member=pl.lit(ensemble_member, dtype=pl.Int16),
+                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt16),
                     nwp_source=pl.lit("ecmwf_ens"),
                 )
             )
