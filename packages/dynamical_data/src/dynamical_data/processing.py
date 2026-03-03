@@ -26,35 +26,39 @@ def get_gb_h3_grid(geojson_path: Path) -> pl.DataFrame:
         file_contents = f.read()
 
     shape: BaseGeometry = shapely.from_geojson(file_contents)
+
     # Buffer by 0.25 degrees to catch islands/coasts
+    # This is expensive! It takes about 30 seconds.
+    # TODO: Let's not do this for every NWP init. Instead let's compute the h3 grid for GB once, and
+    # save that to disk as a Parquet? Maybe in Dagster, to make it easy to run for different
+    # geographies.
     shape = shape.buffer(0.25)
 
     cells = h3.geo_to_cells(shape, res=H3_RES)
     df = pl.DataFrame({"h3_index": list(cells)}, schema={"h3_index": pl.UInt64}).sort("h3_index")
 
     # Pre-compute the proportion mapping
-    df_with_children = df.with_columns(h3_res7=plh3.cell_to_children("h3_index", 7)).explode(
-        "h3_res7"
-    )
-
-    df_with_grid_x_y = df_with_children.with_columns(
-        nwp_lat=((plh3.cell_to_lat("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor() * GRID_SIZE,
-        nwp_lng=((plh3.cell_to_lng("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor() * GRID_SIZE,
-    )
-
-    df_with_counts = (
-        df_with_grid_x_y.group_by("h3_index")
-        .agg(grid_cell_counts=pl.struct(["nwp_lat", "nwp_lng"]).value_counts())
-        .with_columns(
-            total=pl.col("grid_cell_counts").list.agg(pl.element().struct.field("count").sum())
-        )
-        .explode("grid_cell_counts")
-        .unnest("grid_cell_counts")
-        .unnest("nwp_lat_nwp_lng")
-        .with_columns(proportion=pl.col.count / pl.col.total)
-    )
+    df_with_counts = compute_h3_grid_weights(df)
 
     return df_with_counts
+
+
+def compute_h3_grid_weights(df: pl.DataFrame) -> pl.DataFrame:
+    """Computes the proportion mapping for H3 grid cells."""
+    return (
+        df.with_columns(h3_res7=plh3.cell_to_children("h3_index", 7))
+        .explode("h3_res7")
+        .with_columns(
+            nwp_lat=((plh3.cell_to_lat("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
+            * GRID_SIZE,
+            nwp_lng=((plh3.cell_to_lng("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
+            * GRID_SIZE,
+        )
+        .group_by(["h3_index", "nwp_lat", "nwp_lng"])
+        .len()
+        .with_columns(total=pl.col("len").sum().over("h3_index"))
+        .with_columns(proportion=pl.col("len") / pl.col("total"))
+    )
 
 
 def calculate_wind_speed_and_direction(
@@ -93,7 +97,7 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
     session = repo.readonly_session("main")
     ds = xr.open_zarr(session.store, chunks=None)
 
-    if nwp_init_time not in ds.init_time.values:
+    if np.datetime64(nwp_init_time.replace(tzinfo=None)) not in ds.init_time.values:
         raise ValueError(f"{nwp_init_time} is not in ds.init_time.values")
 
     loaded_ds = download_ecmwf(nwp_init_time, ds, h3_grid)
@@ -120,10 +124,12 @@ def download_ecmwf(
     lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
     lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
 
+    # Xarray datasets from Dynamical are usually tz-naive UTC.
+    # If nwp_init_time is aware, we need to make it naive for the selection.
     ds_cropped = ds.sel(
         latitude=lat_slice,
         longitude=slice(min_lng, max_lng),
-        init_time=nwp_init_time,
+        init_time=nwp_init_time.replace(tzinfo=None),
     )
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
@@ -170,7 +176,9 @@ def process_ecmwf_dataset(
 
             # Aggregate to H3 resolution 5
             processed = (
-                joined.with_columns(pl.col([str(x) for x in numeric_vars]) * pl.col("proportion"))
+                joined.with_columns(
+                    (pl.col([str(x) for x in numeric_vars]).fill_nan(0.0) * pl.col("proportion"))
+                )
                 .group_by("h3_index")
                 .agg(
                     [
@@ -179,9 +187,11 @@ def process_ecmwf_dataset(
                     ]
                 )
                 .with_columns(
-                    valid_time=pl.lit(nwp_init_time + lead_time.astype("timedelta64[s]").item()),
-                    init_time=pl.lit(nwp_init_time),
-                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
+                    valid_time=pl.lit(
+                        nwp_init_time + lead_time.astype("timedelta64[s]").item()
+                    ).cast(pl.Datetime("us", "UTC")),
+                    init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
+                    ensemble_member=pl.lit(ensemble_member, dtype=pl.Int16),
                     nwp_source=pl.lit("ecmwf_ens"),
                 )
             )
