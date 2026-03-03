@@ -68,8 +68,7 @@ class PowerForecast(pt.Model):
     substation_id: int = pt.Field(dtype=pl.Int32)
     power_mw: float = pt.Field(dtype=pl.Float32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    model_name: str = pt.Field(dtype=pl.String)
-    model_version: str = pt.Field(dtype=pl.String)
+    power_fcst_model: str = pt.Field(dtype=pl.Categorical)
 
 
 class Nwp(pt.Model):

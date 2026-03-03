@@ -113,8 +113,7 @@ def xgb_forecast(context: dg.AssetExecutionContext, xgb_model: Path) -> dg.Outpu
             pl.col("substation_id"),
             pl.lit(preds).alias("power_mw").cast(pl.Float32),
             pl.lit(datetime.now()).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
-            pl.lit("xgboost").alias("model_name"),
-            pl.lit("1.0.0").alias("model_version"),
+            pl.lit("xgboost_v1.0.0").alias("power_fcst_model").cast(pl.Categorical),
         ]
     )
 
