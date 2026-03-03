@@ -7,7 +7,6 @@ load_dotenv()
 
 # The config utility should provide these as Path objects.
 POWER_DATA_PATH = Path(os.getenv("POWER_DATA_PATH", "data/power.parquet"))
-WEATHER_DATA_PATH = Path(os.getenv("WEATHER_DATA_PATH", "data/weather_delta"))
-NWP_DATA_PATH = WEATHER_DATA_PATH
+NWP_DATA_PATH = Path(os.getenv("NWP_DATA_PATH", "data/weather_delta"))
 FORECAST_DATA_PATH = Path(os.getenv("FORECAST_DATA_PATH", "data/forecast.parquet"))
 METRICS_DATA_PATH = Path(os.getenv("METRICS_DATA_PATH", "data/metrics.parquet"))
