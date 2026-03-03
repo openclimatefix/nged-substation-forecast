@@ -1,8 +1,7 @@
-import marimo as mo
-from typing import Any, cast
+import marimo
 
 __generated_with = "0.19.11"
-app = cast(Any, mo).App(width="full")
+app = marimo.App(width="full")
 
 with app.setup:
     from pathlib import Path, PurePosixPath
@@ -11,7 +10,8 @@ with app.setup:
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
     import pyarrow
-    import lonboard as lb
+    import lonboard
+    import marimo as mo
     import polars as pl
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
@@ -63,7 +63,7 @@ def _(df):
 
 @app.cell
 def _(arrow_table):
-    layer = cast(Any, lb).ScatterplotLayer(
+    layer = lonboard.ScatterplotLayer(
         arrow_table,
         pickable=True,
         auto_highlight=True,
@@ -74,17 +74,17 @@ def _(arrow_table):
         stroked=False,  # No outline.
     )
 
-    map = cast(Any, lb).Map(layers=[layer])
+    map = lonboard.Map(layers=[layer])
 
     # Enable reactivity in Marimo:
-    layer_widget = cast(Any, mo).ui.anywidget(layer)
+    layer_widget = mo.ui.anywidget(layer)  # type: ignore[invalid-argument-type]
     return layer_widget, map
 
 
 @app.cell
 def _(df, layer_widget, map):
     if layer_widget.selected_index is None:
-        right_pane = cast(Any, mo).md(
+        right_pane = mo.md(
             """
             ### Select a Substation
             *Click a dot on the map to view the demand profile.*
@@ -97,7 +97,7 @@ def _(df, layer_widget, map):
         try:
             filtered_demand = pl.read_parquet(BASE_PARQUET_PATH / parquet_filename)
         except Exception as e:
-            right_pane = cast(Any, mo).md(f"{e}")
+            right_pane = mo.md(f"{e}")
         else:
             power_column = "MW" if "MW" in filtered_demand else "MVA"
             right_pane = (
@@ -120,7 +120,7 @@ def _(df, layer_widget, map):
                 .interactive()
             )
 
-    cast(Any, mo).vstack([map, right_pane])
+    mo.vstack([map, right_pane])
     return
 
 
