@@ -1,3 +1,3 @@
-- [ ] Before using `replace(tzinfo=None)`, make sure the datetime is in UTC
+- [x] Before using `replace(tzinfo=None)`, make sure the datetime is in UTC
 - [ ] Use uint8 in Delta Lake. Maybe explicity pass the pyarrow uint8 type
 - [ ] Don't fill_na on precipitation and radiation.

@@ -1,5 +1,5 @@
 import concurrent.futures
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final
 
@@ -97,15 +97,19 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
     session = repo.readonly_session("main")
     ds = xr.open_zarr(session.store, chunks=None)
 
-    if np.datetime64(nwp_init_time.replace(tzinfo=None)) not in ds.init_time.values:
-        raise ValueError(f"{nwp_init_time} is not in ds.init_time.values")
+    utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
 
-    loaded_ds = download_ecmwf(nwp_init_time, ds, h3_grid)
-    return process_ecmwf_dataset(nwp_init_time=nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid)
+    if utc_nwp_init_time not in ds.init_time.values:
+        raise ValueError(f"{utc_nwp_init_time} is not in ds.init_time.values")
+
+    loaded_ds = download_ecmwf(utc_nwp_init_time, ds, h3_grid)
+    return process_ecmwf_dataset(
+        nwp_init_time=utc_nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid
+    )
 
 
 def download_ecmwf(
-    nwp_init_time: datetime,
+    nwp_init_time: np.datetime64,
     ds: xr.Dataset,
     h3_grid: pl.DataFrame,
 ) -> xr.Dataset:
@@ -127,9 +131,7 @@ def download_ecmwf(
     # Xarray datasets from Dynamical are usually tz-naive UTC.
     # If nwp_init_time is aware, we need to make it naive for the selection.
     ds_cropped = ds.sel(
-        latitude=lat_slice,
-        longitude=slice(min_lng, max_lng),
-        init_time=nwp_init_time.replace(tzinfo=None),
+        latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
     )
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
@@ -147,7 +149,7 @@ def download_ecmwf(
 
 
 def process_ecmwf_dataset(
-    nwp_init_time: datetime,
+    nwp_init_time: np.datetime64,
     loaded_ds: xr.Dataset,
     h3_grid: pl.DataFrame,
 ) -> pt.DataFrame[Nwp]:
