@@ -3,3 +3,4 @@
   doesn't support unsigned ints (surprisingly!). So we'll just use Parquet.
 - [x] Don't fill_na on precipitation and radiation.
 - [ ] Save the H3 indicies for GB as a one-off step, perhaps in Dagster?
+- [ ] Customise opencode-swarm agents.

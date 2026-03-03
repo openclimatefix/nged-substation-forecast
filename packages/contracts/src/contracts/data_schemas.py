@@ -5,6 +5,7 @@ from datetime import datetime
 
 import patito as pt
 import polars as pl
+from typing import cast
 
 
 class SubstationFlows(pt.Model):
@@ -38,12 +39,15 @@ class SubstationFlows(pt.Model):
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
                 f" {dataframe.columns=}, {dataframe.height=}"
             )
-        return super().validate(
-            dataframe=dataframe,
-            columns=columns,
-            allow_missing_columns=allow_missing_columns,
-            allow_superfluous_columns=allow_superfluous_columns,
-            drop_superfluous_columns=drop_superfluous_columns,
+        return cast(
+            pt.DataFrame["SubstationFlows"],
+            super().validate(
+                dataframe=dataframe,
+                columns=columns,
+                allow_missing_columns=allow_missing_columns,
+                allow_superfluous_columns=allow_superfluous_columns,
+                drop_superfluous_columns=drop_superfluous_columns,
+            ),
         )
 
 
@@ -98,3 +102,42 @@ class Nwp(pt.Model):
     precipitation_surface: int | None = pt.Field(dtype=pl.UInt8)
 
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
+
+    @classmethod
+    def validate(
+        cls,
+        dataframe: pl.DataFrame,
+        columns: Sequence[str] | None = None,
+        allow_missing_columns: bool = False,
+        allow_superfluous_columns: bool = False,
+        drop_superfluous_columns: bool = False,
+    ) -> pt.DataFrame["Nwp"]:  # type: ignore[invalid-method-override]
+        """Validate the given dataframe, ensuring no nulls from second step onwards."""
+        validated_df = super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
+        )
+
+        # Check for nulls from second forecast step onwards
+        # (i.e. where valid_time > init_time)
+        cols_to_check = [
+            "precipitation_surface",
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
+        ]
+
+        second_step_onwards = validated_df.filter(pl.col("valid_time") > pl.col("init_time"))
+
+        for col in cols_to_check:
+            null_count = second_step_onwards.select(pl.col(col).is_null().sum()).item()
+            if null_count > 0:
+                raise ValueError(
+                    f"Column '{col}' contains {null_count} null values from the second forecast "
+                    "step onwards. These variables are only allowed to be null for the first "
+                    "forecast step (lead time 0)."
+                )
+
+        return cast(pt.DataFrame["Nwp"], validated_df)
