@@ -21,7 +21,7 @@ MODEL_BASE_PATH = Path("data/models/xgboost")
 FORECAST_BASE_PATH = Path("data/forecasts/xgboost")
 
 
-@dg.asset(partitions_def=substation_names_def, deps=["live_primary_parquet"])
+@dg.asset(partitions_def=substation_names_def, deps=["live_primary_parquet", "ecmwf_ens_forecast"])
 def xgb_model(context: dg.AssetExecutionContext) -> dg.Output[Path]:
     """Train an XGBoost model for a specific substation."""
     substation_name = context.partition_key
@@ -82,7 +82,7 @@ def xgb_model(context: dg.AssetExecutionContext) -> dg.Output[Path]:
     )
 
 
-@dg.asset(partitions_def=substation_names_def)
+@dg.asset(partitions_def=substation_names_def, deps=["ecmwf_ens_forecast"])
 def xgb_forecast(context: dg.AssetExecutionContext, xgb_model: Path) -> dg.Output[pl.DataFrame]:
     """Generate a forecast using the trained XGBoost model."""
     substation_name = context.partition_key
