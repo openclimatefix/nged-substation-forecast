@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 import polars_h3 as plh3
 import shapely
+from shapely.geometry.base import BaseGeometry
 import xarray as xr
 from pathlib import Path
 
@@ -19,7 +20,7 @@ def get_gb_h3_grid(geojson_path: Path) -> pl.DataFrame:
     with open(geojson_path) as f:
         file_contents = f.read()
 
-    shape = shapely.from_geojson(file_contents)
+    shape: BaseGeometry = shapely.from_geojson(file_contents)
     # Buffer by 0.25 degrees to catch islands/coasts
     shape = shape.buffer(0.25)
 
@@ -102,7 +103,9 @@ def download_and_process_ecmwf(
 
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(download_array, name) for name in ds_cropped.data_vars]
+        futures = [
+            executor.submit(download_array, str(name)) for name in ds_cropped.data_vars.keys()
+        ]
         for future in concurrent.futures.as_completed(futures):
             data_arrays.update(future.result())
 
@@ -130,9 +133,14 @@ def download_and_process_ecmwf(
 
             # Aggregate to H3 res 5
             processed = (
-                joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
+                joined.with_columns(pl.col([str(x) for x in numeric_vars]) * pl.col("proportion"))
                 .group_by("h3_index")
-                .agg([pl.col(numeric_vars).sum(), pl.col(categorical_vars).mode().first()])
+                .agg(
+                    [
+                        pl.col([str(x) for x in numeric_vars]).sum(),
+                        pl.col(categorical_vars).mode().first(),
+                    ]
+                )
                 .with_columns(
                     valid_time=pl.lit(init_time + lead_time.astype("timedelta64[s]").item()),
                     init_time=pl.lit(init_time),
@@ -146,15 +154,15 @@ def download_and_process_ecmwf(
                 processed,
                 "wind_u_10m",
                 "wind_v_10m",
-                "wind_speed_10m_mps",
-                "wind_direction_10m_degrees",
+                "wind_speed_10m",
+                "wind_direction_10m",
             )
             processed = calculate_wind_speed_and_direction(
                 processed,
                 "wind_u_100m",
                 "wind_v_100m",
-                "wind_speed_100m_mps",
-                "wind_direction_100m_degrees",
+                "wind_speed_100m",
+                "wind_direction_100m",
             )
 
             # Drop raw wind components

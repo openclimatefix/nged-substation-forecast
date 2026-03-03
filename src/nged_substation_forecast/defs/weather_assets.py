@@ -6,7 +6,8 @@ import icechunk
 import numpy as np
 from pathlib import Path
 
-from contracts.config import WEATHER_DATA_PATH
+from contracts.config import NWP_DATA_PATH
+from contracts.data_schemas import Nwp
 from dynamical_data.processing import download_and_process_ecmwf, get_gb_h3_grid
 from dynamical_data.scaling import load_scaling_params, scale_to_uint8
 
@@ -71,9 +72,12 @@ def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
 
     final_df = pl.concat(all_processed)
 
-    # 5. Save to Delta Lake
-    # The WEATHER_DATA_PATH from config.py is a Path object
-    # deltalake write_deltalake supports local paths
-    final_df.write_delta(str(WEATHER_DATA_PATH), mode="append", overwrite_schema=True)
+    # 5. Validate against Nwp contract
+    Nwp.validate(final_df)
 
-    context.log.info(f"Saved {len(final_df)} rows to {WEATHER_DATA_PATH}")
+    # 6. Save to Delta Lake
+    # The NWP_DATA_PATH from config.py is a Path object
+    # deltalake write_deltalake supports local paths
+    final_df.write_delta(str(NWP_DATA_PATH), mode="append", overwrite_schema=True)
+
+    context.log.info(f"Saved {len(final_df)} rows to {NWP_DATA_PATH}")

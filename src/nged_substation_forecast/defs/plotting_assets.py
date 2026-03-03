@@ -55,7 +55,7 @@ def forecast_vs_actual_plot(
     combined_df = pd.concat([df_f, df_a])
 
     # Create Altair chart
-    chart = (
+    (
         alt.Chart(combined_df)
         .mark_line()
         .encode(

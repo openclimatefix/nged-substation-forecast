@@ -7,6 +7,8 @@ from typing import Any, Self
 
 import polars as pl
 import xgboost as xgb
+from xgboost import XGBRegressor
+from typing import cast
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class XGBoostForecaster:
             params: Dictionary of XGBoost parameters.
         """
         self.params = params or self.get_default_params()
-        self.model: xgb.XGBRegressor | None = None
+        self.model: XGBRegressor | None = None
         self.feature_names: Sequence[str] | None = None
 
     @staticmethod
@@ -67,7 +69,7 @@ class XGBoostForecaster:
                     (X_eval_df.select(feature_cols).to_numpy(), y_eval_series.to_numpy())
                 )
 
-        self.model = xgb.XGBRegressor(**self.params)
+        self.model = cast(Any, xgb).XGBRegressor(**self.params)
         self.model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
 
     def predict(self, df: pl.DataFrame) -> pl.Series:
@@ -114,7 +116,7 @@ class XGBoostForecaster:
             An instance of XGBoostForecaster with the loaded model.
         """
         instance = cls()
-        instance.model = xgb.XGBRegressor()
+        instance.model = cast(Any, xgb).XGBRegressor()
         instance.model.load_model(path)
         # Note: feature_names might need to be recovered if not stored in the model
         try:

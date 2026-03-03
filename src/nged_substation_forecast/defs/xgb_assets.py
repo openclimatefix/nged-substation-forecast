@@ -106,7 +106,7 @@ def xgb_forecast(context: dg.AssetExecutionContext, xgb_model: Path) -> dg.Outpu
     # Make predictions
     preds = forecaster.predict(df)
 
-    # Conform to Forecast contract
+    # Conform to PowerForecast contract
     forecast_df = df.select(
         [
             pl.col("timestamp").alias("valid_time"),

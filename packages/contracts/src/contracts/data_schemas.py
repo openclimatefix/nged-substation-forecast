@@ -61,7 +61,7 @@ class SubstationLocations(pt.Model):
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
 
 
-class Forecast(pt.Model):
+class PowerForecast(pt.Model):
     """Forecast data schema."""
 
     nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
@@ -72,7 +72,7 @@ class Forecast(pt.Model):
     model_version: str = pt.Field(dtype=pl.String)
 
 
-class Weather(pt.Model):
+class Nwp(pt.Model):
     """Weather data schema for NWP forecasts."""
 
     nwp_source: str = pt.Field(dtype=pl.String)
@@ -81,18 +81,17 @@ class Weather(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
-    # Variables (uint8 represented as logical float32 in contract,
-    # though storage might be uint8 for efficiency)
-    temperature_2m: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m_mps: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m_degrees: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m_mps: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m_degrees: float = pt.Field(dtype=pl.Float32)
-    pressure_surface: float = pt.Field(dtype=pl.Float32)
-    pressure_reduced_to_mean_sea_level: float = pt.Field(dtype=pl.Float32)
-    geopotential_height_500hpa: float = pt.Field(dtype=pl.Float32)
-    downward_long_wave_radiation_flux_surface: float = pt.Field(dtype=pl.Float32)
-    downward_short_wave_radiation_flux_surface: float = pt.Field(dtype=pl.Float32)
-    precipitation_surface: float = pt.Field(dtype=pl.Float32)
+    # Variables stored as uint8 on disk
+    temperature_2m: int = pt.Field(dtype=pl.UInt8)
+    dew_point_temperature_2m: int = pt.Field(dtype=pl.UInt8)
+    wind_speed_10m: int = pt.Field(dtype=pl.UInt8)
+    wind_direction_10m: int = pt.Field(dtype=pl.UInt8)
+    wind_speed_100m: int = pt.Field(dtype=pl.UInt8)
+    wind_direction_100m: int = pt.Field(dtype=pl.UInt8)
+    pressure_surface: int = pt.Field(dtype=pl.UInt8)
+    pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
+    geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
+    downward_long_wave_radiation_flux_surface: int = pt.Field(dtype=pl.UInt8)
+    downward_short_wave_radiation_flux_surface: int = pt.Field(dtype=pl.UInt8)
+    precipitation_surface: int = pt.Field(dtype=pl.UInt8)
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)

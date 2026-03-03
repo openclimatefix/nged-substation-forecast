@@ -3,7 +3,7 @@ import dagster as dg
 from pathlib import Path
 from xgboost_forecaster import get_substation_metadata
 
-from contracts.data_schemas import Forecast
+from contracts.data_schemas import PowerForecast
 from contracts.config import METRICS_DATA_PATH
 
 
@@ -66,7 +66,7 @@ def metrics_asset(
         return pl.DataFrame()
 
     # Validate forecasts against contract
-    Forecast.validate(all_forecasts)
+    PowerForecast.validate(all_forecasts)
 
     # Ensure combined_actuals has substation_id for joining
     # If not present, we might need to skip or error.
