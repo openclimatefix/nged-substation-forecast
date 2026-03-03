@@ -103,9 +103,7 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
         raise ValueError(f"{utc_nwp_init_time} is not in ds.init_time.values")
 
     loaded_ds = download_ecmwf(utc_nwp_init_time, ds, h3_grid)
-    return process_ecmwf_dataset(
-        nwp_init_time=utc_nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid
-    )
+    return process_ecmwf_dataset(nwp_init_time=nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid)
 
 
 def download_ecmwf(
@@ -149,7 +147,7 @@ def download_ecmwf(
 
 
 def process_ecmwf_dataset(
-    nwp_init_time: np.datetime64,
+    nwp_init_time: datetime,
     loaded_ds: xr.Dataset,
     h3_grid: pl.DataFrame,
 ) -> pt.DataFrame[Nwp]:
