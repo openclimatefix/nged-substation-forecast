@@ -175,16 +175,23 @@ def process_ecmwf_dataset(
             numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
 
             # Aggregate to H3 resolution 5
+
             processed = (
                 joined.with_columns(
-                    (pl.col([str(x) for x in numeric_vars]).fill_nan(0.0) * pl.col("proportion"))
+                    (pl.col([str(x) for x in numeric_vars]).fill_nan(None) * pl.col("proportion"))
                 )
                 .group_by("h3_index")
                 .agg(
                     [
-                        pl.col([str(x) for x in numeric_vars]).sum(),
-                        pl.col(categorical_vars).mode().first(),
+                        pl.when(pl.col(str(x)).null_count() < pl.count())
+                        # The .then().otherwise() pattern ensures that any aggregations consisting
+                        # entirely of nulls (common at step 0) are null after aggregation.
+                        .then(pl.col(str(x)).sum())
+                        .otherwise(None)
+                        .alias(str(x))
+                        for x in numeric_vars
                     ]
+                    + [pl.col(categorical_vars).mode().first()],
                 )
                 .with_columns(
                     valid_time=pl.lit(

@@ -90,7 +90,11 @@ class Nwp(pt.Model):
     pressure_surface: int = pt.Field(dtype=pl.UInt8)
     pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
     geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
-    downward_long_wave_radiation_flux_surface: int = pt.Field(dtype=pl.UInt8)
-    downward_short_wave_radiation_flux_surface: int = pt.Field(dtype=pl.UInt8)
-    precipitation_surface: int = pt.Field(dtype=pl.UInt8)
+
+    # Precipitation and radiation variables are null for the first forecast step (lead time 0)
+    # in ECMWF ENS, as they are accumulated over the previous interval.
+    downward_long_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
+    downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
+    precipitation_surface: int | None = pt.Field(dtype=pl.UInt8)
+
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
