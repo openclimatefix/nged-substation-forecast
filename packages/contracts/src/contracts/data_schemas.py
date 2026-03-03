@@ -59,3 +59,14 @@ class SubstationLocations(pt.Model):
     substation_type: str = pt.Field(dtype=pl.Categorical)
     latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
+
+
+class Forecast(pt.Model):
+    """Forecast data schema."""
+
+    nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    substation_id: int = pt.Field(dtype=pl.Int32)
+    power_mw: float = pt.Field(dtype=pl.Float32)
+    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    model_name: str = pt.Field(dtype=pl.String)
+    model_version: str = pt.Field(dtype=pl.String)

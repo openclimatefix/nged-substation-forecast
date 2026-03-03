@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from datetime import datetime
 
 import dagster as dg
 import polars as pl
@@ -105,7 +106,17 @@ def xgb_forecast(context: dg.AssetExecutionContext, xgb_model: Path) -> dg.Outpu
     # Make predictions
     preds = forecaster.predict(df)
 
-    forecast_df = df.select(["timestamp", "substation_name"]).with_columns(prediction=preds)
+    # Conform to Forecast contract
+    forecast_df = df.select(
+        [
+            pl.col("timestamp").alias("valid_time"),
+            pl.col("substation_id"),
+            pl.lit(preds).alias("power_mw").cast(pl.Float32),
+            pl.lit(datetime.now()).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
+            pl.lit("xgboost").alias("model_name"),
+            pl.lit("1.0.0").alias("model_version"),
+        ]
+    )
 
     # Save forecast
     forecast_path = FORECAST_BASE_PATH / f"{substation_name}.parquet"
