@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
+import dagster as dg
 from contracts.config import NWP_DATA_PATH
-from dagster import AssetExecutionContext, DailyPartitionsDefinition, asset
+from dagster import AssetExecutionContext, DailyPartitionsDefinition, asset, define_asset_job
 from dynamical_data import download_and_scale_ecmwf
 
 # Daily partitions starting from 2024-04-01
@@ -27,3 +28,10 @@ def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
     scaled_df.write_parquet(output_path)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
+
+
+update_ecmwf_ens_forecast = define_asset_job(
+    name="update_ecmwf_ens_forecast",
+    selection=[ecmwf_ens_forecast],
+    executor_def=dg.in_process_executor,
+)
