@@ -1,15 +1,20 @@
 import concurrent.futures
 from datetime import datetime
+from pathlib import Path
 from typing import Final
 
 import h3.api.numpy_int as h3
+import icechunk
 import numpy as np
+import patito as pt
 import polars as pl
 import polars_h3 as plh3
 import shapely
-from shapely.geometry.base import BaseGeometry
 import xarray as xr
-from pathlib import Path
+from contracts.data_schemas import Nwp
+from shapely.geometry.base import BaseGeometry
+
+from .scaling import load_scaling_params, scale_to_uint8
 
 H3_RES: Final[int] = 5
 GRID_SIZE: Final[float] = 0.25
@@ -72,11 +77,34 @@ def calculate_wind_speed_and_direction(
     )
 
 
-def download_and_process_ecmwf(
-    init_time: datetime,
+def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
+    # TODO: This geojson should be moved into a new `geo` package.
+    geojson_path = Path("packages/dynamical_data/england_scotland_wales.geojson")
+
+    h3_grid = get_gb_h3_grid(geojson_path)
+
+    storage = icechunk.s3_storage(
+        bucket="dynamical-ecmwf-ifs-ens",
+        prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+        region="us-west-2",
+        anonymous=True,
+    )
+    repo = icechunk.Repository.open(storage)
+    session = repo.readonly_session("main")
+    ds = xr.open_zarr(session.store, chunks=None)
+
+    if nwp_init_time not in ds.init_time.values:
+        raise ValueError(f"{nwp_init_time} is not in ds.init_time.values")
+
+    loaded_ds = download_ecmwf(nwp_init_time, ds, h3_grid)
+    return process_ecmwf_dataset(nwp_init_time=nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid)
+
+
+def download_ecmwf(
+    nwp_init_time: datetime,
     ds: xr.Dataset,
     h3_grid: pl.DataFrame,
-) -> pl.DataFrame:
+) -> xr.Dataset:
     """Download and process ECMWF data for a specific initialization time."""
 
     # Find spatial bounds from grid
@@ -89,13 +117,13 @@ def download_and_process_ecmwf(
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
     # We check the first two elements to determine if latitude is ascending or descending.
-    is_lat_descending = ds.latitude.values[0] > ds.latitude.values[1]
-    lat_slice = slice(max_lat, min_lat) if is_lat_descending else slice(min_lat, max_lat)
+    lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
+    lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
 
     ds_cropped = ds.sel(
         latitude=lat_slice,
         longitude=slice(min_lng, max_lng),
-        init_time=init_time,
+        init_time=nwp_init_time,
     )
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
@@ -109,7 +137,14 @@ def download_and_process_ecmwf(
         for future in concurrent.futures.as_completed(futures):
             data_arrays.update(future.result())
 
-    loaded_ds = xr.Dataset(data_arrays)
+    return xr.Dataset(data_arrays)
+
+
+def process_ecmwf_dataset(
+    nwp_init_time: datetime,
+    loaded_ds: xr.Dataset,
+    h3_grid: pl.DataFrame,
+) -> pt.DataFrame[Nwp]:
     lat_grid, lon_grid = np.meshgrid(
         loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
     )
@@ -118,20 +153,22 @@ def download_and_process_ecmwf(
     for lead_time in loaded_ds.lead_time.values:
         for ensemble_member in loaded_ds.ensemble_member.values:
             member_ds = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
+
+            # TODO: Don't do all this computation on every loop!
             nwp_data = {name: arr.values.ravel() for name, arr in member_ds.items()}
             nwp_data.update({"longitude": lon_grid.ravel(), "latitude": lat_grid.ravel()})
 
-            _nwp_df = pl.DataFrame(nwp_data)
+            nwp_df = pl.DataFrame(nwp_data)
 
             joined = h3_grid.join(
-                _nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
+                nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
             )
 
             all_nwp_vars = list(member_ds.data_vars.keys())
             categorical_vars = ["categorical_precipitation_type_surface"]
             numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
 
-            # Aggregate to H3 res 5
+            # Aggregate to H3 resolution 5
             processed = (
                 joined.with_columns(pl.col([str(x) for x in numeric_vars]) * pl.col("proportion"))
                 .group_by("h3_index")
@@ -142,8 +179,8 @@ def download_and_process_ecmwf(
                     ]
                 )
                 .with_columns(
-                    valid_time=pl.lit(init_time + lead_time.astype("timedelta64[s]").item()),
-                    init_time=pl.lit(init_time),
+                    valid_time=pl.lit(nwp_init_time + lead_time.astype("timedelta64[s]").item()),
+                    init_time=pl.lit(nwp_init_time),
                     ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
                     nwp_source=pl.lit("ecmwf_ens"),
                 )
@@ -170,4 +207,11 @@ def download_and_process_ecmwf(
 
             dfs.append(processed)
 
-    return pl.concat(dfs)
+    processed_df = pl.concat(dfs)
+
+    scaling_params = load_scaling_params(
+        Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
+    )
+    scaled_df = scale_to_uint8(processed_df, scaling_params)
+
+    return Nwp.validate(scaled_df)

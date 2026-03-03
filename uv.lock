@@ -1614,11 +1614,13 @@ dependencies = [
     { name = "contracts" },
     { name = "dagster" },
     { name = "dagster-webserver" },
+    { name = "dynamical-data" },
     { name = "nged-data" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars" },
     { name = "requests" },
+    { name = "xgboost-forecaster" },
 ]
 
 [package.dev-dependencies]
@@ -1636,11 +1638,13 @@ requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
     { name = "dagster", specifier = ">=1.12.11" },
     { name = "dagster-webserver", specifier = ">=1.12.11" },
+    { name = "dynamical-data", editable = "packages/dynamical_data" },
     { name = "nged-data", editable = "packages/nged_data" },
     { name = "obstore" },
     { name = "patito", git = "https://github.com/JackKelly/patito.git?branch=use-validated-dataframe" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "xgboost-forecaster", editable = "packages/xgboost_forecaster" },
 ]
 
 [package.metadata.requires-dev]
