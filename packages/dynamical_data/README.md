@@ -8,7 +8,11 @@ We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
 All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.
 
-Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
+The conclusion is to:
+- sort by "init_time", "lead_time", "ensemble_member", "h3_index" 
+- compression="zstd", compression_level=14 = 51 MB
+
+As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
 level) results in Parquet files ranging between about 205 MB to 220 MB.
 
 ### Test different sort orders:

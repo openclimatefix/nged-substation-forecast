@@ -11,6 +11,7 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 # The `pool="ECMWF"` works in conjunction with `concurrent.pools.default_limit` in
 # $DAGSTER_HOME/dagster.yaml to limit the number of times this asset can be run concurrently.
 # The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
+# See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
 @asset(partitions_def=weather_partitions, pool="ECMWF")
 def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
@@ -24,7 +25,7 @@ def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename
 
-    scaled_df.write_parquet(output_path)
+    scaled_df.write_parquet(output_path, compression="zstd", compression_level=14)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
 

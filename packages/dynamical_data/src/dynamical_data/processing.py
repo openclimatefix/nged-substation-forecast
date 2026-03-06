@@ -87,6 +87,7 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
 
     h3_grid = get_gb_h3_grid(geojson_path)
 
+    # TODO: Most of the code below should be moved into `download_ecmwf`.
     storage = icechunk.s3_storage(
         bucket="dynamical-ecmwf-ifs-ens",
         prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
@@ -228,5 +229,6 @@ def process_ecmwf_dataset(
         Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
     )
     scaled_df = scale_to_uint8(processed_df, scaling_params)
+    scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     return Nwp.validate(scaled_df, drop_superfluous_columns=True)
