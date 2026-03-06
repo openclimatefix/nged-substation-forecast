@@ -19,7 +19,7 @@ def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
     scaled_df = download_and_scale_ecmwf(nwp_init_time)
 
-    output_dir = NWP_DATA_PATH / "ecmwf" / "ens"
+    output_dir = NWP_DATA_PATH / "ECMWF" / "ENS"
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename
