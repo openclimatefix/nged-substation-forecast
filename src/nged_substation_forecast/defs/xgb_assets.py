@@ -1,8 +1,8 @@
 """Dagster assets for XGBoost forecasting."""
 
 import logging
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 import dagster as dg
 import polars as pl
@@ -26,11 +26,8 @@ def xgb_model(context: dg.AssetExecutionContext) -> dg.Output[Path]:
     """Train an XGBoost model for a specific substation."""
     substation_name = context.partition_key
 
-    # Load metadata to get h3_index and other info
-    # In a real scenario, this might be another asset
     metadata = get_substation_metadata()
 
-    # Prepare data
     df = prepare_data_for_substation(
         sub_name=substation_name,
         metadata=metadata,
