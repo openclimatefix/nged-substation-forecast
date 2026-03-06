@@ -3,12 +3,15 @@ from datetime import datetime, timezone
 import dagster as dg
 from contracts.config import NWP_DATA_PATH
 from dagster import AssetExecutionContext, DailyPartitionsDefinition, asset, define_asset_job
-from dynamical_data import download_and_scale_ecmwf
+from dynamical_data.processing import download_and_scale_ecmwf
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
 
-@asset(partitions_def=weather_partitions, op_tags={"dagster/max_runtime_concurrency": 1})
+# The `pool="ECMWF"` works in conjunction with `concurrent.pools.default_limit` in
+# $DAGSTER_HOME/dagster.yaml to limit the number of times this asset can be run concurrently.
+# The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
+@asset(partitions_def=weather_partitions, pool="ECMWF")
 def ecmwf_ens_forecast(context: AssetExecutionContext) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
     partition_key = context.partition_key

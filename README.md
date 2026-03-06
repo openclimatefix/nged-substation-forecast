@@ -30,6 +30,11 @@ Optional: To allow Dagster to remember its state after you shut it down:
     storage:
       sqlite:
         base_dir: "history"
+
+    # Limit concurrency for heavy processing steps like downloading ECMWF ENS:
+    concurrency:
+      pools:
+        default_limit: 1
     ```
 3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
 
@@ -47,6 +52,8 @@ NGED_S3_BUCKET_URL=https://
 NGED_S3_BUCKET_ACCESS_KEY=
 NGED_S3_BUCKET_SECRET=
 ```
+
+See `contracts/config.py` for more configuration options.
 
 ### NGED CKAN API token:
 1. Log in to [NGED's Connected Data](https://connecteddata.nationalgrid.co.uk) platform.
