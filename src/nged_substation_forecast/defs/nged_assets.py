@@ -17,7 +17,12 @@ from nged_data import ckan
 
 # Define Partitions
 # We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
+
+# TODO: Change this to a DailyPartition, and just partition on the day we grab data.
 last_modified_dates_def = DynamicPartitionsDefinition(name="last_modified_dates")
+
+# TODO: Actually, let's use a static definition for now, it's easier. Maybe just a hard-coded CSV
+# file in git with the substation names, and maybe their numbers?
 substation_names_def = DynamicPartitionsDefinition(name="substation_names")
 composite_def = MultiPartitionsDefinition(
     {"last_modified_date": last_modified_dates_def, "substation_name": substation_names_def}
@@ -64,8 +69,8 @@ def list_resources_for_live_primaries(context: AssetExecutionContext):
         json_path.write_text(json_string)
 
     # Update dynamic partitions
-    context.instance.add_dynamic_partitions("substation_names", substation_names)
-    context.instance.add_dynamic_partitions("last_modified_dates", last_modified_date_strings)
+    context.instance.add_dynamic_partitions("substation_names", list(substation_names))
+    context.instance.add_dynamic_partitions("last_modified_dates", list(last_modified_date_strings))
 
 
 @asset(partitions_def=composite_def, deps=[list_resources_for_live_primaries])

@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import polars as pl
 import pytest
-from contracts.data_schemas import SubstationFlows
+from contracts.data_schemas import Nwp, PowerForecast, SubstationFlows
 
 
 def test_substation_flows_validation_mw_or_mva():
@@ -69,3 +69,108 @@ def test_substation_flows_validation_both():
 
     # Should pass
     SubstationFlows.validate(df_both)
+
+
+def test_power_forecast_validation():
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_id": [123],
+            "power_mw": [50.5],
+            "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
+            "power_fcst_model": ["xgboost_v1.0.0"],
+        }
+    ).with_columns(
+        [
+            pl.col("substation_id").cast(pl.Int32),
+            pl.col("power_mw").cast(pl.Float32),
+            pl.col("power_fcst_model").cast(pl.Categorical),
+        ]
+    )
+
+    # Should pass
+    PowerForecast.validate(df)
+
+
+def test_nwp_validation():
+    init_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    base_data = {
+        "nwp_source": ["ecmwf_ens", "ecmwf_ens"],
+        "init_time": [init_time, init_time],
+        "ensemble_member": [0, 0],
+        "h3_index": [123, 123],
+        "temperature_2m": [10, 11],
+        "dew_point_temperature_2m": [5, 6],
+        "wind_speed_10m": [2, 3],
+        "wind_direction_10m": [180, 190],
+        "wind_speed_100m": [4, 5],
+        "wind_direction_100m": [200, 210],
+        "pressure_surface": [100, 101],
+        "pressure_reduced_to_mean_sea_level": [102, 103],
+        "geopotential_height_500hpa": [50, 51],
+        "categorical_precipitation_type_surface": [0, 0],
+    }
+
+    # Case 1: Valid (Null at step 0, value at step 1)
+    df_valid = pl.DataFrame(
+        {
+            **base_data,
+            "valid_time": [init_time, init_time + timedelta(hours=1)],
+            "precipitation_surface": [None, 1],
+            "downward_short_wave_radiation_flux_surface": [None, 100],
+            "downward_long_wave_radiation_flux_surface": [None, 200],
+        }
+    ).with_columns(
+        [
+            pl.col("ensemble_member").cast(pl.UInt16),
+            pl.col("h3_index").cast(pl.UInt64),
+            pl.col("temperature_2m").cast(pl.UInt8),
+            pl.col("dew_point_temperature_2m").cast(pl.UInt8),
+            pl.col("wind_speed_10m").cast(pl.UInt8),
+            pl.col("wind_direction_10m").cast(pl.UInt8),
+            pl.col("wind_speed_100m").cast(pl.UInt8),
+            pl.col("wind_direction_100m").cast(pl.UInt8),
+            pl.col("pressure_surface").cast(pl.UInt8),
+            pl.col("pressure_reduced_to_mean_sea_level").cast(pl.UInt8),
+            pl.col("geopotential_height_500hpa").cast(pl.UInt8),
+            pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
+            pl.col("precipitation_surface").cast(pl.UInt8),
+            pl.col("downward_short_wave_radiation_flux_surface").cast(pl.UInt8),
+            pl.col("downward_long_wave_radiation_flux_surface").cast(pl.UInt8),
+        ]
+    )
+
+    # Should pass
+    Nwp.validate(df_valid)
+
+    # Case 2: Invalid (Null at step 1)
+    df_invalid = pl.DataFrame(
+        {
+            **base_data,
+            "valid_time": [init_time, init_time + timedelta(hours=1)],
+            "precipitation_surface": [None, None],
+            "downward_short_wave_radiation_flux_surface": [None, 100],
+            "downward_long_wave_radiation_flux_surface": [None, 200],
+        }
+    ).with_columns(
+        [
+            pl.col("ensemble_member").cast(pl.UInt16),
+            pl.col("h3_index").cast(pl.UInt64),
+            pl.col("temperature_2m").cast(pl.UInt8),
+            pl.col("dew_point_temperature_2m").cast(pl.UInt8),
+            pl.col("wind_speed_10m").cast(pl.UInt8),
+            pl.col("wind_direction_10m").cast(pl.UInt8),
+            pl.col("wind_speed_100m").cast(pl.UInt8),
+            pl.col("wind_direction_100m").cast(pl.UInt8),
+            pl.col("pressure_surface").cast(pl.UInt8),
+            pl.col("pressure_reduced_to_mean_sea_level").cast(pl.UInt8),
+            pl.col("geopotential_height_500hpa").cast(pl.UInt8),
+            pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
+            pl.col("precipitation_surface").cast(pl.UInt8),
+            pl.col("downward_short_wave_radiation_flux_surface").cast(pl.UInt8),
+            pl.col("downward_long_wave_radiation_flux_surface").cast(pl.UInt8),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="Column 'precipitation_surface' contains 1 null values"):
+        Nwp.validate(df_invalid)
