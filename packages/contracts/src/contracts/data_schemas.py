@@ -2,10 +2,10 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import cast
 
 import patito as pt
 import polars as pl
-from typing import cast
 
 
 class SubstationFlows(pt.Model):
@@ -73,15 +73,15 @@ class PowerForecast(pt.Model):
     power_mw: float = pt.Field(dtype=pl.Float32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     power_fcst_model: str = pt.Field(dtype=pl.Categorical)
+    ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
 
 class Nwp(pt.Model):
     """Weather data schema for NWP forecasts."""
 
-    nwp_source: str = pt.Field(dtype=pl.String)
     init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    ensemble_member: int = pt.Field(dtype=pl.UInt16)
+    ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
     # Variables stored as uint8 on disk

@@ -175,7 +175,6 @@ def process_ecmwf_dataset(
             numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
 
             # Aggregate to H3 resolution 5
-
             processed = (
                 joined.with_columns(
                     (pl.col([str(x) for x in numeric_vars]).fill_nan(None) * pl.col("proportion"))
@@ -198,8 +197,7 @@ def process_ecmwf_dataset(
                         nwp_init_time + lead_time.astype("timedelta64[s]").item()
                     ).cast(pl.Datetime("us", "UTC")),
                     init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
-                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt16),
-                    nwp_source=pl.lit("ecmwf_ens"),
+                    ensemble_member=pl.lit(ensemble_member, dtype=pl.UInt8),
                 )
             )
 
@@ -231,4 +229,4 @@ def process_ecmwf_dataset(
     )
     scaled_df = scale_to_uint8(processed_df, scaling_params)
 
-    return Nwp.validate(scaled_df)
+    return Nwp.validate(scaled_df, drop_superfluous_columns=True)
