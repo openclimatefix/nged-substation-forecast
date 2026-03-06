@@ -1,10 +1,10 @@
-import polars as pl
-import dagster as dg
 from pathlib import Path
-from xgboost_forecaster import get_substation_metadata
 
+import dagster as dg
+import polars as pl
+from contracts.config import FORECAST_METRICS_DATA_PATH
 from contracts.data_schemas import PowerForecast
-from contracts.config import METRICS_DATA_PATH
+from xgboost_forecaster import get_substation_metadata
 
 
 @dg.asset(deps=["live_primary_parquet"])
@@ -96,10 +96,12 @@ def metrics_asset(
         ]
     )
 
-    # Save results to a Parquet file in METRICS_DATA_PATH
-    METRICS_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    metrics.write_parquet(METRICS_DATA_PATH)
+    # TODO: We probably want to store metrics to
+    #       FORECAST_METRICS_DATA_PATH / model_name / model_version
+    #       But how to get that info easily?
+    FORECAST_METRICS_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    metrics.write_parquet(FORECAST_METRICS_DATA_PATH / "metrics.parquet")
 
-    context.log.info(f"Saved metrics to {METRICS_DATA_PATH}")
+    context.log.info(f"Saved metrics to {FORECAST_METRICS_DATA_PATH}")
 
     return metrics

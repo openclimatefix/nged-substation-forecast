@@ -1,12 +1,17 @@
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
-# Load environment variables from .env
 load_dotenv()
 
-# The config utility should provide these as Path objects.
-POWER_DATA_PATH = Path(os.getenv("POWER_DATA_PATH", "data/power.parquet"))
-NWP_DATA_PATH = Path(os.getenv("NWP_DATA_PATH", "data/nwp"))
-FORECAST_DATA_PATH = Path(os.getenv("FORECAST_DATA_PATH", "data/forecast.parquet"))
-METRICS_DATA_PATH = Path(os.getenv("METRICS_DATA_PATH", "data/metrics.parquet"))
+# TODO: All config should probably be in a Pydantic class
+NGED_DATA_PATH = Path(os.getenv("NGED_DATA_PATH", "data/NGED"))
+NWP_DATA_PATH = Path(os.getenv("NWP_DATA_PATH", "data/NWP"))
+POWER_FORECASTS_DATA_PATH = Path(os.getenv("POWER_FORECASTS_DATA_PATH", "data/power_forecasts"))
+FORECAST_METRICS_DATA_PATHDATA_PATH = Path(
+    os.getenv("FORECAST_METRICS_DATA_PATH", "data/forecast_metrics")
+)
+TRAINED_ML_MODEL_PARAMS_BASE_PATH = Path(
+    os.getenv("TRAINED_ML_MODEL_PARAMS_BASE_PATH", "data/trained_ML_model_params")
+)

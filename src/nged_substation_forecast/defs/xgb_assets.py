@@ -6,6 +6,7 @@ from pathlib import Path
 
 import dagster as dg
 import polars as pl
+from contracts.config import POWER_FORECASTS_DATA_PATH, TRAINED_ML_MODEL_PARAMS_BASE_PATH
 from xgboost_forecaster import (
     XGBoostForecaster,
     get_substation_metadata,
@@ -15,10 +16,6 @@ from xgboost_forecaster import (
 from .nged_assets import substation_names_def
 
 log = logging.getLogger(__name__)
-
-# TODO: Configure these paths
-MODEL_BASE_PATH = Path("data/models/xgboost")
-FORECAST_BASE_PATH = Path("data/forecasts/xgboost")
 
 
 @dg.asset(partitions_def=substation_names_def, deps=["live_primary_parquet", "ecmwf_ens_forecast"])
@@ -63,7 +60,12 @@ def xgb_model(context: dg.AssetExecutionContext) -> dg.Output[Path]:
     )
 
     # Save model
-    model_path = MODEL_BASE_PATH / f"{substation_name}.json"
+    model_path = (
+        TRAINED_ML_MODEL_PARAMS_BASE_PATH
+        / XGBoostForecaster.model_name
+        / XGBoostForecaster.version
+        / f"{substation_name}.json"
+    )
     forecaster.save(model_path)
 
     importance_df = forecaster.get_feature_importance()
@@ -110,12 +112,19 @@ def xgb_forecast(context: dg.AssetExecutionContext, xgb_model: Path) -> dg.Outpu
             pl.col("substation_id"),
             pl.lit(preds).alias("power_mw").cast(pl.Float32),
             pl.lit(datetime.now()).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
-            pl.lit("xgboost_v1.0.0").alias("power_fcst_model").cast(pl.Categorical),
+            pl.lit(XGBoostForecaster.model_name_and_version())
+            .alias("power_fcst_model")
+            .cast(pl.Categorical),
         ]
     )
 
     # Save forecast
-    forecast_path = FORECAST_BASE_PATH / f"{substation_name}.parquet"
+    forecast_path = (
+        POWER_FORECASTS_DATA_PATH
+        / XGBoostForecaster.model_name
+        / XGBoostForecaster.version
+        / f"{substation_name}.parquet"
+    )
     forecast_path.parent.mkdir(parents=True, exist_ok=True)
     forecast_df.write_parquet(forecast_path)
 

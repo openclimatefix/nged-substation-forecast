@@ -3,18 +3,24 @@
 import logging
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import polars as pl
 import xgboost as xgb
 from xgboost import XGBRegressor
-from typing import cast
 
 log = logging.getLogger(__name__)
 
 
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
+
+    model_name = "xgboost"
+    version = "v0.0.1"
+
+    @staticmethod
+    def model_name_and_version() -> str:
+        return f"{XGBoostForecaster.model_name}_{XGBoostForecaster.version}"
 
     def __init__(self, params: dict[str, Any] | None = None) -> None:
         """Initialize the forecaster with optional XGBoost parameters.
