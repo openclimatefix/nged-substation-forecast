@@ -7,7 +7,7 @@ with app.setup:
     from pathlib import PurePosixPath
     from contracts.config import Settings
 
-    settings = Settings()
+    settings = Settings()  # type: ignore[call-arg]
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow  # type: ignore

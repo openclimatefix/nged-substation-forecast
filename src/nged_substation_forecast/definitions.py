@@ -7,8 +7,8 @@ from contracts.config import Settings
 from nged_substation_forecast.config_resource import NgedConfig
 
 
-settings = Settings()
-config_resource = NgedConfig(**Settings().model_dump())
+settings = Settings()  # type: ignore[call-arg]
+config_resource = NgedConfig(**settings.model_dump())
 
 
 defs = Definitions(

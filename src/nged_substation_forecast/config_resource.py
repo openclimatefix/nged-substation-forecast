@@ -6,9 +6,9 @@ class NgedConfig(ConfigurableResource):
     """Dagster resource for NGED substation forecast configuration."""
 
     NGED_CKAN_TOKEN: str = ""
-    NGED_S3_BUCKET_URL: str = "https://connecteddata.nationalgrid.co.uk"
-    NGED_S3_BUCKET_ACCESS_KEY: str = ""
-    NGED_S3_BUCKET_SECRET: str = ""
+    NGED_S3_BUCKET_URL: str
+    NGED_S3_BUCKET_ACCESS_KEY: str
+    NGED_S3_BUCKET_SECRET: str
     NGED_DATA_PATH: str = "data/NGED"
     NWP_DATA_PATH: str = "data/NWP"
     POWER_FORECASTS_DATA_PATH: str = "data/power_forecasts"

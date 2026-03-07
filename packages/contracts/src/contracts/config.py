@@ -8,9 +8,9 @@ class Settings(BaseSettings):
     NGED_CKAN_TOKEN: SecretStr = SecretStr("")
 
     # S3 Storage
-    NGED_S3_BUCKET_URL: HttpUrl = HttpUrl("https://connecteddata.nationalgrid.co.uk")
-    NGED_S3_BUCKET_ACCESS_KEY: SecretStr = SecretStr("")
-    NGED_S3_BUCKET_SECRET: SecretStr = SecretStr("")
+    NGED_S3_BUCKET_URL: HttpUrl
+    NGED_S3_BUCKET_ACCESS_KEY: SecretStr
+    NGED_S3_BUCKET_SECRET: SecretStr
 
     # Paths
     NGED_DATA_PATH: Path = Path("data/NGED")

@@ -1,6 +1,6 @@
 from contracts.config import Settings
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
 
 
 def test_s3_access():
