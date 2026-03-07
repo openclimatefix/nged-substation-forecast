@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import SecretStr, HttpUrl
+from pydantic import SecretStr, HttpUrl, Field
 from pathlib import Path
 
 
@@ -17,12 +17,12 @@ PROJECT_ROOT = find_project_root()
 
 class Settings(BaseSettings):
     # NGED Connected Data
-    NGED_CKAN_TOKEN: SecretStr
+    NGED_CKAN_TOKEN: SecretStr = Field(...)
 
     # S3 Storage
-    NGED_S3_BUCKET_URL: HttpUrl
-    NGED_S3_BUCKET_ACCESS_KEY: SecretStr
-    NGED_S3_BUCKET_SECRET: SecretStr
+    NGED_S3_BUCKET_URL: HttpUrl = Field(...)
+    NGED_S3_BUCKET_ACCESS_KEY: SecretStr = Field(...)
+    NGED_S3_BUCKET_SECRET: SecretStr = Field(...)
 
     # Paths
     NGED_DATA_PATH: Path = Path("data/NGED")
