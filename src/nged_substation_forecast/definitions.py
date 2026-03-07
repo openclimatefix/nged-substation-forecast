@@ -9,7 +9,7 @@ from nged_substation_forecast.config_resource import NgedConfig
 
 def create_defs() -> Definitions:
     """Create Dagster definitions."""
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings()
     config_resource = NgedConfig(**settings.model_dump(mode="json"))
 
     return Definitions(

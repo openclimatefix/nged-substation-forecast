@@ -15,7 +15,7 @@ def test_settings_load_from_env():
     )
     env_file_path = Path(".env")
     env_file_path.write_text(env_content)
-    settings = Settings()  # type: ignore[call-arg]
+    settings = Settings(**{})
     Path(".env").unlink()
 
     assert settings.NGED_CKAN_TOKEN == SecretStr("test_ckan_token")
@@ -33,4 +33,4 @@ def test_settings_no_defaults():
             NGED_S3_BUCKET_SECRET: SecretStr
             NGED_CKAN_TOKEN: SecretStr
 
-        NoDefaultsSettings()  # type: ignore[call-arg]
+        NoDefaultsSettings(**{})
