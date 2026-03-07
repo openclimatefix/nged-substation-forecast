@@ -79,12 +79,14 @@ def test_power_forecast_validation():
             "power_mw": [50.5],
             "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
             "power_fcst_model": ["xgboost_v1.0.0"],
+            "ensemble_member": [0],
         }
     ).with_columns(
         [
             pl.col("substation_id").cast(pl.Int32),
             pl.col("power_mw").cast(pl.Float32),
             pl.col("power_fcst_model").cast(pl.Categorical),
+            pl.col("ensemble_member").cast(pl.UInt8),
         ]
     )
 
@@ -95,7 +97,6 @@ def test_power_forecast_validation():
 def test_nwp_validation():
     init_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
     base_data = {
-        "nwp_source": ["ecmwf_ens", "ecmwf_ens"],
         "init_time": [init_time, init_time],
         "ensemble_member": [0, 0],
         "h3_index": [123, 123],
@@ -122,7 +123,7 @@ def test_nwp_validation():
         }
     ).with_columns(
         [
-            pl.col("ensemble_member").cast(pl.UInt16),
+            pl.col("ensemble_member").cast(pl.UInt8),
             pl.col("h3_index").cast(pl.UInt64),
             pl.col("temperature_2m").cast(pl.UInt8),
             pl.col("dew_point_temperature_2m").cast(pl.UInt8),
@@ -154,7 +155,7 @@ def test_nwp_validation():
         }
     ).with_columns(
         [
-            pl.col("ensemble_member").cast(pl.UInt16),
+            pl.col("ensemble_member").cast(pl.UInt8),
             pl.col("h3_index").cast(pl.UInt64),
             pl.col("temperature_2m").cast(pl.UInt8),
             pl.col("dew_point_temperature_2m").cast(pl.UInt8),
