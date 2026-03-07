@@ -20,11 +20,12 @@ log = logging.getLogger(__name__)
 @dg.asset(partitions_def=substation_names_def, deps=["live_primary_parquet", "ecmwf_ens_forecast"])
 def xgb_model(context: dg.AssetExecutionContext, config: NgedConfig) -> dg.Output[Path]:
     """Train an XGBoost model for a specific substation."""
+    settings = config.to_settings()
     substation_name = context.partition_key
 
     data_config = DataConfig(
-        base_power_path=Path(config.NGED_DATA_PATH) / "parquet" / "live_primary_flows",
-        base_weather_path=Path(config.NWP_DATA_PATH) / "ECMWF" / "ENS",
+        base_power_path=settings.NGED_DATA_PATH / "parquet" / "live_primary_flows",
+        base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
     )
     metadata = get_substation_metadata(data_config)
 
@@ -41,7 +42,7 @@ def xgb_model(context: dg.AssetExecutionContext, config: NgedConfig) -> dg.Outpu
     # Train model
     forecaster = XGBoostForecaster()
 
-    # Split into train/eval (simple temporal split)
+    # Split into train/eval
     df = df.sort("timestamp")
     train_size = int(len(df) * 0.8)
     train_df = df.head(train_size)
@@ -65,7 +66,7 @@ def xgb_model(context: dg.AssetExecutionContext, config: NgedConfig) -> dg.Outpu
 
     # Save model
     model_path = (
-        Path(config.TRAINED_ML_MODEL_PARAMS_BASE_PATH)
+        settings.TRAINED_ML_MODEL_PARAMS_BASE_PATH
         / XGBoostForecaster.model_name_and_version()
         / f"{substation_name}.json"
     )
@@ -90,14 +91,15 @@ def xgb_forecast(
     context: dg.AssetExecutionContext, xgb_model: Path, config: NgedConfig
 ) -> dg.Output[pl.DataFrame]:
     """Generate a forecast using the trained XGBoost model."""
+    settings = config.to_settings()
     substation_name = context.partition_key
 
     # Load model
     forecaster = XGBoostForecaster.load(xgb_model)
 
     data_config = DataConfig(
-        base_power_path=Path(config.NGED_DATA_PATH) / "parquet" / "live_primary_flows",
-        base_weather_path=Path(config.NWP_DATA_PATH) / "ECMWF" / "ENS",
+        base_power_path=settings.NGED_DATA_PATH / "parquet" / "live_primary_flows",
+        base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
     )
     metadata = get_substation_metadata(data_config)
 
@@ -129,7 +131,7 @@ def xgb_forecast(
 
     # Save forecast
     forecast_path = (
-        Path(config.POWER_FORECASTS_DATA_PATH)
+        settings.POWER_FORECASTS_DATA_PATH
         / XGBoostForecaster.model_name_and_version()
         / f"{substation_name}.parquet"
     )

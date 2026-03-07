@@ -14,13 +14,7 @@ def forecast_vs_actual_plot(
     combined_actuals: pl.DataFrame,
     config: NgedConfig,
 ):
-    """Generates an Altair plot comparing forecast vs actuals.
-
-    Args:
-        context: Asset execution context.
-        xgb_forecast: Dictionary of forecast dataframes per partition.
-        combined_actuals: Combined actual power data.
-    """
+    """Generates an Altair plot comparing forecast vs actuals."""
     if not xgb_forecast:
         context.log.warning("No forecasts provided for plotting.")
         return
@@ -33,11 +27,9 @@ def forecast_vs_actual_plot(
 
     substation_ids = context.op_config.get("substation_ids", [])
     if not substation_ids:
-        # Pick 5 random substations if none specified
         unique_ids = all_forecasts.select("substation_id").unique()["substation_id"].to_list()
         substation_ids = random.sample(unique_ids, min(5, len(unique_ids)))
 
-    # Filter data
     plot_forecast = all_forecasts.filter(pl.col("substation_id").is_in(substation_ids))
     plot_actuals = combined_actuals.filter(pl.col("substation_id").is_in(substation_ids))
 

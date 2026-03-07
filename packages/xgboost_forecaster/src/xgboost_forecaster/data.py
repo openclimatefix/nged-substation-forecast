@@ -8,7 +8,6 @@ from typing import cast
 
 import h3.api.numpy_int as h3
 import polars as pl
-from contracts.config import settings
 from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -22,23 +21,17 @@ log = logging.getLogger(__name__)
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    def __init__(
-        self,
-        base_power_path: Path = Path("data/NGED/parquet/live_primary_flows"),
-        base_weather_path: Path = Path("packages/dynamical_data/data"),
-        h3_res: int = 5,
-        resolution: str = "30m",
-    ):
-        self.base_power_path = base_power_path
-        self.base_weather_path = base_weather_path
-        self.h3_res = h3_res
-        self.resolution = resolution
+    base_power_path: Path = Path("data/NGED/parquet/live_primary_flows")
+    base_weather_path: Path = Path("packages/dynamical_data/data")
+    h3_res: int = 5
+    resolution: str = "30m"
+    ckan_token: str = ""
 
 
 def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     """Join substation locations with their live flow parquet filenames."""
     config = config or DataConfig()
-    api_key = settings.NGED_CKAN_TOKEN
+    api_key = config.ckan_token
     locations = ckan.get_primary_substation_locations(api_key=api_key)
     live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 

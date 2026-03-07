@@ -1,6 +1,5 @@
 import dagster as dg
 import polars as pl
-from pathlib import Path
 from nged_substation_forecast.config_resource import NgedConfig
 from contracts.data_schemas import PowerForecast
 from xgboost_forecaster import get_substation_metadata, DataConfig
@@ -9,7 +8,8 @@ from xgboost_forecaster import get_substation_metadata, DataConfig
 @dg.asset(deps=["live_primary_parquet"])
 def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> pl.DataFrame:
     """Combines all live primary parquet files into a single dataframe."""
-    actuals_path = Path(config.NGED_DATA_PATH) / "parquet/live_primary_flows"
+    settings = config.to_settings()
+    actuals_path = settings.NGED_DATA_PATH / "parquet/live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
 
@@ -19,8 +19,8 @@ def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> p
 
     # Get metadata to map filenames to substation IDs
     data_config = DataConfig(
-        base_power_path=Path(config.NGED_DATA_PATH) / "parquet" / "live_primary_flows",
-        base_weather_path=Path(config.NWP_DATA_PATH) / "ECMWF" / "ENS",
+        base_power_path=settings.NGED_DATA_PATH / "parquet" / "live_primary_flows",
+        base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
     )
     metadata = get_substation_metadata(data_config)
 
@@ -37,7 +37,6 @@ def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> p
             continue  # Skip if we don't know the substation ID
 
         # Some actuals might have 'MW', others 'MVA'.
-        # Rename to power_mw for consistency with Forecast.
         if "MW" in df.columns:
             df = df.rename({"MW": "power_mw"})
         elif "MVA" in df.columns:
@@ -59,6 +58,7 @@ def metrics_asset(
     config: NgedConfig,
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation."""
+    settings = config.to_settings()
     if not xgb_forecast:
         context.log.warning("No forecasts provided.")
         return pl.DataFrame()
@@ -72,15 +72,7 @@ def metrics_asset(
     # Validate forecasts against contract
     PowerForecast.validate(all_forecasts)
 
-    # Ensure combined_actuals has substation_id for joining
-    # If not present, we might need to skip or error.
-    if "substation_id" not in combined_actuals.columns:
-        context.log.error("combined_actuals missing 'substation_id' column.")
-        return pl.DataFrame()
-
     # Join on substation_id and time
-    # Forecast: valid_time, power_mw
-    # Actuals: timestamp, power_mw
     comparison = all_forecasts.join(
         combined_actuals,
         left_on=["substation_id", "valid_time"],
@@ -100,12 +92,10 @@ def metrics_asset(
         ]
     )
 
-    # TODO: We probably want to store metrics to
-    #       FORECAST_METRICS_DATA_PATH / model_name / model_version
-    #       But how to get that info easily?
-    Path(config.FORECAST_METRICS_DATA_PATH).mkdir(parents=True, exist_ok=True)
-    metrics.write_parquet(Path(config.FORECAST_METRICS_DATA_PATH) / "metrics.parquet")
+    output_path = settings.FORECAST_METRICS_DATA_PATH
+    output_path.mkdir(parents=True, exist_ok=True)
+    metrics.write_parquet(output_path / "metrics.parquet")
 
-    context.log.info(f"Saved metrics to {config.FORECAST_METRICS_DATA_PATH}")
+    context.log.info(f"Saved metrics to {output_path}")
 
     return metrics

@@ -16,14 +16,7 @@ from dagster import (
 )
 from nged_data import ckan
 
-# Define Partitions
-# We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
-
-# TODO: Change this to a DailyPartition, and just partition on the day we grab data.
 last_modified_dates_def = DynamicPartitionsDefinition(name="last_modified_dates")
-
-# TODO: Actually, let's use a static definition for now, it's easier. Maybe just a hard-coded CSV
-# file in git with the substation names, and maybe their numbers?
 substation_names_def = DynamicPartitionsDefinition(name="substation_names")
 composite_def = MultiPartitionsDefinition(
     {"last_modified_date": last_modified_dates_def, "substation_name": substation_names_def}
@@ -33,8 +26,9 @@ composite_def = MultiPartitionsDefinition(
 def _json_filename_for_ckan_resource(
     config: NgedConfig, last_modified_date: str, substation_name: str
 ) -> Path:
+    settings = config.to_settings()
     return (
-        Path(config.NGED_DATA_PATH)
+        settings.NGED_DATA_PATH
         / "raw"
         / "live_primary_flows"
         / last_modified_date
@@ -43,8 +37,9 @@ def _json_filename_for_ckan_resource(
 
 
 def _local_csv_filename(config: NgedConfig, last_modified_date: str, substation_name: str) -> Path:
+    settings = config.to_settings()
     return (
-        Path(config.NGED_DATA_PATH)
+        settings.NGED_DATA_PATH
         / "raw"
         / "live_primary_flows"
         / last_modified_date
@@ -54,34 +49,32 @@ def _local_csv_filename(config: NgedConfig, last_modified_date: str, substation_
 
 @asset
 def list_resources_for_live_primaries(context: AssetExecutionContext, config: NgedConfig):
+    settings = config.to_settings()
     substation_names: set[str] = set()
     last_modified_date_strings: set[str] = set()
     for resource in ckan.get_csv_resources_for_live_primary_substation_flows(
-        api_key=config.NGED_CKAN_TOKEN
+        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
     ):
         last_modified_date_str = resource.last_modified.strftime("%Y-%m-%d")
         last_modified_date_strings.add(last_modified_date_str)
         substation_names.add(resource.name)
 
-        # Save JSON representation of CKAN Resource:
         json_string = resource.model_dump_json()
         json_path = _json_filename_for_ckan_resource(config, last_modified_date_str, resource.name)
         json_path.parent.mkdir(parents=True, exist_ok=True)
         json_path.write_text(json_string)
 
-    # Update dynamic partitions
     context.instance.add_dynamic_partitions("substation_names", list(substation_names))
     context.instance.add_dynamic_partitions("last_modified_dates", list(last_modified_date_strings))
 
 
 @asset(partitions_def=composite_def, deps=[list_resources_for_live_primaries])
 def live_primary_csv(context: AssetExecutionContext, config: NgedConfig) -> Path:
-    # Retrieve the keys
+    settings = config.to_settings()
     partition = composite_def.get_partition_key_from_str(context.partition_key).keys_by_dimension
     last_modified_date_str = partition["last_modified_date"]
     substation_name = partition["substation_name"]
 
-    # Load JSON representation of CKAN resource to get the CSV filename
     json_filename = _json_filename_for_ckan_resource(
         config, last_modified_date_str, substation_name
     )
@@ -89,16 +82,16 @@ def live_primary_csv(context: AssetExecutionContext, config: NgedConfig) -> Path
     json_text = json_filename.read_text()
     resource = nged_data.CkanResource.model_validate_json(json_text)
 
-    # Get CSV from CKAN
     csv_url = str(resource.url)
     context.log.info(f"Downloading CSV for {substation_name} from {resource.url}")
-    response = ckan.httpx_get_with_auth(csv_url, api_key=config.NGED_CKAN_TOKEN)
+    response = ckan.httpx_get_with_auth(
+        csv_url, api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
+    )
     response.raise_for_status()
 
-    # Save CSV file to disk
     csv_filename = PurePosixPath(csv_url).name
     dst_full_path = (
-        Path(config.NGED_DATA_PATH)
+        settings.NGED_DATA_PATH
         / "raw"
         / "live_primary_flows"
         / last_modified_date_str
@@ -114,10 +107,10 @@ def live_primary_csv(context: AssetExecutionContext, config: NgedConfig) -> Path
 def live_primary_parquet(
     context: AssetExecutionContext, live_primary_csv: Path, config: NgedConfig
 ) -> None:
+    settings = config.to_settings()
     new_df = nged_data.process_live_primary_substation_flows(live_primary_csv)
-    # TODO(Jack): Parquets should use Hive partitioning & be partitioned by month & substation num.
     parquet_path = (
-        Path(config.NGED_DATA_PATH)
+        settings.NGED_DATA_PATH
         / "parquet"
         / "live_primary_flows"
         / live_primary_csv.with_suffix(".parquet").name
@@ -132,7 +125,6 @@ def live_primary_parquet(
         )
         merged_df = old_df.merge_sorted(new_df, key="timestamp")
     else:
-        # TODO: Remove this mkdir line, and use `sink_parquet(mkdir=True)` when that API stabilises.
         parquet_path.parent.mkdir(exist_ok=True, parents=True)
         merged_df = new_df
     merged_df.write_parquet(parquet_path, compression="zstd")

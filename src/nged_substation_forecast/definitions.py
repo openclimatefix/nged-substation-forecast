@@ -8,7 +8,7 @@ from nged_substation_forecast.config_resource import NgedConfig
 
 
 settings = Settings()
-config_resource = NgedConfig(**settings.model_dump())
+config_resource = NgedConfig(**Settings().model_dump())
 
 
 defs = Definitions(

@@ -1,36 +1,9 @@
-import marimo
+from contracts.config import Settings
 
-__generated_with = "0.19.9"
-app = marimo.App(width="full")
-
-with app.setup:
-    import obstore
-    from typing import Final
-    from contracts.config import settings
-
-    BUCKET_URL: Final[str] = settings.NGED_S3_BUCKET_URL
-    ACCESS_KEY: Final[str] = settings.NGED_S3_BUCKET_ACCESS_KEY
-    SECRET_KEY: Final[str] = settings.NGED_S3_BUCKET_SECRET
+settings = Settings()
 
 
-@app.cell
-def _():
-    s3_from_url = obstore.store.S3Store.from_url(
-        url=BUCKET_URL,
-        config={
-            "aws_access_key_id": ACCESS_KEY,
-            "aws_secret_access_key": SECRET_KEY,
-        },
-    )
-    s3_from_url
-    return (s3_from_url,)
-
-
-@app.cell
-def _(s3_from_url):
-    list(s3_from_url.list())
-    return
-
-
-if __name__ == "__main__":
-    app.run()
+def test_s3_access():
+    str(settings.NGED_S3_BUCKET_URL)
+    settings.NGED_S3_BUCKET_ACCESS_KEY.get_secret_value()
+    # ... logic using settings ...
