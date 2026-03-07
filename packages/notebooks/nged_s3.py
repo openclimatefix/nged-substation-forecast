@@ -4,16 +4,13 @@ __generated_with = "0.19.9"
 app = marimo.App(width="full")
 
 with app.setup:
-    from dotenv import load_dotenv
     import obstore
-    import os
     from typing import Final
+    from contracts.config import settings
 
-    load_dotenv()
-
-    BUCKET_URL: Final[str] = os.environ["NGED_S3_BUCKET_URL"]
-    ACCESS_KEY: Final[str] = os.environ["NGED_S3_BUCKET_ACCESS_KEY"]
-    SECRET_KEY: Final[str] = os.environ["NGED_S3_BUCKET_SECRET"]
+    BUCKET_URL: Final[str] = settings.NGED_S3_BUCKET_URL
+    ACCESS_KEY: Final[str] = settings.NGED_S3_BUCKET_ACCESS_KEY
+    SECRET_KEY: Final[str] = settings.NGED_S3_BUCKET_SECRET
 
 
 @app.cell

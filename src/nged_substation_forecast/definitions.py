@@ -2,15 +2,16 @@
 
 from pathlib import Path
 
-from dagster import Definitions, definitions, load_from_defs_folder
+from dagster import Definitions, load_from_defs_folder
+from contracts.config import Settings
+from nged_substation_forecast.config_resource import NgedConfig
 
 
-@definitions
-def defs() -> Definitions:
-    """Load all Dagster definitions from the defs folder.
+settings = Settings()
+config_resource = NgedConfig(**settings.model_dump())
 
-    Returns:
-        Definitions: The combined Dagster definitions.
-    """
-    defs = load_from_defs_folder(path_within_project=Path(__file__).parent)
-    return defs
+
+defs = Definitions(
+    assets=load_from_defs_folder(path_within_project=Path(__file__).parent).assets,
+    resources={"config": config_resource},
+)

@@ -1,16 +1,15 @@
-from pathlib import Path
-
 import dagster as dg
 import polars as pl
-from contracts.config import FORECAST_METRICS_DATA_PATH
+from pathlib import Path
+from nged_substation_forecast.config_resource import NgedConfig
 from contracts.data_schemas import PowerForecast
-from xgboost_forecaster import get_substation_metadata
+from xgboost_forecaster import get_substation_metadata, DataConfig
 
 
 @dg.asset(deps=["live_primary_parquet"])
-def combined_actuals() -> pl.DataFrame:
+def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> pl.DataFrame:
     """Combines all live primary parquet files into a single dataframe."""
-    actuals_path = Path("data/NGED/parquet/live_primary_flows")
+    actuals_path = Path(config.NGED_DATA_PATH) / "parquet/live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
 
@@ -19,7 +18,11 @@ def combined_actuals() -> pl.DataFrame:
         return pl.DataFrame()
 
     # Get metadata to map filenames to substation IDs
-    metadata = get_substation_metadata()
+    data_config = DataConfig(
+        base_power_path=Path(config.NGED_DATA_PATH) / "parquet" / "live_primary_flows",
+        base_weather_path=Path(config.NWP_DATA_PATH) / "ECMWF" / "ENS",
+    )
+    metadata = get_substation_metadata(data_config)
 
     dfs = []
     for p in parquets:
@@ -53,6 +56,7 @@ def metrics_asset(
     context: dg.AssetExecutionContext,
     xgb_forecast: dict[str, pl.DataFrame],
     combined_actuals: pl.DataFrame,
+    config: NgedConfig,
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation."""
     if not xgb_forecast:
@@ -99,9 +103,9 @@ def metrics_asset(
     # TODO: We probably want to store metrics to
     #       FORECAST_METRICS_DATA_PATH / model_name / model_version
     #       But how to get that info easily?
-    FORECAST_METRICS_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    metrics.write_parquet(FORECAST_METRICS_DATA_PATH / "metrics.parquet")
+    Path(config.FORECAST_METRICS_DATA_PATH).mkdir(parents=True, exist_ok=True)
+    metrics.write_parquet(Path(config.FORECAST_METRICS_DATA_PATH) / "metrics.parquet")
 
-    context.log.info(f"Saved metrics to {FORECAST_METRICS_DATA_PATH}")
+    context.log.info(f"Saved metrics to {config.FORECAST_METRICS_DATA_PATH}")
 
     return metrics

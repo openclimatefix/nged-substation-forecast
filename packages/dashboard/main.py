@@ -8,11 +8,12 @@ with app.setup:
     from typing import Final
 
     import altair as alt
-    import geoarrow.pyarrow as geo_pyarrow
+    import geoarrow.pyarrow as geo_pyarrow  # type: ignore
     import pyarrow
     import lonboard
     import marimo as mo
     import polars as pl
+    from contracts.config import settings
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -26,8 +27,10 @@ with app.setup:
 def _():
     # TODO: Dagster should grab the latest locations (only when it updates)
     #       and store the locations locally.
-    _locations = ckan.get_primary_substation_locations()
-    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
+    _locations = ckan.get_primary_substation_locations(api_key=settings.NGED_CKAN_TOKEN)
+    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
+        api_key=settings.NGED_CKAN_TOKEN
+    )
 
     df = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
     df = df.with_columns(

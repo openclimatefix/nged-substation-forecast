@@ -2,6 +2,7 @@ import polars as pl
 import dagster as dg
 import altair as alt
 import random
+from nged_substation_forecast.config_resource import NgedConfig
 
 
 @dg.asset(
@@ -11,6 +12,7 @@ def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     xgb_forecast: dict[str, pl.DataFrame],
     combined_actuals: pl.DataFrame,
+    config: NgedConfig,
 ):
     """Generates an Altair plot comparing forecast vs actuals.
 
