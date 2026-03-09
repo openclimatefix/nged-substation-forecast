@@ -5,14 +5,15 @@ from pathlib import Path
 import dagster as dg
 import polars as pl
 from xgboost_forecaster import (
+    DataConfig,
     XGBoostForecaster,
     get_substation_metadata,
     prepare_data_for_substation,
-    DataConfig,
 )
 
-from .nged_assets import substation_names_def
 from nged_substation_forecast.config_resource import NgedConfig
+
+from .nged_assets import substation_names_def
 
 log = logging.getLogger(__name__)
 

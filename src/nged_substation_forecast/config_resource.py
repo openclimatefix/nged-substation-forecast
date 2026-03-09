@@ -1,10 +1,13 @@
+from contracts.config import Settings
 from dagster import ConfigurableResource
 from pydantic import Field
-from contracts.config import Settings
 
 
 class NgedConfig(ConfigurableResource):
     """Dagster resource for NGED substation forecast configuration."""
+
+    # This is a repetition of the fields in packages/contracts/config/Settings
+    # because Dagster ConfigurableResource can't handle the rich Pydantic types.
 
     NGED_CKAN_TOKEN: str = Field(...)  # NGED Connected Data CKAN Token
     NGED_S3_BUCKET_URL: str = Field(...)  # S3 Bucket URL

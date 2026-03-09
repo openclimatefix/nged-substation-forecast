@@ -1,9 +1,10 @@
 """Utility for scaling NWP variables to uint8."""
 
-import polars as pl
 from pathlib import Path
 
+import polars as pl
 
+# TODO: Most of (maybe *all of*) this file should be moved to packages/dynamical_data/scaling/
 scaling_params_path = Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
 
 

@@ -1,5 +1,6 @@
-import polars as pl
 from pathlib import Path
+
+import polars as pl
 
 
 def load_scaling_params(csv_path: Path) -> pl.DataFrame:
@@ -26,7 +27,6 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
         buffered_min = row["buffered_min"]
         buffered_range = row["buffered_range"]
 
-        # Convert float NaNs to nulls, clip, then scale
         clipped_col = (
             pl.col(col_name)
             .fill_nan(None)

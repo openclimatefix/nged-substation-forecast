@@ -16,6 +16,7 @@ def find_project_root() -> Path:
 PROJECT_ROOT = find_project_root()
 
 
+# TODO: Rename this file to settings.py. Or rename this class to Config.
 class Settings(BaseSettings):
     # NGED Connected Data
     # TODO: These should all be lowercase.

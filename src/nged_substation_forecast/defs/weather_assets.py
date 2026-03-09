@@ -3,11 +3,16 @@ from datetime import datetime, timezone
 import dagster as dg
 from dagster import AssetExecutionContext, DailyPartitionsDefinition, asset, define_asset_job
 from dynamical_data.processing import download_and_scale_ecmwf
+
 from nged_substation_forecast.config_resource import NgedConfig
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
 
+# The `pool="ECMWF"` works in conjunction with `concurrent.pools.default_limit` in
+# $DAGSTER_HOME/dagster.yaml to limit the number of times this asset can be run concurrently.
+# The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
+# See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
 @asset(partitions_def=weather_partitions, pool="ECMWF")
 def ecmwf_ens_forecast(context: AssetExecutionContext, config: NgedConfig) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
