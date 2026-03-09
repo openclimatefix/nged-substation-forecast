@@ -4,30 +4,34 @@ __generated_with = "0.19.11"
 app = marimo.App(width="full")
 
 with app.setup:
-    from pathlib import Path, PurePosixPath
-    from typing import Final
+    from pathlib import PurePosixPath
+
+    from contracts.config import Settings
+
+    settings = Settings()
 
     import altair as alt
-    import geoarrow.pyarrow as geo_pyarrow
-    import pyarrow
+    import geoarrow.pyarrow as geo_pyarrow  # type: ignore
     import lonboard
     import marimo as mo
     import polars as pl
+    import pyarrow
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
-    # TODO(Jack): This path should be configured once for the entire uv workspace.
-    BASE_PARQUET_PATH: Final[Path] = Path(
-        "~/dev/python/nged-substation-forecast/data/NGED/parquet/live_primary_flows"
-    ).expanduser()
+    BASE_PARQUET_PATH = settings.NGED_DATA_PATH / "parquet" / "live_primary_flows"
 
 
 @app.cell
 def _():
     # TODO: Dagster should grab the latest locations (only when it updates)
     #       and store the locations locally.
-    _locations = ckan.get_primary_substation_locations()
-    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
+    _locations = ckan.get_primary_substation_locations(
+        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
+    )
+    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
+        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
+    )
 
     df = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
     df = df.with_columns(
@@ -66,14 +70,13 @@ def _(arrow_table):
     layer = lonboard.ScatterplotLayer(
         arrow_table,
         pickable=True,
-        auto_highlight=True,
         # Styling
+        auto_highlight=True,
         get_fill_color=[0, 128, 255],
         get_radius=1000,
         radius_units="meters",
-        stroked=False,  # No outline.
+        stroked=False,  # No outline
     )
-
     map = lonboard.Map(layers=[layer])
 
     # Enable reactivity in Marimo:

@@ -1,29 +1,26 @@
 """Utility for scaling NWP variables to uint8."""
 
-import polars as pl
 from pathlib import Path
 
-# Load scaling params from the provided CSV
-import os
+import polars as pl
 
-SCALING_PARAMS_PATH = Path(
-    os.getenv(
-        "XGBOOST_SCALING_PARAMS_PATH", "packages/dynamical_data/scaling/ecmwf_scaling_params.csv"
-    )
-)
+# TODO: Most of (maybe *all of*) this file should be moved to packages/dynamical_data/scaling/
+scaling_params_path = Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
 
 
-def load_scaling_params() -> pl.DataFrame:
-    if not SCALING_PARAMS_PATH.exists():
+def load_scaling_params(path: Path | None = None) -> pl.DataFrame:
+    if path is None:
+        path = scaling_params_path
+    if not path.exists():
         # Fallback for if we are running from root or package
         alt_path = Path("packages/xgboost_forecaster/scaling_params.csv")
         if not alt_path.exists():
             # If it still doesn't exist, we might be in trouble, but let's try to find it
             raise FileNotFoundError(
-                f"Scaling params not found at {SCALING_PARAMS_PATH}. Please set the XGBOOST_SCALING_PARAMS_PATH environment variable."
+                f"Scaling params not found at {path}. Please set the XGBOOST_SCALING_PARAMS_PATH environment variable."
             )
         return pl.read_csv(alt_path)
-    return pl.read_csv(SCALING_PARAMS_PATH)
+    return pl.read_csv(path)
 
 
 def get_scaling_expressions(params: pl.DataFrame, reverse: bool = False) -> list[pl.Expr]:

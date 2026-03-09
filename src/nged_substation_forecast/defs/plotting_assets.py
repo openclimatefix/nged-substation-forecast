@@ -1,7 +1,10 @@
-import polars as pl
-import dagster as dg
-import altair as alt
 import random
+
+import altair as alt
+import dagster as dg
+import polars as pl
+
+from nged_substation_forecast.config_resource import NgedConfig
 
 
 @dg.asset(
@@ -11,6 +14,7 @@ def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     xgb_forecast: dict[str, pl.DataFrame],
     combined_actuals: pl.DataFrame,
+    config: NgedConfig,
 ):
     """Generates an Altair plot comparing forecast vs actuals.
 
@@ -18,6 +22,7 @@ def forecast_vs_actual_plot(
         context: Asset execution context.
         xgb_forecast: Dictionary of forecast dataframes per partition.
         combined_actuals: Combined actual power data.
+        config: NgedConfig.
     """
     if not xgb_forecast:
         context.log.warning("No forecasts provided for plotting.")
@@ -44,13 +49,15 @@ def forecast_vs_actual_plot(
         return
 
     # Prepare for plotting
+    # TODO: Don't use `to_pandas()`!
     df_f = plot_forecast.to_pandas().rename(columns={"valid_time": "time", "power_mw": "value"})
     df_f["type"] = "Forecast"
 
+    # TODO: Don't use `to_pandas()`!
     df_a = plot_actuals.to_pandas().rename(columns={"timestamp": "time", "power_mw": "value"})
     df_a["type"] = "Actual"
 
-    import pandas as pd
+    import pandas as pd  # TODO: Remove!
 
     combined_df = pd.concat([df_f, df_a])
 

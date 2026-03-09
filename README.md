@@ -40,20 +40,10 @@ Optional: To allow Dagster to remember its state after you shut it down:
 
 ## Environment variables
 
-This code expects the following environment variables to be set. For example, you could put these
-into a `.env` file:
+This code uses `pydantic-settings` to manage configuration. You can set these variables in your environment or in a `.env` file.
 
-```env
-# A token for NGED's Connected Data portal: https://connecteddata.nationalgrid.co.uk
-NGED_CKAN_TOKEN=
-
-# NGED's AWS S3 bucket containing their data
-NGED_S3_BUCKET_URL=https://
-NGED_S3_BUCKET_ACCESS_KEY=
-NGED_S3_BUCKET_SECRET=
-```
-
-See `contracts/config.py` for more configuration options.
+For a full list of available settings, their types, and their defaults, please see the `Settings` class in:
+`packages/contracts/src/contracts/config.py`
 
 ### NGED CKAN API token:
 1. Log in to [NGED's Connected Data](https://connecteddata.nationalgrid.co.uk) platform.

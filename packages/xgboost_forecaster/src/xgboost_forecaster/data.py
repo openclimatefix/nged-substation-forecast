@@ -2,13 +2,13 @@
 
 import dataclasses
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import cast
 
 import h3.api.numpy_int as h3
 import polars as pl
+from contracts.config import Settings
 from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -17,26 +17,28 @@ from xgboost_forecaster.scaling import get_scaling_expressions, load_scaling_par
 
 log = logging.getLogger(__name__)
 
+_SETTINGS = Settings()
+
 
 @dataclasses.dataclass
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    base_power_path: Path = Path(
-        os.getenv("XGBOOST_POWER_PATH", "data/NGED/parquet/live_primary_flows")
-    )
-    base_weather_path: Path = Path(
-        os.getenv("XGBOOST_WEATHER_PATH", "packages/dynamical_data/data")
-    )
-    h3_res: int = 5
+    base_power_path: Path = _SETTINGS.NGED_DATA_PATH / "parquet" / "live_primary_flows"
+    base_weather_path: Path = _SETTINGS.NWP_DATA_PATH / "ECMWF" / "ENS"
+    # TODO: Remove `ckan_token` after teaching Dagster to download substation locations
+    ckan_token: str = _SETTINGS.NGED_CKAN_TOKEN.get_secret_value()
+    h3_res: int = 5  # TODO: This should probably be stored somewhere like NWP_DATA_PATH/ECMWF/ENS/metadata.json?
     resolution: str = "30m"
 
 
+# TODO: Most of (or maybe all of) this function should be computed by Dagster once.
 def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     """Join substation locations with their live flow parquet filenames."""
     config = config or DataConfig()
-    locations = ckan.get_primary_substation_locations()
-    live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows()
+    api_key = config.ckan_token
+    locations = ckan.get_primary_substation_locations(api_key=api_key)
+    live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
     df = join_location_table_to_live_primaries(live_primaries=live_primaries, locations=locations)
 
