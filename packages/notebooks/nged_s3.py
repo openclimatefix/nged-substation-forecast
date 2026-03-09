@@ -1,11 +1,13 @@
 import marimo
 
-__generated_with = "0.19.9"
+__generated_with = "0.20.4"
 app = marimo.App(width="full")
 
 with app.setup:
     import obstore
-    from contracts.config import Settings
+    from contracts.config import Settings, PROJECT_ROOT
+
+    assert (PROJECT_ROOT / ".env").exists()
 
     settings = Settings()
 
@@ -30,6 +32,11 @@ def _():
 @app.cell
 def _(s3_from_url):
     list(s3_from_url.list())
+    return
+
+
+@app.cell
+def _():
     return
 
 

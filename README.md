@@ -45,12 +45,6 @@ This code uses `pydantic-settings` to manage configuration. You can set these va
 For a full list of available settings, their types, and their defaults, please see the `Settings` class in:
 `packages/contracts/src/contracts/config.py`
 
-Key environment variables include:
-- `NGED_CKAN_TOKEN`: API token for NGED's Connected Data portal.
-- `NGED_S3_BUCKET_URL`: URL for NGED's AWS S3 bucket.
-- `NGED_S3_BUCKET_ACCESS_KEY`: Access key for NGED's AWS S3 bucket.
-- `NGED_S3_BUCKET_SECRET`: Secret key for NGED's AWS S3 bucket.
-
 ### NGED CKAN API token:
 1. Log in to [NGED's Connected Data](https://connecteddata.nationalgrid.co.uk) platform.
 1. Click on your username (top right), and go to "User Profile" -> API Tokens -> Create API token

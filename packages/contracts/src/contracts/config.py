@@ -1,6 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import SecretStr, HttpUrl, Field
 from pathlib import Path
+
+from pydantic import Field, HttpUrl, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def find_project_root() -> Path:
@@ -17,6 +18,7 @@ PROJECT_ROOT = find_project_root()
 
 class Settings(BaseSettings):
     # NGED Connected Data
+    # TODO: These should all be lowercase.
     NGED_CKAN_TOKEN: SecretStr = Field(...)
 
     # S3 Storage
