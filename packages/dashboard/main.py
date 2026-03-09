@@ -5,17 +5,17 @@ app = marimo.App(width="full")
 
 with app.setup:
     from pathlib import PurePosixPath
+
     from contracts.config import Settings
 
     settings = Settings()
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow  # type: ignore
-    import pyarrow
     import lonboard
     import marimo as mo
     import polars as pl
-
+    import pyarrow
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -24,6 +24,8 @@ with app.setup:
 
 @app.cell
 def _():
+    # TODO: Dagster should grab the latest locations (only when it updates)
+    #       and store the locations locally.
     _locations = ckan.get_primary_substation_locations(
         api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
     )
@@ -42,6 +44,7 @@ def _():
 
 @app.cell
 def _(df):
+    # Create arrow table
     geo_array = (
         geo_pyarrow.point()
         .with_crs("epsg:4326")
@@ -67,13 +70,16 @@ def _(arrow_table):
     layer = lonboard.ScatterplotLayer(
         arrow_table,
         pickable=True,
+        # Styling
         auto_highlight=True,
         get_fill_color=[0, 128, 255],
         get_radius=1000,
         radius_units="meters",
-        stroked=False,
+        stroked=False,  # No outline
     )
     map = lonboard.Map(layers=[layer])
+
+    # Enable reactivity in Marimo:
     layer_widget = mo.ui.anywidget(layer)  # type: ignore[invalid-argument-type]
     return layer_widget, map
 
@@ -112,7 +118,7 @@ def _(df, layer_widget, map):
                 .properties(
                     title=selected_df["substation_name_in_location_table"].item(),
                     height=300,
-                    width="container",
+                    width="container",  # Fill available width
                 )
                 .interactive()
             )
