@@ -242,7 +242,6 @@ def live_primary_flows(
                             source_alias="s",
                             target_alias="t",
                         )
-                        .when_matched_update_all()
                         .when_not_matched_insert_all()
                         .execute()
                     )
