@@ -1,6 +1,0 @@
-- Implement a Dagster asset to download substation locations and create mapping between substations and H3 index.
-    - Use `nged_data.ckan.get_primary_substation_locations`
-    - Add a column for the H3 resolution 5 index the substation is in. Call this column `h3_res_5`.
-    - Save to disk as a Parquet file (including all the columns in `SubstationLocations`).
-- Modify @packages/dashboard/main.py and @packages/xgboost_forecaster/src/xgboost_forecaster/data.py to load the substation locations from disk.
-- 
