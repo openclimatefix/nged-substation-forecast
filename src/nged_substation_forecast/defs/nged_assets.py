@@ -19,7 +19,6 @@ from dagster import (
     MaterializeResult,
     MetadataValue,
     asset,
-    define_asset_job,
 )
 from nged_data import ckan
 
@@ -77,7 +76,7 @@ def _load_list_of_processed_substations(nged_config: NgedConfig, partition_key: 
     return set()
 
 
-def _save_processed_substations(
+def _save_list_of_processed_substations(
     nged_config: NgedConfig, partition_key: str, processed_substations: set[str]
 ) -> None:
     status_file = _get_status_file_path(nged_config, partition_key)
@@ -194,7 +193,7 @@ def live_primary_flows(
     api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
-    # 1. Filter by already processed (unless forced)
+    # Remove substations that have already been downloaded for partition_key (unless forced)
     if config.force_rerun_all:
         unprocessed_resources = all_resources
     else:
@@ -202,7 +201,7 @@ def live_primary_flows(
 
     already_processed_count = len(all_resources) - len(unprocessed_resources)
 
-    # 2. Apply manual filters
+    # Apply manual filters
     resources_to_process = unprocessed_resources
     if config.substation_names:
         resources_to_process = [
@@ -231,7 +230,7 @@ def live_primary_flows(
     failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
 
     processed_substations.update(successes)
-    _save_processed_substations(nged_config, partition_key, processed_substations)
+    _save_list_of_processed_substations(nged_config, partition_key, processed_substations)
 
     metadata: dict[str, dg.MetadataValue] = {
         "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
@@ -249,10 +248,3 @@ def live_primary_flows(
     )
 
     yield MaterializeResult(metadata=metadata)
-
-
-update_live_primary_flows = define_asset_job(
-    name="update_live_primary_flows",
-    selection=[live_primary_flows],
-    executor_def=dg.in_process_executor,
-)

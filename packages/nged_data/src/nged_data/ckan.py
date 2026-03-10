@@ -25,7 +25,7 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
         log.info(
             "Fetching substation locations with API key (length: %d, prefix: %s...)",
             len(api_key),
-            api_key[:4] if api_key else "None",
+            api_key[:4],
         )
     else:
         log.warning("Fetching substation locations WITHOUT API key")
@@ -50,7 +50,6 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
     ckan_result = find_one_match(lambda result: result["format"].upper() == "CSV", ckan_results)
     url = str(ckan_result["url"])
     http_response = httpx_get_with_auth(url, api_key=api_key)
-    http_response.raise_for_status()
     locations = pl.read_csv(http_response.content)
     locations = change_dataframe_column_names_to_snake_case(locations)
     locations = locations.filter(
