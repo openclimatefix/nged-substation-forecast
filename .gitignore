@@ -18,9 +18,11 @@ __marimo__/
 .env
 .env.backup
 
+# Data storage
+data/
+
 # Dagster
 packages/dynamical_data/uint8_nwp.parquet
 .tmp_dagster_home_*
-data/
-# `history/` is defined in `storage:sqlite:base_dir` in `$DAGSTER_HOME/dagster.yaml`
-history/
+# `dagster_history/` is defined in `$DAGSTER_HOME/dagster.yaml`
+dagster_history/

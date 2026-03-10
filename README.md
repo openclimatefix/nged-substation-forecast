@@ -29,7 +29,7 @@ Optional: To allow Dagster to remember its state after you shut it down:
     ```yaml
     storage:
       sqlite:
-        base_dir: "history"
+        base_dir: "dagster_history"
 
     # Limit concurrency for heavy processing steps like downloading ECMWF ENS:
     concurrency:
