@@ -188,17 +188,21 @@ def live_primary_flows(
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
     partition_key = context.partition_key
-    if config.force_rerun_all:
-        processed_substations = set([])
-    else:
-        processed_substations = _load_list_of_processed_substations(nged_config, partition_key)
+    # Always load the historical state for this partition
+    processed_substations = _load_list_of_processed_substations(nged_config, partition_key)
 
     api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
-    unprocessed_resources = [r for r in all_resources if r.name not in processed_substations]
+    # 1. Filter by already processed (unless forced)
+    if config.force_rerun_all:
+        unprocessed_resources = all_resources
+    else:
+        unprocessed_resources = [r for r in all_resources if r.name not in processed_substations]
+
     already_processed_count = len(all_resources) - len(unprocessed_resources)
 
+    # 2. Apply manual filters
     resources_to_process = unprocessed_resources
     if config.substation_names:
         resources_to_process = [
