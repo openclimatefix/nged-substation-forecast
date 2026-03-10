@@ -41,7 +41,9 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     weather_files = sorted(config.base_weather_path.glob("*.parquet"))
     latest_init_time = None
     for f in reversed(weather_files):
-        file_init_time = datetime.strptime(f.stem, "%Y-%m-%dT%H").replace(tzinfo=timezone.utc)
+        file_init_time = datetime.strptime(f.stem.replace("Z", ""), "%Y-%m-%dT%H").replace(
+            tzinfo=timezone.utc
+        )
         if file_init_time <= test_start_time:
             latest_init_time = file_init_time
             break
@@ -209,7 +211,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
         .resolve_scale(y="independent")
     )
 
-    filename = "multi_substation_altair.json"
+    filename = "multi_substation_altair.html"
     chart.save(filename)
     log.info(f"Altair chart saved to {filename}")
 

@@ -13,7 +13,6 @@ from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
 
 from xgboost_forecaster.features import add_temporal_features, add_weather_features
-from xgboost_forecaster.scaling import get_scaling_expressions, load_scaling_params
 
 log = logging.getLogger(__name__)
 
@@ -102,7 +101,6 @@ def load_weather_data(
     init_time: datetime | None = None,
     average_ensembles: bool = True,
     resample_to: str = "30m",
-    scale_to_uint8: bool = True,
 ) -> pl.DataFrame:
     """Load weather data for specific H3 cells and date range."""
     config = config or DataConfig()
@@ -112,7 +110,9 @@ def load_weather_data(
 
     if init_time:
         init_str = init_time.strftime("%Y-%m-%dT%H")
-        relevant_files = [f for f in relevant_files if f.stem == init_str]
+        relevant_files = [
+            f for f in relevant_files if f.stem == init_str or f.stem == f"{init_str}Z"
+        ]
 
     if not relevant_files:
         log.warning(f"No weather files found for range {start_date} to {end_date}")
@@ -130,17 +130,16 @@ def load_weather_data(
 
     weather = pl.concat(weather_dfs, how="diagonal")
 
-    # Calculate target timestamp: init_time + lead_time
-    weather = weather.with_columns(
-        timestamp=(pl.col("init_time") + pl.col("lead_time")).cast(pl.Datetime("us", "UTC"))
-    )
+    # Calculate target timestamp: use valid_time
+    weather = weather.with_columns(timestamp=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
 
     # Variables to keep
     nwp_vars = [
         col
         for col in weather.columns
         if weather[col].dtype in [pl.Float32, pl.Float64, pl.UInt8]
-        and col not in ["timestamp", "h3_index", "lead_time", "init_time", "ensemble_member"]
+        and col
+        not in ["timestamp", "h3_index", "lead_time", "init_time", "ensemble_member", "valid_time"]
     ]
 
     group_cols = ["h3_index", "timestamp"]
@@ -177,15 +176,6 @@ def load_weather_data(
 
         weather = pl.concat(upsampled_parts)
 
-    if scale_to_uint8:
-        scaling_params = load_scaling_params()
-        available_vars = set(scaling_params["col_name"].to_list())
-        vars_to_scale = [v for v in nwp_vars if v in available_vars]
-        scaling_exprs = get_scaling_expressions(
-            scaling_params.filter(pl.col("col_name").is_in(vars_to_scale))
-        )
-        weather = weather.with_columns(scaling_exprs)
-
     return weather
 
 
@@ -195,7 +185,6 @@ def prepare_data_for_substation(
     config: DataConfig | None = None,
     use_lags: bool = True,
     member_selection: str = "mean",
-    scale_to_uint8: bool = True,
 ) -> pl.DataFrame:
     """Load and join data for a single substation."""
     config = config or DataConfig()
@@ -245,7 +234,6 @@ def prepare_data_for_substation(
         end_date,
         config,
         average_ensembles=(member_selection == "mean"),
-        scale_to_uint8=scale_to_uint8,
     )
     if weather.is_empty():
         return pl.DataFrame()
