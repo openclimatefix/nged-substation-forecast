@@ -1,6 +1,14 @@
+import math
+
 import patito as pt
 import polars as pl
 from contracts.data_schemas import SubstationFlows
+
+
+class MissingCorePowerVariablesError(ValueError):
+    """Raised when a substation CSV lacks both MW and MVA data."""
+
+    pass
 
 
 def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[SubstationFlows]:
@@ -32,10 +40,33 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
             "Timestamp": "timestamp",
             "MW Inst": "MW",
             "MVAr Inst": "MVAr",
+            "MVA Inst": "MVA",
             "Derived MVA": "MVA",
         },
         strict=False,
     )
+
+    # If we don't have MVA or MW, but we have Current and Voltage, we can compute MVA.
+    # Apparent Power (MVA) = sqrt(3) * Voltage (kV) * Current (A) / 1000
+    if "MVA" not in df.columns and "MW" not in df.columns:
+        # Check for current and voltage columns
+        current_col = None
+        volts_col = None
+
+        for col in ["Current Inst", "Amps"]:
+            if col in df.columns:
+                current_col = col
+                break
+
+        for col in ["Volts Inst", "Volts"]:
+            if col in df.columns:
+                volts_col = col
+                break
+
+        if current_col and volts_col:
+            df = df.with_columns(
+                (math.sqrt(3) * pl.col(volts_col) * pl.col(current_col) / 1000).alias("MVA")
+            )
 
     columns = [col for col in SubstationFlows.columns if col in df.columns]
     df = df.select(columns)
@@ -45,4 +76,8 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
     try:
         return SubstationFlows.validate(df, allow_missing_columns=True)
     except Exception as e:
+        # If the error is about missing MW or MVA, raise a specific exception
+        # so we can catch it and ignore it gracefully.
+        if "must contain at least one of 'MW' or 'MVA'" in str(e):
+            raise MissingCorePowerVariablesError("Missing core power variables (MW/MVA)") from e
         raise RuntimeError(f"First rows of CSV data, before processing: {first_orig_rows}") from e

@@ -21,9 +21,14 @@ def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg
     """Train XGBoost models for all substations."""
     settings = nged_config.to_settings()
 
-    power_path = settings.NGED_DATA_PATH / "parquet" / "live_primary_flows"
-    substation_files = list(power_path.glob("*.parquet"))
-    substation_names = [f.stem for f in substation_files]
+    power_path = settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
+    if not power_path.exists():
+        context.log.warning("No Delta table found.")
+        return dg.Output([], metadata={"n_models": 0})
+
+    substation_names = (
+        pl.read_delta(str(power_path)).select("substation_name").unique().to_series().to_list()
+    )
 
     context.log.info(f"Training models for {len(substation_names)} substations")
 
@@ -109,7 +114,7 @@ def xgb_forecasts(
             forecaster = XGBoostForecaster.load(model_path)
 
             data_config = DataConfig(
-                base_power_path=settings.NGED_DATA_PATH / "parquet" / "live_primary_flows",
+                base_power_path=settings.NGED_DATA_PATH / "delta" / "live_primary_flows",
                 base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
             )
             metadata = get_substation_metadata(data_config)
