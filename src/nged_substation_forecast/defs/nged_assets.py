@@ -1,5 +1,6 @@
 """Dagster assets for NGED data."""
 
+import httpx
 import json
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -89,13 +90,14 @@ def _download_and_process_substation(
     nged_config: NgedConfig,
     max_retries: int,
     log: dg.DagsterLogManager,
+    client: httpx.Client,
 ) -> SubstationIngestionResult:
     substation_name = resource.name
     log.info(f"Processing substation {substation_name}...")
     # 1. Download
     try:
         response = ckan.httpx_get_with_auth(
-            str(resource.url), api_key=api_key, max_retries=max_retries
+            str(resource.url), api_key=api_key, max_retries=max_retries, client=client
         )
         csv_data = response.content
     except Exception as e:
@@ -193,15 +195,16 @@ def live_primary_flows(
     resources_to_process = [r for r in all_resources if r.name not in processed_substations]
     skipped_count = len(all_resources) - len(resources_to_process)
 
-    with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
-        results = list(
-            executor.map(
-                lambda r: _download_and_process_substation(
-                    r, api_key, nged_config, config.max_retries, context.log
-                ),
-                resources_to_process,
+    with httpx.Client() as client:
+        with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
+            results = list(
+                executor.map(
+                    lambda r: _download_and_process_substation(
+                        r, api_key, nged_config, config.max_retries, context.log, client
+                    ),
+                    resources_to_process,
+                )
             )
-        )
 
     successes = [r.substation_name for r in results if r.stage == IngestionStage.SUCCESS]
     failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
