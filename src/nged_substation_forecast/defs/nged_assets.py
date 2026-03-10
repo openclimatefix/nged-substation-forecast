@@ -39,7 +39,7 @@ class SubstationIngestionResult(NamedTuple):
     """The result of ingesting a single substation's data."""
 
     substation_name: str
-    stage: IngestionStage
+    stage: IngestionStage  # This tells us at which stage in the process the failure occurred.
     error_message: str | None = None
     csv_snippet: str | None = None
 
@@ -50,8 +50,8 @@ class LivePrimaryFlowsConfig(dg.Config):
     force_rerun_all: bool = False
     max_concurrent_connections: int = 10
     max_retries: int = 3
-    substation_names: list[str] | None = None
-    limit: int | None = None
+    substation_names: list[str] | None = None  # Download only a subset of substations.
+    limit: int | None = None  # Only download the first n substations. Useful for testing.
 
 
 def _get_parquet_path(nged_config: NgedConfig, substation_name: str) -> Path:
