@@ -50,6 +50,8 @@ class LivePrimaryFlowsConfig(dg.Config):
     force_rerun_all: bool = False
     max_concurrent_connections: int = 10
     max_retries: int = 3
+    substation_names: list[str] | None = None
+    limit: int | None = None
 
 
 def _get_parquet_path(nged_config: NgedConfig, substation_name: str) -> Path:
@@ -203,8 +205,21 @@ def live_primary_flows(
     api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
-    resources_to_process = [r for r in all_resources if r.name not in processed_substations]
-    skipped_count = len(all_resources) - len(resources_to_process)
+    unprocessed_resources = [r for r in all_resources if r.name not in processed_substations]
+    already_processed_count = len(all_resources) - len(unprocessed_resources)
+
+    resources_to_process = unprocessed_resources
+    if config.substation_names:
+        resources_to_process = [
+            r for r in resources_to_process if r.name in config.substation_names
+        ]
+        context.log.info("Filtered to %d substations by name", len(resources_to_process))
+
+    if config.limit:
+        resources_to_process = resources_to_process[: config.limit]
+        context.log.info("Limited to %d substations", config.limit)
+
+    filtered_out_count = len(unprocessed_resources) - len(resources_to_process)
 
     with httpx.Client() as client:
         with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
@@ -225,7 +240,8 @@ def live_primary_flows(
 
     metadata: dict[str, dg.MetadataValue] = {
         "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
-        "Skipped (Already Processed)": MetadataValue.int(skipped_count),
+        "Already Processed": MetadataValue.int(already_processed_count),
+        "Filtered Out": MetadataValue.int(filtered_out_count),
         "Successfully Processed Today": MetadataValue.int(len(successes)),
         "Failed": MetadataValue.int(len(failures)),
     }

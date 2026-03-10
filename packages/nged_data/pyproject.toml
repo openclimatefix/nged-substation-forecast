@@ -9,7 +9,6 @@ dependencies = [
     "polars>=1.0.0",
     "dotenv>=0.9.9",
     "httpx>=0.28.1",
-    "ckanapi>=4.9",
     "patito",
     "pydantic>=2.12.5",
 ]

@@ -8,7 +8,6 @@ from typing import Any, Final
 import httpx
 import patito as pt
 import polars as pl
-from ckanapi import RemoteCKAN
 from contracts.data_schemas import SubstationLocations
 
 from nged_data.schemas import CkanResource, PackageSearchResult
@@ -33,9 +32,32 @@ def _ensure_absolute_url(url: str) -> str:
 
 def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLocations]:
     """Note that 'Park Lane' appears twice (with different substation numbers)."""
-    with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
-        ckan_response = nged_ckan.action.resource_search(query="name:Primary Substation Location")
-    ckan_results = ckan_response["results"]
+    if api_key:
+        log.info(
+            "Fetching substation locations with API key (length: %d, prefix: %s...)",
+            len(api_key),
+            api_key[:4] if api_key else "None",
+        )
+    else:
+        log.warning("Fetching substation locations WITHOUT API key")
+
+    url = f"{BASE_CKAN_URL}/api/3/action/resource_search"
+    headers = {"Authorization": api_key} if api_key else {}
+    params = {"query": "name:Primary Substation Location"}
+
+    try:
+        resp = httpx.get(url, headers=headers, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        log.error("CKAN resource_search failed: %s", e)
+        raise
+
+    if not data.get("success"):
+        log.error("CKAN resource_search returned success=False: %s", data.get("error"))
+        raise RuntimeError(f"CKAN search failed: {data.get('error')}")
+
+    ckan_results = data["result"]["results"]
     ckan_result = find_one_match(lambda result: result["format"].upper() == "CSV", ckan_results)
     url = _ensure_absolute_url(ckan_result["url"])
     http_response = httpx_get_with_auth(url, api_key=api_key)
@@ -95,19 +117,48 @@ def get_csv_resources_for_package(
 
 
 def package_search(query: str, api_key: str) -> PackageSearchResult:
-    with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
-        result: dict[str, Any] = nged_ckan.action.package_search(q=query)
+    if api_key:
+        log.info(
+            "Performing CKAN search with API key (length: %d, prefix: %s...)",
+            len(api_key),
+            api_key[:4] if api_key else "None",
+        )
+    else:
+        log.warning("Performing CKAN search WITHOUT API key")
 
-    # Fix relative URLs in resources
+    url = f"{BASE_CKAN_URL}/api/3/action/package_search"
+    headers = {"Authorization": api_key} if api_key else {}
+    params = {"q": query, "rows": 1000}  # Get more results in one go
+
+    try:
+        resp = httpx.get(url, headers=headers, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        log.error("CKAN package_search failed: %s", e)
+        raise
+
+    if not data.get("success"):
+        log.error("CKAN package_search returned success=False: %s", data.get("error"))
+        raise RuntimeError(f"CKAN search failed: {data.get('error')}")
+
+    result = data.get("result", {})
+
+    # Fix relative URLs and ensure absolute
     for package in result.get("results", []):
         for resource in package.get("resources", []):
-            resource["url"] = _ensure_absolute_url(resource.get("url", ""))
+            original_url = resource.get("url", "")
+            if original_url.lower() == "redacted":
+                if api_key:
+                    raise RuntimeError(
+                        f"CKAN returned 'redacted' URL for resource '{resource.get('name')}' even though an API key was used! This suggests the key is invalid, lacks permissions, or was incorrectly passed (e.g. masked)."
+                    )
+                else:
+                    log.warning("Found redacted URL in unauthenticated CKAN search")
 
-    result_validated = PackageSearchResult.model_validate(result)
-    log.debug(
-        "%d results found from CKAN 'package_search?q=%s'", len(result_validated.results), query
-    )
-    return result_validated
+            resource["url"] = _ensure_absolute_url(original_url)
+
+    return PackageSearchResult.model_validate(result)
 
 
 def httpx_get_with_auth(
