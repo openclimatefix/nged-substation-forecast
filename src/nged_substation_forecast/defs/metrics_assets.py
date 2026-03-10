@@ -6,9 +6,9 @@ from xgboost_forecaster import get_substation_metadata, DataConfig
 
 
 @dg.asset(deps=["live_primary_flows"])
-def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> pl.DataFrame:
+def combined_actuals(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> pl.DataFrame:
     """Combines all live primary parquet files into a single dataframe."""
-    settings = config.to_settings()
+    settings = nged_config.to_settings()
     actuals_path = settings.NGED_DATA_PATH / "parquet/live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
@@ -55,10 +55,10 @@ def metrics_asset(
     context: dg.AssetExecutionContext,
     xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
-    config: NgedConfig,
+    nged_config: NgedConfig,
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation."""
-    settings = config.to_settings()
+    settings = nged_config.to_settings()
     if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty.")
         return pl.DataFrame()

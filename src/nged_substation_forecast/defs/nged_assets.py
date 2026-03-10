@@ -51,13 +51,13 @@ class LivePrimaryFlowsConfig(dg.Config):
     max_retries: int = 3
 
 
-def _get_parquet_path(config: NgedConfig, substation_name: str) -> Path:
-    settings = config.to_settings()
+def _get_parquet_path(nged_config: NgedConfig, substation_name: str) -> Path:
+    settings = nged_config.to_settings()
     return settings.NGED_DATA_PATH / "parquet" / "live_primary_flows" / f"{substation_name}.parquet"
 
 
-def _get_status_file_path(config: NgedConfig, partition_key: str) -> Path:
-    settings = config.to_settings()
+def _get_status_file_path(nged_config: NgedConfig, partition_key: str) -> Path:
+    settings = nged_config.to_settings()
     return (
         settings.NGED_DATA_PATH
         / "status"

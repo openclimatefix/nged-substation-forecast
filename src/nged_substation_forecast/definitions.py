@@ -14,7 +14,7 @@ def create_defs() -> Definitions:
 
     return Definitions(
         assets=load_from_defs_folder(path_within_project=Path(__file__).parent).assets,
-        resources={"config": config_resource},
+        resources={"nged_config": config_resource},
     )
 
 

@@ -17,9 +17,9 @@ log = logging.getLogger(__name__)
 
 
 @dg.asset(deps=["live_primary_flows", "ecmwf_ens_forecast"])
-def xgb_models(context: dg.AssetExecutionContext, config: NgedConfig) -> dg.Output[list[Path]]:
+def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg.Output[list[Path]]:
     """Train XGBoost models for all substations."""
-    settings = config.to_settings()
+    settings = nged_config.to_settings()
 
     power_path = settings.NGED_DATA_PATH / "parquet" / "live_primary_flows"
     substation_files = list(power_path.glob("*.parquet"))
@@ -96,10 +96,10 @@ def xgb_models(context: dg.AssetExecutionContext, config: NgedConfig) -> dg.Outp
 
 @dg.asset(deps=["ecmwf_ens_forecast"])
 def xgb_forecasts(
-    context: dg.AssetExecutionContext, xgb_models: list[Path], config: NgedConfig
+    context: dg.AssetExecutionContext, xgb_models: list[Path], nged_config: NgedConfig
 ) -> dg.Output[pl.DataFrame]:
     """Generate forecasts for all substations using the trained XGBoost models."""
-    settings = config.to_settings()
+    settings = nged_config.to_settings()
 
     all_forecasts = []
     for model_path in xgb_models:

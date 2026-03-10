@@ -7,14 +7,19 @@ import polars as pl
 from nged_substation_forecast.config_resource import NgedConfig
 
 
-@dg.asset(
-    config_schema={"substation_ids": dg.Field(dg.Array(int), is_required=False, default_value=[])}
-)
+class PlotConfig(dg.Config):
+    """Configuration for the forecast vs actual plot asset."""
+
+    substation_ids: list[int] = []
+
+
+@dg.asset
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
-    config: NgedConfig,
+    config: PlotConfig,
+    nged_config: NgedConfig,
 ):
     """Generates an Altair plot comparing forecast vs actuals.
 
@@ -22,13 +27,14 @@ def forecast_vs_actual_plot(
         context: Asset execution context.
         xgb_forecasts: Combined forecast dataframe.
         combined_actuals: Combined actual power data.
-        config: NgedConfig.
+        config: PlotConfig.
+        nged_config: NgedConfig.
     """
     if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty for plotting.")
         return
 
-    substation_ids = context.op_config.get("substation_ids", [])
+    substation_ids = config.substation_ids
     if not substation_ids:
         # Pick 5 random substations if none specified
         unique_ids = xgb_forecasts.select("substation_id").unique()["substation_id"].to_list()
