@@ -1,9 +1,11 @@
 """Dagster assets for NGED data."""
 
 import json
-import time
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
 from pathlib import Path
+from typing import NamedTuple
 
 import dagster as dg
 import nged_data
@@ -21,6 +23,24 @@ from dagster import (
 from nged_data import ckan
 
 from nged_substation_forecast.config_resource import NgedConfig
+
+
+class IngestionStage(str, Enum):
+    """Stages of the ingestion process."""
+
+    DOWNLOAD = "Download"
+    PROCESSING = "Processing"
+    STORAGE = "Storage"
+    SUCCESS = "Success"
+
+
+class SubstationIngestionResult(NamedTuple):
+    """The result of ingesting a single substation's data."""
+
+    substation_name: str
+    stage: IngestionStage
+    error_message: str | None = None
+    csv_snippet: str | None = None
 
 
 class LivePrimaryFlowsConfig(dg.Config):
@@ -46,6 +66,107 @@ def _get_status_file_path(config: NgedConfig, partition_key: str) -> Path:
     )
 
 
+def _load_list_of_processed_substations(nged_config: NgedConfig, partition_key: str) -> set[str]:
+    status_file = _get_status_file_path(nged_config, partition_key)
+    if status_file.exists():
+        with open(status_file) as f:
+            return set(json.load(f))
+    return set()
+
+
+def _save_processed_substations(
+    nged_config: NgedConfig, partition_key: str, processed_substations: set[str]
+) -> None:
+    status_file = _get_status_file_path(nged_config, partition_key)
+    status_file.parent.mkdir(exist_ok=True, parents=True)
+    with open(status_file, "w") as f:
+        json.dump(list(processed_substations), f)
+
+
+def _download_and_process_substation(
+    resource: nged_data.CkanResource,
+    api_key: str,
+    nged_config: NgedConfig,
+    max_retries: int,
+) -> SubstationIngestionResult:
+    substation_name = resource.name
+
+    # Download
+    try:
+        response = ckan.httpx_get_with_auth(
+            str(resource.url), api_key=api_key, max_retries=max_retries
+        )
+        csv_data = response.content
+    except Exception as e:
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.DOWNLOAD, error_message=str(e)
+        )
+
+    # Process
+    try:
+        new_df = nged_data.process_live_primary_substation_flows(csv_data)
+    except Exception as e:
+        try:
+            csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
+        except Exception:
+            csv_snippet = "Could not decode CSV snippet"
+        return SubstationIngestionResult(
+            substation_name=substation_name,
+            stage=IngestionStage.PROCESSING,
+            error_message=str(e),
+            csv_snippet=csv_snippet,
+        )
+
+    # Merge & Save
+    try:
+        parquet_path = _get_parquet_path(nged_config, substation_name)
+        if parquet_path.exists():
+            old_df = pl.read_parquet(parquet_path)
+            last_timestamp = old_df.select("timestamp").max().item()
+            new_df_filtered = new_df.filter(pl.col("timestamp") > last_timestamp)
+
+            if new_df_filtered.is_empty():
+                return SubstationIngestionResult(substation_name, IngestionStage.SUCCESS)
+
+            merged_df = (
+                pl.concat([old_df, new_df_filtered]).unique(subset="timestamp").sort(by="timestamp")
+            )
+        else:
+            parquet_path.parent.mkdir(exist_ok=True, parents=True)
+            merged_df = new_df
+
+        merged_df.write_parquet(parquet_path, compression="zstd")
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.SUCCESS
+        )
+    except Exception as e:
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.STORAGE, error_message=str(e)
+        )
+
+
+def _format_failure_metadata(
+    failures: list[SubstationIngestionResult],
+) -> dict[str, dg.MetadataValue]:
+    if not failures:
+        return {}
+
+    # Build Markdown Table
+    md_table = "| Substation | Stage | Error |\n| :--- | :--- | :--- |\n"
+    for failure in failures:
+        md_table += (
+            f"| {failure.substation_name} | {failure.stage.value} | {failure.error_message} |\n"
+        )
+
+    # Build Snippets
+    md_snippets = "### Failed CSV Snippets\n"
+    for failure in failures:
+        if failure.csv_snippet:
+            md_snippets += f"**{failure.substation_name}**:\n```text\n{failure.csv_snippet}\n```\n"
+
+    return {"Failure Details": MetadataValue.md(md_table + "\n" + md_snippets)}
+
+
 @asset(
     partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
     check_specs=[
@@ -54,120 +175,43 @@ def _get_status_file_path(config: NgedConfig, partition_key: str) -> Path:
 )
 def live_primary_flows(
     context: AssetExecutionContext, config: LivePrimaryFlowsConfig, nged_config: NgedConfig
-):
+) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
-    settings = nged_config.to_settings()
     partition_key = context.partition_key
-    status_file = _get_status_file_path(nged_config, partition_key)
+    if config.force_rerun_all:
+        processed_substations = set([])
+    else:
+        processed_substations = _load_list_of_processed_substations(nged_config, partition_key)
 
-    # Load state
-    processed_substations = set()
-    if not config.force_rerun_all and status_file.exists():
-        try:
-            with open(status_file) as f:
-                processed_substations = set(json.load(f))
-        except Exception as e:
-            context.log.warning(f"Failed to load status file {status_file}: {e}")
-
-    # Fetch all resources
-    api_key = settings.NGED_CKAN_TOKEN.get_secret_value()
+    api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
     resources_to_process = [r for r in all_resources if r.name not in processed_substations]
     skipped_count = len(all_resources) - len(resources_to_process)
 
-    def process_substation(resource: nged_data.CkanResource):
-        name = resource.name
-        # Download with retries
-        csv_data = None
-        error_msg = None
-        for attempt in range(config.max_retries):
-            try:
-                response = ckan.httpx_get_with_auth(str(resource.url), api_key=api_key)
-                response.raise_for_status()
-                csv_data = response.content
-                break
-            except Exception as e:
-                error_msg = str(e)
-                if attempt < config.max_retries - 1:
-                    time.sleep(2 ** (attempt + 1))
-
-        if csv_data is None:
-            return name, "Download", error_msg, None
-
-        # Process
-        try:
-            new_df = nged_data.process_live_primary_substation_flows(csv_data)
-        except Exception as e:
-            # Extract first ~3 lines for debugging
-            try:
-                snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
-            except:
-                snippet = "Could not decode CSV snippet"
-            return name, "Processing", str(e), snippet
-
-        # Merge & Save
-        try:
-            parquet_path = _get_parquet_path(nged_config, name)
-            if parquet_path.exists():
-                old_df = pl.read_parquet(parquet_path)
-                last_timestamp = old_df.select("timestamp").max().item()
-
-                # Filter new data
-                new_df_filtered = new_df.filter(pl.col("timestamp") > last_timestamp)
-
-                if new_df_filtered.is_empty():
-                    return name, "Success", None, None
-
-                merged_df = (
-                    pl.concat([old_df, new_df_filtered])
-                    .unique(subset="timestamp")
-                    .sort(by="timestamp")
-                )
-            else:
-                parquet_path.parent.mkdir(exist_ok=True, parents=True)
-                merged_df = new_df
-
-            merged_df.write_parquet(parquet_path, compression="zstd")
-            return name, "Success", None, None
-        except Exception as e:
-            return name, "Storage", str(e), None
-
-    # Execute in parallel
     with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
-        results = list(executor.map(process_substation, resources_to_process))
+        results = list(
+            executor.map(
+                lambda r: _download_and_process_substation(
+                    r, api_key, nged_config, config.max_retries
+                ),
+                resources_to_process,
+            )
+        )
 
-    # Analyze results
-    successes = [r[0] for r in results if r[1] == "Success"]
-    failures = [r for r in results if r[1] != "Success"]
+    successes = [r.substation_name for r in results if r.stage == IngestionStage.SUCCESS]
+    failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
 
-    # Update state
     processed_substations.update(successes)
-    status_file.parent.mkdir(exist_ok=True, parents=True)
-    with open(status_file, "w") as f:
-        json.dump(list(processed_substations), f)
+    _save_processed_substations(nged_config, partition_key, processed_substations)
 
-    # Prepare reporting
     metadata: dict[str, dg.MetadataValue] = {
         "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
         "Skipped (Already Processed)": MetadataValue.int(skipped_count),
         "Successfully Processed Today": MetadataValue.int(len(successes)),
         "Failed": MetadataValue.int(len(failures)),
     }
-
-    if failures:
-        # Build Markdown Table
-        md_table = "| Substation | Stage | Error |\n| :--- | :--- | :--- |\n"
-        for name, stage, err, _ in failures:
-            md_table += f"| {name} | {stage} | {err} |\n"
-
-        # Build Snippets
-        md_snippets = "### Failed CSV Snippets\n"
-        for name, stage, _, snippet in failures:
-            if snippet:
-                md_snippets += f"**{name}**:\n```text\n{snippet}\n```\n"
-
-        metadata["Failure Details"] = MetadataValue.md(md_table + "\n" + md_snippets)
+    metadata.update(_format_failure_metadata(failures))
 
     yield AssetCheckResult(
         passed=len(failures) == 0,

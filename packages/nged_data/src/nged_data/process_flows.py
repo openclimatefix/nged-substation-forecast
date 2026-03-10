@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import patito as pt
 import polars as pl
 from contracts.data_schemas import SubstationFlows

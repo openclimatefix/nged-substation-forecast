@@ -1,6 +1,7 @@
 """Generic CKAN client for interacting with NGED's Connected Data portal."""
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any, Final
 
@@ -83,9 +84,21 @@ def package_search(query: str, api_key: str) -> PackageSearchResult:
     return result_validated
 
 
-def httpx_get_with_auth(url: str, api_key: str, **kwargs) -> httpx.Response:
+def httpx_get_with_auth(
+    url: str, api_key: str, max_retries: int = 3, **kwargs: Any
+) -> httpx.Response:
     auth_headers = {"Authorization": api_key}
-    return httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
+    for attempt in range(max_retries):
+        try:
+            response = httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except Exception:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** (attempt + 1))
+    # This line should never be reached
+    raise RuntimeError("Retry loop failed unexpectedly")
 
 
 def remove_duplicate_names(resources: list[CkanResource]) -> list[CkanResource]:
