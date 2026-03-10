@@ -5,6 +5,12 @@ import polars as pl
 from contracts.data_schemas import SubstationFlows
 
 
+class MissingCorePowerVariablesError(ValueError):
+    """Raised when a substation CSV lacks both MW and MVA data."""
+
+    pass
+
+
 def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[SubstationFlows]:
     """Read a primary substation CSV and validate it against the schema."""
     df = pl.read_csv(csv_data)
@@ -73,5 +79,5 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
         # If the error is about missing MW or MVA, raise a specific exception
         # so we can catch it and ignore it gracefully.
         if "must contain at least one of 'MW' or 'MVA'" in str(e):
-            raise ValueError("Missing core power variables (MW/MVA)") from e
+            raise MissingCorePowerVariablesError("Missing core power variables (MW/MVA)") from e
         raise RuntimeError(f"First rows of CSV data, before processing: {first_orig_rows}") from e

@@ -24,6 +24,7 @@ from dagster import (
 )
 from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
+from nged_data.process_flows import MissingCorePowerVariablesError
 
 from nged_substation_forecast.config_resource import NgedConfig
 
@@ -88,26 +89,15 @@ def _download_and_process_substation(
     # Process
     try:
         new_df = nged_data.process_live_primary_substation_flows(csv_data)
-    except ValueError as e:
-        if "Missing core power variables" in str(e):
-            log.info(f"Skipping substation {substation_name} because it lacks MW/MVA data.")
-            # Return success but with no dataframe, so it gets recorded as processed
-            # but nothing is merged into Delta Lake.
-            return SubstationIngestionResult(
-                substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
-            )
-        # Handle other ValueErrors normally
-        try:
-            csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
-        except Exception:
-            csv_snippet = "Could not decode CSV snippet"
+    except MissingCorePowerVariablesError:
+        log.info(f"Skipping substation {substation_name} because it lacks MW/MVA data.")
+        # Return success but with no dataframe, so it gets recorded as processed
+        # but nothing is merged into Delta Lake.
         return SubstationIngestionResult(
-            substation_name=substation_name,
-            stage=IngestionStage.PROCESSING,
-            error_message=str(e),
-            csv_snippet=csv_snippet,
+            substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
         )
     except Exception as e:
+        # Handle other errors normally
         try:
             csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
         except Exception:
