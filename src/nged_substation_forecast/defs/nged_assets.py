@@ -1,5 +1,6 @@
 """Dagster assets for NGED data."""
 
+import copy
 import random
 import time
 from collections.abc import Iterable
@@ -97,7 +98,6 @@ def _download_and_process_substation(
             substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
         )
     except Exception as e:
-        # Handle other errors normally
         try:
             csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
         except Exception:
@@ -109,11 +109,11 @@ def _download_and_process_substation(
             csv_snippet=csv_snippet,
         )
 
-    # Add required columns for Delta
-    parquet_filename = PurePosixPath(url).stem
+    # Add required columns for Delta Lake
+    csv_url_stem = PurePosixPath(url).stem
     new_df = new_df.with_columns(
         [
-            pl.lit(parquet_filename).alias("substation_name"),
+            pl.lit(csv_url_stem).alias("substation_name"),
             pl.lit(partition_date).cast(pl.Datetime("us", "UTC")).alias("ingested_at"),
         ]
     )
@@ -170,10 +170,9 @@ def live_primary_flows(
 
     # Check what we've already processed today
     processed_substations = set()
-    if not config.force_rerun_all and Path(delta_path).exists():
+    if Path(delta_path).exists() and not config.force_rerun_all:
         try:
-            # Query the delta table for today's ingestions
-            # We use the parquet_filename (which is what we store in substation_name column)
+            # Query the delta table for today's ingestions.
             processed_df = pl.read_delta(
                 delta_path, pyarrow_options={"filters": [("ingested_at", "=", partition_date)]}
             )
@@ -188,23 +187,23 @@ def live_primary_flows(
     # Filter resources
     unprocessed_resources = []
     for r in all_resources:
-        parquet_filename = PurePosixPath(str(r.url)).stem
-        if config.force_rerun_all or parquet_filename not in processed_substations:
+        substation_name = PurePosixPath(str(r.url)).stem
+        if config.force_rerun_all or substation_name not in processed_substations:
             unprocessed_resources.append(r)
 
     already_processed_count = len(all_resources) - len(unprocessed_resources)
 
     # Apply manual filters
-    resources_to_process = unprocessed_resources
     if config.substation_names:
         resources_to_process = [
-            r for r in resources_to_process if r.name in config.substation_names
+            r for r in unprocessed_resources if r.name in config.substation_names
         ]
         context.log.info("Filtered to %d substations by name", len(resources_to_process))
-
-    if config.limit:
-        resources_to_process = resources_to_process[: config.limit]
+    elif config.limit:
+        resources_to_process = unprocessed_resources[: config.limit]
         context.log.info("Limited to %d substations", config.limit)
+    else:
+        resources_to_process = copy.copy(unprocessed_resources)
 
     filtered_out_count = len(unprocessed_resources) - len(resources_to_process)
 
