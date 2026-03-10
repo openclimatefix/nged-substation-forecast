@@ -88,10 +88,11 @@ def _download_and_process_substation(
     api_key: str,
     nged_config: NgedConfig,
     max_retries: int,
+    log: dg.DagsterLogManager,
 ) -> SubstationIngestionResult:
     substation_name = resource.name
-
-    # Download
+    log.info(f"Processing substation {substation_name}...")
+    # 1. Download
     try:
         response = ckan.httpx_get_with_auth(
             str(resource.url), api_key=api_key, max_retries=max_retries
@@ -193,7 +194,7 @@ def live_primary_flows(
         results = list(
             executor.map(
                 lambda r: _download_and_process_substation(
-                    r, api_key, nged_config, config.max_retries
+                    r, api_key, nged_config, config.max_retries, context.log
                 ),
                 resources_to_process,
             )

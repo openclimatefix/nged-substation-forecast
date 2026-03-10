@@ -38,4 +38,4 @@ class CkanResource(BaseModel):
     restricted_level: Literal["registered", "public"] | None = None
     size: int
     state: Literal["active"]
-    url: HttpUrl
+    url: str

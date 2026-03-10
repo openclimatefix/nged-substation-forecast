@@ -77,6 +77,14 @@ def get_csv_resources_for_package(
 def package_search(query: str, api_key: str) -> PackageSearchResult:
     with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
         result: dict[str, Any] = nged_ckan.action.package_search(q=query)
+
+    # Fix relative URLs in resources
+    for package in result.get("results", []):
+        for resource in package.get("resources", []):
+            url = resource.get("url")
+            if url and url.startswith("/"):
+                resource["url"] = BASE_CKAN_URL + url
+
     result_validated = PackageSearchResult.model_validate(result)
     log.debug(
         "%d results found from CKAN 'package_search?q=%s'", len(result_validated.results), query
