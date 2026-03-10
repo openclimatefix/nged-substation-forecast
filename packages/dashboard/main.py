@@ -16,6 +16,7 @@ with app.setup:
     import marimo as mo
     import polars as pl
     import pyarrow
+    from contracts.data_schemas import SubstationLocations
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -26,7 +27,9 @@ with app.setup:
 def _():
     # TODO: Dagster should grab the latest locations (only when it updates)
     #       and store the locations locally.
-    _locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
+    locations_path = settings.nged_data_path / "parquet" / "substation_locations.parquet"
+    _locations = SubstationLocations.validate(pl.read_parquet(locations_path))
+
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
         api_key=settings.nged_ckan_token
     )

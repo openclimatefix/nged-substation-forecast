@@ -68,6 +68,12 @@ class SubstationLocations(pt.Model):
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
 
 
+class SubstationLocationsWithH3(SubstationLocations):
+    """Substation locations including their H3 index."""
+
+    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
+
+
 class PowerForecast(pt.Model):
     """Forecast data schema."""
 
