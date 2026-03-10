@@ -5,10 +5,10 @@ from contracts.data_schemas import PowerForecast
 from xgboost_forecaster import get_substation_metadata, DataConfig
 
 
-@dg.asset(deps=["live_primary_parquet"])
-def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> pl.DataFrame:
+@dg.asset(deps=["live_primary_flows"])
+def combined_actuals(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> pl.DataFrame:
     """Combines all live primary parquet files into a single dataframe."""
-    settings = config.to_settings()
+    settings = nged_config.to_settings()
     actuals_path = settings.NGED_DATA_PATH / "parquet/live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
@@ -53,27 +53,21 @@ def combined_actuals(context: dg.AssetExecutionContext, config: NgedConfig) -> p
 @dg.asset
 def metrics_asset(
     context: dg.AssetExecutionContext,
-    xgb_forecast: dict[str, pl.DataFrame],
+    xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
-    config: NgedConfig,
+    nged_config: NgedConfig,
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation."""
-    settings = config.to_settings()
-    if not xgb_forecast:
-        context.log.warning("No forecasts provided.")
-        return pl.DataFrame()
-
-    all_forecasts = pl.concat(list(xgb_forecast.values()))
-
-    if all_forecasts.is_empty() or combined_actuals.is_empty():
+    settings = nged_config.to_settings()
+    if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty.")
         return pl.DataFrame()
 
     # Validate forecasts against contract
-    PowerForecast.validate(all_forecasts)
+    PowerForecast.validate(xgb_forecasts)
 
     # Join on substation_id and time
-    comparison = all_forecasts.join(
+    comparison = xgb_forecasts.join(
         combined_actuals,
         left_on=["substation_id", "valid_time"],
         right_on=["substation_id", "timestamp"],

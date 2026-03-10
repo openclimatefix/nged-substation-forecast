@@ -1,13 +1,13 @@
 """Generic CKAN client for interacting with NGED's Connected Data portal."""
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any, Final
 
 import httpx
 import patito as pt
 import polars as pl
-from ckanapi import RemoteCKAN
 from contracts.data_schemas import SubstationLocations
 
 from nged_data.schemas import CkanResource, PackageSearchResult
@@ -21,13 +21,35 @@ BASE_CKAN_URL: Final[str] = "https://connecteddata.nationalgrid.co.uk"
 
 def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLocations]:
     """Note that 'Park Lane' appears twice (with different substation numbers)."""
-    with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
-        ckan_response = nged_ckan.action.resource_search(query="name:Primary Substation Location")
-    ckan_results = ckan_response["results"]
+    if api_key:
+        log.info(
+            "Fetching substation locations with API key (length: %d, prefix: %s...)",
+            len(api_key),
+            api_key[:4],
+        )
+    else:
+        log.warning("Fetching substation locations WITHOUT API key")
+
+    url = f"{BASE_CKAN_URL}/api/3/action/resource_search"
+    headers = {"Authorization": api_key} if api_key else {}
+    params = {"query": "name:Primary Substation Location"}
+
+    try:
+        resp = httpx.get(url, headers=headers, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        log.error("CKAN resource_search failed: %s", e)
+        raise
+
+    if not data.get("success"):
+        log.error("CKAN resource_search returned success=False: %s", data.get("error"))
+        raise RuntimeError(f"CKAN search failed: {data.get('error')}")
+
+    ckan_results = data["result"]["results"]
     ckan_result = find_one_match(lambda result: result["format"].upper() == "CSV", ckan_results)
-    url = ckan_result["url"]
+    url = str(ckan_result["url"])
     http_response = httpx_get_with_auth(url, api_key=api_key)
-    http_response.raise_for_status()
     locations = pl.read_csv(http_response.content)
     locations = change_dataframe_column_names_to_snake_case(locations)
     locations = locations.filter(
@@ -39,7 +61,6 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
 
 def download_resource(resource: CkanResource, api_key: str) -> bytes:
     http_response = httpx_get_with_auth(str(resource.url), api_key=api_key)
-    http_response.raise_for_status()
     return http_response.content
 
 
@@ -62,7 +83,12 @@ def get_csv_resources_for_package(
     resources = []
     for result in package_search_result.results:
         resources.extend(result.resources)
-    resources = [CkanResource.model_validate(resource) for resource in resources]
+
+    if any(str(r.url).lower() == "redacted" for r in resources):
+        raise RuntimeError(
+            "Found redacted resources. Please check your NGED_CKAN_TOKEN is correct and has the necessary permissions."
+        )
+
     resources = [r for r in resources if r.format == "CSV" and r.size > 100]
     resources = remove_duplicate_names(resources)
 
@@ -74,18 +100,61 @@ def get_csv_resources_for_package(
 
 
 def package_search(query: str, api_key: str) -> PackageSearchResult:
-    with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
-        result: dict[str, Any] = nged_ckan.action.package_search(q=query)
-    result_validated = PackageSearchResult.model_validate(result)
-    log.debug(
-        "%d results found from CKAN 'package_search?q=%s'", len(result_validated.results), query
-    )
-    return result_validated
+    if api_key:
+        log.info(
+            "Performing CKAN search with API key (length: %d, prefix: %s...)",
+            len(api_key),
+            api_key[:4] if api_key else "None",
+        )
+    else:
+        log.warning("Performing CKAN search WITHOUT API key")
+
+    url = f"{BASE_CKAN_URL}/api/3/action/package_search"
+    headers = {"Authorization": api_key} if api_key else {}
+    params = {"q": query, "rows": 1000}  # Get more results in one go
+
+    try:
+        resp = httpx.get(url, headers=headers, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        log.error("CKAN package_search failed: %s", e)
+        raise
+
+    if not data.get("success"):
+        log.error("CKAN package_search returned success=False: %s", data.get("error"))
+        raise RuntimeError(f"CKAN search failed: {data.get('error')}")
+
+    result = data.get("result", {})
+
+    return PackageSearchResult.model_validate(result)
 
 
-def httpx_get_with_auth(url: str, api_key: str, **kwargs) -> httpx.Response:
+def httpx_get_with_auth(
+    url: str, api_key: str, max_retries: int = 3, client: httpx.Client | None = None, **kwargs: Any
+) -> httpx.Response:
     auth_headers = {"Authorization": api_key}
-    return httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
+    for attempt in range(max_retries):
+        try:
+            if client:
+                response = client.get(url=url, headers=auth_headers, timeout=30, **kwargs)
+            else:
+                response = httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except Exception as e:
+            log.warning(
+                "Attempt %d failed for URL %s (Auth: %s): %s",
+                attempt + 1,
+                url,
+                "Yes" if api_key else "No",
+                e,
+            )
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(2 ** (attempt + 1))
+    # This line should never be reached
+    raise RuntimeError("Retry loop failed unexpectedly")
 
 
 def remove_duplicate_names(resources: list[CkanResource]) -> list[CkanResource]:

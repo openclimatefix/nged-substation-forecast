@@ -1,152 +1,250 @@
 """Dagster assets for NGED data."""
 
-from datetime import datetime
+import json
+from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
+from enum import Enum
 from pathlib import Path, PurePosixPath
+from typing import NamedTuple
 
 import dagster as dg
+import httpx
 import nged_data
 import polars as pl
 from dagster import (
+    AssetCheckResult,
+    AssetCheckSpec,
     AssetExecutionContext,
-    DynamicPartitionsDefinition,
-    MultiPartitionsDefinition,
+    DailyPartitionsDefinition,
+    MaterializeResult,
+    MetadataValue,
     asset,
-    define_asset_job,
 )
 from nged_data import ckan
 
 from nged_substation_forecast.config_resource import NgedConfig
 
-# Define Partitions
-# We use Multi-Partitions so every day's download is saved uniquely by (Date, Name)
 
-# TODO: Change this to a DailyPartition, and just partition on the day we grab data.
-last_modified_dates_def = DynamicPartitionsDefinition(name="last_modified_dates")
+class IngestionStage(str, Enum):
+    """Stages of the ingestion process."""
 
-# TODO: Actually, let's use a static definition for now, it's easier. Maybe just a hard-coded CSV
-# file in git with the substation names, and maybe their numbers?
-substation_names_def = DynamicPartitionsDefinition(name="substation_names")
-composite_def = MultiPartitionsDefinition(
-    {"last_modified_date": last_modified_dates_def, "substation_name": substation_names_def}
-)
+    DOWNLOAD = "Download"
+    PROCESSING = "Processing"
+    STORAGE = "Storage"
+    SUCCESS = "Success"
 
 
-def _json_filename_for_ckan_resource(
-    config: NgedConfig, last_modified_date: str, substation_name: str
-) -> Path:
-    settings = config.to_settings()
+class SubstationIngestionResult(NamedTuple):
+    """The result of ingesting a single substation's data."""
+
+    substation_name: str
+    stage: IngestionStage  # This tells us at which stage in the process the failure occurred.
+    error_message: str | None = None
+    csv_snippet: str | None = None
+
+
+class LivePrimaryFlowsConfig(dg.Config):
+    """Configuration for the live primary flows ingestion asset."""
+
+    force_rerun_all: bool = False
+    max_concurrent_connections: int = 10
+    max_retries: int = 3
+    substation_names: list[str] | None = None  # Download only a subset of substations.
+    limit: int | None = None  # Only download the first n substations. Useful for testing.
+
+
+def _get_parquet_path(nged_config: NgedConfig, substation_name: str) -> Path:
+    settings = nged_config.to_settings()
+    return settings.NGED_DATA_PATH / "parquet" / "live_primary_flows" / f"{substation_name}.parquet"
+
+
+def _get_status_file_path(nged_config: NgedConfig, partition_key: str) -> Path:
+    settings = nged_config.to_settings()
     return (
         settings.NGED_DATA_PATH
-        / "raw"
+        / "status"
         / "live_primary_flows"
-        / last_modified_date
-        / f"{substation_name} CKAN Resource.json"
+        / f"processed_{partition_key}.json"
     )
 
 
-def _local_csv_filename(config: NgedConfig, last_modified_date: str, substation_name: str) -> Path:
-    settings = config.to_settings()
-    return (
-        settings.NGED_DATA_PATH
-        / "raw"
-        / "live_primary_flows"
-        / last_modified_date
-        / f"{substation_name}.csv"
-    )
+def _load_list_of_processed_substations(nged_config: NgedConfig, partition_key: str) -> set[str]:
+    status_file = _get_status_file_path(nged_config, partition_key)
+    if status_file.exists():
+        with open(status_file) as f:
+            return set(json.load(f))
+    return set()
 
 
-@asset
-def list_resources_for_live_primaries(context: AssetExecutionContext, config: NgedConfig):
-    settings = config.to_settings()
-    substation_names: set[str] = set()
-    last_modified_date_strings: set[str] = set()
-    for resource in ckan.get_csv_resources_for_live_primary_substation_flows(
-        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
-    ):
-        last_modified_date_str = resource.last_modified.strftime("%Y-%m-%d")
-        last_modified_date_strings.add(last_modified_date_str)
-        substation_names.add(resource.name)
-
-        json_string = resource.model_dump_json()
-        json_path = _json_filename_for_ckan_resource(config, last_modified_date_str, resource.name)
-        json_path.parent.mkdir(parents=True, exist_ok=True)
-        json_path.write_text(json_string)
-
-    context.instance.add_dynamic_partitions("substation_names", list(substation_names))
-    context.instance.add_dynamic_partitions("last_modified_dates", list(last_modified_date_strings))
-
-
-@asset(partitions_def=composite_def, deps=[list_resources_for_live_primaries])
-def live_primary_csv(context: AssetExecutionContext, config: NgedConfig) -> Path:
-    settings = config.to_settings()
-
-    # Retrieve the partition keys
-    partition = composite_def.get_partition_key_from_str(context.partition_key).keys_by_dimension
-    last_modified_date_str = partition["last_modified_date"]
-    substation_name = partition["substation_name"]
-
-    # Load JSON representation of CKAN resource to get the CSV filename
-    json_filename = _json_filename_for_ckan_resource(
-        config, last_modified_date_str, substation_name
-    )
-    context.log.info(f"Loading {json_filename}...")
-    json_text = json_filename.read_text()
-    resource = nged_data.CkanResource.model_validate_json(json_text)
-
-    # Get CSV from CKAN
-    csv_url = str(resource.url)
-    context.log.info(f"Downloading CSV for {substation_name} from {resource.url}")
-    response = ckan.httpx_get_with_auth(
-        csv_url, api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
-    )
-    response.raise_for_status()
-
-    csv_filename = PurePosixPath(csv_url).name
-    dst_full_path = (
-        settings.NGED_DATA_PATH
-        / "raw"
-        / "live_primary_flows"
-        / last_modified_date_str
-        / csv_filename
-    )
-    dst_full_path.parent.mkdir(exist_ok=True, parents=True)
-    dst_full_path.write_bytes(response.content)
-
-    return dst_full_path
-
-
-@asset(partitions_def=composite_def)
-def live_primary_parquet(
-    context: AssetExecutionContext, live_primary_csv: Path, config: NgedConfig
+def _save_list_of_processed_substations(
+    nged_config: NgedConfig, partition_key: str, processed_substations: set[str]
 ) -> None:
-    settings = config.to_settings()
-    new_df = nged_data.process_live_primary_substation_flows(live_primary_csv)
+    status_file = _get_status_file_path(nged_config, partition_key)
+    status_file.parent.mkdir(exist_ok=True, parents=True)
+    with open(status_file, "w") as f:
+        json.dump(list(processed_substations), f)
 
-    # TODO: Parquets should use Hive partitioning & be partitioned by month & substation num.
-    parquet_path = (
-        settings.NGED_DATA_PATH
-        / "parquet"
-        / "live_primary_flows"
-        / live_primary_csv.with_suffix(".parquet").name
-    )
-    if parquet_path.exists():
-        old_df = pl.read_parquet(parquet_path)
-        last_timestamp: datetime = old_df.select("timestamp").max().item()
-        new_df = (
-            new_df.filter(pl.col("timestamp") > last_timestamp)
-            .unique(subset="timestamp")
-            .sort(by="timestamp")
+
+def _download_and_process_substation(
+    resource: nged_data.CkanResource,
+    api_key: str,
+    nged_config: NgedConfig,
+    max_retries: int,
+    log: dg.DagsterLogManager,
+    client: httpx.Client,
+) -> SubstationIngestionResult:
+    substation_name = resource.name
+    log.info(f"Processing substation {substation_name}...")
+
+    # Download
+    url = str(resource.url)
+    try:
+        response = ckan.httpx_get_with_auth(
+            url, api_key=api_key, max_retries=max_retries, client=client
         )
-        merged_df = old_df.merge_sorted(new_df, key="timestamp")
-    else:
-        # TODO: Remove this mkdir line, and use `write_parquet(mkdir=True)` when that API stabilises.
-        parquet_path.parent.mkdir(exist_ok=True, parents=True)
-        merged_df = new_df
-    merged_df.write_parquet(parquet_path, compression="zstd")
+        csv_data = response.content
+    except Exception as e:
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.DOWNLOAD, error_message=str(e)
+        )
+
+    # Process
+    try:
+        new_df = nged_data.process_live_primary_substation_flows(csv_data)
+    except Exception as e:
+        try:
+            csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
+        except Exception:
+            csv_snippet = "Could not decode CSV snippet"
+        return SubstationIngestionResult(
+            substation_name=substation_name,
+            stage=IngestionStage.PROCESSING,
+            error_message=str(e),
+            csv_snippet=csv_snippet,
+        )
+
+    # Merge & Save
+    try:
+        parquet_filename = PurePosixPath(str(resource.url)).stem
+        parquet_path = _get_parquet_path(nged_config, parquet_filename)
+        if parquet_path.exists():
+            old_df = pl.read_parquet(parquet_path)
+            last_timestamp = old_df.select("timestamp").max().item()
+            new_df_filtered = new_df.filter(pl.col("timestamp") > last_timestamp)
+
+            if new_df_filtered.is_empty():
+                return SubstationIngestionResult(
+                    substation_name=substation_name, stage=IngestionStage.SUCCESS
+                )
+
+            merged_df = (
+                pl.concat([old_df, new_df_filtered]).unique(subset="timestamp").sort(by="timestamp")
+            )
+        else:
+            parquet_path.parent.mkdir(exist_ok=True, parents=True)
+            merged_df = new_df
+
+        merged_df.write_parquet(parquet_path, compression="zstd")
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.SUCCESS
+        )
+    except Exception as e:
+        return SubstationIngestionResult(
+            substation_name=substation_name, stage=IngestionStage.STORAGE, error_message=str(e)
+        )
 
 
-update_live_primary_flows = define_asset_job(
-    name="update_live_primary_flows",
-    selection=[list_resources_for_live_primaries, live_primary_csv, live_primary_parquet],
-    executor_def=dg.in_process_executor,
+def _format_failure_metadata(
+    failures: list[SubstationIngestionResult],
+) -> dict[str, dg.MetadataValue]:
+    if not failures:
+        return {}
+
+    # Build Markdown Table
+    md_table = "| Substation | Stage | Error |\n| :--- | :--- | :--- |\n"
+    for failure in failures:
+        md_table += (
+            f"| {failure.substation_name} | {failure.stage.value} | {failure.error_message} |\n"
+        )
+
+    # Build Snippets
+    md_snippets = "### Failed CSV Snippets\n"
+    for failure in failures:
+        if failure.csv_snippet:
+            md_snippets += f"**{failure.substation_name}**:\n```text\n{failure.csv_snippet}\n```\n"
+
+    return {"Failure Details": MetadataValue.md(md_table + "\n" + md_snippets)}
+
+
+@asset(
+    partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
+    check_specs=[
+        AssetCheckSpec(name="all_substations_succeeded", asset="live_primary_flows"),
+    ],
 )
+def live_primary_flows(
+    context: AssetExecutionContext, config: LivePrimaryFlowsConfig, nged_config: NgedConfig
+) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
+    """Download and process live primary substation flows from NGED CKAN."""
+    partition_key = context.partition_key
+    # Always load the historical state for this partition
+    processed_substations = _load_list_of_processed_substations(nged_config, partition_key)
+
+    api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
+    all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
+
+    # Remove substations that have already been downloaded for partition_key (unless forced)
+    if config.force_rerun_all:
+        unprocessed_resources = all_resources
+    else:
+        unprocessed_resources = [r for r in all_resources if r.name not in processed_substations]
+
+    already_processed_count = len(all_resources) - len(unprocessed_resources)
+
+    # Apply manual filters
+    resources_to_process = unprocessed_resources
+    if config.substation_names:
+        resources_to_process = [
+            r for r in resources_to_process if r.name in config.substation_names
+        ]
+        context.log.info("Filtered to %d substations by name", len(resources_to_process))
+
+    if config.limit:
+        resources_to_process = resources_to_process[: config.limit]
+        context.log.info("Limited to %d substations", config.limit)
+
+    filtered_out_count = len(unprocessed_resources) - len(resources_to_process)
+
+    with httpx.Client() as client:
+        with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
+            results = list(
+                executor.map(
+                    lambda r: _download_and_process_substation(
+                        r, api_key, nged_config, config.max_retries, context.log, client
+                    ),
+                    resources_to_process,
+                )
+            )
+
+    successes = [r.substation_name for r in results if r.stage == IngestionStage.SUCCESS]
+    failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
+
+    processed_substations.update(successes)
+    _save_list_of_processed_substations(nged_config, partition_key, processed_substations)
+
+    metadata: dict[str, dg.MetadataValue] = {
+        "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
+        "Already Processed": MetadataValue.int(already_processed_count),
+        "Filtered Out": MetadataValue.int(filtered_out_count),
+        "Successfully Processed Today": MetadataValue.int(len(successes)),
+        "Failed": MetadataValue.int(len(failures)),
+    }
+    metadata.update(_format_failure_metadata(failures))
+
+    yield AssetCheckResult(
+        passed=len(failures) == 0,
+        check_name="all_substations_succeeded",
+        metadata=metadata,
+    )
+
+    yield MaterializeResult(metadata=metadata)

@@ -1,13 +1,11 @@
-from pathlib import Path
-
 import patito as pt
 import polars as pl
 from contracts.data_schemas import SubstationFlows
 
 
-def process_live_primary_substation_flows(csv_path: Path) -> pt.DataFrame[SubstationFlows]:
+def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[SubstationFlows]:
     """Read a primary substation CSV and validate it against the schema."""
-    df = pl.read_csv(csv_path)
+    df = pl.read_csv(csv_data)
     first_orig_rows = df.head()
 
     # The CSV column names vary between NGED license areas:
@@ -47,4 +45,4 @@ def process_live_primary_substation_flows(csv_path: Path) -> pt.DataFrame[Substa
     try:
         return SubstationFlows.validate(df, allow_missing_columns=True)
     except Exception as e:
-        raise RuntimeError(f"First rows in {csv_path}, before processing: {first_orig_rows}") from e
+        raise RuntimeError(f"First rows of CSV data, before processing: {first_orig_rows}") from e
