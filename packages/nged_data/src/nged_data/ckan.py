@@ -74,6 +74,16 @@ def get_csv_resources_for_package(
     for result in package_search_result.results:
         resources.extend(result.resources)
     resources = [CkanResource.model_validate(resource) for resource in resources]
+
+    # Log any redacted URLs found
+    redacted_count = sum(1 for r in resources if str(r.url).lower() == "redacted")
+    if redacted_count > 0:
+        log.warning(
+            "Found %d resources with 'redacted' URLs in search results (Auth: %s)",
+            redacted_count,
+            "Yes" if api_key else "No",
+        )
+
     resources = [r for r in resources if r.format == "CSV" and r.size > 100]
     resources = remove_duplicate_names(resources)
 
@@ -110,7 +120,9 @@ def httpx_get_with_auth(
 
     if not url.startswith("http"):
         log.error("Invalid URL requested (missing protocol): '%s'", url)
-        # This will still fail at httpx level, but we get the log.
+
+    if not api_key:
+        log.warning("No API key provided for CKAN request to %s", url)
 
     auth_headers = {"Authorization": api_key}
     for attempt in range(max_retries):
@@ -121,7 +133,14 @@ def httpx_get_with_auth(
                 response = httpx.get(url=url, headers=auth_headers, timeout=30, **kwargs)
             response.raise_for_status()
             return response
-        except Exception:
+        except Exception as e:
+            log.warning(
+                "Attempt %d failed for URL %s (Auth: %s): %s",
+                attempt + 1,
+                url,
+                "Yes" if api_key else "No",
+                e,
+            )
             if attempt == max_retries - 1:
                 raise
             time.sleep(2 ** (attempt + 1))
