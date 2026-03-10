@@ -1,15 +1,18 @@
 import dagster as dg
 import polars as pl
-from nged_substation_forecast.config_resource import NgedConfig
+from dagster import ResourceParam
+
 from contracts.data_schemas import PowerForecast
-from xgboost_forecaster import get_substation_metadata, DataConfig
+from contracts.settings import Settings
+from xgboost_forecaster import DataConfig, get_substation_metadata
 
 
 @dg.asset(deps=["live_primary_flows"])
-def combined_actuals(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> pl.DataFrame:
+def combined_actuals(
+    context: dg.AssetExecutionContext, settings: ResourceParam[Settings]
+) -> pl.DataFrame:
     """Combines all live primary flows into a single dataframe."""
-    settings = nged_config.to_settings()
-    actuals_path = settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
+    actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
 
@@ -20,7 +23,7 @@ def combined_actuals(context: dg.AssetExecutionContext, nged_config: NgedConfig)
     # Get metadata to map filenames to substation IDs
     data_config = DataConfig(
         base_power_path=actuals_path,
-        base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
+        base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
     )
     metadata = get_substation_metadata(data_config)
 
@@ -44,10 +47,9 @@ def metrics_asset(
     context: dg.AssetExecutionContext,
     xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
-    nged_config: NgedConfig,
+    settings: ResourceParam[Settings],
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation."""
-    settings = nged_config.to_settings()
     if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty.")
         return pl.DataFrame()
@@ -75,7 +77,7 @@ def metrics_asset(
         ]
     )
 
-    output_path = settings.FORECAST_METRICS_DATA_PATH
+    output_path = settings.forecast_metrics_data_path
     output_path.mkdir(parents=True, exist_ok=True)
     metrics.write_parquet(output_path / "metrics.parquet")
 

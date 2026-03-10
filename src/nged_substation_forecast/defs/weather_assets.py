@@ -1,10 +1,16 @@
 from datetime import datetime, timezone
 
 import dagster as dg
-from dagster import AssetExecutionContext, DailyPartitionsDefinition, asset, define_asset_job
+from dagster import (
+    AssetExecutionContext,
+    DailyPartitionsDefinition,
+    ResourceParam,
+    asset,
+    define_asset_job,
+)
 from dynamical_data.processing import download_and_scale_ecmwf
 
-from nged_substation_forecast.config_resource import NgedConfig
+from contracts.settings import Settings
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
@@ -14,15 +20,14 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 # The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
 # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
 @asset(partitions_def=weather_partitions, pool="ECMWF")
-def ecmwf_ens_forecast(context: AssetExecutionContext, nged_config: NgedConfig) -> None:
+def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[Settings]) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
-    settings = nged_config.to_settings()
     partition_key = context.partition_key
     nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
     scaled_df = download_and_scale_ecmwf(nwp_init_time)
 
-    output_dir = settings.NWP_DATA_PATH / "ECMWF" / "ENS"
+    output_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename

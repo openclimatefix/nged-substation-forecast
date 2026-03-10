@@ -8,7 +8,7 @@ from typing import cast
 
 import h3.api.numpy_int as h3
 import polars as pl
-from contracts.config import Settings
+from contracts.settings import Settings
 from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
 
@@ -23,11 +23,11 @@ _SETTINGS = Settings()
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    base_power_path: Path = _SETTINGS.NGED_DATA_PATH / "delta" / "live_primary_flows"
-    base_weather_path: Path = _SETTINGS.NWP_DATA_PATH / "ECMWF" / "ENS"
+    base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
+    base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
     # TODO: Remove `ckan_token` after teaching Dagster to download substation locations
-    ckan_token: str = _SETTINGS.NGED_CKAN_TOKEN.get_secret_value()
-    h3_res: int = 5  # TODO: This should probably be stored somewhere like NWP_DATA_PATH/ECMWF/ENS/metadata.json?
+    ckan_token: str = _SETTINGS.nged_ckan_token
+    h3_res: int = 5  # TODO: This should probably be stored somewhere like nwp_data_path/ECMWF/ENS/metadata.json?
     resolution: str = "30m"
 
 
