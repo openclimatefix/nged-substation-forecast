@@ -4,7 +4,7 @@ import json
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 import dagster as dg
@@ -120,14 +120,17 @@ def _download_and_process_substation(
 
     # Merge & Save
     try:
-        parquet_path = _get_parquet_path(nged_config, substation_name)
+        parquet_filename = PurePosixPath(str(resource.url)).stem
+        parquet_path = _get_parquet_path(nged_config, parquet_filename)
         if parquet_path.exists():
             old_df = pl.read_parquet(parquet_path)
             last_timestamp = old_df.select("timestamp").max().item()
             new_df_filtered = new_df.filter(pl.col("timestamp") > last_timestamp)
 
             if new_df_filtered.is_empty():
-                return SubstationIngestionResult(substation_name, IngestionStage.SUCCESS)
+                return SubstationIngestionResult(
+                    substation_name=substation_name, stage=IngestionStage.SUCCESS
+                )
 
             merged_df = (
                 pl.concat([old_df, new_df_filtered]).unique(subset="timestamp").sort(by="timestamp")
