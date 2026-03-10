@@ -14,6 +14,7 @@ import dagster as dg
 import httpx
 import nged_data
 import polars as pl
+import h3.api.numpy_int as h3
 from dagster import (
     AssetCheckResult,
     AssetCheckSpec,
@@ -28,6 +29,7 @@ from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
 from nged_data.process_flows import MissingCorePowerVariablesError
 
+from contracts.data_schemas import SubstationLocationsWithH3
 from contracts.settings import Settings
 
 
@@ -277,3 +279,43 @@ def live_primary_flows(
     )
 
     yield MaterializeResult(metadata=metadata)
+
+
+@asset
+def substation_locations(
+    context: AssetExecutionContext,
+    settings: ResourceParam[Settings],
+) -> MaterializeResult:
+    """Download primary substation locations and map them to H3 cells."""
+    # 1. Download using existing CKAN function
+    locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
+
+    # 2. Add the H3 resolution 5 column
+    locations = locations.with_columns(
+        h3_res_5=pl.struct(["latitude", "longitude"]).map_elements(
+            lambda x: (
+                h3.latlng_to_cell(x["latitude"], x["longitude"], 5)
+                if x["latitude"] is not None and x["longitude"] is not None
+                else None
+            ),
+            return_dtype=pl.UInt64,
+        )
+    )
+
+    # 3. Validate against the new schema
+    locations = locations.cast(SubstationLocationsWithH3.dtypes)  # type: ignore[invalid-argument-type]
+    validated_locations = SubstationLocationsWithH3.validate(locations)
+
+    # 4. Save to disk
+    out_dir = settings.nged_data_path / "parquet"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "substation_locations.parquet"
+
+    validated_locations.write_parquet(out_path)
+
+    return MaterializeResult(
+        metadata={
+            "Path": MetadataValue.path(str(out_path)),
+            "Row Count": MetadataValue.int(len(validated_locations)),
+        }
+    )

@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import cast
 
-import h3.api.numpy_int as h3
 import polars as pl
+from contracts.data_schemas import SubstationLocations
 from contracts.settings import Settings
 from nged_data import ckan
 from nged_data.substation_names.align import join_location_table_to_live_primaries
@@ -36,17 +36,15 @@ def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     """Join substation locations with their live flow parquet filenames."""
     config = config or DataConfig()
     api_key = config.ckan_token
-    locations = ckan.get_primary_substation_locations(api_key=api_key)
+    locations_path = _SETTINGS.nged_data_path / "parquet" / "substation_locations.parquet"
+    locations = SubstationLocations.validate(pl.read_parquet(locations_path))
     live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
     df = join_location_table_to_live_primaries(live_primaries=live_primaries, locations=locations)
 
     # Add H3 index based on lat/lng
+    df = df.rename({"h3_res_5": "h3_index"})
     df = df.with_columns(
-        h3_index=pl.struct(["latitude", "longitude"]).map_elements(
-            lambda x: h3.latlng_to_cell(x["latitude"], x["longitude"], config.h3_res),
-            return_dtype=pl.UInt64,
-        ),
         parquet_filename=pl.col("url").map_elements(
             lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
         ),
