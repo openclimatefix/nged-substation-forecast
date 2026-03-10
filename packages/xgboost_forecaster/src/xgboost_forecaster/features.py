@@ -5,7 +5,7 @@ from datetime import timedelta
 import numpy as np
 import polars as pl
 
-from xgboost_forecaster.scaling import get_scaling_expressions, load_scaling_params
+from xgboost_forecaster.scaling import load_scaling_params, uint8_to_physical_unit
 
 
 def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
@@ -44,26 +44,10 @@ def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
     Returns:
         DataFrame with added physical features.
     """
-    is_scaled = df["temperature_2m"].dtype == pl.UInt8
-
-    if is_scaled:
-        params = load_scaling_params()
-        descale_cols = ["temperature_2m", "wind_u_10m", "wind_v_10m"]
-        descale_exprs = get_scaling_expressions(
-            params.filter(pl.col("col_name").is_in(descale_cols)), reverse=True
-        )
-        phys_df = df.select(["timestamp"] + descale_cols).with_columns(descale_exprs)
-    else:
-        phys_df = df
-
-    # Wind speed in m/s
-    # Wind direction in degrees (0-360)
-    phys_df = phys_df.with_columns(
-        wind_speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt(),
-        wind_direction_10m=(
-            pl.arctan2(pl.col("wind_u_10m"), pl.col("wind_v_10m")) * 180 / np.pi + 180
-        ),
-    )
+    params = load_scaling_params()
+    descale_cols = ["temperature_2m", "wind_speed_10m", "wind_direction_10m"]
+    descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(descale_cols)))
+    phys_df = df.select(["timestamp"] + descale_cols).with_columns(descale_exprs)
 
     # Windchill formula: 13.12 + 0.6215*T - 11.37*V^0.16 + 0.3965*T*V^0.16
     # V is wind speed in km/h
@@ -79,8 +63,8 @@ def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
     # Join back to original df
     return df.with_columns(
         [
-            phys_df["wind_speed_10m"].cast(pl.Float32),
-            phys_df["wind_direction_10m"].cast(pl.Float32),
+            phys_df["wind_speed_10m"].alias("wind_speed_10m_phys").cast(pl.Float32),
+            phys_df["wind_direction_10m"].alias("wind_direction_10m_phys").cast(pl.Float32),
             phys_df["windchill"].cast(pl.Float32),
         ]
     )

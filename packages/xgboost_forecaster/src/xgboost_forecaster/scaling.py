@@ -1,5 +1,3 @@
-"""Utility for scaling NWP variables to uint8."""
-
 from pathlib import Path
 
 import polars as pl
@@ -23,44 +21,23 @@ def load_scaling_params(path: Path | None = None) -> pl.DataFrame:
     return pl.read_csv(path)
 
 
-def get_scaling_expressions(params: pl.DataFrame, reverse: bool = False) -> list[pl.Expr]:
-    exprs = []
-    dtype = pl.UInt8
+def uint8_to_physical_unit(params: pl.DataFrame) -> list[pl.Expr]:
+    """Convert uint8 columns back to physical units (Float32).
 
+    Args:
+        params: DataFrame with scaling parameters (col_name, buffered_min, buffered_range).
+
+    Returns:
+        List of Polars expressions for the conversion.
+    """
+    exprs = []
     for row in params.iter_rows(named=True):
         col = row["col_name"]
         b_min = row["buffered_min"]
         b_range = row["buffered_range"]
 
-        if not reverse:
-            # Raw -> UInt8
-            # clipped_col = pl.col(col).clip(lower_bound=b_min, upper_bound=row["buffered_max"])
-            # expr = ((clipped_col - b_min) / b_range) * 255
-            # Simplified for speed/memory in lazy mode:
-            expr = (
-                (
-                    (
-                        (
-                            pl.col(col)
-                            .fill_nan(None)
-                            .clip(lower_bound=b_min, upper_bound=row["buffered_max"])
-                            - b_min
-                        )
-                        / b_range
-                    )
-                    * 255
-                )
-                .round()
-                .cast(dtype)
-                .alias(col)
-            )
-        else:
-            # UInt8 -> Raw (Float32)
-            expr = ((pl.col(col).cast(pl.Float32) / 255 * b_range) + b_min).alias(col)
+        # UInt8 -> Raw (Float32)
+        expr = ((pl.col(col).cast(pl.Float32) / 255 * b_range) + b_min).alias(col)
         exprs.append(expr)
-
-    # Categorical precipitation is already roughly 0-7, just cast it
-    if not reverse:
-        exprs.append(pl.col("categorical_precipitation_type_surface").cast(pl.UInt8))
 
     return exprs

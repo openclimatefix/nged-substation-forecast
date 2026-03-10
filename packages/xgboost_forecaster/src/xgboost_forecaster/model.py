@@ -61,7 +61,11 @@ class XGBoostForecaster:
             eval_set: Optional list of (X, y) tuples for early stopping.
         """
         if feature_cols is None:
-            feature_cols = [c for c in df.columns if c != target_col and c != "timestamp"]
+            feature_cols = [
+                c
+                for c in df.columns
+                if c != target_col and c != "timestamp" and df[c].dtype.is_numeric()
+            ]
 
         self.feature_names = feature_cols
         X = df.select(feature_cols).to_numpy()
