@@ -7,47 +7,36 @@ from xgboost_forecaster import get_substation_metadata, DataConfig
 
 @dg.asset(deps=["live_primary_flows"])
 def combined_actuals(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> pl.DataFrame:
-    """Combines all live primary parquet files into a single dataframe."""
+    """Combines all live primary flows into a single dataframe."""
     settings = nged_config.to_settings()
-    actuals_path = settings.NGED_DATA_PATH / "parquet/live_primary_flows"
+    actuals_path = settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
     if not actuals_path.exists():
         return pl.DataFrame()
 
-    parquets = list(actuals_path.glob("*.parquet"))
-    if not parquets:
+    df = pl.read_delta(str(actuals_path))
+    if df.is_empty():
         return pl.DataFrame()
 
     # Get metadata to map filenames to substation IDs
     data_config = DataConfig(
-        base_power_path=settings.NGED_DATA_PATH / "parquet" / "live_primary_flows",
+        base_power_path=actuals_path,
         base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
     )
     metadata = get_substation_metadata(data_config)
 
-    dfs = []
-    for p in parquets:
-        df = pl.read_parquet(p)
+    # Join metadata to get substation_id
+    metadata = metadata.with_columns(
+        pl.col("parquet_filename").str.replace(".parquet", "").alias("substation_name")
+    )
 
-        # Get substation ID for this file
-        sub_meta = metadata.filter(pl.col("parquet_filename") == p.name)
-        if not sub_meta.is_empty():
-            sub_id = sub_meta["substation_number"][0]
-            df = df.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
-        else:
-            continue  # Skip if we don't know the substation ID
+    df = df.join(
+        metadata.select(["substation_name", "substation_number"]), on="substation_name", how="inner"
+    ).rename({"substation_number": "substation_id"})
 
-        # Some actuals might have 'MW', others 'MVA'.
-        if "MW" in df.columns:
-            df = df.rename({"MW": "power_mw"})
-        elif "MVA" in df.columns:
-            df = df.rename({"MVA": "power_mw"})
+    # Some actuals might have 'MW', others 'MVA'.
+    df = df.with_columns(pl.coalesce(["MW", "MVA"]).alias("power_mw"))
 
-        dfs.append(df)
-
-    if not dfs:
-        return pl.DataFrame()
-
-    return pl.concat(dfs, how="diagonal")
+    return df
 
 
 @dg.asset

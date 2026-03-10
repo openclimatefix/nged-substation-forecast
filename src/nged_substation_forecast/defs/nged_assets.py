@@ -1,8 +1,10 @@
 """Dagster assets for NGED data."""
 
-import json
+import random
+import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import NamedTuple
@@ -20,6 +22,7 @@ from dagster import (
     MetadataValue,
     asset,
 )
+from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
 
 from nged_substation_forecast.config_resource import NgedConfig
@@ -41,6 +44,7 @@ class SubstationIngestionResult(NamedTuple):
     stage: IngestionStage  # This tells us at which stage in the process the failure occurred.
     error_message: str | None = None
     csv_snippet: str | None = None
+    df: pl.DataFrame | None = None
 
 
 class LivePrimaryFlowsConfig(dg.Config):
@@ -53,45 +57,18 @@ class LivePrimaryFlowsConfig(dg.Config):
     limit: int | None = None  # Only download the first n substations. Useful for testing.
 
 
-def _get_parquet_path(nged_config: NgedConfig, substation_name: str) -> Path:
+def _get_delta_path(nged_config: NgedConfig) -> Path:
     settings = nged_config.to_settings()
-    return settings.NGED_DATA_PATH / "parquet" / "live_primary_flows" / f"{substation_name}.parquet"
-
-
-def _get_status_file_path(nged_config: NgedConfig, partition_key: str) -> Path:
-    settings = nged_config.to_settings()
-    return (
-        settings.NGED_DATA_PATH
-        / "status"
-        / "live_primary_flows"
-        / f"processed_{partition_key}.json"
-    )
-
-
-def _load_list_of_processed_substations(nged_config: NgedConfig, partition_key: str) -> set[str]:
-    status_file = _get_status_file_path(nged_config, partition_key)
-    if status_file.exists():
-        with open(status_file) as f:
-            return set(json.load(f))
-    return set()
-
-
-def _save_list_of_processed_substations(
-    nged_config: NgedConfig, partition_key: str, processed_substations: set[str]
-) -> None:
-    status_file = _get_status_file_path(nged_config, partition_key)
-    status_file.parent.mkdir(exist_ok=True, parents=True)
-    with open(status_file, "w") as f:
-        json.dump(list(processed_substations), f)
+    return settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
 
 
 def _download_and_process_substation(
     resource: nged_data.CkanResource,
     api_key: str,
-    nged_config: NgedConfig,
     max_retries: int,
     log: dg.DagsterLogManager,
     client: httpx.Client,
+    partition_date: datetime,
 ) -> SubstationIngestionResult:
     substation_name = resource.name
     log.info(f"Processing substation {substation_name}...")
@@ -111,6 +88,25 @@ def _download_and_process_substation(
     # Process
     try:
         new_df = nged_data.process_live_primary_substation_flows(csv_data)
+    except ValueError as e:
+        if "Missing core power variables" in str(e):
+            log.info(f"Skipping substation {substation_name} because it lacks MW/MVA data.")
+            # Return success but with no dataframe, so it gets recorded as processed
+            # but nothing is merged into Delta Lake.
+            return SubstationIngestionResult(
+                substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
+            )
+        # Handle other ValueErrors normally
+        try:
+            csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
+        except Exception:
+            csv_snippet = "Could not decode CSV snippet"
+        return SubstationIngestionResult(
+            substation_name=substation_name,
+            stage=IngestionStage.PROCESSING,
+            error_message=str(e),
+            csv_snippet=csv_snippet,
+        )
     except Exception as e:
         try:
             csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
@@ -123,35 +119,27 @@ def _download_and_process_substation(
             csv_snippet=csv_snippet,
         )
 
-    # Merge & Save
-    try:
-        parquet_filename = PurePosixPath(str(resource.url)).stem
-        parquet_path = _get_parquet_path(nged_config, parquet_filename)
-        if parquet_path.exists():
-            old_df = pl.read_parquet(parquet_path)
-            last_timestamp = old_df.select("timestamp").max().item()
-            new_df_filtered = new_df.filter(pl.col("timestamp") > last_timestamp)
+    # Add required columns for Delta
+    parquet_filename = PurePosixPath(url).stem
+    new_df = new_df.with_columns(
+        [
+            pl.lit(parquet_filename).alias("substation_name"),
+            pl.lit(partition_date).cast(pl.Datetime("us", "UTC")).alias("ingested_at"),
+        ]
+    )
 
-            if new_df_filtered.is_empty():
-                return SubstationIngestionResult(
-                    substation_name=substation_name, stage=IngestionStage.SUCCESS
-                )
-
-            merged_df = (
-                pl.concat([old_df, new_df_filtered]).unique(subset="timestamp").sort(by="timestamp")
-            )
+    # Ensure uniform schema
+    for col in ["MW", "MVA", "MVAr"]:
+        if col not in new_df.columns:
+            new_df = new_df.with_columns(pl.lit(None).cast(pl.Float32).alias(col))
         else:
-            parquet_path.parent.mkdir(exist_ok=True, parents=True)
-            merged_df = new_df
+            new_df = new_df.with_columns(pl.col(col).cast(pl.Float32))
 
-        merged_df.write_parquet(parquet_path, compression="zstd")
-        return SubstationIngestionResult(
-            substation_name=substation_name, stage=IngestionStage.SUCCESS
-        )
-    except Exception as e:
-        return SubstationIngestionResult(
-            substation_name=substation_name, stage=IngestionStage.STORAGE, error_message=str(e)
-        )
+    new_df = new_df.select(["timestamp", "substation_name", "MW", "MVA", "MVAr", "ingested_at"])
+
+    return SubstationIngestionResult(
+        substation_name=substation_name, stage=IngestionStage.SUCCESS, df=new_df
+    )
 
 
 def _format_failure_metadata(
@@ -186,18 +174,33 @@ def live_primary_flows(
     context: AssetExecutionContext, config: LivePrimaryFlowsConfig, nged_config: NgedConfig
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
-    partition_key = context.partition_key
-    # Always load the historical state for this partition
-    processed_substations = _load_list_of_processed_substations(nged_config, partition_key)
+    partition_date_str = context.partition_key
+    partition_date = datetime.strptime(partition_date_str, "%Y-%m-%d")
+    delta_path = str(_get_delta_path(nged_config))
+
+    # Check what we've already processed today
+    processed_substations = set()
+    if not config.force_rerun_all and Path(delta_path).exists():
+        try:
+            # Query the delta table for today's ingestions
+            # We use the parquet_filename (which is what we store in substation_name column)
+            processed_df = pl.read_delta(
+                delta_path, pyarrow_options={"filters": [("ingested_at", "=", partition_date)]}
+            )
+            if not processed_df.is_empty():
+                processed_substations = set(processed_df["substation_name"].unique().to_list())
+        except Exception as e:
+            context.log.warning(f"Failed to read Delta table state: {e}")
 
     api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
-    # Remove substations that have already been downloaded for partition_key (unless forced)
-    if config.force_rerun_all:
-        unprocessed_resources = all_resources
-    else:
-        unprocessed_resources = [r for r in all_resources if r.name not in processed_substations]
+    # Filter resources
+    unprocessed_resources = []
+    for r in all_resources:
+        parquet_filename = PurePosixPath(str(r.url)).stem
+        if config.force_rerun_all or parquet_filename not in processed_substations:
+            unprocessed_resources.append(r)
 
     already_processed_count = len(all_resources) - len(unprocessed_resources)
 
@@ -215,22 +218,53 @@ def live_primary_flows(
 
     filtered_out_count = len(unprocessed_resources) - len(resources_to_process)
 
+    # Download concurrently
     with httpx.Client() as client:
         with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
             results = list(
                 executor.map(
                     lambda r: _download_and_process_substation(
-                        r, api_key, nged_config, config.max_retries, context.log, client
+                        r, api_key, config.max_retries, context.log, client, partition_date
                     ),
                     resources_to_process,
                 )
             )
 
-    successes = [r.substation_name for r in results if r.stage == IngestionStage.SUCCESS]
+    successes = [r for r in results if r.stage == IngestionStage.SUCCESS and r.df is not None]
     failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
 
-    processed_substations.update(successes)
-    _save_list_of_processed_substations(nged_config, partition_key, processed_substations)
+    # Merge into Delta Lake
+    if successes:
+        context.log.info(f"Merging {len(successes)} dataframes into Delta Lake...")
+        combined_df = pl.concat([r.df for r in successes if r.df is not None])
+
+        if not Path(delta_path).exists():
+            write_deltalake(delta_path, combined_df.to_arrow(), partition_by=["substation_name"])
+        else:
+            # Retry loop for concurrent writes (just in case, though we are doing one big write here)
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    dt = DeltaTable(delta_path)
+                    (
+                        dt.merge(
+                            source=combined_df.to_arrow(),
+                            predicate="s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
+                            source_alias="s",
+                            target_alias="t",
+                        )
+                        .when_matched_update_all()
+                        .when_not_matched_insert_all()
+                        .execute()
+                    )
+                    break
+                except Exception as e:
+                    if "concurrent" in str(e).lower() or "commit failed" in str(e).lower():
+                        time.sleep(random.uniform(0.5, 2.0) * (1.5**attempt))
+                        if attempt == max_retries - 1:
+                            raise
+                    else:
+                        raise
 
     metadata: dict[str, dg.MetadataValue] = {
         "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
@@ -240,6 +274,11 @@ def live_primary_flows(
         "Failed": MetadataValue.int(len(failures)),
     }
     metadata.update(_format_failure_metadata(failures))
+
+    if failures:
+        context.log.error(f"Found {len(failures)} failures!")
+        for f in failures:
+            context.log.error(f"Failure: {f.substation_name} - {f.stage} - {f.error_message}")
 
     yield AssetCheckResult(
         passed=len(failures) == 0,

@@ -23,7 +23,7 @@ _SETTINGS = Settings()
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    base_power_path: Path = _SETTINGS.NGED_DATA_PATH / "parquet" / "live_primary_flows"
+    base_power_path: Path = _SETTINGS.NGED_DATA_PATH / "delta" / "live_primary_flows"
     base_weather_path: Path = _SETTINGS.NWP_DATA_PATH / "ECMWF" / "ENS"
     # TODO: Remove `ckan_token` after teaching Dagster to download substation locations
     ckan_token: str = _SETTINGS.NGED_CKAN_TOKEN.get_secret_value()
@@ -53,22 +53,38 @@ def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     )
 
     # Only return substations we have local power data for
-    df = df.filter(
-        pl.col("parquet_filename").map_elements(
-            lambda f: (config.base_power_path / f).exists(), return_dtype=pl.Boolean
+    try:
+        available_subs = (
+            pl.read_delta(str(config.base_power_path))
+            .select("substation_name")
+            .unique()
+            .to_series()
+            .to_list()
         )
-    )
+
+        df = df.filter(pl.col("parquet_filename").str.replace(".parquet", "").is_in(available_subs))
+    except Exception:
+        # If delta table doesn't exist or has an issue, return empty
+        df = df.filter(pl.lit(False))
+
     return df
 
 
-def load_substation_power(parquet_filename: str, config: DataConfig | None = None) -> pl.DataFrame:
+def load_substation_power(sub_name: str, config: DataConfig | None = None) -> pl.DataFrame:
     """Load, validate and downsample power data for a single substation."""
     config = config or DataConfig()
-    path = config.base_power_path / parquet_filename
-    if not path.exists():
-        raise FileNotFoundError(f"Power data not found at {path}")
 
-    df = pl.read_parquet(path)
+    delta_path = str(config.base_power_path)
+    try:
+        df = pl.read_delta(
+            delta_path, pyarrow_options={"filters": [("substation_name", "=", sub_name)]}
+        )
+    except Exception:
+        return pl.DataFrame()
+
+    if df.is_empty():
+        return pl.DataFrame()
+
     # Ensure standard column names and types
     power_col = "MW" if "MW" in df.columns else "MVA"
     df = (
@@ -188,16 +204,24 @@ def prepare_data_for_substation(
 ) -> pl.DataFrame:
     """Load and join data for a single substation."""
     config = config or DataConfig()
-    sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == sub_name)
+
+    # Check if we should filter by substation_name_in_location_table or the stem of parquet_filename
+    # Since sub_name is usually the stem of parquet_filename (e.g. 'abbeywood-primary-transformer-flows')
+    if "substation_name" in metadata.columns:
+        sub_meta = metadata.filter(pl.col("substation_name") == sub_name)
+    else:
+        sub_meta = metadata.filter(
+            pl.col("parquet_filename").str.replace(".parquet", "") == sub_name
+        )
+
     if sub_meta.is_empty():
         log.warning(f"Substation {sub_name} not found in metadata")
         return pl.DataFrame()
 
     h3_index = sub_meta["h3_index"][0]
     sub_id = sub_meta["substation_number"][0]
-    parquet_file = sub_meta["parquet_filename"][0]
 
-    power = load_substation_power(parquet_file, config)
+    power = load_substation_power(sub_name, config)
     if power.is_empty():
         return pl.DataFrame()
 

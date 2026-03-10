@@ -24,6 +24,9 @@ class SubstationFlows(pt.Model):
     # Reactive power:
     MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
 
+    # When this data was ingested into our system
+    ingested_at: datetime | None = pt.Field(dtype=pl.Datetime(time_zone="UTC"), allow_missing=True)
+
     @classmethod
     def validate(
         cls,
