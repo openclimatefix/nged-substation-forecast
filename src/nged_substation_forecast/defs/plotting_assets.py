@@ -3,8 +3,9 @@ import random
 import altair as alt
 import dagster as dg
 import polars as pl
+from dagster import ResourceParam
 
-from nged_substation_forecast.config_resource import NgedConfig
+from contracts.settings import Settings
 
 
 class PlotConfig(dg.Config):
@@ -19,7 +20,7 @@ def forecast_vs_actual_plot(
     xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
     config: PlotConfig,
-    nged_config: NgedConfig,
+    settings: ResourceParam[Settings],
 ):
     """Generates an Altair plot comparing forecast vs actuals.
 
@@ -28,7 +29,7 @@ def forecast_vs_actual_plot(
         xgb_forecasts: Combined forecast dataframe.
         combined_actuals: Combined actual power data.
         config: PlotConfig.
-        nged_config: NgedConfig.
+        settings: Settings.
     """
     if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty for plotting.")

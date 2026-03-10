@@ -6,7 +6,7 @@ app = marimo.App(width="full")
 with app.setup:
     from pathlib import PurePosixPath
 
-    from contracts.config import Settings
+    from contracts.settings import Settings
 
     settings = Settings()
 
@@ -19,18 +19,16 @@ with app.setup:
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
-    BASE_PARQUET_PATH = settings.NGED_DATA_PATH / "parquet" / "live_primary_flows"
+    BASE_PARQUET_PATH = settings.nged_data_path / "parquet" / "live_primary_flows"
 
 
 @app.cell
 def _():
     # TODO: Dagster should grab the latest locations (only when it updates)
     #       and store the locations locally.
-    _locations = ckan.get_primary_substation_locations(
-        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
-    )
+    _locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
-        api_key=settings.NGED_CKAN_TOKEN.get_secret_value()
+        api_key=settings.nged_ckan_token
     )
 
     df = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)

@@ -21,13 +21,14 @@ from dagster import (
     DailyPartitionsDefinition,
     MaterializeResult,
     MetadataValue,
+    ResourceParam,
     asset,
 )
 from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
 from nged_data.process_flows import MissingCorePowerVariablesError
 
-from nged_substation_forecast.config_resource import NgedConfig
+from contracts.settings import Settings
 
 
 class IngestionStage(str, Enum):
@@ -59,9 +60,8 @@ class LivePrimaryFlowsConfig(dg.Config):
     limit: int | None = None  # Only download the first n substations. Useful for testing.
 
 
-def _get_delta_path(nged_config: NgedConfig) -> Path:
-    settings = nged_config.to_settings()
-    return settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
+def _get_delta_path(settings: Settings) -> Path:
+    return settings.nged_data_path / "delta" / "live_primary_flows"
 
 
 def _download_and_process_substation(
@@ -161,12 +161,14 @@ def _format_failure_metadata(
     ],
 )
 def live_primary_flows(
-    context: AssetExecutionContext, config: LivePrimaryFlowsConfig, nged_config: NgedConfig
+    context: AssetExecutionContext,
+    config: LivePrimaryFlowsConfig,
+    settings: ResourceParam[Settings],
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
     partition_date_str = context.partition_key
     partition_date = datetime.strptime(partition_date_str, "%Y-%m-%d")
-    delta_path = str(_get_delta_path(nged_config))
+    delta_path = str(_get_delta_path(settings))
 
     # Check what we've already processed today
     processed_substations = set()
@@ -181,7 +183,7 @@ def live_primary_flows(
         except Exception as e:
             context.log.warning(f"Failed to read Delta table state: {e}")
 
-    api_key = nged_config.to_settings().NGED_CKAN_TOKEN.get_secret_value()
+    api_key = settings.nged_ckan_token
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
 
     # Filter resources

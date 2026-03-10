@@ -4,6 +4,7 @@ from pathlib import Path
 
 import dagster as dg
 import polars as pl
+from dagster import ResourceParam
 from xgboost_forecaster import (
     DataConfig,
     XGBoostForecaster,
@@ -11,17 +12,17 @@ from xgboost_forecaster import (
     prepare_data_for_substation,
 )
 
-from nged_substation_forecast.config_resource import NgedConfig
+from contracts.settings import Settings
 
 log = logging.getLogger(__name__)
 
 
 @dg.asset(deps=["live_primary_flows", "ecmwf_ens_forecast"])
-def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg.Output[list[Path]]:
+def xgb_models(
+    context: dg.AssetExecutionContext, settings: ResourceParam[Settings]
+) -> dg.Output[list[Path]]:
     """Train XGBoost models for all substations."""
-    settings = nged_config.to_settings()
-
-    power_path = settings.NGED_DATA_PATH / "delta" / "live_primary_flows"
+    power_path = settings.nged_data_path / "delta" / "live_primary_flows"
     if not power_path.exists():
         context.log.warning("No Delta table found.")
         return dg.Output([], metadata={"n_models": 0})
@@ -37,7 +38,7 @@ def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg
         try:
             data_config = DataConfig(
                 base_power_path=power_path,
-                base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
+                base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
             )
             metadata = get_substation_metadata(data_config)
 
@@ -79,7 +80,7 @@ def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg
 
             # Save model
             model_path = (
-                settings.TRAINED_ML_MODEL_PARAMS_BASE_PATH
+                settings.trained_ml_model_params_base_path
                 / XGBoostForecaster.model_name_and_version()
                 / f"{substation_name}.json"
             )
@@ -101,11 +102,9 @@ def xgb_models(context: dg.AssetExecutionContext, nged_config: NgedConfig) -> dg
 
 @dg.asset(deps=["ecmwf_ens_forecast"])
 def xgb_forecasts(
-    context: dg.AssetExecutionContext, xgb_models: list[Path], nged_config: NgedConfig
+    context: dg.AssetExecutionContext, xgb_models: list[Path], settings: ResourceParam[Settings]
 ) -> dg.Output[pl.DataFrame]:
     """Generate forecasts for all substations using the trained XGBoost models."""
-    settings = nged_config.to_settings()
-
     all_forecasts = []
     for model_path in xgb_models:
         substation_name = model_path.stem
@@ -114,8 +113,8 @@ def xgb_forecasts(
             forecaster = XGBoostForecaster.load(model_path)
 
             data_config = DataConfig(
-                base_power_path=settings.NGED_DATA_PATH / "delta" / "live_primary_flows",
-                base_weather_path=settings.NWP_DATA_PATH / "ECMWF" / "ENS",
+                base_power_path=settings.nged_data_path / "delta" / "live_primary_flows",
+                base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
             )
             metadata = get_substation_metadata(data_config)
 
@@ -159,7 +158,7 @@ def xgb_forecasts(
 
     # Save combined forecast
     forecast_path = (
-        settings.POWER_FORECASTS_DATA_PATH
+        settings.power_forecasts_data_path
         / XGBoostForecaster.model_name_and_version()
         / "all_substations.parquet"
     )

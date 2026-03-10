@@ -5,7 +5,7 @@ app = marimo.App(width="full")
 
 with app.setup:
     import obstore
-    from contracts.config import Settings, PROJECT_ROOT
+    from contracts.settings import Settings, PROJECT_ROOT
     import polars as pl
     from io import BytesIO
 
@@ -17,10 +17,10 @@ with app.setup:
 @app.cell
 def _():
     store = obstore.store.S3Store.from_url(
-        url=str(settings.NGED_S3_BUCKET_URL),
+        url=settings.nged_s3_bucket_url,
         config={
-            "aws_access_key_id": settings.NGED_S3_BUCKET_ACCESS_KEY.get_secret_value(),
-            "aws_secret_access_key": settings.NGED_S3_BUCKET_SECRET.get_secret_value(),
+            "aws_access_key_id": settings.nged_s3_bucket_access_key,
+            "aws_secret_access_key": settings.nged_s3_bucket_secret,
         },
     )
     store
