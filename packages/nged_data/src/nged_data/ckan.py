@@ -19,17 +19,6 @@ log = logging.getLogger(__name__)
 BASE_CKAN_URL: Final[str] = "https://connecteddata.nationalgrid.co.uk"
 
 
-def _ensure_absolute_url(url: str) -> str:
-    if not url:
-        return url
-    if url.startswith("http://") or url.startswith("https://"):
-        return url
-    if url.startswith("/"):
-        return BASE_CKAN_URL + url
-    # Handle cases like "dataset/..."
-    return BASE_CKAN_URL + "/" + url
-
-
 def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLocations]:
     """Note that 'Park Lane' appears twice (with different substation numbers)."""
     if api_key:
@@ -59,7 +48,7 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
 
     ckan_results = data["result"]["results"]
     ckan_result = find_one_match(lambda result: result["format"].upper() == "CSV", ckan_results)
-    url = _ensure_absolute_url(ckan_result["url"])
+    url = str(ckan_result["url"])
     http_response = httpx_get_with_auth(url, api_key=api_key)
     http_response.raise_for_status()
     locations = pl.read_csv(http_response.content)
@@ -95,15 +84,10 @@ def get_csv_resources_for_package(
     resources = []
     for result in package_search_result.results:
         resources.extend(result.resources)
-    resources = [CkanResource.model_validate(resource) for resource in resources]
 
-    # Log any redacted URLs found
-    redacted_count = sum(1 for r in resources if str(r.url).lower() == "redacted")
-    if redacted_count > 0:
-        log.warning(
-            "Found %d resources with 'redacted' URLs in search results (Auth: %s)",
-            redacted_count,
-            "Yes" if api_key else "No",
+    if any(str(r.url).lower() == "redacted" for r in resources):
+        raise RuntimeError(
+            "Found redacted resources. Please check your NGED_CKAN_TOKEN is correct and has the necessary permissions."
         )
 
     resources = [r for r in resources if r.format == "CSV" and r.size > 100]
@@ -144,37 +128,12 @@ def package_search(query: str, api_key: str) -> PackageSearchResult:
 
     result = data.get("result", {})
 
-    # Fix relative URLs and ensure absolute
-    for package in result.get("results", []):
-        for resource in package.get("resources", []):
-            original_url = resource.get("url", "")
-            if original_url.lower() == "redacted":
-                if api_key:
-                    raise RuntimeError(
-                        f"CKAN returned 'redacted' URL for resource '{resource.get('name')}' even though an API key was used! This suggests the key is invalid, lacks permissions, or was incorrectly passed (e.g. masked)."
-                    )
-                else:
-                    log.warning("Found redacted URL in unauthenticated CKAN search")
-
-            resource["url"] = _ensure_absolute_url(original_url)
-
     return PackageSearchResult.model_validate(result)
 
 
 def httpx_get_with_auth(
     url: str, api_key: str, max_retries: int = 3, client: httpx.Client | None = None, **kwargs: Any
 ) -> httpx.Response:
-    original_url = url
-    url = _ensure_absolute_url(url)
-    if url != original_url:
-        log.debug("Fixed relative URL: %s -> %s", original_url, url)
-
-    if not url.startswith("http"):
-        log.error("Invalid URL requested (missing protocol): '%s'", url)
-
-    if not api_key:
-        log.warning("No API key provided for CKAN request to %s", url)
-
     auth_headers = {"Authorization": api_key}
     for attempt in range(max_retries):
         try:

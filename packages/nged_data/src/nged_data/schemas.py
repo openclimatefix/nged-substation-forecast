@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, HttpUrl
 
 
 class PackageSearchResult(BaseModel):
@@ -38,4 +38,4 @@ class CkanResource(BaseModel):
     restricted_level: Literal["registered", "public"] | None = None
     size: int
     state: Literal["active"]
-    url: str
+    url: HttpUrl

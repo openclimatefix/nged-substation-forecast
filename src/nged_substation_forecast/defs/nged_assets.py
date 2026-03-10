@@ -97,17 +97,8 @@ def _download_and_process_substation(
     substation_name = resource.name
     log.info(f"Processing substation {substation_name}...")
 
-    # Validate URL
-    url = str(resource.url)
-    if not url or url.lower() == "redacted":
-        log.warning(f"Substation {substation_name} has an invalid or redacted URL: '{url}'")
-        return SubstationIngestionResult(
-            substation_name=substation_name,
-            stage=IngestionStage.DOWNLOAD,
-            error_message=f"Invalid or redacted URL: '{url}'",
-        )
-
     # Download
+    url = str(resource.url)
     try:
         response = ckan.httpx_get_with_auth(
             url, api_key=api_key, max_retries=max_retries, client=client
