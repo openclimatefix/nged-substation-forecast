@@ -20,13 +20,24 @@ log = logging.getLogger(__name__)
 BASE_CKAN_URL: Final[str] = "https://connecteddata.nationalgrid.co.uk"
 
 
+def _ensure_absolute_url(url: str) -> str:
+    if not url:
+        return url
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    if url.startswith("/"):
+        return BASE_CKAN_URL + url
+    # Handle cases like "dataset/..."
+    return BASE_CKAN_URL + "/" + url
+
+
 def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLocations]:
     """Note that 'Park Lane' appears twice (with different substation numbers)."""
     with RemoteCKAN(BASE_CKAN_URL, apikey=api_key) as nged_ckan:
         ckan_response = nged_ckan.action.resource_search(query="name:Primary Substation Location")
     ckan_results = ckan_response["results"]
     ckan_result = find_one_match(lambda result: result["format"].upper() == "CSV", ckan_results)
-    url = ckan_result["url"]
+    url = _ensure_absolute_url(ckan_result["url"])
     http_response = httpx_get_with_auth(url, api_key=api_key)
     http_response.raise_for_status()
     locations = pl.read_csv(http_response.content)
@@ -40,7 +51,6 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
 
 def download_resource(resource: CkanResource, api_key: str) -> bytes:
     http_response = httpx_get_with_auth(str(resource.url), api_key=api_key)
-    http_response.raise_for_status()
     return http_response.content
 
 
@@ -81,9 +91,7 @@ def package_search(query: str, api_key: str) -> PackageSearchResult:
     # Fix relative URLs in resources
     for package in result.get("results", []):
         for resource in package.get("resources", []):
-            url = resource.get("url")
-            if url and url.startswith("/"):
-                resource["url"] = BASE_CKAN_URL + url
+            resource["url"] = _ensure_absolute_url(resource.get("url", ""))
 
     result_validated = PackageSearchResult.model_validate(result)
     log.debug(
@@ -95,6 +103,15 @@ def package_search(query: str, api_key: str) -> PackageSearchResult:
 def httpx_get_with_auth(
     url: str, api_key: str, max_retries: int = 3, client: httpx.Client | None = None, **kwargs: Any
 ) -> httpx.Response:
+    original_url = url
+    url = _ensure_absolute_url(url)
+    if url != original_url:
+        log.debug("Fixed relative URL: %s -> %s", original_url, url)
+
+    if not url.startswith("http"):
+        log.error("Invalid URL requested (missing protocol): '%s'", url)
+        # This will still fail at httpx level, but we get the log.
+
     auth_headers = {"Authorization": api_key}
     for attempt in range(max_retries):
         try:

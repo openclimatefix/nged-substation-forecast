@@ -1,6 +1,5 @@
 """Dagster assets for NGED data."""
 
-import httpx
 import json
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
@@ -9,6 +8,7 @@ from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 import dagster as dg
+import httpx
 import nged_data
 import polars as pl
 from dagster import (
@@ -94,10 +94,21 @@ def _download_and_process_substation(
 ) -> SubstationIngestionResult:
     substation_name = resource.name
     log.info(f"Processing substation {substation_name}...")
-    # 1. Download
+
+    # Validate URL
+    url = str(resource.url)
+    if not url or url.lower() == "redacted":
+        log.warning(f"Substation {substation_name} has an invalid or redacted URL: '{url}'")
+        return SubstationIngestionResult(
+            substation_name=substation_name,
+            stage=IngestionStage.DOWNLOAD,
+            error_message=f"Invalid or redacted URL: '{url}'",
+        )
+
+    # Download
     try:
         response = ckan.httpx_get_with_auth(
-            str(resource.url), api_key=api_key, max_retries=max_retries, client=client
+            url, api_key=api_key, max_retries=max_retries, client=client
         )
         csv_data = response.content
     except Exception as e:
