@@ -19,8 +19,9 @@ EXAMPLE_DATA_DIR = Path(__file__).parent.parent / "example_csv_data"
 )
 def test_primary_substation_csv_to_dataframe(csv_filename: str):
     csv_path = EXAMPLE_DATA_DIR / csv_filename
+    csv_data = csv_path.read_bytes()
 
-    df = process_live_primary_substation_flows(csv_path)
+    df = process_live_primary_substation_flows(csv_data)
 
     assert df.height > 0
     assert "timestamp" in df.columns

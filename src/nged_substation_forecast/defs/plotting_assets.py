@@ -12,7 +12,7 @@ from nged_substation_forecast.config_resource import NgedConfig
 )
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
-    xgb_forecast: dict[str, pl.DataFrame],
+    xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
     config: NgedConfig,
 ):
@@ -20,28 +20,22 @@ def forecast_vs_actual_plot(
 
     Args:
         context: Asset execution context.
-        xgb_forecast: Dictionary of forecast dataframes per partition.
+        xgb_forecasts: Combined forecast dataframe.
         combined_actuals: Combined actual power data.
         config: NgedConfig.
     """
-    if not xgb_forecast:
-        context.log.warning("No forecasts provided for plotting.")
-        return
-
-    all_forecasts = pl.concat(list(xgb_forecast.values()))
-
-    if all_forecasts.is_empty() or combined_actuals.is_empty():
+    if xgb_forecasts.is_empty() or combined_actuals.is_empty():
         context.log.warning("Forecast or actuals are empty for plotting.")
         return
 
     substation_ids = context.op_config.get("substation_ids", [])
     if not substation_ids:
         # Pick 5 random substations if none specified
-        unique_ids = all_forecasts.select("substation_id").unique()["substation_id"].to_list()
+        unique_ids = xgb_forecasts.select("substation_id").unique()["substation_id"].to_list()
         substation_ids = random.sample(unique_ids, min(5, len(unique_ids)))
 
     # Filter data
-    plot_forecast = all_forecasts.filter(pl.col("substation_id").is_in(substation_ids))
+    plot_forecast = xgb_forecasts.filter(pl.col("substation_id").is_in(substation_ids))
     plot_actuals = combined_actuals.filter(pl.col("substation_id").is_in(substation_ids))
 
     if plot_forecast.is_empty() or plot_actuals.is_empty():
