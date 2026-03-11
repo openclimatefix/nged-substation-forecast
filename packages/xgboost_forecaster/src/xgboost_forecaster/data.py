@@ -3,14 +3,12 @@
 import dataclasses
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import cast
 
 import polars as pl
-from contracts.data_schemas import SubstationLocations
+from contracts.data_schemas import SubstationMetadata
 from contracts.settings import Settings
-from nged_data import ckan
-from nged_data.substation_names.align import join_location_table_to_live_primaries
 
 from xgboost_forecaster.features import add_temporal_features, add_weather_features
 
@@ -33,34 +31,25 @@ class DataConfig:
 
 # TODO: Most of (or maybe all of) this function should be computed by Dagster once.
 def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
-    """Join substation locations with their live flow parquet filenames."""
+    """Load substation metadata and filter for those with available power data."""
     config = config or DataConfig()
-    api_key = config.ckan_token
-    locations_path = _SETTINGS.nged_data_path / "parquet" / "substation_locations.parquet"
-    locations = SubstationLocations.validate(pl.read_parquet(locations_path))
-    live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
+    metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
+    if not metadata_path.exists():
+        return pl.DataFrame()
 
-    df = join_location_table_to_live_primaries(live_primaries=live_primaries, locations=locations)
+    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
-    # Add H3 index based on lat/lng
-    df = df.rename({"h3_res_5": "h3_index"})
-    df = df.with_columns(
-        parquet_filename=pl.col("url").map_elements(
-            lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
-        ),
-    )
-
-    # Only return substations we have local power data for
+    # Only return substations we have local power data for in Delta Lake
     try:
         available_subs = (
             pl.read_delta(str(config.base_power_path))
-            .select("substation_name")
+            .select("substation_number")
             .unique()
             .to_series()
             .to_list()
         )
 
-        df = df.filter(pl.col("parquet_filename").str.replace(".parquet", "").is_in(available_subs))
+        df = df.filter(pl.col("substation_number").is_in(available_subs))
     except Exception:
         # If delta table doesn't exist or has an issue, return empty
         df = df.filter(pl.lit(False))
@@ -68,14 +57,14 @@ def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     return df
 
 
-def load_substation_power(sub_name: str, config: DataConfig | None = None) -> pl.DataFrame:
+def load_substation_power(sub_number: int, config: DataConfig | None = None) -> pl.DataFrame:
     """Load, validate and downsample power data for a single substation."""
     config = config or DataConfig()
 
     delta_path = str(config.base_power_path)
     try:
         df = pl.read_delta(
-            delta_path, pyarrow_options={"filters": [("substation_name", "=", sub_name)]}
+            delta_path, pyarrow_options={"filters": [("substation_number", "=", sub_number)]}
         )
     except Exception:
         return pl.DataFrame()
@@ -194,7 +183,7 @@ def load_weather_data(
 
 
 def prepare_data_for_substation(
-    sub_name: str,
+    sub_number: int,
     metadata: pl.DataFrame,
     config: DataConfig | None = None,
     use_lags: bool = True,
@@ -203,23 +192,15 @@ def prepare_data_for_substation(
     """Load and join data for a single substation."""
     config = config or DataConfig()
 
-    # Check if we should filter by substation_name_in_location_table or the stem of parquet_filename
-    # Since sub_name is usually the stem of parquet_filename (e.g. 'abbeywood-primary-transformer-flows')
-    if "substation_name" in metadata.columns:
-        sub_meta = metadata.filter(pl.col("substation_name") == sub_name)
-    else:
-        sub_meta = metadata.filter(
-            pl.col("parquet_filename").str.replace(".parquet", "") == sub_name
-        )
+    sub_meta = metadata.filter(pl.col("substation_number") == sub_number)
 
     if sub_meta.is_empty():
-        log.warning(f"Substation {sub_name} not found in metadata")
+        log.warning(f"Substation {sub_number} not found in metadata")
         return pl.DataFrame()
 
-    h3_index = sub_meta["h3_index"][0]
-    sub_id = sub_meta["substation_number"][0]
+    h3_index = sub_meta["h3_res_5"][0]
 
-    power = load_substation_power(sub_name, config)
+    power = load_substation_power(sub_number, config)
     if power.is_empty():
         return pl.DataFrame()
 
@@ -268,8 +249,7 @@ def prepare_data_for_substation(
 
     if not sub_data.is_empty():
         sub_data = sub_data.with_columns(
-            pl.lit(sub_id).alias("substation_id").cast(pl.Int32),
-            pl.lit(sub_name).alias("substation_name"),
+            pl.lit(sub_number).alias("substation_number").cast(pl.Int32),
         )
         sub_data = add_temporal_features(sub_data)
 
@@ -277,15 +257,15 @@ def prepare_data_for_substation(
 
 
 def prepare_training_data(
-    substation_names: list[str],
+    substation_numbers: list[int],
     metadata: pl.DataFrame,
     config: DataConfig | None = None,
     **kwargs,
 ) -> pl.DataFrame:
     """Join power and weather data for multiple substations and add features."""
     all_subs_data = []
-    for sub_name in substation_names:
-        sub_data = prepare_data_for_substation(sub_name, metadata, config, **kwargs)
+    for sub_number in substation_numbers:
+        sub_data = prepare_data_for_substation(sub_number, metadata, config, **kwargs)
         if not sub_data.is_empty():
             all_subs_data.append(sub_data)
 

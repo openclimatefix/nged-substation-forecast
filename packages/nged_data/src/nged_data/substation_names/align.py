@@ -2,7 +2,7 @@ from pathlib import Path
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationLocations
+from contracts.data_schemas import SubstationLocations, SubstationMetadata
 
 from nged_data.schemas import CkanResource
 
@@ -34,7 +34,21 @@ def simplify_substation_name(col_name: str) -> pl.Expr:
 def join_location_table_to_live_primaries(
     locations: pt.DataFrame[SubstationLocations],
     live_primaries: list[CkanResource],
-) -> pl.DataFrame:
+) -> pt.DataFrame[SubstationMetadata]:
+    """
+    Joins the substation locations dataset to the list of live primary flow resources.
+
+    This function performs a "dance" of normalization because NGED uses slightly different
+    naming conventions in different datasets. For example:
+    - The locations dataset might use "Abington 33/11kv".
+    - The live flows dataset might use "Abington Primary Transformer Flows".
+
+    We normalize these by stripping out common suffixes and voltage information to create
+    a "simple_name" that can be used for joining. We also use a manual mapping file for
+    cases where the automated normalization isn't enough.
+
+    Returns a DataFrame that can be validated against SubstationMetadata.
+    """
     live_primaries_df = pl.DataFrame(live_primaries)
 
     # Append a "simple_name" column to each dataframe:
@@ -60,9 +74,20 @@ def join_location_table_to_live_primaries(
         simple_name=pl.coalesce("simplified_substation_name_in_location_table", "simple_name")
     )
 
-    # Rename the name columns
+    # Rename the name columns to match SubstationMetadata
     live_primaries_df = live_primaries_df.rename({"name": "substation_name_in_live_primaries"})
     locations_renamed_col = locations.rename(
         {"substation_name": "substation_name_in_location_table"}
     )
-    return live_primaries_df.join(locations_renamed_col, on="simple_name").sort(by="simple_name")
+
+    # Join and select relevant columns for SubstationMetadata
+    joined = live_primaries_df.join(locations_renamed_col, on="simple_name")
+
+    # Ensure the URL is a string
+    joined = joined.cast({"url": pl.String})
+
+    # Select only the columns defined in the SubstationMetadata schema
+    columns_to_select = [col for col in SubstationMetadata.columns if col in joined.columns]
+    df = joined.select(columns_to_select).sort(by="substation_number")
+
+    return SubstationMetadata.validate(df, allow_missing_columns=True)
