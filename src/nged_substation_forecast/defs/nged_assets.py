@@ -27,7 +27,6 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
 from nged_data.process_flows import MissingCorePowerVariablesError
 
@@ -244,19 +243,23 @@ def live_primary_flows(
         combined_df = pl.concat([r.df for r in successes if r.df is not None])
 
         if not Path(delta_path).exists():
-            write_deltalake(delta_path, combined_df.to_arrow(), partition_by=["substation_name"])
+            combined_df.write_delta(
+                delta_path, delta_write_options={"partition_by": ["substation_name"]}
+            )
         else:
-            # Retry loop for concurrent writes (just in case, though we are doing one big write here)
+            # Retry loop for concurrent writes
             max_retries = 5
             for attempt in range(max_retries):
                 try:
-                    dt = DeltaTable(delta_path)
                     (
-                        dt.merge(
-                            source=combined_df.to_arrow(),
-                            predicate="s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
-                            source_alias="s",
-                            target_alias="t",
+                        combined_df.write_delta(
+                            delta_path,
+                            mode="merge",
+                            delta_merge_options={
+                                "predicate": "s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
+                                "source_alias": "s",
+                                "target_alias": "t",
+                            },
                         )
                         .when_not_matched_insert_all()
                         .execute()
