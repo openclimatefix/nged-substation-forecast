@@ -31,7 +31,10 @@ Please also create a data contract for `primary_substation_metadata`, and modify
 Change the `live_primary_flows` Dagster asset to depend on `primary_substation_metadata`.
 
 I'm imagining that we'd re-run `primary_substation_metadata` every day, and *update*
-`substation_metadata.parquet`.
+`substation_metadata.parquet`. This _might_ be overkill. But it's fairly fast (a few seconds), and
+means that we can dynamically adapt to NGED adding new substations. But please never _delete_
+substations from `primary_substation_metadata` to protect against NGED accidentally truncating their
+lists of substations.
 
 In the Delta Lake schema for `live_primary_flows`, replace `substation_name` with
 `substation_number`. (i.e. that Delta Table won't store the `substation_name` at all. It'll
@@ -41,5 +44,11 @@ Please write a throw-away script to convert the existing Delta Lake table on dis
 
 Please update all the downstream code, for example:
 
-- @packages/dashboard/main.py
+- @packages/dashboard/main.py (remember that this is a Marimo notebook!)
 - @packages/xgboost_forecaster
+- any relevant unit tests
+
+And please look for other downstream code that might need changing.
+
+Finally, please add comments to the code to explain why we have to do this little dance of
+normalising the substation names before joining them.
