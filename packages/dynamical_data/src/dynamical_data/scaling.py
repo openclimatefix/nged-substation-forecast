@@ -19,19 +19,20 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
         DataFrame with rescaled uint8 columns.
     """
     exprs = []
+
     for row in scaling_params.to_dicts():
         col_name = row["col_name"]
         if col_name not in df.columns:
             continue
 
         buffered_min = row["buffered_min"]
+        buffered_max = row["buffered_max"]
         buffered_range = row["buffered_range"]
 
-        clipped_col = (
-            pl.col(col_name)
-            .fill_nan(None)
-            .clip(lower_bound=buffered_min, upper_bound=row["buffered_max"])
-        )
+        # Handle NaNs first (Polars treats NaN as > any finite number)
+        base_col = pl.col(col_name).fill_nan(None)
+
+        clipped_col = base_col.clip(lower_bound=buffered_min, upper_bound=buffered_max)
 
         if buffered_range == 0.0:
             expr = pl.lit(0, dtype=pl.UInt8).alias(col_name)
