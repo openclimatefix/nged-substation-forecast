@@ -5,6 +5,7 @@ app = marimo.App(width="full")
 
 with app.setup:
     from pathlib import PurePosixPath
+    from typing import cast
 
     from contracts.settings import Settings
 
@@ -14,6 +15,7 @@ with app.setup:
     import geoarrow.pyarrow as geo_pyarrow
     import lonboard
     import marimo as mo
+    from datetime import datetime
     from pathlib import Path
     import polars as pl
     import pyarrow
@@ -23,7 +25,7 @@ with app.setup:
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
-    BASE_PARQUET_PATH = BASE_PATH / settings.nged_data_path / "parquet" / "live_primary_flows"
+    BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "live_primary_flows"
 
 
 @app.cell
@@ -37,13 +39,22 @@ def _():
         api_key=settings.nged_ckan_token
     )
 
-    df = join_location_table_to_live_primaries(live_primaries=_live_primaries, locations=_locations)
+    df = join_location_table_to_live_primaries(
+        live_primaries=_live_primaries,
+        locations=_locations,  # type: ignore[arg-type]
+    )
     df = df.with_columns(
-        parquet_filename=pl.col("url").map_elements(
-            lambda url: PurePosixPath(url.path).with_suffix(".parquet").name, return_dtype=pl.String
+        substation_name=pl.col("url").map_elements(
+            lambda url: PurePosixPath(url.path).stem, return_dtype=pl.String
         )
     )
     return (df,)
+
+
+@app.cell
+def _(df):
+    df
+    return
 
 
 @app.cell
@@ -64,6 +75,7 @@ def _(df):
             "geometry": geo_array,
             "name": df["substation_name_in_location_table"],
             "number": df["substation_number"],
+            "csv_stem": df["substation_name"],
         },
     )
     return (arrow_table,)
@@ -90,6 +102,10 @@ def _(arrow_table):
 
 @app.cell
 def _(df, layer_widget, map):
+    delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
+        pl.col("timestamp") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
+    )
+
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
@@ -99,33 +115,39 @@ def _(df, layer_widget, map):
         )
     else:
         selected_df = df[layer_widget.selected_index]
-        parquet_filename = selected_df["parquet_filename"].item()
+        substation_name = selected_df["substation_name"].item()
 
         try:
-            filtered_demand = pl.read_parquet(BASE_PARQUET_PATH / parquet_filename)
+            filtered_demand = cast(
+                pl.DataFrame,
+                delta_df.filter(pl.col("substation_name") == substation_name).collect(),
+            )
         except Exception as e:
             right_pane = mo.md(f"{e}")
         else:
-            power_column = "MW" if "MW" in filtered_demand else "MVA"
-            right_pane = (
-                alt.Chart(filtered_demand)
-                .mark_line()
-                .encode(
-                    x=alt.X(
-                        "timestamp:T",
-                        axis=alt.Axis(format="%H:%M %b %d"),
-                    ),
-                    y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
-                    color=alt.value("teal"),
-                    tooltip=["timestamp", power_column],
+            if filtered_demand.height == 0:
+                right_pane = mo.md("No data")
+            else:
+                power_column = "MW" if filtered_demand["MW"].is_not_null().all() else "MVA"
+                right_pane = (
+                    alt.Chart(filtered_demand)
+                    .mark_line()
+                    .encode(
+                        x=alt.X(
+                            "timestamp:T",
+                            axis=alt.Axis(format="%H:%M %b %d"),
+                        ),
+                        y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
+                        color=alt.value("teal"),
+                        tooltip=["timestamp", power_column],
+                    )
+                    .properties(
+                        title=selected_df["substation_name_in_location_table"].item(),
+                        height=300,
+                        width="container",  # Fill available width
+                    )
+                    .interactive()
                 )
-                .properties(
-                    title=selected_df["substation_name_in_location_table"].item(),
-                    height=300,
-                    width="container",  # Fill available width
-                )
-                .interactive()
-            )
 
     mo.vstack([map, right_pane])
     return
