@@ -19,9 +19,13 @@ def data_config(tmp_path):
     # Create dummy data files (replace with actual data creation later)
     import polars as pl
 
-    df = pl.DataFrame({"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0]})
-    df = df.with_columns(pl.col("timestamp").str.to_datetime())
-    df.write_parquet(power_path / "substation1.parquet")
+    df = pl.DataFrame(
+        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "substation_number": [123]}
+    )
+    df = df.with_columns(
+        pl.col("timestamp").str.to_datetime(), pl.col("substation_number").cast(pl.Int32)
+    )
+    df.write_delta(power_path, delta_write_options={"partition_by": ["substation_number"]})
     (weather_path / "weather1.parquet").write_text("dummy weather data")
 
     return DataConfig(
@@ -31,12 +35,9 @@ def data_config(tmp_path):
 
 
 def test_load_substation_power_with_config(data_config):
-    # Create dummy data
-    parquet_filename = "substation1.parquet"
-
     # Test that the function loads data without errors
     try:
-        load_substation_power(parquet_filename, config=data_config)
+        load_substation_power(123, config=data_config)
     except Exception as e:
         assert False, f"Failed to load substation power: {e}"
 

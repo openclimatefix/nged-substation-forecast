@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import NamedTuple, cast
 
 import dagster as dg
@@ -14,7 +14,10 @@ import h3.api.numpy_int as h3
 import httpx
 import nged_data
 import polars as pl
-from contracts.data_schemas import MissingCorePowerVariablesError, SubstationLocationsWithH3
+from contracts.data_schemas import (
+    MissingCorePowerVariablesError,
+    SubstationMetadata,
+)
 from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
@@ -41,7 +44,7 @@ class IngestionStage(str, Enum):
 class SubstationIngestionResult(NamedTuple):
     """The result of ingesting a single substation's data."""
 
-    substation_name: str
+    substation_number: int
     stage: IngestionStage  # This tells us at which stage in the process the failure occurred.
     error_message: str | None = None
     csv_snippet: str | None = None
@@ -54,7 +57,7 @@ class LivePrimaryFlowsConfig(dg.Config):
     force_rerun_all: bool = False
     max_concurrent_connections: int = 32
     max_retries: int = 3
-    substation_names: list[str] | None = None  # Download only a subset of substations.
+    substation_numbers: list[int] | None = None  # Download only a subset of substations.
     limit: int | None = None  # Only download the first n substations. Useful for testing.
 
 
@@ -63,18 +66,17 @@ def _get_delta_path(settings: Settings) -> Path:
 
 
 def _download_and_process_substation(
-    resource: nged_data.CkanResource,
+    substation_number: int,
+    url: str,
     api_key: str,
     max_retries: int,
     log: dg.DagsterLogManager,
     client: httpx.Client,
     partition_date: datetime,
 ) -> SubstationIngestionResult:
-    substation_name = resource.name
-    log.info(f"Processing substation {substation_name}...")
+    log.info(f"Processing substation {substation_number}...")
 
     # Download
-    url = str(resource.url)
     try:
         response = ckan.httpx_get_with_auth(
             url, api_key=api_key, max_retries=max_retries, client=client
@@ -82,18 +84,18 @@ def _download_and_process_substation(
         csv_data = response.content
     except Exception as e:
         return SubstationIngestionResult(
-            substation_name=substation_name, stage=IngestionStage.DOWNLOAD, error_message=str(e)
+            substation_number=substation_number, stage=IngestionStage.DOWNLOAD, error_message=str(e)
         )
 
     # Process
     try:
         new_df = nged_data.process_live_primary_substation_flows(csv_data)
     except MissingCorePowerVariablesError:
-        log.info(f"Skipping substation {substation_name} because it lacks MW/MVA data.")
+        log.info(f"Skipping substation {substation_number} because it lacks MW/MVA data.")
         # Return success but with no dataframe, so it gets recorded as processed
         # but nothing is merged into Delta Lake.
         return SubstationIngestionResult(
-            substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
+            substation_number=substation_number, stage=IngestionStage.SUCCESS, df=None
         )
     except Exception as e:
         # The exception might have a note with the CSV snippet from process_flows.py
@@ -106,17 +108,16 @@ def _download_and_process_substation(
         except Exception:
             csv_snippet = "Could not decode CSV snippet"
         return SubstationIngestionResult(
-            substation_name=substation_name,
+            substation_number=substation_number,
             stage=IngestionStage.PROCESSING,
             error_message=error_message,
             csv_snippet=csv_snippet,
         )
 
     # Add required columns for Delta Lake
-    csv_url_stem = PurePosixPath(url).stem
     new_df = new_df.with_columns(
         [
-            pl.lit(csv_url_stem).alias("substation_name"),
+            pl.lit(substation_number).cast(pl.Int32).alias("substation_number"),
             pl.lit(partition_date).cast(pl.Datetime("us", "UTC")).alias("ingested_at"),
         ]
     )
@@ -128,10 +129,10 @@ def _download_and_process_substation(
         else:
             new_df = new_df.with_columns(pl.col(col).cast(pl.Float32))
 
-    new_df = new_df.select(["timestamp", "substation_name", "MW", "MVA", "MVAr", "ingested_at"])
+    new_df = new_df.select(["timestamp", "substation_number", "MW", "MVA", "MVAr", "ingested_at"])
 
     return SubstationIngestionResult(
-        substation_name=substation_name, stage=IngestionStage.SUCCESS, df=new_df
+        substation_number=substation_number, stage=IngestionStage.SUCCESS, df=new_df
     )
 
 
@@ -142,24 +143,26 @@ def _format_failure_metadata(
         return {}
 
     # Build Markdown Table
-    md_table = "| Substation | Stage | Error |\n| :--- | :--- | :--- |\n"
+    md_table = "| Substation Number | Stage | Error |\n| :--- | :--- | :--- |\n"
     for failure in failures:
         md_table += (
-            f"| {failure.substation_name} | {failure.stage.value} | {failure.error_message} |\n"
+            f"| {failure.substation_number} | {failure.stage.value} | {failure.error_message} |\n"
         )
 
     # Build Snippets
     md_snippets = "### Failed CSV Snippets\n"
     for failure in failures:
         if failure.csv_snippet:
-            md_snippets += f"**{failure.substation_name}**:\n```text\n{failure.csv_snippet}\n```\n"
+            md_snippets += (
+                f"**{failure.substation_number}**:\n```text\n{failure.csv_snippet}\n```\n"
+            )
 
     return {"Failure Details": MetadataValue.md(md_table + "\n" + md_snippets)}
 
 
 def _get_processed_substations(
     delta_path: str, partition_date: datetime, log: dg.DagsterLogManager
-) -> set[str]:
+) -> set[int]:
     """Identify which substations have already been processed for the given partition date."""
     if not Path(delta_path).exists():
         return set()
@@ -169,14 +172,14 @@ def _get_processed_substations(
             pl.DataFrame,
             pl.scan_delta(delta_path)
             .filter(pl.col("ingested_at") == pl.lit(partition_date).cast(pl.Datetime("us", "UTC")))
-            .select("substation_name")
+            .select("substation_number")
             .unique()
             .collect(),
         )
     except Exception as e:
         log.exception(f"Failed to read Delta Table {delta_path}: {e}")
         raise
-    processed_substations = set(processed_df.get_column("substation_name").to_list())
+    processed_substations = set(processed_df.get_column("substation_number").to_list())
     log.info(
         f"{len(processed_substations)} substations have already been processed for {partition_date}"
     )
@@ -184,21 +187,19 @@ def _get_processed_substations(
 
 
 def _filter_resources(
-    all_resources: list[nged_data.CkanResource],
-    processed_substations: set[str],
+    all_resources: list[tuple[int, str]],
+    processed_substations: set[int],
     config: LivePrimaryFlowsConfig,
     log: dg.DagsterLogManager,
-) -> list[nged_data.CkanResource]:
-    """Filter CKAN resources based on processing state and configuration."""
+) -> list[tuple[int, str]]:
+    """Filter resources based on processing state and configuration."""
     # Filter out already processed
-    unprocessed = [
-        r for r in all_resources if PurePosixPath(str(r.url)).stem not in processed_substations
-    ]
+    unprocessed = [r for r in all_resources if r[0] not in processed_substations]
 
     # Apply manual filters
-    if config.substation_names:
-        filtered = [r for r in unprocessed if r.name in config.substation_names]
-        log.info("Filtered to %d substations by name", len(filtered))
+    if config.substation_numbers:
+        filtered = [r for r in unprocessed if r[0] in config.substation_numbers]
+        log.info("Filtered to %d substations by number", len(filtered))
         return filtered
 
     if config.limit:
@@ -210,7 +211,7 @@ def _filter_resources(
 
 
 def _download_and_process_all(
-    resources: list[nged_data.CkanResource],
+    resources: list[tuple[int, str]],
     api_key: str,
     config: LivePrimaryFlowsConfig,
     log: dg.DagsterLogManager,
@@ -222,7 +223,7 @@ def _download_and_process_all(
             return list(
                 executor.map(
                     lambda r: _download_and_process_substation(
-                        r, api_key, config.max_retries, log, client, partition_date
+                        r[0], r[1], api_key, config.max_retries, log, client, partition_date
                     ),
                     resources,
                 )
@@ -241,7 +242,7 @@ def _merge_to_delta(
 
     if not Path(delta_path).exists():
         combined_df.write_delta(
-            delta_path, delta_write_options={"partition_by": ["substation_name"]}
+            delta_path, delta_write_options={"partition_by": ["substation_number"]}
         )
         return
 
@@ -254,7 +255,7 @@ def _merge_to_delta(
                     delta_path,
                     mode="merge",
                     delta_merge_options={
-                        "predicate": "s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
+                        "predicate": "s.timestamp = t.timestamp AND s.substation_number = t.substation_number",
                         "source_alias": "s",
                         "target_alias": "t",
                     },
@@ -277,6 +278,7 @@ def _merge_to_delta(
     check_specs=[
         AssetCheckSpec(name="all_substations_succeeded", asset="live_primary_flows"),
     ],
+    deps=["substation_metadata"],
 )
 def live_primary_flows(
     context: AssetExecutionContext,
@@ -294,22 +296,29 @@ def live_primary_flows(
         else _get_processed_substations(delta_path, partition_date, context.log)
     )
 
-    # Fetch and filter resources
-    api_key = settings.nged_ckan_token
-    all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
+    # Fetch resources from metadata
+    metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
+    if not metadata_path.exists():
+        raise FileNotFoundError(f"Metadata file not found at {metadata_path}")
+
+    metadata_df = pl.read_parquet(metadata_path)
+    all_resources = (
+        metadata_df.filter(pl.col("url").is_not_null())
+        .select(["substation_number", "url"])
+        .iter_rows()
+    )
+    all_resources = list(all_resources)
+
     resources_to_process = _filter_resources(
         all_resources, processed_substations, config, context.log
     )
-    resources_to_process = sorted(resources_to_process, key=lambda r: r.name)
+    resources_to_process = sorted(resources_to_process, key=lambda r: r[0])
     context.log.info(
         f"Planning to download and process data for {len(resources_to_process)} substations."
     )
-    if len(resources_to_process) >= 1:
-        context.log.info(f"First substation to process = {resources_to_process[0]}")
-    if len(resources_to_process) >= 2:
-        context.log.info(f"Last substation to process = {resources_to_process[-1]}")
 
     # Download and process
+    api_key = settings.nged_ckan_token
     results = _download_and_process_all(
         resources_to_process, api_key, config, context.log, partition_date
     )
@@ -324,7 +333,7 @@ def live_primary_flows(
     filtered_out_count = len(all_resources) - already_processed_count - len(resources_to_process)
 
     metadata: dict[str, dg.MetadataValue] = {
-        "Total resources on CKAN": MetadataValue.int(len(all_resources)),
+        "Total resources in metadata": MetadataValue.int(len(all_resources)),
         "Already processed for this partition": MetadataValue.int(already_processed_count),
         "Manually filtered out": MetadataValue.int(filtered_out_count),
         "Successfully processed for this partition": MetadataValue.int(len(successes)),
@@ -335,7 +344,7 @@ def live_primary_flows(
     if failures:
         context.log.error(f"Found {len(failures)} failures!")
         for f in failures:
-            context.log.error(f"Failure: {f.substation_name} - {f.stage} - {f.error_message}")
+            context.log.error(f"Failure: {f.substation_number} - {f.stage} - {f.error_message}")
 
     yield AssetCheckResult(
         passed=len(failures) == 0,
@@ -346,7 +355,7 @@ def live_primary_flows(
 
 
 @asset
-def substation_locations(
+def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
 ) -> MaterializeResult:
@@ -366,20 +375,52 @@ def substation_locations(
         )
     )
 
-    # 3. Validate against the new schema
-    locations = locations.cast(SubstationLocationsWithH3.dtypes)  # type: ignore[invalid-argument-type]
-    validated_locations = SubstationLocationsWithH3.validate(locations)
+    # 3. Fetch live primary flow resources from CKAN
+    live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
+        api_key=settings.nged_ckan_token
+    )
 
-    # 4. Save to disk
+    # 4. Join locations with live primaries
+    new_metadata = nged_data.substation_names.align.join_location_table_to_live_primaries(
+        locations=locations, live_primaries=live_primaries
+    )
+
+    # 5. Add last_updated column
+    now = datetime.now().astimezone(datetime.now().astimezone().tzinfo)
+    new_metadata = new_metadata.with_columns(
+        last_updated=pl.lit(now).cast(pl.Datetime("us", "UTC"))
+    )
+
+    # 6. Load existing metadata and upsert
     out_dir = settings.nged_data_path / "parquet"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / "substation_locations.parquet"
+    out_path = out_dir / "substation_metadata.parquet"
 
-    validated_locations.write_parquet(out_path)
+    if out_path.exists():
+        existing_metadata = pl.read_parquet(out_path)
+        # Upsert: update existing rows, keep old rows that are not in new_metadata
+        # We use an outer join and then coalesce
+        combined = existing_metadata.join(
+            new_metadata, on="substation_number", how="outer", suffix="_new"
+        )
+
+        # Coalesce columns
+        cols = [c for c in existing_metadata.columns if c != "substation_number"]
+        coalesce_exprs = [pl.coalesce(f"{c}_new", c).alias(c) for c in cols]
+        final_metadata = combined.select(["substation_number"] + coalesce_exprs)
+    else:
+        final_metadata = new_metadata
+
+    # 7. Validate against the new schema
+    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)
+    validated_metadata = SubstationMetadata.validate(final_metadata)
+
+    # 8. Save to disk
+    validated_metadata.write_parquet(out_path)
 
     return MaterializeResult(
         metadata={
             "Path": MetadataValue.path(str(out_path)),
-            "Row Count": MetadataValue.int(len(validated_locations)),
+            "Row Count": MetadataValue.int(len(validated_metadata)),
         }
     )

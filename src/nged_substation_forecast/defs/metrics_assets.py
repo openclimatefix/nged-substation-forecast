@@ -27,13 +27,9 @@ def combined_actuals(
     )
     metadata = get_substation_metadata(data_config)
 
-    # Join metadata to get substation_id
-    metadata = metadata.with_columns(
-        pl.col("parquet_filename").str.replace(".parquet", "").alias("substation_name")
-    )
-
+    # Join metadata to get substation_number
     df = df.join(
-        metadata.select(["substation_name", "substation_number"]), on="substation_name", how="inner"
+        metadata.select(["substation_number"]), on="substation_number", how="inner"
     ).rename({"substation_number": "substation_id"})
 
     # Some actuals might have 'MW', others 'MVA'.

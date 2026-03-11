@@ -2,7 +2,7 @@ from pathlib import Path
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationLocations
+from contracts.data_schemas import SubstationLocations, SubstationMetadata
 
 from nged_data.schemas import CkanResource
 
@@ -36,30 +36,18 @@ def join_location_table_to_live_primaries(
     live_primaries: list[CkanResource],
 ) -> pl.DataFrame:
     """
-    Returns a DataFrame with the following columns:
+    Joins the substation locations dataset to the list of live primary flow resources.
 
-        "created",
-        "description",
-        "format",
-        "id",
-        "last_modified",
-        "metadata_modified",
-        "mimetype",
-        "substation_name_in_live_primaries",
-        "package_id",
-        "restricted_level",
-        "size",
-        "state",
-        "url",
-        "simple_name",
-        "simplified_substation_name_in_location_table",
-        "substation_number",
-        "substation_name_in_location_table",
-        "substation_type",
-        "latitude",
-        "longitude",
-        "h3_res_5"
+    This function performs a "dance" of normalization because NGED uses slightly different
+    naming conventions in different datasets. For example:
+    - The locations dataset might use "Abington 33/11kv".
+    - The live flows dataset might use "Abington Primary Transformer Flows".
 
+    We normalize these by stripping out common suffixes and voltage information to create
+    a "simple_name" that can be used for joining. We also use a manual mapping file for
+    cases where the automated normalization isn't enough.
+
+    Returns a DataFrame that can be validated against SubstationMetadata.
     """
     live_primaries_df = pl.DataFrame(live_primaries)
 
@@ -86,9 +74,29 @@ def join_location_table_to_live_primaries(
         simple_name=pl.coalesce("simplified_substation_name_in_location_table", "simple_name")
     )
 
-    # Rename the name columns
-    live_primaries_df = live_primaries_df.rename({"name": "substation_name_in_live_primaries"})
+    # Rename the name columns to match SubstationMetadata
+    live_primaries_df = live_primaries_df.rename(
+        {"name": "substation_name_in_live_primaries", "url": "url"}
+    )
     locations_renamed_col = locations.rename(
         {"substation_name": "substation_name_in_location_table"}
     )
-    return live_primaries_df.join(locations_renamed_col, on="simple_name").sort(by="simple_name")
+
+    # Join and select relevant columns for SubstationMetadata
+    joined = live_primaries_df.join(locations_renamed_col, on="simple_name")
+
+    # Ensure the URL is a string
+    joined = joined.with_columns(url=pl.col("url").cast(pl.String))
+
+    return joined.select(
+        [
+            "substation_number",
+            "substation_name_in_location_table",
+            "substation_name_in_live_primaries",
+            "url",
+            "substation_type",
+            "latitude",
+            "longitude",
+            "h3_res_5",
+        ]
+    ).sort(by="substation_number")

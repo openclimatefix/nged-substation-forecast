@@ -27,14 +27,14 @@ def xgb_models(
         context.log.warning("No Delta table found.")
         return dg.Output([], metadata={"n_models": 0})
 
-    substation_names = (
-        pl.read_delta(str(power_path)).select("substation_name").unique().to_series().to_list()
+    substation_numbers = (
+        pl.read_delta(str(power_path)).select("substation_number").unique().to_series().to_list()
     )
 
-    context.log.info(f"Training models for {len(substation_names)} substations")
+    context.log.info(f"Training models for {len(substation_numbers)} substations")
 
     model_paths = []
-    for substation_name in substation_names:
+    for substation_number in substation_numbers:
         try:
             data_config = DataConfig(
                 base_power_path=power_path,
@@ -43,14 +43,14 @@ def xgb_models(
             metadata = get_substation_metadata(data_config)
 
             df = prepare_data_for_substation(
-                sub_name=substation_name,
+                sub_number=substation_number,
                 metadata=metadata,
                 config=data_config,
                 use_lags=True,
             )
 
             if df.is_empty():
-                context.log.warning(f"No data available for substation {substation_name}")
+                context.log.warning(f"No data available for substation {substation_number}")
                 continue
 
             # Train model
@@ -64,9 +64,7 @@ def xgb_models(
 
             target_col = "power_mw"
             feature_cols = [
-                c
-                for c in df.columns
-                if c not in [target_col, "timestamp", "substation_name", "substation_id"]
+                c for c in df.columns if c not in [target_col, "timestamp", "substation_number"]
             ]
 
             eval_set = [(eval_df, eval_df[target_col])]
@@ -82,14 +80,14 @@ def xgb_models(
             model_path = (
                 settings.trained_ml_model_params_base_path
                 / XGBoostForecaster.model_name_and_version()
-                / f"{substation_name}.json"
+                / f"{substation_number}.json"
             )
             model_path.parent.mkdir(parents=True, exist_ok=True)
             forecaster.save(model_path)
             model_paths.append(model_path)
 
         except Exception as e:
-            context.log.error(f"Failed to train model for {substation_name}: {e}")
+            context.log.error(f"Failed to train model for {substation_number}: {e}")
 
     return dg.Output(
         model_paths,
@@ -107,7 +105,7 @@ def xgb_forecasts(
     """Generate forecasts for all substations using the trained XGBoost models."""
     all_forecasts = []
     for model_path in xgb_models:
-        substation_name = model_path.stem
+        substation_number = int(model_path.stem)
         try:
             # Load model
             forecaster = XGBoostForecaster.load(model_path)
@@ -119,7 +117,7 @@ def xgb_forecasts(
             metadata = get_substation_metadata(data_config)
 
             df = prepare_data_for_substation(
-                sub_name=substation_name,
+                sub_number=substation_number,
                 metadata=metadata,
                 config=data_config,
                 use_lags=True,
@@ -127,7 +125,7 @@ def xgb_forecasts(
 
             if df.is_empty():
                 context.log.warning(
-                    f"No data available for forecasting substation {substation_name}"
+                    f"No data available for forecasting substation {substation_number}"
                 )
                 continue
 
@@ -138,7 +136,7 @@ def xgb_forecasts(
             forecast_df = df.select(
                 [
                     pl.col("timestamp").alias("valid_time"),
-                    pl.col("substation_id"),
+                    pl.col("substation_number").alias("substation_id"),
                     pl.lit(preds).alias("power_mw").cast(pl.Float32),
                     pl.lit(datetime.now()).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
                     pl.lit(XGBoostForecaster.model_name_and_version())
@@ -149,7 +147,7 @@ def xgb_forecasts(
             all_forecasts.append(forecast_df)
 
         except Exception as e:
-            context.log.error(f"Failed to generate forecast for {substation_name}: {e}")
+            context.log.error(f"Failed to generate forecast for {substation_number}: {e}")
 
     if not all_forecasts:
         return dg.Output(pl.DataFrame(), metadata={"n_forecasts": 0})

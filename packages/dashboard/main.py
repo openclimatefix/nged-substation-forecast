@@ -4,7 +4,6 @@ __generated_with = "0.20.4"
 app = marimo.App(width="full")
 
 with app.setup:
-    from pathlib import PurePosixPath
     from typing import cast
 
     from contracts.settings import Settings
@@ -19,9 +18,7 @@ with app.setup:
     from pathlib import Path
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationLocationsWithH3
-    from nged_data import ckan
-    from nged_data.substation_names.align import join_location_table_to_live_primaries
+    from contracts.data_schemas import SubstationMetadata
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
@@ -36,25 +33,13 @@ def _(locations_path):
 
 @app.cell
 def _():
-    locations_path = (
-        BASE_PATH / settings.nged_data_path / "parquet" / "substation_locations.parquet"
-    )
-    _locations = SubstationLocationsWithH3.validate(pl.read_parquet(locations_path))
+    metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "substation_metadata.parquet"
+    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
-    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
-        api_key=settings.nged_ckan_token
-    )
+    # Filter for substations with live telemetry
+    df = df.filter(pl.col("url").is_not_null())
 
-    df = join_location_table_to_live_primaries(
-        live_primaries=_live_primaries,
-        locations=_locations,  # type: ignore[arg-type]
-    )
-    df = df.with_columns(
-        substation_name=pl.col("url").map_elements(
-            lambda url: PurePosixPath(url.path).stem, return_dtype=pl.String
-        )
-    )
-    return df, locations_path
+    return df, metadata_path
 
 
 @app.cell
@@ -81,7 +66,6 @@ def _(df):
             "geometry": geo_array,
             "name": df["substation_name_in_location_table"],
             "number": df["substation_number"],
-            "csv_stem": df["substation_name"],
         },
     )
     return (arrow_table,)
@@ -121,12 +105,12 @@ def _(df, layer_widget, map):
         )
     else:
         selected_df = df[layer_widget.selected_index]
-        substation_name = selected_df["substation_name"].item()
+        substation_number = selected_df["substation_number"].item()
 
         try:
             filtered_demand = cast(
                 pl.DataFrame,
-                delta_df.filter(pl.col("substation_name") == substation_name).collect(),
+                delta_df.filter(pl.col("substation_number") == substation_number).collect(),
             )
         except Exception as e:
             right_pane = mo.md(f"{e}")

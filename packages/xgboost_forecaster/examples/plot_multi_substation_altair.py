@@ -30,7 +30,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     metadata = get_substation_metadata(config)
 
     # Randomly select substations
-    available_subs = metadata["substation_name_in_location_table"].to_list()
+    available_subs = metadata["substation_number"].to_list()
     sample_subs = random.sample(available_subs, min(num_subs, len(available_subs)))
     log.info(f"Selected substations: {sample_subs}")
 
@@ -79,17 +79,16 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     # 2. Generate forecasts for each substation and ensemble member
     all_plot_data = []
 
-    for sub_name in sample_subs:
-        log.info(f"Generating forecast for {sub_name}...")
-        sub_meta = metadata.filter(pl.col("substation_name_in_location_table") == sub_name)
-        h3_index = sub_meta["h3_index"][0]
-        sub_id = sub_meta["substation_number"][0]
-        parquet_file = sub_meta["parquet_filename"][0]
+    for sub_number in sample_subs:
+        log.info(f"Generating forecast for {sub_number}...")
+        sub_meta = metadata.filter(pl.col("substation_number") == sub_number)
+        h3_index = sub_meta["h3_res_5"][0]
+        sub_name = sub_meta["substation_name_in_location_table"][0]
 
         # Historical power for lags
-        power_full = load_substation_power(parquet_file, config)
+        power_full = load_substation_power(sub_number, config)
         if power_full.is_empty():
-            log.warning(f"Skipping {sub_name} due to lack of sane power data.")
+            log.warning(f"Skipping {sub_number} due to lack of sane power data.")
             continue
 
         power_full = power_full.sort("timestamp")
@@ -143,7 +142,7 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
 
         # Add temporal features
         pred_data = (
-            pred_data.with_columns(pl.lit(sub_id).alias("substation_id").cast(pl.Int32))
+            pred_data.with_columns(pl.lit(sub_number).alias("substation_number").cast(pl.Int32))
             .pipe(add_temporal_features)
             .filter(pl.col("timestamp") <= forecast_end_time)
             .drop_nulls(subset=feature_names)
