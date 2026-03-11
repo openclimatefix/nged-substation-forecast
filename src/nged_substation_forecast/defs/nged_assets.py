@@ -98,6 +98,11 @@ def _download_and_process_substation(
             substation_name=substation_name, stage=IngestionStage.SUCCESS, df=None
         )
     except Exception as e:
+        # The exception might have a note with the CSV snippet from process_flows.py
+        error_message = str(e)
+        if hasattr(e, "__notes__") and e.__notes__:
+            error_message += "\n" + "\n".join(e.__notes__)
+
         try:
             csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
         except Exception:
@@ -105,7 +110,7 @@ def _download_and_process_substation(
         return SubstationIngestionResult(
             substation_name=substation_name,
             stage=IngestionStage.PROCESSING,
-            error_message=str(e),
+            error_message=error_message,
             csv_snippet=csv_snippet,
         )
 

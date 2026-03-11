@@ -2,7 +2,7 @@ import math
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import MissingCorePowerVariablesError, SubstationFlows
+from contracts.data_schemas import SubstationFlows
 
 
 def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[SubstationFlows]:
@@ -69,9 +69,6 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
 
     try:
         return SubstationFlows.validate(df, allow_missing_columns=True)
-    except MissingCorePowerVariablesError as e:
-        raise MissingCorePowerVariablesError(
-            f"{e}\nFirst rows of CSV data, before processing: {first_orig_rows}"
-        ) from e
     except Exception as e:
-        raise RuntimeError(f"First rows of CSV data, before processing: {first_orig_rows}") from e
+        e.add_note(f"First rows of CSV data, before processing: {first_orig_rows}")
+        raise
