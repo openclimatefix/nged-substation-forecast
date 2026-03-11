@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.11"
+__generated_with = "0.20.4"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -11,24 +11,27 @@ with app.setup:
     settings = Settings()
 
     import altair as alt
-    import geoarrow.pyarrow as geo_pyarrow  # type: ignore
+    import geoarrow.pyarrow as geo_pyarrow
     import lonboard
     import marimo as mo
+    from pathlib import Path
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationLocations
+    from contracts.data_schemas import SubstationLocationsWithH3
     from nged_data import ckan
     from nged_data.substation_names.align import join_location_table_to_live_primaries
 
-    BASE_PARQUET_PATH = settings.nged_data_path / "parquet" / "live_primary_flows"
+    BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
+
+    BASE_PARQUET_PATH = BASE_PATH / settings.nged_data_path / "parquet" / "live_primary_flows"
 
 
 @app.cell
 def _():
-    # TODO: Dagster should grab the latest locations (only when it updates)
-    #       and store the locations locally.
-    locations_path = settings.nged_data_path / "parquet" / "substation_locations.parquet"
-    _locations = SubstationLocations.validate(pl.read_parquet(locations_path))
+    locations_path = (
+        BASE_PATH / settings.nged_data_path / "parquet" / "substation_locations.parquet"
+    )
+    _locations = SubstationLocationsWithH3.validate(pl.read_parquet(locations_path))
 
     _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
         api_key=settings.nged_ckan_token
