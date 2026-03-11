@@ -28,7 +28,7 @@ from dagster import (
     asset,
 )
 from nged_data import ckan
-from nged_data.process_flows import MissingCorePowerVariablesError
+from contracts.data_schemas import MissingCorePowerVariablesError
 
 
 class IngestionStage(str, Enum):

@@ -8,6 +8,12 @@ import patito as pt
 import polars as pl
 
 
+class MissingCorePowerVariablesError(ValueError):
+    """Raised when a substation CSV lacks both MW and MVA data."""
+
+    pass
+
+
 class SubstationFlows(pt.Model):
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
@@ -38,7 +44,7 @@ class SubstationFlows(pt.Model):
     ) -> pt.DataFrame["SubstationFlows"]:  # type: ignore[invalid-method-override]
         """Validate the given dataframe, ensuring either MW or MVA is present."""
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
-            raise ValueError(
+            raise MissingCorePowerVariablesError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
                 f" {dataframe.columns=}, {dataframe.height=}"
             )
