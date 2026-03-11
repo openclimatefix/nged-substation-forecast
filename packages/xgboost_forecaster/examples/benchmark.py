@@ -27,7 +27,7 @@ def run_benchmark(
     exclude_features: list[str] | None = None,
 ):
     metadata = get_substation_metadata()
-    available_subs = metadata["substation_name_in_location_table"].to_list()
+    available_subs = metadata["substation_number"].to_list()
 
     # Use a fixed seed for reproducible benchmarking
     random.seed(42)
@@ -67,7 +67,7 @@ def run_benchmark(
     potential_features = [
         col
         for col in train_data.columns
-        if col not in ["timestamp", target_col, "ensemble_member", "h3_index", "substation_name"]
+        if col not in ["timestamp", target_col, "ensemble_member", "h3_index", "substation_number"]
         and train_data[col].dtype.is_numeric()
     ]
 

@@ -21,6 +21,9 @@ class SubstationFlows(pt.Model):
     # We'll set a loose range for now to catch extreme errors.
     # If we want to reduce storage space we could store kW and kVAr as Int16.
 
+    # The unique identifier for the substation.
+    substation_number: int = pt.Field(dtype=pl.Int32)
+
     # Active power:
     MW: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
 
@@ -78,6 +81,31 @@ class SubstationLocationsWithH3(SubstationLocations):
     """Substation locations including their H3 index."""
 
     h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
+
+
+class SubstationMetadata(pt.Model):
+    """Metadata for a substation, joining location data with live telemetry info."""
+
+    # NGED has 192,000 substations.
+    substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
+
+    substation_name_in_location_table: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
+
+    # This will be null if the substation doesn't have live telemetry.
+    substation_name_in_live_primaries: str | None = pt.Field(
+        dtype=pl.String, min_length=2, max_length=128, allow_missing=True
+    )
+
+    # The URL to the live telemetry CSV on NGED's CKAN portal.
+    url: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+
+    substation_type: str = pt.Field(dtype=pl.Categorical)
+    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
+    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
+    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
+
+    # When this metadata record was last updated from the upstream NGED datasets.
+    last_updated: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
 
 class PowerForecast(pt.Model):

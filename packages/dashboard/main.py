@@ -3,89 +3,41 @@ import marimo
 __generated_with = "0.20.4"
 app = marimo.App(width="full")
 
-
-@app.cell
-def _():
-    from pathlib import PurePosixPath
+with app.setup:
     from typing import cast
 
     from contracts.settings import Settings
 
     settings = Settings()
 
+    from datetime import datetime
+    from pathlib import Path
+
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
     import lonboard
     import marimo as mo
-    from datetime import datetime
-    from pathlib import Path
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationLocationsWithH3
-    from nged_data import ckan
-    from nged_data.substation_names.align import join_location_table_to_live_primaries
+    from contracts.data_schemas import SubstationMetadata
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
     BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "live_primary_flows"
-    return (
-        BASE_DELTA_PATH,
-        BASE_PATH,
-        PurePosixPath,
-        SubstationLocationsWithH3,
-        alt,
-        cast,
-        ckan,
-        datetime,
-        geo_pyarrow,
-        join_location_table_to_live_primaries,
-        lonboard,
-        mo,
-        pl,
-        pyarrow,
-        settings,
-    )
 
 
 @app.cell
-def _(
-    BASE_PATH,
-    PurePosixPath,
-    SubstationLocationsWithH3,
-    ckan,
-    join_location_table_to_live_primaries,
-    pl,
-    settings,
-):
-    locations_path = (
-        BASE_PATH / settings.nged_data_path / "parquet" / "substation_locations.parquet"
-    )
-    _locations = SubstationLocationsWithH3.validate(pl.read_parquet(locations_path))
+def _():
+    metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "substation_metadata.parquet"
+    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
-    _live_primaries = ckan.get_csv_resources_for_live_primary_substation_flows(
-        api_key=settings.nged_ckan_token
-    )
-
-    df = join_location_table_to_live_primaries(
-        live_primaries=_live_primaries,
-        locations=_locations,  # type: ignore[arg-type]
-    )
-    df = df.with_columns(
-        substation_name=pl.col("url").map_elements(
-            lambda url: PurePosixPath(url.path).stem, return_dtype=pl.String
-        )
-    )
+    # Filter for substations with live telemetry
+    df = df.filter(pl.col("url").is_not_null())
     return (df,)
 
 
 @app.cell
 def _(df):
-    df
-    return
-
-
-@app.cell
-def _(df, geo_pyarrow, pl, pyarrow):
     # Create arrow table
     geo_array = (
         geo_pyarrow.point()
@@ -102,14 +54,13 @@ def _(df, geo_pyarrow, pl, pyarrow):
             "geometry": geo_array,
             "name": df["substation_name_in_location_table"],
             "number": df["substation_number"],
-            "csv_stem": df["substation_name"],
         },
     )
     return (arrow_table,)
 
 
 @app.cell
-def _(arrow_table, lonboard, mo):
+def _(arrow_table):
     layer = lonboard.ScatterplotLayer(
         arrow_table,
         pickable=True,
@@ -128,7 +79,7 @@ def _(arrow_table, lonboard, mo):
 
 
 @app.cell
-def _(BASE_DELTA_PATH, alt, cast, datetime, df, layer_widget, map, mo, pl):
+def _(df, layer_widget, map):
     delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
         pl.col("timestamp") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
     )
@@ -142,12 +93,12 @@ def _(BASE_DELTA_PATH, alt, cast, datetime, df, layer_widget, map, mo, pl):
         )
     else:
         selected_df = df[layer_widget.selected_index]
-        substation_name = selected_df["substation_name"].item()
+        substation_number = selected_df["substation_number"].item()
 
         try:
             filtered_demand = cast(
                 pl.DataFrame,
-                delta_df.filter(pl.col("substation_name") == substation_name).collect(),
+                delta_df.filter(pl.col("substation_number") == substation_number).collect(),
             )
         except Exception as e:
             right_pane = mo.md(f"{e}")
