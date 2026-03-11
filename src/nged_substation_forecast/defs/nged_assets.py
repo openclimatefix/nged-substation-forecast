@@ -8,13 +8,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
 import dagster as dg
+import h3.api.numpy_int as h3
 import httpx
 import nged_data
 import polars as pl
-import h3.api.numpy_int as h3
+from contracts.data_schemas import SubstationLocationsWithH3
+from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
     AssetCheckSpec,
@@ -28,9 +30,6 @@ from dagster import (
 from deltalake import DeltaTable, write_deltalake
 from nged_data import ckan
 from nged_data.process_flows import MissingCorePowerVariablesError
-
-from contracts.data_schemas import SubstationLocationsWithH3
-from contracts.settings import Settings
 
 
 class IngestionStage(str, Enum):
@@ -172,18 +171,33 @@ def live_primary_flows(
     partition_date = datetime.strptime(partition_date_str, "%Y-%m-%d")
     delta_path = str(_get_delta_path(settings))
 
-    # Check what we've already processed today
+    # Check what we've already processed for partition_date.
     processed_substations = set()
     if Path(delta_path).exists() and not config.force_rerun_all:
         try:
-            # Query the delta table for today's ingestions.
-            processed_df = pl.read_delta(
-                delta_path, pyarrow_options={"filters": [("ingested_at", "=", partition_date)]}
+            # Find which substations have already been downloaded for partition_date:
+            processed_df = cast(
+                pl.DataFrame,
+                pl.scan_delta(delta_path)
+                .filter(
+                    pl.col("ingested_at") == pl.lit(partition_date).cast(pl.Datetime("us", "UTC"))
+                )
+                .select("substation_name")
+                .unique()
+                .collect(),
             )
-            if not processed_df.is_empty():
-                processed_substations = set(processed_df["substation_name"].unique().to_list())
         except Exception as e:
-            context.log.warning(f"Failed to read Delta table state: {e}")
+            context.log.warning(f"Failed to read Delta Table {delta_path}: {e}")
+            raise e
+        else:
+            processed_substations = set(processed_df.get_column("substation_name").to_list())
+
+    already_processed_count = len(processed_substations)
+    context.log.info(
+        "%d substations have already been ingested for partition %s",
+        already_processed_count,
+        partition_date_str,
+    )
 
     api_key = settings.nged_ckan_token
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
@@ -194,8 +208,6 @@ def live_primary_flows(
         substation_name = PurePosixPath(str(r.url)).stem
         if config.force_rerun_all or substation_name not in processed_substations:
             unprocessed_resources.append(r)
-
-    already_processed_count = len(all_resources) - len(unprocessed_resources)
 
     # Apply manual filters
     if config.substation_names:
@@ -259,10 +271,10 @@ def live_primary_flows(
                         raise
 
     metadata: dict[str, dg.MetadataValue] = {
-        "Total Resources on CKAN": MetadataValue.int(len(all_resources)),
-        "Already Processed": MetadataValue.int(already_processed_count),
-        "Filtered Out": MetadataValue.int(filtered_out_count),
-        "Successfully Processed Today": MetadataValue.int(len(successes)),
+        "Total resources on CKAN": MetadataValue.int(len(all_resources)),
+        "Already processed for this partition": MetadataValue.int(already_processed_count),
+        "Manually filtered out": MetadataValue.int(filtered_out_count),
+        "Successfully processed for this partition": MetadataValue.int(len(successes)),
         "Failed": MetadataValue.int(len(failures)),
     }
     metadata.update(_format_failure_metadata(failures))
