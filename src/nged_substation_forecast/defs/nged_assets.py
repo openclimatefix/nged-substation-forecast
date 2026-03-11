@@ -425,7 +425,7 @@ def substation_metadata(
         final_metadata = new_metadata
 
     # 7. Validate against the new schema
-    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)
+    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore[arg-type]
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk

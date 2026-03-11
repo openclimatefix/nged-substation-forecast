@@ -10,10 +10,12 @@ def test_substation_flows_validation_mw_or_mva():
     df_mw = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_number": [123],
             "MW": [10.0],
         }
     ).with_columns(
         [
+            pl.col("substation_number").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
         ]
     )
@@ -25,10 +27,12 @@ def test_substation_flows_validation_mw_or_mva():
     df_mva = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_number": [123],
             "MVA": [10.0],
         }
     ).with_columns(
         [
+            pl.col("substation_number").cast(pl.Int32),
             pl.col("MVA").cast(pl.Float32),
         ]
     )
@@ -40,10 +44,12 @@ def test_substation_flows_validation_mw_or_mva():
     df_none = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_number": [123],
             "MVAr": [5.0],
         }
     ).with_columns(
         [
+            pl.col("substation_number").cast(pl.Int32),
             pl.col("MVAr").cast(pl.Float32),
         ]
     )
@@ -57,11 +63,13 @@ def test_substation_flows_validation_both():
     df_both = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_number": [123],
             "MW": [10.0],
             "MVA": [12.0],
         }
     ).with_columns(
         [
+            pl.col("substation_number").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
             pl.col("MVA").cast(pl.Float32),
         ]
