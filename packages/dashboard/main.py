@@ -3,7 +3,9 @@ import marimo
 __generated_with = "0.20.4"
 app = marimo.App(width="full")
 
-with app.setup:
+
+@app.cell
+def _():
     from pathlib import PurePosixPath
     from typing import cast
 
@@ -26,10 +28,35 @@ with app.setup:
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
     BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "live_primary_flows"
+    return (
+        BASE_DELTA_PATH,
+        BASE_PATH,
+        PurePosixPath,
+        SubstationLocationsWithH3,
+        alt,
+        cast,
+        ckan,
+        datetime,
+        geo_pyarrow,
+        join_location_table_to_live_primaries,
+        lonboard,
+        mo,
+        pl,
+        pyarrow,
+        settings,
+    )
 
 
 @app.cell
-def _():
+def _(
+    BASE_PATH,
+    PurePosixPath,
+    SubstationLocationsWithH3,
+    ckan,
+    join_location_table_to_live_primaries,
+    pl,
+    settings,
+):
     locations_path = (
         BASE_PATH / settings.nged_data_path / "parquet" / "substation_locations.parquet"
     )
@@ -58,7 +85,7 @@ def _(df):
 
 
 @app.cell
-def _(df):
+def _(df, geo_pyarrow, pl, pyarrow):
     # Create arrow table
     geo_array = (
         geo_pyarrow.point()
@@ -82,7 +109,7 @@ def _(df):
 
 
 @app.cell
-def _(arrow_table):
+def _(arrow_table, lonboard, mo):
     layer = lonboard.ScatterplotLayer(
         arrow_table,
         pickable=True,
@@ -101,7 +128,7 @@ def _(arrow_table):
 
 
 @app.cell
-def _(df, layer_widget, map):
+def _(BASE_DELTA_PATH, alt, cast, datetime, df, layer_widget, map, mo, pl):
     delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
         pl.col("timestamp") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
     )
@@ -150,11 +177,6 @@ def _(df, layer_widget, map):
                 )
 
     mo.vstack([map, right_pane])
-    return
-
-
-@app.cell
-def _():
     return
 
 
