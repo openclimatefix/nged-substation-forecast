@@ -26,26 +26,13 @@ with app.setup:
 
 
 @app.cell
-def _(locations_path):
-    pl.read_parquet(locations_path)
-    return
-
-
-@app.cell
 def _():
     metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "substation_metadata.parquet"
     df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
     # Filter for substations with live telemetry
     df = df.filter(pl.col("url").is_not_null())
-
-    return df, metadata_path
-
-
-@app.cell
-def _(df):
-    df
-    return
+    return (df,)
 
 
 @app.cell
@@ -140,11 +127,6 @@ def _(df, layer_widget, map):
                 )
 
     mo.vstack([map, right_pane])
-    return
-
-
-@app.cell
-def _():
     return
 
 

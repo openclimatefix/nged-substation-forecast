@@ -34,7 +34,7 @@ def simplify_substation_name(col_name: str) -> pl.Expr:
 def join_location_table_to_live_primaries(
     locations: pt.DataFrame[SubstationLocations],
     live_primaries: list[CkanResource],
-) -> pl.DataFrame:
+) -> pt.DataFrame[SubstationMetadata]:
     """
     Joins the substation locations dataset to the list of live primary flow resources.
 
@@ -75,9 +75,7 @@ def join_location_table_to_live_primaries(
     )
 
     # Rename the name columns to match SubstationMetadata
-    live_primaries_df = live_primaries_df.rename(
-        {"name": "substation_name_in_live_primaries", "url": "url"}
-    )
+    live_primaries_df = live_primaries_df.rename({"name": "substation_name_in_live_primaries"})
     locations_renamed_col = locations.rename(
         {"substation_name": "substation_name_in_location_table"}
     )
@@ -86,17 +84,10 @@ def join_location_table_to_live_primaries(
     joined = live_primaries_df.join(locations_renamed_col, on="simple_name")
 
     # Ensure the URL is a string
-    joined = joined.with_columns(url=pl.col("url").cast(pl.String))
+    joined = joined.cast({"url": pl.String})
 
-    return joined.select(
-        [
-            "substation_number",
-            "substation_name_in_location_table",
-            "substation_name_in_live_primaries",
-            "url",
-            "substation_type",
-            "latitude",
-            "longitude",
-            "h3_res_5",
-        ]
-    ).sort(by="substation_number")
+    # Select only the columns defined in the SubstationMetadata schema
+    columns_to_select = [col for col in SubstationMetadata.columns if col in joined.columns]
+    df = joined.select(columns_to_select).sort(by="substation_number")
+
+    return SubstationMetadata.validate(df, allow_missing_columns=True)

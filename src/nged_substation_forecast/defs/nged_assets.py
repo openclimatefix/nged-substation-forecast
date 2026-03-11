@@ -12,7 +12,6 @@ from typing import NamedTuple, cast
 import dagster as dg
 import h3.api.numpy_int as h3
 import httpx
-import nged_data
 import polars as pl
 from contracts.data_schemas import (
     MissingCorePowerVariablesError,
@@ -29,7 +28,8 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from nged_data import ckan
+from nged_data import ckan, process_live_primary_substation_flows
+from nged_data.substation_names import align
 
 
 class IngestionStage(str, Enum):
@@ -89,7 +89,7 @@ def _download_and_process_substation(
 
     # Process
     try:
-        new_df = nged_data.process_live_primary_substation_flows(csv_data)
+        new_df = process_live_primary_substation_flows(csv_data)
     except MissingCorePowerVariablesError:
         log.info(f"Skipping substation {substation_number} because it lacks MW/MVA data.")
         # Return success but with no dataframe, so it gets recorded as processed
@@ -186,19 +186,26 @@ def _get_processed_substations(
     return processed_substations
 
 
+class SubstationResource(NamedTuple):
+    """A resource for a substation's live telemetry."""
+
+    substation_number: int
+    url: str
+
+
 def _filter_resources(
-    all_resources: list[tuple[int, str]],
+    all_resources: list[SubstationResource],
     processed_substations: set[int],
     config: LivePrimaryFlowsConfig,
     log: dg.DagsterLogManager,
-) -> list[tuple[int, str]]:
+) -> list[SubstationResource]:
     """Filter resources based on processing state and configuration."""
     # Filter out already processed
-    unprocessed = [r for r in all_resources if r[0] not in processed_substations]
+    unprocessed = [r for r in all_resources if r.substation_number not in processed_substations]
 
     # Apply manual filters
     if config.substation_numbers:
-        filtered = [r for r in unprocessed if r[0] in config.substation_numbers]
+        filtered = [r for r in unprocessed if r.substation_number in config.substation_numbers]
         log.info("Filtered to %d substations by number", len(filtered))
         return filtered
 
@@ -211,7 +218,7 @@ def _filter_resources(
 
 
 def _download_and_process_all(
-    resources: list[tuple[int, str]],
+    resources: list[SubstationResource],
     api_key: str,
     config: LivePrimaryFlowsConfig,
     log: dg.DagsterLogManager,
@@ -223,7 +230,13 @@ def _download_and_process_all(
             return list(
                 executor.map(
                     lambda r: _download_and_process_substation(
-                        r[0], r[1], api_key, config.max_retries, log, client, partition_date
+                        r.substation_number,
+                        r.url,
+                        api_key,
+                        config.max_retries,
+                        log,
+                        client,
+                        partition_date,
                     ),
                     resources,
                 )
@@ -302,17 +315,17 @@ def live_primary_flows(
         raise FileNotFoundError(f"Metadata file not found at {metadata_path}")
 
     metadata_df = pl.read_parquet(metadata_path)
-    all_resources = (
-        metadata_df.filter(pl.col("url").is_not_null())
+    all_resources = [
+        SubstationResource(substation_number=row[0], url=row[1])
+        for row in metadata_df.filter(pl.col("url").is_not_null())
         .select(["substation_number", "url"])
         .iter_rows()
-    )
-    all_resources = list(all_resources)
+    ]
 
     resources_to_process = _filter_resources(
         all_resources, processed_substations, config, context.log
     )
-    resources_to_process = sorted(resources_to_process, key=lambda r: r[0])
+    resources_to_process = sorted(resources_to_process, key=lambda r: r.substation_number)
     context.log.info(
         f"Planning to download and process data for {len(resources_to_process)} substations."
     )
@@ -381,7 +394,7 @@ def substation_metadata(
     )
 
     # 4. Join locations with live primaries
-    new_metadata = nged_data.substation_names.align.join_location_table_to_live_primaries(
+    new_metadata = align.join_location_table_to_live_primaries(
         locations=locations, live_primaries=live_primaries
     )
 
