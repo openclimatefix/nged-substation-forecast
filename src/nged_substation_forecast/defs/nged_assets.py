@@ -1,6 +1,5 @@
 """Dagster assets for NGED data."""
 
-import copy
 import random
 import time
 from collections.abc import Iterable
@@ -15,7 +14,7 @@ import h3.api.numpy_int as h3
 import httpx
 import nged_data
 import polars as pl
-from contracts.data_schemas import SubstationLocationsWithH3
+from contracts.data_schemas import MissingCorePowerVariablesError, SubstationLocationsWithH3
 from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
@@ -28,7 +27,6 @@ from dagster import (
     asset,
 )
 from nged_data import ckan
-from contracts.data_schemas import MissingCorePowerVariablesError
 
 
 class IngestionStage(str, Enum):
@@ -54,7 +52,7 @@ class LivePrimaryFlowsConfig(dg.Config):
     """Configuration for the live primary flows ingestion asset."""
 
     force_rerun_all: bool = False
-    max_concurrent_connections: int = 10
+    max_concurrent_connections: int = 32
     max_retries: int = 3
     substation_names: list[str] | None = None  # Download only a subset of substations.
     limit: int | None = None  # Only download the first n substations. Useful for testing.
@@ -159,6 +157,121 @@ def _format_failure_metadata(
     return {"Failure Details": MetadataValue.md(md_table + "\n" + md_snippets)}
 
 
+def _get_processed_substations(
+    delta_path: str, partition_date: datetime, log: dg.DagsterLogManager
+) -> set[str]:
+    """Identify which substations have already been processed for the given partition date."""
+    if not Path(delta_path).exists():
+        return set()
+
+    try:
+        processed_df = cast(
+            pl.DataFrame,
+            pl.scan_delta(delta_path)
+            .filter(pl.col("ingested_at") == pl.lit(partition_date).cast(pl.Datetime("us", "UTC")))
+            .select("substation_name")
+            .unique()
+            .collect(),
+        )
+    except Exception as e:
+        log.exception(f"Failed to read Delta Table {delta_path}: {e}")
+        raise
+    processed_substations = set(processed_df.get_column("substation_name").to_list())
+    log.info(
+        f"{len(processed_substations)} substations have already been processed for {partition_date}"
+    )
+    return processed_substations
+
+
+def _filter_resources(
+    all_resources: list[nged_data.CkanResource],
+    processed_substations: set[str],
+    config: LivePrimaryFlowsConfig,
+    log: dg.DagsterLogManager,
+) -> list[nged_data.CkanResource]:
+    """Filter CKAN resources based on processing state and configuration."""
+    # Filter out already processed
+    unprocessed = [
+        r for r in all_resources if PurePosixPath(str(r.url)).stem not in processed_substations
+    ]
+
+    # Apply manual filters
+    if config.substation_names:
+        filtered = [r for r in unprocessed if r.name in config.substation_names]
+        log.info("Filtered to %d substations by name", len(filtered))
+        return filtered
+
+    if config.limit:
+        limited = unprocessed[: config.limit]
+        log.info("Limited to %d substations", config.limit)
+        return limited
+
+    return unprocessed
+
+
+def _download_and_process_all(
+    resources: list[nged_data.CkanResource],
+    api_key: str,
+    config: LivePrimaryFlowsConfig,
+    log: dg.DagsterLogManager,
+    partition_date: datetime,
+) -> list[SubstationIngestionResult]:
+    """Download and process multiple substations concurrently."""
+    with httpx.Client() as client:
+        with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
+            return list(
+                executor.map(
+                    lambda r: _download_and_process_substation(
+                        r, api_key, config.max_retries, log, client, partition_date
+                    ),
+                    resources,
+                )
+            )
+
+
+def _merge_to_delta(
+    delta_path: str, successes: list[SubstationIngestionResult], log: dg.DagsterLogManager
+):
+    """Merge successful ingestion results into the Delta Lake table."""
+    if not successes:
+        return
+
+    log.info(f"Merging {len(successes)} dataframes into Delta Lake...")
+    combined_df = pl.concat([r.df for r in successes if r.df is not None])
+
+    if not Path(delta_path).exists():
+        combined_df.write_delta(
+            delta_path, delta_write_options={"partition_by": ["substation_name"]}
+        )
+        return
+
+    # Retry loop for concurrent writes
+    max_retries = 5
+    for attempt in range(max_retries):
+        try:
+            (
+                combined_df.write_delta(
+                    delta_path,
+                    mode="merge",
+                    delta_merge_options={
+                        "predicate": "s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
+                        "source_alias": "s",
+                        "target_alias": "t",
+                    },
+                )
+                .when_not_matched_insert_all()
+                .execute()
+            )
+            break
+        except Exception as e:
+            if "concurrent" in str(e).lower() or "commit failed" in str(e).lower():
+                time.sleep(random.uniform(0.5, 2.0) * (1.5**attempt))
+                if attempt == max_retries - 1:
+                    raise
+            else:
+                raise
+
+
 @asset(
     partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
     check_specs=[
@@ -171,112 +284,44 @@ def live_primary_flows(
     settings: ResourceParam[Settings],
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
-    partition_date_str = context.partition_key
-    partition_date = datetime.strptime(partition_date_str, "%Y-%m-%d")
+    partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
     delta_path = str(_get_delta_path(settings))
 
-    # Check what we've already processed for partition_date.
-    processed_substations = set()
-    if Path(delta_path).exists() and not config.force_rerun_all:
-        try:
-            # Find which substations have already been downloaded for partition_date:
-            processed_df = cast(
-                pl.DataFrame,
-                pl.scan_delta(delta_path)
-                .filter(
-                    pl.col("ingested_at") == pl.lit(partition_date).cast(pl.Datetime("us", "UTC"))
-                )
-                .select("substation_name")
-                .unique()
-                .collect(),
-            )
-        except Exception as e:
-            context.log.warning(f"Failed to read Delta Table {delta_path}: {e}")
-            raise e
-        else:
-            processed_substations = set(processed_df.get_column("substation_name").to_list())
-
-    already_processed_count = len(processed_substations)
-    context.log.info(
-        "%d substations have already been ingested for partition %s",
-        already_processed_count,
-        partition_date_str,
+    # Identify what's already processed
+    processed_substations = (
+        set()
+        if config.force_rerun_all
+        else _get_processed_substations(delta_path, partition_date, context.log)
     )
 
+    # Fetch and filter resources
     api_key = settings.nged_ckan_token
     all_resources = ckan.get_csv_resources_for_live_primary_substation_flows(api_key=api_key)
+    resources_to_process = _filter_resources(
+        all_resources, processed_substations, config, context.log
+    )
+    resources_to_process = sorted(resources_to_process, key=lambda r: r.name)
+    context.log.info(
+        f"Planning to download and process data for {len(resources_to_process)} substations."
+    )
+    if len(resources_to_process) >= 1:
+        context.log.info(f"First substation to process = {resources_to_process[0]}")
+    if len(resources_to_process) >= 2:
+        context.log.info(f"Last substation to process = {resources_to_process[-1]}")
 
-    # Filter resources
-    unprocessed_resources = []
-    for r in all_resources:
-        substation_name = PurePosixPath(str(r.url)).stem
-        if config.force_rerun_all or substation_name not in processed_substations:
-            unprocessed_resources.append(r)
-
-    # Apply manual filters
-    if config.substation_names:
-        resources_to_process = [
-            r for r in unprocessed_resources if r.name in config.substation_names
-        ]
-        context.log.info("Filtered to %d substations by name", len(resources_to_process))
-    elif config.limit:
-        resources_to_process = unprocessed_resources[: config.limit]
-        context.log.info("Limited to %d substations", config.limit)
-    else:
-        resources_to_process = copy.copy(unprocessed_resources)
-
-    filtered_out_count = len(unprocessed_resources) - len(resources_to_process)
-
-    # Download concurrently
-    with httpx.Client() as client:
-        with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
-            results = list(
-                executor.map(
-                    lambda r: _download_and_process_substation(
-                        r, api_key, config.max_retries, context.log, client, partition_date
-                    ),
-                    resources_to_process,
-                )
-            )
-
+    # Download and process
+    results = _download_and_process_all(
+        resources_to_process, api_key, config, context.log, partition_date
+    )
     successes = [r for r in results if r.stage == IngestionStage.SUCCESS and r.df is not None]
     failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
 
-    # Merge into Delta Lake
-    if successes:
-        context.log.info(f"Merging {len(successes)} dataframes into Delta Lake...")
-        combined_df = pl.concat([r.df for r in successes if r.df is not None])
+    # Storage
+    _merge_to_delta(delta_path, successes, context.log)
 
-        if not Path(delta_path).exists():
-            combined_df.write_delta(
-                delta_path, delta_write_options={"partition_by": ["substation_name"]}
-            )
-        else:
-            # Retry loop for concurrent writes
-            max_retries = 5
-            for attempt in range(max_retries):
-                try:
-                    (
-                        combined_df.write_delta(
-                            delta_path,
-                            mode="merge",
-                            delta_merge_options={
-                                "predicate": "s.timestamp = t.timestamp AND s.substation_name = t.substation_name",
-                                "source_alias": "s",
-                                "target_alias": "t",
-                            },
-                        )
-                        .when_not_matched_insert_all()
-                        .execute()
-                    )
-                    break
-                except Exception as e:
-                    if "concurrent" in str(e).lower() or "commit failed" in str(e).lower():
-                        time.sleep(random.uniform(0.5, 2.0) * (1.5**attempt))
-                        if attempt == max_retries - 1:
-                            raise
-                    else:
-                        raise
+    # Reporting
+    already_processed_count = len(processed_substations)
+    filtered_out_count = len(all_resources) - already_processed_count - len(resources_to_process)
 
     metadata: dict[str, dg.MetadataValue] = {
         "Total resources on CKAN": MetadataValue.int(len(all_resources)),
@@ -297,7 +342,6 @@ def live_primary_flows(
         check_name="all_substations_succeeded",
         metadata=metadata,
     )
-
     yield MaterializeResult(metadata=metadata)
 
 
