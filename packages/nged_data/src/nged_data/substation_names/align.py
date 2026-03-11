@@ -35,6 +35,32 @@ def join_location_table_to_live_primaries(
     locations: pt.DataFrame[SubstationLocations],
     live_primaries: list[CkanResource],
 ) -> pl.DataFrame:
+    """
+    Returns a DataFrame with the following columns:
+
+        "created",
+        "description",
+        "format",
+        "id",
+        "last_modified",
+        "metadata_modified",
+        "mimetype",
+        "substation_name_in_live_primaries",
+        "package_id",
+        "restricted_level",
+        "size",
+        "state",
+        "url",
+        "simple_name",
+        "simplified_substation_name_in_location_table",
+        "substation_number",
+        "substation_name_in_location_table",
+        "substation_type",
+        "latitude",
+        "longitude",
+        "h3_res_5"
+
+    """
     live_primaries_df = pl.DataFrame(live_primaries)
 
     # Append a "simple_name" column to each dataframe:

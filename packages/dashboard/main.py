@@ -29,6 +29,12 @@ with app.setup:
 
 
 @app.cell
+def _(locations_path):
+    pl.read_parquet(locations_path)
+    return
+
+
+@app.cell
 def _():
     locations_path = (
         BASE_PATH / settings.nged_data_path / "parquet" / "substation_locations.parquet"
@@ -48,7 +54,7 @@ def _():
             lambda url: PurePosixPath(url.path).stem, return_dtype=pl.String
         )
     )
-    return (df,)
+    return df, locations_path
 
 
 @app.cell
