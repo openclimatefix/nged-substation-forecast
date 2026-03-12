@@ -124,8 +124,10 @@ def load_weather_data(
     weather = weather.group_by(group_cols).agg([pl.col(c).mean() for c in nwp_vars])
 
     # Resample and Interpolate to match target resolution
-    ts_min = weather["timestamp"].min()
-    ts_max = weather["timestamp"].max()
+    ts_min, ts_max = weather.select(
+        min=pl.col("timestamp").min(),
+        max=pl.col("timestamp").max(),
+    ).row(0)
     if ts_min is not None and ts_max is not None:
         time_grid = (
             pl.datetime_range(
@@ -195,10 +197,9 @@ def prepare_data_for_substation(
         )
 
     first_timestamp, last_timestamp = power.select(
-        min=pl.col("timestamp").min(), max=pl.col("timestamp").max()
-    )
-    first_timestamp = first_timestamp.item()
-    last_timestamp = last_timestamp.item()
+        min=pl.col("timestamp").min(),
+        max=pl.col("timestamp").max(),
+    ).row(0)
 
     if first_timestamp is None or last_timestamp is None:
         raise RuntimeError("first_timestamp or last_timestamp is None!")
