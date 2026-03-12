@@ -79,6 +79,9 @@ def load_weather_data(
     """Load weather data for specific H3 cells and date range."""
     config = config or DataConfig()
     # We'll load all files between start and end date
+    # TODO(Jack): I'm not sure what's going on here! Why don't we just select based on a single
+    # init time, and generating the filename from that init time. I need to look at how
+    # `load_weather_data` is called.
     files = sorted(config.base_weather_path.glob("*.parquet"))
     relevant_files = [f for f in files if start_date <= f.stem.split("T")[0] <= end_date]
 
