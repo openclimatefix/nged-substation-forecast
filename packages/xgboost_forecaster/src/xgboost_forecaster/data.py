@@ -4,8 +4,8 @@ import dataclasses
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import cast
 
+import patito as pt
 import polars as pl
 from contracts.data_schemas import SubstationFlows, SubstationMetadata
 from contracts.settings import Settings
@@ -75,7 +75,6 @@ def load_weather_data(
     config: DataConfig | None = None,
     init_time: datetime | None = None,
     average_ensembles: bool = True,
-    resample_to: str = "30m",
 ) -> pl.DataFrame:
     """Load weather data for specific H3 cells and date range."""
     config = config or DataConfig()
@@ -129,7 +128,9 @@ def load_weather_data(
     ts_max = weather["timestamp"].max()
     if ts_min is not None and ts_max is not None:
         time_grid = (
-            pl.datetime_range(ts_min, ts_max, interval=resample_to, time_zone="UTC", eager=True)
+            pl.datetime_range(
+                ts_min, ts_max, interval=config.resolution, time_zone="UTC", eager=True
+            )
             .alias("timestamp")
             .to_frame()
         )
@@ -155,65 +156,67 @@ def load_weather_data(
 
 
 def prepare_data_for_substation(
-    sub_number: int,
-    metadata: pl.DataFrame,
+    substation_number: int,
+    substation_metadata: pt.DataFrame[SubstationMetadata],
     config: DataConfig | None = None,
     use_lags: bool = True,
-    member_selection: str = "mean",
+    weather_ens_member_selection: str = "mean",
 ) -> pl.DataFrame:
     """Load and join data for a single substation."""
     config = config or DataConfig()
 
-    sub_meta = metadata.filter(pl.col("substation_number") == sub_number)
+    sub_meta = substation_metadata.filter(pl.col("substation_number") == substation_number)
 
     if sub_meta.is_empty():
-        log.warning(f"Substation {sub_number} not found in metadata")
-        return pl.DataFrame()
+        raise RuntimeError(f"Substation {substation_number} not found in metadata")
 
     h3_index = sub_meta["h3_res_5"][0]
 
-    power = load_substation_power(sub_number, config)
+    power = load_substation_power(substation_number, config)
     if power.is_empty():
-        return pl.DataFrame()
+        raise RuntimeError(f"No power data for substation {substation_number}!")
 
     if use_lags:
         # Add power lags
         power_lag_7d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_7d"),
+                pl.col("power").alias("power_lag_7d"),
             ]
         )
         power_lag_14d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_14d"),
+                pl.col("power").alias("power_lag_14d"),
             ]
         )
         power = power.join(power_lag_7d, on="timestamp", how="left").join(
             power_lag_14d, on="timestamp", how="left"
         )
 
-    power_min = cast(datetime, power["timestamp"].min())
-    power_max = cast(datetime, power["timestamp"].max())
+    first_timestamp, last_timestamp = power.select(
+        min=pl.col("timestamp").min(), max=pl.col("timestamp").max()
+    )
+    first_timestamp = first_timestamp.item()
+    last_timestamp = last_timestamp.item()
 
-    if power_min is None or power_max is None:
-        return pl.DataFrame()
+    if first_timestamp is None or last_timestamp is None:
+        raise RuntimeError("first_timestamp or last_timestamp is None!")
 
-    end_date = power_max.strftime("%Y-%m-%d")
-    weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
+    end_date = last_timestamp.strftime("%Y-%m-%d")
+    weather_start = (first_timestamp - timedelta(days=2)).strftime("%Y-%m-%d")
 
     weather = load_weather_data(
         [h3_index],
         weather_start,
         end_date,
         config,
-        average_ensembles=(member_selection == "mean"),
+        average_ensembles=(weather_ens_member_selection == "mean"),
     )
     if weather.is_empty():
         return pl.DataFrame()
 
-    if member_selection == "single":
+    if weather_ens_member_selection == "single":
         weather = weather.filter(pl.col("ensemble_member") == 0)
 
     weather = add_weather_features(weather)
@@ -221,7 +224,7 @@ def prepare_data_for_substation(
 
     if not sub_data.is_empty():
         sub_data = sub_data.with_columns(
-            pl.lit(sub_number).alias("substation_number").cast(pl.Int32),
+            pl.lit(substation_number).alias("substation_number").cast(pl.Int32),
         )
         sub_data = add_temporal_features(sub_data)
 
