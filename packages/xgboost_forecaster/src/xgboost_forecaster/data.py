@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import cast
 
 import polars as pl
-from contracts.data_schemas import SubstationMetadata
+from contracts.data_schemas import SubstationFlows, SubstationMetadata
 from contracts.settings import Settings
 
 from xgboost_forecaster.features import add_temporal_features, add_weather_features
@@ -23,75 +23,47 @@ class DataConfig:
 
     base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
     base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
-    # TODO: Remove `ckan_token` after teaching Dagster to download substation locations
-    ckan_token: str = _SETTINGS.nged_ckan_token
     h3_res: int = 5  # TODO: This should probably be stored somewhere like nwp_data_path/ECMWF/ENS/metadata.json?
     resolution: str = "30m"
 
 
-# TODO: Most of (or maybe all of) this function should be computed by Dagster once.
 def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     """Load substation metadata and filter for those with available power data."""
     config = config or DataConfig()
     metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
-    if not metadata_path.exists():
-        return pl.DataFrame()
-
-    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
+    metadata_df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
     # Only return substations we have local power data for in Delta Lake
-    try:
-        available_subs = (
-            pl.read_delta(str(config.base_power_path))
-            .select("substation_number")
-            .unique()
-            .to_series()
-            .to_list()
-        )
+    substations_with_telemetry = (
+        pl.read_delta(str(config.base_power_path))
+        .select("substation_number")
+        .unique()
+        .to_series()
+        .to_list()
+    )
 
-        df = df.filter(pl.col("substation_number").is_in(available_subs))
-    except Exception:
-        # If delta table doesn't exist or has an issue, return empty
-        df = df.filter(pl.lit(False))
-
-    return df
+    return metadata_df.filter(pl.col("substation_number").is_in(substations_with_telemetry))
 
 
 def load_substation_power(sub_number: int, config: DataConfig | None = None) -> pl.DataFrame:
     """Load, validate and downsample power data for a single substation."""
     config = config or DataConfig()
 
-    delta_path = str(config.base_power_path)
-    try:
-        df = pl.read_delta(
-            delta_path, pyarrow_options={"filters": [("substation_number", "=", sub_number)]}
-        )
-    except Exception:
-        return pl.DataFrame()
-
-    if df.is_empty():
-        return pl.DataFrame()
-
-    # Ensure standard column names and types
-    power_col = "MW" if "MW" in df.columns else "MVA"
-    df = (
-        df.select(
-            [
-                pl.col("timestamp").cast(pl.Datetime("us", "UTC")),
-                pl.col(power_col).alias("power_mw").cast(pl.Float32),
-            ]
-        )
-        .drop_nulls()
-        .sort("timestamp")
+    df = SubstationFlows.validate(
+        pl.scan_delta(config.base_power_path)  # type: ignore[invalid-argument-type]
+        .filter(pl.col("substation_number") == sub_number)
+        .collect()
     )
 
-    if df.is_empty():
-        return df
+    # Ensure standard column names and types
+    power_col = SubstationFlows.choose_power_column(df)
+    df = df.rename({power_col: "power"})
+    df = df.select(["timestamp", "power"]).drop_nulls().sort("timestamp")
 
     # Downsample to target resolution (period ending)
     df = df.group_by_dynamic(
         "timestamp", every=config.resolution, closed="right", label="right"
-    ).agg(pl.col("power_mw").mean())
+    ).agg(pl.col("power").mean())
 
     return df
 

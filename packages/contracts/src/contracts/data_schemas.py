@@ -15,7 +15,7 @@ class MissingCorePowerVariablesError(ValueError):
 
 
 class SubstationFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
 
     # Primary substations usually have flows in the tens of MW.
     # We'll set a loose range for now to catch extreme errors.
@@ -61,6 +61,10 @@ class SubstationFlows(pt.Model):
                 drop_superfluous_columns=drop_superfluous_columns,
             ),
         )
+
+    @staticmethod
+    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
+        return "MW" if dataframe["MW"].is_not_null().all() else "MVA"
 
 
 class SubstationLocations(pt.Model):
