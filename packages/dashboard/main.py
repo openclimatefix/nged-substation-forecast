@@ -19,7 +19,7 @@ with app.setup:
     import marimo as mo
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationMetadata
+    from contracts.data_schemas import SubstationMetadata, SubstationFlows
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
@@ -106,7 +106,7 @@ def _(df, layer_widget, map):
             if filtered_demand.height == 0:
                 right_pane = mo.md("No data")
             else:
-                power_column = "MW" if filtered_demand["MW"].is_not_null().all() else "MVA"
+                power_column = SubstationFlows.choose_power_column(filtered_demand)
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()
