@@ -32,17 +32,24 @@ This will save a PNG file (e.g., `forecast_Lawford_33_11kv_S_Stn.png`) in the cu
 ### Programmatic Usage
 
 ```python
-from xgboost_forecaster.data import get_substation_metadata, prepare_training_data
-from xgboost_forecaster.model import train_model
+from datetime import date
+from xgboost_forecaster import get_substation_metadata, prepare_training_data, XGBoostForecaster, EnsembleSelection
 
 # 1. Get metadata
 metadata = get_substation_metadata()
 
 # 2. Prepare data for a substation
-data = prepare_training_data("Hillmorton 33 11kv S Stn", metadata)
+data = prepare_training_data(
+    substation_numbers=[12345], 
+    metadata=metadata,
+    start_date=date(2026, 2, 1),
+    end_date=date(2026, 2, 28),
+    selection=EnsembleSelection.MEAN
+)
 
 # 3. Train model
-model, metrics = train_model(data)
+forecaster = XGBoostForecaster()
+forecaster.train(data)
 ```
 
 ## Data Sources

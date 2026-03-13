@@ -7,9 +7,11 @@ import polars as pl
 from dagster import ResourceParam
 from xgboost_forecaster import (
     DataConfig,
+    EnsembleSelection,
     XGBoostForecaster,
     get_substation_metadata,
-    prepare_data_for_substation,
+    prepare_inference_data,
+    prepare_training_data,
 )
 
 from contracts.settings import Settings
@@ -33,21 +35,32 @@ def xgb_models(
 
     context.log.info(f"Training models for {len(substation_numbers)} substations")
 
+    data_config = DataConfig(
+        base_power_path=power_path,
+        base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
+    )
+    metadata = get_substation_metadata(data_config)
+
+    # We need a start and end date for training.
+    # For now, let's use a fixed range or infer from power data if possible.
+    # In a real scenario, this might be configurable.
+    start_date = datetime(2026, 2, 1).date()
+    end_date = datetime(2026, 2, 28).date()
+
+    df_all = prepare_training_data(
+        substation_numbers=substation_numbers,
+        metadata=metadata,
+        start_date=start_date,
+        end_date=end_date,
+        config=data_config,
+        selection=EnsembleSelection.MEAN,
+        use_lags=True,
+    )
+
     model_paths = []
     for substation_number in substation_numbers:
         try:
-            data_config = DataConfig(
-                base_power_path=power_path,
-                base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
-            )
-            metadata = get_substation_metadata(data_config)
-
-            df = prepare_data_for_substation(
-                sub_number=substation_number,
-                metadata=metadata,
-                config=data_config,
-                use_lags=True,
-            )
+            df = df_all.filter(pl.col("substation_number") == substation_number)
 
             if df.is_empty():
                 context.log.warning(f"No data available for substation {substation_number}")
@@ -116,8 +129,13 @@ def xgb_forecasts(
             )
             metadata = get_substation_metadata(data_config)
 
-            df = prepare_data_for_substation(
-                sub_number=substation_number,
+            # For inference, we use the latest available NWP run.
+            # In a real scenario, this would be passed in or determined from the environment.
+            init_time = datetime(2026, 2, 17, 0)  # Example init time
+
+            df = prepare_inference_data(
+                substation_number=substation_number,
+                init_time=init_time,
                 metadata=metadata,
                 config=data_config,
                 use_lags=True,
@@ -138,7 +156,7 @@ def xgb_forecasts(
                     pl.col("timestamp").alias("valid_time"),
                     pl.col("substation_number").alias("substation_id"),
                     pl.lit(preds).alias("power_mw").cast(pl.Float32),
-                    pl.lit(datetime.now()).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
+                    pl.lit(init_time).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
                     pl.lit(XGBoostForecaster.model_name_and_version())
                     .alias("power_fcst_model")
                     .cast(pl.Categorical),

@@ -3,10 +3,9 @@
 import logging
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import polars as pl
-import xgboost as xgb
 from xgboost import XGBRegressor
 
 log = logging.getLogger(__name__)
@@ -68,19 +67,18 @@ class XGBoostForecaster:
             ]
 
         self.feature_names = feature_cols
-        X = df.select(feature_cols).to_numpy()
-        y = df.select(target_col).to_numpy().flatten()
+        X = df.select(feature_cols)
+        y = df.select(target_col)
 
         xgb_eval_set = None
         if eval_set:
             xgb_eval_set = []
             for X_eval_df, y_eval_series in eval_set:
-                xgb_eval_set.append(
-                    (X_eval_df.select(feature_cols).to_numpy(), y_eval_series.to_numpy())
-                )
+                xgb_eval_set.append((X_eval_df.select(feature_cols), y_eval_series))
 
-        self.model = cast(Any, xgb).XGBRegressor(**self.params)
-        self.model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
+        model = XGBRegressor(**self.params)
+        model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
+        self.model = model
 
     def predict(self, df: pl.DataFrame) -> pl.Series:
         """Make predictions using the trained model.
@@ -94,12 +92,12 @@ class XGBoostForecaster:
         Raises:
             ValueError: If the model has not been trained yet.
         """
-        if self.model is None or self.feature_names is None:
+        if (model := self.model) is None or self.feature_names is None:
             raise ValueError("Model must be trained before calling predict.")
 
-        X = df.select(self.feature_names).to_numpy()
-        preds = self.model.predict(X)
-        return pl.Series("predictions", preds)
+        X = df.select(self.feature_names)
+        preds = model.predict(X)
+        return pl.Series("predictions", preds, dtype=pl.Float32)
 
     def save(self, path: Path) -> None:
         """Save the model and metadata to a file.
@@ -107,11 +105,11 @@ class XGBoostForecaster:
         Args:
             path: Path to save the model to.
         """
-        if self.model is None:
+        if (model := self.model) is None:
             raise ValueError("No model to save.")
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.model.save_model(path)
+        model.save_model(path)
         # We could also save feature names separately if needed,
         # but XGBoost models often store them if passed during fit.
 
@@ -126,21 +124,22 @@ class XGBoostForecaster:
             An instance of XGBoostForecaster with the loaded model.
         """
         instance = cls()
-        instance.model = cast(Any, xgb).XGBRegressor()
-        instance.model.load_model(path)
+        model = XGBRegressor()
+        model.load_model(path)
+        instance.model = model
         # Note: feature_names might need to be recovered if not stored in the model
         try:
-            instance.feature_names = instance.model.get_booster().feature_names
+            instance.feature_names = model.get_booster().feature_names
         except Exception:
             instance.feature_names = None
         return instance
 
     def get_feature_importance(self) -> pl.DataFrame:
         """Get feature importance as a Polars DataFrame."""
-        if self.model is None or self.feature_names is None:
+        if (model := self.model) is None or self.feature_names is None:
             raise ValueError("Model must be trained.")
 
-        importance = self.model.feature_importances_
+        importance = model.feature_importances_
         return pl.DataFrame({"feature": self.feature_names, "importance": importance}).sort(
             "importance", descending=True
         )

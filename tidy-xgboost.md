@@ -1,3 +1,15 @@
+## Background
+
+All the code in @packages/xgboost_forecaster was written by Gemini. I'd now like to tidy up and
+simplify this code.
+
+I have made a start manually tweaking the code in
+@packages/xgboost_forecaster/src/xgboost_forecaster/data.py. For example, I have made the variable
+names and function arguments more readable, and I have added some TODO comments, and I have tweaked
+some of the code logic. The code is currently in an un-runnable state because I haven't updated the
+call sites.
+
+
 ## Aims
 
 - Significantly tidy up the XGBoost code.
@@ -13,6 +25,8 @@ as early in the call chain as possible.
 `prepare_data_for_substation` function, replace that string with an `Enum`.
 - Functions should, in general, be no more than 50 lines of code. Break large functions into
 smaller, easy-to-test, easy-to-understand units. Each function should do one well-defined task.
+- Prefer longer but easier to read names.
+- Include physical units in variable names where appropriate (e.g. mw for megawatts).
 
 ## Specific tasks
 

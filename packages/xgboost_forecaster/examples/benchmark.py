@@ -9,6 +9,7 @@ from typing import cast
 
 import polars as pl
 from xgboost_forecaster import (
+    EnsembleSelection,
     XGBoostForecaster,
     get_substation_metadata,
     prepare_training_data,
@@ -23,7 +24,7 @@ log.setLevel(logging.INFO)
 def run_benchmark(
     label: str,
     num_subs: int = 10,
-    member_selection: str = "mean",
+    member_selection: EnsembleSelection = EnsembleSelection.MEAN,
     exclude_features: list[str] | None = None,
 ):
     metadata = get_substation_metadata()
@@ -35,13 +36,23 @@ def run_benchmark(
 
     test_start_time = datetime(2026, 2, 17, tzinfo=timezone.utc)
 
+    # Determine date range from available weather files
+    from xgboost_forecaster import DataConfig
+
+    config = DataConfig()
+    weather_files = sorted(config.base_weather_path.glob("*.parquet"))
+    start_date = datetime.strptime(weather_files[0].stem[:10], "%Y-%m-%d").date()
+    end_date = datetime.strptime(weather_files[-1].stem[:10], "%Y-%m-%d").date()
+
     # Prepare training data
     print(f"Loading training data ({member_selection})...")
     train_all = prepare_training_data(
-        sample_subs,
-        metadata,
+        substation_numbers=sample_subs,
+        metadata=metadata,
+        start_date=start_date,
+        end_date=end_date,
+        selection=member_selection,
         use_lags=True,
-        member_selection=member_selection,
     )
     if train_all.is_empty():
         print(f"{label}: No training data")
@@ -51,7 +62,14 @@ def run_benchmark(
 
     # Prepare test data
     print("Loading test data...")
-    test_all = prepare_training_data(sample_subs, metadata, use_lags=True, member_selection="mean")
+    test_all = prepare_training_data(
+        substation_numbers=sample_subs,
+        metadata=metadata,
+        start_date=start_date,
+        end_date=end_date,
+        selection=EnsembleSelection.MEAN,
+        use_lags=True,
+    )
     if test_all.is_empty():
         print(f"{label}: No test data")
         return
@@ -102,8 +120,12 @@ if __name__ == "__main__":
     num_subs = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 
     # Map modes
-    member_map = {"Baseline": "mean", "Single": "single", "Exploded": "all"}
-    selection = member_map.get(mode, "mean")
+    member_map = {
+        "Baseline": EnsembleSelection.MEAN,
+        "Single": EnsembleSelection.SINGLE,
+        "Exploded": EnsembleSelection.ALL,
+    }
+    selection = member_map.get(mode, EnsembleSelection.MEAN)
 
     # Experiment modes
     if mode == "Pure-Baseline":

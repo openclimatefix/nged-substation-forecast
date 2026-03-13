@@ -6,16 +6,18 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 
 import altair as alt
+import patito as pt
 import polars as pl
+from contracts.data_schemas import SimplifiedSubstationFlows
 from xgboost_forecaster import (
     DataConfig,
+    EnsembleSelection,
     XGBoostForecaster,
     get_substation_metadata,
+    load_nwp_run,
     load_substation_power,
-    load_weather_data,
     prepare_training_data,
 )
-from xgboost_forecaster.features import add_temporal_features, add_weather_features
 
 # Configure logging
 logging.basicConfig(
@@ -58,8 +60,17 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
 
     # 1. Train ONE global model for all 5 substations
     log.info("Preparing training data for global model...")
+    start_date = datetime.strptime(weather_files[0].stem[:10], "%Y-%m-%d").date()
+    end_date = datetime.strptime(weather_files[-1].stem[:10], "%Y-%m-%d").date()
+
     all_train_data = prepare_training_data(
-        sample_subs, metadata, use_lags=True, member_selection="mean"
+        substation_numbers=sample_subs,
+        metadata=metadata,
+        start_date=start_date,
+        end_date=end_date,
+        config=config,
+        selection=EnsembleSelection.MEAN,
+        use_lags=True,
     )
 
     if all_train_data.is_empty():
@@ -74,7 +85,6 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     )
     forecaster = XGBoostForecaster()
     forecaster.train(train_data)
-    feature_names = forecaster.feature_names
 
     # 2. Generate forecasts for each substation and ensemble member
     all_plot_data = []
@@ -82,7 +92,6 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
     for sub_number in sample_subs:
         log.info(f"Generating forecast for {sub_number}...")
         sub_meta = metadata.filter(pl.col("substation_number") == sub_number)
-        h3_index = sub_meta["h3_res_5"][0]
         sub_name = sub_meta["substation_name_in_location_table"][0]
 
         # Historical power for lags
@@ -93,60 +102,22 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
 
         power_full = power_full.sort("timestamp")
 
-        # Weather ensemble
-        weather_ensemble = load_weather_data(
-            [h3_index],
-            start_date=latest_init_time.strftime("%Y-%m-%d"),
-            end_date=cast(datetime, all_train_data["timestamp"].max()).strftime("%Y-%m-%d"),
-            config=config,
-            init_time=latest_init_time,
-            average_ensembles=False,
+        # Weather ensemble (ALL members)
+        raw_weather = load_nwp_run(
+            latest_init_time.replace(tzinfo=None), [sub_meta["h3_res_5"][0]], config
         )
+        from xgboost_forecaster.data import process_weather_data, join_features
 
-        if weather_ensemble.is_empty():
-            log.warning(f"Skipping {sub_name} due to lack of weather data.")
-            continue
+        weather_ensemble = process_weather_data(raw_weather, EnsembleSelection.ALL, config)
 
-        # Load historical weather for lags
-        weather_history = load_weather_data(
-            [h3_index],
-            start_date=(latest_init_time - timedelta(days=15)).strftime("%Y-%m-%d"),
-            end_date=latest_init_time.strftime("%Y-%m-%d"),
-            config=config,
-            average_ensembles=True,
+        # Join weather ensemble with power lags and add features
+        pred_data = join_features(
+            cast(pt.DataFrame[SimplifiedSubstationFlows], power_full),
+            weather_ensemble,
+            sub_number,
+            use_lags=True,
         )
-
-        # Power for lags
-        power_for_lags = power_full.filter(pl.col("timestamp") <= latest_init_time)
-
-        lag_table_7d = power_for_lags.select(
-            [
-                (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_7d"),
-            ]
-        )
-        lag_table_14d = power_for_lags.select(
-            [
-                (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_14d"),
-            ]
-        )
-
-        # Add weather features
-        weather_ensemble = add_weather_features(weather_ensemble, history=weather_history)
-
-        # Join weather ensemble with power lags
-        pred_data = weather_ensemble.join(lag_table_7d, on="timestamp", how="inner").join(
-            lag_table_14d, on="timestamp", how="left"
-        )
-
-        # Add temporal features
-        pred_data = (
-            pred_data.with_columns(pl.lit(sub_number).alias("substation_number").cast(pl.Int32))
-            .pipe(add_temporal_features)
-            .filter(pl.col("timestamp") <= forecast_end_time)
-            .drop_nulls(subset=feature_names)
-        )
+        pred_data = pred_data.filter(pl.col("timestamp") <= forecast_end_time)
 
         if pred_data.is_empty():
             continue
@@ -171,7 +142,8 @@ def plot_multi_substation_ensemble_altair(num_subs: int = 5):
                 (pl.col("timestamp") >= latest_init_time)
                 & (pl.col("timestamp") <= forecast_end_time)
             )
-            .select(["timestamp", "power_mw"])
+            .select(["timestamp", "power"])
+            .rename({"power": "power_mw"})
             .with_columns(
                 substation=pl.lit(sub_name), type=pl.lit("actual"), member=pl.lit("truth")
             )
