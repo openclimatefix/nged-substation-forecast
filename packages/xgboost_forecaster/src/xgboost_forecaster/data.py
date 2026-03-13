@@ -4,10 +4,11 @@ import dataclasses
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import cast
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationFlows, SubstationMetadata
+from contracts.data_schemas import SimplifiedSubstationFlows, SubstationFlows, SubstationMetadata
 from contracts.settings import Settings
 
 from xgboost_forecaster.features import add_temporal_features, add_weather_features
@@ -27,7 +28,7 @@ class DataConfig:
     resolution: str = "30m"
 
 
-def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
+def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[SubstationMetadata]:
     """Load substation metadata and filter for those with available power data."""
     config = config or DataConfig()
     metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
@@ -45,27 +46,27 @@ def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
     return metadata_df.filter(pl.col("substation_number").is_in(substations_with_telemetry))
 
 
-def load_substation_power(sub_number: int, config: DataConfig | None = None) -> pl.DataFrame:
+def load_substation_power(
+    substation_number: int, config: DataConfig | None = None
+) -> pt.DataFrame[SimplifiedSubstationFlows]:
     """Load, validate and downsample power data for a single substation."""
     config = config or DataConfig()
 
-    df = SubstationFlows.validate(
-        pl.scan_delta(config.base_power_path)  # type: ignore[invalid-argument-type]
-        .filter(pl.col("substation_number") == sub_number)
-        .collect()
+    df = cast(
+        pt.DataFrame[SubstationFlows],
+        pl.scan_delta(config.base_power_path)
+        .filter(pl.col("substation_number") == substation_number)
+        .collect(),
     )
 
-    # Ensure standard column names and types
-    power_col = SubstationFlows.choose_power_column(df)
-    df = df.rename({power_col: "power"})
-    df = df.select(["timestamp", "power"]).drop_nulls().sort("timestamp")
+    df = SubstationFlows.to_simplified_substation_flows(df)
 
     # Downsample to target resolution (period ending)
     df = df.group_by_dynamic(
         "timestamp", every=config.resolution, closed="right", label="right"
     ).agg(pl.col("power").mean())
 
-    return df
+    return df  # type: ignore[invalid-return-type]
 
 
 def load_weather_data(

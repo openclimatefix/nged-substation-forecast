@@ -17,12 +17,12 @@ class MissingCorePowerVariablesError(ValueError):
 class SubstationFlows(pt.Model):
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
 
+    # The unique identifier for the substation.
+    substation_number: int = pt.Field(dtype=pl.Int32)
+
     # Primary substations usually have flows in the tens of MW.
     # We'll set a loose range for now to catch extreme errors.
     # If we want to reduce storage space we could store kW and kVAr as Int16.
-
-    # The unique identifier for the substation.
-    substation_number: int = pt.Field(dtype=pl.Int32)
 
     # Active power:
     MW: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
@@ -65,6 +65,20 @@ class SubstationFlows(pt.Model):
     @staticmethod
     def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
         return "MW" if dataframe["MW"].is_not_null().all() else "MVA"
+
+    @staticmethod
+    def to_simplified_substation_flows(
+        dataframe: pt.DataFrame["SubstationFlows"],
+    ) -> pt.DataFrame[SimplifiedSubstationFlows]:
+        power_col = SubstationFlows.choose_power_column(dataframe)
+        dataframe = dataframe.rename({power_col: "MW_or_MVA"})  # type: ignore[invalid-assignment]
+        dataframe = dataframe.select(["timestamp", "MW_or_MVA"]).drop_nulls()  # type: ignore[invalid-assignment]
+        return cast(pt.DataFrame[SimplifiedSubstationFlows], dataframe)
+
+
+class SimplifiedSubstationFlows(pt.Model):
+    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
 class SubstationLocations(pt.Model):
