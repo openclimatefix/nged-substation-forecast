@@ -66,7 +66,7 @@ def load_substation_power(
         "timestamp", every=config.resolution, closed="right", label="right"
     ).agg(pl.col("power").mean())
 
-    return df  # type: ignore[invalid-return-type]
+    return cast(pt.DataFrame[SimplifiedSubstationFlows], df)
 
 
 def load_weather_data(
@@ -80,8 +80,9 @@ def load_weather_data(
     """Load weather data for specific H3 cells and date range."""
     config = config or DataConfig()
     # We'll load all files between start and end date
+
     # TODO(Jack): I'm not sure what's going on here! Why don't we just select based on a single
-    # init time, and generating the filename from that init time. I need to look at how
+    # init time, and generate the filename from that init time? I need to look at how
     # `load_weather_data` is called.
     files = sorted(config.base_weather_path.glob("*.parquet"))
     relevant_files = [f for f in files if start_date <= f.stem.split("T")[0] <= end_date]
@@ -129,8 +130,7 @@ def load_weather_data(
 
     # Resample and Interpolate to match target resolution
     ts_min, ts_max = weather.select(
-        min=pl.col("timestamp").min(),
-        max=pl.col("timestamp").max(),
+        min=pl.col("timestamp").min(), max=pl.col("timestamp").max()
     ).row(0)
     if ts_min is not None and ts_max is not None:
         time_grid = (
@@ -238,16 +238,18 @@ def prepare_data_for_substation(
 
 def prepare_training_data(
     substation_numbers: list[int],
-    metadata: pl.DataFrame,
+    substation_metadata: pt.DataFrame[SubstationMetadata],
     config: DataConfig | None = None,
     **kwargs,
-) -> pl.DataFrame:
+) -> pl.DataFrame:  # TODO: Return pt.DataFrame[SpecificType]
     """Join power and weather data for multiple substations and add features."""
     all_subs_data = []
-    for sub_number in substation_numbers:
-        sub_data = prepare_data_for_substation(sub_number, metadata, config, **kwargs)
-        if not sub_data.is_empty():
-            all_subs_data.append(sub_data)
+    for substation_number in substation_numbers:
+        substation_data = prepare_data_for_substation(
+            substation_number, substation_metadata, config, **kwargs
+        )
+        if not substation_data.is_empty():
+            all_subs_data.append(substation_data)
 
     if not all_subs_data:
         return pl.DataFrame()
