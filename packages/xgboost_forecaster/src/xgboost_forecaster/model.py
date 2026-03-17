@@ -47,7 +47,7 @@ class XGBoostForecaster:
     def train(
         self,
         df: pl.DataFrame,
-        target_col: str = "power_mw",
+        target_col: str = "MW_or_MVA",
         feature_cols: list[str] | None = None,
         eval_set: list[tuple[pl.DataFrame, pl.Series]] | None = None,
     ) -> None:

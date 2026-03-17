@@ -75,7 +75,7 @@ def xgb_models(
             train_df = df.head(train_size)
             eval_df = df.tail(len(df) - train_size)
 
-            target_col = "power_mw"
+            target_col = "MW_or_MVA"
             feature_cols = [
                 c for c in df.columns if c not in [target_col, "timestamp", "substation_number"]
             ]
@@ -155,7 +155,7 @@ def xgb_forecasts(
                 [
                     pl.col("timestamp").alias("valid_time"),
                     pl.col("substation_number").alias("substation_id"),
-                    pl.lit(preds).alias("power_mw").cast(pl.Float32),
+                    pl.lit(preds).alias("MW_or_MVA").cast(pl.Float32),
                     pl.lit(init_time).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
                     pl.lit(XGBoostForecaster.model_name_and_version())
                     .alias("power_fcst_model")

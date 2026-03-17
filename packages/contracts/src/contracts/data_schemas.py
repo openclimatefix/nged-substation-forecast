@@ -71,14 +71,14 @@ class SubstationFlows(pt.Model):
         dataframe: pt.DataFrame["SubstationFlows"],
     ) -> pt.DataFrame[SimplifiedSubstationFlows]:
         power_col = SubstationFlows.choose_power_column(dataframe)
-        dataframe = dataframe.rename({power_col: "power"})  # type: ignore[invalid-assignment]
-        dataframe = dataframe.select(["timestamp", "power"]).drop_nulls()  # type: ignore[invalid-assignment]
+        dataframe = dataframe.rename({power_col: "MW_or_MVA"})  # type: ignore[invalid-assignment]
+        dataframe = dataframe.select(["timestamp", "MW_or_MVA"]).drop_nulls()  # type: ignore[invalid-assignment]
         return cast(pt.DataFrame[SimplifiedSubstationFlows], dataframe)
 
 
 class SimplifiedSubstationFlows(pt.Model):
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
-    power: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
 class SubstationLocations(pt.Model):
@@ -131,7 +131,7 @@ class PowerForecast(pt.Model):
 
     nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     substation_id: int = pt.Field(dtype=pl.Int32)
-    power_mw: float = pt.Field(dtype=pl.Float32)
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     power_fcst_model: str = pt.Field(dtype=pl.Categorical)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
@@ -231,7 +231,7 @@ class SubstationFeatures(pt.Model):
 
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     substation_number: int = pt.Field(dtype=pl.Int32)
-    power_mw: float = pt.Field(dtype=pl.Float32)
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
     power_lag_7d: float | None = pt.Field(dtype=pl.Float32)

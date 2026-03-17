@@ -51,11 +51,11 @@ def forecast_vs_actual_plot(
 
     # Prepare for plotting
     # TODO: Don't use `to_pandas()`!
-    df_f = plot_forecast.to_pandas().rename(columns={"valid_time": "time", "power_mw": "value"})
+    df_f = plot_forecast.to_pandas().rename(columns={"valid_time": "time", "MW_or_MVA": "value"})
     df_f["type"] = "Forecast"
 
     # TODO: Don't use `to_pandas()`!
-    df_a = plot_actuals.to_pandas().rename(columns={"timestamp": "time", "power_mw": "value"})
+    df_a = plot_actuals.to_pandas().rename(columns={"timestamp": "time", "MW_or_MVA": "value"})
     df_a["type"] = "Actual"
 
     import pandas as pd  # TODO: Remove!

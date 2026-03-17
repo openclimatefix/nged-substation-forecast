@@ -72,7 +72,7 @@ def load_substation_power(
     # Downsample to target resolution (period ending)
     df = df.group_by_dynamic(
         "timestamp", every=config.resolution, closed="right", label="right"
-    ).agg(pl.col("power").mean())
+    ).agg(pl.col("MW_or_MVA").mean())
 
     return cast(pt.DataFrame[SimplifiedSubstationFlows], df)
 
@@ -261,13 +261,13 @@ def join_features(
         power_lag_7d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
-                pl.col("power").alias("power_lag_7d"),
+                pl.col("MW_or_MVA").alias("power_lag_7d"),
             ]
         )
         power_lag_14d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
-                pl.col("power").alias("power_lag_14d"),
+                pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
         power_df = power.join(power_lag_7d, on="timestamp", how="left").join(
@@ -287,7 +287,7 @@ def join_features(
 
     df = df.with_columns(
         pl.lit(substation_number).alias("substation_number").cast(pl.Int32),
-        pl.col("power").alias("power_mw").cast(pl.Float32),
+        pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
     # Add features
