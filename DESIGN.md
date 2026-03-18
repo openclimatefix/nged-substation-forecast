@@ -281,6 +281,7 @@ TODO(Jack)
 
 This is up for discussion.
 
+```
 nged-substation-forecast/
 ├── pyproject.toml  ← uv workspace config
 │
@@ -474,7 +475,7 @@ nged-substation-forecast/
     └── nged_substation_forecast/ ← Deps: dagster, mlflow, sub-packages
         ├── dagster_assets.py
         └── …
-
+```
 
 ## Plan
 
