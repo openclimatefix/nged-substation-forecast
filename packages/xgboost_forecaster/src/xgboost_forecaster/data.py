@@ -2,15 +2,24 @@
 
 import dataclasses
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
+import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationMetadata
+from contracts.data_schemas import (
+    Nwp,
+    ProcessedWeather,
+    SimplifiedSubstationFlows,
+    SubstationFeatures,
+    SubstationFlows,
+    SubstationMetadata,
+)
 from contracts.settings import Settings
 
 from xgboost_forecaster.features import add_temporal_features, add_weather_features
+from xgboost_forecaster.types import EnsembleSelection
 
 log = logging.getLogger(__name__)
 
@@ -23,120 +32,153 @@ class DataConfig:
 
     base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
     base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
-    # TODO: Remove `ckan_token` after teaching Dagster to download substation locations
-    ckan_token: str = _SETTINGS.nged_ckan_token
     h3_res: int = 5  # TODO: This should probably be stored somewhere like nwp_data_path/ECMWF/ENS/metadata.json?
     resolution: str = "30m"
 
 
-# TODO: Most of (or maybe all of) this function should be computed by Dagster once.
-def get_substation_metadata(config: DataConfig | None = None) -> pl.DataFrame:
+def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[SubstationMetadata]:
     """Load substation metadata and filter for those with available power data."""
     config = config or DataConfig()
     metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
-    if not metadata_path.exists():
-        return pl.DataFrame()
-
-    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
+    metadata_df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
     # Only return substations we have local power data for in Delta Lake
-    try:
-        available_subs = (
-            pl.read_delta(str(config.base_power_path))
-            .select("substation_number")
-            .unique()
-            .to_series()
-            .to_list()
-        )
+    substations_with_telemetry = (
+        pl.read_delta(str(config.base_power_path))
+        .select("substation_number")
+        .unique()
+        .to_series()
+        .to_list()
+    )
 
-        df = df.filter(pl.col("substation_number").is_in(available_subs))
-    except Exception:
-        # If delta table doesn't exist or has an issue, return empty
-        df = df.filter(pl.lit(False))
-
-    return df
+    return metadata_df.filter(pl.col("substation_number").is_in(substations_with_telemetry))
 
 
-def load_substation_power(sub_number: int, config: DataConfig | None = None) -> pl.DataFrame:
+def load_substation_power(
+    substation_number: int, config: DataConfig | None = None
+) -> pt.DataFrame[SimplifiedSubstationFlows]:
     """Load, validate and downsample power data for a single substation."""
     config = config or DataConfig()
 
-    delta_path = str(config.base_power_path)
-    try:
-        df = pl.read_delta(
-            delta_path, pyarrow_options={"filters": [("substation_number", "=", sub_number)]}
-        )
-    except Exception:
-        return pl.DataFrame()
-
-    if df.is_empty():
-        return pl.DataFrame()
-
-    # Ensure standard column names and types
-    power_col = "MW" if "MW" in df.columns else "MVA"
-    df = (
-        df.select(
-            [
-                pl.col("timestamp").cast(pl.Datetime("us", "UTC")),
-                pl.col(power_col).alias("power_mw").cast(pl.Float32),
-            ]
-        )
-        .drop_nulls()
-        .sort("timestamp")
+    df = cast(
+        pt.DataFrame[SubstationFlows],
+        pl.scan_delta(config.base_power_path)
+        .filter(pl.col("substation_number") == substation_number)
+        .collect(),
     )
 
-    if df.is_empty():
-        return df
+    df = SubstationFlows.to_simplified_substation_flows(df)
 
     # Downsample to target resolution (period ending)
     df = df.group_by_dynamic(
         "timestamp", every=config.resolution, closed="right", label="right"
-    ).agg(pl.col("power_mw").mean())
+    ).agg(pl.col("MW_or_MVA").mean())
 
-    return df
+    return cast(pt.DataFrame[SimplifiedSubstationFlows], df)
 
 
-def load_weather_data(
-    h3_indices: list[int],
-    start_date: str,
-    end_date: str,
-    config: DataConfig | None = None,
-    init_time: datetime | None = None,
-    average_ensembles: bool = True,
-    resample_to: str = "30m",
-) -> pl.DataFrame:
-    """Load weather data for specific H3 cells and date range."""
+def load_nwp_run(
+    init_time: datetime, h3_indices: list[int], config: DataConfig | None = None
+) -> pt.DataFrame[Nwp]:
+    """Load a single NWP forecast run.
+
+    Args:
+        init_time: The initialization time of the NWP run.
+        h3_indices: List of H3 indices to filter for.
+        config: Data configuration.
+
+    Returns:
+        A Patito DataFrame containing the NWP data.
+
+    Raises:
+        FileNotFoundError: If the NWP file for the given init_time does not exist.
+    """
     config = config or DataConfig()
-    # We'll load all files between start and end date
-    files = sorted(config.base_weather_path.glob("*.parquet"))
-    relevant_files = [f for f in files if start_date <= f.stem.split("T")[0] <= end_date]
+    filename = f"{init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
+    file_path = config.base_weather_path / filename
 
-    if init_time:
-        init_str = init_time.strftime("%Y-%m-%dT%H")
-        relevant_files = [
-            f for f in relevant_files if f.stem == init_str or f.stem == f"{init_str}Z"
-        ]
+    df = pl.read_parquet(file_path)
+    df = df.filter(pl.col("h3_index").is_in(h3_indices))
+
+    if df.is_empty():
+        raise RuntimeError(f"No data found for requested H3 indices in {file_path}")
+
+    return Nwp.validate(df)
+
+
+def construct_historical_weather(
+    start_date: date, end_date: date, h3_indices: list[int], config: DataConfig | None = None
+) -> pt.DataFrame[Nwp]:
+    """Construct a continuous historical weather timeseries by stitching NWP runs.
+
+    Args:
+        start_date: Start date for the timeseries.
+        end_date: End date for the timeseries.
+        h3_indices: List of H3 indices to filter for.
+        config: Data configuration.
+
+    Returns:
+        A Patito DataFrame containing the stitched NWP data.
+
+    Raises:
+        RuntimeError: If no NWP files are found in the date range.
+    """
+    config = config or DataConfig()
+    files = sorted(config.base_weather_path.glob("*.parquet"))
+    relevant_files = [
+        f
+        for f in files
+        if start_date <= datetime.strptime(f.stem[:10], "%Y-%m-%d").date() <= end_date
+    ]
 
     if not relevant_files:
-        log.warning(f"No weather files found for range {start_date} to {end_date}")
-        return pl.DataFrame()
+        raise RuntimeError(f"No NWP files found between {start_date} and {end_date}")
 
     weather_dfs = []
     for f in relevant_files:
         df = pl.read_parquet(f)
         df = df.filter(pl.col("h3_index").is_in(h3_indices))
+
+        if df.is_empty():
+            continue
+
+        # Stitching logic: keep only short lead times (e.g. <= 24h) to form a continuous series
+        # This avoids using long-range forecasts for historical training data.
+        df = df.filter((pl.col("valid_time") - pl.col("init_time")) <= timedelta(hours=24))
+
         if not df.is_empty():
             weather_dfs.append(df)
 
     if not weather_dfs:
-        return pl.DataFrame()
+        raise RuntimeError(f"No weather data found for H3 indices in range {start_date}-{end_date}")
 
-    weather = pl.concat(weather_dfs, how="diagonal")
+    # Combine and keep the latest forecast for each valid_time/h3_index/ensemble_member
+    combined = pl.concat(weather_dfs, how="diagonal")
+    combined = combined.sort(["h3_index", "ensemble_member", "valid_time", "init_time"])
+    combined = combined.unique(subset=["h3_index", "ensemble_member", "valid_time"], keep="last")
+
+    return Nwp.validate(combined)
+
+
+def process_weather_data(
+    weather: pt.DataFrame[Nwp], selection: EnsembleSelection, config: DataConfig | None = None
+) -> pt.DataFrame[ProcessedWeather]:
+    """Process raw NWP data: ensemble selection, grouping, and interpolation.
+
+    Args:
+        weather: Raw NWP data.
+        selection: Ensemble selection method.
+        config: Data configuration.
+
+    Returns:
+        A Patito DataFrame containing the processed weather data.
+    """
+    config = config or DataConfig()
 
     # Calculate target timestamp: use valid_time
     weather = weather.with_columns(timestamp=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
 
-    # Variables to keep
+    # Variables to keep (all numeric ones except metadata)
     nwp_vars = [
         col
         for col in weather.columns
@@ -146,130 +188,216 @@ def load_weather_data(
     ]
 
     group_cols = ["h3_index", "timestamp"]
-    if not average_ensembles:
+    if selection == EnsembleSelection.ALL:
         group_cols.append("ensemble_member")
 
-    # We MUST group by the target columns to avoid duplicate rows for the same timestamp
-    weather = weather.group_by(group_cols).agg([pl.col(c).mean() for c in nwp_vars])
+    # Ensemble selection
+    if selection == EnsembleSelection.SINGLE:
+        weather_df = weather.filter(pl.col("ensemble_member") == 0)
+    elif selection == EnsembleSelection.MEAN:
+        weather_df = weather.group_by(group_cols).agg([pl.col(c).mean() for c in nwp_vars])
+    else:
+        weather_df = cast(pl.DataFrame, weather)
 
     # Resample and Interpolate to match target resolution
-    ts_min = weather["timestamp"].min()
-    ts_max = weather["timestamp"].max()
-    if ts_min is not None and ts_max is not None:
-        time_grid = (
-            pl.datetime_range(ts_min, ts_max, interval=resample_to, time_zone="UTC", eager=True)
-            .alias("timestamp")
-            .to_frame()
-        )
+    ts_min, ts_max = weather_df.select(
+        min=pl.col("timestamp").min(), max=pl.col("timestamp").max()
+    ).row(0)
 
-        group_cols_only_idx = ["h3_index"]
-        if "ensemble_member" in weather.columns:
-            group_cols_only_idx.append("ensemble_member")
+    if ts_min is None or ts_max is None:
+        raise RuntimeError("No timestamps found in weather data for interpolation")
 
-        groups = weather.select(group_cols_only_idx).unique()
+    time_grid = (
+        pl.datetime_range(ts_min, ts_max, interval=config.resolution, time_zone="UTC", eager=True)
+        .alias("timestamp")
+        .to_frame()
+    )
 
-        upsampled_parts = []
-        for group in groups.iter_rows(named=True):
-            group_df = weather.filter(*[pl.col(k) == v for k, v in group.items()]).sort("timestamp")
-            upsampled = time_grid.join(group_df, on="timestamp", how="left")
-            upsampled = upsampled.with_columns(
-                [pl.lit(v).alias(k) for k, v in group.items()]
-            ).interpolate()
-            upsampled_parts.append(upsampled)
+    group_cols_only_idx = ["h3_index"]
+    if selection == EnsembleSelection.ALL:
+        group_cols_only_idx.append("ensemble_member")
 
-        weather = pl.concat(upsampled_parts)
+    groups = weather_df.select(group_cols_only_idx).unique()
 
-    return weather
+    upsampled_parts = []
+    for group in groups.iter_rows(named=True):
+        group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("timestamp")
+        upsampled = time_grid.join(group_df, on="timestamp", how="left")
+        upsampled = upsampled.with_columns(
+            [pl.lit(v).alias(k) for k, v in group.items()]
+        ).interpolate()
+        upsampled_parts.append(upsampled)
+
+    weather_df = pl.concat(upsampled_parts)
+
+    # Ensure Float32 for memory efficiency and contract compliance
+    weather_df = weather_df.with_columns([pl.col(c).cast(pl.Float32) for c in nwp_vars])
+
+    return ProcessedWeather.validate(weather_df)
 
 
-def prepare_data_for_substation(
-    sub_number: int,
-    metadata: pl.DataFrame,
-    config: DataConfig | None = None,
+def join_features(
+    power: pt.DataFrame[SimplifiedSubstationFlows],
+    weather: pt.DataFrame[ProcessedWeather],
+    substation_number: int,
     use_lags: bool = True,
-    member_selection: str = "mean",
-) -> pl.DataFrame:
-    """Load and join data for a single substation."""
-    config = config or DataConfig()
+) -> pt.DataFrame[SubstationFeatures]:
+    """Join power and weather data and add all features.
 
-    sub_meta = metadata.filter(pl.col("substation_number") == sub_number)
+    Args:
+        power: Simplified substation power data.
+        weather: Processed weather data.
+        substation_number: The substation number.
+        use_lags: Whether to add power lags.
 
-    if sub_meta.is_empty():
-        log.warning(f"Substation {sub_number} not found in metadata")
-        return pl.DataFrame()
+    Returns:
+        A Patito DataFrame containing the joined data and features.
 
-    h3_index = sub_meta["h3_res_5"][0]
-
-    power = load_substation_power(sub_number, config)
-    if power.is_empty():
-        return pl.DataFrame()
-
+    Raises:
+        RuntimeError: If the join results in an empty DataFrame.
+    """
     if use_lags:
         # Add power lags
         power_lag_7d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_7d"),
+                pl.col("MW_or_MVA").alias("power_lag_7d"),
             ]
         )
         power_lag_14d = power.select(
             [
                 (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
-                pl.col("power_mw").alias("power_mw_lag_14d"),
+                pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
-        power = power.join(power_lag_7d, on="timestamp", how="left").join(
+        power_df = power.join(power_lag_7d, on="timestamp", how="left").join(
             power_lag_14d, on="timestamp", how="left"
         )
+    else:
+        power_df = cast(pl.DataFrame, power)
 
-    power_min = cast(datetime, power["timestamp"].min())
-    power_max = cast(datetime, power["timestamp"].max())
+    # Inner join to ensure we only have rows where both power and weather are available
+    df = power_df.join(weather, on="timestamp", how="inner")
 
-    if power_min is None or power_max is None:
-        return pl.DataFrame()
-
-    end_date = power_max.strftime("%Y-%m-%d")
-    weather_start = (power_min - timedelta(days=2)).strftime("%Y-%m-%d")
-
-    weather = load_weather_data(
-        [h3_index],
-        weather_start,
-        end_date,
-        config,
-        average_ensembles=(member_selection == "mean"),
-    )
-    if weather.is_empty():
-        return pl.DataFrame()
-
-    if member_selection == "single":
-        weather = weather.filter(pl.col("ensemble_member") == 0)
-
-    weather = add_weather_features(weather)
-    sub_data = power.join(weather, on="timestamp", how="inner")
-
-    if not sub_data.is_empty():
-        sub_data = sub_data.with_columns(
-            pl.lit(sub_number).alias("substation_number").cast(pl.Int32),
+    if df.is_empty():
+        raise RuntimeError(
+            f"Join resulted in empty DataFrame for substation {substation_number}. "
+            "Check if power and weather timestamps overlap."
         )
-        sub_data = add_temporal_features(sub_data)
 
-    return sub_data
+    df = df.with_columns(
+        pl.lit(substation_number).alias("substation_number").cast(pl.Int32),
+        pl.col("MW_or_MVA").cast(pl.Float32),
+    )
+
+    # Add features
+    df = add_weather_features(df)
+    df = add_temporal_features(df)
+
+    # Final cleanup and validation
+    return SubstationFeatures.validate(df, drop_superfluous_columns=True)
 
 
 def prepare_training_data(
     substation_numbers: list[int],
-    metadata: pl.DataFrame,
+    metadata: pt.DataFrame[SubstationMetadata],
+    start_date: date,
+    end_date: date,
     config: DataConfig | None = None,
-    **kwargs,
-) -> pl.DataFrame:
-    """Join power and weather data for multiple substations and add features."""
+    selection: EnsembleSelection = EnsembleSelection.MEAN,
+    use_lags: bool = True,
+) -> pt.DataFrame[SubstationFeatures]:
+    """Prepare training data for multiple substations.
+
+    Args:
+        substation_numbers: List of substation numbers.
+        metadata: Substation metadata.
+        start_date: Start date for weather data.
+        end_date: End date for weather data.
+        config: Data configuration.
+        selection: Ensemble selection method.
+        use_lags: Whether to add power lags.
+
+    Returns:
+        A Patito DataFrame containing the training data for all substations.
+    """
+    config = config or DataConfig()
+
+    # 1. Extract all unique h3_indices
+    relevant_metadata = metadata.filter(pl.col("substation_number").is_in(substation_numbers))
+    h3_indices = relevant_metadata["h3_res_5"].unique().to_list()
+
+    # 2. Load historical weather once for all indices
+    log.info(f"Loading historical weather for {len(h3_indices)} H3 indices...")
+    raw_weather = construct_historical_weather(start_date, end_date, h3_indices, config)
+
+    # 3. Process weather once
+    log.info("Processing weather data...")
+    processed_weather = process_weather_data(raw_weather, selection, config)
+
+    # 4. Loop over substations and join
     all_subs_data = []
-    for sub_number in substation_numbers:
-        sub_data = prepare_data_for_substation(sub_number, metadata, config, **kwargs)
-        if not sub_data.is_empty():
+    for sub_num in substation_numbers:
+        log.info(f"Preparing data for substation {sub_num}...")
+        try:
+            sub_meta = relevant_metadata.filter(pl.col("substation_number") == sub_num)
+            if sub_meta.is_empty():
+                log.warning(f"Substation {sub_num} not found in metadata. Skipping.")
+                continue
+
+            h3_idx = sub_meta["h3_res_5"][0]
+            power = load_substation_power(sub_num, config)
+
+            # Filter processed weather for this substation's H3 index
+            sub_weather = processed_weather.filter(pl.col("h3_index") == h3_idx)
+
+            sub_data = join_features(power, sub_weather, sub_num, use_lags)
             all_subs_data.append(sub_data)
+        except Exception as e:
+            log.error(f"Failed to prepare data for substation {sub_num}: {e}")
+            raise
 
     if not all_subs_data:
-        return pl.DataFrame()
+        raise RuntimeError("No data prepared for any substation")
 
-    return pl.concat(all_subs_data, how="diagonal")
+    return cast(pt.DataFrame[SubstationFeatures], pl.concat(all_subs_data, how="diagonal"))
+
+
+def prepare_inference_data(
+    substation_number: int,
+    init_time: datetime,
+    metadata: pt.DataFrame[SubstationMetadata],
+    config: DataConfig | None = None,
+    use_lags: bool = True,
+) -> pt.DataFrame[SubstationFeatures]:
+    """Prepare data for inference for a single substation.
+
+    Args:
+        substation_number: The substation number.
+        init_time: The NWP initialization time to use.
+        metadata: Substation metadata.
+        config: Data configuration.
+        use_lags: Whether to add power lags.
+
+    Returns:
+        A Patito DataFrame containing the inference data.
+    """
+    config = config or DataConfig()
+
+    sub_meta = metadata.filter(pl.col("substation_number") == substation_number)
+    if sub_meta.is_empty():
+        raise RuntimeError(f"Substation {substation_number} not found in metadata")
+
+    h3_idx = sub_meta["h3_res_5"][0]
+
+    # 1. Load NWP run
+    raw_weather = load_nwp_run(init_time, [h3_idx], config)
+
+    # 2. Process weather (always use MEAN for inference unless specified otherwise)
+    processed_weather = process_weather_data(raw_weather, EnsembleSelection.MEAN, config)
+
+    # 3. Load power data (for lags)
+    power = load_substation_power(substation_number, config)
+
+    # 4. Join and add features
+    return join_features(power, processed_weather, substation_number, use_lags)

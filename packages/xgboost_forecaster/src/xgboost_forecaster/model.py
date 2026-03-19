@@ -3,15 +3,15 @@
 import logging
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import polars as pl
-import xgboost as xgb
 from xgboost import XGBRegressor
 
 log = logging.getLogger(__name__)
 
 
+# TODO: Create an abstract base class that defines the universal interface to all Forecasters.
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
@@ -48,7 +48,7 @@ class XGBoostForecaster:
     def train(
         self,
         df: pl.DataFrame,
-        target_col: str = "power_mw",
+        target_col: str = "MW_or_MVA",
         feature_cols: list[str] | None = None,
         eval_set: list[tuple[pl.DataFrame, pl.Series]] | None = None,
     ) -> None:
@@ -68,19 +68,18 @@ class XGBoostForecaster:
             ]
 
         self.feature_names = feature_cols
-        X = df.select(feature_cols).to_numpy()
-        y = df.select(target_col).to_numpy().flatten()
+        X = df.select(feature_cols)
+        y = df.select(target_col)
 
         xgb_eval_set = None
         if eval_set:
             xgb_eval_set = []
             for X_eval_df, y_eval_series in eval_set:
-                xgb_eval_set.append(
-                    (X_eval_df.select(feature_cols).to_numpy(), y_eval_series.to_numpy())
-                )
+                xgb_eval_set.append((X_eval_df.select(feature_cols), y_eval_series))
 
-        self.model = cast(Any, xgb).XGBRegressor(**self.params)
-        self.model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
+        model = XGBRegressor(**self.params)
+        model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
+        self.model = model
 
     def predict(self, df: pl.DataFrame) -> pl.Series:
         """Make predictions using the trained model.
@@ -97,9 +96,9 @@ class XGBoostForecaster:
         if self.model is None or self.feature_names is None:
             raise ValueError("Model must be trained before calling predict.")
 
-        X = df.select(self.feature_names).to_numpy()
-        preds = self.model.predict(X)
-        return pl.Series("predictions", preds)
+        X = df.select(self.feature_names)
+        predictions = self.model.predict(X)
+        return pl.Series(name="predictions", values=predictions, dtype=pl.Float32)
 
     def save(self, path: Path) -> None:
         """Save the model and metadata to a file.
@@ -126,11 +125,12 @@ class XGBoostForecaster:
             An instance of XGBoostForecaster with the loaded model.
         """
         instance = cls()
-        instance.model = cast(Any, xgb).XGBRegressor()
-        instance.model.load_model(path)
+        model = XGBRegressor()
+        model.load_model(path)
+        instance.model = model
         # Note: feature_names might need to be recovered if not stored in the model
         try:
-            instance.feature_names = instance.model.get_booster().feature_names
+            instance.feature_names = model.get_booster().feature_names
         except Exception:
             instance.feature_names = None
         return instance

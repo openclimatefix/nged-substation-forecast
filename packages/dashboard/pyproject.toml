@@ -12,6 +12,7 @@ dependencies = [
     "nged-data",
     "pyarrow>=23.0.0",
     "geoarrow-pyarrow>=0.2.0",
+    "patito>=0.8.5",
 ]
 
 [dependency-groups]

@@ -33,7 +33,7 @@ def combined_actuals(
     ).rename({"substation_number": "substation_id"})
 
     # Some actuals might have 'MW', others 'MVA'.
-    df = df.with_columns(pl.coalesce(["MW", "MVA"]).alias("power_mw"))
+    df = df.with_columns(pl.coalesce(["MW", "MVA"]).alias("MW_or_MVA"))
 
     return df
 
@@ -68,8 +68,8 @@ def metrics_asset(
     # Compute metrics per substation
     metrics = comparison.group_by("substation_id").agg(
         [
-            (pl.col("power_mw") - pl.col("power_mw_actual")).abs().mean().alias("mae"),
-            ((pl.col("power_mw") - pl.col("power_mw_actual")) ** 2).mean().sqrt().alias("rmse"),
+            (pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")).abs().mean().alias("mae"),
+            ((pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")) ** 2).mean().sqrt().alias("rmse"),
         ]
     )
 
