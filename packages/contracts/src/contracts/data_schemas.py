@@ -134,10 +134,17 @@ class PowerForecast(pt.Model):
 
     nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     substation_id: int = pt.Field(dtype=pl.Int32)
-    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    power_fcst_model: str = pt.Field(dtype=pl.Categorical)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
+
+    # Identifier for our ML-based power forecasting model.
+    # Returned by `Forecaster.model_name_and_version()`.
+    power_fcst_model: str = pt.Field(dtype=pl.Categorical)
+
+    # Active power (megawatts) or apparent power (mega volt amp).
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
+
+    # TODO: Capture probabilistic information.
 
 
 class Nwp(pt.Model):

@@ -11,6 +11,7 @@ from xgboost import XGBRegressor
 log = logging.getLogger(__name__)
 
 
+# TODO: Create an abstract base class that defines the universal interface to all Forecasters.
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
