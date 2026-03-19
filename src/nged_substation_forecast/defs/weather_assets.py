@@ -2,7 +2,9 @@ from datetime import datetime, timezone
 
 import dagster as dg
 import polars as pl
+from contracts.settings import Settings
 from dagster import (
+    AssetCheckExecutionContext,
     AssetCheckResult,
     AssetCheckSeverity,
     AssetExecutionContext,
@@ -13,8 +15,6 @@ from dagster import (
     define_asset_job,
 )
 from dynamical_data.processing import download_and_scale_ecmwf
-
-from contracts.settings import Settings
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
@@ -43,7 +43,7 @@ def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[S
 
 @asset_check(asset=ecmwf_ens_forecast)
 def check_ecmwf_historical_bounds(
-    context: AssetExecutionContext, settings: ResourceParam[Settings]
+    context: AssetCheckExecutionContext, settings: ResourceParam[Settings]
 ) -> AssetCheckResult:
     """Check if any weather variables hit the absolute historical bounds (0 or 255)."""
     partition_key = context.partition_key
