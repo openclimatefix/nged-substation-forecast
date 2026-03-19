@@ -217,6 +217,7 @@ class Nwp(pt.Model):
 class ProcessedWeather(pt.Model):
     """Weather data after ensemble selection and interpolation."""
 
+    # TODO: Rename `timestamp` to `valid_time`
     timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
