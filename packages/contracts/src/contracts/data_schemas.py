@@ -33,7 +33,10 @@ class SubstationFlows(pt.Model):
     # Reactive power:
     MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
 
-    # When this data was ingested into our system
+    # When this data was ingested into our system. When we update our datasets, we examine
+    # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
+    # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
+    # we didn't record when the data was ingested).
     ingested_at: datetime | None = pt.Field(dtype=pl.Datetime(time_zone="UTC"), allow_missing=True)
 
     @classmethod
