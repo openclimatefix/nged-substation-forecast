@@ -17,9 +17,10 @@ with app.setup:
     import geoarrow.pyarrow as geo_pyarrow
     import lonboard
     import marimo as mo
+    import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationMetadata, SubstationFlows
+    from contracts.data_schemas import SubstationFlows, SubstationMetadata
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
@@ -97,7 +98,7 @@ def _(df, layer_widget, map):
 
         try:
             filtered_demand = cast(
-                pl.DataFrame,
+                pt.DataFrame[SubstationFlows],
                 delta_df.filter(pl.col("substation_number") == substation_number).collect(),
             )
         except Exception as e:
