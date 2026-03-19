@@ -4,6 +4,7 @@ from pathlib import Path
 
 import dagster as dg
 import polars as pl
+from contracts.settings import Settings
 from dagster import ResourceParam
 from xgboost_forecaster import (
     DataConfig,
@@ -13,8 +14,6 @@ from xgboost_forecaster import (
     prepare_inference_data,
     prepare_training_data,
 )
-
-from contracts.settings import Settings
 
 log = logging.getLogger(__name__)
 
@@ -42,8 +41,10 @@ def xgb_models(
     metadata = get_substation_metadata(data_config)
 
     # We need a start and end date for training.
-    # For now, let's use a fixed range or infer from power data if possible.
-    # In a real scenario, this might be configurable.
+    # For now, let's use a fixed range.
+    # TODO: This should be configurable so we can do expanding window time series cross-validation
+    # (i.e. where we mimic what happens in production) and so that, when we train for production,
+    # we use as much historical data as possible.
     start_date = datetime(2026, 2, 1).date()
     end_date = datetime(2026, 2, 28).date()
 
@@ -60,6 +61,8 @@ def xgb_models(
     model_paths = []
     for substation_number in substation_numbers:
         try:
+            # TODO: Move all the code in this `try` block into a new function.
+
             df = df_all.filter(pl.col("substation_number") == substation_number)
 
             if df.is_empty():
@@ -129,8 +132,7 @@ def xgb_forecasts(
             )
             metadata = get_substation_metadata(data_config)
 
-            # For inference, we use the latest available NWP run.
-            # In a real scenario, this would be passed in or determined from the environment.
+            # TODO (p1): This MUST be changed to dynamically use the most recent NWP init!
             init_time = datetime(2026, 2, 17, 0)  # Example init time
 
             df = prepare_inference_data(
