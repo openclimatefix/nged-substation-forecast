@@ -93,12 +93,12 @@ class XGBoostForecaster:
         Raises:
             ValueError: If the model has not been trained yet.
         """
-        if (model := self.model) is None or self.feature_names is None:
+        if self.model is None or self.feature_names is None:
             raise ValueError("Model must be trained before calling predict.")
 
         X = df.select(self.feature_names)
-        preds = model.predict(X)
-        return pl.Series("predictions", preds, dtype=pl.Float32)
+        predictions = self.model.predict(X)
+        return pl.Series(name="predictions", values=predictions, dtype=pl.Float32)
 
     def save(self, path: Path) -> None:
         """Save the model and metadata to a file.
@@ -106,11 +106,11 @@ class XGBoostForecaster:
         Args:
             path: Path to save the model to.
         """
-        if (model := self.model) is None:
+        if self.model is None:
             raise ValueError("No model to save.")
 
         path.parent.mkdir(parents=True, exist_ok=True)
-        model.save_model(path)
+        self.model.save_model(path)
         # We could also save feature names separately if needed,
         # but XGBoost models often store them if passed during fit.
 
@@ -137,10 +137,10 @@ class XGBoostForecaster:
 
     def get_feature_importance(self) -> pl.DataFrame:
         """Get feature importance as a Polars DataFrame."""
-        if (model := self.model) is None or self.feature_names is None:
+        if self.model is None or self.feature_names is None:
             raise ValueError("Model must be trained.")
 
-        importance = model.feature_importances_
+        importance = self.model.feature_importances_
         return pl.DataFrame({"feature": self.feature_names, "importance": importance}).sort(
             "importance", descending=True
         )
