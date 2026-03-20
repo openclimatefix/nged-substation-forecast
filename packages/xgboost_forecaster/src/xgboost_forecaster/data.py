@@ -299,11 +299,16 @@ def join_features(
     )
     df = df.join(power_target, on="valid_time", how="left")
 
+    # Add features
+    df = add_weather_features(df)
+    df = add_temporal_features(df)
+
     if is_training:
-        # During training, we must have the target variable
-        df = df.drop_nulls(subset=["MW_or_MVA"])
+        # During training, we must have the target variable and all features
+        df = df.drop_nulls()
     else:
-        # During inference, we fill with 0.0 to satisfy the contract
+        # During inference, we fill the target with 0.0 to satisfy the contract
+        # But we still expect all features to be present (non-null)
         df = df.with_columns(MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0))
 
     if df.is_empty():
@@ -317,9 +322,19 @@ def join_features(
         MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
-    # Add features
-    df = add_weather_features(df)
-    df = add_temporal_features(df)
+    if not is_training:
+        # Check for nulls in features (except MW_or_MVA which we just filled)
+        feature_cols = [c for c in df.columns if c != "MW_or_MVA"]
+        null_counts = df.select([pl.col(c).is_null().sum().alias(c) for c in feature_cols])
+        total_nulls = null_counts.sum_horizontal().item()
+        if total_nulls > 0:
+            # Find which columns have nulls
+            null_cols = [c for c in feature_cols if null_counts[c][0] > 0]
+            raise RuntimeError(
+                f"Inference data for substation {substation_number} contains null features "
+                f"in columns: {null_cols}. This usually indicates a data gap in historical "
+                "power or weather data."
+            )
 
     # Final cleanup and validation
     return SubstationFeatures.validate(df, drop_superfluous_columns=True)
