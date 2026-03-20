@@ -97,6 +97,8 @@ def train_xgboost_models_for_range(
 
     substation_numbers = params.substation_numbers
     if substation_numbers is None:
+        # This fallback is now handled by the `xgb_models` asset, but we keep it
+        # for robustness when called directly.
         substation_numbers = (
             pl.read_delta(str(power_path))
             .select("substation_number")
@@ -172,10 +174,15 @@ def train_xgboost_models_for_range(
 def xgb_models(
     context: dg.AssetExecutionContext,
     config: XGBoostTrainingConfig,
+    healthy_substations: list[int],
     settings: ResourceParam[Settings],
 ) -> dg.Output[str]:
     """Train XGBoost models for all substations and log to MLflow."""
-    artifacts = train_xgboost_models_for_range(context, config.to_params(), settings)
+    params = config.to_params()
+    if params.substation_numbers is None:
+        params.substation_numbers = healthy_substations
+
+    artifacts = train_xgboost_models_for_range(context, params, settings)
 
     if not artifacts:
         return dg.Output("", metadata={"n_models": 0})
