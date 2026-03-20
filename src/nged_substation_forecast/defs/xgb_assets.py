@@ -1,9 +1,12 @@
 import logging
 from datetime import datetime
+from typing import cast
 
 import dagster as dg
 import mlflow
+import patito as pt
 import polars as pl
+from contracts.data_schemas import SubstationForecastPredictions
 from contracts.settings import Settings
 from dagster import ResourceParam
 from xgboost_forecaster import (
@@ -178,7 +181,10 @@ def xgb_forecasts(
     inference_df = pl.concat(all_inference_data)
 
     # Make predictions using the model-agnostic MLflow wrapper
-    preds_df = loaded_model.predict(inference_df)
+    preds_df = cast(
+        pt.DataFrame[SubstationForecastPredictions],
+        loaded_model.predict(inference_df),
+    )
 
     # Conform to PowerForecast contract
     final_df = preds_df.with_columns(

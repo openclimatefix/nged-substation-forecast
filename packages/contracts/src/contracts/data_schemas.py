@@ -129,6 +129,14 @@ class SubstationMetadata(pt.Model):
     last_updated: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
 
+class SubstationForecastPredictions(pt.Model):
+    """Raw predictions from a substation-level forecaster."""
+
+    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    substation_number: int = pt.Field(dtype=pl.Int32)
+    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
+
+
 class PowerForecast(pt.Model):
     """Forecast data schema."""
 

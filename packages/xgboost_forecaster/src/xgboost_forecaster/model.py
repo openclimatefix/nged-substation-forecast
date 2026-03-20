@@ -3,15 +3,21 @@
 import logging
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationFeatures
+from contracts.data_schemas import SubstationFeatures, SubstationForecastPredictions
 from xgboost import XGBRegressor
 
 log = logging.getLogger(__name__)
+
+
+class NoPredictionsError(Exception):
+    """Raised when the forecaster fails to produce any predictions."""
+
+    pass
 
 
 class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
@@ -36,7 +42,7 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         self,
         context: mlflow.pyfunc.PythonModelContext,
         model_input: pt.DataFrame[SubstationFeatures],
-    ) -> pl.DataFrame:
+    ) -> pt.DataFrame[SubstationForecastPredictions]:
         """Make predictions using the loaded models.
 
         Args:
@@ -44,14 +50,15 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
             model_input: Input data as a Patito DataFrame of SubstationFeatures.
 
         Returns:
-            Polars DataFrame of predictions.
+            Patito DataFrame of SubstationForecastPredictions.
         """
         # If we have a global model, use it for everything
         if "global" in self.models:
             preds = self.models["global"].predict(model_input)
-            return model_input.select(["timestamp", "substation_number"]).with_columns(
+            res = model_input.select(["timestamp", "substation_number"]).with_columns(
                 pl.Series(name="MW_or_MVA", values=preds, dtype=pl.Float32)
             )
+            return cast(pt.DataFrame[SubstationForecastPredictions], res)
 
         # Otherwise, route to local models
         all_preds = []
@@ -69,18 +76,18 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
             )
 
         if not all_preds:
-            return pl.DataFrame(
-                schema={
-                    "timestamp": pl.Datetime,
-                    "substation_number": pl.Int32,
-                    "MW_or_MVA": pl.Float32,
-                }
+            raise NoPredictionsError(
+                f"No models found for any of the substations in the input data: "
+                f"{model_input['substation_number'].unique().to_list()}"
             )
 
-        return pl.concat(all_preds)
+        res = pl.concat(all_preds)
+        return cast(pt.DataFrame[SubstationForecastPredictions], res)
 
 
 # TODO: Create an abstract base class that defines the universal interface to all Forecasters.
+
+
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
