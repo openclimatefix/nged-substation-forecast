@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import cast
 
 import dagster as dg
@@ -19,20 +19,57 @@ from xgboost_forecaster import (
     get_substation_metadata,
     prepare_inference_data,
     prepare_training_data,
+    train_local_xgboost_model,
 )
+
+from pydantic import BaseModel
 
 log = logging.getLogger(__name__)
 
 
-@dg.asset(deps=["live_primary_flows", "ecmwf_ens_forecast"])
-def xgb_models(
-    context: dg.AssetExecutionContext, settings: ResourceParam[Settings]
-) -> dg.Output[str]:
-    """Train XGBoost models for all substations and log to MLflow."""
+class XGBoostTrainingParams(BaseModel):
+    """Parameters for XGBoost training."""
+
+    train_start_date: str | None = None
+    train_end_date: str | None = None
+    test_end_date: str | None = None
+
+
+class XGBoostTrainingConfig(dg.Config):
+    """Configuration for XGBoost training."""
+
+    train_start_date: str | None = None
+    train_end_date: str | None = None
+    test_end_date: str | None = None
+
+    def to_params(self) -> XGBoostTrainingParams:
+        """Convert config to params."""
+        return XGBoostTrainingParams(
+            train_start_date=self.train_start_date,
+            train_end_date=self.train_end_date,
+            test_end_date=self.test_end_date,
+        )
+
+
+def train_xgboost_models_for_range(
+    context: dg.AssetExecutionContext | dg.OpExecutionContext,
+    params: XGBoostTrainingParams,
+    settings: Settings,
+) -> dict[str, str]:
+    """Train XGBoost models for a given date range.
+
+    Args:
+        context: Dagster context.
+        params: Training parameters.
+        settings: Application settings.
+
+    Returns:
+        A dictionary mapping substation numbers to model paths.
+    """
     power_path = settings.nged_data_path / "delta" / "live_primary_flows"
     if not power_path.exists():
         context.log.warning("No Delta table found.")
-        return dg.Output("", metadata={"n_models": 0})
+        return {}
 
     substation_numbers = (
         pl.read_delta(str(power_path)).select("substation_number").unique().to_series().to_list()
@@ -46,13 +83,20 @@ def xgb_models(
     )
     metadata = get_substation_metadata(data_config)
 
-    # We need a start and end date for training.
-    # For now, let's use a fixed range.
-    # TODO: This should be configurable so we can do expanding window time series cross-validation
-    # (i.e. where we mimic what happens in production) and so that, when we train for production,
-    # we use as much historical data as possible.
-    start_date = datetime(2026, 2, 1).date()
-    end_date = datetime(2026, 2, 28).date()
+    # Resolve training dates
+    if params.train_end_date:
+        end_date = date.fromisoformat(params.train_end_date)
+    else:
+        # Default to 7 days ago to ensure data is settled
+        end_date = (datetime.now() - timedelta(days=7)).date()
+
+    if params.train_start_date:
+        start_date = date.fromisoformat(params.train_start_date)
+    else:
+        # Default to 1 year before end_date
+        start_date = end_date - timedelta(days=365)
+
+    context.log.info(f"Training from {start_date} to {end_date}")
 
     df_all = prepare_training_data(
         substation_numbers=substation_numbers,
@@ -67,36 +111,11 @@ def xgb_models(
     artifacts = {}
     for substation_number in substation_numbers:
         try:
-            # TODO: Move all the code in this `try` block into a new function.
-
             df = df_all.filter(pl.col("substation_number") == substation_number)
 
             if df.is_empty():
                 context.log.warning(f"No data available for substation {substation_number}")
                 continue
-
-            # Train model
-            forecaster = XGBoostForecaster()
-
-            # Split into train/eval
-            df = df.sort("valid_time")
-            train_size = int(len(df) * 0.8)
-            train_df = df.head(train_size)
-            eval_df = df.tail(len(df) - train_size)
-
-            target_col = "MW_or_MVA"
-            feature_cols = [
-                c for c in df.columns if c not in [target_col, "valid_time", "substation_number"]
-            ]
-
-            eval_set = [(eval_df, eval_df[target_col])]
-
-            forecaster.train(
-                df=train_df,
-                target_col=target_col,
-                feature_cols=feature_cols,
-                eval_set=eval_set,
-            )
 
             # Save model to a temporary location for MLflow to pick up
             model_path = (
@@ -104,12 +123,32 @@ def xgb_models(
                 / XGBoostForecaster.model_name_and_version()
                 / f"{substation_number}.json"
             )
-            model_path.parent.mkdir(parents=True, exist_ok=True)
-            forecaster.save(model_path)
+
+            train_local_xgboost_model(
+                substation_number=substation_number,
+                df=df,
+                output_path=model_path,
+            )
+
             artifacts[str(substation_number)] = str(model_path)
 
         except Exception as e:
             context.log.error(f"Failed to train model for {substation_number}: {e}")
+
+    return artifacts
+
+
+@dg.asset(deps=["live_primary_flows", "ecmwf_ens_forecast"])
+def xgb_models(
+    context: dg.AssetExecutionContext,
+    config: XGBoostTrainingConfig,
+    settings: ResourceParam[Settings],
+) -> dg.Output[str]:
+    """Train XGBoost models for all substations and log to MLflow."""
+    artifacts = train_xgboost_models_for_range(context, config.to_params(), settings)
+
+    if not artifacts:
+        return dg.Output("", metadata={"n_models": 0})
 
     # Log to MLflow
     # We omit the MLflow input/output signature to prevent MLflow from forcing the

@@ -257,3 +257,57 @@ class XGBoostForecaster:
         return pl.DataFrame({"feature": self.feature_names, "importance": importance}).sort(
             "importance", descending=True
         )
+
+
+def train_local_xgboost_model(
+    substation_number: int,
+    df: pl.DataFrame,
+    output_path: Path,
+    target_col: str = "MW_or_MVA",
+    train_test_split: float = 0.8,
+) -> Path:
+    """Train an XGBoost model for a single substation and save it.
+
+    Args:
+        substation_number: The substation number.
+        df: Dataframe containing features and target for this substation.
+        output_path: Path where the trained model should be saved.
+        target_col: Name of the target column.
+        train_test_split: Fraction of data to use for training (rest for evaluation).
+
+    Returns:
+        The path to the saved model.
+
+    Raises:
+        ValueError: If the input dataframe is empty.
+    """
+    if df.is_empty():
+        raise ValueError(f"No data available for substation {substation_number}")
+
+    # Train model
+    forecaster = XGBoostForecaster()
+
+    # Split into train/eval
+    df = df.sort("valid_time")
+    train_size = int(len(df) * train_test_split)
+    train_df = df.head(train_size)
+    eval_df = df.tail(len(df) - train_size)
+
+    feature_cols = [
+        c for c in df.columns if c not in [target_col, "valid_time", "substation_number"]
+    ]
+
+    eval_set = [(eval_df, eval_df[target_col])]
+
+    forecaster.train(
+        df=train_df,
+        target_col=target_col,
+        feature_cols=feature_cols,
+        eval_set=eval_set,
+    )
+
+    # Save model
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    forecaster.save(output_path)
+
+    return output_path
