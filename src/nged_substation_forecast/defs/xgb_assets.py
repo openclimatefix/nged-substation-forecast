@@ -77,14 +77,14 @@ def xgb_models(
             forecaster = XGBoostForecaster()
 
             # Split into train/eval
-            df = df.sort("timestamp")
+            df = df.sort("valid_time")
             train_size = int(len(df) * 0.8)
             train_df = df.head(train_size)
             eval_df = df.tail(len(df) - train_size)
 
             target_col = "MW_or_MVA"
             feature_cols = [
-                c for c in df.columns if c not in [target_col, "timestamp", "substation_number"]
+                c for c in df.columns if c not in [target_col, "valid_time", "substation_number"]
             ]
 
             eval_set = [(eval_df, eval_df[target_col])]
@@ -180,17 +180,18 @@ def xgb_forecasts(
 
     inference_df = pl.concat(all_inference_data)
 
-    # Make predictions using the model-agnostic MLflow wrapper
-    preds_df = cast(
-        pt.DataFrame[PowerForecast],
-        loaded_model.predict(
-            inference_df,
-            params={
-                "nwp_init_time": init_time.isoformat(),
-                "power_fcst_model": XGBoostForecaster.model_name_and_version(),
-            },
-        ),
+    # Make predictions using the model-agnostic MLflow wrapper.
+    # MLflow's pyfunc.PythonModel.predict expects a list of inputs when using
+    # custom types (like Patito DataFrames) to support batching.
+    # We wrap our single DataFrame in a list and unwrap the result.
+    result_list = loaded_model.predict(
+        [inference_df],
+        params={
+            "nwp_init_time": init_time.isoformat(),
+            "power_fcst_model": XGBoostForecaster.model_name_and_version(),
+        },
     )
+    preds_df = cast(pt.DataFrame[PowerForecast], result_list[0])
 
     # Save combined forecast
     forecast_path = (

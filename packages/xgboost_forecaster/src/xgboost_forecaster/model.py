@@ -2,14 +2,19 @@
 
 import logging
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import mlflow
 import patito as pt
 import polars as pl
 from contracts.data_schemas import InferenceParams, PowerForecast, SubstationFeatures
 from xgboost import XGBRegressor
+
+if TYPE_CHECKING:
+    import patito as pt
+    from contracts.data_schemas import PowerForecast, SubstationFeatures
 
 log = logging.getLogger(__name__)
 
@@ -41,19 +46,25 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
     def predict(
         self,
         context: mlflow.pyfunc.PythonModelContext,
-        model_input: pt.DataFrame[SubstationFeatures],
+        model_input: list[pt.DataFrame[SubstationFeatures]],
         params: dict[str, Any] | None = None,
-    ) -> pt.DataFrame[PowerForecast]:
+    ) -> list[pt.DataFrame[PowerForecast]]:
         """Make predictions using the loaded models.
+
+        Note:
+            MLflow's pyfunc.PythonModel.predict expects a list of inputs when using
+            custom types (like Patito DataFrames) to support batching. Even though
+            a single DataFrame already contains a batch of rows, we must wrap it
+            in a list to satisfy MLflow's type hint inspection and avoid warnings.
 
         Args:
             context: MLflow context.
-            model_input: Input data as a Patito DataFrame of SubstationFeatures.
+            model_input: A list containing a single Patito DataFrame of SubstationFeatures.
             params: Optional dictionary of parameters, including 'nwp_init_time'
                 and 'power_fcst_model'.
 
         Returns:
-            Patito DataFrame of PowerForecast.
+            A list containing a single Patito DataFrame of PowerForecast.
         """
         if params is None:
             raise ValueError("'params' must be provided to the predict method")
@@ -65,20 +76,26 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
             inference_params.power_fcst_model or XGBoostForecaster.model_name_and_version()
         )
 
+        # Unwrap the input list. MLflow expects a list for custom types.
+        if not isinstance(model_input, list) or len(model_input) == 0:
+            raise ValueError("model_input must be a non-empty list of DataFrames")
+
+        df = model_input[0]
+
         # If we have a global model, use it for everything
         if "global" in self.models:
-            preds = self.models["global"].predict(model_input)
-            res = model_input.select(["valid_time", "substation_number"]).with_columns(
+            preds = self.models["global"].predict(df)
+            res = df.select(["valid_time", "substation_number"]).with_columns(
                 MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
                 nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
                 power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
                 ensemble_member=pl.lit(0).cast(pl.UInt8),
             )
-            return cast(pt.DataFrame[PowerForecast], res)
+            return [cast(pt.DataFrame[PowerForecast], res)]
 
         # Otherwise, route to local models
         all_preds = []
-        for substation_number, group in model_input.group_by("substation_number"):
+        for substation_number, group in df.group_by("substation_number"):
             sub_id_str = str(substation_number)
             if sub_id_str not in self.models:
                 log.warning(f"No model found for substation {substation_number}")
@@ -97,11 +114,11 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         if not all_preds:
             raise NoPredictionsError(
                 f"No models found for any of the substations in the input data: "
-                f"{model_input['substation_number'].unique().to_list()}"
+                f"{df['substation_number'].unique().to_list()}"
             )
 
         res = pl.concat(all_preds)
-        return cast(pt.DataFrame[PowerForecast], res)
+        return [cast(pt.DataFrame[PowerForecast], res)]
 
 
 # TODO: Create an abstract base class that defines the universal interface to all Forecasters.
