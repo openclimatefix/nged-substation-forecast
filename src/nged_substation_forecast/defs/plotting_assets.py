@@ -1,4 +1,6 @@
 import random
+from datetime import datetime, timedelta
+from typing import cast
 
 import altair as alt
 import dagster as dg
@@ -19,6 +21,7 @@ def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     xgb_forecasts: pl.DataFrame,
     combined_actuals: pl.DataFrame,
+    substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
 ):
@@ -28,6 +31,7 @@ def forecast_vs_actual_plot(
         context: Asset execution context.
         xgb_forecasts: Combined forecast dataframe.
         combined_actuals: Combined actual power data.
+        substation_metadata: Substation metadata.
         config: PlotConfig.
         settings: Settings.
     """
@@ -45,39 +49,95 @@ def forecast_vs_actual_plot(
 
     # Filter data
     plot_forecast = xgb_forecasts.filter(pl.col("substation_number").is_in(substation_ids))
-    plot_actuals = combined_actuals.filter(pl.col("substation_number").is_in(substation_ids))
 
-    if plot_forecast.is_empty() or plot_actuals.is_empty():
-        context.log.warning("No data for selected substations in plotting.")
+    if plot_forecast.is_empty():
+        context.log.warning("No forecast data for selected substations.")
         return
 
-    # Prepare for plotting
-    # TODO: Don't use `to_pandas()`!
-    df_f = plot_forecast.to_pandas().rename(columns={"valid_time": "time", "MW_or_MVA": "value"})
-    df_f["type"] = "Forecast"
+    # Get the start of the forecast to filter actuals
+    forecast_start = cast(datetime, plot_forecast["valid_time"].min())
+    history_start = forecast_start - timedelta(days=2)
 
-    # TODO: Don't use `to_pandas()`!
-    df_a = plot_actuals.to_pandas().rename(columns={"timestamp": "time", "MW_or_MVA": "value"})
-    df_a["type"] = "Actual"
+    plot_actuals = combined_actuals.filter(
+        (pl.col("substation_number").is_in(substation_ids))
+        & (pl.col("timestamp") >= history_start)
+        & (pl.col("timestamp") <= plot_forecast["valid_time"].max())
+    )
 
-    import pandas as pd  # TODO: Remove!
+    if plot_actuals.is_empty():
+        context.log.warning("No actuals data for selected substations in the plotting window.")
+        # We can still plot the forecast though, but the goal is comparison.
 
-    combined_df = pd.concat([df_f, df_a])
+    # Join with metadata to get names
+    metadata_subset = substation_metadata.select(
+        ["substation_number", "substation_name_in_location_table"]
+    ).rename({"substation_name_in_location_table": "substation_name"})
 
-    # Create Altair chart
+    # Prepare for plotting using Polars
+    df_f = (
+        plot_forecast.join(metadata_subset, on="substation_number", how="left")
+        .with_columns(
+            type=pl.lit("Forecast"),
+            display_name=pl.format(
+                "{} ({})", pl.col("substation_name"), pl.col("substation_number")
+            ),
+        )
+        .select(
+            time=pl.col("valid_time"),
+            value=pl.col("MW_or_MVA"),
+            type=pl.col("type"),
+            display_name=pl.col("display_name"),
+        )
+    )
+
+    df_a = (
+        plot_actuals.join(metadata_subset, on="substation_number", how="left")
+        .with_columns(
+            type=pl.lit("Actual"),
+            display_name=pl.format(
+                "{} ({})", pl.col("substation_name"), pl.col("substation_number")
+            ),
+        )
+        .select(
+            time=pl.col("timestamp"),
+            value=pl.col("MW_or_MVA"),
+            type=pl.col("type"),
+            display_name=pl.col("display_name"),
+        )
+    )
+
+    combined_df = pl.concat([df_f, df_a])
+
+    # Create Altair chart with subplots (facets)
     chart = (
         alt.Chart(combined_df)
-        .mark_line()
+        .mark_line(strokeWidth=1.5, opacity=0.8)
         .encode(
-            x="time:T",
-            y="value:Q",
-            color="substation_number:N",
-            strokeDash="type:N",
-            tooltip=["time", "value", "substation_number", "type"],
+            x=alt.X("time:T", title="Time (UTC)"),
+            y=alt.Y("value:Q", title="Power (MW/MVA)"),
+            color=alt.Color(
+                "type:N",
+                scale=alt.Scale(domain=["Actual", "Forecast"], range=["#5276A7", "#F18536"]),
+                legend=alt.Legend(title="Data Type"),
+            ),
+            strokeDash=alt.StrokeDash(
+                "type:N",
+                scale=alt.Scale(domain=["Actual", "Forecast"], range=[[0], [4, 2]]),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("time:T", format="%Y-%m-%d %H:%M"),
+                alt.Tooltip("value:Q", format=".2f"),
+                alt.Tooltip("display_name:N"),
+                alt.Tooltip("type:N"),
+            ],
         )
-        .properties(
-            title=f"Forecast vs Actuals for Substation(s): {substation_ids}", width=800, height=400
-        )
+        .properties(width=800, height=200)
+        .facet(row=alt.Row("display_name:N", title="Substation"), spacing=40)
+        .resolve_scale(y="independent")
+        .configure_title(fontSize=16, anchor="start", color="gray")
+        .configure_axis(labelFontSize=12, titleFontSize=14)
+        .configure_legend(labelFontSize=12, titleFontSize=14)
         .interactive()
     )
 
