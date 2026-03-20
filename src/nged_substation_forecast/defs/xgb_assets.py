@@ -181,17 +181,16 @@ def xgb_forecasts(
     inference_df = pl.concat(all_inference_data)
 
     # Make predictions using the model-agnostic MLflow wrapper.
-    # MLflow's pyfunc.PythonModel.predict expects a list of inputs when using
-    # custom types (like Patito DataFrames) to support batching.
-    # We wrap our single DataFrame in a list and unwrap the result.
-    result_list = loaded_model.predict(
-        [inference_df],
-        params={
-            "nwp_init_time": init_time.isoformat(),
-            "power_fcst_model": XGBoostForecaster.model_name_and_version(),
-        },
+    preds_df = cast(
+        pt.DataFrame[PowerForecast],
+        loaded_model.predict(
+            inference_df,
+            params={
+                "nwp_init_time": init_time.isoformat(),
+                "power_fcst_model": XGBoostForecaster.model_name_and_version(),
+            },
+        ),
     )
-    preds_df = cast(pt.DataFrame[PowerForecast], result_list[0])
 
     # Save combined forecast
     forecast_path = (
