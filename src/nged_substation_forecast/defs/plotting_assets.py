@@ -38,12 +38,14 @@ def forecast_vs_actual_plot(
     substation_ids = config.substation_ids
     if not substation_ids:
         # Pick 5 random substations if none specified
-        unique_ids = xgb_forecasts.select("substation_id").unique()["substation_id"].to_list()
+        unique_ids = (
+            xgb_forecasts.select("substation_number").unique()["substation_number"].to_list()
+        )
         substation_ids = random.sample(unique_ids, min(5, len(unique_ids)))
 
     # Filter data
-    plot_forecast = xgb_forecasts.filter(pl.col("substation_id").is_in(substation_ids))
-    plot_actuals = combined_actuals.filter(pl.col("substation_id").is_in(substation_ids))
+    plot_forecast = xgb_forecasts.filter(pl.col("substation_number").is_in(substation_ids))
+    plot_actuals = combined_actuals.filter(pl.col("substation_number").is_in(substation_ids))
 
     if plot_forecast.is_empty() or plot_actuals.is_empty():
         context.log.warning("No data for selected substations in plotting.")
@@ -69,9 +71,9 @@ def forecast_vs_actual_plot(
         .encode(
             x="time:T",
             y="value:Q",
-            color="substation_id:N",
+            color="substation_number:N",
             strokeDash="type:N",
-            tooltip=["time", "value", "substation_id", "type"],
+            tooltip=["time", "value", "substation_number", "type"],
         )
         .properties(
             title=f"Forecast vs Actuals for Substation(s): {substation_ids}", width=800, height=400

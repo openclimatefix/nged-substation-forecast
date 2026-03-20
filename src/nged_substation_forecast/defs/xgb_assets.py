@@ -6,7 +6,7 @@ import dagster as dg
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationForecastPredictions
+from contracts.data_schemas import PowerForecast
 from contracts.settings import Settings
 from dagster import ResourceParam
 from xgboost_forecaster import (
@@ -182,21 +182,15 @@ def xgb_forecasts(
 
     # Make predictions using the model-agnostic MLflow wrapper
     preds_df = cast(
-        pt.DataFrame[SubstationForecastPredictions],
-        loaded_model.predict(inference_df),
+        pt.DataFrame[PowerForecast],
+        loaded_model.predict(
+            inference_df,
+            params={
+                "nwp_init_time": init_time.isoformat(),
+                "power_fcst_model": XGBoostForecaster.model_name_and_version(),
+            },
+        ),
     )
-
-    # Conform to PowerForecast contract
-    final_df = preds_df.with_columns(
-        [
-            pl.col("timestamp").alias("valid_time"),
-            pl.col("substation_number").alias("substation_id"),
-            pl.lit(init_time).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
-            pl.lit(XGBoostForecaster.model_name_and_version())
-            .alias("power_fcst_model")
-            .cast(pl.Categorical),
-        ]
-    ).select(["valid_time", "substation_id", "MW_or_MVA", "nwp_init_time", "power_fcst_model"])
 
     # Save combined forecast
     forecast_path = (
@@ -205,13 +199,13 @@ def xgb_forecasts(
         / "all_substations.parquet"
     )
     forecast_path.parent.mkdir(parents=True, exist_ok=True)
-    final_df.write_parquet(forecast_path)
+    preds_df.write_parquet(forecast_path)
 
     return dg.Output(
-        final_df,
+        preds_df,
         metadata={
             "path": dg.MetadataValue.path(forecast_path),
-            "n_points": len(final_df),
-            "n_substations": final_df.select("substation_id").n_unique(),
+            "n_points": len(preds_df),
+            "n_substations": preds_df.select("substation_number").n_unique(),
         },
     )

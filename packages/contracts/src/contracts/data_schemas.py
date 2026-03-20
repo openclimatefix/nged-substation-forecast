@@ -6,6 +6,7 @@ from typing import cast
 
 import patito as pt
 import polars as pl
+from pydantic import BaseModel
 
 
 class MissingCorePowerVariablesError(ValueError):
@@ -129,19 +130,11 @@ class SubstationMetadata(pt.Model):
     last_updated: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
 
 
-class SubstationForecastPredictions(pt.Model):
-    """Raw predictions from a substation-level forecaster."""
-
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
-    substation_number: int = pt.Field(dtype=pl.Int32)
-    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
-
-
 class PowerForecast(pt.Model):
     """Forecast data schema."""
 
     nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    substation_id: int = pt.Field(dtype=pl.Int32)
+    substation_number: int = pt.Field(dtype=pl.Int32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
@@ -153,6 +146,13 @@ class PowerForecast(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # TODO: Capture probabilistic information.
+
+
+class InferenceParams(BaseModel):
+    """Parameters for ML model inference."""
+
+    nwp_init_time: datetime
+    power_fcst_model: str | None = None
 
 
 class Nwp(pt.Model):
@@ -222,11 +222,10 @@ class Nwp(pt.Model):
         return cast(pt.DataFrame["Nwp"], validated_df)
 
 
-class ProcessedWeather(pt.Model):
+class ProcessedNwp(pt.Model):
     """Weather data after ensemble selection and interpolation."""
 
-    # TODO: Rename `timestamp` to `valid_time`
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
     # Weather variables as Float32
@@ -248,7 +247,7 @@ class ProcessedWeather(pt.Model):
 class SubstationFeatures(pt.Model):
     """Final joined dataset ready for XGBoost."""
 
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     substation_number: int = pt.Field(dtype=pl.Int32)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 

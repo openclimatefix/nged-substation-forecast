@@ -83,7 +83,7 @@ def test_power_forecast_validation():
     df = pl.DataFrame(
         {
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_id": [123],
+            "substation_number": [123],
             "MW_or_MVA": [50.5],
             "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
             "power_fcst_model": ["xgboost_v1.0.0"],
@@ -91,7 +91,7 @@ def test_power_forecast_validation():
         }
     ).with_columns(
         [
-            pl.col("substation_id").cast(pl.Int32),
+            pl.col("substation_number").cast(pl.Int32),
             pl.col("MW_or_MVA").cast(pl.Float32),
             pl.col("power_fcst_model").cast(pl.Categorical),
             pl.col("ensemble_member").cast(pl.UInt8),

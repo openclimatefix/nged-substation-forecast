@@ -12,26 +12,20 @@ def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
     """Add cyclical and standard temporal features.
 
     Args:
-        df: DataFrame with a 'timestamp' column.
+        df: DataFrame with a 'valid_time' column.
 
     Returns:
         DataFrame with added temporal features.
     """
     return df.with_columns(
-        [
-            # Cyclical Hour (24h)
-            (pl.col("timestamp").dt.hour() * 2 * np.pi / 24).sin().alias("hour_sin"),
-            (pl.col("timestamp").dt.hour() * 2 * np.pi / 24).cos().alias("hour_cos"),
-            # Cyclical Day of Year (365.25d)
-            (pl.col("timestamp").dt.ordinal_day() * 2 * np.pi / 365.25)
-            .sin()
-            .alias("day_of_year_sin"),
-            (pl.col("timestamp").dt.ordinal_day() * 2 * np.pi / 365.25)
-            .cos()
-            .alias("day_of_year_cos"),
-            # Day of week (0-6)
-            pl.col("timestamp").dt.weekday().alias("day_of_week"),
-        ]
+        # Cyclical Hour (24h)
+        hour_sin=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).sin(),
+        hour_cos=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).cos(),
+        # Cyclical Day of Year (365.25d)
+        day_of_year_sin=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25).sin(),
+        day_of_year_cos=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25).cos(),
+        # Day of week (0-6)
+        day_of_week=pl.col("valid_time").dt.weekday(),
     )
 
 
@@ -47,7 +41,7 @@ def add_physical_features(df: pl.DataFrame) -> pl.DataFrame:
     params = load_scaling_params()
     descale_cols = ["temperature_2m", "wind_speed_10m", "wind_direction_10m"]
     descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(descale_cols)))
-    phys_df = df.select(["timestamp"] + descale_cols).with_columns(descale_exprs)
+    phys_df = df.select(["valid_time"] + descale_cols).with_columns(descale_exprs)
 
     # Windchill formula: 13.12 + 0.6215*T - 11.37*V^0.16 + 0.3965*T*V^0.16
     # V is wind speed in km/h
@@ -91,8 +85,8 @@ def add_weather_features(
                 ],
                 how="diagonal",
             )
-            .unique("timestamp")
-            .sort("timestamp")
+            .unique("valid_time")
+            .sort("valid_time")
         )
     else:
         full_weather = weather
@@ -104,7 +98,7 @@ def add_weather_features(
     def _get_lagged_view(df: pl.DataFrame, offset: timedelta, suffix: str) -> pl.DataFrame:
         lagged = df.select(
             [
-                (pl.col("timestamp") + offset).alias("timestamp"),
+                (pl.col("valid_time") + offset).alias("valid_time"),
                 pl.col("temperature_2m").alias(f"temperature_2m_{suffix}"),
                 pl.col("downward_short_wave_radiation_flux_surface").alias(
                     f"sw_radiation_{suffix}"
@@ -118,13 +112,13 @@ def add_weather_features(
     weather_lag_14d = _get_lagged_view(full_weather, timedelta(days=14), "lag_14d")
     weather_trend_6h = full_weather.select(
         [
-            (pl.col("timestamp") + timedelta(hours=6)).alias("timestamp"),
+            (pl.col("valid_time") + timedelta(hours=6)).alias("valid_time"),
             pl.col("temperature_2m").alias("temperature_2m_6h_ago"),
         ]
         + ([pl.col("ensemble_member")] if "ensemble_member" in full_weather.columns else [])
     )
 
-    join_on = ["timestamp"]
+    join_on = ["valid_time"]
     if "ensemble_member" in weather.columns and "ensemble_member" in weather_lag_7d.columns:
         join_on.append("ensemble_member")
 

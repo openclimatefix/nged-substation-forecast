@@ -8,7 +8,7 @@ from typing import Any, Self, cast
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationFeatures, SubstationForecastPredictions
+from contracts.data_schemas import InferenceParams, PowerForecast, SubstationFeatures
 from xgboost import XGBRegressor
 
 log = logging.getLogger(__name__)
@@ -42,23 +42,39 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         self,
         context: mlflow.pyfunc.PythonModelContext,
         model_input: pt.DataFrame[SubstationFeatures],
-    ) -> pt.DataFrame[SubstationForecastPredictions]:
+        params: dict[str, Any] | None = None,
+    ) -> pt.DataFrame[PowerForecast]:
         """Make predictions using the loaded models.
 
         Args:
             context: MLflow context.
             model_input: Input data as a Patito DataFrame of SubstationFeatures.
+            params: Optional dictionary of parameters, including 'nwp_init_time'
+                and 'power_fcst_model'.
 
         Returns:
-            Patito DataFrame of SubstationForecastPredictions.
+            Patito DataFrame of PowerForecast.
         """
+        if params is None:
+            raise ValueError("'params' must be provided to the predict method")
+
+        # Validate parameters using Pydantic model
+        inference_params = InferenceParams(**params)
+        nwp_init_time = inference_params.nwp_init_time
+        power_fcst_model = (
+            inference_params.power_fcst_model or XGBoostForecaster.model_name_and_version()
+        )
+
         # If we have a global model, use it for everything
         if "global" in self.models:
             preds = self.models["global"].predict(model_input)
-            res = model_input.select(["timestamp", "substation_number"]).with_columns(
-                pl.Series(name="MW_or_MVA", values=preds, dtype=pl.Float32)
+            res = model_input.select(["valid_time", "substation_number"]).with_columns(
+                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
+                nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
+                power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
+                ensemble_member=pl.lit(0).cast(pl.UInt8),
             )
-            return cast(pt.DataFrame[SubstationForecastPredictions], res)
+            return cast(pt.DataFrame[PowerForecast], res)
 
         # Otherwise, route to local models
         all_preds = []
@@ -70,8 +86,11 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
 
             preds = self.models[sub_id_str].predict(group)
             all_preds.append(
-                group.select(["timestamp", "substation_number"]).with_columns(
-                    pl.Series(name="MW_or_MVA", values=preds, dtype=pl.Float32)
+                group.select(["valid_time", "substation_number"]).with_columns(
+                    MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
+                    nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
+                    power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
+                    ensemble_member=pl.lit(0).cast(pl.UInt8),
                 )
             )
 
@@ -82,12 +101,10 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
             )
 
         res = pl.concat(all_preds)
-        return cast(pt.DataFrame[SubstationForecastPredictions], res)
+        return cast(pt.DataFrame[PowerForecast], res)
 
 
 # TODO: Create an abstract base class that defines the universal interface to all Forecasters.
-
-
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
@@ -140,7 +157,7 @@ class XGBoostForecaster:
             feature_cols = [
                 c
                 for c in df.columns
-                if c != target_col and c != "timestamp" and df[c].dtype.is_numeric()
+                if c != target_col and c != "valid_time" and df[c].dtype.is_numeric()
             ]
 
         self.feature_names = feature_cols

@@ -28,12 +28,10 @@ def combined_actuals(
     metadata = get_substation_metadata(data_config)
 
     # Join metadata to get substation_number
-    df = df.join(
-        metadata.select(["substation_number"]), on="substation_number", how="inner"
-    ).rename({"substation_number": "substation_id"})
+    df = df.join(metadata.select(["substation_number"]), on="substation_number", how="inner")
 
     # Some actuals might have 'MW', others 'MVA'.
-    df = df.with_columns(pl.coalesce(["MW", "MVA"]).alias("MW_or_MVA"))
+    df = df.with_columns(MW_or_MVA=pl.coalesce(["MW", "MVA"]))
 
     return df
 
@@ -53,11 +51,11 @@ def metrics_asset(
     # Validate forecasts against contract
     PowerForecast.validate(xgb_forecasts)
 
-    # Join on substation_id and time
+    # Join on substation_number and time
     comparison = xgb_forecasts.join(
         combined_actuals,
-        left_on=["substation_id", "valid_time"],
-        right_on=["substation_id", "timestamp"],
+        left_on=["substation_number", "valid_time"],
+        right_on=["substation_number", "timestamp"],
         suffix="_actual",
     )
 
@@ -66,11 +64,9 @@ def metrics_asset(
         return pl.DataFrame()
 
     # Compute metrics per substation
-    metrics = comparison.group_by("substation_id").agg(
-        [
-            (pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")).abs().mean().alias("mae"),
-            ((pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")) ** 2).mean().sqrt().alias("rmse"),
-        ]
+    metrics = comparison.group_by("substation_number").agg(
+        mae=(pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")).abs().mean(),
+        rmse=((pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")) ** 2).mean().sqrt(),
     )
 
     output_path = settings.forecast_metrics_data_path
