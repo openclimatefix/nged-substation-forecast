@@ -7,6 +7,12 @@ import polars as pl
 
 from xgboost_forecaster.scaling import load_scaling_params, uint8_to_physical_unit
 
+# TODO: All the functions in this file should be moved into a common package, so other ML models can
+# also use these features.
+
+# TODO: All the functions in this file should use `pt.DataFrame[...]` type hints for both the input
+# and output.
+
 
 def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
     """Add cyclical and standard temporal features.
@@ -26,6 +32,7 @@ def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
         day_of_year_cos=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25).cos(),
         # Day of week (0-6)
         day_of_week=pl.col("valid_time").dt.weekday(),
+        # TODO: Try adding `day_of_week_sin` and `day_of_week_cos`.
     )
 
 
