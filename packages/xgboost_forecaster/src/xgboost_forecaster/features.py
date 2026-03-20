@@ -25,13 +25,17 @@ def add_temporal_features(df: pl.DataFrame) -> pl.DataFrame:
     """
     return df.with_columns(
         # Cyclical Hour (24h)
-        hour_sin=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).sin(),
-        hour_cos=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).cos(),
+        hour_sin=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).sin().cast(pl.Float32),
+        hour_cos=(pl.col("valid_time").dt.hour() * 2 * np.pi / 24).cos().cast(pl.Float32),
         # Cyclical Day of Year (365.25d)
-        day_of_year_sin=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25).sin(),
-        day_of_year_cos=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25).cos(),
+        day_of_year_sin=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25)
+        .sin()
+        .cast(pl.Float32),
+        day_of_year_cos=(pl.col("valid_time").dt.ordinal_day() * 2 * np.pi / 365.25)
+        .cos()
+        .cast(pl.Float32),
         # Day of week (0-6)
-        day_of_week=pl.col("valid_time").dt.weekday(),
+        day_of_week=pl.col("valid_time").dt.weekday().cast(pl.Int8),
         # TODO: Try adding `day_of_week_sin` and `day_of_week_cos`.
     )
 
@@ -137,6 +141,7 @@ def add_weather_features(
 
     return weather.with_columns(
         temp_trend_6h=(
-            pl.col("temperature_2m").cast(pl.Int16) - pl.col("temperature_2m_6h_ago").cast(pl.Int16)
-        )
+            pl.col("temperature_2m").cast(pl.Float32)
+            - pl.col("temperature_2m_6h_ago").cast(pl.Float32)
+        ).cast(pl.Float32)
     )

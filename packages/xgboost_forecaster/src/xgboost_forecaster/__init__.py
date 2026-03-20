@@ -7,4 +7,5 @@ from .data import prepare_inference_data as prepare_inference_data
 from .data import prepare_training_data as prepare_training_data
 from .model import XGBoostForecaster as XGBoostForecaster
 from .model import XGBoostPyFuncWrapper as XGBoostPyFuncWrapper
+from .model import train_local_xgboost_model as train_local_xgboost_model
 from .types import EnsembleSelection as EnsembleSelection

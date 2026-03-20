@@ -65,7 +65,7 @@ def forecast_vs_actual_plot(
     combined_df = pd.concat([df_f, df_a])
 
     # Create Altair chart
-    (
+    chart = (
         alt.Chart(combined_df)
         .mark_line()
         .encode(
@@ -81,11 +81,17 @@ def forecast_vs_actual_plot(
         .interactive()
     )
 
+    # Save chart to HTML for easy viewing
+    plot_path = settings.nged_data_path / "plots" / "forecast_vs_actual.html"
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    chart.save(str(plot_path))
+
     # Log chart and metadata
     context.add_output_metadata(
         {
             "plot_metadata": dg.MetadataValue.text("Altair plot generated"),
             "substation_ids_plotted": dg.MetadataValue.json(substation_ids),
+            "plot_url": dg.MetadataValue.path(str(plot_path)),
         }
     )
 
