@@ -1,3 +1,4 @@
+#######################
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -6,23 +7,41 @@ dist/
 wheels/
 *.egg-info
 
+#######################
 # Virtual environments
 .venv
 
+#######################
 # Marimo
 marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+#######################
 # Environment variables & secrets
 .env
 .env.backup
 
+#######################
 # Data storage
 data/
 
+#######################
 # Dagster
 packages/dynamical_data/uint8_nwp.parquet
 .tmp_dagster_home_*
 # `dagster_history/` is defined in `$DAGSTER_HOME/dagster.yaml`
 dagster_history/
+
+#######################
+# MLflow 
+
+# This directory contains all the artifacts (e.g. the XGBoost models), parameters, and metrics for
+# every experiment you run locally. It can grow very large and contains binary files that don't
+# belong in Git.
+mlruns/ 
+
+# If you use a SQLite backend for MLflow (which is common for local development to enable better
+# searching/filtering than the file backend), this database file stores the run metadata. Like any
+# database file, it shouldn't be versioned.
+mlflow.db 

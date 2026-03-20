@@ -3,15 +3,128 @@
 import logging
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
+import mlflow
+import patito as pt
 import polars as pl
+from contracts.data_schemas import InferenceParams, PowerForecast, SubstationFeatures
 from xgboost import XGBRegressor
+
+if TYPE_CHECKING:
+    import patito as pt
+    from contracts.data_schemas import PowerForecast, SubstationFeatures
 
 log = logging.getLogger(__name__)
 
 
-# TODO: Create an abstract base class that defines the universal interface to all Forecasters.
+class NoPredictionsError(Exception):
+    """Raised when the forecaster fails to produce any predictions."""
+
+    pass
+
+
+class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
+    """MLflow pyfunc wrapper for XGBoostForecaster.
+
+    This wrapper allows the model to be used in a model-agnostic way during inference.
+    It handles both global models (one model for all substations) and local models
+    (one model per substation) by routing the input data to the correct model.
+    """
+
+    # We use this undocumented MLflow escape hatch to completely disable MLflow's
+    # aggressive type hint inspection at class definition time. This allows us to use
+    # sane, expressive type hints (like pt.DataFrame[SubstationFeatures]) without
+    # MLflow spamming the Dagster UI with UserWarnings about unsupported types.
+    # We rely on Patito for actual runtime schema validation anyway.
+    #
+    # Note: Because this is an undocumented API, there is a minor risk that MLflow
+    # could rename or remove this attribute in a future release. If they do, our
+    # code will not crash (MLflow uses a safe `getattr` check), but the annoying
+    # UserWarnings would return during Dagster startup.
+    _skip_type_hint_validation = True
+
+    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
+        """Load the underlying XGBoost models from the artifacts.
+
+        Args:
+            context: MLflow context containing the artifacts.
+        """
+        self.models: dict[str, XGBoostForecaster] = {}
+        for name, path in context.artifacts.items():
+            self.models[name] = XGBoostForecaster.load(Path(path))
+
+    def predict(  # type: ignore
+        self,
+        context: mlflow.pyfunc.PythonModelContext,
+        model_input: pt.DataFrame[SubstationFeatures],
+        params: InferenceParams,
+    ) -> pt.DataFrame[PowerForecast]:
+        """Make predictions using the loaded models.
+
+        Args:
+            context: MLflow context.
+            model_input: Input data as a Patito DataFrame of SubstationFeatures.
+            params: Parameters for inference, including 'nwp_init_time'
+                and 'power_fcst_model'.
+
+        Returns:
+            Patito DataFrame of PowerForecast.
+        """
+        # If params is a dict (passed by MLflow), convert to InferenceParams object.
+        # We must do this manually because we've disabled MLflow's automatic
+        # type hint validation/conversion.
+        if isinstance(params, dict):
+            params = InferenceParams(**params)
+
+        nwp_init_time = params.nwp_init_time
+        power_fcst_model = params.power_fcst_model or XGBoostForecaster.model_name_and_version()
+
+        # If we have a global model, use it for all substations.
+        if "global" in self.models:
+            preds = self.models["global"].predict(model_input)
+            res = model_input.select(["valid_time", "substation_number"]).with_columns(
+                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
+            )
+        else:
+            # Otherwise, route to local models
+            all_preds = []
+            for substation_number, group in model_input.group_by("substation_number"):
+                sub_id_str = str(substation_number)
+                if sub_id_str not in self.models:
+                    log.warning(f"No model found for substation {substation_number}")
+                    continue
+
+                preds = self.models[sub_id_str].predict(group)
+                all_preds.append(
+                    group.select(["valid_time", "substation_number"]).with_columns(
+                        MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
+                    )
+                )
+
+            if not all_preds:
+                raise NoPredictionsError(
+                    f"No models found for any of the substations in the input data: "
+                    f"{model_input['substation_number'].unique().to_list()}"
+                )
+
+            res = pl.concat(all_preds)
+
+        # Add common metadata columns
+        res = res.with_columns(
+            nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
+            power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
+            ensemble_member=pl.lit(0).cast(pl.UInt8),
+        )
+
+        return cast(pt.DataFrame[PowerForecast], res)
+
+
+# TODO: Create an abstract base class (e.g. `BaseForecaster`) that defines the universal
+# interface for *training* and *saving* all ML models (XGBoost, PyTorch GNN, etc.).
+# While the `XGBoostPyFuncWrapper` above provides a universal interface for *inference*
+# via MLflow, Dagster's training assets still need a common interface to instantiate,
+# train, and save the underlying mathematical models regardless of their architecture.
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
@@ -64,7 +177,7 @@ class XGBoostForecaster:
             feature_cols = [
                 c
                 for c in df.columns
-                if c != target_col and c != "timestamp" and df[c].dtype.is_numeric()
+                if c != target_col and c != "valid_time" and df[c].dtype.is_numeric()
             ]
 
         self.feature_names = feature_cols

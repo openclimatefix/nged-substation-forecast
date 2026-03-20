@@ -6,4 +6,5 @@ from .data import load_substation_power as load_substation_power
 from .data import prepare_inference_data as prepare_inference_data
 from .data import prepare_training_data as prepare_training_data
 from .model import XGBoostForecaster as XGBoostForecaster
+from .model import XGBoostPyFuncWrapper as XGBoostPyFuncWrapper
 from .types import EnsembleSelection as EnsembleSelection

@@ -10,7 +10,7 @@ import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     Nwp,
-    ProcessedWeather,
+    ProcessedNwp,
     SimplifiedSubstationFlows,
     SubstationFeatures,
     SubstationFlows,
@@ -162,7 +162,7 @@ def construct_historical_weather(
 
 def process_weather_data(
     weather: pt.DataFrame[Nwp], selection: EnsembleSelection, config: DataConfig | None = None
-) -> pt.DataFrame[ProcessedWeather]:
+) -> pt.DataFrame[ProcessedNwp]:
     """Process raw NWP data: ensemble selection, grouping, and interpolation.
 
     Args:
@@ -176,18 +176,17 @@ def process_weather_data(
     config = config or DataConfig()
 
     # Calculate target timestamp: use valid_time
-    weather = weather.with_columns(timestamp=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
+    weather = weather.with_columns(valid_time=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
 
     # Variables to keep (all numeric ones except metadata)
     nwp_vars = [
         col
         for col in weather.columns
         if weather[col].dtype in [pl.Float32, pl.Float64, pl.UInt8]
-        and col
-        not in ["timestamp", "h3_index", "lead_time", "init_time", "ensemble_member", "valid_time"]
+        and col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
     ]
 
-    group_cols = ["h3_index", "timestamp"]
+    group_cols = ["h3_index", "valid_time"]
     if selection == EnsembleSelection.ALL:
         group_cols.append("ensemble_member")
 
@@ -201,7 +200,7 @@ def process_weather_data(
 
     # Resample and Interpolate to match target resolution
     ts_min, ts_max = weather_df.select(
-        min=pl.col("timestamp").min(), max=pl.col("timestamp").max()
+        min=pl.col("valid_time").min(), max=pl.col("valid_time").max()
     ).row(0)
 
     if ts_min is None or ts_max is None:
@@ -209,7 +208,7 @@ def process_weather_data(
 
     time_grid = (
         pl.datetime_range(ts_min, ts_max, interval=config.resolution, time_zone="UTC", eager=True)
-        .alias("timestamp")
+        .alias("valid_time")
         .to_frame()
     )
 
@@ -221,8 +220,8 @@ def process_weather_data(
 
     upsampled_parts = []
     for group in groups.iter_rows(named=True):
-        group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("timestamp")
-        upsampled = time_grid.join(group_df, on="timestamp", how="left")
+        group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("valid_time")
+        upsampled = time_grid.join(group_df, on="valid_time", how="left")
         upsampled = upsampled.with_columns(
             [pl.lit(v).alias(k) for k, v in group.items()]
         ).interpolate()
@@ -233,12 +232,12 @@ def process_weather_data(
     # Ensure Float32 for memory efficiency and contract compliance
     weather_df = weather_df.with_columns([pl.col(c).cast(pl.Float32) for c in nwp_vars])
 
-    return ProcessedWeather.validate(weather_df)
+    return ProcessedNwp.validate(weather_df)
 
 
 def join_features(
     power: pt.DataFrame[SimplifiedSubstationFlows],
-    weather: pt.DataFrame[ProcessedWeather],
+    weather: pt.DataFrame[ProcessedNwp],
     substation_number: int,
     use_lags: bool = True,
 ) -> pt.DataFrame[SubstationFeatures]:
@@ -260,24 +259,26 @@ def join_features(
         # Add power lags
         power_lag_7d = power.select(
             [
-                (pl.col("timestamp") + timedelta(days=7)).alias("timestamp"),
+                (pl.col("timestamp") + timedelta(days=7)).alias("valid_time"),
                 pl.col("MW_or_MVA").alias("power_lag_7d"),
             ]
         )
         power_lag_14d = power.select(
             [
-                (pl.col("timestamp") + timedelta(days=14)).alias("timestamp"),
+                (pl.col("timestamp") + timedelta(days=14)).alias("valid_time"),
                 pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
-        power_df = power.join(power_lag_7d, on="timestamp", how="left").join(
-            power_lag_14d, on="timestamp", how="left"
+        # Rename power timestamp to valid_time for join
+        power_df = power.rename({"timestamp": "valid_time"})
+        power_df = power_df.join(power_lag_7d, on="valid_time", how="left").join(
+            power_lag_14d, on="valid_time", how="left"
         )
     else:
-        power_df = cast(pl.DataFrame, power)
+        power_df = power.rename({"timestamp": "valid_time"})
 
     # Inner join to ensure we only have rows where both power and weather are available
-    df = power_df.join(weather, on="timestamp", how="inner")
+    df = power_df.join(weather, on="valid_time", how="inner")
 
     if df.is_empty():
         raise RuntimeError(
@@ -286,8 +287,8 @@ def join_features(
         )
 
     df = df.with_columns(
-        pl.lit(substation_number).alias("substation_number").cast(pl.Int32),
-        pl.col("MW_or_MVA").cast(pl.Float32),
+        substation_number=pl.lit(substation_number).cast(pl.Int32),
+        MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
     # Add features
