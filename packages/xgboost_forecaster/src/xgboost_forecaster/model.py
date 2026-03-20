@@ -54,7 +54,7 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         for name, path in context.artifacts.items():
             self.models[name] = XGBoostForecaster.load(Path(path))
 
-    def predict(  # type: ignore[invalid-method-override]
+    def predict(  # type: ignore
         self,
         context: mlflow.pyfunc.PythonModelContext,
         model_input: pt.DataFrame[SubstationFeatures],
@@ -65,7 +65,8 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         Args:
             context: MLflow context.
             model_input: Input data as a Patito DataFrame of SubstationFeatures.
-            params: Parameters for inference.
+            params: Parameters for inference, including 'nwp_init_time'
+                and 'power_fcst_model'.
 
         Returns:
             Patito DataFrame of PowerForecast.
@@ -83,38 +84,39 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         if "global" in self.models:
             preds = self.models["global"].predict(model_input)
             res = model_input.select(["valid_time", "substation_number"]).with_columns(
-                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
-                nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
-                power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
-                ensemble_member=pl.lit(0).cast(pl.UInt8),
+                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
             )
-            return cast(pt.DataFrame[PowerForecast], res)
+        else:
+            # Otherwise, route to local models
+            all_preds = []
+            for substation_number, group in model_input.group_by("substation_number"):
+                sub_id_str = str(substation_number)
+                if sub_id_str not in self.models:
+                    log.warning(f"No model found for substation {substation_number}")
+                    continue
 
-        # Otherwise, route to local models
-        all_preds = []
-        for substation_number, group in model_input.group_by("substation_number"):
-            sub_id_str = str(substation_number)
-            if sub_id_str not in self.models:
-                log.warning(f"No model found for substation {substation_number}")
-                continue
-
-            preds = self.models[sub_id_str].predict(group)
-            all_preds.append(
-                group.select(["valid_time", "substation_number"]).with_columns(
-                    MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
-                    nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
-                    power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
-                    ensemble_member=pl.lit(0).cast(pl.UInt8),
+                preds = self.models[sub_id_str].predict(group)
+                all_preds.append(
+                    group.select(["valid_time", "substation_number"]).with_columns(
+                        MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
+                    )
                 )
-            )
 
-        if not all_preds:
-            raise NoPredictionsError(
-                f"No models found for any of the substations in the input data: "
-                f"{model_input['substation_number'].unique().to_list()}"
-            )
+            if not all_preds:
+                raise NoPredictionsError(
+                    f"No models found for any of the substations in the input data: "
+                    f"{model_input['substation_number'].unique().to_list()}"
+                )
 
-        res = pl.concat(all_preds)
+            res = pl.concat(all_preds)
+
+        # Add common metadata columns
+        res = res.with_columns(
+            nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
+            power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
+            ensemble_member=pl.lit(0).cast(pl.UInt8),
+        )
+
         return cast(pt.DataFrame[PowerForecast], res)
 
 
