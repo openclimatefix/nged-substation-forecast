@@ -57,8 +57,6 @@ nged-data = { workspace = true }
 contracts = { workspace = true }
 xgboost_forecaster = { workspace = true }
 dynamical_data = { workspace = true }
-# TODO: Remove the line below if/when patito merges Jack's PR: https://github.com/JakobGM/patito/pull/161
-patito = { git = "https://github.com/JackKelly/patito.git", branch = "use-validated-dataframe" }
 
 # --- DAGSTER ---
 
