@@ -70,9 +70,11 @@ def load_substation_power(
     df = SubstationFlows.to_simplified_substation_flows(df)
 
     # Downsample to target resolution (period ending)
-    df = df.group_by_dynamic(
-        "timestamp", every=config.resolution, closed="right", label="right"
-    ).agg(pl.col("MW_or_MVA").mean())
+    df = (
+        df.sort("timestamp")
+        .group_by_dynamic("timestamp", every=config.resolution, closed="right", label="right")
+        .agg(pl.col("MW_or_MVA").mean())
+    )
 
     return cast(pt.DataFrame[SimplifiedSubstationFlows], df)
 
@@ -223,14 +225,17 @@ def process_weather_data(
         group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("valid_time")
         upsampled = time_grid.join(group_df, on="valid_time", how="left")
         upsampled = upsampled.with_columns(
-            [pl.lit(v).alias(k) for k, v in group.items()]
+            [pl.lit(v, dtype=weather_df.schema[k]).alias(k) for k, v in group.items()]
         ).interpolate()
         upsampled_parts.append(upsampled)
 
     weather_df = pl.concat(upsampled_parts)
 
     # Ensure Float32 for memory efficiency and contract compliance
-    weather_df = weather_df.with_columns([pl.col(c).cast(pl.Float32) for c in nwp_vars])
+    # But keep h3_index as UInt64
+    weather_df = weather_df.with_columns(
+        [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [pl.col("h3_index").cast(pl.UInt64)]
+    )
 
     return ProcessedNwp.validate(weather_df)
 
@@ -351,8 +356,12 @@ def prepare_training_data(
 
             # Filter processed weather for this substation's H3 index
             sub_weather = processed_weather.filter(pl.col("h3_index") == h3_idx)
+            print(
+                f"DEBUG: Substation {sub_num}: h3_idx={h3_idx}, sub_weather shape={sub_weather.shape}"
+            )
 
             sub_data = join_features(power, sub_weather, sub_num, use_lags)
+
             all_subs_data.append(sub_data)
         except Exception as e:
             log.error(f"Failed to prepare data for substation {sub_num}: {e}")

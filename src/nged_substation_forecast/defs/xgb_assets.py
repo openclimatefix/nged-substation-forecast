@@ -50,6 +50,7 @@ class XGBoostTrainingParams(BaseModel):
     train_start_date: str | None = None
     train_end_date: str | None = None
     test_end_date: str | None = None
+    substation_numbers: list[int] | None = None
 
 
 class XGBoostTrainingConfig(dg.Config):
@@ -62,6 +63,7 @@ class XGBoostTrainingConfig(dg.Config):
     train_start_date: str | None = None
     train_end_date: str | None = None
     test_end_date: str | None = None
+    substation_numbers: list[int] | None = None
 
     def to_params(self) -> XGBoostTrainingParams:
         """Convert static config into dynamic params."""
@@ -69,6 +71,7 @@ class XGBoostTrainingConfig(dg.Config):
             train_start_date=self.train_start_date,
             train_end_date=self.train_end_date,
             test_end_date=self.test_end_date,
+            substation_numbers=self.substation_numbers,
         )
 
 
@@ -92,9 +95,15 @@ def train_xgboost_models_for_range(
         context.log.warning("No Delta table found.")
         return {}
 
-    substation_numbers = (
-        pl.read_delta(str(power_path)).select("substation_number").unique().to_series().to_list()
-    )
+    substation_numbers = params.substation_numbers
+    if substation_numbers is None:
+        substation_numbers = (
+            pl.read_delta(str(power_path))
+            .select("substation_number")
+            .unique()
+            .to_series()
+            .to_list()
+        )
 
     context.log.info(f"Training models for {len(substation_numbers)} substations")
 
@@ -208,9 +217,18 @@ def xgb_models(
     )
 
 
+class XGBoostInferenceConfig(dg.Config):
+    """Configuration for XGBoost inference."""
+
+    init_time: str | None = None
+
+
 @dg.asset(deps=["ecmwf_ens_forecast"])
 def xgb_forecasts(
-    context: dg.AssetExecutionContext, xgb_models: str, settings: ResourceParam[Settings]
+    context: dg.AssetExecutionContext,
+    xgb_models: str,
+    config: XGBoostInferenceConfig,
+    settings: ResourceParam[Settings],
 ) -> dg.Output[pl.DataFrame]:
     """Generate forecasts for all substations using the trained XGBoost models via MLflow."""
     if not xgb_models:
@@ -225,8 +243,14 @@ def xgb_forecasts(
     )
     metadata = get_substation_metadata(data_config)
 
-    # TODO (p1): This MUST be changed to dynamically use the most recent NWP init!
-    init_time = datetime(2026, 2, 17, 0)  # Example init time
+    # Resolve init_time
+    if config.init_time:
+        init_time = datetime.fromisoformat(config.init_time)
+    else:
+        # Default to the most recent midnight
+        init_time = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    context.log.info(f"Generating forecasts for init_time {init_time}")
 
     # Prepare inference data for all substations at once
     # Currently prepare_inference_data only takes one substation_number.
