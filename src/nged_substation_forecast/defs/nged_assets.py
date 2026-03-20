@@ -371,7 +371,7 @@ def live_primary_flows(
 def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
-) -> MaterializeResult:
+) -> pl.DataFrame:
     """Download primary substation locations and map them to H3 cells."""
     # 1. Download using existing CKAN function
     locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
@@ -431,9 +431,11 @@ def substation_metadata(
     # 8. Save to disk
     validated_metadata.write_parquet(out_path)
 
-    return MaterializeResult(
+    context.add_output_metadata(
         metadata={
             "Path": MetadataValue.path(str(out_path)),
             "Row Count": MetadataValue.int(len(validated_metadata)),
         }
     )
+
+    return validated_metadata
