@@ -123,7 +123,7 @@ def xgb_models(
         outputs=None,
         params=ParamSchema(
             [
-                ParamSpec(name="nwp_init_time", dtype="string", default=None),
+                ParamSpec(name="nwp_init_time", dtype="datetime", default=None),
                 ParamSpec(name="power_fcst_model", dtype="string", default=None),
             ]
         ),
