@@ -300,6 +300,9 @@ def join_features(
         )
 
         # Use asof join for lags to handle slight misalignments
+        # TODO: Are we *sure* we still need to use `asof`? I have a hunch it might be left over from
+        # when opencode was dropping weather columns, and couldn't get the model to train, and put
+        # this `asof` in in an attempt to get the code to work, but it might not be necessary?
         df = df.sort("valid_time")
         power_lag_7d = power_lag_7d.sort("valid_time")
         power_lag_14d = power_lag_14d.sort("valid_time")
