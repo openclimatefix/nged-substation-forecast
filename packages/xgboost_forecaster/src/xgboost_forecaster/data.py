@@ -252,6 +252,7 @@ def join_features(
     weather: pt.DataFrame[ProcessedNwp],
     substation_number: int,
     use_lags: bool = True,
+    is_training: bool = False,
 ) -> pt.DataFrame[SubstationFeatures]:
     """Join power and weather data and add all features.
 
@@ -260,6 +261,7 @@ def join_features(
         weather: Processed weather data.
         substation_number: The substation number.
         use_lags: Whether to add power lags.
+        is_training: Whether we are in training mode (drops rows with missing actuals).
 
     Returns:
         A Patito DataFrame containing the joined data and features.
@@ -267,6 +269,9 @@ def join_features(
     Raises:
         RuntimeError: If the join results in an empty DataFrame.
     """
+    # Start with weather as the base (defines the valid_time range)
+    df = weather.clone()
+
     if use_lags:
         # Add power lags
         power_lag_7d = power.select(
@@ -281,26 +286,35 @@ def join_features(
                 pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
-        # Rename power timestamp to valid_time for join
-        power_df = power.rename({"timestamp": "valid_time"})
-        power_df = power_df.join(power_lag_7d, on="valid_time", how="left").join(
+        df = df.join(power_lag_7d, on="valid_time", how="left").join(
             power_lag_14d, on="valid_time", how="left"
         )
-    else:
-        power_df = power.rename({"timestamp": "valid_time"})
 
-    # Use left join for weather to ensure we keep all forecast steps even if power lags are missing
-    df = weather.join(power_df, on="valid_time", how="left")
+    # Join with current power (the target)
+    power_target = power.select(
+        [
+            pl.col("timestamp").alias("valid_time"),
+            pl.col("MW_or_MVA"),
+        ]
+    )
+    df = df.join(power_target, on="valid_time", how="left")
+
+    if is_training:
+        # During training, we must have the target variable
+        df = df.drop_nulls(subset=["MW_or_MVA"])
+    else:
+        # During inference, we fill with 0.0 to satisfy the contract
+        df = df.with_columns(MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0))
 
     if df.is_empty():
         raise RuntimeError(
             f"Join resulted in empty DataFrame for substation {substation_number}. "
-            "Check if weather data is available."
+            "Check if weather and power data overlap."
         )
 
     df = df.with_columns(
         substation_number=pl.lit(substation_number).cast(pl.Int32),
-        MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0).cast(pl.Float32),
+        MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
     # Add features
@@ -367,7 +381,7 @@ def prepare_training_data(
                 f"DEBUG: Substation {sub_num}: h3_idx={h3_idx}, sub_weather shape={sub_weather.shape}"
             )
 
-            sub_data = join_features(power, sub_weather, sub_num, use_lags)
+            sub_data = join_features(power, sub_weather, sub_num, use_lags, is_training=True)
 
             all_subs_data.append(sub_data)
         except Exception as e:
@@ -417,4 +431,4 @@ def prepare_inference_data(
     power = load_substation_power(substation_number, config)
 
     # 4. Join and add features
-    return join_features(power, processed_weather, substation_number, use_lags)
+    return join_features(power, processed_weather, substation_number, use_lags, is_training=False)
