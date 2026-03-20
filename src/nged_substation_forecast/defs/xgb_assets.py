@@ -192,8 +192,8 @@ def xgb_models(
         outputs=None,
         params=ParamSchema(
             [
-                ParamSpec(name="nwp_init_time", dtype="datetime", default=None),
-                ParamSpec(name="power_fcst_model", dtype="string", default=None),
+                ParamSpec(name="nwp_init_time", dtype="datetime", default=datetime(2000, 1, 1)),
+                ParamSpec(name="power_fcst_model", dtype="string", default=""),
             ]
         ),
     )
@@ -221,6 +221,7 @@ class XGBoostInferenceConfig(dg.Config):
     """Configuration for XGBoost inference."""
 
     init_time: str | None = None
+    substation_numbers: list[int] | None = None
 
 
 @dg.asset(deps=["ecmwf_ens_forecast"])
@@ -252,15 +253,12 @@ def xgb_forecasts(
 
     context.log.info(f"Generating forecasts for init_time {init_time}")
 
-    # Prepare inference data for all substations at once
-    # Currently prepare_inference_data only takes one substation_number.
-    # Let's check if we can loop over them or if we should update prepare_inference_data.
-    # For now, let's loop to keep it simple, but we'll pass the whole DF to the model.
-
     # We need to know which substations we have models for.
-    # The pyfunc wrapper knows this, but we don't have easy access to its internal state here.
-    # However, we can just try to prepare data for all substations that have metadata.
-    substation_numbers = metadata.select("substation_number").to_series().to_list()
+    # If substation_numbers is provided in config, use that.
+    # Otherwise, try all substations in metadata.
+    substation_numbers = config.substation_numbers
+    if substation_numbers is None:
+        substation_numbers = metadata.select("substation_number").to_series().to_list()
 
     all_inference_data = []
     for substation_number in substation_numbers:
@@ -275,12 +273,16 @@ def xgb_forecasts(
             if not df.is_empty():
                 all_inference_data.append(df)
         except Exception as e:
-            context.log.error(f"Failed to prepare inference data for {substation_number}: {e}")
+            context.log.warning(f"Failed to prepare inference data for {substation_number}: {e}")
 
     if not all_inference_data:
+        context.log.error("No inference data prepared for any substation.")
         return dg.Output(pl.DataFrame(), metadata={"n_forecasts": 0})
 
     inference_df = pl.concat(all_inference_data)
+    context.log.info(
+        f"Prepared inference data for {inference_df['substation_number'].n_unique()} substations"
+    )
 
     # Make predictions using the model-agnostic MLflow wrapper.
     # We pass an InferenceParams object which MLflow will serialize to a dict.

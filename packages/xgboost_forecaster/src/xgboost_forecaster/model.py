@@ -89,7 +89,7 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         else:
             # Otherwise, route to local models
             all_preds = []
-            for substation_number, group in model_input.group_by("substation_number"):
+            for (substation_number,), group in model_input.group_by("substation_number"):
                 sub_id_str = str(substation_number)
                 if sub_id_str not in self.models:
                     log.warning(f"No model found for substation {substation_number}")

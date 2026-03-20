@@ -224,9 +224,12 @@ def process_weather_data(
     for group in groups.iter_rows(named=True):
         group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("valid_time")
         upsampled = time_grid.join(group_df, on="valid_time", how="left")
+        # Interpolate only the weather variables, not the group columns
+        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
+        # Fill in the group columns
         upsampled = upsampled.with_columns(
             [pl.lit(v, dtype=weather_df.schema[k]).alias(k) for k, v in group.items()]
-        ).interpolate()
+        )
         upsampled_parts.append(upsampled)
 
     weather_df = pl.concat(upsampled_parts)
