@@ -21,6 +21,7 @@ dependencies = [
     "patito",
     "polars>=1.0.0",
     "requests>=2.31.0",
+    "mlflow-skinny",
     "dynamical_data",
     "nged-data",
     "contracts",

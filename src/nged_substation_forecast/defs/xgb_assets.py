@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime
-from pathlib import Path
 
 import dagster as dg
+import mlflow
 import polars as pl
 from contracts.settings import Settings
 from dagster import ResourceParam
@@ -10,6 +10,7 @@ from xgboost_forecaster import (
     DataConfig,
     EnsembleSelection,
     XGBoostForecaster,
+    XGBoostPyFuncWrapper,
     get_substation_metadata,
     prepare_inference_data,
     prepare_training_data,
@@ -21,12 +22,12 @@ log = logging.getLogger(__name__)
 @dg.asset(deps=["live_primary_flows", "ecmwf_ens_forecast"])
 def xgb_models(
     context: dg.AssetExecutionContext, settings: ResourceParam[Settings]
-) -> dg.Output[list[Path]]:
-    """Train XGBoost models for all substations."""
+) -> dg.Output[str]:
+    """Train XGBoost models for all substations and log to MLflow."""
     power_path = settings.nged_data_path / "delta" / "live_primary_flows"
     if not power_path.exists():
         context.log.warning("No Delta table found.")
-        return dg.Output([], metadata={"n_models": 0})
+        return dg.Output("", metadata={"n_models": 0})
 
     substation_numbers = (
         pl.read_delta(str(power_path)).select("substation_number").unique().to_series().to_list()
@@ -58,7 +59,7 @@ def xgb_models(
         use_lags=True,
     )
 
-    model_paths = []
+    artifacts = {}
     for substation_number in substation_numbers:
         try:
             # TODO: Move all the code in this `try` block into a new function.
@@ -92,7 +93,7 @@ def xgb_models(
                 eval_set=eval_set,
             )
 
-            # Save model
+            # Save model to a temporary location for MLflow to pick up
             model_path = (
                 settings.trained_ml_model_params_base_path
                 / XGBoostForecaster.model_name_and_version()
@@ -100,41 +101,65 @@ def xgb_models(
             )
             model_path.parent.mkdir(parents=True, exist_ok=True)
             forecaster.save(model_path)
-            model_paths.append(model_path)
+            artifacts[str(substation_number)] = str(model_path)
 
         except Exception as e:
             context.log.error(f"Failed to train model for {substation_number}: {e}")
 
+    # Log to MLflow
+    # We omit the MLflow signature to prevent MLflow from forcing the input into a Pandas DataFrame.
+    # We rely on Patito for strict schema validation instead.
+    with mlflow.start_run():
+        model_info = mlflow.pyfunc.log_model(
+            artifact_path="model",
+            python_model=XGBoostPyFuncWrapper(),
+            artifacts=artifacts,
+        )
+
     return dg.Output(
-        model_paths,
+        model_info.model_uri,
         metadata={
-            "n_models": len(model_paths),
-            "substations": dg.MetadataValue.text(", ".join([p.stem for p in model_paths])),
+            "n_models": len(artifacts),
+            "substations": dg.MetadataValue.text(", ".join(artifacts.keys())),
+            "mlflow_run_id": model_info.run_id,
+            "model_uri": model_info.model_uri,
         },
     )
 
 
 @dg.asset(deps=["ecmwf_ens_forecast"])
 def xgb_forecasts(
-    context: dg.AssetExecutionContext, xgb_models: list[Path], settings: ResourceParam[Settings]
+    context: dg.AssetExecutionContext, xgb_models: str, settings: ResourceParam[Settings]
 ) -> dg.Output[pl.DataFrame]:
-    """Generate forecasts for all substations using the trained XGBoost models."""
-    all_forecasts = []
-    for model_path in xgb_models:
-        substation_number = int(model_path.stem)
+    """Generate forecasts for all substations using the trained XGBoost models via MLflow."""
+    if not xgb_models:
+        return dg.Output(pl.DataFrame(), metadata={"n_forecasts": 0})
+
+    # Load model from MLflow
+    loaded_model = mlflow.pyfunc.load_model(xgb_models)
+
+    data_config = DataConfig(
+        base_power_path=settings.nged_data_path / "delta" / "live_primary_flows",
+        base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
+    )
+    metadata = get_substation_metadata(data_config)
+
+    # TODO (p1): This MUST be changed to dynamically use the most recent NWP init!
+    init_time = datetime(2026, 2, 17, 0)  # Example init time
+
+    # Prepare inference data for all substations at once
+    # Currently prepare_inference_data only takes one substation_number.
+    # Let's check if we can loop over them or if we should update prepare_inference_data.
+    # For now, let's loop to keep it simple, but we'll pass the whole DF to the model.
+
+    # We need to know which substations we have models for.
+    # The pyfunc wrapper knows this, but we don't have easy access to its internal state here.
+    # However, we can just try to prepare data for all substations that have metadata.
+    substation_numbers = metadata.select("substation_number").to_series().to_list()
+
+    all_inference_data = []
+    for substation_number in substation_numbers:
         try:
-            # Load model
-            forecaster = XGBoostForecaster.load(model_path)
-
-            data_config = DataConfig(
-                base_power_path=settings.nged_data_path / "delta" / "live_primary_flows",
-                base_weather_path=settings.nwp_data_path / "ECMWF" / "ENS",
-            )
-            metadata = get_substation_metadata(data_config)
-
-            # TODO (p1): This MUST be changed to dynamically use the most recent NWP init!
-            init_time = datetime(2026, 2, 17, 0)  # Example init time
-
             df = prepare_inference_data(
                 substation_number=substation_number,
                 init_time=init_time,
@@ -142,37 +167,30 @@ def xgb_forecasts(
                 config=data_config,
                 use_lags=True,
             )
-
-            if df.is_empty():
-                context.log.warning(
-                    f"No data available for forecasting substation {substation_number}"
-                )
-                continue
-
-            # Make predictions
-            preds = forecaster.predict(df)
-
-            # Conform to PowerForecast contract
-            forecast_df = df.select(
-                [
-                    pl.col("timestamp").alias("valid_time"),
-                    pl.col("substation_number").alias("substation_id"),
-                    pl.lit(preds).alias("MW_or_MVA").cast(pl.Float32),
-                    pl.lit(init_time).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
-                    pl.lit(XGBoostForecaster.model_name_and_version())
-                    .alias("power_fcst_model")
-                    .cast(pl.Categorical),
-                ]
-            )
-            all_forecasts.append(forecast_df)
-
+            if not df.is_empty():
+                all_inference_data.append(df)
         except Exception as e:
-            context.log.error(f"Failed to generate forecast for {substation_number}: {e}")
+            context.log.error(f"Failed to prepare inference data for {substation_number}: {e}")
 
-    if not all_forecasts:
+    if not all_inference_data:
         return dg.Output(pl.DataFrame(), metadata={"n_forecasts": 0})
 
-    final_df = pl.concat(all_forecasts)
+    inference_df = pl.concat(all_inference_data)
+
+    # Make predictions using the model-agnostic MLflow wrapper
+    preds_df = loaded_model.predict(inference_df)
+
+    # Conform to PowerForecast contract
+    final_df = preds_df.with_columns(
+        [
+            pl.col("timestamp").alias("valid_time"),
+            pl.col("substation_number").alias("substation_id"),
+            pl.lit(init_time).alias("nwp_init_time").cast(pl.Datetime("us", "UTC")),
+            pl.lit(XGBoostForecaster.model_name_and_version())
+            .alias("power_fcst_model")
+            .cast(pl.Categorical),
+        ]
+    ).select(["valid_time", "substation_id", "MW_or_MVA", "nwp_init_time", "power_fcst_model"])
 
     # Save combined forecast
     forecast_path = (
@@ -188,6 +206,6 @@ def xgb_forecasts(
         metadata={
             "path": dg.MetadataValue.path(forecast_path),
             "n_points": len(final_df),
-            "n_substations": len(all_forecasts),
+            "n_substations": final_df.select("substation_id").n_unique(),
         },
     )

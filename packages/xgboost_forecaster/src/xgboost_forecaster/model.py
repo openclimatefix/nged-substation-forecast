@@ -5,10 +5,79 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Self
 
+import mlflow
+import patito as pt
 import polars as pl
+from contracts.data_schemas import SubstationFeatures
 from xgboost import XGBRegressor
 
 log = logging.getLogger(__name__)
+
+
+class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
+    """MLflow pyfunc wrapper for XGBoostForecaster.
+
+    This wrapper allows the model to be used in a model-agnostic way during inference.
+    It handles both global models (one model for all substations) and local models
+    (one model per substation) by routing the input data to the correct model.
+    """
+
+    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
+        """Load the underlying XGBoost models from the artifacts.
+
+        Args:
+            context: MLflow context containing the artifacts.
+        """
+        self.models: dict[str, XGBoostForecaster] = {}
+        for name, path in context.artifacts.items():
+            self.models[name] = XGBoostForecaster.load(Path(path))
+
+    def predict(
+        self,
+        context: mlflow.pyfunc.PythonModelContext,
+        model_input: pt.DataFrame[SubstationFeatures],
+    ) -> pl.DataFrame:
+        """Make predictions using the loaded models.
+
+        Args:
+            context: MLflow context.
+            model_input: Input data as a Patito DataFrame of SubstationFeatures.
+
+        Returns:
+            Polars DataFrame of predictions.
+        """
+        # If we have a global model, use it for everything
+        if "global" in self.models:
+            preds = self.models["global"].predict(model_input)
+            return model_input.select(["timestamp", "substation_number"]).with_columns(
+                pl.Series(name="MW_or_MVA", values=preds, dtype=pl.Float32)
+            )
+
+        # Otherwise, route to local models
+        all_preds = []
+        for substation_number, group in model_input.group_by("substation_number"):
+            sub_id_str = str(substation_number)
+            if sub_id_str not in self.models:
+                log.warning(f"No model found for substation {substation_number}")
+                continue
+
+            preds = self.models[sub_id_str].predict(group)
+            all_preds.append(
+                group.select(["timestamp", "substation_number"]).with_columns(
+                    pl.Series(name="MW_or_MVA", values=preds, dtype=pl.Float32)
+                )
+            )
+
+        if not all_preds:
+            return pl.DataFrame(
+                schema={
+                    "timestamp": pl.Datetime,
+                    "substation_number": pl.Int32,
+                    "MW_or_MVA": pl.Float32,
+                }
+            )
+
+        return pl.concat(all_preds)
 
 
 # TODO: Create an abstract base class that defines the universal interface to all Forecasters.

@@ -14,9 +14,10 @@ dependencies = [
     "polars-h3>=0.6.1",
     "h3>=4.4.2",
     "contracts",
+    "patito",
     "nged-data",
     "pyarrow>=23.0.1",
-    "pandas>=3.0.1",
+    "mlflow-skinny",
     "altair>=6.0.0",
 ]
 
