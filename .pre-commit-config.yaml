@@ -21,13 +21,13 @@ repos:
         types: [python]
       - id: ty
         name: ty
-        entry: uv run ty check --project .
+        entry: uv run --all-packages ty check --project .
         language: system
         pass_filenames: false
         always_run: true
       - id: pytest
         name: pytest
-        entry: uv run python -m pytest
+        entry: uv run --all-packages python -m pytest
         language: system
         pass_filenames: false
         always_run: true

@@ -34,14 +34,14 @@ packages/dynamical_data/uint8_nwp.parquet
 dagster_history/
 
 #######################
-# MLflow 
+# MLflow
 
 # This directory contains all the artifacts (e.g. the XGBoost models), parameters, and metrics for
 # every experiment you run locally. It can grow very large and contains binary files that don't
 # belong in Git.
-mlruns/ 
+mlruns/
 
 # If you use a SQLite backend for MLflow (which is common for local development to enable better
 # searching/filtering than the file backend), this database file stores the run metadata. Like any
 # database file, it shouldn't be versioned.
-mlflow.db 
+mlflow.db

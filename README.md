@@ -16,8 +16,15 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 repo which contains multiple Python packages.
 
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
-1. `uv sync`
+1. `uv sync --all-packages` (The `--all-packages` flag ensures that dependencies for all workspace members, like the dashboard and notebooks, are installed into the shared virtual environment, which is necessary for IDE support and type checking).
 1. `uv run pre-commit install`
+
+To run linting and type checking:
+1. `uv run ruff check .`
+2. `uv run --all-packages ty check`
+
+To run tests:
+1. `uv run --all-packages pytest`
 
 To run Dagster:
 1. `uv run dg dev`
