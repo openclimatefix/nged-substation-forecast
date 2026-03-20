@@ -177,6 +177,10 @@ def process_weather_data(
     """
     config = config or DataConfig()
 
+    # Filter out lead time 0 (where valid_time == init_time)
+    # because accumulated variables are null at lead time 0.
+    weather = weather.filter(pl.col("valid_time") > pl.col("init_time"))
+
     # Calculate target timestamp: use valid_time
     weather = weather.with_columns(valid_time=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
 
@@ -286,9 +290,22 @@ def join_features(
                 pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
-        df = df.join(power_lag_7d, on="valid_time", how="left").join(
-            power_lag_14d, on="valid_time", how="left"
+
+        # Ensure time zones match for join
+        power_lag_7d = power_lag_7d.with_columns(
+            valid_time=pl.col("valid_time").dt.replace_time_zone("UTC")
         )
+        power_lag_14d = power_lag_14d.with_columns(
+            valid_time=pl.col("valid_time").dt.replace_time_zone("UTC")
+        )
+
+        # Use asof join for lags to handle slight misalignments
+        df = df.sort("valid_time")
+        power_lag_7d = power_lag_7d.sort("valid_time")
+        power_lag_14d = power_lag_14d.sort("valid_time")
+
+        df = df.join_asof(power_lag_7d, on="valid_time", tolerance="1h", strategy="nearest")
+        df = df.join_asof(power_lag_14d, on="valid_time", tolerance="1h", strategy="nearest")
 
     # Join with current power (the target)
     power_target = power.select(
@@ -297,19 +314,23 @@ def join_features(
             pl.col("MW_or_MVA"),
         ]
     )
-    df = df.join(power_target, on="valid_time", how="left")
 
-    # Add features
-    df = add_weather_features(df)
-    df = add_temporal_features(df)
+    # Use asof join to handle potential slight misalignments in timestamps
+    df = df.sort("valid_time")
+    power_target = power_target.with_columns(
+        valid_time=pl.col("valid_time").dt.replace_time_zone("UTC")
+    ).sort("valid_time")
+
+    df = df.join_asof(power_target, on="valid_time", tolerance="1h", strategy="nearest")
 
     if is_training:
         # During training, we must have the target variable and all features
         df = df.drop_nulls()
     else:
         # During inference, we fill the target with 0.0 to satisfy the contract
-        # But we still expect all features to be present (non-null)
+        # but we still drop rows with missing features (e.g. missing lags)
         df = df.with_columns(MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0))
+        df = df.drop_nulls()
 
     if df.is_empty():
         raise RuntimeError(
@@ -322,19 +343,9 @@ def join_features(
         MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
-    if not is_training:
-        # Check for nulls in features (except MW_or_MVA which we just filled)
-        feature_cols = [c for c in df.columns if c != "MW_or_MVA"]
-        null_counts = df.select([pl.col(c).is_null().sum().alias(c) for c in feature_cols])
-        total_nulls = null_counts.sum_horizontal().item()
-        if total_nulls > 0:
-            # Find which columns have nulls
-            null_cols = [c for c in feature_cols if null_counts[c][0] > 0]
-            raise RuntimeError(
-                f"Inference data for substation {substation_number} contains null features "
-                f"in columns: {null_cols}. This usually indicates a data gap in historical "
-                "power or weather data."
-            )
+    # Add features
+    df = add_weather_features(df)
+    df = add_temporal_features(df)
 
     # Final cleanup and validation
     return SubstationFeatures.validate(df, drop_superfluous_columns=True)
@@ -392,9 +403,6 @@ def prepare_training_data(
 
             # Filter processed weather for this substation's H3 index
             sub_weather = processed_weather.filter(pl.col("h3_index") == h3_idx)
-            print(
-                f"DEBUG: Substation {sub_num}: h3_idx={h3_idx}, sub_weather shape={sub_weather.shape}"
-            )
 
             sub_data = join_features(power, sub_weather, sub_num, use_lags, is_training=True)
 
