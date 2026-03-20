@@ -207,7 +207,7 @@ def xgb_forecasts(
 
     preds_df = cast(
         pt.DataFrame[PowerForecast],
-        loaded_model.predict(inference_df, params=params.model_dump(mode="json")),
+        loaded_model.predict(inference_df, params=params.model_dump()),
     )
 
     # Save combined forecast
