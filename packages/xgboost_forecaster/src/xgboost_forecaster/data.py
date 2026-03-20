@@ -222,7 +222,7 @@ def process_weather_data(
 
     upsampled_parts = []
     for group in groups.iter_rows(named=True):
-        group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("valid_time")
+        group_df = weather_df.filter([pl.col(k) == v for k, v in group.items()]).sort("valid_time")
         upsampled = time_grid.join(group_df, on="valid_time", how="left")
         # Interpolate only the weather variables, not the group columns
         upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
@@ -235,12 +235,16 @@ def process_weather_data(
     weather_df = pl.concat(upsampled_parts)
 
     # Ensure Float32 for memory efficiency and contract compliance
-    # But keep h3_index as UInt64
-    weather_df = weather_df.with_columns(
-        [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [pl.col("h3_index").cast(pl.UInt64)]
-    )
+    # But keep h3_index as UInt64 and ensemble_member as UInt8 if present
+    cast_exprs = [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [
+        pl.col("h3_index").cast(pl.UInt64)
+    ]
+    if "ensemble_member" in weather_df.columns:
+        cast_exprs.append(pl.col("ensemble_member").cast(pl.UInt8))
 
-    return ProcessedNwp.validate(weather_df)
+    weather_df = weather_df.with_columns(cast_exprs)
+
+    return ProcessedNwp.validate(weather_df, drop_superfluous_columns=True)
 
 
 def join_features(
@@ -285,18 +289,18 @@ def join_features(
     else:
         power_df = power.rename({"timestamp": "valid_time"})
 
-    # Inner join to ensure we only have rows where both power and weather are available
-    df = power_df.join(weather, on="valid_time", how="inner")
+    # Use left join for weather to ensure we keep all forecast steps even if power lags are missing
+    df = weather.join(power_df, on="valid_time", how="left")
 
     if df.is_empty():
         raise RuntimeError(
             f"Join resulted in empty DataFrame for substation {substation_number}. "
-            "Check if power and weather timestamps overlap."
+            "Check if weather data is available."
         )
 
     df = df.with_columns(
         substation_number=pl.lit(substation_number).cast(pl.Int32),
-        MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
+        MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0).cast(pl.Float32),
     )
 
     # Add features
@@ -406,8 +410,8 @@ def prepare_inference_data(
     # 1. Load NWP run
     raw_weather = load_nwp_run(init_time, [h3_idx], config)
 
-    # 2. Process weather (always use MEAN for inference unless specified otherwise)
-    processed_weather = process_weather_data(raw_weather, EnsembleSelection.MEAN, config)
+    # 2. Process weather (use ALL for probabilistic inference)
+    processed_weather = process_weather_data(raw_weather, EnsembleSelection.ALL, config)
 
     # 3. Load power data (for lags)
     power = load_substation_power(substation_number, config)

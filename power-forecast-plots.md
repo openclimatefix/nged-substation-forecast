@@ -66,7 +66,7 @@ dg.materialize(
 ```
 
 ## Improvement Goals
-- [ ] Remove the dependency on `pandas` inside the plotting asset (use `polars` directly).
-- [ ] Use a different subplot per substation. Write the substation name (from the metadata) on the plot.
-- [ ] Improve the visual style (colors, stroke widths, legends). Use thinner lines.
-- [ ] Only plot 2 days of "history" (before the power forecast starts)
+- [x] Remove the dependency on `pandas` inside the plotting asset (use `polars` directly).
+- [x] Use a different subplot per substation. Write the substation name (from the metadata) on the plot.
+- [x] Improve the visual style (colors, stroke widths, legends). Use thinner lines.
+- [x] Only plot 2 days of "history" (before the power forecast starts)

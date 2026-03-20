@@ -227,6 +227,7 @@ class ProcessedNwp(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     h3_index: int = pt.Field(dtype=pl.UInt64)
+    ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
 
     # Weather variables as Float32
     temperature_2m: float = pt.Field(dtype=pl.Float32)
@@ -249,6 +250,7 @@ class SubstationFeatures(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
     substation_number: int = pt.Field(dtype=pl.Int32)
+    ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
