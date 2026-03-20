@@ -83,9 +83,9 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         # If we have a global model, use it for all substations.
         if "global" in self.models:
             preds = self.models["global"].predict(model_input)
-            res = model_input.select(["valid_time", "substation_number"]).with_columns(
-                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
-            )
+            res = model_input.select(
+                ["valid_time", "substation_number", "ensemble_member"]
+            ).with_columns(MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32))
         else:
             # Otherwise, route to local models
             all_preds = []
@@ -97,9 +97,9 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
 
                 preds = self.models[sub_id_str].predict(group)
                 all_preds.append(
-                    group.select(["valid_time", "substation_number"]).with_columns(
-                        MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
-                    )
+                    group.select(
+                        ["valid_time", "substation_number", "ensemble_member"]
+                    ).with_columns(MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32))
                 )
 
             if not all_preds:
@@ -114,8 +114,13 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         res = res.with_columns(
             nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
             power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
-            ensemble_member=pl.lit(0).cast(pl.UInt8),
         )
+
+        # Ensure ensemble_member is present and cast to UInt8
+        if "ensemble_member" not in res.columns:
+            res = res.with_columns(ensemble_member=pl.lit(0).cast(pl.UInt8))
+        else:
+            res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
 
         return cast(pt.DataFrame[PowerForecast], res)
 
@@ -209,7 +214,7 @@ class XGBoostForecaster:
         if self.model is None or self.feature_names is None:
             raise ValueError("Model must be trained before calling predict.")
 
-        X = df.select(self.feature_names)
+        X = df.select(self.feature_names).to_pandas()
         predictions = self.model.predict(X)
         return pl.Series(name="predictions", values=predictions, dtype=pl.Float32)
 

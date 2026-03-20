@@ -87,6 +87,7 @@ def forecast_vs_actual_plot(
             value=pl.col("MW_or_MVA"),
             type=pl.col("type"),
             display_name=pl.col("display_name"),
+            ensemble_member=pl.col("ensemble_member"),
         )
     )
 
@@ -97,34 +98,46 @@ def forecast_vs_actual_plot(
             display_name=pl.format(
                 "{} ({})", pl.col("substation_name"), pl.col("substation_number")
             ),
+            ensemble_member=pl.lit(0).cast(pl.UInt8),
         )
         .select(
             time=pl.col("timestamp"),
             value=pl.col("MW_or_MVA"),
             type=pl.col("type"),
             display_name=pl.col("display_name"),
+            ensemble_member=pl.col("ensemble_member"),
         )
     )
 
     combined_df = pl.concat([df_f, df_a])
 
     # Create Altair chart with subplots (facets)
-    chart = (
-        alt.Chart(combined_df)
-        .mark_line(strokeWidth=1.5, opacity=0.8)
+    # We use a layered approach for the spaghetti plot
+    # Note: For faceting layered charts, the data must be at the top level
+    base = alt.Chart(combined_df).encode(
+        x=alt.X("time:T", title="Time (UTC)"),
+        y=alt.Y("value:Q", title="Power (MW/MVA)"),
+    )
+
+    forecast_layer = (
+        base.transform_filter(alt.datum.type == "Forecast")
+        .mark_line(strokeWidth=1, opacity=0.15, color="#F18536")
         .encode(
-            x=alt.X("time:T", title="Time (UTC)"),
-            y=alt.Y("value:Q", title="Power (MW/MVA)"),
-            color=alt.Color(
-                "type:N",
-                scale=alt.Scale(domain=["Actual", "Forecast"], range=["#5276A7", "#F18536"]),
-                legend=alt.Legend(title="Data Type"),
-            ),
-            strokeDash=alt.StrokeDash(
-                "type:N",
-                scale=alt.Scale(domain=["Actual", "Forecast"], range=[[0], [4, 2]]),
-                legend=None,
-            ),
+            detail="ensemble_member:N",
+            tooltip=[
+                alt.Tooltip("time:T", format="%Y-%m-%d %H:%M"),
+                alt.Tooltip("value:Q", format=".2f"),
+                alt.Tooltip("display_name:N"),
+                alt.Tooltip("ensemble_member:N"),
+                alt.Tooltip("type:N"),
+            ],
+        )
+    )
+
+    actuals_layer = (
+        base.transform_filter(alt.datum.type == "Actual")
+        .mark_line(strokeWidth=2, opacity=1, color="#5276A7")
+        .encode(
             tooltip=[
                 alt.Tooltip("time:T", format="%Y-%m-%d %H:%M"),
                 alt.Tooltip("value:Q", format=".2f"),
@@ -132,7 +145,11 @@ def forecast_vs_actual_plot(
                 alt.Tooltip("type:N"),
             ],
         )
-        .properties(width=800, height=200)
+    )
+
+    chart = (
+        alt.layer(forecast_layer, actuals_layer)
+        .properties(width=800, height=250)
         .facet(row=alt.Row("display_name:N", title="Substation"), spacing=40)
         .resolve_scale(y="independent")
         .configure_title(fontSize=16, anchor="start", color="gray")

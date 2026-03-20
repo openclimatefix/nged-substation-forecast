@@ -222,7 +222,7 @@ def process_weather_data(
 
     upsampled_parts = []
     for group in groups.iter_rows(named=True):
-        group_df = weather_df.filter(*[pl.col(k) == v for k, v in group.items()]).sort("valid_time")
+        group_df = weather_df.filter([pl.col(k) == v for k, v in group.items()]).sort("valid_time")
         upsampled = time_grid.join(group_df, on="valid_time", how="left")
         # Interpolate only the weather variables, not the group columns
         upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
@@ -235,12 +235,16 @@ def process_weather_data(
     weather_df = pl.concat(upsampled_parts)
 
     # Ensure Float32 for memory efficiency and contract compliance
-    # But keep h3_index as UInt64
-    weather_df = weather_df.with_columns(
-        [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [pl.col("h3_index").cast(pl.UInt64)]
-    )
+    # But keep h3_index as UInt64 and ensemble_member as UInt8 if present
+    cast_exprs = [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [
+        pl.col("h3_index").cast(pl.UInt64)
+    ]
+    if "ensemble_member" in weather_df.columns:
+        cast_exprs.append(pl.col("ensemble_member").cast(pl.UInt8))
 
-    return ProcessedNwp.validate(weather_df)
+    weather_df = weather_df.with_columns(cast_exprs)
+
+    return ProcessedNwp.validate(weather_df, drop_superfluous_columns=True)
 
 
 def join_features(
@@ -248,6 +252,7 @@ def join_features(
     weather: pt.DataFrame[ProcessedNwp],
     substation_number: int,
     use_lags: bool = True,
+    is_training: bool = False,
 ) -> pt.DataFrame[SubstationFeatures]:
     """Join power and weather data and add all features.
 
@@ -256,6 +261,7 @@ def join_features(
         weather: Processed weather data.
         substation_number: The substation number.
         use_lags: Whether to add power lags.
+        is_training: Whether we are in training mode (drops rows with missing actuals).
 
     Returns:
         A Patito DataFrame containing the joined data and features.
@@ -263,6 +269,9 @@ def join_features(
     Raises:
         RuntimeError: If the join results in an empty DataFrame.
     """
+    # Start with weather as the base (defines the valid_time range)
+    df = weather.clone()
+
     if use_lags:
         # Add power lags
         power_lag_7d = power.select(
@@ -277,21 +286,35 @@ def join_features(
                 pl.col("MW_or_MVA").alias("power_lag_14d"),
             ]
         )
-        # Rename power timestamp to valid_time for join
-        power_df = power.rename({"timestamp": "valid_time"})
-        power_df = power_df.join(power_lag_7d, on="valid_time", how="left").join(
+        df = df.join(power_lag_7d, on="valid_time", how="left").join(
             power_lag_14d, on="valid_time", how="left"
         )
-    else:
-        power_df = power.rename({"timestamp": "valid_time"})
 
-    # Inner join to ensure we only have rows where both power and weather are available
-    df = power_df.join(weather, on="valid_time", how="inner")
+    # Join with current power (the target)
+    power_target = power.select(
+        [
+            pl.col("timestamp").alias("valid_time"),
+            pl.col("MW_or_MVA"),
+        ]
+    )
+    df = df.join(power_target, on="valid_time", how="left")
+
+    # Add features
+    df = add_weather_features(df)
+    df = add_temporal_features(df)
+
+    if is_training:
+        # During training, we must have the target variable and all features
+        df = df.drop_nulls()
+    else:
+        # During inference, we fill the target with 0.0 to satisfy the contract
+        # But we still expect all features to be present (non-null)
+        df = df.with_columns(MW_or_MVA=pl.col("MW_or_MVA").fill_null(0.0))
 
     if df.is_empty():
         raise RuntimeError(
             f"Join resulted in empty DataFrame for substation {substation_number}. "
-            "Check if power and weather timestamps overlap."
+            "Check if weather and power data overlap."
         )
 
     df = df.with_columns(
@@ -299,9 +322,19 @@ def join_features(
         MW_or_MVA=pl.col("MW_or_MVA").cast(pl.Float32),
     )
 
-    # Add features
-    df = add_weather_features(df)
-    df = add_temporal_features(df)
+    if not is_training:
+        # Check for nulls in features (except MW_or_MVA which we just filled)
+        feature_cols = [c for c in df.columns if c != "MW_or_MVA"]
+        null_counts = df.select([pl.col(c).is_null().sum().alias(c) for c in feature_cols])
+        total_nulls = null_counts.sum_horizontal().item()
+        if total_nulls > 0:
+            # Find which columns have nulls
+            null_cols = [c for c in feature_cols if null_counts[c][0] > 0]
+            raise RuntimeError(
+                f"Inference data for substation {substation_number} contains null features "
+                f"in columns: {null_cols}. This usually indicates a data gap in historical "
+                "power or weather data."
+            )
 
     # Final cleanup and validation
     return SubstationFeatures.validate(df, drop_superfluous_columns=True)
@@ -363,7 +396,7 @@ def prepare_training_data(
                 f"DEBUG: Substation {sub_num}: h3_idx={h3_idx}, sub_weather shape={sub_weather.shape}"
             )
 
-            sub_data = join_features(power, sub_weather, sub_num, use_lags)
+            sub_data = join_features(power, sub_weather, sub_num, use_lags, is_training=True)
 
             all_subs_data.append(sub_data)
         except Exception as e:
@@ -406,11 +439,11 @@ def prepare_inference_data(
     # 1. Load NWP run
     raw_weather = load_nwp_run(init_time, [h3_idx], config)
 
-    # 2. Process weather (always use MEAN for inference unless specified otherwise)
-    processed_weather = process_weather_data(raw_weather, EnsembleSelection.MEAN, config)
+    # 2. Process weather (use ALL for probabilistic inference)
+    processed_weather = process_weather_data(raw_weather, EnsembleSelection.ALL, config)
 
     # 3. Load power data (for lags)
     power = load_substation_power(substation_number, config)
 
     # 4. Join and add features
-    return join_features(power, processed_weather, substation_number, use_lags)
+    return join_features(power, processed_weather, substation_number, use_lags, is_training=False)
