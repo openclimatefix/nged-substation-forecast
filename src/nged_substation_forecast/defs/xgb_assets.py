@@ -27,8 +27,25 @@ from pydantic import BaseModel
 log = logging.getLogger(__name__)
 
 
+# We define both a Pydantic BaseModel (XGBoostTrainingParams) and a Dagster Config
+# (XGBoostTrainingConfig) to handle the two ways training parameters enter our pipeline:
+#
+# 1. XGBoostTrainingParams: Used for *dynamic* data passed between ops. In the
+#    cross-validation job, the training windows are generated during the run, making
+#    them "Data" rather than "Configuration". Using a pure Pydantic model also keeps
+#    our core training logic decoupled from Dagster.
+#
+# 2. XGBoostTrainingConfig: Used for *static* configuration provided by a user or
+#    schedule before the run starts. This allows for type-safe configuration in the
+#    Dagster UI.
+
+
 class XGBoostTrainingParams(BaseModel):
-    """Parameters for XGBoost training."""
+    """Parameters for XGBoost training.
+
+    This is a pure Pydantic model used for passing training parameters as data
+    between ops (e.g. in cross-validation).
+    """
 
     train_start_date: str | None = None
     train_end_date: str | None = None
@@ -36,14 +53,18 @@ class XGBoostTrainingParams(BaseModel):
 
 
 class XGBoostTrainingConfig(dg.Config):
-    """Configuration for XGBoost training."""
+    """Configuration for XGBoost training.
+
+    This is a Dagster Config object used for static configuration provided at
+    launch time via the Dagster UI or run configuration.
+    """
 
     train_start_date: str | None = None
     train_end_date: str | None = None
     test_end_date: str | None = None
 
     def to_params(self) -> XGBoostTrainingParams:
-        """Convert config to params."""
+        """Convert static config into dynamic params."""
         return XGBoostTrainingParams(
             train_start_date=self.train_start_date,
             train_end_date=self.train_end_date,

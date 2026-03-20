@@ -29,6 +29,11 @@ def generate_expanding_windows(
 ) -> Iterable[dg.DynamicOutput[XGBoostTrainingParams]]:
     """Generate expanding windows for cross-validation.
 
+    Note: We return XGBoostTrainingParams (a Pydantic model) rather than
+    XGBoostTrainingConfig (a Dagster Config) because these windows are
+    generated dynamically during the run, making them "Data" rather than
+    "Configuration".
+
     Args:
         config: Cross-validation configuration.
 
