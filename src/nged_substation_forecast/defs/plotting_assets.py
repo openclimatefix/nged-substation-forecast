@@ -115,7 +115,7 @@ def forecast_vs_actual_plot(
     # We use a layered approach for the spaghetti plot
     # Note: For faceting layered charts, the data must be at the top level
     base = alt.Chart(combined_df).encode(
-        x=alt.X("time:T", title="Time (UTC)"),
+        x=alt.X("time:T", title="Time (UTC)", axis=alt.Axis(format="%a %d %b %H:%M")),
         y=alt.Y("value:Q", title="Power (MW/MVA)"),
     )
 

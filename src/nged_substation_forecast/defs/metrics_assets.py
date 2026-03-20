@@ -60,11 +60,15 @@ def healthy_substations(
     daily_stats = df.group_by(["substation_number", "date"]).agg(
         max_abs=pl.col("MW_or_MVA").abs().max(),
         std=pl.col("MW_or_MVA").std(),
+        count=pl.col("MW_or_MVA").count(),
     )
 
     # 3. Identify bad days
-    # Peak < 0.5 MW or Std < 0.01
-    bad_days = daily_stats.filter((pl.col("max_abs") < 0.5) | (pl.col("std") < 0.01))
+    # A day is bad if it has enough data to be evaluated (> 50 observations)
+    # AND (Peak < 0.5 MW or Std < 0.01)
+    bad_days = daily_stats.filter(
+        (pl.col("count") > 50) & ((pl.col("max_abs") < 0.5) | (pl.col("std").fill_null(0.0) < 0.01))
+    )
 
     # 4. Get substations with ANY bad days
     substations_with_bad_data = bad_days.select("substation_number").unique().to_series().to_list()
