@@ -112,6 +112,8 @@ def xgb_models(
     # Log to MLflow
     # We omit the MLflow signature to prevent MLflow from forcing the input into a Pandas DataFrame.
     # We rely on Patito for strict schema validation instead.
+    # TODO: Log the training data `df_all` to MLflow using `mlflow.data.from_polars()`
+    # to establish data lineage for this model run.
     with mlflow.start_run():
         model_info = mlflow.pyfunc.log_model(
             artifact_path="model",

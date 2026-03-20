@@ -37,6 +37,11 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
     # sane, expressive type hints (like pt.DataFrame[SubstationFeatures]) without
     # MLflow spamming the Dagster UI with UserWarnings about unsupported types.
     # We rely on Patito for actual runtime schema validation anyway.
+    #
+    # Note: Because this is an undocumented API, there is a minor risk that MLflow
+    # could rename or remove this attribute in a future release. If they do, our
+    # code will not crash (MLflow uses a safe `getattr` check), but the annoying
+    # UserWarnings would return during Dagster startup.
     _skip_type_hint_validation = True
 
     def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
@@ -115,7 +120,11 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         return cast(pt.DataFrame[PowerForecast], res)
 
 
-# TODO: Create an abstract base class that defines the universal interface to all Forecasters.
+# TODO: Create an abstract base class (e.g. `BaseForecaster`) that defines the universal
+# interface for *training* and *saving* all ML models (XGBoost, PyTorch GNN, etc.).
+# While the `XGBoostPyFuncWrapper` above provides a universal interface for *inference*
+# via MLflow, Dagster's training assets still need a common interface to instantiate,
+# train, and save the underlying mathematical models regardless of their architecture.
 class XGBoostForecaster:
     """Wrapper around XGBoost for substation-level forecasting."""
 
