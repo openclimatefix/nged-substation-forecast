@@ -6,9 +6,11 @@ import dagster as dg
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.data_schemas import PowerForecast
+from contracts.data_schemas import InferenceParams, PowerForecast
 from contracts.settings import Settings
 from dagster import ResourceParam
+from mlflow.models import ModelSignature
+from mlflow.types import ParamSchema, ParamSpec
 from xgboost_forecaster import (
     DataConfig,
     EnsembleSelection,
@@ -110,15 +112,29 @@ def xgb_models(
             context.log.error(f"Failed to train model for {substation_number}: {e}")
 
     # Log to MLflow
-    # We omit the MLflow signature to prevent MLflow from forcing the input into a Pandas DataFrame.
-    # We rely on Patito for strict schema validation instead.
+    # We omit the MLflow input/output signature to prevent MLflow from forcing the
+    # input into a Pandas DataFrame. We rely on Patito for strict schema validation instead.
+    # However, we manually define a params schema so that MLflow allows parameters
+    # to be passed at inference time.
     # TODO: Log the training data `df_all` to MLflow using `mlflow.data.from_polars()`
     # to establish data lineage for this model run.
+    signature = ModelSignature(
+        inputs=None,
+        outputs=None,
+        params=ParamSchema(
+            [
+                ParamSpec(name="nwp_init_time", dtype="string", default=None),
+                ParamSpec(name="power_fcst_model", dtype="string", default=None),
+            ]
+        ),
+    )
+
     with mlflow.start_run():
         model_info = mlflow.pyfunc.log_model(
             artifact_path="model",
             python_model=XGBoostPyFuncWrapper(),
             artifacts=artifacts,
+            signature=signature,
         )
 
     return dg.Output(
@@ -183,15 +199,15 @@ def xgb_forecasts(
     inference_df = pl.concat(all_inference_data)
 
     # Make predictions using the model-agnostic MLflow wrapper.
+    # We pass an InferenceParams object which MLflow will serialize to a dict.
+    params = InferenceParams(
+        nwp_init_time=init_time,
+        power_fcst_model=XGBoostForecaster.model_name_and_version(),
+    )
+
     preds_df = cast(
         pt.DataFrame[PowerForecast],
-        loaded_model.predict(
-            inference_df,
-            params={
-                "nwp_init_time": init_time.isoformat(),
-                "power_fcst_model": XGBoostForecaster.model_name_and_version(),
-            },
-        ),
+        loaded_model.predict(inference_df, params=params.model_dump(mode="json")),
     )
 
     # Save combined forecast

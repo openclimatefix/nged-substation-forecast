@@ -54,34 +54,32 @@ class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
         for name, path in context.artifacts.items():
             self.models[name] = XGBoostForecaster.load(Path(path))
 
-    def predict(
+    def predict(  # type: ignore[invalid-method-override]
         self,
         context: mlflow.pyfunc.PythonModelContext,
         model_input: pt.DataFrame[SubstationFeatures],
-        params: dict[str, Any] | None = None,
+        params: InferenceParams,
     ) -> pt.DataFrame[PowerForecast]:
         """Make predictions using the loaded models.
 
         Args:
             context: MLflow context.
             model_input: Input data as a Patito DataFrame of SubstationFeatures.
-            params: Optional dictionary of parameters, including 'nwp_init_time'
-                and 'power_fcst_model'.
+            params: Parameters for inference.
 
         Returns:
             Patito DataFrame of PowerForecast.
         """
-        if params is None:
-            raise ValueError("'params' must be provided to the predict method")
+        # If params is a dict (passed by MLflow), convert to InferenceParams object.
+        # We must do this manually because we've disabled MLflow's automatic
+        # type hint validation/conversion.
+        if isinstance(params, dict):
+            params = InferenceParams(**params)
 
-        # Validate parameters using Pydantic model
-        inference_params = InferenceParams(**params)
-        nwp_init_time = inference_params.nwp_init_time
-        power_fcst_model = (
-            inference_params.power_fcst_model or XGBoostForecaster.model_name_and_version()
-        )
+        nwp_init_time = params.nwp_init_time
+        power_fcst_model = params.power_fcst_model or XGBoostForecaster.model_name_and_version()
 
-        # If we have a global model, use it for everything
+        # If we have a global model, use it for all substations.
         if "global" in self.models:
             preds = self.models["global"].predict(model_input)
             res = model_input.select(["valid_time", "substation_number"]).with_columns(
