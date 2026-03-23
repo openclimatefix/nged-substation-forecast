@@ -108,9 +108,7 @@ By embedding this translation logic inside the MLflow model artifact itself, you
 - If needed, we could consider using Modal (orchestrated by Dagster) to run "compute-heavy" jobs
 like ML training or back-tests.
 
-## ---
-
-**4\. Phased Implementation Plan**
+## **4\. Phased Implementation Plan**
 
 ### **Phase 1: Infrastructure Plumbing & The "Naive" XGBoost Baseline**
 
@@ -224,9 +222,7 @@ forecasts.
 * Multi-sequence alignment.
 * Disaggregate other DERs (e.g. EV chargers, or batteries).
 
-## ---
-
-**5\. Evaluation Metrics**
+## **5\. Evaluation Metrics**
 
 Standard metrics fail on highly stochastic customer meters and counterfactual NRA targets.
 
@@ -234,9 +230,7 @@ Standard metrics fail on highly stochastic customer meters and counterfactual NR
 * **Substations (NRA Evaluation):** \* *Masked Evaluation:* Only score the model during verified, normal un-switched periods.
   * *The Super-Node Invariance Test:* If nodes $i$ and $j$ are currently switched, evaluate the error of their sum: $|(\\hat{y}\_i^{\\text{NRA}} \+ \\hat{y}\_j^{\\text{NRA}}) \- (y\_i^{\\text{measured}} \+ y\_j^{\\text{measured}})|$.
 
-## ---
-
-**6\. Directory Layout**
+## **6\. Directory Layout**
 
 ```
 nged-substation-forecast/
