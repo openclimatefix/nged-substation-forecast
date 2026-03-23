@@ -219,7 +219,7 @@ the BSP power to be the (rough) sum of its primary substations, and the same for
 * Experiment with forecasting for BSPs and GSPs. Compare top-down forecasts against bottom-up
 forecasts.
 * Experiment with pre-trained encoders (e.g. a weather encoder).
-* Multi-sequence alignment.
+* Multi-sequence alignment with axial attention & automatic selection of "similar days".
 * Disaggregate other DERs (e.g. EV chargers, or batteries).
 
 ## **5\. Evaluation Metrics**
