@@ -124,7 +124,7 @@ like ML training or back-tests.
 
 **Target completion date**: End of May 2026.
 
-### **Phase 2: Topology Switching Detection (Ground Truth Pipeline)**
+### **Phase 2: Topology Switching Detection**
 
 *Isolate and label historical switching events to significantly improve the demand forecasts.*
 
@@ -137,9 +137,9 @@ like ML training or back-tests.
 
 **Target completion date**: End of June 2026.
 
-### **Phase 3: The MVP Forecasting Pipeline (Advanced XGBoost)**
+### **Phase 3: Upgrade forecast to handle switching events, and output NRA forecasts**
 
-*With clean switching labels, we build the robust statistical baseline.*
+*With clean switching labels, build the robust statistical baseline.*
 
 * **Substation NRA (normal running arrangement) Forecast (Global Model):** Train one global demand forecast XGBoost model across all substations. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude. Only use "true" NRA data as the training target.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type. Discard exact point-lags (which cause "phantom echoes" of random machine outages). Replace with **State-Lags**: 2-hour rolling max/min, 3-hour windowed mean, and weekly rolling medians.
