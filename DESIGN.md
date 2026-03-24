@@ -146,6 +146,8 @@ like ML training or back-tests.
 
 **Target completion date**: End of July 2026.
 
+**Stretch goal:** For each ML experiment, calculate £ saved for NGED's flexibility spend.
+
 ### **Phase 4: Grey-Box Physics-Informed Neural Network (PyTorch)**
 
 *Transitioning from black-box trees to explainable physics to explicitly model Behind-The-Meter (BTM) assets.*
@@ -222,6 +224,8 @@ the BSP power to be the (rough) sum of its primary substations, and the same for
 
 ### **Phase 6: Further research**
 
+* For each ML experiment, calculate £ saved for NGED's flexibility spend (if we haven't done this
+already).
 * Continually improve the current best model
 * Implement forecasts for BSPs and GSPs. Compare top-down forecasts against bottom-up forecasts.
 * Experiment with pre-trained encoders (e.g. a weather encoder).
