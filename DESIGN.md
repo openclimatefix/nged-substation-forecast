@@ -104,7 +104,7 @@ By embedding this translation logic inside the MLflow model artifact itself, you
 ### Compute infrastructure
 
 - I (Jack) will run ML experiments on my workstation (Ubuntu, with an nvidia A6000 GPU).
-- Dagster and MLFlow will run on AWS App Runner for the "production test harness".
+- Dagster and MLflow will run on AWS App Runner for the "production test harness".
 - If needed, we could consider using Modal (orchestrated by Dagster) to run "compute-heavy" jobs
 like ML training or back-tests.
 
