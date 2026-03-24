@@ -166,7 +166,7 @@ parameters will be probability distributions, initialised with sensible priors.
 * **Identifiability Constraints:** The gross demand module is heavily regularized to prevent the optimizer from confusing a massive noon-time solar export with a drop in human demand.
 * **Compare against previous forecasts.**
 
-**Target completion date**: End of October 2026.
+**Target completion date**: End of November 2026.
 
 #### Solar PV differentiable physics
 
@@ -220,7 +220,7 @@ the BSP power to be the (rough) sum of its primary substations, and the same for
 * **Dynamic Adjacency Matrix:** The GNN probably cannot implicitly learn grid topology. The live Switching Detector (from Phase 2\) acts as a permanent interceptor, continuously updating the adjacency matrix ($A\_t$) before inference.
 * This ensures the GNN's message-passing layers route data along the actual physical paths of the switched grid, preventing exploding gradients in the physical loss functions.
 
-**Target completion date**: End of December 2026.
+**Target completion date**: End of Feb 2027.
 
 ### **Phase 6: Further research**
 
