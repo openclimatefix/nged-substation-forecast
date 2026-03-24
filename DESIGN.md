@@ -66,7 +66,7 @@ models, comparing the models, and pushing models into production.
 differentiable phyics, etc) will have their own Python package within the `uv workspace`.
 
 ### The Universal Model Interface (MLflow PyFunc)
-To decouple the Dagster data pipeline from the ML code, all models are saved as custom MLflow `pyfunc` artifacts.
+To decouple the Dagster data pipeline from the ML code, all models are saved as [custom MLflow `pyfunc`](https://mlflow.org/docs/latest/ml/traditional-ml/tutorials/creating-custom-pyfunc/part2-pyfunc-components/) artifacts.
 
 **The Adapter Pattern**: The `pyfunc` wrapper encapsulates the model weights and all translation logic.
 
@@ -114,22 +114,23 @@ like ML training or back-tests.
 
 *Before attempting to detect complex switching events, we must prove the data engineering, MLflow tracking, and Dagster orchestration work end-to-end in a production environment.*
 
-* **Ingestion:** Download NGED data and ECMWF (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done).
-* **The "Naive" Model:** Build a very simple XGBoost net demand forecast for the ~50 trial sites (including substations and customer meters). Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model.
-* **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure: validating live data reading, Polars asof joins, PyFunc model serving, and Marimo visualisations.
-* **Additional features**: Implement simple baseline algorithms to compare against (e.g. ARIMA &
-7-day lagged persistence). Create leaderboard of forecasts. Define a standard data contract for all
-power forecasts.
+* **Ingestion:** Download NGED data and ECMWF (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done, but needs some optimisation).
+* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 80% done, but needs some tidying).
+* **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure: validating live data reading, [Polars `asof` joins](https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.join_asof.html), MLflow PyFunc model serving, and Marimo visualisations.
+* **Additional features**:
+    - Define a standard data contract for all power forecasts.
+    - Implement simple baseline algorithms to compare against (e.g. ARIMA & 7-day lagged persistence).
+    - Create performance evaluation framework & leaderboard of forecasts.
 
 **Target completion date**: End of May 2026.
 
 ### **Phase 2: Topology Switching Detection (Ground Truth Pipeline)**
 
-*Isolating and labeling historical switching events to uncover the true network physics.*
+*Isolate and label historical switching events to significantly improve the demand forecasts.*
 
 * **Exogenous Baseline:** Train K-Fold Out-of-Fold (OOF) XGBoost models using *only* weather and time features (strictly no lagged power features, which mask step-changes). Use Huber/MAE loss.
 * **Residual Detection:** Apply CUSUM or Rolling Difference filters to the baseline residuals ($r\_{i,t} \= y\_{i,t} \- \\hat{y}\_{i,t}$) to flag topological step-changes.
-* **Spatial Verification (Super-Node Test):** Validate switches by applying Kirchhoff's laws to neighbors. Calculate the Variance Ratio for a node $i$ and neighbor subset $\\mathcal{S}$:
+* **Spatial Verification (Super-Node Test):** Validate switches by applying Kirchhoff's laws to neighbours. Calculate the Variance Ratio for a node $i$ and neighbour subset $\\mathcal{S}$:
   $$\\text{VR} \= \\frac{\\text{Var}(r\_i \+ \\sum\_{m \\in \\mathcal{S}} r\_m)}{\\text{Var}(r\_i) \+ \\sum\_{m \\in \\mathcal{S}} \\text{Var}(r\_m)}$$
   If $\\text{VR} \\ll 1$, power was conserved, mathematically confirming the switch.
 
