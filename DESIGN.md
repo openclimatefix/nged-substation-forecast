@@ -114,8 +114,8 @@ like ML training or back-tests.
 
 *Before attempting to detect complex switching events, we must prove the data engineering, MLflow tracking, and Dagster orchestration work end-to-end in a production environment.*
 
-* **Ingestion:** Download NGED data and ECMWF (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done, but needs some optimisation).
-* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 80% done, but needs some tidying).
+* **Ingestion:** Download NGED data and ECMWF ensemble NWP (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done, but needs some optimisation).
+* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Output an ensemble of power forecasts by passing the NWP ensemble members through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 80% done, but needs some tidying).
 * **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure: validating live data reading, [Polars `asof` joins](https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.join_asof.html), MLflow PyFunc model serving, and Marimo visualisations.
 * **Additional features**:
     - Define a standard data contract for all power forecasts.
@@ -140,7 +140,7 @@ like ML training or back-tests.
 
 *With clean topology labels, we build the robust statistical baseline.*
 
-* **Substation NRA Forecast (Global Model):** Train one global XGBoost model. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model.
+* **Substation NRA (normal running arrangement) Forecast (Global Model):** Train one global demand forecast XGBoost model across all substations. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type. Discard exact point-lags (which cause "phantom echoes" of random machine outages). Replace with **State-Lags**: 2-hour rolling max/min, 3-hour windowed mean, and weekly rolling medians.
 
 **Target completion date**: End of July 2026.
