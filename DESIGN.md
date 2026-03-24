@@ -97,7 +97,7 @@ By embedding this translation logic inside the MLflow model artifact itself, you
 
 ### Data Contracts
 - **Input Contract** (`canonical_grid_features`): A single Dagster Asset handles all domain logic (joins, NWP alignment, timezones) and outputs a canonical Polars DataFrame.
-- **Output Contract**: A single "Long Format" Polars DataFrame representing 9 specific quantiles (P1, P5, P10, P25, P50, P75, P90, P95, P99) to capture hardware and commercial risk.
+- **Output Contract**: A single "Long Format" Polars DataFrame representing 9 specific quantiles (P1, P5, P10, P25, P50, P75, P90, P95, P99) to capture hardware risk and commercial risk.
     - **Schema**: timestamp, substation_id, horizon_step, ensemble_member, q1, q5, ..., q99
     - **Ensembles**: Individual traces are saved under distinct `ensemble_member` IDs (e.g., '1', '2'), while mathematically pooled quantiles are saved under `ensemble_member = 0`. Production systems filter exclusively for `0` (assuming they don't want the ensembles of power forecasts).
 
@@ -115,7 +115,7 @@ like ML training or back-tests.
 *Before attempting to detect complex switching events, we must prove the data engineering, MLflow tracking, and Dagster orchestration work end-to-end in a production environment.*
 
 * **Ingestion:** Download NGED data and ECMWF ensemble NWP (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done, but needs some optimisation).
-* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Output an ensemble of power forecasts by passing the NWP ensemble members through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 80% done, but needs some tidying).
+* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 70% done, but needs some tidying).
 * **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure: validating live data reading, [Polars `asof` joins](https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.join_asof.html), MLflow PyFunc model serving, and Marimo visualisations.
 * **Additional features**:
     - Define a standard data contract for all power forecasts.
@@ -133,14 +133,15 @@ like ML training or back-tests.
 * **Spatial Verification (Super-Node Test):** Validate switches by applying Kirchhoff's laws to neighbours. Calculate the Variance Ratio for a node $i$ and neighbour subset $\\mathcal{S}$:
   $$\\text{VR} \= \\frac{\\text{Var}(r\_i \+ \\sum\_{m \\in \\mathcal{S}} r\_m)}{\\text{Var}(r\_i) \+ \\sum\_{m \\in \\mathcal{S}} \\text{Var}(r\_m)}$$
   If $\\text{VR} \\ll 1$, power was conserved, mathematically confirming the switch.
+* **Validate against NGED's sparse "switching event" spreadsheets.**
 
 **Target completion date**: End of June 2026.
 
 ### **Phase 3: The MVP Forecasting Pipeline (Advanced XGBoost)**
 
-*With clean topology labels, we build the robust statistical baseline.*
+*With clean switching labels, we build the robust statistical baseline.*
 
-* **Substation NRA (normal running arrangement) Forecast (Global Model):** Train one global demand forecast XGBoost model across all substations. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude.
+* **Substation NRA (normal running arrangement) Forecast (Global Model):** Train one global demand forecast XGBoost model across all substations. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude. Only use "true" NRA data as the training target.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type. Discard exact point-lags (which cause "phantom echoes" of random machine outages). Replace with **State-Lags**: 2-hour rolling max/min, 3-hour windowed mean, and weekly rolling medians.
 
 **Target completion date**: End of July 2026.
@@ -149,10 +150,10 @@ like ML training or back-tests.
 
 *Transitioning from black-box trees to explainable physics to explicitly model Behind-The-Meter (BTM) assets.*
 
-We will build differentiable physics modules that implement the physics in equations in
+We will build differentiable physics modules that implement physics equations in
 pytorch. One aim is to use these differentiable physics models to infer the physically-meaningful
-parameters of the model. Don't use any maths above A-Level standard in the physics models. The
-parameters will be probability distributions, using sensible priors.
+parameters of the model. We won't use any maths above A-Level standard in the physics models. The
+parameters will be probability distributions, initialised with sensible priors.
 
 * **Explicit Disaggregation:** The model explicitly outputs unmetered solar and unmetered wind alongside gross demand:
   $$P\_{\\text{net}} \= P\_{\\text{gross\\\_demand}} \- P\_{\\text{solar}} \- P\_{\\text{wind}}$$
@@ -161,21 +162,23 @@ parameters will be probability distributions, using sensible priors.
   $$\\hat{S} \= \\sqrt{P\_{\\text{net}}^2 \+ Q\_{\\text{base}}^2}$$
   Where baseline reactive power ($Q\_{\\text{base}}$) is learnable, allowing the real power ($P\_{\\text{net}}$) to smoothly cross zero.
 * **Identifiability Constraints:** The gross demand module is heavily regularized to prevent the optimizer from confusing a massive noon-time solar export with a drop in human demand.
+* **Compare against previous forecasts.**
 
 **Target completion date**: End of October 2026.
 
 #### Solar PV differentiable physics
 
-For solar PV, we'd write code to capture the minimal set of equations describing how sunlight is turned into electricity. We'd like to infer
-the PV panel tilt and azimuth, and the ratio of DC capacity to AC capacity (because it's
-increasingly common for PV developers to install, say, 5 MW of PV panels with a 3 MW inverter).
-Further down the line, we'd like to infer shading (represented as a 2D array representing the PV
-system's "view" of the sky). We can re-implement equations from pvlib in PyTorch.
+For solar PV, we'd write code to capture the minimal set of equations describing how sunlight is
+turned into electricity. We'd like to infer the PV panel tilt and azimuth, and the ratio of DC
+capacity to AC capacity (because it's increasingly common for PV developers to install, say, 5 MW of
+PV panels with a 3 MW inverter). Further down the line, we'd like to infer shading (represented as a
+2D array representing the PV system's "view" of the sky). We can re-implement equations from pvlib
+in PyTorch.
 
 We may release a Python package with this minimal set of equations in PyTorch, as a package called
 "solar-torch".
 
-To handle fleets of solar PV systems (which might have different parameters), we could use, models
+To handle fleets of solar PV systems (which might have different parameters), we could use models
 for, say, 3 PV systems (with different tilts and azimuths), and learn the ratio of these, and learn
 a scaling parameter.
 
@@ -184,7 +187,6 @@ from CERRA and/or the nearest weather station.
 
 ##### Stretch goals for solar PV forecasting research
 
-- Forecast for individual PV sites.
 - Run on all of PVOutput.org and/or Open Climate Fix's UK_PV dataset to infer PV panel tilt,
 azimuth, AC:DC ratio, and shading, for each PV system in the dataset and publish as an open dataset.
 - Once models are trained for each PV system, infer irradiance from PV power. Do this for thousands
@@ -200,16 +202,20 @@ as a live "irradiance nowcasting" gridded dataset.
 *Capturing highly non-linear, cross-network interactions during extreme events.*
 
 For example, each primary substation will be represented by a node in the GNN. It'll be connected to
-a PV fleet node (to model the unmetered PV), and a wind fleet node (for the unmetered wind), and a gross demand node, and nodes for any metered generation. The edges from the metered generation nodes to their substations will also capture curtailment. The curtailment "gate" will be driven by both ends of the graph edge: the substation (to capture how congested the grid is) and the generation node.
+a PV fleet node (to model the unmetered PV), and a wind fleet node (for the unmetered wind), and a
+gross demand node, and nodes for any metered generation. The edges from the metered generation nodes
+to their substations will also capture curtailment. The curtailment "gate" will be driven by both
+ends of the graph edge: the substation (to capture how congested the grid is) and the generation
+node.
 
 The GNN will also represent the electrical connection between substations: Both the hierarchy GSP ->
 BSP -> primary, and the "mesh" horizontal connections.
 
-Sum up the forecasts for primary substations up to BSPs. And sum up BSPs to GSPs. Don't force
-a simple sum (because there will be line losses etc.). Instead use the ML loss function to encourage
+Sum up the forecasts for primary substations up to BSPs. And sum up BSPs to GSPs. Don't force a
+simple sum (because there will be line losses etc.). Instead use the ML loss function to encourage
 the BSP power to be the (rough) sum of its primary substations, and the same for GSPs.
 
-* **Dynamic Adjacency Matrix:** The GNN cannot implicitly learn grid topology. The live Switching Detector (from Phase 2\) acts as a permanent interceptor, continuously updating the adjacency matrix ($A\_t$) before inference.
+* **Dynamic Adjacency Matrix:** The GNN probably cannot implicitly learn grid topology. The live Switching Detector (from Phase 2\) acts as a permanent interceptor, continuously updating the adjacency matrix ($A\_t$) before inference.
 * This ensures the GNN's message-passing layers route data along the actual physical paths of the switched grid, preventing exploding gradients in the physical loss functions.
 
 **Target completion date**: End of December 2026.
@@ -217,8 +223,7 @@ the BSP power to be the (rough) sum of its primary substations, and the same for
 ### **Phase 6: Further research**
 
 * Continually improve the current best model
-* Experiment with forecasting for BSPs and GSPs. Compare top-down forecasts against bottom-up
-forecasts.
+* Implement forecasts for BSPs and GSPs. Compare top-down forecasts against bottom-up forecasts.
 * Experiment with pre-trained encoders (e.g. a weather encoder).
 * Multi-sequence alignment with axial attention & automatic selection of "similar days".
 * Disaggregate other DERs (e.g. EV chargers, or batteries).
