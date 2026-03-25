@@ -17,8 +17,8 @@ log = logging.getLogger(__name__)
 class XGBoostTrainData(BaseDataRequirements):
     """Training data requirements for XGBoost."""
 
-    weather_cerra: pt.LazyFrame[ProcessedNwp]
-    substation_scada: pt.LazyFrame[SubstationFlows]
+    weather_ecmwf_ens_0_25: pt.LazyFrame[ProcessedNwp]
+    substation_power_flows: pt.LazyFrame[SubstationFlows]
 
 
 class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
@@ -43,11 +43,11 @@ class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
         # to create the training dataset.
         joined_df = cast(
             pl.DataFrame,
-            data.substation_scada.rename(
+            data.substation_power_flows.rename(
                 {"timestamp": "valid_time", "substation_number": "substation_id"}
             )
             .join(
-                data.weather_cerra.rename({"h3_index": "substation_id"}),
+                data.weather_ecmwf_ens_0_25.rename({"h3_index": "substation_id"}),
                 on=["valid_time", "substation_id"],
             )
             .collect(),

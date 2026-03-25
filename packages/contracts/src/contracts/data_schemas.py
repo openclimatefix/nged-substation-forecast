@@ -159,6 +159,14 @@ class PowerForecast(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
 
+class ScalingParams(pt.Model):
+    """Schema for weather variable scaling parameters."""
+
+    col_name: str = pt.Field(dtype=pl.String)
+    buffered_min: float = pt.Field(dtype=pl.Float32)
+    buffered_range: float = pt.Field(dtype=pl.Float32)
+
+
 class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 

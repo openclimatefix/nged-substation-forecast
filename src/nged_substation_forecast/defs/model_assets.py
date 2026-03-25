@@ -10,6 +10,7 @@ import polars as pl
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 
+from ml_core.assets import FeatureAsset
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def load_hydra_config(model_name: str) -> dict:
     if not GlobalHydra.instance().is_initialized():
         initialize(version_base=None, config_path="../../../conf")
     cfg = compose(config_name="config", overrides=[f"model={model_name}"])
-    return dict(cfg.model)  # Return as a plain dictionary
+    return dict(cfg)  # Return the full config including data_split
 
 
 def get_trainer_class(trainer_path: str):
@@ -58,8 +59,10 @@ def create_model_assets(model_name: str):
     Returns:
         A list of Dagster assets (train and evaluate).
     """
-    hydra_cfg = load_hydra_config(model_name)
-    TrainerClass = get_trainer_class(hydra_cfg["trainer_class"])
+    # Load config to get trainer class and model name
+    full_cfg = load_hydra_config(model_name)
+    model_cfg = full_cfg["model"]
+    TrainerClass = get_trainer_class(model_cfg["trainer_class"])
 
     # Determine required assets from the Trainer's requirements class.
     # This is where the 'Dagster Vocabulary' (FeatureAsset) is used to
@@ -77,15 +80,15 @@ def create_model_assets(model_name: str):
         log.info(f"Training model: {model_name}")
 
         # Slicing the data based on Hydra config
-        train_start = hydra_cfg["data_split"]["train_start"]
-        train_end = hydra_cfg["data_split"]["train_end"]
+        train_start = full_cfg["data_split"]["train_start"]
+        train_end = full_cfg["data_split"]["train_end"]
 
         payload_dict = {}
         for key, lf in kwargs.items():
             # Apply temporal slicing using Polars pushdown.
             # We assume all feature assets have a time-based column.
-            # For SCADA it's 'timestamp', for NWP it's 'valid_time'.
-            time_col = "timestamp" if "scada" in key else "valid_time"
+            # For power flows it's 'timestamp', for NWP it's 'valid_time'.
+            time_col = "timestamp" if "power_flows" in key else "valid_time"
             payload_dict[key] = lf.filter(pl.col(time_col).is_between(train_start, train_end))
 
         # Instantiate the Pydantic payload
@@ -95,8 +98,8 @@ def create_model_assets(model_name: str):
         # Train and Log to MLflow
         trainer = TrainerClass()
         with mlflow.start_run(run_name=model_name) as run:
-            mlflow.log_params(hydra_cfg)
-            trained_model = trainer.train(payload, hydra_cfg)
+            mlflow.log_params(full_cfg)
+            trained_model = trainer.train(payload, model_cfg)
 
             # Log to registry, bypassing MLflow's Pandas-centric signature engine
             mlflow.pyfunc.log_model(
@@ -128,13 +131,12 @@ def create_model_assets(model_name: str):
 
         # Prepare inference data (collect LazyFrames to DataFrames)
         # We use the test split defined in the Hydra configuration.
-        hydra_cfg = load_hydra_config(model_name)
-        test_start = hydra_cfg["data_split"]["test_start"]
-        test_end = hydra_cfg["data_split"]["test_end"]
+        test_start = full_cfg["data_split"]["test_start"]
+        test_end = full_cfg["data_split"]["test_end"]
 
         inference_payload_dict = {}
         for key, lf in kwargs.items():
-            time_col = "timestamp" if "scada" in key else "valid_time"
+            time_col = "timestamp" if "power_flows" in key else "valid_time"
             inference_payload_dict[key] = lf.filter(
                 pl.col(time_col).is_between(test_start, test_end)
             ).collect()

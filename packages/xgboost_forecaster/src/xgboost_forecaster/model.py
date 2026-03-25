@@ -5,10 +5,10 @@ from typing import Type
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import ProcessedNwp
+from contracts.data_schemas import PowerForecast, ProcessedNwp
 from xgboost import XGBRegressor
 
-from ml_core.model import BasePolarsModel
+from ml_core.model import ForecastInference
 from ml_core.trainer import BaseDataRequirements
 
 log = logging.getLogger(__name__)
@@ -17,10 +17,10 @@ log = logging.getLogger(__name__)
 class XGBoostInferenceData(BaseDataRequirements):
     """Inference data requirements for XGBoost."""
 
-    weather_cerra: pt.DataFrame[ProcessedNwp]
+    weather_ecmwf_ens_0_25: pt.DataFrame[ProcessedNwp]
 
 
-class XGBoostPolarsWrapper(BasePolarsModel[XGBoostInferenceData]):
+class XGBoostPolarsWrapper(ForecastInference[XGBoostInferenceData]):
     """MLflow pyfunc wrapper for XGBoost inference.
 
     This class is designed to be lightweight and serializable by MLflow.
@@ -38,17 +38,17 @@ class XGBoostPolarsWrapper(BasePolarsModel[XGBoostInferenceData]):
         """
         self.model = model
 
-    def _run_inference(self, data: XGBoostInferenceData) -> pl.DataFrame:
+    def _run_inference(self, data: XGBoostInferenceData) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
 
         Args:
             data: The validated inference data.
 
         Returns:
-            A Polars DataFrame containing the predictions.
+            A Patito DataFrame containing the predictions.
         """
         # 🎉 PERFECT IDE TYPE HINTING 🎉
-        df = data.weather_cerra
+        df = data.weather_ecmwf_ens_0_25
 
         # Prepare features (must match training features)
         # For this example, we'll just select numeric columns
@@ -57,6 +57,8 @@ class XGBoostPolarsWrapper(BasePolarsModel[XGBoostInferenceData]):
         preds = self.model.predict(X)
 
         # Return predictions joined with metadata
-        return df.select(["valid_time", "h3_index", "ensemble_member"]).with_columns(
-            MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
+        return pt.DataFrame[PowerForecast](
+            df.select(["valid_time", "h3_index", "ensemble_member"]).with_columns(
+                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
+            )
         )

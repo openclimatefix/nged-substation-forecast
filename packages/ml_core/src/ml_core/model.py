@@ -4,14 +4,16 @@ from abc import ABC, abstractmethod
 from typing import Generic, Type, TypeVar
 
 import mlflow
+import patito as pt
 import polars as pl
+from contracts.data_schemas import PowerForecast
 
 from ml_core.trainer import BaseDataRequirements
 
 T_InferReq = TypeVar("T_InferReq", bound=BaseDataRequirements)
 
 
-class BasePolarsModel(mlflow.pyfunc.PythonModel, ABC, Generic[T_InferReq]):
+class ForecastInference(mlflow.pyfunc.PythonModel, ABC, Generic[T_InferReq]):
     """Abstract base class for all ML model artifacts.
 
     The Model is a lightweight, deployable mathematical artifact that handles
@@ -38,7 +40,7 @@ class BasePolarsModel(mlflow.pyfunc.PythonModel, ABC, Generic[T_InferReq]):
         context: mlflow.pyfunc.PythonModelContext,
         model_input: dict[str, pl.DataFrame],
         params: dict | None = None,
-    ) -> pl.DataFrame:
+    ) -> pt.DataFrame[PowerForecast]:
         """Satisfies MLflow's rigid string-based signature.
 
         Immediately parses the raw dictionary into our strictly-typed,
@@ -50,7 +52,7 @@ class BasePolarsModel(mlflow.pyfunc.PythonModel, ABC, Generic[T_InferReq]):
             params: Optional inference parameters (unused).
 
         Returns:
-            A Polars DataFrame containing the model's predictions.
+            A Patito DataFrame containing the model's predictions.
         """
         if not hasattr(self, "inference_requirements_class"):
             raise TypeError(
@@ -63,13 +65,13 @@ class BasePolarsModel(mlflow.pyfunc.PythonModel, ABC, Generic[T_InferReq]):
         return self._run_inference(typed_data)
 
     @abstractmethod
-    def _run_inference(self, data: T_InferReq) -> pl.DataFrame:
+    def _run_inference(self, data: T_InferReq) -> pt.DataFrame[PowerForecast]:
         """The developer writes their math here, enjoying full IDE autocomplete.
 
         Args:
             data: The validated Pydantic payload containing the required DataFrames.
 
         Returns:
-            A Polars DataFrame containing the model's predictions.
+            A Patito DataFrame containing the model's predictions.
         """
         pass
