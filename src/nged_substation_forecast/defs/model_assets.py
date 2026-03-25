@@ -76,7 +76,7 @@ def create_model_assets(model_name: str):
         """Generic training asset that delegates to the model's Trainer class."""
         log.info(f"Training model: {model_name}")
 
-        # 1. Slicing the data based on Hydra config
+        # Slicing the data based on Hydra config
         # In a real scenario, we would use the dates from hydra_cfg["data_split"]
         # to filter the LazyFrames in kwargs.
         payload_dict = {}
@@ -86,11 +86,11 @@ def create_model_assets(model_name: str):
             # lf = lf.filter(pl.col("timestamp").is_between(...))
             payload_dict[key] = lf
 
-        # 2. Instantiate the Pydantic payload
+        # Instantiate the Pydantic payload
         # This validates that all required assets were provided and have correct types.
         payload = TrainerClass.requirements_class(**payload_dict)
 
-        # 3. Train and Log to MLflow
+        # Train and Log to MLflow
         trainer = TrainerClass()
         with mlflow.start_run(run_name=model_name) as run:
             mlflow.log_params(hydra_cfg)
@@ -124,7 +124,7 @@ def create_model_assets(model_name: str):
         """Generic evaluation asset that loads the model and generates forecasts."""
         log.info(f"Evaluating model: {model_name}")
 
-        # 1. Load the model from MLflow
+        # Load the model from MLflow
         # In a real scenario, we would use the run_id from the metadata
         # run_id = context.step_context.get_output_metadata(f"train_{model_name}")["mlflow_run_id"]
         # pyfunc_model = mlflow.pyfunc.load_model(f"runs:/{run_id}/model")
@@ -132,14 +132,14 @@ def create_model_assets(model_name: str):
         # For this example, we'll assume 'model' is the trained artifact
         # (though in Dagster it would usually be a path or a reference)
 
-        # 2. Prepare inference data (collect LazyFrames to DataFrames)
+        # Prepare inference data (collect LazyFrames to DataFrames)
         inference_payload_dict = {key: lf.collect() for key, lf in kwargs.items()}
 
-        # 3. Run inference
+        # Run inference
         # The model artifact handles the internal validation and math
         predictions_df = model.predict(None, inference_payload_dict)
 
-        # 4. Add metadata for Delta Lake
+        # Add metadata for Delta Lake
         # We partition by power_fcst_model_name and power_fcst_init_year_month
         now = datetime.now()
         year_month = now.strftime("%Y-%m")
@@ -152,7 +152,7 @@ def create_model_assets(model_name: str):
             nwp_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
         )
 
-        # 5. Write to Delta Lake
+        # Write to Delta Lake
         # results_df.write_delta(
         #     "data/evaluation_results.delta",
         #     mode="append",
