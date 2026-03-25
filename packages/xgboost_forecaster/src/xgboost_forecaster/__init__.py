@@ -5,7 +5,6 @@ from .data import load_nwp_run as load_nwp_run
 from .data import load_substation_power as load_substation_power
 from .data import prepare_inference_data as prepare_inference_data
 from .data import prepare_training_data as prepare_training_data
-from .model import XGBoostForecaster as XGBoostForecaster
-from .model import XGBoostPyFuncWrapper as XGBoostPyFuncWrapper
-from .model import train_local_xgboost_model as train_local_xgboost_model
+from .model import XGBoostPolarsWrapper as XGBoostPolarsWrapper
+from .trainer import XGBoostTrainer as XGBoostTrainer
 from .types import EnsembleSelection as EnsembleSelection

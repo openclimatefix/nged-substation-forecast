@@ -15,6 +15,18 @@ TODO(Jack): Adapt the OCF template README for this project :)
 This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/workspaces): A single
 repo which contains multiple Python packages.
 
+### Sub-packages
+
+- **`packages/contracts`**: Lightweight package defining data schemas (using Patito/Polars) and project settings. This package has minimal dependencies to ensure it can be used by any component without bringing in heavy ML libraries.
+- **`packages/ml_core`**: Unified ML model interface and shared utilities. This package contains the base classes for trainers and models, and shared logic like feature engineering and data splitting. It depends on `mlflow-skinny`.
+- **`packages/xgboost_forecaster`**: Implementation of the substation forecast using XGBoost, following the `ml_core` interface.
+- **`packages/nged_data`**: Data ingestion and processing for NGED datasets.
+- **`packages/dynamical_data`**: Handling of NWP and other time-varying datasets.
+
+### Dependency Isolation
+
+We maintain a strict separation between `contracts` and `ml_core`. `contracts` defines the *shape* of the data, while `ml_core` defines the *machinery* for ML. By keeping them separate, we ensure that a component that only needs to validate a schema (like a data ingestion script) doesn't need to install heavy ML dependencies like MLflow.
+
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
 1. `uv sync --all-packages` (The `--all-packages` flag ensures that dependencies for all workspace members, like the dashboard and notebooks, are installed into the shared virtual environment, which is necessary for IDE support and type checking).
 1. `uv run pre-commit install`

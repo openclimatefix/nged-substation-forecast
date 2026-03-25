@@ -1,0 +1,13 @@
+ml_model_name: "xgboost_baseline"
+trainer_class: "xgboost_forecaster.trainer.XGBoostTrainer"
+data_split:
+  train_start: "2019-01-01"
+  train_end: "2022-12-31"
+  test_start: "2023-01-01"
+  test_end: "2023-12-31"
+hyperparameters:
+  learning_rate: 0.01
+  n_estimators: 100
+  max_depth: 6
+features:
+  nwp_provider: "ecmwf"

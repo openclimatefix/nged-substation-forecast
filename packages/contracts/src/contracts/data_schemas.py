@@ -137,21 +137,26 @@ class SubstationMetadata(pt.Model):
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema."""
+    """Forecast data schema for deterministic ensemble forecasts."""
 
-    nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    substation_number: int = pt.Field(dtype=pl.Int32)
     valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
     # Identifier for our ML-based power forecasting model.
-    # Returned by `Forecaster.model_name_and_version()`.
-    power_fcst_model: str = pt.Field(dtype=pl.Categorical)
+    ml_model_name: str = pt.Field(dtype=pl.Categorical)
+
+    # The datetime that the power forecast was initialised.
+    power_fcst_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+
+    # The datetime that the underlying weather forecast was initialised.
+    nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+
+    # Year and month of the power forecast initialisation (for partitioning).
+    power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
     # Active power (megawatts) or apparent power (mega volt amp).
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
-
-    # TODO: Capture probabilistic information.
 
 
 class InferenceParams(BaseModel):

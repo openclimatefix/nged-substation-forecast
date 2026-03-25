@@ -25,8 +25,11 @@ dependencies = [
     "dynamical_data",
     "nged-data",
     "contracts",
+    "ml_core",
     "obstore",
     "xgboost_forecaster",
+    "hydra-core",
+    "deltalake",
 ]
 
 [build-system]
@@ -55,6 +58,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 nged-data = { workspace = true }
 contracts = { workspace = true }
+ml_core = { workspace = true }
 xgboost_forecaster = { workspace = true }
 dynamical_data = { workspace = true }
 
