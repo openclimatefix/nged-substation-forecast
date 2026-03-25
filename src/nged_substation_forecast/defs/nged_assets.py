@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import Any, NamedTuple, cast
 
 import dagster as dg
 import h3.api.numpy_int as h3
@@ -425,7 +425,7 @@ def substation_metadata(
         final_metadata = new_metadata
 
     # 7. Validate against the new schema
-    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore[arg-type]
+    final_metadata = final_metadata.cast(cast(Any, SubstationMetadata.dtypes))
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk

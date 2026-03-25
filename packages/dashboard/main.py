@@ -4,7 +4,7 @@ __generated_with = "0.20.4"
 app = marimo.App(width="full")
 
 with app.setup:
-    from typing import cast
+    from typing import Any, cast
 
     from contracts.settings import Settings
 
@@ -75,7 +75,7 @@ def _(arrow_table):
     map = lonboard.Map(layers=[layer])
 
     # Enable reactivity in Marimo:
-    layer_widget = mo.ui.anywidget(layer)  # type: ignore[invalid-argument-type]
+    layer_widget = mo.ui.anywidget(cast(Any, layer))
     return layer_widget, map
 
 

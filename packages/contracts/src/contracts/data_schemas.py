@@ -2,11 +2,14 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import patito as pt
 import polars as pl
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class MissingCorePowerVariablesError(ValueError):
@@ -43,17 +46,17 @@ class SubstationFlows(pt.Model):
     @classmethod
     def validate(
         cls,
-        dataframe: pl.DataFrame,
+        dataframe: pl.DataFrame | "pd.DataFrame",
         columns: Sequence[str] | None = None,
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["SubstationFlows"]:  # type: ignore[invalid-method-override]
+    ) -> pt.DataFrame["SubstationFlows"]:
         """Validate the given dataframe, ensuring either MW or MVA is present."""
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
             raise MissingCorePowerVariablesError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
-                f" {dataframe.columns=}, {dataframe.height=}"
+                f" {dataframe.columns=}, {len(dataframe)=}"
             )
         return cast(
             pt.DataFrame["SubstationFlows"],
@@ -75,9 +78,12 @@ class SubstationFlows(pt.Model):
         dataframe: pt.DataFrame["SubstationFlows"],
     ) -> pt.DataFrame[SimplifiedSubstationFlows]:
         power_col = SubstationFlows.choose_power_column(dataframe)
-        dataframe = dataframe.rename({power_col: "MW_or_MVA"})  # type: ignore[invalid-assignment]
-        dataframe = dataframe.select(["timestamp", "MW_or_MVA"]).drop_nulls()  # type: ignore[invalid-assignment]
-        return cast(pt.DataFrame[SimplifiedSubstationFlows], dataframe)
+        simplified_df = (
+            dataframe.rename({power_col: "MW_or_MVA"})
+            .select(["timestamp", "MW_or_MVA"])
+            .drop_nulls()
+        )
+        return cast(pt.DataFrame[SimplifiedSubstationFlows], simplified_df)
 
 
 class SimplifiedSubstationFlows(pt.Model):
@@ -185,12 +191,12 @@ class Nwp(pt.Model):
     @classmethod
     def validate(
         cls,
-        dataframe: pl.DataFrame,
+        dataframe: pl.DataFrame | "pd.DataFrame",
         columns: Sequence[str] | None = None,
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["Nwp"]:  # type: ignore[invalid-method-override]
+    ) -> pt.DataFrame["Nwp"]:
         """Validate the given dataframe, ensuring no nulls from second step onwards."""
         validated_df = super().validate(
             dataframe=dataframe,
@@ -199,6 +205,9 @@ class Nwp(pt.Model):
             allow_superfluous_columns=allow_superfluous_columns,
             drop_superfluous_columns=drop_superfluous_columns,
         )
+
+        if not isinstance(validated_df, pl.DataFrame):
+            return cast(pt.DataFrame["Nwp"], validated_df)
 
         # Check for nulls from second forecast step onwards
         # (i.e. where valid_time > init_time)

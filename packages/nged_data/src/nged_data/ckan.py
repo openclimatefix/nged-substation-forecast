@@ -3,7 +3,7 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any, Final
+from typing import Any, Final, cast
 
 import httpx
 import patito as pt
@@ -55,7 +55,8 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
     locations = locations.filter(
         pl.col("substation_type").str.to_lowercase().str.contains("primary")
     )
-    locations = locations.cast(SubstationLocations.dtypes)  # type: ignore[invalid-argument-type]
+    dtypes = cast(Any, SubstationLocations.dtypes)
+    locations = locations.cast(dtypes)
     return SubstationLocations.validate(locations, drop_superfluous_columns=True)
 
 
