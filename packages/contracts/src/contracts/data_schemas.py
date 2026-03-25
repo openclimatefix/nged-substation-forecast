@@ -144,7 +144,7 @@ class PowerForecast(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
     # Identifier for our ML-based power forecasting model.
-    ml_model_name: str = pt.Field(dtype=pl.Categorical)
+    power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
 
     # The datetime that the power forecast was initialised.
     power_fcst_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))

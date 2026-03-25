@@ -107,7 +107,7 @@ def create_model_assets(model_name: str):
             context.add_output_metadata(
                 {
                     "mlflow_run_id": run.info.run_id,
-                    "ml_model_name": model_name,
+                    "power_fcst_model_name": model_name,
                 }
             )
 
@@ -140,12 +140,12 @@ def create_model_assets(model_name: str):
         predictions_df = model.predict(None, inference_payload_dict)
 
         # 4. Add metadata for Delta Lake
-        # We partition by ml_model_name and power_fcst_init_year_month
+        # We partition by power_fcst_model_name and power_fcst_init_year_month
         now = datetime.now()
         year_month = now.strftime("%Y-%m")
 
         results_df = predictions_df.with_columns(
-            ml_model_name=pl.lit(model_name).cast(pl.Categorical),
+            power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
             power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
             power_fcst_init_year_month=pl.lit(year_month).cast(pl.String),
             # nwp_init_time should come from the input data in a real scenario
@@ -157,14 +157,14 @@ def create_model_assets(model_name: str):
         #     "data/evaluation_results.delta",
         #     mode="append",
         #     delta_table_options={
-        #         "partition_by": ["ml_model_name", "power_fcst_init_year_month"]
+        #         "partition_by": ["power_fcst_model_name", "power_fcst_init_year_month"]
         #     },
         # )
 
         context.add_output_metadata(
             {
                 "num_rows": len(results_df),
-                "ml_model_name": model_name,
+                "power_fcst_model_name": model_name,
             }
         )
         return results_df

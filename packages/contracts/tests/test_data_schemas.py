@@ -85,7 +85,7 @@ def test_power_forecast_validation():
             "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
             "substation_number": [123],
             "ensemble_member": [0],
-            "ml_model_name": ["xgboost_baseline"],
+            "power_fcst_model_name": ["xgboost_baseline"],
             "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "power_fcst_init_year_month": ["2026-01"],
@@ -95,7 +95,7 @@ def test_power_forecast_validation():
         [
             pl.col("substation_number").cast(pl.Int32),
             pl.col("ensemble_member").cast(pl.UInt8),
-            pl.col("ml_model_name").cast(pl.Categorical),
+            pl.col("power_fcst_model_name").cast(pl.Categorical),
             pl.col("MW_or_MVA").cast(pl.Float32),
         ]
     )
