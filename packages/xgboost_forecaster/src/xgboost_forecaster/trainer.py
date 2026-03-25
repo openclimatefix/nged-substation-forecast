@@ -38,9 +38,9 @@ class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
         """
         log.info("Starting XGBoost training...")
 
-        # Join SCADA and weather data
-        # In a real scenario, we would do more complex feature engineering here.
-        # For this example, we'll just join and collect.
+        # Join SCADA and weather data.
+        # We join the historical power flows with the weather forecasts
+        # to create the training dataset.
         joined_df = cast(
             pl.DataFrame,
             data.substation_scada.rename(

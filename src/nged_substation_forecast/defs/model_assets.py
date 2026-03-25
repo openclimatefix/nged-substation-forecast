@@ -77,14 +77,16 @@ def create_model_assets(model_name: str):
         log.info(f"Training model: {model_name}")
 
         # Slicing the data based on Hydra config
-        # In a real scenario, we would use the dates from hydra_cfg["data_split"]
-        # to filter the LazyFrames in kwargs.
+        train_start = hydra_cfg["data_split"]["train_start"]
+        train_end = hydra_cfg["data_split"]["train_end"]
+
         payload_dict = {}
         for key, lf in kwargs.items():
-            # Apply temporal slicing using Polars pushdown
-            # (The model is ignorant of this!)
-            # lf = lf.filter(pl.col("timestamp").is_between(...))
-            payload_dict[key] = lf
+            # Apply temporal slicing using Polars pushdown.
+            # We assume all feature assets have a time-based column.
+            # For SCADA it's 'timestamp', for NWP it's 'valid_time'.
+            time_col = "timestamp" if "scada" in key else "valid_time"
+            payload_dict[key] = lf.filter(pl.col(time_col).is_between(train_start, train_end))
 
         # Instantiate the Pydantic payload
         # This validates that all required assets were provided and have correct types.
@@ -124,16 +126,18 @@ def create_model_assets(model_name: str):
         """Generic evaluation asset that loads the model and generates forecasts."""
         log.info(f"Evaluating model: {model_name}")
 
-        # Load the model from MLflow
-        # In a real scenario, we would use the run_id from the metadata
-        # run_id = context.step_context.get_output_metadata(f"train_{model_name}")["mlflow_run_id"]
-        # pyfunc_model = mlflow.pyfunc.load_model(f"runs:/{run_id}/model")
-
-        # For this example, we'll assume 'model' is the trained artifact
-        # (though in Dagster it would usually be a path or a reference)
-
         # Prepare inference data (collect LazyFrames to DataFrames)
-        inference_payload_dict = {key: lf.collect() for key, lf in kwargs.items()}
+        # We use the test split defined in the Hydra configuration.
+        hydra_cfg = load_hydra_config(model_name)
+        test_start = hydra_cfg["data_split"]["test_start"]
+        test_end = hydra_cfg["data_split"]["test_end"]
+
+        inference_payload_dict = {}
+        for key, lf in kwargs.items():
+            time_col = "timestamp" if "scada" in key else "valid_time"
+            inference_payload_dict[key] = lf.filter(
+                pl.col(time_col).is_between(test_start, test_end)
+            ).collect()
 
         # Run inference
         # The model artifact handles the internal validation and math
@@ -148,7 +152,8 @@ def create_model_assets(model_name: str):
             power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
             power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
             power_fcst_init_year_month=pl.lit(year_month).cast(pl.String),
-            # nwp_init_time should come from the input data in a real scenario
+            # nwp_init_time is ideally derived from the input weather data,
+            # but for now we use the current time as a placeholder.
             nwp_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
         )
 

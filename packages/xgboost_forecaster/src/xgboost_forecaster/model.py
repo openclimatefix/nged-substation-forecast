@@ -48,8 +48,6 @@ class XGBoostPolarsWrapper(BasePolarsModel[XGBoostInferenceData]):
             A Polars DataFrame containing the predictions.
         """
         # 🎉 PERFECT IDE TYPE HINTING 🎉
-        # In a real scenario, we would apply the same feature engineering
-        # as used during training.
         df = data.weather_cerra
 
         # Prepare features (must match training features)
