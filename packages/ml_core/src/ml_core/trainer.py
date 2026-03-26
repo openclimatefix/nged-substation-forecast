@@ -38,7 +38,25 @@ class BaseDataRequirements(BaseModel):
         return [FeatureAsset(f) for f in cls.model_fields.keys()]
 
 
-class BaseTrainer(ABC, Generic[T_TrainReq]):
+class DataRequirementsMixin:
+    """Mixin to provide data requirement discovery for trainers and models."""
+
+    # Explicitly define the requirements class to avoid fragile __orig_bases__ inspection.
+    # This is used by the Dagster factory to determine which assets to inject.
+    requirements_class: Type[BaseDataRequirements]
+
+    @classmethod
+    def data_requirements(cls) -> list[FeatureAsset]:
+        """Auto-resolves Dagster dependencies from the requirements class."""
+        if not hasattr(cls, "requirements_class"):
+            raise TypeError(
+                f"Class {cls.__name__} must define a 'requirements_class' attribute "
+                "pointing to a BaseDataRequirements subclass."
+            )
+        return cls.requirements_class.get_required_assets()
+
+
+class BaseTrainer(ABC, DataRequirementsMixin, Generic[T_TrainReq]):
     """Abstract base class for all ML model trainers.
 
     The Trainer is a heavy script that handles `LazyFrames`, targets, and
@@ -57,20 +75,6 @@ class BaseTrainer(ABC, Generic[T_TrainReq]):
        implementation of `BaseInferenceModel` (an MLflow `PythonModel`) that
        captures everything required to run the model in production.
     """
-
-    # Explicitly define the requirements class to avoid fragile __orig_bases__ inspection.
-    # This is used by the Dagster factory to determine which assets to inject.
-    requirements_class: Type[T_TrainReq]
-
-    @classmethod
-    def data_requirements(cls) -> list[FeatureAsset]:
-        """Auto-resolves Dagster dependencies from the requirements class."""
-        if not hasattr(cls, "requirements_class"):
-            raise TypeError(
-                f"Class {cls.__name__} must define a 'requirements_class' attribute "
-                "pointing to a BaseDataRequirements subclass."
-            )
-        return cls.requirements_class.get_required_assets()
 
     @abstractmethod
     def train(self, data: T_TrainReq, config: dict) -> mlflow.pyfunc.PythonModel:

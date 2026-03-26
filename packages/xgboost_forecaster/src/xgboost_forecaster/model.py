@@ -1,12 +1,14 @@
 """XGBoost model artifact for inference."""
 
 import logging
+from datetime import datetime
 from typing import Type
 
 import mlflow
 import patito as pt
 import polars as pl
 from contracts.data_schemas import PowerForecast, ProcessedNwp
+from pydantic import BaseModel
 from xgboost import XGBRegressor
 
 from ml_core.model import BaseInferenceModel
@@ -21,7 +23,14 @@ class XGBoostInferenceData(BaseDataRequirements):
     weather_ecmwf_ens_0_25: pt.DataFrame[ProcessedNwp]
 
 
-class XGBoostInferenceModel(BaseInferenceModel[XGBoostInferenceData]):
+class XGBoostInferParams(BaseModel):
+    """Inference parameters for XGBoost."""
+
+    nwp_init_time: datetime | None = None
+    power_fcst_model_name: str | None = None
+
+
+class XGBoostInferenceModel(BaseInferenceModel[XGBoostInferenceData, XGBoostInferParams]):
     """MLflow pyfunc wrapper for XGBoost inference.
 
     This class is designed to be lightweight and serializable by MLflow.
@@ -29,7 +38,8 @@ class XGBoostInferenceModel(BaseInferenceModel[XGBoostInferenceData]):
     to the format expected by the underlying XGBoost model.
     """
 
-    inference_requirements_class: Type[XGBoostInferenceData] = XGBoostInferenceData
+    requirements_class: Type[XGBoostInferenceData] = XGBoostInferenceData
+    params_class: Type[XGBoostInferParams] = XGBoostInferParams
 
     def __init__(self, model: XGBRegressor):
         """Initialize the wrapper with a trained XGBoost model.
@@ -43,14 +53,14 @@ class XGBoostInferenceModel(BaseInferenceModel[XGBoostInferenceData]):
         self,
         data: XGBoostInferenceData,
         context: mlflow.pyfunc.PythonModelContext | None = None,
-        params: dict | None = None,
+        params: XGBoostInferParams | None = None,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
 
         Args:
             data: The validated inference data.
             context: MLflow context (unused).
-            params: Optional inference parameters (unused).
+            params: The validated inference parameters.
 
         Returns:
             A Patito DataFrame containing the predictions.
