@@ -1,11 +1,10 @@
-"""Shared MLOps utilities for training and evaluation."""
-
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import dagster as dg
 import mlflow
 import polars as pl
+from contracts.data_schemas import InferenceParams
 
 log = logging.getLogger(__name__)
 
@@ -95,25 +94,16 @@ def evaluate_and_save_model(
         sliced_data[key] = lf.filter(pl.col(time_col).is_between(test_start, test_end)).collect()
 
     # 2. Call the Model-Specific Inference
-    predictions_df = forecaster.predict(**sliced_data)
-
-    # 3. Add metadata columns for Delta Lake
-    now = datetime.now()
-    year_month = now.strftime("%Y-%m")
-
-    results_df = predictions_df.with_columns(
-        power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
-        power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
-        power_fcst_init_year_month=pl.lit(year_month).cast(pl.String),
-        # nwp_init_time is ideally derived from the input weather data,
-        # but for now we use the current time as a placeholder.
-        nwp_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
+    # Construct InferenceParams. We use the current time for nwp_init_time
+    # as a placeholder if it's not available in the data.
+    inference_params = InferenceParams(
+        nwp_init_time=datetime.now(timezone.utc),
+        power_fcst_model=model_name,
     )
 
-    # 4. Save to Delta Lake (Placeholder)
-    # results_df.write_delta(...)
+    results_df = forecaster.predict(inference_params=inference_params, **sliced_data)
 
-    # 5. Trigger Dynamic Partition
+    # 3. Trigger Dynamic Partition
     context.instance.add_dynamic_partitions("model_partitions", [model_name])
 
     context.add_output_metadata(

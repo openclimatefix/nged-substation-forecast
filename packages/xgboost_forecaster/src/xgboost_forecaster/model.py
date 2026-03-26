@@ -1,11 +1,18 @@
 """XGBoost implementation of the Forecaster interface."""
 
 import logging
+from datetime import datetime, timezone
 from typing import cast
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import PowerForecast, ProcessedNwp, SubstationFlows
+from contracts.data_schemas import (
+    InferenceParams,
+    PowerForecast,
+    ProcessedNwp,
+    SubstationFlows,
+    SubstationMetadata,
+)
 from xgboost import XGBRegressor
 
 from ml_core.features import add_cyclical_temporal_features
@@ -29,12 +36,40 @@ class XGBoostForecaster(BaseForecaster):
         """
         self.model = model
 
+    def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Apply feature engineering and extract the feature matrix.
+
+        Args:
+            df: The joined input data.
+
+        Returns:
+            A Polars DataFrame containing only the feature columns.
+        """
+        # 1. Apply shared feature engineering
+        df = add_cyclical_temporal_features(df, time_col="valid_time")
+
+        # 2. Define columns that are NOT features
+        exclude_cols = {
+            "MW",
+            "MVA",
+            "MVAr",
+            "ingested_at",
+            "valid_time",
+            "substation_number",
+            "h3_index",
+            "ensemble_member",
+        }
+
+        # 3. Return the feature matrix as a Polars DataFrame
+        feature_cols = [c for c in df.columns if c not in exclude_cols]
+        return df.select(feature_cols)
+
     def train(  # type: ignore[override]
         self,
         config: dict,
         nwp: pt.LazyFrame[ProcessedNwp],
         substation_power_flows: pt.LazyFrame[SubstationFlows],
-        substation_metadata: pl.DataFrame,
+        substation_metadata: pt.DataFrame[SubstationMetadata],
         **kwargs,
     ) -> XGBRegressor:
         """Train the XGBoost model.
@@ -66,42 +101,28 @@ class XGBoostForecaster(BaseForecaster):
             ).collect(),
         )
 
-        # Use shared feature engineering from ml_core
-        joined_df = add_cyclical_temporal_features(joined_df, time_col="valid_time")
-
         # Prepare features and target
-        X = joined_df.select(
-            pl.all().exclude(
-                [
-                    "MW",
-                    "MVA",
-                    "MVAr",
-                    "ingested_at",
-                    "valid_time",
-                    "substation_number",
-                    "h3_index",
-                    "ensemble_member",
-                ]
-            )
-        ).to_pandas()
-        y = joined_df.select("MW").to_pandas()
+        X = self._prepare_features(joined_df)
+        y = joined_df.select("MW").to_series()
 
         self.model = XGBRegressor(**config.get("hyperparameters", {}))
         self.model.fit(X, y)
 
         return self.model
 
-    def predict(
+    def predict(  # type: ignore[override]
         self,
-        nwp: pt.DataFrame[ProcessedNwp],
-        substation_metadata: pl.DataFrame,
+        substation_metadata: pt.DataFrame[SubstationMetadata],
+        inference_params: InferenceParams,
+        nwp: pt.DataFrame[ProcessedNwp] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
 
         Args:
-            nwp: The validated weather forecast data.
             substation_metadata: The substation metadata containing h3 mapping.
+            inference_params: Parameters for inference.
+            nwp: The validated weather forecast data.
             **kwargs: Additional arguments (unused).
 
         Returns:
@@ -109,6 +130,9 @@ class XGBoostForecaster(BaseForecaster):
         """
         if self.model is None:
             raise ValueError("Model must be trained before calling predict.")
+
+        if nwp is None:
+            raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
         # Expand NWP to all substations
         metadata_df = substation_metadata.select(["substation_number", "h3_res_5"])
@@ -118,19 +142,27 @@ class XGBoostForecaster(BaseForecaster):
             how="inner",
         )
 
-        # Use shared feature engineering from ml_core
-        df = add_cyclical_temporal_features(df, time_col="valid_time")
-
         # Prepare features (must match training features)
-        X = df.select(
-            pl.all().exclude(["valid_time", "substation_number", "h3_index", "ensemble_member"])
-        ).to_pandas()
+        X = self._prepare_features(df)
 
         preds = self.model.predict(X)
 
         # Return predictions with correct schema
-        return pt.DataFrame[PowerForecast](
-            df.select(["valid_time", "substation_number", "ensemble_member"]).with_columns(
-                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32)
-            )
+        now = datetime.now(timezone.utc)
+        model_name = inference_params.power_fcst_model or "xgboost_global"
+
+        res = df.select(["valid_time", "substation_number", "ensemble_member"]).with_columns(
+            MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
+            power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
+            power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
+            nwp_init_time=pl.lit(inference_params.nwp_init_time).cast(pl.Datetime("us", "UTC")),
+            power_fcst_init_year_month=pl.lit(now.strftime("%Y-%m")).cast(pl.String),
         )
+
+        # Handle potential nulls in ensemble_member (required by schema)
+        if "ensemble_member" not in res.columns:
+            res = res.with_columns(ensemble_member=pl.lit(0).cast(pl.UInt8))
+        else:
+            res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
+
+        return pt.DataFrame[PowerForecast](res)
