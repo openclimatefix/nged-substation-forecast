@@ -10,7 +10,6 @@ import polars as pl
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 
-from ml_core.assets import FeatureAsset
 
 log = logging.getLogger(__name__)
 

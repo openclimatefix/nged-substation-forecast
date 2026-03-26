@@ -3,12 +3,13 @@
 import logging
 from typing import Type
 
+import mlflow
 import patito as pt
 import polars as pl
 from contracts.data_schemas import PowerForecast, ProcessedNwp
 from xgboost import XGBRegressor
 
-from ml_core.model import ForecastInference
+from ml_core.model import BaseInferenceModel
 from ml_core.trainer import BaseDataRequirements
 
 log = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class XGBoostInferenceData(BaseDataRequirements):
     weather_ecmwf_ens_0_25: pt.DataFrame[ProcessedNwp]
 
 
-class XGBoostPolarsWrapper(ForecastInference[XGBoostInferenceData]):
+class XGBoostInferenceModel(BaseInferenceModel[XGBoostInferenceData]):
     """MLflow pyfunc wrapper for XGBoost inference.
 
     This class is designed to be lightweight and serializable by MLflow.
@@ -38,11 +39,18 @@ class XGBoostPolarsWrapper(ForecastInference[XGBoostInferenceData]):
         """
         self.model = model
 
-    def _run_inference(self, data: XGBoostInferenceData) -> pt.DataFrame[PowerForecast]:
+    def _run_inference(
+        self,
+        data: XGBoostInferenceData,
+        context: mlflow.pyfunc.PythonModelContext | None = None,
+        params: dict | None = None,
+    ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
 
         Args:
             data: The validated inference data.
+            context: MLflow context (unused).
+            params: Optional inference parameters (unused).
 
         Returns:
             A Patito DataFrame containing the predictions.

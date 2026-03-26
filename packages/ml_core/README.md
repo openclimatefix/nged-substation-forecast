@@ -4,7 +4,7 @@ Unified ML model interface and shared utilities for substation forecasting.
 
 ## Purpose
 
-This package provides the abstract base classes and shared logic required to implement the "Write-Once" ML pipeline (where we want to only have exactly one `train` asset in Dagster, and exactly one `inference` asset in Dagster, and these assets can be completely agnostic to the underlying ML model). We strictly separate the **Trainer** (heavy training logic) from the **ForecastInference** (lightweight inference artifact).
+This package provides the abstract base classes and shared logic required to implement the "Write-Once" ML pipeline (where we want to only have exactly one `train` asset in Dagster, and exactly one `inference` asset in Dagster, and these assets can be completely agnostic to the underlying ML model). We strictly separate the **Trainer** (heavy training logic) from the **BaseInferenceModel** (lightweight inference artifact).
 
 ## Why this package exists
 

@@ -9,7 +9,7 @@ from contracts.data_schemas import ProcessedNwp, SubstationFlows
 from xgboost import XGBRegressor
 
 from ml_core.trainer import BaseDataRequirements, BaseTrainer
-from xgboost_forecaster.model import XGBoostPolarsWrapper
+from xgboost_forecaster.model import XGBoostInferenceModel
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
 
     requirements_class: Type[XGBoostTrainData] = XGBoostTrainData
 
-    def train(self, data: XGBoostTrainData, config: dict) -> XGBoostPolarsWrapper:
+    def train(self, data: XGBoostTrainData, config: dict) -> XGBoostInferenceModel:
         """Train the XGBoost model.
 
         Args:
@@ -63,4 +63,4 @@ class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
         model = XGBRegressor(**config.get("hyperparameters", {}))
         model.fit(X, y)
 
-        return XGBoostPolarsWrapper(model)
+        return XGBoostInferenceModel(model)

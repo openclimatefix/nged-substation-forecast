@@ -5,6 +5,6 @@ from .data import load_nwp_run as load_nwp_run
 from .data import load_substation_power as load_substation_power
 from .data import prepare_inference_data as prepare_inference_data
 from .data import prepare_training_data as prepare_training_data
-from .model import XGBoostPolarsWrapper as XGBoostPolarsWrapper
+from .model import XGBoostInferenceModel as XGBoostInferenceModel
 from .trainer import XGBoostTrainer as XGBoostTrainer
 from .types import EnsembleSelection as EnsembleSelection
