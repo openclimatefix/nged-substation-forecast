@@ -10,6 +10,9 @@ import polars as pl
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 
+from ml_core.assets import FeatureAsset
+from .metrics_assets import create_metrics_asset
+from .plotting_assets import create_plotting_asset
 
 log = logging.getLogger(__name__)
 
@@ -56,7 +59,7 @@ def create_model_assets(model_name: str):
         model_name: The name of the model (must match a YAML in conf/model/).
 
     Returns:
-        A list of Dagster assets (train and evaluate).
+        A list of Dagster assets (train, evaluate, metrics, and plot).
     """
     # Load config to get trainer class and model name
     full_cfg = load_hydra_config(model_name)
@@ -175,7 +178,11 @@ def create_model_assets(model_name: str):
         )
         return results_df
 
-    return [train_model, evaluate_model]
+    # Create metrics and plotting assets for this model
+    metrics_asset = create_metrics_asset(model_name)
+    plotting_asset = create_plotting_asset(model_name)
+
+    return [train_model, evaluate_model, metrics_asset, plotting_asset]
 
 
 # Example of how to instantiate the assets for the baseline model

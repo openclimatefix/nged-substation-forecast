@@ -93,43 +93,55 @@ def healthy_substations(
     return healthy_ids
 
 
-@dg.asset
-def metrics_asset(
-    context: dg.AssetExecutionContext,
-    xgb_forecasts: pl.DataFrame,
-    combined_actuals: pl.DataFrame,
-    settings: ResourceParam[Settings],
-) -> pl.DataFrame:
-    """Computes MAE/RMSE per substation."""
-    if xgb_forecasts.is_empty() or combined_actuals.is_empty():
-        context.log.warning("Forecast or actuals are empty.")
-        return pl.DataFrame()
+def create_metrics_asset(model_name: str):
+    """Factory to create a metrics asset for a specific model."""
 
-    # Validate forecasts against contract
-    PowerForecast.validate(xgb_forecasts)
-
-    # Join on substation_number and time
-    comparison = xgb_forecasts.join(
-        combined_actuals,
-        left_on=["substation_number", "valid_time"],
-        right_on=["substation_number", "timestamp"],
-        suffix="_actual",
+    @dg.asset(
+        name=f"metrics_{model_name}",
+        ins={
+            "forecasts": dg.AssetIn(f"evaluate_{model_name}"),
+            "combined_actuals": dg.AssetIn("combined_actuals"),
+        },
+        compute_kind="python",
+        group_name="models",
     )
+    def metrics_asset(
+        context: dg.AssetExecutionContext,
+        forecasts: pl.DataFrame,
+        combined_actuals: pl.DataFrame,
+        settings: ResourceParam[Settings],
+    ) -> pl.DataFrame:
+        """Computes MAE/RMSE per substation."""
+        if forecasts.is_empty() or combined_actuals.is_empty():
+            context.log.warning("Forecast or actuals are empty.")
+            return pl.DataFrame()
 
-    if comparison.is_empty():
-        context.log.warning("No overlapping data between forecast and actuals.")
-        return pl.DataFrame()
+        # Validate forecasts against contract
+        PowerForecast.validate(forecasts)
 
-    # Compute metrics per substation
-    metrics = comparison.group_by("substation_number").agg(
-        mae=(pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")).abs().mean(),
-        rmse=((pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")) ** 2).mean().sqrt(),
-    )
+        # Join on substation_number and time
+        comparison = forecasts.join(
+            combined_actuals,
+            left_on=["substation_number", "valid_time"],
+            right_on=["substation_number", "timestamp"],
+            suffix="_actual",
+        )
 
-    output_path = settings.forecast_metrics_data_path
-    output_path.mkdir(parents=True, exist_ok=True)
-    metrics.write_parquet(output_path / "metrics.parquet")
+        if comparison.is_empty():
+            context.log.warning("No overlapping data between forecast and actuals.")
+            return pl.DataFrame()
 
-    context.log.info(f"Saved metrics to {output_path}")
+        # Compute metrics per substation
+        metrics = comparison.group_by("substation_number").agg(
+            mae=(pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")).abs().mean(),
+            rmse=((pl.col("MW_or_MVA") - pl.col("MW_or_MVA_actual")) ** 2).mean().sqrt(),
+        )
 
-    return metrics
+        output_path = settings.forecast_metrics_data_path / model_name
+        output_path.mkdir(parents=True, exist_ok=True)
+        metrics.write_parquet(output_path / "metrics.parquet")
+
+        context.log.info(f"Saved metrics to {output_path}")
+        return metrics
+
+    return metrics_asset
