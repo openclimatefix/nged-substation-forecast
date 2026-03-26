@@ -1,62 +1,62 @@
-# Architecture Implementation Plan: The Pythonic "Zero Magic" Pipeline
+# Architecture Implementation Plan: The "Tiny Wrapper" Pipeline
 
-This document outlines the detailed, step-by-step plan for refactoring the MLOps architecture from a highly abstracted, factory-driven approach to a clean, explicit, Pythonic architecture. This new design prioritizes readability, explicit dependencies, and native framework integrations while maintaining strict data contracts and a "Write-Once" downstream analysis pipeline.
+This document outlines the detailed plan for refactoring the MLOps architecture to use explicit, "tiny wrapper" Dagster assets that delegate to shared MLOps utilities. This design achieves a "Write-Once" downstream pipeline and eliminates boilerplate without relying on complex metaprogramming or Dagster factories.
 
 ## 🎯 Architectural Philosophy
 
-1.  **Zero Dagster Magic:** No asset factories. We write explicit `@asset def train_xgboost(...)` and `@asset def evaluate_xgboost(...)` functions. This makes the DAG instantly understandable and grep-able.
-2.  **Native MLflow:** We abandon the generic `mlflow.pyfunc` wrapper and its rigid dictionary-based signature. We use native MLflow flavors (e.g., `mlflow.xgboost.log_model`) for robust serialization.
-3.  **Pythonic Data Contracts:** We delete Pydantic data requirement wrappers. We rely on standard Python function signatures and Patito type hints (e.g., `def predict(self, weather: pt.DataFrame[ProcessedNwp])`) for perfect IDE autocomplete and runtime validation.
-4.  **Write-Once Downstream:** The `metrics` and `plot` assets remain completely model-agnostic. They are single, partitioned assets that wake up automatically when an evaluation asset finishes and adds a dynamic partition key.
+1.  **Explicit Dagster Assets:** We write explicit `@asset def train_xgboost(...)` functions. These assets are "tiny wrappers" that simply declare dependencies and pass them as `**kwargs` to a shared utility.
+2.  **Shared MLOps Utilities:** We extract universal boilerplate (temporal slicing, MLflow logging, Delta Lake saving, and dynamic partition triggering) into reusable functions in `ml_core`.
+3.  **Pure ML Logic:** The actual model training and inference logic lives in pure Python classes (`Trainer` and `Forecaster`) that are completely ignorant of Dagster and MLflow. They just accept and return Polars DataFrames.
+4.  **Native MLflow:** We use native MLflow flavors (e.g., `mlflow.xgboost.log_model`) instead of the generic `pyfunc` wrapper.
 
 ---
 
 ## 🛠️ Implementation Plan
 
-### Phase 1: Simplify `ml_core` (The Foundation)
-We will strip away the complex Pydantic and MLflow pyfunc abstractions.
-1.  **Delete `ml_core/trainer.py`**: We no longer need `BaseDataRequirements`, `DataRequirementsMixin`, or `BaseTrainer`. The Dagster asset itself will handle dependency injection.
-2.  **Refactor `ml_core/model.py`**:
-    -   Remove `BaseInferenceModel` and all MLflow/Pydantic dependencies.
-    -   Create a radically simple `BaseForecaster(ABC)` class with a single abstract method: `def predict(self, **kwargs) -> pt.DataFrame[PowerForecast]`.
-3.  **Update `ml_core/__init__.py`**: Ensure it only exports `BaseForecaster` and `FeatureAsset`.
+### Phase 1: Create Shared MLOps Utilities (`ml_core/utils.py`)
+We will create the universal functions that handle the boilerplate for all models.
+1.  **Create `ml_core/utils.py`**.
+2.  **Implement `train_and_log_model`**:
+    -   Signature: `def train_and_log_model(context, model_name: str, trainer, config: dict, flavor: str, **kwargs)`
+    -   Logic:
+        -   Extract `train_start` and `train_end` from `config["data_split"]`.
+        -   Temporally slice all `LazyFrames` in `**kwargs` (using `timestamp` or `valid_time` depending on the key name).
+        -   Call `model = trainer.train(config, **sliced_kwargs)`.
+        -   Start an MLflow run, log parameters, and save the model using the specified `flavor` (e.g., `mlflow.xgboost.log_model`).
+        -   Add the `mlflow_run_id` to the Dagster context metadata.
+        -   Return the trained model.
+3.  **Implement `evaluate_and_save_model`**:
+    -   Signature: `def evaluate_and_save_model(context, model_name: str, forecaster, config: dict, **kwargs)`
+    -   Logic:
+        -   Extract `test_start` and `test_end` from `config["data_split"]`.
+        -   Temporally slice and `.collect()` all `LazyFrames` in `**kwargs`.
+        -   Call `predictions_df = forecaster.predict(**sliced_kwargs)`.
+        -   Add metadata columns (`power_fcst_model_name`, `power_fcst_init_time`, `power_fcst_init_year_month`, `nwp_init_time`).
+        -   *(Placeholder)* Save `predictions_df` to Delta Lake.
+        -   Call `context.instance.add_dynamic_partitions("model_partitions", [model_name])`.
+        -   Return `predictions_df`.
 
-### Phase 2: Refactor XGBoost Implementation (`packages/xgboost_forecaster`)
-We will update the XGBoost code to use native MLflow and the new, simple interface.
-1.  **Delete `trainer.py`**: The training logic will move directly into the Dagster asset (or a shared utility function if we want to reuse the exact XGBoost training loop later).
+### Phase 2: Refactor XGBoost Logic (`packages/xgboost_forecaster`)
+We will strip Dagster and MLflow out of the XGBoost classes, making them pure ML logic.
+1.  **Create `trainer.py`**:
+    -   Implement `class XGBoostTrainer`.
+    -   Implement `def train(self, config: dict, weather: pl.LazyFrame, scada: pl.LazyFrame)`.
+    -   Move the joining, feature selection, and `XGBRegressor.fit()` logic here. Return the trained model.
 2.  **Refactor `model.py`**:
-    -   Rename `XGBoostInferenceModel` to `XGBoostForecaster` (inheriting from `BaseForecaster`).
-    -   Update the `predict` signature to explicitly require the data it needs: `def predict(self, weather_ecmwf_ens_0_25: pt.DataFrame[ProcessedNwp], **kwargs) -> pt.DataFrame[PowerForecast]`.
-    -   Implement the prediction logic directly on the Patito DataFrame.
+    -   Ensure `XGBoostForecaster` inherits from `BaseForecaster`.
+    -   Ensure `predict(self, weather_ecmwf_ens_0_25: pt.DataFrame[ProcessedNwp], **kwargs)` contains only the feature selection and `model.predict()` logic.
 
-### Phase 3: Explicit Dagster Assets (`src/nged_substation_forecast/defs/`)
-We will replace the "magic" factory with explicit, easy-to-read assets.
-1.  **Delete `model_assets.py`**.
-2.  **Create `xgb_assets.py`**:
-    -   Implement `@asset def train_xgboost(context, weather_ecmwf_ens_0_25, substation_power_flows)`:
-        -   Load Hydra config.
-        -   Filter data temporally.
-        -   Train the model.
-        -   Log using `mlflow.xgboost.log_model`.
-    -   Implement `@asset def evaluate_xgboost(context, train_xgboost, weather_ecmwf_ens_0_25)`:
-        -   Load model using `mlflow.xgboost.load_model`.
-        -   Wrap in `XGBoostForecaster`.
-        -   Call `.predict(weather_ecmwf_ens_0_25=...)`.
-        -   Save results to Delta Lake (`data/evaluation_results.delta`).
-        -   **Crucial Step:** Call `context.instance.add_dynamic_partitions("model_partitions", ["xgboost_baseline"])`.
+### Phase 3: Implement "Tiny Wrapper" Assets (`src/nged_substation_forecast/defs/xgb_assets.py`)
+We will rewrite the Dagster assets to be extremely thin.
+1.  **Refactor `train_xgboost`**:
+    -   Signature: `@asset(ins={"weather": dg.AssetIn("ecmwf_ens_forecast"), "scada": dg.AssetIn("combined_actuals")}) def train_xgboost(context, weather: pl.LazyFrame, scada: pl.LazyFrame)`
+    -   Logic: Load config, instantiate `XGBoostTrainer`, and `return train_and_log_model(...)`.
+2.  **Refactor `evaluate_xgboost`**:
+    -   Signature: `@asset(ins={"model": dg.AssetIn("train_xgboost"), "weather": dg.AssetIn("ecmwf_ens_forecast")}) def evaluate_xgboost(context, model, weather: pl.LazyFrame)`
+    -   Logic: Load config, instantiate `XGBoostForecaster(model)`, and `return evaluate_and_save_model(...)`.
 
-### Phase 4: The "Write-Once" Downstream Pipeline (Metrics & Plotting)
-We will configure the downstream assets to run automatically when a new partition is added.
-1.  **Define Dynamic Partitions**: In a central definitions file (e.g., `definitions.py` or a new `partitions.py`), define `model_partitions = dg.DynamicPartitionsDefinition(name="model_partitions")`.
-2.  **Refactor `metrics_assets.py`**:
-    -   Remove the `create_metrics_asset` factory.
-    -   Create a single `@asset(partitions_def=model_partitions)` named `metrics`.
-    -   Add `auto_materialize_policy=dg.AutoMaterializePolicy.eager()` so it runs automatically when `evaluate_xgboost` adds a partition key.
-    -   Update the logic to read the specific model's forecasts from the Delta Lake table using `context.partition_key`.
-3.  **Refactor `plotting_assets.py`**:
-    -   Apply the exact same partition and auto-materialize logic as the `metrics` asset.
-
-### Phase 5: Cleanup & Verification
-1.  **Remove Unused Code**: Delete `test_mixin.py` and any other remnants of the factory architecture.
-2.  **Update Documentation**: Revise `ml_core/README.md` and the root `README.md` to reflect the new "Explicit Assets + Shared Utilities" philosophy.
+### Phase 4: Cleanup & Verification
+1.  **Update `ml_core/__init__.py`**: Export the new utility functions.
+2.  **Update Documentation**: Ensure READMEs reflect the new "Tiny Wrapper" and shared utility architecture.
 3.  **Run Checks**: Execute `uv run ruff check . --fix`, `uv run ruff format .`, `uv run --all-packages ty check`, and `uv run --all-packages pytest` to ensure the new architecture is sound.
+4.  **Verify Dagster**: Run `uv run dg dev` to ensure the DAG loads correctly and the dynamic partitions are recognized.

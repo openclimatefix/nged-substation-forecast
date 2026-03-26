@@ -37,7 +37,7 @@ This partitioning strategy allows for efficient querying of specific model runs 
 
 ### Downstream Analysis
 
-The `metrics` and `plot` assets are model-agnostic and partitioned by `model_partitions`. They use an `AutoMaterializePolicy.eager()` to automatically run whenever a new model partition is added to the system (e.g., when an `evaluate_*` asset finishes).
+The `metrics` and `plot` assets are model-agnostic and partitioned by `model_partitions`. They use an `AutoMaterializePolicy.eager()` to automatically run whenever a new model partition is added to the system (e.g., when an `evaluate_*` asset finishes and calls `context.instance.add_dynamic_partitions`).
 
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
 1. `uv sync --all-packages` (The `--all-packages` flag ensures that dependencies for all workspace members, like the dashboard and notebooks, are installed into the shared virtual environment, which is necessary for IDE support and type checking).

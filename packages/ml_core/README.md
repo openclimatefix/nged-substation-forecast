@@ -4,7 +4,7 @@ Unified ML model interface and shared utilities for substation forecasting.
 
 ## Purpose
 
-This package provides the abstract base classes and shared logic required to implement the "Zero Magic" ML pipeline. It prioritizes readability, explicit dependencies, and native framework integrations.
+This package provides the abstract base classes and shared logic required to implement the "Tiny Wrapper" ML pipeline. It prioritizes readability, explicit dependencies, and native framework integrations.
 
 ## Why this package exists
 
@@ -12,8 +12,8 @@ To enable rapid experimentation with different model architectures (XGBoost, GNN
 
 ## Key Components
 
-- **`assets.py`**: The "Dagster Vocabulary" (FeatureAsset Enum).
 - **`model.py`**: Base classes for forecasters (`BaseForecaster`).
+- **`utils.py`**: Shared MLOps utilities for training (`train_and_log_model`) and evaluation (`evaluate_and_save_model`).
 - **`features.py`**: Shared feature engineering logic (e.g., cyclical time features).
 - **`data.py`**: Shared data splitting and loading logic.
 - **`scaling.py`**: Shared normalization and scaling utilities.

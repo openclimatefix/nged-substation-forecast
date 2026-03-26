@@ -41,6 +41,12 @@ def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[S
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
 
 
+@asset(deps=[ecmwf_ens_forecast])
+def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
+    """Provides a LazyFrame scanning all downloaded NWP data."""
+    return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
+
+
 @asset_check(asset=ecmwf_ens_forecast)
 def check_ecmwf_historical_bounds(
     context: AssetCheckExecutionContext, settings: ResourceParam[Settings]
