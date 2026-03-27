@@ -1,6 +1,6 @@
 import logging
 from datetime import date, datetime, timezone
-from typing import Any
+from typing import Any, Union
 
 import dagster as dg
 import mlflow
@@ -27,7 +27,7 @@ def _slice_temporal_data(data: Any, start: date | str, end: date | str, time_col
 
 
 def train_and_log_model(
-    context: dg.AssetExecutionContext,
+    context: Union[dg.AssetExecutionContext, dg.OpExecutionContext],
     model_name: str,
     trainer,
     config: TrainingConfig,
@@ -36,7 +36,7 @@ def train_and_log_model(
     """Universal utility to handle temporal slicing and MLflow logging for training.
 
     Args:
-        context: Dagster execution context.
+        context: Dagster execution context (Asset or Op).
         model_name: Name of the model (for MLflow run name).
         trainer: An object with a `train(config, **kwargs)` method.
         config: Training configuration object.
@@ -66,13 +66,14 @@ def train_and_log_model(
     with mlflow.start_run(run_name=model_name) as run:
         mlflow.log_params(config.model_dump(mode="json"))
         trainer.log_model(model_name)
-        context.add_output_metadata({"mlflow_run_id": run.info.run_id})
+        if hasattr(context, "add_output_metadata"):
+            context.add_output_metadata({"mlflow_run_id": run.info.run_id})
 
     return model
 
 
 def evaluate_and_save_model(
-    context: dg.AssetExecutionContext,
+    context: Union[dg.AssetExecutionContext, dg.OpExecutionContext],
     model_name: str,
     forecaster,
     config: TrainingConfig,
@@ -81,7 +82,7 @@ def evaluate_and_save_model(
     """Universal utility to handle temporal slicing, inference, and storage.
 
     Args:
-        context: Dagster execution context.
+        context: Dagster execution context (Asset or Op).
         model_name: Name of the model.
         forecaster: An object with a `predict(**kwargs)` method.
         config: Training configuration object.
@@ -150,13 +151,15 @@ def evaluate_and_save_model(
     results_df = forecaster.predict(inference_params=inference_params, **sliced_data)
 
     # 3. Trigger Dynamic Partition
-    context.instance.add_dynamic_partitions("model_partitions", [model_name])
+    if hasattr(context, "instance") and context.instance:
+        context.instance.add_dynamic_partitions("model_partitions", [model_name])
 
-    context.add_output_metadata(
-        {
-            "num_rows": len(results_df),
-            "power_fcst_model_name": model_name,
-        }
-    )
+    if hasattr(context, "add_output_metadata"):
+        context.add_output_metadata(
+            {
+                "num_rows": len(results_df),
+                "power_fcst_model_name": model_name,
+            }
+        )
 
     return results_df

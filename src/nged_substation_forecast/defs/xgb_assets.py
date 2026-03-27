@@ -22,7 +22,7 @@ def load_hydra_config(model_name: str) -> TrainingConfig:
 
 @dg.asset(
     ins={
-        "nwp": dg.AssetIn("all_nwp_data"),
+        "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_power_flows": dg.AssetIn("combined_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
@@ -53,7 +53,7 @@ def train_xgboost(
 @dg.asset(
     ins={
         "model": dg.AssetIn("train_xgboost"),
-        "nwp": dg.AssetIn("all_nwp_data"),
+        "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_power_flows": dg.AssetIn("combined_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },

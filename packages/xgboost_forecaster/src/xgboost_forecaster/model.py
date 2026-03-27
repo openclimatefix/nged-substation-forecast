@@ -109,6 +109,8 @@ class XGBoostForecaster(BaseForecaster):
                 "timestamp",
                 every="30m",
                 group_by="substation_number",
+                closed="right",
+                label="right",
             )
             .agg(
                 [
@@ -158,9 +160,14 @@ class XGBoostForecaster(BaseForecaster):
                 }
                 prefixed_nwp = nwp_lf.rename(rename_mapping)
 
+                # Join on ensemble_member if it exists in both dataframes
+                join_keys = ["valid_time", "h3_index"]
+                if "ensemble_member" in joined_df_lf.collect_schema().names():
+                    join_keys.append("ensemble_member")
+
                 joined_df_lf = joined_df_lf.join(
                     prefixed_nwp,
-                    on=["valid_time", "h3_index"],
+                    on=join_keys,
                     how="left",
                 )
 
@@ -232,9 +239,14 @@ class XGBoostForecaster(BaseForecaster):
             }
             prefixed_nwp = nwp_lf.rename(rename_mapping)
 
+            # Join on ensemble_member if it exists in both dataframes
+            join_keys = ["valid_time", "h3_index"]
+            if "ensemble_member" in combined_nwps_lf.collect_schema().names():
+                join_keys.append("ensemble_member")
+
             combined_nwps_lf = combined_nwps_lf.join(
                 prefixed_nwp,
-                on=["valid_time", "h3_index", "ensemble_member"],
+                on=join_keys,
                 how="left",
             )
 
@@ -253,6 +265,8 @@ class XGBoostForecaster(BaseForecaster):
                     "timestamp",
                     every="30m",
                     group_by="substation_number",
+                    closed="right",
+                    label="right",
                 )
                 .agg(
                     [

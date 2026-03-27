@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import cast
 
 import dagster as dg
 import polars as pl
@@ -8,6 +9,7 @@ from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
     AssetExecutionContext,
+    AssetIn,
     DailyPartitionsDefinition,
     ResourceParam,
     asset,
@@ -45,6 +47,58 @@ def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[S
 def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
     """Provides a LazyFrame scanning all downloaded NWP data."""
     return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
+
+
+@asset(
+    ins={
+        "all_nwp_data": AssetIn("all_nwp_data"),
+        "substation_metadata": AssetIn("substation_metadata"),
+    }
+)
+def processed_nwp_data(
+    all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
+) -> pl.LazyFrame:
+    """Process NWP data: lead-time filtering, ensemble mean, and 30m interpolation."""
+    # 1. Filter by H3 indices to reduce data size
+    h3_indices = substation_metadata["h3_res_5"].unique().to_list()
+    lf = all_nwp_data.filter(pl.col("h3_index").is_in(h3_indices))
+
+    # 2. Lead-time filtering (Fixing Leakage)
+    # Pick the most recent init_time for each valid_time.
+    # This ensures we have exactly one forecast per valid_time and ensemble_member.
+    # We sort by init_time and take the last one for each valid_time.
+    lf = lf.sort("init_time").group_by(["valid_time", "h3_index", "ensemble_member"]).last()
+
+    # 3. Ensemble Mean (Fixing Row Explosion)
+    # This reduces the data size by 50x and simplifies the join.
+    nwp_vars = [
+        col
+        for col in lf.collect_schema().names()
+        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
+    ]
+    lf = lf.group_by(["valid_time", "h3_index"]).agg([pl.col(c).mean() for c in nwp_vars])
+
+    # 4. Interpolation (Fixing Nulls)
+    # Since we've reduced the data size, we can collect and interpolate.
+    df = cast(pl.DataFrame, lf.collect())
+
+    # Upsample to 30m and interpolate for each H3 index
+    h3_groups = df.select("h3_index").unique().to_series().to_list()
+    upsampled_parts = []
+    for h3 in h3_groups:
+        group_df = df.filter(pl.col("h3_index") == h3).sort("valid_time")
+        upsampled = group_df.upsample(time_column="valid_time", every="30m")
+        # Interpolate only the weather variables
+        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
+        # Fill in the h3_index and a dummy ensemble_member
+        upsampled = upsampled.with_columns(
+            h3_index=pl.lit(h3, dtype=pl.UInt64), ensemble_member=pl.lit(0).cast(pl.UInt8)
+        )
+        upsampled_parts.append(upsampled)
+
+    processed_df = pl.concat(upsampled_parts)
+
+    return processed_df.lazy()
 
 
 @asset_check(asset=ecmwf_ens_forecast)
