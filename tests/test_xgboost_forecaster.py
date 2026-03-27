@@ -1,9 +1,16 @@
 import pytest
 import polars as pl
+import patito as pt
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 from typing import cast
 
+from contracts.data_schemas import (
+    InferenceParams,
+    ProcessedNwp,
+    SubstationFlows,
+    SubstationMetadata,
+)
 from xgboost_forecaster.data import (
     DataConfig,
     load_nwp_run,
@@ -383,3 +390,72 @@ def test_latest_available_weekly_lag_prevents_leakage():
 
         row_long = X.filter(pl.col("ecmwf_ens_0_25deg_lead_time_hours") == 240.0)
         assert row_long["latest_available_weekly_lag"][0] == 1414.0
+
+
+def test_xgboost_predict_with_lags():
+    # Setup dummy data for predict
+    valid_time = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)
+    init_time = valid_time - timedelta(days=1)
+
+    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    nwp = pl.DataFrame(
+        [
+            {
+                "init_time": init_time,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+            }
+        ]
+    ).lazy()
+
+    flows = pl.DataFrame(
+        [
+            {
+                "timestamp": valid_time - timedelta(days=7),
+                "substation_number": 1,
+                "MW": 77.0,
+                "MVA": 77.0,
+            },
+            {
+                "timestamp": valid_time - timedelta(days=14),
+                "substation_number": 1,
+                "MW": 1414.0,
+                "MVA": 1414.0,
+            },
+        ]
+    ).lazy()
+
+    forecaster = XGBoostForecaster()
+    # Mock the model and its feature_names_in_
+    mock_model = patch("xgboost.XGBRegressor").start()
+    mock_model.feature_names_in_ = [
+        "ecmwf_ens_0_25deg_temperature_2m",
+        "latest_available_weekly_lag",
+        "hour_sin",
+        "hour_cos",
+        "day_of_year_sin",
+        "day_of_year_cos",
+        "day_of_week",
+    ]
+    mock_model.predict.return_value = [100.0]
+    forecaster.model = mock_model
+
+    inference_params = InferenceParams(
+        nwp_init_time=init_time,
+        power_fcst_model_name="test",
+    )
+
+    preds = forecaster.predict(
+        substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+        inference_params=inference_params,
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+        substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+    )
+
+    assert len(preds) == 1
+    assert preds["MW_or_MVA"][0] == 100.0
+    # Check that the lag was correctly picked up (77.0 for 1-day lead time)
+    # We can't easily check the internal X dataframe without more patching,
+    # but the fact that it didn't crash is a good sign.

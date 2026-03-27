@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, cast
 
 import patito as pt
 import polars as pl
@@ -46,6 +46,7 @@ class BaseForecaster(ABC):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts.
@@ -53,7 +54,8 @@ class BaseForecaster(ABC):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            **kwargs: Model-specific data inputs (e.g., nwps, substation_power_flows).
+            substation_power_flows: The historical power flow data (for lags).
+            **kwargs: Model-specific data inputs (e.g., nwps).
                 These should generally be passed as LazyFrames where possible.
 
         Returns:
@@ -132,7 +134,7 @@ class LocalForecasters(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        substation_power_flows: pt.LazyFrame[SubstationFlows] | None = None,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts by routing to local models.
@@ -140,7 +142,7 @@ class LocalForecasters(BaseForecaster):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            substation_power_flows: The historical power flow data (optional, for lags).
+            substation_power_flows: The historical power flow data (for lags).
             **kwargs: Additional arguments passed to the underlying predict methods (e.g., nwps).
 
         Returns:
@@ -156,10 +158,11 @@ class LocalForecasters(BaseForecaster):
 
             sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
 
-            # Filter optional inputs if they exist
-            sub_flows = None
-            if substation_power_flows is not None:
-                sub_flows = substation_power_flows.filter(pl.col("substation_number") == sub_num)
+            # Filter inputs
+            sub_flows = cast(
+                pt.LazyFrame[SubstationFlows],
+                substation_power_flows.filter(pl.col("substation_number") == sub_num),
+            )
 
             preds = self.models[sub_num].predict(
                 substation_metadata=sub_meta,

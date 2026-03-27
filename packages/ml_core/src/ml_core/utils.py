@@ -1,6 +1,6 @@
 import logging
 from datetime import date, datetime, timezone
-from typing import Any, Union
+from typing import Any, Union, cast
 
 import dagster as dg
 import mlflow
@@ -98,7 +98,7 @@ def evaluate_and_save_model(
     sliced_data = {}
     for key, val in kwargs.items():
         if key == "substation_metadata":
-            sliced_data[key] = val.collect() if isinstance(val, pl.LazyFrame) else val
+            sliced_data[key] = val
             continue
 
         time_col = "timestamp" if "power_flows" in key else "valid_time"
@@ -110,37 +110,29 @@ def evaluate_and_save_model(
         if "power_flows" in key:
             slice_start = test_start - timedelta(days=14)
 
-        sliced = _slice_temporal_data(val, slice_start, test_end, time_col)
-
-        # Collect LazyFrames into DataFrames for inference
-        if isinstance(sliced, dict):
-            sliced_data[key] = {
-                k: (v.collect() if isinstance(v, pl.LazyFrame) else v) for k, v in sliced.items()
-            }
-        else:
-            sliced_data[key] = sliced.collect() if isinstance(sliced, pl.LazyFrame) else sliced
+        sliced_data[key] = _slice_temporal_data(val, slice_start, test_end, time_col)
 
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data
     nwp_init_time = datetime.now(timezone.utc)
-    if "nwps" in kwargs:
+    if "nwps" in sliced_data:
         # Assuming nwps is a dictionary or list of LazyFrames
-        nwps_data = kwargs["nwps"]
+        nwps_data = sliced_data["nwps"]
         if isinstance(nwps_data, dict) and nwps_data:
             first_nwp = next(iter(nwps_data.values()))
             if isinstance(first_nwp, pl.LazyFrame):
-                df = first_nwp.select(pl.col("init_time").max()).collect()
-                if isinstance(df, pl.DataFrame):
+                df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
+                if not df.is_empty():
                     nwp_init_time = df.item()
         elif isinstance(nwps_data, list) and nwps_data:
             first_nwp = nwps_data[0]
             if isinstance(first_nwp, pl.LazyFrame):
-                df = first_nwp.select(pl.col("init_time").max()).collect()
-                if isinstance(df, pl.DataFrame):
+                df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
+                if not df.is_empty():
                     nwp_init_time = df.item()
         elif isinstance(nwps_data, pl.LazyFrame):
-            df = nwps_data.select(pl.col("init_time").max()).collect()
-            if isinstance(df, pl.DataFrame):
+            df = cast(pl.DataFrame, nwps_data.select(pl.col("init_time").max()).collect())
+            if not df.is_empty():
                 nwp_init_time = df.item()
 
     inference_params = InferenceParams(

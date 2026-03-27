@@ -192,49 +192,49 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     )
 
     # 3. Interpolation (Fixing Nulls)
-    # Since we've reduced the data size, we can collect and interpolate.
-    df = cast(pl.DataFrame, lf.collect())
+    # To avoid OOM, we process each init_time separately.
+    init_times = cast(pl.DataFrame, lf.select("init_time").unique().collect()).to_series().to_list()
+    log.info(f"Processing {len(init_times)} NWP runs...")
 
-    # Variables to interpolate (all numeric ones except metadata)
-    nwp_vars = [
-        col
-        for col in df.columns
-        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
-    ]
+    processed_parts = []
+    for init in init_times:
+        # Collect only this run
+        df = cast(pl.DataFrame, lf.filter(pl.col("init_time") == init).collect())
 
-    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
-    # We group by all three to ensure we interpolate within a single forecast trajectory.
-    groups = df.select(["h3_index", "ensemble_member", "init_time"]).unique()
-    upsampled_parts = []
-    for group in groups.iter_rows(named=True):
-        h3 = group["h3_index"]
-        ens = group["ensemble_member"]
-        init = group["init_time"]
-        group_df = df.filter(
-            (pl.col("h3_index") == h3)
-            & (pl.col("ensemble_member") == ens)
-            & (pl.col("init_time") == init)
-        ).sort("valid_time")
-        upsampled = group_df.upsample(time_column="valid_time", every="30m")
-        # Interpolate only the weather variables
-        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-        # Fill in the metadata columns
-        upsampled = upsampled.with_columns(
-            h3_index=pl.lit(h3, dtype=pl.UInt64),
-            ensemble_member=pl.lit(ens, dtype=pl.UInt8),
-            init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
-        )
-        # Recalculate lead_time_hours for the new 30m timestamps
-        upsampled = upsampled.with_columns(
-            lead_time_hours=(
-                (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
-            ).cast(pl.Float32)
-        )
-        upsampled_parts.append(upsampled)
+        # Variables to interpolate (all numeric ones except metadata)
+        nwp_vars = [
+            col
+            for col in df.columns
+            if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
+        ]
 
-    if not upsampled_parts:
-        return pl.DataFrame(schema=df.schema).lazy()
+        # Upsample to 30m and interpolate for each H3 index and ensemble member
+        groups = df.select(["h3_index", "ensemble_member"]).unique()
+        for group in groups.iter_rows(named=True):
+            h3 = group["h3_index"]
+            ens = group["ensemble_member"]
+            group_df = df.filter(
+                (pl.col("h3_index") == h3) & (pl.col("ensemble_member") == ens)
+            ).sort("valid_time")
+            upsampled = group_df.upsample(time_column="valid_time", every="30m")
+            # Interpolate only the weather variables
+            upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
+            # Fill in the metadata columns
+            upsampled = upsampled.with_columns(
+                h3_index=pl.lit(h3, dtype=pl.UInt64),
+                ensemble_member=pl.lit(ens, dtype=pl.UInt8),
+                init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
+            )
+            # Recalculate lead_time_hours for the new 30m timestamps
+            upsampled = upsampled.with_columns(
+                lead_time_hours=(
+                    (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
+                ).cast(pl.Float32)
+            )
+            processed_parts.append(upsampled)
 
-    processed_df = pl.concat(upsampled_parts)
+    if not processed_parts:
+        # Return empty LazyFrame with correct schema
+        return lf.limit(0)
 
-    return processed_df.lazy()
+    return pl.concat(processed_parts).lazy()

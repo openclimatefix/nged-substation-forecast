@@ -196,8 +196,8 @@ class XGBoostForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
         nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
-        substation_power_flows: pt.LazyFrame[SubstationFlows] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -205,6 +205,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             substation_metadata: The substation metadata containing h3 mapping.
             inference_params: Parameters for inference.
+            substation_power_flows: The historical power flow data (for lags).
             nwps: A dictionary of weather forecast lazyframes.
             **kwargs: Additional arguments (unused).
 
@@ -214,26 +215,13 @@ class XGBoostForecaster(BaseForecaster):
         if self.model is None:
             raise ValueError("Model must be trained before calling predict.")
 
-        # We need to know which NWPs are required from the model config.
-        # However, XGBoostForecaster doesn't store the config.
-        # For now, we assume if nwps is provided, we use it.
-        # In a more robust implementation, we might store the feature names.
-
         # Expand metadata to all substations
         metadata_df = substation_metadata.select(["substation_number", "h3_res_5"])
-
-        # We'll start with the metadata and join NWPs to it.
-        # This is slightly different from train because we don't have power flows.
-        # We need a base dataframe with valid_time.
-        # We'll take the first NWP as the base for valid_time and ensemble_member.
 
         if not nwps:
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
-        first_nwp_name = next(iter(nwps))
-
         # Filter NWPs to the specific init_time requested for inference
-        # If multiple init_times are present, we take the most recent one at or before target_init_time
         target_init_time = inference_params.nwp_init_time
         filtered_nwps = {}
         for name, lf in nwps.items():
@@ -245,13 +233,20 @@ class XGBoostForecaster(BaseForecaster):
                 .last()
             )
 
-        # FIX: Create a base dataframe with just the keys
-        combined_nwps_lf = filtered_nwps[first_nwp_name].select(
-            ["valid_time", "h3_index", "ensemble_member", "init_time"]
-        )
+        # 1. Initialize combined NWP LazyFrame with the first NWP
+        nwps_iter = iter(filtered_nwps.items())
+        first_nwp_name, first_nwp_lf = next(nwps_iter)
 
-        # FIX: Loop through ALL nwps to apply prefixes consistently
-        for nwp_name, nwp_lf in filtered_nwps.items():
+        prefix = f"{first_nwp_name.value}_"
+        rename_mapping = {
+            col: f"{prefix}{col}"
+            for col in first_nwp_lf.collect_schema().names()
+            if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+        }
+        combined_nwps_lf = first_nwp_lf.rename(rename_mapping)
+
+        # Loop through REMAINING nwps to apply prefixes consistently
+        for nwp_name, nwp_lf in nwps_iter:
             prefix = f"{nwp_name.value}_"
             rename_mapping = {
                 col: f"{prefix}{col}"
@@ -281,26 +276,25 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # 3. Apply the same lag generation logic to substation_power_flows
-        if substation_power_flows is not None:
-            flows_30m = downsample_power_flows(substation_power_flows)
+        flows_30m = downsample_power_flows(substation_power_flows)
 
-            # FIX: Generate lags by shifting timestamps forward
-            lag_7d = flows_30m.select(
-                pl.col("substation_number"),
-                (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
-                pl.col("MW_or_MVA").alias("power_lag_7d"),
-            )
+        # Generate lags by shifting timestamps forward
+        lag_7d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_7d"),
+        )
 
-            lag_14d = flows_30m.select(
-                pl.col("substation_number"),
-                (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
-                pl.col("MW_or_MVA").alias("power_lag_14d"),
-            )
+        lag_14d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_14d"),
+        )
 
-            # 4. Join power flows into the feature matrix
-            df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
-                lag_14d, on=["substation_number", "valid_time"], how="left"
-            )
+        # 4. Join power flows into the feature matrix
+        df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
+            lag_14d, on=["substation_number", "valid_time"], how="left"
+        )
 
         # 5. Create dynamic seasonal lag (same logic as train)
         seven_days_h = timedelta(days=7).total_seconds() / 3600
@@ -323,7 +317,9 @@ class XGBoostForecaster(BaseForecaster):
         X = self._prepare_features(df)
 
         # Enforce exact column order from training
-        if hasattr(self, "feature_names") and self.feature_names:
+        if hasattr(self.model, "feature_names_in_"):
+            X = X.select(self.model.feature_names_in_)
+        elif hasattr(self, "feature_names") and self.feature_names:
             X = X.select(self.feature_names)
 
         preds = self.model.predict(X.to_arrow())

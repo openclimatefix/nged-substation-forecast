@@ -77,7 +77,7 @@ def evaluate_xgboost(
 
     # Note: We must inject config into the forecaster so it can build features
     forecaster = XGBoostForecaster(model)
-    forecaster.config = config
+    forecaster.config = config.model
 
     return evaluate_and_save_model(
         context=context,

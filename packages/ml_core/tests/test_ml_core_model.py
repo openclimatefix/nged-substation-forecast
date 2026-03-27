@@ -24,6 +24,7 @@ class MockForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
