@@ -10,12 +10,10 @@ import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     Nwp,
-    ProcessedNwp,
     SubstationMetadata,
 )
 from contracts.settings import Settings
 
-from xgboost_forecaster.types import EnsembleSelection
 
 log = logging.getLogger(__name__)
 
@@ -128,82 +126,105 @@ def construct_historical_weather(
     return Nwp.validate(combined)
 
 
-def process_weather_data(
-    weather: pt.DataFrame[Nwp], selection: EnsembleSelection, config: DataConfig | None = None
-) -> pt.DataFrame[ProcessedNwp]:
-    """Process raw NWP data: ensemble selection, grouping, and interpolation.
+def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
+    """Downsample power flows to 30m using period-ending semantics.
 
     Args:
-        weather: Raw NWP data.
-        selection: Ensemble selection method.
-        config: Data configuration.
+        flows: Historical power flow data.
 
     Returns:
-        A Patito DataFrame containing the processed weather data.
+        Downsampled power flows.
     """
-    config = config or DataConfig()
-
-    # Filter out lead time 0 (where valid_time == init_time)
-    # because accumulated variables are null at lead time 0.
-    weather = weather.filter(pl.col("valid_time") > pl.col("init_time"))
-
-    # Calculate target timestamp: use valid_time
-    weather = weather.with_columns(valid_time=pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
-
-    # Variables to keep (all numeric ones except metadata)
-    nwp_vars = [
-        col
-        for col in weather.columns
-        if weather[col].dtype in [pl.Float32, pl.Float64, pl.UInt8]
-        and col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
-    ]
-
-    group_cols = ["h3_index", "valid_time", "init_time"]
-    if selection == EnsembleSelection.ALL:
-        group_cols.append("ensemble_member")
-
-    # Ensemble selection
-    if selection == EnsembleSelection.SINGLE:
-        weather_df = weather.filter(pl.col("ensemble_member") == 0)
-    elif selection == EnsembleSelection.MEAN:
-        weather_df = weather.group_by(group_cols).agg([pl.col(c).mean() for c in nwp_vars])
-    else:
-        weather_df = cast(pl.DataFrame, weather)
-
-    # Resample and Interpolate to match target resolution
-    group_cols_only_idx = ["h3_index", "init_time"]
-    if selection == EnsembleSelection.ALL:
-        group_cols_only_idx.append("ensemble_member")
-
-    groups = weather_df.select(group_cols_only_idx).unique()
-
-    upsampled_parts = []
-    for group in groups.iter_rows(named=True):
-        group_df = weather_df.filter([pl.col(k) == v for k, v in group.items()]).sort("valid_time")
-        upsampled = group_df.upsample(time_column="valid_time", every=config.resolution)
-        # Interpolate only the weather variables
-        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-        # Fill in the group columns
-        upsampled = upsampled.with_columns(
-            [pl.lit(v, dtype=weather_df.schema[k]).alias(k) for k, v in group.items()]
+    return (
+        flows.sort("timestamp")
+        .group_by_dynamic(
+            "timestamp",
+            every="30m",
+            group_by="substation_number",
+            closed="right",
+            label="right",
         )
-        upsampled_parts.append(upsampled)
+        .agg(
+            [
+                pl.col("MW").mean(),
+                pl.col("MVA").mean(),
+            ]
+        )
+        .with_columns(
+            pl.when(pl.col("MW").is_not_null())
+            .then(pl.col("MW"))
+            .otherwise(pl.col("MVA"))
+            .alias("MW_or_MVA")
+        )
+    )
 
-    weather_df = pl.concat(upsampled_parts)
 
-    # Ensure Float32 for memory efficiency and contract compliance
-    # But keep h3_index as UInt64 and ensemble_member as UInt8 if present
-    cast_exprs = [pl.col(c).cast(pl.Float32) for c in nwp_vars] + [
-        pl.col("h3_index").cast(pl.UInt64)
-    ]
-    if "ensemble_member" in weather_df.columns:
-        cast_exprs.append(pl.col("ensemble_member").cast(pl.UInt8))
+def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
+    """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
-    weather_df = weather_df.with_columns(cast_exprs)
-    weather_df = weather_df.with_columns(
+    Args:
+        nwp: Raw NWP data.
+        h3_indices: List of H3 indices to filter for.
+
+    Returns:
+        Processed NWP data.
+    """
+    # 1. Filter by H3 indices to reduce data size
+    lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
+
+    # 2. Calculate Lead Time and Filter (Fixing Leakage)
+    # We strictly exclude lead_time == 0 because accumulated variables are null there.
+    # This also prevents the model from learning from "perfect" 0-hour forecasts.
+    lf = lf.with_columns(
         lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
         .dt.total_hours()
         .cast(pl.Float32)
-    )
+    ).filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
 
-    return ProcessedNwp.validate(weather_df, drop_superfluous_columns=True)
+    # 3. Interpolation (Fixing Nulls)
+    # Since we've reduced the data size, we can collect and interpolate.
+    df = cast(pl.DataFrame, lf.collect())
+
+    # Variables to interpolate (all numeric ones except metadata)
+    nwp_vars = [
+        col
+        for col in df.columns
+        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
+    ]
+
+    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
+    # We group by all three to ensure we interpolate within a single forecast trajectory.
+    groups = df.select(["h3_index", "ensemble_member", "init_time"]).unique()
+    upsampled_parts = []
+    for group in groups.iter_rows(named=True):
+        h3 = group["h3_index"]
+        ens = group["ensemble_member"]
+        init = group["init_time"]
+        group_df = df.filter(
+            (pl.col("h3_index") == h3)
+            & (pl.col("ensemble_member") == ens)
+            & (pl.col("init_time") == init)
+        ).sort("valid_time")
+        upsampled = group_df.upsample(time_column="valid_time", every="30m")
+        # Interpolate only the weather variables
+        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
+        # Fill in the metadata columns
+        upsampled = upsampled.with_columns(
+            h3_index=pl.lit(h3, dtype=pl.UInt64),
+            ensemble_member=pl.lit(ens, dtype=pl.UInt8),
+            init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
+        )
+        # Recalculate lead_time_hours for the new 30m timestamps
+        upsampled = upsampled.with_columns(
+            lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
+            .dt.total_hours()
+            .cast(pl.Float32)
+        )
+        upsampled_parts.append(upsampled)
+
+    if not upsampled_parts:
+        return pl.DataFrame(schema=df.schema).lazy()
+
+    processed_df = pl.concat(upsampled_parts)
+
+    return processed_df.lazy()

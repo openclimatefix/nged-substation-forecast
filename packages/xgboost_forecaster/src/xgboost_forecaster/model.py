@@ -20,6 +20,7 @@ import mlflow
 
 from ml_core.features import add_cyclical_temporal_features
 from ml_core.model import BaseForecaster
+from xgboost_forecaster.data import downsample_power_flows
 
 log = logging.getLogger(__name__)
 
@@ -111,28 +112,7 @@ class XGBoostForecaster(BaseForecaster):
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
 
         # 1. Downsample power flows to 30m and calculate target fallback
-        flows_30m = (
-            substation_power_flows.sort("timestamp")
-            .group_by_dynamic(
-                "timestamp",
-                every="30m",
-                group_by="substation_number",
-                closed="right",
-                label="right",
-            )
-            .agg(
-                [
-                    pl.col("MW").mean(),
-                    pl.col("MVA").mean(),
-                ]
-            )
-            .with_columns(
-                pl.when(pl.col("MW").is_not_null())
-                .then(pl.col("MW"))
-                .otherwise(pl.col("MVA"))
-                .alias("MW_or_MVA")
-            )
-        )
+        flows_30m = downsample_power_flows(substation_power_flows)
 
         # 2. Generate lags by shifting timestamps forward
         lag_7d = flows_30m.select(
@@ -279,28 +259,7 @@ class XGBoostForecaster(BaseForecaster):
 
         # 3. Apply the same lag generation logic to substation_power_flows
         if substation_power_flows is not None:
-            flows_30m = (
-                substation_power_flows.sort("timestamp")
-                .group_by_dynamic(
-                    "timestamp",
-                    every="30m",
-                    group_by="substation_number",
-                    closed="right",
-                    label="right",
-                )
-                .agg(
-                    [
-                        pl.col("MW").mean(),
-                        pl.col("MVA").mean(),
-                    ]
-                )
-                .with_columns(
-                    pl.when(pl.col("MW").is_not_null())
-                    .then(pl.col("MW"))
-                    .otherwise(pl.col("MVA"))
-                    .alias("MW_or_MVA")
-                )
-            )
+            flows_30m = downsample_power_flows(substation_power_flows)
 
             # FIX: Generate lags by shifting timestamps forward
             lag_7d = flows_30m.select(

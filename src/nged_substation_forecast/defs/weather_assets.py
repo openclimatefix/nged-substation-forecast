@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import cast
 
 import dagster as dg
 import polars as pl
@@ -17,6 +16,7 @@ from dagster import (
     define_asset_job,
 )
 from dynamical_data.processing import download_and_scale_ecmwf
+from xgboost_forecaster.data import process_nwp_data
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
@@ -59,63 +59,8 @@ def processed_nwp_data(
     all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members."""
-    # 1. Filter by H3 indices to reduce data size
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
-    lf = all_nwp_data.filter(pl.col("h3_index").is_in(h3_indices))
-
-    # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # We strictly exclude lead_time == 0 because accumulated variables are null there.
-    # This also prevents the model from learning from "perfect" 0-hour forecasts.
-    lf = lf.with_columns(
-        lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
-        .dt.total_hours()
-        .cast(pl.Float32)
-    ).filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
-
-    # 3. Interpolation (Fixing Nulls)
-    # Since we've reduced the data size, we can collect and interpolate.
-    df = cast(pl.DataFrame, lf.collect())
-
-    # Variables to interpolate (all numeric ones except metadata)
-    nwp_vars = [
-        col
-        for col in df.columns
-        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
-    ]
-
-    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
-    # We group by all three to ensure we interpolate within a single forecast trajectory.
-    groups = df.select(["h3_index", "ensemble_member", "init_time"]).unique()
-    upsampled_parts = []
-    for group in groups.iter_rows(named=True):
-        h3 = group["h3_index"]
-        ens = group["ensemble_member"]
-        init = group["init_time"]
-        group_df = df.filter(
-            (pl.col("h3_index") == h3)
-            & (pl.col("ensemble_member") == ens)
-            & (pl.col("init_time") == init)
-        ).sort("valid_time")
-        upsampled = group_df.upsample(time_column="valid_time", every="30m")
-        # Interpolate only the weather variables
-        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-        # Fill in the metadata columns
-        upsampled = upsampled.with_columns(
-            h3_index=pl.lit(h3, dtype=pl.UInt64),
-            ensemble_member=pl.lit(ens, dtype=pl.UInt8),
-            init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
-        )
-        # Recalculate lead_time_hours for the new 30m timestamps
-        upsampled = upsampled.with_columns(
-            lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
-            .dt.total_hours()
-            .cast(pl.Float32)
-        )
-        upsampled_parts.append(upsampled)
-
-    processed_df = pl.concat(upsampled_parts)
-
-    return processed_df.lazy()
+    return process_nwp_data(all_nwp_data, h3_indices)
 
 
 @asset_check(asset=ecmwf_ens_forecast)
