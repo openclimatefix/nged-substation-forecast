@@ -2,11 +2,12 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import patito as pt
 import polars as pl
 from pydantic import BaseModel
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pandas as pd

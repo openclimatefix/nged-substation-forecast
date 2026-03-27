@@ -5,6 +5,7 @@ import dagster as dg
 import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
+from contracts.hydra_schemas import TrainingConfig
 
 log = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ def train_and_log_model(
     context: dg.AssetExecutionContext,
     model_name: str,
     trainer,
-    config: dict,
+    config: TrainingConfig,
     flavor: str,
     **kwargs,
 ):
@@ -23,7 +24,7 @@ def train_and_log_model(
         context: Dagster execution context.
         model_name: Name of the model (for MLflow run name).
         trainer: An object with a `train(config, **kwargs)` method.
-        config: Hydra configuration dictionary.
+        config: Training configuration object.
         flavor: MLflow flavor to use for logging (e.g., 'xgboost', 'pytorch').
         **kwargs: Input LazyFrames to be temporally sliced.
 
@@ -31,8 +32,8 @@ def train_and_log_model(
         The trained model object.
     """
     # 1. Universal Temporal Slicing
-    train_start = config["data_split"]["train_start"]
-    train_end = config["data_split"]["train_end"]
+    train_start = config.data_split.train_start
+    train_end = config.data_split.train_end
 
     sliced_data = {}
     for key, lf in kwargs.items():
@@ -46,11 +47,11 @@ def train_and_log_model(
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
-    model = trainer.train(config["model"], **sliced_data)
+    model = trainer.train(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
     with mlflow.start_run(run_name=model_name) as run:
-        mlflow.log_params(config)
+        mlflow.log_params(config.model_dump())
 
         if flavor == "xgboost":
             mlflow.xgboost.log_model(model, artifact_path="model")
@@ -66,7 +67,7 @@ def evaluate_and_save_model(
     context: dg.AssetExecutionContext,
     model_name: str,
     forecaster,
-    config: dict,
+    config: TrainingConfig,
     **kwargs,
 ):
     """Universal utility to handle temporal slicing, inference, and storage.
@@ -75,15 +76,15 @@ def evaluate_and_save_model(
         context: Dagster execution context.
         model_name: Name of the model.
         forecaster: An object with a `predict(**kwargs)` method.
-        config: Hydra configuration dictionary.
+        config: Training configuration object.
         **kwargs: Input LazyFrames to be temporally sliced and collected.
 
     Returns:
         A Polars DataFrame containing the predictions.
     """
     # 1. Universal Temporal Slicing for Test Set
-    test_start = config["data_split"]["test_start"]
-    test_end = config["data_split"]["test_end"]
+    test_start = config.data_split.test_start
+    test_end = config.data_split.test_end
 
     sliced_data = {}
     for key, lf in kwargs.items():

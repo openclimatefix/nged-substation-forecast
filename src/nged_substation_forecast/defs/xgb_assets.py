@@ -1,18 +1,23 @@
 import dagster as dg
 import polars as pl
+from typing import cast
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from omegaconf import OmegaConf
 
+from contracts.hydra_schemas import TrainingConfig
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
+
 from xgboost_forecaster.model import XGBoostForecaster
 
 
-def load_hydra_config(model_name: str) -> dict:
+def load_hydra_config(model_name: str) -> TrainingConfig:
     """Load the Hydra configuration for a specific model."""
     if not GlobalHydra.instance().is_initialized():
         initialize(version_base=None, config_path="../../../conf")
     cfg = compose(config_name="config", overrides=[f"model={model_name}"])
-    return dict(cfg)
+    cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
+    return TrainingConfig(**cfg_dict)
 
 
 @dg.asset(

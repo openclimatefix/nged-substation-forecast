@@ -13,6 +13,7 @@ from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
 )
+from contracts.hydra_schemas import ModelConfig
 from xgboost import XGBRegressor
 
 from ml_core.features import add_cyclical_temporal_features
@@ -64,9 +65,9 @@ class XGBoostForecaster(BaseForecaster):
         feature_cols = [c for c in df.columns if c not in exclude_cols]
         return df.select(feature_cols)
 
-    def train(  # type: ignore[override]
+    def train(  # type: ignore
         self,
-        config: dict,
+        config: ModelConfig,
         nwp: pt.LazyFrame[ProcessedNwp],
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
@@ -75,7 +76,7 @@ class XGBoostForecaster(BaseForecaster):
         """Train the XGBoost model.
 
         Args:
-            config: The model-specific Hydra configuration.
+            config: The model configuration object.
             nwp: The weather forecast data.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata containing h3 mapping.
@@ -105,7 +106,7 @@ class XGBoostForecaster(BaseForecaster):
         X = self._prepare_features(joined_df)
         y = joined_df.select("MW").to_series()
 
-        self.model = XGBRegressor(**config.get("hyperparameters", {}))
+        self.model = XGBRegressor(**config.hyperparameters.model_dump())
         self.model.fit(X, y)
 
         return self.model

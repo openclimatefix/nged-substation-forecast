@@ -13,6 +13,7 @@ from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
 )
+from contracts.hydra_schemas import ModelConfig
 
 log = logging.getLogger(__name__)
 
@@ -29,11 +30,11 @@ class BaseForecaster(ABC):
     """
 
     @abstractmethod
-    def train(self, *args, **kwargs) -> Any:
+    def train(self, config: ModelConfig, **kwargs) -> Any:
         """Train the model.
 
         Args:
-            config: Model-specific configuration.
+            config: Model configuration object.
             **kwargs: Model-specific data inputs (e.g., weather, power flows).
 
         Returns:
@@ -79,9 +80,9 @@ class LocalForecasters(BaseForecaster):
         self.forecaster_kwargs = forecaster_kwargs
         self.models: dict[int, BaseForecaster] = {}
 
-    def train(
+    def train(  # type: ignore
         self,
-        config: dict,
+        config: ModelConfig,
         nwp: pt.LazyFrame[ProcessedNwp],
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
@@ -90,7 +91,7 @@ class LocalForecasters(BaseForecaster):
         """Train a separate model for each substation.
 
         Args:
-            config: Model-specific configuration.
+            config: Model configuration object.
             nwp: The weather forecast data.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata.
