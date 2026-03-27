@@ -175,11 +175,13 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
     # We strictly exclude lead_time == 0 because accumulated variables are null there.
     # This also prevents the model from learning from "perfect" 0-hour forecasts.
-    lf = lf.with_columns(
-        lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
-        .dt.total_hours()
-        .cast(pl.Float32)
-    ).filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
+    lf = (
+        lf.with_columns(
+            lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
+        )
+        .with_columns(pl.col("lead_time_hours").cast(pl.Float32))
+        .filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
+    )
 
     # 3. Interpolation (Fixing Nulls)
     # Since we've reduced the data size, we can collect and interpolate.
@@ -216,9 +218,9 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         )
         # Recalculate lead_time_hours for the new 30m timestamps
         upsampled = upsampled.with_columns(
-            lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
-            .dt.total_hours()
-            .cast(pl.Float32)
+            lead_time_hours=(
+                (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
+            ).cast(pl.Float32)
         )
         upsampled_parts.append(upsampled)
 
