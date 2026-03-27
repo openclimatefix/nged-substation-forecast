@@ -58,7 +58,7 @@ def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
 def processed_nwp_data(
     all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
 ) -> pl.LazyFrame:
-    """Process NWP data: lead-time filtering, ensemble mean, and 30m interpolation."""
+    """Process NWP data: lead-time filtering and 30m interpolation for all members."""
     # 1. Filter by H3 indices to reduce data size
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
     lf = all_nwp_data.filter(pl.col("h3_index").is_in(h3_indices))
@@ -69,30 +69,33 @@ def processed_nwp_data(
     # We sort by init_time and take the last one for each valid_time.
     lf = lf.sort("init_time").group_by(["valid_time", "h3_index", "ensemble_member"]).last()
 
-    # 3. Ensemble Mean (Fixing Row Explosion)
-    # This reduces the data size by 50x and simplifies the join.
-    nwp_vars = [
-        col
-        for col in lf.collect_schema().names()
-        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
-    ]
-    lf = lf.group_by(["valid_time", "h3_index"]).agg([pl.col(c).mean() for c in nwp_vars])
-
-    # 4. Interpolation (Fixing Nulls)
+    # 3. Interpolation (Fixing Nulls)
     # Since we've reduced the data size, we can collect and interpolate.
     df = cast(pl.DataFrame, lf.collect())
 
-    # Upsample to 30m and interpolate for each H3 index
-    h3_groups = df.select("h3_index").unique().to_series().to_list()
+    # Variables to interpolate (all numeric ones except metadata)
+    nwp_vars = [
+        col
+        for col in df.columns
+        if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
+    ]
+
+    # Upsample to 30m and interpolate for each H3 index and ensemble member
+    # We group by both to avoid interpolating across different members.
+    groups = df.select(["h3_index", "ensemble_member"]).unique()
     upsampled_parts = []
-    for h3 in h3_groups:
-        group_df = df.filter(pl.col("h3_index") == h3).sort("valid_time")
+    for group in groups.iter_rows(named=True):
+        h3 = group["h3_index"]
+        ens = group["ensemble_member"]
+        group_df = df.filter((pl.col("h3_index") == h3) & (pl.col("ensemble_member") == ens)).sort(
+            "valid_time"
+        )
         upsampled = group_df.upsample(time_column="valid_time", every="30m")
         # Interpolate only the weather variables
         upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-        # Fill in the h3_index and a dummy ensemble_member
+        # Fill in the h3_index and ensemble_member
         upsampled = upsampled.with_columns(
-            h3_index=pl.lit(h3, dtype=pl.UInt64), ensemble_member=pl.lit(0).cast(pl.UInt8)
+            h3_index=pl.lit(h3, dtype=pl.UInt64), ensemble_member=pl.lit(ens, dtype=pl.UInt8)
         )
         upsampled_parts.append(upsampled)
 

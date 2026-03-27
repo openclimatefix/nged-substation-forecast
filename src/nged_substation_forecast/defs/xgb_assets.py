@@ -39,12 +39,16 @@ def train_xgboost(
     model_name = "xgboost"
     config = load_hydra_config(model_name)
 
+    # Option A: Train on the control member (ensemble_member == 0)
+    # This avoids non-linearity issues and distribution shift.
+    nwp_train = nwp.filter(pl.col("ensemble_member") == 0)
+
     return train_and_log_model(
         context=context,
         model_name=model_name,
         trainer=XGBoostForecaster(),
         config=config,
-        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
     )

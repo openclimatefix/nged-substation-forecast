@@ -96,18 +96,21 @@ def train_cv_fold(
     config = cast(TrainingConfig, config)
     model_name = f"xgboost_cv_fold_{config.data_split.train_end}"
 
+    # Option A: Train on the control member (ensemble_member == 0)
+    nwp_train = nwp.filter(pl.col("ensemble_member") == 0)
+
     # 1. Train
     model = train_and_log_model(
         context=context,
         model_name=model_name,
         trainer=XGBoostForecaster(),
         config=config,
-        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
     )
 
-    # 2. Evaluate
+    # 2. Evaluate (on all members)
     forecaster = XGBoostForecaster(model)
     forecaster.config = config.model
 
