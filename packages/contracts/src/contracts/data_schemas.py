@@ -2,12 +2,11 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import patito as pt
 import polars as pl
 from pydantic import BaseModel
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -38,7 +37,7 @@ class SubstationFlows(pt.Model):
     # Reactive power:
     MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
 
-    # When this data was ingested into our system. When we update our datasets, we examine
+    # The datetime this data was ingested into our system. When we update our datasets, we examine
     # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
     # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
     # we didn't record when the data was ingested).
@@ -93,6 +92,8 @@ class SimplifiedSubstationFlows(pt.Model):
 
 
 class SubstationLocations(pt.Model):
+    """The data structure of the raw substation location data from NGED."""
+
     # NGED has 192,000 substations.
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
 
@@ -161,7 +162,10 @@ class PowerForecast(pt.Model):
 
 
 class ScalingParams(pt.Model):
-    """Schema for weather variable scaling parameters."""
+    """Schema for weather variable scaling parameters.
+
+    Used when scaling between physical units (e.g. degrees C) and their unsigned 8-bit integer
+    (uint8) representations (in the range [0, 255])."""
 
     col_name: str = pt.Field(dtype=pl.String)
     buffered_min: float = pt.Field(dtype=pl.Float32)
