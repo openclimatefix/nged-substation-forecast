@@ -180,7 +180,7 @@ class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 
     nwp_init_time: datetime
-    power_fcst_model: str | None = None
+    power_fcst_model_name: str | None = None
 
 
 class Nwp(pt.Model):

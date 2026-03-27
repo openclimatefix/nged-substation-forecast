@@ -11,18 +11,13 @@ from contracts.hydra_schemas import TrainingConfig
 log = logging.getLogger(__name__)
 
 
-def _slice_temporal_data(data: Any, start: date | str, end: date | str) -> Any:
+def _slice_temporal_data(data: Any, start: date | str, end: date | str, time_col: str) -> Any:
     """Recursively slice temporal data (LazyFrames, DataFrames, or dicts thereof)."""
     if isinstance(data, dict):
-        return {k: _slice_temporal_data(v, start, end) for k, v in data.items()}
+        return {k: _slice_temporal_data(v, start, end, time_col) for k, v in data.items()}
 
     if isinstance(data, (pl.LazyFrame, pl.DataFrame)):
-        # We assume all feature assets have a time-based column.
-        # For power flows it's 'timestamp', for NWP it's 'valid_time'.
-        # We check the schema to find which one exists.
         cols = data.collect_schema().names() if isinstance(data, pl.LazyFrame) else data.columns
-        time_col = "timestamp" if "timestamp" in cols else "valid_time"
-
         if time_col not in cols:
             return data
 
@@ -36,7 +31,6 @@ def train_and_log_model(
     model_name: str,
     trainer,
     config: TrainingConfig,
-    flavor: str,
     **kwargs,
 ):
     """Universal utility to handle temporal slicing and MLflow logging for training.
@@ -46,7 +40,6 @@ def train_and_log_model(
         model_name: Name of the model (for MLflow run name).
         trainer: An object with a `train(config, **kwargs)` method.
         config: Training configuration object.
-        flavor: MLflow flavor to use for logging (e.g., 'xgboost', 'pytorch').
         **kwargs: Input LazyFrames to be temporally sliced.
 
     Returns:
@@ -61,7 +54,9 @@ def train_and_log_model(
         if key == "substation_metadata":
             sliced_data[key] = val
             continue
-        sliced_data[key] = _slice_temporal_data(val, train_start, train_end)
+
+        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        sliced_data[key] = _slice_temporal_data(val, train_start, train_end, time_col)
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
@@ -70,12 +65,7 @@ def train_and_log_model(
     # 3. Universal MLflow Logging
     with mlflow.start_run(run_name=model_name) as run:
         mlflow.log_params(config.model_dump(mode="json"))
-
-        if flavor == "xgboost":
-            mlflow.xgboost.log_model(model, artifact_path="model")
-        else:
-            raise ValueError(f"Unsupported MLflow flavor: {flavor}")
-
+        trainer.log_model(model_name)
         context.add_output_metadata({"mlflow_run_id": run.info.run_id})
 
     return model
@@ -110,7 +100,8 @@ def evaluate_and_save_model(
             sliced_data[key] = val.collect() if isinstance(val, pl.LazyFrame) else val
             continue
 
-        sliced = _slice_temporal_data(val, test_start, test_end)
+        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        sliced = _slice_temporal_data(val, test_start, test_end, time_col)
 
         # Collect LazyFrames into DataFrames for inference
         if isinstance(sliced, dict):
@@ -121,11 +112,31 @@ def evaluate_and_save_model(
             sliced_data[key] = sliced.collect() if isinstance(sliced, pl.LazyFrame) else sliced
 
     # 2. Call the Model-Specific Inference
-    # Construct InferenceParams. We use the current time for nwp_init_time
-    # as a placeholder if it's not available in the data.
+    # Extract the actual init_time from the provided nwps data
+    nwp_init_time = datetime.now(timezone.utc)
+    if "nwps" in kwargs:
+        # Assuming nwps is a dictionary or list of LazyFrames
+        nwps_data = kwargs["nwps"]
+        if isinstance(nwps_data, dict) and nwps_data:
+            first_nwp = next(iter(nwps_data.values()))
+            if isinstance(first_nwp, pl.LazyFrame):
+                df = first_nwp.select(pl.col("init_time").max()).collect()
+                if isinstance(df, pl.DataFrame):
+                    nwp_init_time = df.item()
+        elif isinstance(nwps_data, list) and nwps_data:
+            first_nwp = nwps_data[0]
+            if isinstance(first_nwp, pl.LazyFrame):
+                df = first_nwp.select(pl.col("init_time").max()).collect()
+                if isinstance(df, pl.DataFrame):
+                    nwp_init_time = df.item()
+        elif isinstance(nwps_data, pl.LazyFrame):
+            df = nwps_data.select(pl.col("init_time").max()).collect()
+            if isinstance(df, pl.DataFrame):
+                nwp_init_time = df.item()
+
     inference_params = InferenceParams(
-        nwp_init_time=datetime.now(timezone.utc),
-        power_fcst_model=model_name,
+        nwp_init_time=nwp_init_time,
+        power_fcst_model_name=model_name,
     )
 
     results_df = forecaster.predict(inference_params=inference_params, **sliced_data)

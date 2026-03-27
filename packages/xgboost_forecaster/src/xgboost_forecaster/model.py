@@ -16,6 +16,8 @@ from contracts.data_schemas import (
 from contracts.hydra_schemas import ModelConfig, NwpModel
 from xgboost import XGBRegressor
 
+import mlflow
+
 from ml_core.features import add_cyclical_temporal_features
 from ml_core.model import BaseForecaster
 
@@ -37,6 +39,11 @@ class XGBoostForecaster(BaseForecaster):
         """
         self.model = model
 
+    def log_model(self, model_name: str) -> None:
+        """Log the model to MLflow."""
+        if self.model is not None:
+            mlflow.xgboost.log_model(self.model, artifact_path="model")
+
     def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
         """Apply feature engineering and extract the feature matrix.
 
@@ -49,21 +56,24 @@ class XGBoostForecaster(BaseForecaster):
         # 1. Apply shared feature engineering
         df = add_cyclical_temporal_features(df, time_col="valid_time")
 
-        # 2. Define columns that are NOT features
-        exclude_cols = {
-            "MW",
-            "MVA",
-            "MVAr",
-            "ingested_at",
-            "valid_time",
-            "substation_number",
-            "h3_index",
-            "ensemble_member",
-        }
+        # 2. Extract feature matrix using explicit feature names from config
+        if not hasattr(self, "config") or not self.config.features.feature_names:
+            # Fallback if config is missing or feature names are empty
+            exclude_cols = {
+                "MW",
+                "MVA",
+                "MVAr",
+                "MW_or_MVA",
+                "ingested_at",
+                "valid_time",
+                "substation_number",
+                "h3_index",
+                "ensemble_member",
+            }
+            feature_cols = [c for c in df.columns if c not in exclude_cols]
+            return df.select(feature_cols)
 
-        # 3. Return the feature matrix as a Polars DataFrame
-        feature_cols = [c for c in df.columns if c not in exclude_cols]
-        return df.select(feature_cols)
+        return df.select(self.config.features.feature_names)
 
     def train(  # type: ignore
         self,
@@ -85,6 +95,7 @@ class XGBoostForecaster(BaseForecaster):
         Returns:
             The trained XGBRegressor model.
         """
+        self.config = config
         log.info("Starting XGBoost training...")
 
         if len(config.features.nwps) > 0 and not nwps:
@@ -92,8 +103,38 @@ class XGBoostForecaster(BaseForecaster):
 
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
 
+        # 1. Downsample power flows to 30m and calculate target fallback
+        flows_30m = (
+            substation_power_flows.sort("timestamp")
+            .group_by_dynamic(
+                "timestamp",
+                every="30m",
+                group_by="substation_number",
+            )
+            .agg(
+                [
+                    pl.col("MW").mean(),
+                    pl.col("MVA").mean(),
+                ]
+            )
+            .with_columns(
+                pl.when(pl.col("MW").is_not_null())
+                .then(pl.col("MW"))
+                .otherwise(pl.col("MVA"))
+                .alias("MW_or_MVA")
+            )
+        )
+
+        # 2. Generate lags
+        flows_with_lags = flows_30m.with_columns(
+            [
+                pl.col("MW_or_MVA").shift(7 * 48).over("substation_number").alias("power_lag_7d"),
+                pl.col("MW_or_MVA").shift(14 * 48).over("substation_number").alias("power_lag_14d"),
+            ]
+        )
+
         # Join power flows and weather data using substation metadata.
-        flows_with_h3 = substation_power_flows.rename({"timestamp": "valid_time"}).join(
+        flows_with_h3 = flows_with_lags.rename({"timestamp": "valid_time"}).join(
             metadata_lf.rename({"h3_res_5": "h3_index"}),
             on="substation_number",
         )
@@ -120,7 +161,7 @@ class XGBoostForecaster(BaseForecaster):
 
         # Prepare features and target
         X = self._prepare_features(joined_df)
-        y = joined_df.select("MW").to_series()
+        y = joined_df.select("MW_or_MVA").to_series()
 
         self.model = XGBRegressor(**config.hyperparameters.model_dump())
         self.model.fit(X, y)
@@ -132,6 +173,7 @@ class XGBoostForecaster(BaseForecaster):
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
         nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        substation_power_flows: pt.LazyFrame[SubstationFlows] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -162,21 +204,17 @@ class XGBoostForecaster(BaseForecaster):
         # We'll take the first NWP as the base for valid_time and ensemble_member.
 
         if not nwps:
-            # If no NWPs, we might be in a pure AR mode, but XGBoostForecaster
-            # currently expects weather. Let's fail loudly if nwps is missing
-            # but we expect it.
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
         first_nwp_name = next(iter(nwps))
         first_nwp = nwps[first_nwp_name]
 
-        df_lf = first_nwp.select(["valid_time", "h3_index", "ensemble_member"]).join(
-            metadata_df.rename({"h3_res_5": "h3_index"}).lazy(),
-            on="h3_index",
-            how="inner",
-        )
-
+        # 1. Join all NWP LazyFrames together first
+        combined_nwps_lf = first_nwp
         for nwp_name, nwp_lf in nwps.items():
+            if nwp_name == first_nwp_name:
+                continue
+
             prefix = f"{nwp_name.value}_"
             rename_mapping = {
                 col: f"{prefix}{col}"
@@ -185,9 +223,59 @@ class XGBoostForecaster(BaseForecaster):
             }
             prefixed_nwp = nwp_lf.rename(rename_mapping)
 
-            df_lf = df_lf.join(
+            combined_nwps_lf = combined_nwps_lf.join(
                 prefixed_nwp,
                 on=["valid_time", "h3_index", "ensemble_member"],
+                how="left",
+            )
+
+        # 2. Join the resulting combined NWP LazyFrame with metadata_df on h3_index
+        df_lf = combined_nwps_lf.join(
+            metadata_df.rename({"h3_res_5": "h3_index"}).lazy(),
+            on="h3_index",
+            how="inner",
+        )
+
+        # 3. Apply the same lag generation logic to substation_power_flows
+        if substation_power_flows is not None:
+            flows_30m = (
+                substation_power_flows.sort("timestamp")
+                .group_by_dynamic(
+                    "timestamp",
+                    every="30m",
+                    group_by="substation_number",
+                )
+                .agg(
+                    [
+                        pl.col("MW").mean(),
+                        pl.col("MVA").mean(),
+                    ]
+                )
+                .with_columns(
+                    pl.when(pl.col("MW").is_not_null())
+                    .then(pl.col("MW"))
+                    .otherwise(pl.col("MVA"))
+                    .alias("MW_or_MVA")
+                )
+            )
+
+            flows_with_lags = flows_30m.with_columns(
+                [
+                    pl.col("MW_or_MVA")
+                    .shift(7 * 48)
+                    .over("substation_number")
+                    .alias("power_lag_7d"),
+                    pl.col("MW_or_MVA")
+                    .shift(14 * 48)
+                    .over("substation_number")
+                    .alias("power_lag_14d"),
+                ]
+            ).select(["substation_number", "timestamp", "power_lag_7d", "power_lag_14d"])
+
+            # 4. Join power flows into the feature matrix
+            df_lf = df_lf.join(
+                flows_with_lags.rename({"timestamp": "valid_time"}),
+                on=["substation_number", "valid_time"],
                 how="left",
             )
 
@@ -200,7 +288,7 @@ class XGBoostForecaster(BaseForecaster):
 
         # Return predictions with correct schema
         now = datetime.now(timezone.utc)
-        model_name = inference_params.power_fcst_model or "xgboost_global"
+        model_name = inference_params.power_fcst_model_name or "xgboost_global"
 
         res = df.select(["valid_time", "substation_number", "ensemble_member"]).with_columns(
             MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),

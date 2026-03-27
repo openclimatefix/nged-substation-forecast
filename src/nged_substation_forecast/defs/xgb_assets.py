@@ -44,7 +44,6 @@ def train_xgboost(
         model_name=model_name,
         trainer=XGBoostForecaster(),
         config=config,
-        flavor="xgboost",
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
@@ -55,23 +54,33 @@ def train_xgboost(
     ins={
         "model": dg.AssetIn("train_xgboost"),
         "nwp": dg.AssetIn("all_nwp_data"),
+        "substation_power_flows": dg.AssetIn("combined_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     compute_kind="python",
     group_name="models",
 )
 def evaluate_xgboost(
-    context: dg.AssetExecutionContext, model, nwp: pl.LazyFrame, substation_metadata: pl.DataFrame
+    context: dg.AssetExecutionContext,
+    model,
+    nwp: pl.LazyFrame,
+    substation_power_flows: pl.LazyFrame,
+    substation_metadata: pl.DataFrame,
 ):
     """Evaluate the XGBoost model and generate forecasts."""
     model_name = "xgboost"
     config = load_hydra_config(model_name)
 
+    # Note: We must inject config into the forecaster so it can build features
+    forecaster = XGBoostForecaster(model)
+    forecaster.config = config
+
     return evaluate_and_save_model(
         context=context,
         model_name=model_name,
-        forecaster=XGBoostForecaster(model),
+        forecaster=forecaster,
         config=config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
+        substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
     )

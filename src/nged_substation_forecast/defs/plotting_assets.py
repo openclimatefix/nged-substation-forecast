@@ -27,7 +27,7 @@ def forecast_vs_actual_plot(
     model_name = context.partition_key
     context.log.info(f"Generating plot for model: {model_name}")
 
-    # In a real scenario, we would read from the Delta Lake table
+    # TODO: Implement Delta Lake read for evaluation_results.delta
     # forecasts = pl.read_delta("data/evaluation_results.delta").filter(pl.col("power_fcst_model_name") == model_name)
 
     # For now, we'll just return as a placeholder

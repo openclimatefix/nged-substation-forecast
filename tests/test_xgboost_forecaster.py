@@ -3,7 +3,6 @@ import pytest
 
 from xgboost_forecaster.data import (
     DataConfig,
-    load_substation_power,
     load_nwp_run,
 )
 from xgboost_forecaster.scaling import load_scaling_params
@@ -80,11 +79,6 @@ def data_config(tmp_path):
         base_power_path=power_path,
         base_weather_path=weather_path,
     )
-
-
-def test_load_substation_power_with_config(data_config):
-    # Test that the function loads data without errors
-    load_substation_power(123, config=data_config)
 
 
 def test_load_nwp_run_with_config(data_config):

@@ -33,6 +33,7 @@ class ModelFeaturesConfig(BaseModel):
     """Configuration for model features."""
 
     nwps: list[NwpModel] = Field(default_factory=list)
+    feature_names: list[str] = Field(default_factory=list)
 
 
 class ModelConfig(BaseModel):
