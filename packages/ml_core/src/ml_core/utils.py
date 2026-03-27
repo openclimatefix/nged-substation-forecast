@@ -101,7 +101,15 @@ def evaluate_and_save_model(
             continue
 
         time_col = "timestamp" if "power_flows" in key else "valid_time"
-        sliced = _slice_temporal_data(val, test_start, test_end, time_col)
+
+        # Add a 14-day lookback for autoregressive features
+        from datetime import timedelta
+
+        slice_start = test_start
+        if "power_flows" in key:
+            slice_start = test_start - timedelta(days=14)
+
+        sliced = _slice_temporal_data(val, slice_start, test_end, time_col)
 
         # Collect LazyFrames into DataFrames for inference
         if isinstance(sliced, dict):

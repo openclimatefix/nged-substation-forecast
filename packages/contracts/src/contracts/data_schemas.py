@@ -257,6 +257,8 @@ class ProcessedNwp(pt.Model):
     """Weather data after ensemble selection and interpolation."""
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
     h3_index: int = pt.Field(dtype=pl.UInt64)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
 

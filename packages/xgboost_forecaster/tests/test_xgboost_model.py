@@ -52,6 +52,10 @@ def test_xgboost_forecaster_train_and_predict():
         NwpModel.ECMWF_ENS_0_25DEG: pt.DataFrame[ProcessedNwp](
             {
                 "valid_time": timestamps,
+                "init_time": timestamps,
+                "lead_time_hours": [0.0] * len(timestamps),
+                "init_time": timestamps,
+                "lead_time_hours": [0.0] * len(timestamps),
                 "h3_index": [123] * len(timestamps),
                 "ensemble_member": [0] * len(timestamps),
                 "temperature": [15.0] * len(timestamps),
@@ -96,6 +100,10 @@ def test_xgboost_forecaster_train_and_predict():
         NwpModel.ECMWF_ENS_0_25DEG: pt.DataFrame[ProcessedNwp](
             {
                 "valid_time": predict_timestamps,
+                "init_time": predict_timestamps,
+                "lead_time_hours": [0.0] * len(predict_timestamps),
+                "init_time": predict_timestamps,
+                "lead_time_hours": [0.0] * len(predict_timestamps),
                 "h3_index": [123] * len(predict_timestamps),
                 "ensemble_member": [0] * len(predict_timestamps),
                 "temperature": [15.0] * len(predict_timestamps),

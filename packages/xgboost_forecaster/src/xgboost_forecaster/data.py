@@ -2,7 +2,7 @@
 
 import dataclasses
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 from typing import cast
 
@@ -115,10 +115,6 @@ def construct_historical_weather(
         if df.is_empty():
             continue
 
-        # Stitching logic: keep only short lead times (e.g. <= 24h) to form a continuous series
-        # This avoids using long-range forecasts for historical training data.
-        df = df.filter((pl.col("valid_time") - pl.col("init_time")) <= timedelta(hours=24))
-
         if not df.is_empty():
             weather_dfs.append(df)
 
@@ -128,7 +124,6 @@ def construct_historical_weather(
     # Combine and keep the latest forecast for each valid_time/h3_index/ensemble_member
     combined = pl.concat(weather_dfs, how="diagonal")
     combined = combined.sort(["h3_index", "ensemble_member", "valid_time", "init_time"])
-    combined = combined.unique(subset=["h3_index", "ensemble_member", "valid_time"], keep="last")
 
     return Nwp.validate(combined)
 
@@ -163,7 +158,7 @@ def process_weather_data(
         and col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
     ]
 
-    group_cols = ["h3_index", "valid_time"]
+    group_cols = ["h3_index", "valid_time", "init_time"]
     if selection == EnsembleSelection.ALL:
         group_cols.append("ensemble_member")
 
@@ -189,7 +184,7 @@ def process_weather_data(
         .to_frame()
     )
 
-    group_cols_only_idx = ["h3_index"]
+    group_cols_only_idx = ["h3_index", "init_time"]
     if selection == EnsembleSelection.ALL:
         group_cols_only_idx.append("ensemble_member")
 
@@ -200,7 +195,9 @@ def process_weather_data(
         group_df = weather_df.filter([pl.col(k) == v for k, v in group.items()]).sort("valid_time")
         upsampled = time_grid.join(group_df, on="valid_time", how="left")
         # Interpolate only the weather variables, not the group columns
-        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
+        upsampled = upsampled.with_columns(
+            [pl.col(c).fill_null(strategy="forward") for c in nwp_vars]
+        )
         # Fill in the group columns
         upsampled = upsampled.with_columns(
             [pl.lit(v, dtype=weather_df.schema[k]).alias(k) for k, v in group.items()]
@@ -218,5 +215,10 @@ def process_weather_data(
         cast_exprs.append(pl.col("ensemble_member").cast(pl.UInt8))
 
     weather_df = weather_df.with_columns(cast_exprs)
+    weather_df = weather_df.with_columns(
+        lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
+        .dt.total_hours()
+        .cast(pl.Float32)
+    )
 
     return ProcessedNwp.validate(weather_df, drop_superfluous_columns=True)

@@ -70,7 +70,9 @@ class XGBoostForecaster(BaseForecaster):
                 "h3_index",
                 "ensemble_member",
             }
-            feature_cols = [c for c in df.columns if c not in exclude_cols]
+            feature_cols = [
+                c for c in df.columns if c not in exclude_cols and not c.endswith("_init_time")
+            ]
             return df.select(feature_cols)
 
         return df.select(self.config.features.feature_names)
@@ -125,21 +127,29 @@ class XGBoostForecaster(BaseForecaster):
             )
         )
 
-        # 2. Generate lags
-        flows_with_lags = flows_30m.with_columns(
-            [
-                pl.col("MW_or_MVA").shift(7 * 48).over("substation_number").alias("power_lag_7d"),
-                pl.col("MW_or_MVA").shift(14 * 48).over("substation_number").alias("power_lag_14d"),
-            ]
+        # 2. Generate lags by shifting timestamps forward
+        lag_7d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_7d"),
+        )
+
+        lag_14d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_14d"),
         )
 
         # Join power flows and weather data using substation metadata.
-        flows_with_h3 = flows_with_lags.rename({"timestamp": "valid_time"}).join(
+        flows_with_h3 = flows_30m.rename({"timestamp": "valid_time"}).join(
             metadata_lf.rename({"h3_res_5": "h3_index"}),
             on="substation_number",
         )
 
-        joined_df_lf = flows_with_h3
+        joined_df_lf = flows_with_h3.join(
+            lag_7d, on=["substation_number", "valid_time"], how="left"
+        ).join(lag_14d, on=["substation_number", "valid_time"], how="left")
+
         if nwps:
             for nwp_name, nwp_lf in nwps.items():
                 # Prefix columns to avoid collisions
@@ -163,8 +173,13 @@ class XGBoostForecaster(BaseForecaster):
         X = self._prepare_features(joined_df)
         y = joined_df.select("MW_or_MVA").to_series()
 
+        # FIX: Save feature names and convert to pandas
+        self.feature_names = X.columns
+        X_pd = X.to_pandas()
+        y_pd = y.to_pandas()
+
         self.model = XGBRegressor(**config.hyperparameters.model_dump())
-        self.model.fit(X, y)
+        self.model.fit(X_pd, y_pd)
 
         return self.model
 
@@ -209,12 +224,11 @@ class XGBoostForecaster(BaseForecaster):
         first_nwp_name = next(iter(nwps))
         first_nwp = nwps[first_nwp_name]
 
-        # 1. Join all NWP LazyFrames together first
-        combined_nwps_lf = first_nwp
-        for nwp_name, nwp_lf in nwps.items():
-            if nwp_name == first_nwp_name:
-                continue
+        # FIX: Create a base dataframe with just the keys
+        combined_nwps_lf = first_nwp.select(["valid_time", "h3_index", "ensemble_member"])
 
+        # FIX: Loop through ALL nwps to apply prefixes consistently
+        for nwp_name, nwp_lf in nwps.items():
             prefix = f"{nwp_name.value}_"
             rename_mapping = {
                 col: f"{prefix}{col}"
@@ -259,24 +273,22 @@ class XGBoostForecaster(BaseForecaster):
                 )
             )
 
-            flows_with_lags = flows_30m.with_columns(
-                [
-                    pl.col("MW_or_MVA")
-                    .shift(7 * 48)
-                    .over("substation_number")
-                    .alias("power_lag_7d"),
-                    pl.col("MW_or_MVA")
-                    .shift(14 * 48)
-                    .over("substation_number")
-                    .alias("power_lag_14d"),
-                ]
-            ).select(["substation_number", "timestamp", "power_lag_7d", "power_lag_14d"])
+            # FIX: Generate lags by shifting timestamps forward
+            lag_7d = flows_30m.select(
+                pl.col("substation_number"),
+                (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
+                pl.col("MW_or_MVA").alias("power_lag_7d"),
+            )
+
+            lag_14d = flows_30m.select(
+                pl.col("substation_number"),
+                (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
+                pl.col("MW_or_MVA").alias("power_lag_14d"),
+            )
 
             # 4. Join power flows into the feature matrix
-            df_lf = df_lf.join(
-                flows_with_lags.rename({"timestamp": "valid_time"}),
-                on=["substation_number", "valid_time"],
-                how="left",
+            df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
+                lag_14d, on=["substation_number", "valid_time"], how="left"
             )
 
         df = cast(pl.DataFrame, df_lf.collect())
@@ -284,7 +296,12 @@ class XGBoostForecaster(BaseForecaster):
         # Prepare features (must match training features)
         X = self._prepare_features(df)
 
-        preds = self.model.predict(X)
+        # FIX: Enforce column order and convert to pandas
+        if hasattr(self, "feature_names") and self.feature_names:
+            X = X.select(self.feature_names)
+        X_pd = X.to_pandas()
+
+        preds = self.model.predict(X_pd)
 
         # Return predictions with correct schema
         now = datetime.now(timezone.utc)
