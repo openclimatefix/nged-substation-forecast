@@ -164,7 +164,7 @@ class XGBoostTrainer(BaseTrainer[XGBoostTrainData]):
 Hydra injects the parameters into the pipeline.
 **Example (`conf/model/xgboost.yaml`):**
 ```yaml
-model_name: "xgboost_baseline"
+model_name: "xgboost"
 trainer_class: "src.models.xgboost.XGBoostTrainer"
 data_split:
   train_start: "2019-01-01"
@@ -178,7 +178,8 @@ hyperparameters:
 ```
 
 **Saving to MLflow:**
-When Dagster runs, it logs the entire Hydra dictionary to MLflow, ensuring absolute reproducibility. It then registers the model under the `model_name` (e.g., "xgboost_baseline"). MLflow automatically handles the version increments.
+When Dagster runs, it logs the entire Hydra dictionary to MLflow, ensuring absolute reproducibility. It then registers the model under the `model_name` (e.g., "xgboost"
+). MLflow automatically handles the version increments.
 
 ---
 
@@ -190,7 +191,8 @@ We use exactly **one** Dagster asset for training, partitioned statically by the
 from dagster import asset, StaticPartitionsDefinition
 import importlib
 
-model_partitions = StaticPartitionsDefinition(["xgboost_baseline", "st_gnn"])
+model_partitions = StaticPartitionsDefinition(["xgboost"
+, "st_gnn"])
 
 @asset(partitions_def=model_partitions)
 def train_model(context, weather_cerra, substation_scada, grid_topology_edges):
@@ -254,7 +256,8 @@ The `evaluate_model` asset loads the `pyfunc` model, passes the Test set `LazyFr
 We store all forecasts from all models in a **single Delta Lake table** (`evaluation_results.delta`). We do not generate custom CSV files or nested directories.
 
 **The Schema:**
-* `model_name` (e.g., "xgboost_baseline") - **This is the ONLY Partition Column.**
+* `model_name` (e.g., "xgboost"
+) - **This is the ONLY Partition Column.**
 * `model_version` (int)
 * `mlflow_run_id` (string hash)
 * `code_version` (Git commit hash - denormalized for fast plotting)

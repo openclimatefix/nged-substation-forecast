@@ -1,5 +1,5 @@
 defaults:
-  - model: xgboost_baseline
+  - model: xgboost
   - _self_
 
 data_split:

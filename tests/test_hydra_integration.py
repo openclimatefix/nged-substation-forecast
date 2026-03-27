@@ -8,14 +8,14 @@ from contracts.hydra_schemas import TrainingConfig
 def test_real_xgboost_yaml_parses_successfully():
     GlobalHydra.instance().clear()
     with initialize(version_base=None, config_path="../conf"):
-        cfg = compose(config_name="config", overrides=["model=xgboost_baseline"])
+        cfg = compose(config_name="config", overrides=["model=xgboost"])
         cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
         print(f"DEBUG: {cfg_dict=}")
 
         # This will raise a ValidationError if the YAML doesn't match the schema
         config = TrainingConfig(**cfg_dict)
 
-        assert config.model.power_fcst_model_name == "xgboost_baseline"
+        assert config.model.power_fcst_model_name == "xgboost"
         assert config.model.hyperparameters.n_estimators > 0
         assert config.data_split.train_start is not None
         assert config.model.features.nwp_provider == "ecmwf"

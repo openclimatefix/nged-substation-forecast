@@ -35,8 +35,8 @@ def train_xgboost(
     substation_power_flows: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
 ):
-    """Train the XGBoost baseline model."""
-    model_name = "xgboost_baseline"
+    """Train the XGBoost model."""
+    model_name = "xgboost"
     config = load_hydra_config(model_name)
 
     return train_and_log_model(
@@ -63,8 +63,8 @@ def train_xgboost(
 def evaluate_xgboost(
     context: dg.AssetExecutionContext, model, nwp: pl.LazyFrame, substation_metadata: pl.DataFrame
 ):
-    """Evaluate the XGBoost baseline model and generate forecasts."""
-    model_name = "xgboost_baseline"
+    """Evaluate the XGBoost model and generate forecasts."""
+    model_name = "xgboost"
     config = load_hydra_config(model_name)
 
     return evaluate_and_save_model(

@@ -17,7 +17,7 @@ def test_valid_training_config():
             "test_end": "2023-12-31",
         },
         "model": {
-            "power_fcst_model_name": "xgboost_baseline",
+            "power_fcst_model_name": "xgboost",
             "trainer_class": "xgboost_forecaster.trainer.XGBoostTrainer",
             "hyperparameters": {
                 "learning_rate": 0.01,
@@ -30,7 +30,7 @@ def test_valid_training_config():
         },
     }
     config = TrainingConfig(**valid_dict)  # type: ignore
-    assert config.model.power_fcst_model_name == "xgboost_baseline"
+    assert config.model.power_fcst_model_name == "xgboost"
     assert config.model.hyperparameters.learning_rate == 0.01
 
 

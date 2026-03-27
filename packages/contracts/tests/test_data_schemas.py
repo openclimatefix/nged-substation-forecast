@@ -85,7 +85,7 @@ def test_power_forecast_validation():
             "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
             "substation_number": [123],
             "ensemble_member": [0],
-            "power_fcst_model_name": ["xgboost_baseline"],
+            "power_fcst_model_name": ["xgboost"],
             "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "power_fcst_init_year_month": ["2026-01"],
