@@ -85,7 +85,6 @@ class LocalForecasters(BaseForecaster):
         config: ModelConfig,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
         **kwargs,
     ) -> "LocalForecasters":
         """Train a separate model for each substation.
@@ -114,7 +113,6 @@ class LocalForecasters(BaseForecaster):
                 config=config,
                 substation_power_flows=sub_flows,
                 substation_metadata=sub_meta,
-                nwps=nwps,
                 **kwargs,
             )
             self.models[sub_num] = model
