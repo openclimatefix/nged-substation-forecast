@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class DataSplitConfig(BaseModel):
     """Configuration for temporal data splitting."""
 
+    # TODO: Can we use datetime types instead of strings?
     train_start: str
     train_end: str
     test_start: str
