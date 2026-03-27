@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import dagster as dg
@@ -11,7 +11,7 @@ from contracts.hydra_schemas import TrainingConfig
 log = logging.getLogger(__name__)
 
 
-def _slice_temporal_data(data: Any, start: str, end: str) -> Any:
+def _slice_temporal_data(data: Any, start: date | str, end: date | str) -> Any:
     """Recursively slice temporal data (LazyFrames, DataFrames, or dicts thereof)."""
     if isinstance(data, dict):
         return {k: _slice_temporal_data(v, start, end) for k, v in data.items()}
@@ -69,7 +69,7 @@ def train_and_log_model(
 
     # 3. Universal MLflow Logging
     with mlflow.start_run(run_name=model_name) as run:
-        mlflow.log_params(config.model_dump())
+        mlflow.log_params(config.model_dump(mode="json"))
 
         if flavor == "xgboost":
             mlflow.xgboost.log_model(model, artifact_path="model")

@@ -1,3 +1,4 @@
+from datetime import date
 import pytest
 from pydantic import ValidationError
 from contracts.hydra_schemas import (
@@ -54,9 +55,9 @@ def test_invalid_n_estimators():
 def test_missing_required_field():
     with pytest.raises(ValidationError, match="Field required"):
         DataSplitConfig(  # type: ignore
-            train_end="2022-12-31",
-            test_start="2023-01-01",
-            test_end="2023-12-31",
+            train_end=date(2022, 12, 31),
+            test_start=date(2023, 1, 1),
+            test_end=date(2023, 12, 31),
         )
 
 

@@ -1,5 +1,6 @@
 """Hydra configuration schemas for the NGED substation forecast project."""
 
+from datetime import date
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -8,11 +9,10 @@ from pydantic import BaseModel, Field
 class DataSplitConfig(BaseModel):
     """Configuration for temporal data splitting."""
 
-    # TODO: Can we use datetime types instead of strings?
-    train_start: str
-    train_end: str
-    test_start: str
-    test_end: str
+    train_start: date
+    train_end: date
+    test_start: date
+    test_end: date
 
 
 class XGBoostHyperparameters(BaseModel):
