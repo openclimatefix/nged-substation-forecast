@@ -56,22 +56,19 @@ class XGBoostForecaster(BaseForecaster):
         # 1. Apply shared feature engineering
         df = add_cyclical_temporal_features(df, time_col="valid_time")
 
+        # Cast substation_number to categorical if it exists
+        if "substation_number" in df.columns:
+            df = df.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
+
         # 2. Extract feature matrix using explicit feature names from config
         if not hasattr(self, "config") or not self.config.features.feature_names:
-            # Fallback if config is missing or feature names are empty
-            exclude_cols = {
-                "MW",
-                "MVA",
-                "MVAr",
-                "MW_or_MVA",
-                "ingested_at",
-                "valid_time",
-                "substation_number",
-                "h3_index",
-                "ensemble_member",
-            }
+            # Fallback: keep only numeric and categorical columns, excluding the target and h3_index
+            exclude_cols = {"MW", "MVA", "MVAr", "MW_or_MVA", "h3_index", "ensemble_member"}
             feature_cols = [
-                c for c in df.columns if c not in exclude_cols and not c.endswith("_init_time")
+                c
+                for c in df.columns
+                if c not in exclude_cols
+                and (df[c].dtype.is_numeric() or df[c].dtype == pl.Categorical)
             ]
             return df.select(feature_cols)
 
@@ -173,13 +170,11 @@ class XGBoostForecaster(BaseForecaster):
         X = self._prepare_features(joined_df)
         y = joined_df.select("MW_or_MVA").to_series()
 
-        # FIX: Save feature names and convert to pandas
+        # Save feature names as a list of strings
         self.feature_names = X.columns
-        X_pd = X.to_pandas()
-        y_pd = y.to_pandas()
 
         self.model = XGBRegressor(**config.hyperparameters.model_dump())
-        self.model.fit(X_pd, y_pd)
+        self.model.fit(X.to_arrow(), y.to_arrow())
 
         return self.model
 
@@ -296,12 +291,11 @@ class XGBoostForecaster(BaseForecaster):
         # Prepare features (must match training features)
         X = self._prepare_features(df)
 
-        # FIX: Enforce column order and convert to pandas
+        # Enforce exact column order from training
         if hasattr(self, "feature_names") and self.feature_names:
             X = X.select(self.feature_names)
-        X_pd = X.to_pandas()
 
-        preds = self.model.predict(X_pd)
+        preds = self.model.predict(X.to_arrow())
 
         # Return predictions with correct schema
         now = datetime.now(timezone.utc)
