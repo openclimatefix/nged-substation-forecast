@@ -1,0 +1,8 @@
+power_fcst_model_name: "xgboost"
+hyperparameters:
+  learning_rate: 0.01
+  n_estimators: 100
+  max_depth: 6
+features:
+  nwps:
+    - "ecmwf_ens_0_25deg"

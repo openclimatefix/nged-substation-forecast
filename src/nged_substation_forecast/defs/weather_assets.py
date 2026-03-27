@@ -8,6 +8,7 @@ from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
     AssetExecutionContext,
+    AssetIn,
     DailyPartitionsDefinition,
     ResourceParam,
     asset,
@@ -15,6 +16,7 @@ from dagster import (
     define_asset_job,
 )
 from dynamical_data.processing import download_and_scale_ecmwf
+from xgboost_forecaster.data import process_nwp_data
 
 weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offset=1)
 
@@ -39,6 +41,26 @@ def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[S
     scaled_df.write_parquet(output_path, compression="zstd", compression_level=14)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
+
+
+@asset(deps=[ecmwf_ens_forecast])
+def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
+    """Provides a LazyFrame scanning all downloaded NWP data."""
+    return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
+
+
+@asset(
+    ins={
+        "all_nwp_data": AssetIn("all_nwp_data"),
+        "substation_metadata": AssetIn("substation_metadata"),
+    }
+)
+def processed_nwp_data(
+    all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
+) -> pl.LazyFrame:
+    """Process NWP data: lead-time filtering and 30m interpolation for all members."""
+    h3_indices = substation_metadata["h3_res_5"].unique().to_list()
+    return process_nwp_data(all_nwp_data, h3_indices)
 
 
 @asset_check(asset=ecmwf_ens_forecast)

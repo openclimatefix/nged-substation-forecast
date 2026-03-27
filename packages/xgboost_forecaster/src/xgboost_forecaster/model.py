@@ -1,318 +1,345 @@
-"""XGBoost model wrapper for substation forecasting."""
+"""XGBoost implementation of the Forecaster interface."""
 
 import logging
-from collections.abc import Sequence
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self, cast
+from datetime import datetime, timedelta, timezone
+from typing import cast
 
-import mlflow
 import patito as pt
 import polars as pl
-from contracts.data_schemas import InferenceParams, PowerForecast, SubstationFeatures
+from contracts.data_schemas import (
+    InferenceParams,
+    PowerForecast,
+    ProcessedNwp,
+    SubstationFlows,
+    SubstationMetadata,
+)
+from contracts.hydra_schemas import ModelConfig, NwpModel
 from xgboost import XGBRegressor
 
-if TYPE_CHECKING:
-    import patito as pt
-    from contracts.data_schemas import PowerForecast, SubstationFeatures
+import mlflow
+
+from ml_core.features import add_cyclical_temporal_features
+from ml_core.model import BaseForecaster
+from xgboost_forecaster.data import downsample_power_flows
 
 log = logging.getLogger(__name__)
 
 
-class NoPredictionsError(Exception):
-    """Raised when the forecaster fails to produce any predictions."""
+class XGBoostForecaster(BaseForecaster):
+    """XGBoost implementation of the Forecaster interface.
 
-    pass
-
-
-class XGBoostPyFuncWrapper(mlflow.pyfunc.PythonModel):
-    """MLflow pyfunc wrapper for XGBoostForecaster.
-
-    This wrapper allows the model to be used in a model-agnostic way during inference.
-    It handles both global models (one model for all substations) and local models
-    (one model per substation) by routing the input data to the correct model.
+    This class handles the full lifecycle of an XGBoost model: training
+    and production inference.
     """
 
-    # We use this undocumented MLflow escape hatch to completely disable MLflow's
-    # aggressive type hint inspection at class definition time. This allows us to use
-    # sane, expressive type hints (like pt.DataFrame[SubstationFeatures]) without
-    # MLflow spamming the Dagster UI with UserWarnings about unsupported types.
-    # We rely on Patito for actual runtime schema validation anyway.
-    #
-    # Note: Because this is an undocumented API, there is a minor risk that MLflow
-    # could rename or remove this attribute in a future release. If they do, our
-    # code will not crash (MLflow uses a safe `getattr` check), but the annoying
-    # UserWarnings would return during Dagster startup.
-    _skip_type_hint_validation = True
-
-    def load_context(self, context: mlflow.pyfunc.PythonModelContext) -> None:
-        """Load the underlying XGBoost models from the artifacts.
+    def __init__(self, model: XGBRegressor | None = None):
+        """Initialize the forecaster.
 
         Args:
-            context: MLflow context containing the artifacts.
+            model: An optional pre-trained XGBoost model.
         """
-        self.models: dict[str, XGBoostForecaster] = {}
-        for name, path in context.artifacts.items():
-            self.models[name] = XGBoostForecaster.load(Path(path))
+        self.model = model
 
-    def predict(  # type: ignore
-        self,
-        context: mlflow.pyfunc.PythonModelContext,
-        model_input: pt.DataFrame[SubstationFeatures],
-        params: InferenceParams,
-    ) -> pt.DataFrame[PowerForecast]:
-        """Make predictions using the loaded models.
+    def log_model(self, model_name: str) -> None:
+        """Log the model to MLflow."""
+        if self.model is not None:
+            mlflow.xgboost.log_model(self.model, artifact_path="model")
+
+    def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Apply feature engineering and extract the feature matrix.
 
         Args:
-            context: MLflow context.
-            model_input: Input data as a Patito DataFrame of SubstationFeatures.
-            params: Parameters for inference, including 'nwp_init_time'
-                and 'power_fcst_model'.
+            df: The joined input data.
 
         Returns:
-            Patito DataFrame of PowerForecast.
+            A Polars DataFrame containing only the feature columns.
         """
-        # If params is a dict (passed by MLflow), convert to InferenceParams object.
-        # We must do this manually because we've disabled MLflow's automatic
-        # type hint validation/conversion.
-        if isinstance(params, dict):
-            params = InferenceParams(**params)
+        # 1. Apply shared feature engineering
+        df = add_cyclical_temporal_features(df, time_col="valid_time")
 
-        nwp_init_time = params.nwp_init_time
-        power_fcst_model = params.power_fcst_model or XGBoostForecaster.model_name_and_version()
+        # Cast substation_number to categorical if it exists
+        if "substation_number" in df.columns:
+            df = df.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
 
-        # If we have a global model, use it for all substations.
-        if "global" in self.models:
-            preds = self.models["global"].predict(model_input)
-            res = model_input.select(
-                ["valid_time", "substation_number", "ensemble_member"]
-            ).with_columns(MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32))
-        else:
-            # Otherwise, route to local models
-            all_preds = []
-            for (substation_number,), group in model_input.group_by("substation_number"):
-                sub_id_str = str(substation_number)
-                if sub_id_str not in self.models:
-                    log.warning(f"No model found for substation {substation_number}")
-                    continue
+        # 2. Extract feature matrix using explicit feature names from config
+        if not hasattr(self, "config") or not self.config.features.feature_names:
+            # Fallback: keep only numeric and categorical columns, excluding the target and h3_index
+            exclude_cols = {
+                "MW",
+                "MVA",
+                "MVAr",
+                "MW_or_MVA",
+                "h3_index",
+                "ensemble_member",
+                "init_time",
+            }
+            feature_cols = [
+                c
+                for c in df.columns
+                if c not in exclude_cols
+                and (df[c].dtype.is_numeric() or df[c].dtype == pl.Categorical)
+            ]
+            return df.select(feature_cols)
 
-                preds = self.models[sub_id_str].predict(group)
-                all_preds.append(
-                    group.select(
-                        ["valid_time", "substation_number", "ensemble_member"]
-                    ).with_columns(MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32))
-                )
+        return df.select(self.config.features.feature_names)
 
-            if not all_preds:
-                raise NoPredictionsError(
-                    f"No models found for any of the substations in the input data: "
-                    f"{model_input['substation_number'].unique().to_list()}"
-                )
+    def train(  # type: ignore
+        self,
+        config: ModelConfig,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        substation_metadata: pt.DataFrame[SubstationMetadata],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        **kwargs,
+    ) -> XGBRegressor:
+        """Train the XGBoost model.
 
-            res = pl.concat(all_preds)
+        Args:
+            config: The model configuration object.
+            substation_power_flows: The historical power flow data.
+            substation_metadata: The substation metadata containing h3 mapping.
+            nwps: A dictionary of weather forecast dataframes.
+            **kwargs: Additional arguments passed to the underlying train methods.
 
-        # Add common metadata columns
-        res = res.with_columns(
-            nwp_init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
-            power_fcst_model=pl.lit(power_fcst_model).cast(pl.Categorical),
+        Returns:
+            The trained XGBRegressor model.
+        """
+        self.config = config
+        log.info("Starting XGBoost training...")
+
+        if len(config.features.nwps) > 0 and not nwps:
+            raise ValueError("Model config requires NWPs, but none were provided.")
+
+        metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
+
+        # 1. Downsample power flows to 30m and calculate target fallback
+        flows_30m = downsample_power_flows(substation_power_flows)
+
+        # 2. Generate lags by shifting timestamps forward
+        lag_7d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_7d"),
         )
 
-        # Ensure ensemble_member is present and cast to UInt8
+        lag_14d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_14d"),
+        )
+
+        # Join power flows and weather data using substation metadata.
+        flows_with_h3 = flows_30m.rename({"timestamp": "valid_time"}).join(
+            metadata_lf.rename({"h3_res_5": "h3_index"}),
+            on="substation_number",
+        )
+
+        joined_df_lf = flows_with_h3.join(
+            lag_7d, on=["substation_number", "valid_time"], how="left"
+        ).join(lag_14d, on=["substation_number", "valid_time"], how="left")
+
+        if nwps:
+            for nwp_name, nwp_lf in nwps.items():
+                # Prefix columns to avoid collisions
+                prefix = f"{nwp_name.value}_"
+                rename_mapping = {
+                    col: f"{prefix}{col}"
+                    for col in nwp_lf.collect_schema().names()
+                    if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+                }
+                prefixed_nwp = nwp_lf.rename(rename_mapping)
+
+                # Join on ensemble_member and init_time if they exist in both dataframes
+                join_keys = ["valid_time", "h3_index"]
+                if "ensemble_member" in joined_df_lf.collect_schema().names():
+                    join_keys.append("ensemble_member")
+                if "init_time" in joined_df_lf.collect_schema().names():
+                    join_keys.append("init_time")
+
+                joined_df_lf = joined_df_lf.join(
+                    prefixed_nwp,
+                    on=join_keys,
+                    how="left",
+                )
+
+        # 3. Create dynamic seasonal lag to prevent data leakage for week-2 forecasts.
+        # In production, when predicting > 7 days ahead, the 7-day lag is in the future.
+        # We switch to the 14-day lag for these horizons.
+        seven_days_h = timedelta(days=7).total_seconds() / 3600
+        joined_df_lf = (
+            joined_df_lf.with_columns(
+                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
+                / 60.0
+            )
+            .with_columns(
+                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
+                .then(pl.col("power_lag_7d"))
+                .otherwise(pl.col("power_lag_14d"))
+            )
+            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
+        )
+
+        joined_df = cast(pl.DataFrame, joined_df_lf.collect())
+
+        # Prepare features and target
+        X = self._prepare_features(joined_df)
+        y = joined_df.select("MW_or_MVA").to_series()
+
+        # Save feature names as a list of strings
+        self.feature_names = X.columns
+
+        self.model = XGBRegressor(**config.hyperparameters.model_dump())
+        self.model.fit(X.to_arrow(), y.to_arrow())
+
+        return self.model
+
+    def predict(  # type: ignore[override]
+        self,
+        substation_metadata: pt.DataFrame[SubstationMetadata],
+        inference_params: InferenceParams,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        **kwargs,
+    ) -> pt.DataFrame[PowerForecast]:
+        """Execute the inference logic.
+
+        Args:
+            substation_metadata: The substation metadata containing h3 mapping.
+            inference_params: Parameters for inference.
+            substation_power_flows: The historical power flow data (for lags).
+            nwps: A dictionary of weather forecast lazyframes.
+            **kwargs: Additional arguments (unused).
+
+        Returns:
+            A Patito DataFrame containing the predictions.
+        """
+        if self.model is None:
+            raise ValueError("Model must be trained before calling predict.")
+
+        # Expand metadata to all substations
+        metadata_df = substation_metadata.select(["substation_number", "h3_res_5"])
+
+        if not nwps:
+            raise ValueError("XGBoostForecaster requires NWP data for prediction.")
+
+        # Filter NWPs to the specific init_time requested for inference
+        target_init_time = inference_params.nwp_init_time
+        filtered_nwps = {}
+        for name, lf in nwps.items():
+            # Robust "as-of" filter: take the latest run available at or before target_init_time
+            filtered_nwps[name] = (
+                lf.filter(pl.col("init_time") <= target_init_time)
+                .sort("init_time")
+                .group_by(["valid_time", "h3_index", "ensemble_member"])
+                .last()
+            )
+
+        # 1. Initialize combined NWP LazyFrame with the first NWP
+        nwps_iter = iter(filtered_nwps.items())
+        first_nwp_name, first_nwp_lf = next(nwps_iter)
+
+        prefix = f"{first_nwp_name.value}_"
+        rename_mapping = {
+            col: f"{prefix}{col}"
+            for col in first_nwp_lf.collect_schema().names()
+            if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+        }
+        combined_nwps_lf = first_nwp_lf.rename(rename_mapping)
+
+        # Loop through REMAINING nwps to apply prefixes consistently
+        for nwp_name, nwp_lf in nwps_iter:
+            prefix = f"{nwp_name.value}_"
+            rename_mapping = {
+                col: f"{prefix}{col}"
+                for col in nwp_lf.collect_schema().names()
+                if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+            }
+            prefixed_nwp = nwp_lf.rename(rename_mapping)
+
+            # Join on ensemble_member and init_time if they exist in both dataframes
+            join_keys = ["valid_time", "h3_index"]
+            if "ensemble_member" in combined_nwps_lf.collect_schema().names():
+                join_keys.append("ensemble_member")
+            if "init_time" in combined_nwps_lf.collect_schema().names():
+                join_keys.append("init_time")
+
+            combined_nwps_lf = combined_nwps_lf.join(
+                prefixed_nwp,
+                on=join_keys,
+                how="left",
+            )
+
+        # 2. Join the resulting combined NWP LazyFrame with metadata_df on h3_index
+        df_lf = combined_nwps_lf.join(
+            metadata_df.rename({"h3_res_5": "h3_index"}).lazy(),
+            on="h3_index",
+            how="inner",
+        )
+
+        # 3. Apply the same lag generation logic to substation_power_flows
+        flows_30m = downsample_power_flows(substation_power_flows)
+
+        # Generate lags by shifting timestamps forward
+        lag_7d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_7d"),
+        )
+
+        lag_14d = flows_30m.select(
+            pl.col("substation_number"),
+            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
+            pl.col("MW_or_MVA").alias("power_lag_14d"),
+        )
+
+        # 4. Join power flows into the feature matrix
+        df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
+            lag_14d, on=["substation_number", "valid_time"], how="left"
+        )
+
+        # 5. Create dynamic seasonal lag (same logic as train)
+        seven_days_h = timedelta(days=7).total_seconds() / 3600
+        df_lf = (
+            df_lf.with_columns(
+                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
+                / 60.0
+            )
+            .with_columns(
+                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
+                .then(pl.col("power_lag_7d"))
+                .otherwise(pl.col("power_lag_14d"))
+            )
+            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
+        )
+
+        df = cast(pl.DataFrame, df_lf.collect())
+
+        # Prepare features (must match training features)
+        X = self._prepare_features(df)
+
+        # Enforce exact column order from training
+        if hasattr(self.model, "feature_names_in_"):
+            X = X.select(self.model.feature_names_in_)
+        elif hasattr(self, "feature_names") and self.feature_names:
+            X = X.select(self.feature_names)
+
+        preds = self.model.predict(X.to_arrow())
+
+        # Return predictions with correct schema
+        now = datetime.now(timezone.utc)
+        model_name = inference_params.power_fcst_model_name or "xgboost_global"
+
+        res = df.select(["valid_time", "substation_number", "ensemble_member"]).with_columns(
+            MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
+            power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
+            power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
+            nwp_init_time=pl.lit(inference_params.nwp_init_time).cast(pl.Datetime("us", "UTC")),
+            power_fcst_init_year_month=pl.lit(now.strftime("%Y-%m")).cast(pl.String),
+        )
+
+        # Handle potential nulls in ensemble_member (required by schema)
         if "ensemble_member" not in res.columns:
             res = res.with_columns(ensemble_member=pl.lit(0).cast(pl.UInt8))
         else:
             res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
 
-        return cast(pt.DataFrame[PowerForecast], res)
-
-
-# TODO: Create an abstract base class (e.g. `BaseForecaster`) that defines the universal
-# interface for *training* and *saving* all ML models (XGBoost, PyTorch GNN, etc.).
-# While the `XGBoostPyFuncWrapper` above provides a universal interface for *inference*
-# via MLflow, Dagster's training assets still need a common interface to instantiate,
-# train, and save the underlying mathematical models regardless of their architecture.
-class XGBoostForecaster:
-    """Wrapper around XGBoost for substation-level forecasting."""
-
-    model_name = "xgboost"
-    version = "v0.0.1"
-
-    @staticmethod
-    def model_name_and_version() -> str:
-        return f"{XGBoostForecaster.model_name}_{XGBoostForecaster.version}"
-
-    def __init__(self, params: dict[str, Any] | None = None) -> None:
-        """Initialize the forecaster with optional XGBoost parameters.
-
-        Args:
-            params: Dictionary of XGBoost parameters.
-        """
-        self.params = params or self.get_default_params()
-        self.model: XGBRegressor | None = None
-        self.feature_names: Sequence[str] | None = None
-
-    @staticmethod
-    def get_default_params() -> dict[str, Any]:
-        """Returns a dictionary of default XGBoost parameters."""
-        return {
-            "n_estimators": 300,
-            "max_depth": 6,
-            "learning_rate": 0.1,
-            "objective": "reg:squarederror",
-            "n_jobs": -1,
-            "tree_method": "hist",
-            "random_state": 42,
-        }
-
-    def train(
-        self,
-        df: pl.DataFrame,
-        target_col: str = "MW_or_MVA",
-        feature_cols: list[str] | None = None,
-        eval_set: list[tuple[pl.DataFrame, pl.Series]] | None = None,
-    ) -> None:
-        """Train the XGBoost model.
-
-        Args:
-            df: Training data as a Polars DataFrame.
-            target_col: Name of the target column.
-            feature_cols: List of feature column names. If None, uses all except target.
-            eval_set: Optional list of (X, y) tuples for early stopping.
-        """
-        if feature_cols is None:
-            feature_cols = [
-                c
-                for c in df.columns
-                if c != target_col and c != "valid_time" and df[c].dtype.is_numeric()
-            ]
-
-        self.feature_names = feature_cols
-        X = df.select(feature_cols)
-        y = df.select(target_col)
-
-        xgb_eval_set = None
-        if eval_set:
-            xgb_eval_set = []
-            for X_eval_df, y_eval_series in eval_set:
-                xgb_eval_set.append((X_eval_df.select(feature_cols), y_eval_series))
-
-        model = XGBRegressor(**self.params)
-        model.fit(X, y, eval_set=xgb_eval_set, verbose=False)
-        self.model = model
-
-    def predict(self, df: pl.DataFrame) -> pl.Series:
-        """Make predictions using the trained model.
-
-        Args:
-            df: Input data as a Polars DataFrame.
-
-        Returns:
-            Polars Series of predictions.
-
-        Raises:
-            ValueError: If the model has not been trained yet.
-        """
-        if self.model is None or self.feature_names is None:
-            raise ValueError("Model must be trained before calling predict.")
-
-        X = df.select(self.feature_names).to_pandas()
-        predictions = self.model.predict(X)
-        return pl.Series(name="predictions", values=predictions, dtype=pl.Float32)
-
-    def save(self, path: Path) -> None:
-        """Save the model and metadata to a file.
-
-        Args:
-            path: Path to save the model to.
-        """
-        if self.model is None:
-            raise ValueError("No model to save.")
-
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.model.save_model(path)
-        # We could also save feature names separately if needed,
-        # but XGBoost models often store them if passed during fit.
-
-    @classmethod
-    def load(cls, path: Path) -> Self:
-        """Load a model from a file.
-
-        Args:
-            path: Path to the saved model.
-
-        Returns:
-            An instance of XGBoostForecaster with the loaded model.
-        """
-        instance = cls()
-        model = XGBRegressor()
-        model.load_model(path)
-        instance.model = model
-        # Note: feature_names might need to be recovered if not stored in the model
-        try:
-            instance.feature_names = model.get_booster().feature_names
-        except Exception:
-            instance.feature_names = None
-        return instance
-
-    def get_feature_importance(self) -> pl.DataFrame:
-        """Get feature importance as a Polars DataFrame."""
-        if self.model is None or self.feature_names is None:
-            raise ValueError("Model must be trained.")
-
-        importance = self.model.feature_importances_
-        return pl.DataFrame({"feature": self.feature_names, "importance": importance}).sort(
-            "importance", descending=True
-        )
-
-
-def train_local_xgboost_model(
-    substation_number: int,
-    df: pl.DataFrame,
-    output_path: Path,
-    target_col: str = "MW_or_MVA",
-    train_test_split: float = 0.8,
-) -> Path:
-    """Train an XGBoost model for a single substation and save it.
-
-    Args:
-        substation_number: The substation number.
-        df: Dataframe containing features and target for this substation.
-        output_path: Path where the trained model should be saved.
-        target_col: Name of the target column.
-        train_test_split: Fraction of data to use for training (rest for evaluation).
-
-    Returns:
-        The path to the saved model.
-
-    Raises:
-        ValueError: If the input dataframe is empty.
-    """
-    if df.is_empty():
-        raise ValueError(f"No data available for substation {substation_number}")
-
-    # Train model
-    forecaster = XGBoostForecaster()
-
-    # Split into train/eval
-    df = df.sort("valid_time")
-    train_size = int(len(df) * train_test_split)
-    train_df = df.head(train_size)
-    eval_df = df.tail(len(df) - train_size)
-
-    feature_cols = [
-        c for c in df.columns if c not in [target_col, "valid_time", "substation_number"]
-    ]
-
-    eval_set = [(eval_df, eval_df[target_col])]
-
-    forecaster.train(
-        df=train_df,
-        target_col=target_col,
-        feature_cols=feature_cols,
-        eval_set=eval_set,
-    )
-
-    # Save model
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    forecaster.save(output_path)
-
-    return output_path
+        return pt.DataFrame[PowerForecast](res)
