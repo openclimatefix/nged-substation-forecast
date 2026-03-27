@@ -93,7 +93,6 @@ class LocalForecasters(BaseForecaster):
             config: Model configuration object.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata.
-            nwps: A dictionary of weather forecast dataframes.
             **kwargs: Additional arguments passed to the underlying train methods.
 
         Returns:
