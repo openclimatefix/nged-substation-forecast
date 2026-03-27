@@ -1,5 +1,7 @@
 """Hydra configuration schemas for the NGED substation forecast project."""
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
 
 
@@ -20,10 +22,16 @@ class XGBoostHyperparameters(BaseModel):
     max_depth: int = Field(default=6, gt=0)
 
 
+class NwpModel(str, Enum):
+    """Available NWP datasets."""
+
+    ECMWF_ENS_0_25DEG = "ecmwf_ens_0_25deg"
+
+
 class ModelFeaturesConfig(BaseModel):
     """Configuration for model features."""
 
-    nwp_provider: str
+    nwp: NwpModel
 
 
 class ModelConfig(BaseModel):

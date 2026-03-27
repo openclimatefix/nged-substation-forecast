@@ -172,7 +172,7 @@ data_split:
   test_start: "2023-01-01"
   test_end: "2023-12-31"
 features:
-  nwp_provider: "ecmwf"
+  nwp: "ecmwf_ens_0_25deg"
 hyperparameters:
   learning_rate: 0.01
 ```
