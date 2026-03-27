@@ -63,11 +63,14 @@ def processed_nwp_data(
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
     lf = all_nwp_data.filter(pl.col("h3_index").is_in(h3_indices))
 
-    # 2. Lead-time filtering (Fixing Leakage)
-    # Pick the most recent init_time for each valid_time.
-    # This ensures we have exactly one forecast per valid_time and ensemble_member.
-    # We sort by init_time and take the last one for each valid_time.
-    lf = lf.sort("init_time").group_by(["valid_time", "h3_index", "ensemble_member"]).last()
+    # 2. Calculate Lead Time and Filter (Fixing Leakage)
+    # We strictly exclude lead_time == 0 because accumulated variables are null there.
+    # This also prevents the model from learning from "perfect" 0-hour forecasts.
+    lf = lf.with_columns(
+        lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
+        .dt.total_hours()
+        .cast(pl.Float32)
+    ).filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
 
     # 3. Interpolation (Fixing Nulls)
     # Since we've reduced the data size, we can collect and interpolate.
@@ -80,22 +83,33 @@ def processed_nwp_data(
         if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
     ]
 
-    # Upsample to 30m and interpolate for each H3 index and ensemble member
-    # We group by both to avoid interpolating across different members.
-    groups = df.select(["h3_index", "ensemble_member"]).unique()
+    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
+    # We group by all three to ensure we interpolate within a single forecast trajectory.
+    groups = df.select(["h3_index", "ensemble_member", "init_time"]).unique()
     upsampled_parts = []
     for group in groups.iter_rows(named=True):
         h3 = group["h3_index"]
         ens = group["ensemble_member"]
-        group_df = df.filter((pl.col("h3_index") == h3) & (pl.col("ensemble_member") == ens)).sort(
-            "valid_time"
-        )
+        init = group["init_time"]
+        group_df = df.filter(
+            (pl.col("h3_index") == h3)
+            & (pl.col("ensemble_member") == ens)
+            & (pl.col("init_time") == init)
+        ).sort("valid_time")
         upsampled = group_df.upsample(time_column="valid_time", every="30m")
         # Interpolate only the weather variables
         upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-        # Fill in the h3_index and ensemble_member
+        # Fill in the metadata columns
         upsampled = upsampled.with_columns(
-            h3_index=pl.lit(h3, dtype=pl.UInt64), ensemble_member=pl.lit(ens, dtype=pl.UInt8)
+            h3_index=pl.lit(h3, dtype=pl.UInt64),
+            ensemble_member=pl.lit(ens, dtype=pl.UInt8),
+            init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
+        )
+        # Recalculate lead_time_hours for the new 30m timestamps
+        upsampled = upsampled.with_columns(
+            lead_time_hours=(pl.col("valid_time") - pl.col("init_time"))
+            .dt.total_hours()
+            .cast(pl.Float32)
         )
         upsampled_parts.append(upsampled)
 

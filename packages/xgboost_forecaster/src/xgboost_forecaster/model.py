@@ -63,7 +63,15 @@ class XGBoostForecaster(BaseForecaster):
         # 2. Extract feature matrix using explicit feature names from config
         if not hasattr(self, "config") or not self.config.features.feature_names:
             # Fallback: keep only numeric and categorical columns, excluding the target and h3_index
-            exclude_cols = {"MW", "MVA", "MVAr", "MW_or_MVA", "h3_index", "ensemble_member"}
+            exclude_cols = {
+                "MW",
+                "MVA",
+                "MVAr",
+                "MW_or_MVA",
+                "h3_index",
+                "ensemble_member",
+                "init_time",
+            }
             feature_cols = [
                 c
                 for c in df.columns
@@ -156,14 +164,16 @@ class XGBoostForecaster(BaseForecaster):
                 rename_mapping = {
                     col: f"{prefix}{col}"
                     for col in nwp_lf.collect_schema().names()
-                    if col not in ["valid_time", "h3_index", "ensemble_member"]
+                    if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
                 }
                 prefixed_nwp = nwp_lf.rename(rename_mapping)
 
-                # Join on ensemble_member if it exists in both dataframes
+                # Join on ensemble_member and init_time if they exist in both dataframes
                 join_keys = ["valid_time", "h3_index"]
                 if "ensemble_member" in joined_df_lf.collect_schema().names():
                     join_keys.append("ensemble_member")
+                if "init_time" in joined_df_lf.collect_schema().names():
+                    join_keys.append("init_time")
 
                 joined_df_lf = joined_df_lf.join(
                     prefixed_nwp,
@@ -224,25 +234,35 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
         first_nwp_name = next(iter(nwps))
-        first_nwp = nwps[first_nwp_name]
+
+        # Filter NWPs to the specific init_time requested for inference
+        # If multiple init_times are present, we take the one specified in inference_params
+        target_init_time = inference_params.nwp_init_time
+        filtered_nwps = {}
+        for name, lf in nwps.items():
+            filtered_nwps[name] = lf.filter(pl.col("init_time") == target_init_time)
 
         # FIX: Create a base dataframe with just the keys
-        combined_nwps_lf = first_nwp.select(["valid_time", "h3_index", "ensemble_member"])
+        combined_nwps_lf = filtered_nwps[first_nwp_name].select(
+            ["valid_time", "h3_index", "ensemble_member", "init_time"]
+        )
 
         # FIX: Loop through ALL nwps to apply prefixes consistently
-        for nwp_name, nwp_lf in nwps.items():
+        for nwp_name, nwp_lf in filtered_nwps.items():
             prefix = f"{nwp_name.value}_"
             rename_mapping = {
                 col: f"{prefix}{col}"
                 for col in nwp_lf.collect_schema().names()
-                if col not in ["valid_time", "h3_index", "ensemble_member"]
+                if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
             }
             prefixed_nwp = nwp_lf.rename(rename_mapping)
 
-            # Join on ensemble_member if it exists in both dataframes
+            # Join on ensemble_member and init_time if they exist in both dataframes
             join_keys = ["valid_time", "h3_index"]
             if "ensemble_member" in combined_nwps_lf.collect_schema().names():
                 join_keys.append("ensemble_member")
+            if "init_time" in combined_nwps_lf.collect_schema().names():
+                join_keys.append("init_time")
 
             combined_nwps_lf = combined_nwps_lf.join(
                 prefixed_nwp,
