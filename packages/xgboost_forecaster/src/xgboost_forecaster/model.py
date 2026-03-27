@@ -13,7 +13,7 @@ from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
 )
-from contracts.hydra_schemas import ModelConfig
+from contracts.hydra_schemas import ModelConfig, NwpModel
 from xgboost import XGBRegressor
 
 from ml_core.features import add_cyclical_temporal_features
@@ -68,23 +68,27 @@ class XGBoostForecaster(BaseForecaster):
     def train(  # type: ignore
         self,
         config: ModelConfig,
-        nwp: pt.LazyFrame[ProcessedNwp],
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
         **kwargs,
     ) -> XGBRegressor:
         """Train the XGBoost model.
 
         Args:
             config: The model configuration object.
-            nwp: The weather forecast data.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata containing h3 mapping.
+            nwps: A dictionary of weather forecast dataframes.
+            **kwargs: Additional arguments passed to the underlying train methods.
 
         Returns:
             The trained XGBRegressor model.
         """
         log.info("Starting XGBoost training...")
+
+        if len(config.features.nwps) > 0 and not nwps:
+            raise ValueError("Model config requires NWPs, but none were provided.")
 
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
 
@@ -94,13 +98,25 @@ class XGBoostForecaster(BaseForecaster):
             on="substation_number",
         )
 
-        joined_df = cast(
-            pl.DataFrame,
-            flows_with_h3.join(
-                nwp,
-                on=["valid_time", "h3_index"],
-            ).collect(),
-        )
+        joined_df_lf = flows_with_h3
+        if nwps:
+            for nwp_name, nwp_lf in nwps.items():
+                # Prefix columns to avoid collisions
+                prefix = f"{nwp_name.value}_"
+                rename_mapping = {
+                    col: f"{prefix}{col}"
+                    for col in nwp_lf.collect_schema().names()
+                    if col not in ["valid_time", "h3_index", "ensemble_member"]
+                }
+                prefixed_nwp = nwp_lf.rename(rename_mapping)
+
+                joined_df_lf = joined_df_lf.join(
+                    prefixed_nwp,
+                    on=["valid_time", "h3_index"],
+                    how="left",
+                )
+
+        joined_df = cast(pl.DataFrame, joined_df_lf.collect())
 
         # Prepare features and target
         X = self._prepare_features(joined_df)
@@ -115,7 +131,7 @@ class XGBoostForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        nwp: pt.DataFrame[ProcessedNwp] | None = None,
+        nwps: dict[NwpModel, pt.DataFrame[ProcessedNwp]] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -123,7 +139,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             substation_metadata: The substation metadata containing h3 mapping.
             inference_params: Parameters for inference.
-            nwp: The validated weather forecast data.
+            nwps: A dictionary of weather forecast dataframes.
             **kwargs: Additional arguments (unused).
 
         Returns:
@@ -132,16 +148,48 @@ class XGBoostForecaster(BaseForecaster):
         if self.model is None:
             raise ValueError("Model must be trained before calling predict.")
 
-        if nwp is None:
+        # We need to know which NWPs are required from the model config.
+        # However, XGBoostForecaster doesn't store the config.
+        # For now, we assume if nwps is provided, we use it.
+        # In a more robust implementation, we might store the feature names.
+
+        # Expand metadata to all substations
+        metadata_df = substation_metadata.select(["substation_number", "h3_res_5"])
+
+        # We'll start with the metadata and join NWPs to it.
+        # This is slightly different from train because we don't have power flows.
+        # We need a base dataframe with valid_time.
+        # We'll take the first NWP as the base for valid_time and ensemble_member.
+
+        if not nwps:
+            # If no NWPs, we might be in a pure AR mode, but XGBoostForecaster
+            # currently expects weather. Let's fail loudly if nwps is missing
+            # but we expect it.
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
-        # Expand NWP to all substations
-        metadata_df = substation_metadata.select(["substation_number", "h3_res_5"])
-        df = nwp.join(
+        first_nwp_name = next(iter(nwps))
+        first_nwp = nwps[first_nwp_name]
+
+        df = first_nwp.select(["valid_time", "h3_index", "ensemble_member"]).join(
             metadata_df.rename({"h3_res_5": "h3_index"}),
             on="h3_index",
             how="inner",
         )
+
+        for nwp_name, nwp_df in nwps.items():
+            prefix = f"{nwp_name.value}_"
+            rename_mapping = {
+                col: f"{prefix}{col}"
+                for col in nwp_df.columns
+                if col not in ["valid_time", "h3_index", "ensemble_member"]
+            }
+            prefixed_nwp = nwp_df.rename(rename_mapping)
+
+            df = df.join(
+                prefixed_nwp,
+                on=["valid_time", "h3_index", "ensemble_member"],
+                how="left",
+            )
 
         # Prepare features (must match training features)
         X = self._prepare_features(df)

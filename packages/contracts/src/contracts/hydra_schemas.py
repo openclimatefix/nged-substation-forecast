@@ -31,7 +31,7 @@ class NwpModel(str, Enum):
 class ModelFeaturesConfig(BaseModel):
     """Configuration for model features."""
 
-    nwp: NwpModel
+    nwps: list[NwpModel] = Field(default_factory=list)
 
 
 class ModelConfig(BaseModel):

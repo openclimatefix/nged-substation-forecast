@@ -5,7 +5,7 @@ from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 
-from contracts.hydra_schemas import TrainingConfig
+from contracts.hydra_schemas import NwpModel, TrainingConfig
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 
 from xgboost_forecaster.model import XGBoostForecaster
@@ -45,7 +45,7 @@ def train_xgboost(
         trainer=XGBoostForecaster(),
         config=config,
         flavor="xgboost",
-        nwp=nwp,
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
     )
@@ -72,6 +72,6 @@ def evaluate_xgboost(
         model_name=model_name,
         forecaster=XGBoostForecaster(model),
         config=config,
-        nwp=nwp,
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_metadata=substation_metadata,
     )

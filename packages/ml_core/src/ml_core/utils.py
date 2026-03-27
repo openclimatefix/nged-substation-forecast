@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 import dagster as dg
 import mlflow
@@ -8,6 +9,26 @@ from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
 
 log = logging.getLogger(__name__)
+
+
+def _slice_temporal_data(data: Any, start: str, end: str) -> Any:
+    """Recursively slice temporal data (LazyFrames, DataFrames, or dicts thereof)."""
+    if isinstance(data, dict):
+        return {k: _slice_temporal_data(v, start, end) for k, v in data.items()}
+
+    if isinstance(data, (pl.LazyFrame, pl.DataFrame)):
+        # We assume all feature assets have a time-based column.
+        # For power flows it's 'timestamp', for NWP it's 'valid_time'.
+        # We check the schema to find which one exists.
+        cols = data.collect_schema().names() if isinstance(data, pl.LazyFrame) else data.columns
+        time_col = "timestamp" if "timestamp" in cols else "valid_time"
+
+        if time_col not in cols:
+            return data
+
+        return data.filter(pl.col(time_col).is_between(start, end))
+
+    return data
 
 
 def train_and_log_model(
@@ -36,14 +57,11 @@ def train_and_log_model(
     train_end = config.data_split.train_end
 
     sliced_data = {}
-    for key, lf in kwargs.items():
+    for key, val in kwargs.items():
         if key == "substation_metadata":
-            sliced_data[key] = lf
+            sliced_data[key] = val
             continue
-        # We assume all feature assets have a time-based column.
-        # For power flows it's 'timestamp', for NWP it's 'valid_time'.
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
-        sliced_data[key] = lf.filter(pl.col(time_col).is_between(train_start, train_end))
+        sliced_data[key] = _slice_temporal_data(val, train_start, train_end)
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
@@ -87,12 +105,20 @@ def evaluate_and_save_model(
     test_end = config.data_split.test_end
 
     sliced_data = {}
-    for key, lf in kwargs.items():
+    for key, val in kwargs.items():
         if key == "substation_metadata":
-            sliced_data[key] = lf.collect() if isinstance(lf, pl.LazyFrame) else lf
+            sliced_data[key] = val.collect() if isinstance(val, pl.LazyFrame) else val
             continue
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
-        sliced_data[key] = lf.filter(pl.col(time_col).is_between(test_start, test_end)).collect()
+
+        sliced = _slice_temporal_data(val, test_start, test_end)
+
+        # Collect LazyFrames into DataFrames for inference
+        if isinstance(sliced, dict):
+            sliced_data[key] = {
+                k: (v.collect() if isinstance(v, pl.LazyFrame) else v) for k, v in sliced.items()
+            }
+        else:
+            sliced_data[key] = sliced.collect() if isinstance(sliced, pl.LazyFrame) else sliced
 
     # 2. Call the Model-Specific Inference
     # Construct InferenceParams. We use the current time for nwp_init_time

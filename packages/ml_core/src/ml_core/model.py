@@ -13,7 +13,7 @@ from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
 )
-from contracts.hydra_schemas import ModelConfig
+from contracts.hydra_schemas import ModelConfig, NwpModel
 
 log = logging.getLogger(__name__)
 
@@ -83,18 +83,18 @@ class LocalForecasters(BaseForecaster):
     def train(  # type: ignore
         self,
         config: ModelConfig,
-        nwp: pt.LazyFrame[ProcessedNwp],
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
         **kwargs,
     ) -> "LocalForecasters":
         """Train a separate model for each substation.
 
         Args:
             config: Model configuration object.
-            nwp: The weather forecast data.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata.
+            nwps: A dictionary of weather forecast dataframes.
             **kwargs: Additional arguments passed to the underlying train methods.
 
         Returns:
@@ -112,9 +112,9 @@ class LocalForecasters(BaseForecaster):
             model = self.forecaster_cls(**self.forecaster_kwargs)
             model.train(
                 config=config,
-                nwp=nwp,
                 substation_power_flows=sub_flows,
                 substation_metadata=sub_meta,
+                nwps=nwps,
                 **kwargs,
             )
             self.models[sub_num] = model
@@ -125,7 +125,7 @@ class LocalForecasters(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        nwp: pt.DataFrame[ProcessedNwp] | None = None,
+        nwps: dict[NwpModel, pt.DataFrame[ProcessedNwp]] | None = None,
         substation_power_flows: pt.DataFrame[SubstationFlows] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
@@ -134,7 +134,7 @@ class LocalForecasters(BaseForecaster):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            nwp: The weather forecast data.
+            nwps: A dictionary of weather forecast dataframes.
             substation_power_flows: The historical power flow data (optional, for lags).
             **kwargs: Additional arguments passed to the underlying predict methods.
 
@@ -152,10 +152,13 @@ class LocalForecasters(BaseForecaster):
             sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
 
             # Filter optional inputs if they exist
-            sub_nwp = None
-            if nwp is not None:
+            sub_nwps = None
+            if nwps is not None:
                 h3_indices = sub_meta["h3_res_5"].unique().to_list()
-                sub_nwp = nwp.filter(pl.col("h3_index").is_in(h3_indices))
+                sub_nwps = {
+                    name: lf.filter(pl.col("h3_index").is_in(h3_indices))
+                    for name, lf in nwps.items()
+                }
 
             sub_flows = None
             if substation_power_flows is not None:
@@ -164,7 +167,7 @@ class LocalForecasters(BaseForecaster):
             preds = self.models[sub_num].predict(
                 substation_metadata=sub_meta,
                 inference_params=inference_params,
-                nwp=sub_nwp,
+                nwps=sub_nwps,
                 substation_power_flows=sub_flows,
                 **kwargs,
             )
