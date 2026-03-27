@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
+# Define our standard datetime type for all schemas
+UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
+
+
 class MissingCorePowerVariablesError(ValueError):
     """Raised when a substation CSV lacks both MW and MVA data."""
 
@@ -19,7 +23,7 @@ class MissingCorePowerVariablesError(ValueError):
 
 
 class SubstationFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     # The unique identifier for the substation.
     substation_number: int = pt.Field(dtype=pl.Int32)
@@ -41,7 +45,7 @@ class SubstationFlows(pt.Model):
     # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
     # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
     # we didn't record when the data was ingested).
-    ingested_at: datetime | None = pt.Field(dtype=pl.Datetime(time_zone="UTC"), allow_missing=True)
+    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE, allow_missing=True)
 
     @classmethod
     def validate(
@@ -87,7 +91,7 @@ class SubstationFlows(pt.Model):
 
 
 class SimplifiedSubstationFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
@@ -135,13 +139,13 @@ class SubstationMetadata(pt.Model):
     h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
 
     # When this metadata record was last updated from the upstream NGED datasets.
-    last_updated: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
 
 class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts."""
 
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
@@ -149,10 +153,10 @@ class PowerForecast(pt.Model):
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
 
     # The datetime that the power forecast was initialised.
-    power_fcst_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    power_fcst_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     # The datetime that the underlying weather forecast was initialised.
-    nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     # Year and month of the power forecast initialisation (for partitioning).
     power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
@@ -182,8 +186,8 @@ class InferenceParams(BaseModel):
 class Nwp(pt.Model):
     """Weather data schema for NWP forecasts."""
 
-    init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
@@ -252,7 +256,7 @@ class Nwp(pt.Model):
 class ProcessedNwp(pt.Model):
     """Weather data after ensemble selection and interpolation."""
 
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     h3_index: int = pt.Field(dtype=pl.UInt64)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
 
@@ -275,7 +279,7 @@ class ProcessedNwp(pt.Model):
 class SubstationFeatures(pt.Model):
     """Final joined dataset ready for XGBoost."""
 
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
