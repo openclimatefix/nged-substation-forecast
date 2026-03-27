@@ -38,8 +38,16 @@ class ModelFeaturesConfig(BaseModel):
 class ModelConfig(BaseModel):
     """Configuration for the ML model."""
 
-    power_fcst_model_name: str
-    trainer_class: str | None = None
+    power_fcst_model_name: str = Field(
+        ...,
+        description=(
+            "A unique identifier for this model configuration. This name is used to label "
+            "predictions in the evaluation results and to identify the model in MLflow. "
+            "Users should use this as free text to describe substantial differences between "
+            "different versions of the same underlying model (e.g., 'xgboost_baseline', "
+            "'xgboost_with_solar_features')."
+        ),
+    )
     hyperparameters: XGBoostHyperparameters
     features: ModelFeaturesConfig
 

@@ -1,6 +1,6 @@
 ---
 description: Generate an Architecture Decision Record (ADR)
-agent: Architect
+agent: architect
 ---
 We just finalized a major architectural decision. Please generate an Architecture Decision Record (ADR) using the template format we use for this project, which you can find at @docs/architecture_decision_records/template.md
 

@@ -20,7 +20,6 @@ def test_valid_training_config():
         },
         "model": {
             "power_fcst_model_name": "xgboost",
-            "trainer_class": "xgboost_forecaster.trainer.XGBoostTrainer",
             "hyperparameters": {
                 "learning_rate": 0.01,
                 "n_estimators": 100,
