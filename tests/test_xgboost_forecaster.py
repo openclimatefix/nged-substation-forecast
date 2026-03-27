@@ -240,6 +240,7 @@ def test_prepare_training_data_prevents_row_explosion():
                     "h3_index": 1,
                     "ensemble_member": ens,
                     "temperature_2m": 10.0,
+                    "lead_time_hours": (valid_time - init_time).total_seconds() / 3600,
                 }
             )
     nwp = pl.DataFrame(nwp_rows).lazy()
@@ -297,3 +298,88 @@ def test_train_xgboost_asset_filters_to_control_member():
         # Should only contain member 0
         assert len(passed_nwp) == 1
         assert passed_nwp["ensemble_member"][0] == 0
+
+
+def test_latest_available_weekly_lag_prevents_leakage():
+    # Test that the dynamic lag logic correctly switches from 7d to 14d
+    # when lead_time_hours > 168 (7 days)
+
+    valid_time = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)
+
+    # Case 1: lead_time = 24h (1 day) -> should use 7d lag
+    init_time_short = valid_time - timedelta(days=1)
+
+    # Case 2: lead_time = 240h (10 days) -> should use 14d lag
+    init_time_long = valid_time - timedelta(days=10)
+
+    # Power flows
+    flows = pl.DataFrame(
+        {
+            "timestamp": [
+                valid_time,  # Target row
+                valid_time - timedelta(days=7),
+                valid_time - timedelta(days=14),
+            ],
+            "substation_number": [1, 1, 1],
+            "MW": [100.0, 77.0, 1414.0],  # Distinct values for 7d and 14d lags
+            "MVA": [100.0, 77.0, 1414.0],
+        }
+    ).lazy()
+
+    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+
+    nwp = pl.DataFrame(
+        [
+            {
+                "init_time": init_time_short,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+                "lead_time_hours": 24.0,
+            },
+            {
+                "init_time": init_time_long,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+                "lead_time_hours": 240.0,
+            },
+        ]
+    ).lazy()
+
+    config = ModelConfig(
+        power_fcst_model_name="test",
+        hyperparameters=XGBoostHyperparameters(),
+        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+    )
+
+    forecaster = XGBoostForecaster()
+
+    import patito as pt
+    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+
+    with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.train(
+            config=config,
+            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+        )
+
+        X_arrow = mock_fit.call_args[0][0]
+        X = cast(pl.DataFrame, pl.from_arrow(X_arrow))
+
+        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0
+        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0
+        # Note: Polars might reorder rows, so we filter
+
+        # We need to find which row is which. We can use lead_time_hours if it's in X.
+        # It should be there because it's numeric and not in exclude_cols.
+
+        row_short = X.filter(pl.col("ecmwf_ens_0_25deg_lead_time_hours") == 24.0)
+        assert row_short["latest_available_weekly_lag"][0] == 77.0
+
+        row_long = X.filter(pl.col("ecmwf_ens_0_25deg_lead_time_hours") == 240.0)
+        assert row_long["latest_available_weekly_lag"][0] == 1414.0

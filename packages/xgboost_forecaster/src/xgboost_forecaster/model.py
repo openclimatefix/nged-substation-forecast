@@ -1,7 +1,7 @@
 """XGBoost implementation of the Forecaster interface."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import cast
 
 import patito as pt
@@ -161,6 +161,23 @@ class XGBoostForecaster(BaseForecaster):
                     how="left",
                 )
 
+        # 3. Create dynamic seasonal lag to prevent data leakage for week-2 forecasts.
+        # In production, when predicting > 7 days ahead, the 7-day lag is in the future.
+        # We switch to the 14-day lag for these horizons.
+        seven_days_h = timedelta(days=7).total_seconds() / 3600
+        joined_df_lf = (
+            joined_df_lf.with_columns(
+                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
+                / 60.0
+            )
+            .with_columns(
+                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
+                .then(pl.col("power_lag_7d"))
+                .otherwise(pl.col("power_lag_14d"))
+            )
+            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
+        )
+
         joined_df = cast(pl.DataFrame, joined_df_lf.collect())
 
         # Prepare features and target
@@ -216,11 +233,17 @@ class XGBoostForecaster(BaseForecaster):
         first_nwp_name = next(iter(nwps))
 
         # Filter NWPs to the specific init_time requested for inference
-        # If multiple init_times are present, we take the one specified in inference_params
+        # If multiple init_times are present, we take the most recent one at or before target_init_time
         target_init_time = inference_params.nwp_init_time
         filtered_nwps = {}
         for name, lf in nwps.items():
-            filtered_nwps[name] = lf.filter(pl.col("init_time") == target_init_time)
+            # Robust "as-of" filter: take the latest run available at or before target_init_time
+            filtered_nwps[name] = (
+                lf.filter(pl.col("init_time") <= target_init_time)
+                .sort("init_time")
+                .group_by(["valid_time", "h3_index", "ensemble_member"])
+                .last()
+            )
 
         # FIX: Create a base dataframe with just the keys
         combined_nwps_lf = filtered_nwps[first_nwp_name].select(
@@ -278,6 +301,21 @@ class XGBoostForecaster(BaseForecaster):
             df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
                 lag_14d, on=["substation_number", "valid_time"], how="left"
             )
+
+        # 5. Create dynamic seasonal lag (same logic as train)
+        seven_days_h = timedelta(days=7).total_seconds() / 3600
+        df_lf = (
+            df_lf.with_columns(
+                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
+                / 60.0
+            )
+            .with_columns(
+                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
+                .then(pl.col("power_lag_7d"))
+                .otherwise(pl.col("power_lag_14d"))
+            )
+            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
+        )
 
         df = cast(pl.DataFrame, df_lf.collect())
 
