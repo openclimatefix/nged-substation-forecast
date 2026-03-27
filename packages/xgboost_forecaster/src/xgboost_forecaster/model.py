@@ -131,7 +131,7 @@ class XGBoostForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        nwps: dict[NwpModel, pt.DataFrame[ProcessedNwp]] | None = None,
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -139,7 +139,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             substation_metadata: The substation metadata containing h3 mapping.
             inference_params: Parameters for inference.
-            nwps: A dictionary of weather forecast dataframes.
+            nwps: A dictionary of weather forecast lazyframes.
             **kwargs: Additional arguments (unused).
 
         Returns:
@@ -170,26 +170,28 @@ class XGBoostForecaster(BaseForecaster):
         first_nwp_name = next(iter(nwps))
         first_nwp = nwps[first_nwp_name]
 
-        df = first_nwp.select(["valid_time", "h3_index", "ensemble_member"]).join(
-            metadata_df.rename({"h3_res_5": "h3_index"}),
+        df_lf = first_nwp.select(["valid_time", "h3_index", "ensemble_member"]).join(
+            metadata_df.rename({"h3_res_5": "h3_index"}).lazy(),
             on="h3_index",
             how="inner",
         )
 
-        for nwp_name, nwp_df in nwps.items():
+        for nwp_name, nwp_lf in nwps.items():
             prefix = f"{nwp_name.value}_"
             rename_mapping = {
                 col: f"{prefix}{col}"
-                for col in nwp_df.columns
+                for col in nwp_lf.collect_schema().names()
                 if col not in ["valid_time", "h3_index", "ensemble_member"]
             }
-            prefixed_nwp = nwp_df.rename(rename_mapping)
+            prefixed_nwp = nwp_lf.rename(rename_mapping)
 
-            df = df.join(
+            df_lf = df_lf.join(
                 prefixed_nwp,
                 on=["valid_time", "h3_index", "ensemble_member"],
                 how="left",
             )
+
+        df = cast(pl.DataFrame, df_lf.collect())
 
         # Prepare features (must match training features)
         X = self._prepare_features(df)

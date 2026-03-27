@@ -9,11 +9,10 @@ import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    ProcessedNwp,
     SubstationFlows,
     SubstationMetadata,
 )
-from contracts.hydra_schemas import ModelConfig, NwpModel
+from contracts.hydra_schemas import ModelConfig
 
 log = logging.getLogger(__name__)
 
@@ -54,7 +53,8 @@ class BaseForecaster(ABC):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            **kwargs: Model-specific data inputs (e.g., nwp, power flows).
+            **kwargs: Model-specific data inputs (e.g., nwps, substation_power_flows).
+                These should generally be passed as LazyFrames where possible.
 
         Returns:
             A Patito DataFrame containing the model's predictions.
@@ -122,8 +122,7 @@ class LocalForecasters(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        nwps: dict[NwpModel, pt.DataFrame[ProcessedNwp]] | None = None,
-        substation_power_flows: pt.DataFrame[SubstationFlows] | None = None,
+        substation_power_flows: pt.LazyFrame[SubstationFlows] | None = None,
         **kwargs,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts by routing to local models.
@@ -131,9 +130,8 @@ class LocalForecasters(BaseForecaster):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            nwps: A dictionary of weather forecast dataframes.
             substation_power_flows: The historical power flow data (optional, for lags).
-            **kwargs: Additional arguments passed to the underlying predict methods.
+            **kwargs: Additional arguments passed to the underlying predict methods (e.g., nwps).
 
         Returns:
             A concatenated Patito DataFrame of PowerForecasts.
@@ -149,14 +147,6 @@ class LocalForecasters(BaseForecaster):
             sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
 
             # Filter optional inputs if they exist
-            sub_nwps = None
-            if nwps is not None:
-                h3_indices = sub_meta["h3_res_5"].unique().to_list()
-                sub_nwps = {
-                    name: lf.filter(pl.col("h3_index").is_in(h3_indices))
-                    for name, lf in nwps.items()
-                }
-
             sub_flows = None
             if substation_power_flows is not None:
                 sub_flows = substation_power_flows.filter(pl.col("substation_number") == sub_num)
@@ -164,7 +154,6 @@ class LocalForecasters(BaseForecaster):
             preds = self.models[sub_num].predict(
                 substation_metadata=sub_meta,
                 inference_params=inference_params,
-                nwps=sub_nwps,
                 substation_power_flows=sub_flows,
                 **kwargs,
             )
