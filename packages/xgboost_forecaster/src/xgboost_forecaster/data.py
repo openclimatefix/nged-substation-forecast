@@ -121,7 +121,7 @@ def construct_historical_weather(
     if not weather_dfs:
         raise RuntimeError(f"No weather data found for H3 indices in range {start_date}-{end_date}")
 
-    # Combine and keep the latest forecast for each valid_time/h3_index/ensemble_member
+    # Combine all forecasts to retain a distribution of lead times
     combined = pl.concat(weather_dfs, how="diagonal")
     combined = combined.sort(["h3_index", "ensemble_member", "valid_time", "init_time"])
 
@@ -171,19 +171,6 @@ def process_weather_data(
         weather_df = cast(pl.DataFrame, weather)
 
     # Resample and Interpolate to match target resolution
-    ts_min, ts_max = weather_df.select(
-        min=pl.col("valid_time").min(), max=pl.col("valid_time").max()
-    ).row(0)
-
-    if ts_min is None or ts_max is None:
-        raise RuntimeError("No timestamps found in weather data for interpolation")
-
-    time_grid = (
-        pl.datetime_range(ts_min, ts_max, interval=config.resolution, time_zone="UTC", eager=True)
-        .alias("valid_time")
-        .to_frame()
-    )
-
     group_cols_only_idx = ["h3_index", "init_time"]
     if selection == EnsembleSelection.ALL:
         group_cols_only_idx.append("ensemble_member")
@@ -193,11 +180,9 @@ def process_weather_data(
     upsampled_parts = []
     for group in groups.iter_rows(named=True):
         group_df = weather_df.filter([pl.col(k) == v for k, v in group.items()]).sort("valid_time")
-        upsampled = time_grid.join(group_df, on="valid_time", how="left")
-        # Interpolate only the weather variables, not the group columns
-        upsampled = upsampled.with_columns(
-            [pl.col(c).fill_null(strategy="forward") for c in nwp_vars]
-        )
+        upsampled = group_df.upsample(time_column="valid_time", every=config.resolution)
+        # Interpolate only the weather variables
+        upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
         # Fill in the group columns
         upsampled = upsampled.with_columns(
             [pl.lit(v, dtype=weather_df.schema[k]).alias(k) for k, v in group.items()]
