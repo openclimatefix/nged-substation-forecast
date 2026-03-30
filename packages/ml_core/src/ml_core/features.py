@@ -23,8 +23,16 @@ def add_cyclical_temporal_features(df: T, time_col: str = "valid_time") -> T:
         T,
         cast(Any, df).with_columns(
             # Cyclical Hour (24h)
-            hour_sin=(pl.col(time_col).dt.hour() * 2 * np.pi / 24).sin().cast(pl.Float32),
-            hour_cos=(pl.col(time_col).dt.hour() * 2 * np.pi / 24).cos().cast(pl.Float32),
+            hour_sin=(
+                (pl.col(time_col).dt.hour() + pl.col(time_col).dt.minute() / 60.0) * 2 * np.pi / 24
+            )
+            .sin()
+            .cast(pl.Float32),
+            hour_cos=(
+                (pl.col(time_col).dt.hour() + pl.col(time_col).dt.minute() / 60.0) * 2 * np.pi / 24
+            )
+            .cos()
+            .cast(pl.Float32),
             # Cyclical Day of Year (365.25d)
             day_of_year_sin=(pl.col(time_col).dt.ordinal_day() * 2 * np.pi / 365.25)
             .sin()

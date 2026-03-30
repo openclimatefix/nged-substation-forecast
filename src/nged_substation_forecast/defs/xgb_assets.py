@@ -75,8 +75,8 @@ def evaluate_xgboost(
     model_name = "xgboost"
     config = load_hydra_config(model_name)
 
-    # Note: We must inject config into the forecaster so it can build features
-    forecaster = XGBoostForecaster(model)
+    # The Dagster asset now returns the full XGBoostForecaster instance
+    forecaster = model
     forecaster.config = config.model
 
     return evaluate_and_save_model(

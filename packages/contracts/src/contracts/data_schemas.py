@@ -111,6 +111,13 @@ class SimplifiedSubstationFlows(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
+class SubstationTargetMap(pt.Model):
+    """Map of substation_number to the target column (MW or MVA) to use."""
+
+    substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
+    target_col: str = pt.Field(dtype=pl.String)
+
+
 class SubstationLocations(pt.Model):
     """The data structure of the raw substation location data from NGED."""
 
@@ -269,6 +276,20 @@ class Nwp(pt.Model):
         return cast(pt.DataFrame["Nwp"], validated_df)
 
 
+class NwpColumns:
+    """Constants for NWP column names."""
+
+    VALID_TIME = "valid_time"
+    INIT_TIME = "init_time"
+    LEAD_TIME_HOURS = "lead_time_hours"
+    H3_INDEX = "h3_index"
+    ENSEMBLE_MEMBER = "ensemble_member"
+    TEMPERATURE_2M = "temperature_2m"
+    WIND_SPEED_10M = "wind_speed_10m"
+    WIND_DIRECTION_10M = "wind_direction_10m"
+    SW_RADIATION = "downward_short_wave_radiation_flux_surface"
+
+
 class ProcessedNwp(pt.Model):
     """Weather data after ensemble selection and interpolation.
 
@@ -333,8 +354,6 @@ class SubstationFeatures(pt.Model):
     )
 
     # Physical features
-    wind_speed_10m_phys: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    wind_direction_10m_phys: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather lags/trends

@@ -3,7 +3,9 @@
 import polars as pl
 
 
-def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
+def downsample_power_flows(
+    flows: pl.LazyFrame, target_map: pl.LazyFrame | None = None
+) -> pl.LazyFrame:
     """Downsample power flows to 30m using period-ending semantics.
 
     We assume that NWP data represents the average (or accumulated) value for the
@@ -16,11 +18,12 @@ def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
 
     Args:
         flows: Historical power flow data.
+        target_map: Optional map of substation_number to target_col (MW or MVA).
 
     Returns:
         Downsampled power flows.
     """
-    return (
+    downsampled = (
         flows.sort("timestamp")
         .group_by_dynamic(
             "timestamp",
@@ -35,15 +38,43 @@ def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
                 pl.col("MVA").mean(),
             ]
         )
-        .with_columns(
-            mw_count=pl.col("MW").is_not_null().sum().over("substation_number"),
-            mva_count=pl.col("MVA").is_not_null().sum().over("substation_number"),
-        )
-        .with_columns(
-            pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-            .then(pl.col("MW"))
-            .otherwise(pl.col("MVA"))
-            .alias("MW_or_MVA")
-        )
-        .drop(["mw_count", "mva_count"])
     )
+
+    if target_map is not None:
+        downsampled = downsampled.join(target_map, on="substation_number", how="left")
+
+        return (
+            downsampled.with_columns(
+                mw_count=pl.when(pl.col("target_col").is_null())
+                .then(pl.col("MW").is_not_null().sum().over("substation_number"))
+                .otherwise(0),
+                mva_count=pl.when(pl.col("target_col").is_null())
+                .then(pl.col("MVA").is_not_null().sum().over("substation_number"))
+                .otherwise(0),
+            )
+            .with_columns(
+                pl.when(pl.col("target_col") == "MW")
+                .then(pl.col("MW"))
+                .when(pl.col("target_col") == "MVA")
+                .then(pl.col("MVA"))
+                .when(pl.col("mw_count") >= pl.col("mva_count"))
+                .then(pl.col("MW"))
+                .otherwise(pl.col("MVA"))
+                .alias("MW_or_MVA")
+            )
+            .drop(["target_col", "mw_count", "mva_count"])
+        )
+    else:
+        return (
+            downsampled.with_columns(
+                mw_count=pl.col("MW").is_not_null().sum().over("substation_number"),
+                mva_count=pl.col("MVA").is_not_null().sum().over("substation_number"),
+            )
+            .with_columns(
+                pl.when(pl.col("mw_count") >= pl.col("mva_count"))
+                .then(pl.col("MW"))
+                .otherwise(pl.col("MVA"))
+                .alias("MW_or_MVA")
+            )
+            .drop(["mw_count", "mva_count"])
+        )

@@ -2,7 +2,7 @@ import pytest
 import polars as pl
 import patito as pt
 from datetime import datetime, timezone, timedelta
-from typing import cast
+from typing import Any, cast
 from unittest.mock import MagicMock
 from patito.exceptions import DataFrameValidationError
 from contracts.data_schemas import (
@@ -175,8 +175,8 @@ def test_xgboost_forecaster_train_with_infs():
 def test_xgboost_forecaster_predict_with_nans():
     """Test that predict raises ValueError if input features contain NaNs."""
     forecaster = XGBoostForecaster()
-    forecaster.model = MagicMock()
-    forecaster.model.feature_names_in_ = [
+    mock_model = MagicMock()
+    mock_model.feature_names_in_ = [
         "temperature_2m",
         "latest_available_weekly_lag",
         "hour_sin",
@@ -185,6 +185,7 @@ def test_xgboost_forecaster_predict_with_nans():
         "day_of_year_cos",
         "day_of_week",
     ]
+    forecaster.model = cast(Any, mock_model)
 
     valid_time = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
     metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
