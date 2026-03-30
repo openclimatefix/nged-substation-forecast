@@ -322,7 +322,11 @@ class XGBoostForecaster(BaseForecaster):
         elif hasattr(self, "feature_names") and self.feature_names:
             X = X.select(self.feature_names)
 
-        preds = self.model.predict(X.to_arrow())
+        if X.is_empty():
+            log.warning("Feature matrix X is empty. Returning empty predictions.")
+            preds = []
+        else:
+            preds = self.model.predict(X.to_arrow())
 
         # Return predictions with correct schema
         now = datetime.now(timezone.utc)
