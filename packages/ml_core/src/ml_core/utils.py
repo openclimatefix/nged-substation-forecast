@@ -114,7 +114,7 @@ def evaluate_and_save_model(
 
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data
-    nwp_init_time = datetime.now(timezone.utc)
+    forecast_time = datetime.now(timezone.utc)
     if "nwps" in sliced_data:
         # Assuming nwps is a dictionary or list of LazyFrames
         nwps_data = sliced_data["nwps"]
@@ -123,20 +123,20 @@ def evaluate_and_save_model(
             if isinstance(first_nwp, pl.LazyFrame):
                 df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
                 if not df.is_empty():
-                    nwp_init_time = df.item()
+                    forecast_time = df.item() + timedelta(hours=3)
         elif isinstance(nwps_data, list) and nwps_data:
             first_nwp = nwps_data[0]
             if isinstance(first_nwp, pl.LazyFrame):
                 df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
                 if not df.is_empty():
-                    nwp_init_time = df.item()
+                    forecast_time = df.item() + timedelta(hours=3)
         elif isinstance(nwps_data, pl.LazyFrame):
             df = cast(pl.DataFrame, nwps_data.select(pl.col("init_time").max()).collect())
             if not df.is_empty():
-                nwp_init_time = df.item()
+                forecast_time = df.item() + timedelta(hours=3)
 
     inference_params = InferenceParams(
-        nwp_init_time=nwp_init_time,
+        forecast_time=forecast_time,
         power_fcst_model_name=model_name,
     )
 
@@ -186,7 +186,7 @@ def evaluate_and_save_model(
 
             # Calculate lead_time_hours
             eval_df = eval_df.with_columns(
-                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
+                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
                 / 60.0
             )
 

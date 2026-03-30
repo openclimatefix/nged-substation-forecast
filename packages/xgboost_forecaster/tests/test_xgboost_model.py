@@ -66,6 +66,15 @@ def test_xgboost_forecaster_train_and_predict():
                 "h3_index": [123] * len(nwp_timestamps),
                 "ensemble_member": [0] * len(nwp_timestamps),
                 "temperature_2m": [15.0] * len(nwp_timestamps),
+                "dew_point_temperature_2m": [10.0] * len(nwp_timestamps),
+                "wind_speed_10m": [5.0] * len(nwp_timestamps),
+                "wind_direction_10m": [180.0] * len(nwp_timestamps),
+                "wind_speed_100m": [7.0] * len(nwp_timestamps),
+                "wind_direction_100m": [185.0] * len(nwp_timestamps),
+                "pressure_surface": [100.0] * len(nwp_timestamps),
+                "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
+                "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()
     }
@@ -93,7 +102,7 @@ def test_xgboost_forecaster_train_and_predict():
 
     # Predict
     inference_params = InferenceParams(
-        nwp_init_time=datetime(2026, 1, 15, 3, tzinfo=timezone.utc),
+        forecast_time=datetime(2026, 1, 15, 3, tzinfo=timezone.utc),
         power_fcst_model_name="xgboost",
     )
 
@@ -114,6 +123,15 @@ def test_xgboost_forecaster_train_and_predict():
                 "h3_index": [123] * len(predict_timestamps),
                 "ensemble_member": [0] * len(predict_timestamps),
                 "temperature_2m": [15.0] * len(predict_timestamps),
+                "dew_point_temperature_2m": [10.0] * len(predict_timestamps),
+                "wind_speed_10m": [5.0] * len(predict_timestamps),
+                "wind_direction_10m": [180.0] * len(predict_timestamps),
+                "wind_speed_100m": [7.0] * len(predict_timestamps),
+                "wind_direction_100m": [185.0] * len(predict_timestamps),
+                "pressure_surface": [100.0] * len(predict_timestamps),
+                "pressure_reduced_to_mean_sea_level": [101.0] * len(predict_timestamps),
+                "geopotential_height_500hpa": [50.0] * len(predict_timestamps),
+                "categorical_precipitation_type_surface": [0.0] * len(predict_timestamps),
             }
         ).lazy()
     }
@@ -180,6 +198,15 @@ def test_xgboost_forecaster_predict_empty():
                 "h3_index": [123] * len(nwp_timestamps),
                 "ensemble_member": [0] * len(nwp_timestamps),
                 "temperature_2m": [15.0] * len(nwp_timestamps),
+                "dew_point_temperature_2m": [10.0] * len(nwp_timestamps),
+                "wind_speed_10m": [5.0] * len(nwp_timestamps),
+                "wind_direction_10m": [180.0] * len(nwp_timestamps),
+                "wind_speed_100m": [7.0] * len(nwp_timestamps),
+                "wind_direction_100m": [185.0] * len(nwp_timestamps),
+                "pressure_surface": [100.0] * len(nwp_timestamps),
+                "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
+                "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()
     }
@@ -203,9 +230,9 @@ def test_xgboost_forecaster_predict_empty():
         nwps=nwps,
     )
 
-    # Predict with nwp_init_time BEFORE any available NWPs
+    # Predict with forecast_time BEFORE any available NWPs
     inference_params = InferenceParams(
-        nwp_init_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        forecast_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
         power_fcst_model_name="xgboost",
     )
 
@@ -218,6 +245,15 @@ def test_xgboost_forecaster_predict_empty():
                 "h3_index": [123] * len(nwp_timestamps),
                 "ensemble_member": [0] * len(nwp_timestamps),
                 "temperature_2m": [15.0] * len(nwp_timestamps),
+                "dew_point_temperature_2m": [10.0] * len(nwp_timestamps),
+                "wind_speed_10m": [5.0] * len(nwp_timestamps),
+                "wind_direction_10m": [180.0] * len(nwp_timestamps),
+                "wind_speed_100m": [7.0] * len(nwp_timestamps),
+                "wind_direction_100m": [185.0] * len(nwp_timestamps),
+                "pressure_surface": [100.0] * len(nwp_timestamps),
+                "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
+                "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()
     }

@@ -116,7 +116,7 @@ def test_local_forecasters():
 
     # Predict
     inference_params = InferenceParams(
-        nwp_init_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        forecast_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
         power_fcst_model_name="mock",
     )
 

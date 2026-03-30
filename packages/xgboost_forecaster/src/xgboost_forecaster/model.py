@@ -117,7 +117,8 @@ class XGBoostForecaster(BaseForecaster):
         # 2. Calculate the required lag dynamically to strictly prevent lookahead bias
         df = (
             df.with_columns(
-                lead_time_days=(pl.col("valid_time") - pl.col("init_time")).dt.total_days()
+                lead_time_days=(pl.col("valid_time") - pl.col("init_time")).dt.total_seconds()
+                / (24 * 3600)
             )
             .with_columns(
                 lag_days=pl.max_horizontal(
@@ -402,7 +403,7 @@ class XGBoostForecaster(BaseForecaster):
         # The 3-hour availability delay is already handled during the multi-NWP join_asof in train.
         combined_nwps_lf = self._prepare_and_join_nwps(
             nwps,
-            nwp_cutoff=inference_params.nwp_init_time,
+            nwp_cutoff=inference_params.forecast_time,
             collapse_lead_times=collapse_lead_times,
         )
 
@@ -516,7 +517,7 @@ class XGBoostForecaster(BaseForecaster):
         preds = preds * peak_capacities
 
         # Return predictions with correct schema
-        fcst_init_time = inference_params.nwp_init_time
+        fcst_init_time = inference_params.forecast_time
         model_name = inference_params.power_fcst_model_name or "xgboost_global"
 
         res = (

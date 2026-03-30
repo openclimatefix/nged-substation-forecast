@@ -158,7 +158,7 @@ def test_predict_with_empty_features_matrix():
     )
 
     inference_params = InferenceParams(
-        nwp_init_time=datetime(2024, 1, 1, tzinfo=timezone.utc), power_fcst_model_name="test"
+        forecast_time=datetime(2024, 1, 1, tzinfo=timezone.utc), power_fcst_model_name="test"
     )
 
     # Empty NWPs will cause a ValueError as per code

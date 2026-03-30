@@ -117,6 +117,15 @@ def test_xgboost_forecaster_train_with_nans():
             "h3_index": [1],
             "ensemble_member": [0],
             "temperature_2m": [float("nan")],  # NaN!
+            "dew_point_temperature_2m": [5.0],
+            "wind_speed_10m": [2.0],
+            "wind_direction_10m": [180.0],
+            "wind_speed_100m": [3.0],
+            "wind_direction_100m": [185.0],
+            "pressure_surface": [100.0],
+            "pressure_reduced_to_mean_sea_level": [101.0],
+            "geopotential_height_500hpa": [50.0],
+            "categorical_precipitation_type_surface": [0.0],
             "lead_time_hours": [6.0],
         }
     ).lazy()
@@ -159,6 +168,15 @@ def test_xgboost_forecaster_train_with_infs():
             "h3_index": [1],
             "ensemble_member": [0],
             "temperature_2m": [float("inf")],  # Inf!
+            "dew_point_temperature_2m": [5.0],
+            "wind_speed_10m": [2.0],
+            "wind_direction_10m": [180.0],
+            "wind_speed_100m": [3.0],
+            "wind_direction_100m": [185.0],
+            "pressure_surface": [100.0],
+            "pressure_reduced_to_mean_sea_level": [101.0],
+            "geopotential_height_500hpa": [50.0],
+            "categorical_precipitation_type_surface": [0.0],
             "lead_time_hours": [6.0],
         }
     ).lazy()
@@ -210,6 +228,15 @@ def test_xgboost_forecaster_predict_with_nans():
             "h3_index": [1],
             "ensemble_member": [0],
             "temperature_2m": [float("nan")],  # NaN!
+            "dew_point_temperature_2m": [5.0],
+            "wind_speed_10m": [2.0],
+            "wind_direction_10m": [180.0],
+            "wind_speed_100m": [3.0],
+            "wind_direction_100m": [185.0],
+            "pressure_surface": [100.0],
+            "pressure_reduced_to_mean_sea_level": [101.0],
+            "geopotential_height_500hpa": [50.0],
+            "categorical_precipitation_type_surface": [0.0],
         }
     ).lazy()
 
@@ -223,7 +250,7 @@ def test_xgboost_forecaster_predict_with_nans():
     ).lazy()
 
     inference_params = InferenceParams(
-        nwp_init_time=valid_time,
+        forecast_time=valid_time,
         power_fcst_model_name="test",
     )
 
@@ -265,6 +292,15 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
             "h3_index": [1],
             "ensemble_member": [0],
             "temperature_2m": [None],  # Null!
+            "dew_point_temperature_2m": [5.0],
+            "wind_speed_10m": [2.0],
+            "wind_direction_10m": [180.0],
+            "wind_speed_100m": [3.0],
+            "wind_direction_100m": [185.0],
+            "pressure_surface": [100.0],
+            "pressure_reduced_to_mean_sea_level": [101.0],
+            "geopotential_height_500hpa": [50.0],
+            "categorical_precipitation_type_surface": [0.0],
             "lead_time_hours": [6.0],
         }
     ).lazy()

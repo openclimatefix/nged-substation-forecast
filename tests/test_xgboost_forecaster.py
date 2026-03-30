@@ -255,6 +255,15 @@ def test_prepare_training_data_prevents_row_explosion():
                     "h3_index": 1,
                     "ensemble_member": ens,
                     "temperature_2m": 10.0,
+                    "dew_point_temperature_2m": 5.0,
+                    "wind_speed_10m": 2.0,
+                    "wind_direction_10m": 180.0,
+                    "wind_speed_100m": 3.0,
+                    "wind_direction_100m": 185.0,
+                    "pressure_surface": 100.0,
+                    "pressure_reduced_to_mean_sea_level": 101.0,
+                    "geopotential_height_500hpa": 50.0,
+                    "categorical_precipitation_type_surface": 0.0,
                     "lead_time_hours": (valid_time - init_time).total_seconds() / 3600,
                 }
             )
@@ -353,6 +362,15 @@ def test_latest_available_weekly_lag_prevents_leakage():
                 "h3_index": 1,
                 "ensemble_member": 0,
                 "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "categorical_precipitation_type_surface": 0.0,
                 "lead_time_hours": 24.0,
             },
             {
@@ -361,6 +379,15 @@ def test_latest_available_weekly_lag_prevents_leakage():
                 "h3_index": 1,
                 "ensemble_member": 0,
                 "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "categorical_precipitation_type_surface": 0.0,
                 "lead_time_hours": 240.0,
             },
         ]
@@ -419,6 +446,15 @@ def test_xgboost_predict_with_lags():
                 "h3_index": 1,
                 "ensemble_member": 0,
                 "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "categorical_precipitation_type_surface": 0.0,
             }
         ]
     ).lazy()
@@ -469,7 +505,7 @@ def test_xgboost_predict_with_lags():
     forecaster.model = mock_model
 
     inference_params = InferenceParams(
-        nwp_init_time=inference_nwp_init_time,
+        forecast_time=inference_nwp_init_time,
         power_fcst_model_name="test",
     )
 
