@@ -1,7 +1,6 @@
 """XGBoost implementation of the Forecaster interface."""
 
 import logging
-from datetime import datetime, timezone
 from typing import cast
 
 import patito as pt
@@ -80,21 +79,16 @@ class XGBoostForecaster(BaseForecaster):
         res.collect_schema()  # Fail loudly if columns are missing
         return res
 
-    def _add_lags(
-        self, df: pl.LazyFrame, substation_power_flows: pt.LazyFrame[SubstationFlows]
-    ) -> pl.LazyFrame:
+    def _add_lags(self, df: pl.LazyFrame, flows_30m: pl.LazyFrame) -> pl.LazyFrame:
         """Add autoregressive lags to the feature matrix.
 
         Args:
             df: The input LazyFrame (must contain valid_time and init_time).
-            substation_power_flows: Historical power flows.
+            flows_30m: Historical power flows downsampled to 30m.
 
         Returns:
             LazyFrame with added lag features.
         """
-        # 1. Downsample power flows to 30m
-        flows_30m = downsample_power_flows(substation_power_flows)
-
         # 2. Calculate the required lag dynamically to strictly prevent lookahead bias
         df = (
             df.with_columns(
@@ -203,7 +197,7 @@ class XGBoostForecaster(BaseForecaster):
         if "init_time" not in joined_df_lf.collect_schema().names():
             joined_df_lf = joined_df_lf.with_columns(init_time=pl.col("valid_time"))
 
-        joined_df_lf = self._add_lags(joined_df_lf, substation_power_flows)
+        joined_df_lf = self._add_lags(joined_df_lf, flows_30m)
         joined_df_lf = add_cyclical_temporal_features(joined_df_lf, time_col="valid_time")
         # add_weather_features is now called on each NWP before prefixing
 
@@ -280,7 +274,7 @@ class XGBoostForecaster(BaseForecaster):
             inference_params: Parameters for inference.
             substation_power_flows: The historical power flow data (for lags).
             nwps: A dictionary of weather forecast lazyframes.
-            collapse_lead_times: Whether to collapse lead times (unused here).
+            collapse_lead_times: Whether to collapse lead times to simulate real-time inference by keeping only the latest available NWP forecast for each valid time.
 
         Returns:
             A Patito DataFrame containing the predictions.
@@ -356,7 +350,8 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # 3. Add lags and features
-        df_lf = self._add_lags(df_lf, substation_power_flows)
+        flows_30m = downsample_power_flows(substation_power_flows)
+        df_lf = self._add_lags(df_lf, flows_30m)
         df_lf = add_cyclical_temporal_features(df_lf, time_col="valid_time")
         # add_weather_features is now called on each NWP before prefixing
 
@@ -423,7 +418,7 @@ class XGBoostForecaster(BaseForecaster):
             preds = self.model.predict(X.to_arrow())
 
         # Return predictions with correct schema
-        now = datetime.now(timezone.utc)
+        fcst_init_time = inference_params.nwp_init_time
         model_name = inference_params.power_fcst_model_name or "xgboost_global"
 
         res = df.select(
@@ -431,9 +426,9 @@ class XGBoostForecaster(BaseForecaster):
         ).with_columns(
             MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
             power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
-            power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
+            power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
             nwp_init_time=pl.col("init_time").cast(pl.Datetime("us", "UTC")),
-            power_fcst_init_year_month=pl.lit(now.strftime("%Y-%m")).cast(pl.String),
+            power_fcst_init_year_month=pl.lit(fcst_init_time.strftime("%Y-%m")).cast(pl.String),
         )
 
         # Handle potential nulls in ensemble_member (required by schema)
