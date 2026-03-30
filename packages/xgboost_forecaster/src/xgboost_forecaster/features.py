@@ -67,63 +67,54 @@ def add_weather_features(
     Returns:
         LazyFrame with added weather features.
     """
-    # Check if required columns exist
     if "temperature_2m" not in weather.collect_schema().names():
         return weather
 
-    if history is not None:
-        full_weather = (
-            pl.concat(
-                [
-                    history.select(pl.all().exclude("ensemble_member")),
-                    weather.select(pl.all().exclude("ensemble_member")),
-                ],
-                how="diagonal",
-            )
-            .unique("valid_time")
-            .sort("valid_time")
-        )
+    group_cols = ["valid_time"]
+    if "h3_index" in weather.collect_schema().names():
+        group_cols.append("h3_index")
+    if "ensemble_member" in weather.collect_schema().names():
+        group_cols.append("ensemble_member")
+
+    if history is None:
+        history = weather.sort("init_time").group_by(group_cols).last()
     else:
-        full_weather = weather
+        full_weather = pl.concat([history, weather], how="diagonal")
+        history = full_weather.sort("init_time").group_by(group_cols).last()
 
     weather = add_physical_features(weather)
-    if history is not None:
-        full_weather = add_physical_features(full_weather)
+    history = add_physical_features(history)
 
     def _get_lagged_view(df: pl.LazyFrame, offset: timedelta, suffix: str) -> pl.LazyFrame:
         cols = [
             (pl.col("valid_time") + offset).alias("valid_time"),
             pl.col("temperature_2m").alias(f"temperature_2m_{suffix}"),
         ]
+        if "h3_index" in df.collect_schema().names():
+            cols.append(pl.col("h3_index"))
+        if "ensemble_member" in df.collect_schema().names():
+            cols.append(pl.col("ensemble_member"))
         if "downward_short_wave_radiation_flux_surface" in df.collect_schema().names():
             cols.append(
                 pl.col("downward_short_wave_radiation_flux_surface").alias(f"sw_radiation_{suffix}")
             )
+        return df.select(cols)
 
-        if "ensemble_member" in df.collect_schema().names():
-            cols.append(pl.col("ensemble_member"))
-
-        lagged = df.select(cols)
-        return lagged
-
-    weather_lag_7d = _get_lagged_view(full_weather, timedelta(days=7), "lag_7d")
-    weather_lag_14d = _get_lagged_view(full_weather, timedelta(days=14), "lag_14d")
+    weather_lag_7d = _get_lagged_view(history, timedelta(days=7), "lag_7d")
+    weather_lag_14d = _get_lagged_view(history, timedelta(days=14), "lag_14d")
 
     weather_trend_6h_cols = [
         (pl.col("valid_time") + timedelta(hours=6)).alias("valid_time"),
         pl.col("temperature_2m").alias("temperature_2m_6h_ago"),
     ]
-    if "ensemble_member" in full_weather.collect_schema().names():
+    if "h3_index" in history.collect_schema().names():
+        weather_trend_6h_cols.append(pl.col("h3_index"))
+    if "ensemble_member" in history.collect_schema().names():
         weather_trend_6h_cols.append(pl.col("ensemble_member"))
 
-    weather_trend_6h = full_weather.select(weather_trend_6h_cols)
+    weather_trend_6h = history.select(weather_trend_6h_cols)
 
-    join_on = ["valid_time"]
-    if (
-        "ensemble_member" in weather.collect_schema().names()
-        and "ensemble_member" in weather_lag_7d.collect_schema().names()
-    ):
-        join_on.append("ensemble_member")
+    join_on = group_cols
 
     weather = (
         weather.join(weather_lag_7d, on=join_on, how="left")

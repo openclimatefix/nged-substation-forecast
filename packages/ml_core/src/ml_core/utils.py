@@ -107,7 +107,7 @@ def evaluate_and_save_model(
         from datetime import timedelta
 
         slice_start = test_start
-        if "power_flows" in key:
+        if "power_flows" in key or "nwps" in key:
             slice_start = test_start - timedelta(days=14)
 
         sliced_data[key] = _slice_temporal_data(val, slice_start, test_end, time_col)

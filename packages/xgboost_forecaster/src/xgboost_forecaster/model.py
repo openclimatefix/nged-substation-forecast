@@ -237,7 +237,17 @@ class XGBoostForecaster(BaseForecaster):
         y = joined_df.select("MW_or_MVA").to_series()
 
         # NaN/Inf checks
-        if X.select(pl.any_horizontal(pl.all().is_nan() | pl.all().is_infinite())).sum().item() > 0:
+        if (
+            X.select(
+                pl.any_horizontal(
+                    pl.col(pl.Float32, pl.Float64).is_nan()
+                    | pl.col(pl.Float32, pl.Float64).is_infinite()
+                )
+            )
+            .sum()
+            .item()
+            > 0
+        ):
             raise ValueError("Input features X contain NaN or Inf values")
 
         if y.is_nan().any() or y.is_infinite().any():
@@ -286,16 +296,23 @@ class XGBoostForecaster(BaseForecaster):
 
         filtered_nwps_list = []
         for i, (name, lf) in enumerate(nwps.items()):
-            # Take the latest run available at or before nwp_cutoff
-            latest_nwp = (
-                lf.filter(pl.col("init_time") <= nwp_cutoff)
-                .sort("init_time")
-                .group_by(["valid_time", "h3_index", "ensemble_member"])
-                .last()
-            )
+            # 1. Add weather features on the FULL dataset to ensure lags can be computed
+            lf_with_features = add_weather_features(lf)
 
-            # Add weather features BEFORE prefixing
-            latest_nwp = add_weather_features(latest_nwp)
+            # 2. Filter to the specific init_time requested for inference
+            if collapse_lead_times:
+                # Enforce the 3-hour availability delay when simulating real-time inference
+                latest_nwp = (
+                    lf_with_features.filter(
+                        pl.col("init_time") + pl.duration(hours=3) <= nwp_cutoff
+                    )
+                    .sort("init_time")
+                    .group_by(["valid_time", "h3_index", "ensemble_member"])
+                    .last()
+                )
+            else:
+                # For backtesting all lead times, use all available init_times up to nwp_cutoff
+                latest_nwp = lf_with_features.filter(pl.col("init_time") <= nwp_cutoff)
 
             if i == 0:
                 # Primary NWP: no prefix
@@ -367,7 +384,17 @@ class XGBoostForecaster(BaseForecaster):
         X_lf = self._prepare_features(df.lazy())
         X = cast(pl.DataFrame, X_lf.collect())
 
-        if X.select(pl.any_horizontal(pl.all().is_nan() | pl.all().is_infinite())).sum().item() > 0:
+        if (
+            X.select(
+                pl.any_horizontal(
+                    pl.col(pl.Float32, pl.Float64).is_nan()
+                    | pl.col(pl.Float32, pl.Float64).is_infinite()
+                )
+            )
+            .sum()
+            .item()
+            > 0
+        ):
             raise ValueError("Input features X contain NaN or Inf values")
 
         # Enforce exact column order from training
