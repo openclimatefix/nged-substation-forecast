@@ -14,7 +14,7 @@ This document outlines the architectural and implementation changes required to 
 **Target:** `packages/ml_core/src/ml_core/utils.py` & `packages/xgboost_forecaster/src/xgboost_forecaster/model.py`
 *   **Issue:** The current evaluation collapses predictions by `valid_time` and selects the most recent forecast (`.last()`), artificially inflating performance metrics by only evaluating the shortest lead times.
 *   **Implementation:**
-    *   Add a `collapse_lead_times: bool = True` parameter to `XGBoostForecaster.predict`. When `False`, it skips the `.group_by(...).last()` step.
+    *   Add a `collapse_lead_times: bool = False` parameter to `XGBoostForecaster.predict`. When `False`, it skips the `.group_by(...).last()` step.
     *   Refactor `evaluate_and_save_model` to call `predict(collapse_lead_times=False)`.
     *   Calculate `lead_time = valid_time - init_time` in the evaluation results.
     *   Group the predictions by `lead_time` (and optionally `h3_index`) and compute metrics (MAE, RMSE, MAPE) for each horizon.
@@ -26,18 +26,11 @@ This document outlines the architectural and implementation changes required to 
 
 ## 2. Correct the NWP Accumulation Handling (Differencing)
 **Target:** `packages/xgboost_forecaster/src/xgboost_forecaster/data.py`
-*   **Issue:** ECMWF accumulated variables (e.g., precipitation, radiation) are interpolated directly, causing the model to learn spurious relationships with lead time instead of physical rates.
+*   **Issue:** ECMWF accumulated variables (e.g., precipitation, radiation) are de-accumulated by Dynamical.org. The scientist agent wasn't aware of this and tried to recommend a fix. We must add liberal comments to explain that these variables are de-accumulated by Dynamical.org before we download them.
 *   **Implementation:**
-    *   Introduce a preprocessing step in `process_nwp_data` (or a dedicated `deaccumulate_nwp_vars` function) *before* interpolation.
-    *   For each `(init_time, h3_index, ensemble_member)` group, sort by `valid_time`.
-    *   Apply `pl.col(var).diff()` to accumulated variables.
-    *   **CRITICAL:** Divide the differenced value by the time delta (`valid_time.diff().dt.total_hours()`) to convert it into a normalized rate (e.g., per hour). This prevents massive artificial spikes when NWP temporal resolution changes (e.g., ECMWF switching from 1h to 3h steps).
-    *   **CRITICAL:** Clip the resulting rates at 0 (`.clip(lower_bound=0)`) to prevent negative physical values (e.g., negative precipitation) caused by minor numerical artifacts in the NWP output.
-    *   Handle the first timestep (which is already a rate from `init_time`) by filling the null created by `.diff()` with the original first value (also normalized by its time delta from `init_time`).
-*   **Testing:**
-    *   **Unit Test:** In `packages/xgboost_forecaster/tests/test_data.py`, test `deaccumulate_nwp_vars` with a known sequence (e.g., `[10, 25, 45] -> [10, 15, 20]`).
-    *   **Grouping Test:** Ensure differencing is applied correctly within groups and doesn't leak across `h3_index` or `ensemble_member`.
-    *   **Property-Based Test:** Use `hypothesis` to generate non-decreasing sequences and verify the deaccumulated values are always non-negative.
+    *   Comment in the NWP data contract and the `dynamical_data` package to point out that
+    all accumulated values (including precipitation and radiation) are de-accumulated by
+    Dynamical.org *before* we download them.
 
 ## 3. Fix the Multi-NWP Join Logic
 **Target:** `packages/xgboost_forecaster/src/xgboost_forecaster/model.py` (or `data.py`)

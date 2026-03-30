@@ -3,10 +3,16 @@ import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
+    ProcessedNwp,
     SubstationFlows,
     SubstationMetadata,
 )
-from contracts.hydra_schemas import ModelConfig, XGBoostHyperparameters, ModelFeaturesConfig
+from contracts.hydra_schemas import (
+    ModelConfig,
+    XGBoostHyperparameters,
+    ModelFeaturesConfig,
+    NwpModel,
+)
 from ml_core.model import BaseForecaster, LocalForecasters
 from datetime import datetime, timezone
 
@@ -16,7 +22,13 @@ class MockForecaster(BaseForecaster):
         self.kwargs = kwargs
         self.trained = False
 
-    def train(self, config: ModelConfig, **kwargs):
+    def train(
+        self,
+        config: ModelConfig,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        substation_metadata: pt.DataFrame[SubstationMetadata],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+    ):
         self.trained = True
         return self
 
@@ -25,7 +37,8 @@ class MockForecaster(BaseForecaster):
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
-        **kwargs,
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
         sub_num = substation_metadata["substation_number"][0]

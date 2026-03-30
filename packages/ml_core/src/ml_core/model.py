@@ -9,10 +9,11 @@ import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
+    ProcessedNwp,
     SubstationFlows,
     SubstationMetadata,
 )
-from contracts.hydra_schemas import ModelConfig
+from contracts.hydra_schemas import ModelConfig, NwpModel
 
 log = logging.getLogger(__name__)
 
@@ -29,12 +30,20 @@ class BaseForecaster(ABC):
     """
 
     @abstractmethod
-    def train(self, config: ModelConfig, **kwargs) -> Any:
+    def train(
+        self,
+        config: ModelConfig,
+        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        substation_metadata: pt.DataFrame[SubstationMetadata],
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+    ) -> Any:
         """Train the model.
 
         Args:
             config: Model configuration object.
-            **kwargs: Model-specific data inputs (e.g., weather, power flows).
+            substation_power_flows: The historical power flow data.
+            substation_metadata: The substation metadata.
+            nwps: A dictionary of weather forecast dataframes.
 
         Returns:
             The trained native model object (e.g., XGBRegressor).
@@ -47,7 +56,8 @@ class BaseForecaster(ABC):
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
-        **kwargs,
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts.
 
@@ -55,8 +65,8 @@ class BaseForecaster(ABC):
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
             substation_power_flows: The historical power flow data (for lags).
-            **kwargs: Model-specific data inputs (e.g., nwps).
-                These should generally be passed as LazyFrames where possible.
+            nwps: A dictionary of weather forecast dataframes.
+            collapse_lead_times: Whether to collapse lead times (used in backtesting).
 
         Returns:
             A Patito DataFrame containing the model's predictions.
@@ -91,12 +101,12 @@ class LocalForecasters(BaseForecaster):
         self.forecaster_kwargs = forecaster_kwargs
         self.models: dict[int, BaseForecaster] = {}
 
-    def train(  # type: ignore
+    def train(
         self,
         config: ModelConfig,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
-        **kwargs,
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
     ) -> "LocalForecasters":
         """Train a separate model for each substation.
 
@@ -104,7 +114,7 @@ class LocalForecasters(BaseForecaster):
             config: Model configuration object.
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata.
-            **kwargs: Additional arguments passed to the underlying train methods.
+            nwps: A dictionary of weather forecast dataframes.
 
         Returns:
             The trained local forecasters instance.
@@ -116,7 +126,10 @@ class LocalForecasters(BaseForecaster):
         for sub_num in substations:
             log.debug(f"Training model for substation {sub_num}")
             sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
-            sub_flows = substation_power_flows.filter(pl.col("substation_number") == sub_num)
+            sub_flows = cast(
+                pt.LazyFrame[SubstationFlows],
+                substation_power_flows.filter(pl.col("substation_number") == sub_num),
+            )
 
             # Instantiate and train
             model = self.forecaster_cls(**self.forecaster_kwargs)
@@ -124,7 +137,7 @@ class LocalForecasters(BaseForecaster):
                 config=config,
                 substation_power_flows=sub_flows,
                 substation_metadata=sub_meta,
-                **kwargs,
+                nwps=nwps,
             )
             self.models[sub_num] = model
 
@@ -135,7 +148,8 @@ class LocalForecasters(BaseForecaster):
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
-        **kwargs,
+        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts by routing to local models.
 
@@ -143,7 +157,8 @@ class LocalForecasters(BaseForecaster):
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
             substation_power_flows: The historical power flow data (for lags).
-            **kwargs: Additional arguments passed to the underlying predict methods (e.g., nwps).
+            nwps: A dictionary of weather forecast dataframes.
+            collapse_lead_times: Whether to collapse lead times (used in backtesting).
 
         Returns:
             A concatenated Patito DataFrame of PowerForecasts.
@@ -168,7 +183,8 @@ class LocalForecasters(BaseForecaster):
                 substation_metadata=sub_meta,
                 inference_params=inference_params,
                 substation_power_flows=sub_flows,
-                **kwargs,
+                nwps=nwps,
+                collapse_lead_times=collapse_lead_times,
             )
             all_preds.append(preds)
 
@@ -183,5 +199,4 @@ class LocalForecasters(BaseForecaster):
         Args:
             model_name: The base name to register the models under.
         """
-        # TODO: Implement logging for local models
-        pass
+        raise NotImplementedError("Logging for LocalForecasters is not yet implemented.")

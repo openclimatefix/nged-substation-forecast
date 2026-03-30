@@ -140,9 +140,71 @@ def evaluate_and_save_model(
         power_fcst_model_name=model_name,
     )
 
-    results_df = forecaster.predict(inference_params=inference_params, **sliced_data)
+    results_df = forecaster.predict(
+        inference_params=inference_params, collapse_lead_times=False, **sliced_data
+    )
 
-    # 3. Trigger Dynamic Partition
+    # 3. Calculate Metrics per lead_time
+    from ml_core.data import downsample_power_flows
+
+    if "substation_power_flows" in sliced_data:
+        actuals = cast(
+            pl.DataFrame, downsample_power_flows(sliced_data["substation_power_flows"]).collect()
+        )
+
+        # Join predictions with actuals
+        eval_df = results_df.join(
+            actuals.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
+            on=["valid_time", "substation_number"],
+            how="inner",
+        )
+
+        if not eval_df.is_empty():
+            # Calculate lead_time_hours
+            eval_df = eval_df.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
+                / 60.0
+            )
+
+            # Group by lead_time_hours and calculate metrics
+            metrics = (
+                eval_df.group_by("lead_time_hours")
+                .agg(
+                    [
+                        (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean().alias("MAE"),
+                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
+                        (
+                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
+                            / pl.col("actual").abs().clip(lower_bound=1e-3)
+                        )
+                        .mean()
+                        .alias("MAPE"),
+                    ]
+                )
+                .sort("lead_time_hours")
+            )
+
+            # Log metrics to MLflow
+            with mlflow.start_run(run_name=f"{model_name}_eval"):
+                for row in metrics.iter_rows(named=True):
+                    lt = int(row["lead_time_hours"])
+                    mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                    mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                    mlflow.log_metric(f"MAPE_LT_{lt}h", row["MAPE"])
+
+                # Log global metrics
+                mlflow.log_metric(
+                    "MAE_global",
+                    eval_df.select((pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()).item(),
+                )
+                mlflow.log_metric(
+                    "RMSE_global",
+                    eval_df.select(
+                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
+                    ).item(),
+                )
+
+    # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:
         context.instance.add_dynamic_partitions("model_partitions", [model_name])
 

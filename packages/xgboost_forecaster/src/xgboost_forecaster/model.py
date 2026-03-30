@@ -1,7 +1,7 @@
 """XGBoost implementation of the Forecaster interface."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import cast
 
 import patito as pt
@@ -18,9 +18,10 @@ from xgboost import XGBRegressor
 
 import mlflow
 
+from ml_core.data import downsample_power_flows
 from ml_core.features import add_cyclical_temporal_features
 from ml_core.model import BaseForecaster
-from xgboost_forecaster.data import downsample_power_flows
+from xgboost_forecaster.features import add_weather_features
 
 log = logging.getLogger(__name__)
 
@@ -45,25 +46,18 @@ class XGBoostForecaster(BaseForecaster):
         if self.model is not None:
             mlflow.xgboost.log_model(self.model, artifact_path="model")
 
-    def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Apply feature engineering and extract the feature matrix.
+    def _prepare_features(self, df: pl.LazyFrame) -> pl.LazyFrame:
+        """Extract the feature matrix.
 
         Args:
-            df: The joined input data.
+            df: The joined input data with all features already added.
 
         Returns:
-            A Polars DataFrame containing only the feature columns.
+            A Polars LazyFrame containing only the feature columns.
         """
-        # 1. Apply shared feature engineering
-        df = add_cyclical_temporal_features(df, time_col="valid_time")
-
-        # Cast substation_number to categorical if it exists
-        if "substation_number" in df.columns:
-            df = df.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
-
-        # 2. Extract feature matrix using explicit feature names from config
+        # Extract feature matrix using explicit feature names from config
         if not hasattr(self, "config") or not self.config.features.feature_names:
-            # Fallback: keep only numeric and categorical columns, excluding the target and h3_index
+            # Fallback: keep only numeric and categorical columns, excluding the target and metadata
             exclude_cols = {
                 "MW",
                 "MVA",
@@ -72,24 +66,69 @@ class XGBoostForecaster(BaseForecaster):
                 "h3_index",
                 "ensemble_member",
                 "init_time",
+                "available_time",
+                "lead_time_days",
             }
             feature_cols = [
                 c
-                for c in df.columns
-                if c not in exclude_cols
-                and (df[c].dtype.is_numeric() or df[c].dtype == pl.Categorical)
+                for c, dtype in df.collect_schema().items()
+                if c not in exclude_cols and (dtype.is_numeric() or dtype == pl.Categorical)
             ]
             return df.select(feature_cols)
 
-        return df.select(self.config.features.feature_names)
+        res = df.select(self.config.features.feature_names)
+        res.collect_schema()  # Fail loudly if columns are missing
+        return res
 
-    def train(  # type: ignore
+    def _add_lags(
+        self, df: pl.LazyFrame, substation_power_flows: pt.LazyFrame[SubstationFlows]
+    ) -> pl.LazyFrame:
+        """Add autoregressive lags to the feature matrix.
+
+        Args:
+            df: The input LazyFrame (must contain valid_time and init_time).
+            substation_power_flows: Historical power flows.
+
+        Returns:
+            LazyFrame with added lag features.
+        """
+        # 1. Downsample power flows to 30m
+        flows_30m = downsample_power_flows(substation_power_flows)
+
+        # 2. Calculate the required lag dynamically to strictly prevent lookahead bias
+        df = (
+            df.with_columns(
+                lead_time_days=(pl.col("valid_time") - pl.col("init_time")).dt.total_days()
+            )
+            .with_columns(
+                lag_days=pl.max_horizontal(
+                    pl.lit(1), (pl.col("lead_time_days") / 7.0).ceil().cast(pl.Int32)
+                )
+                * 7
+            )
+            .with_columns(
+                target_lag_time=pl.col("valid_time") - pl.duration(days=1) * pl.col("lag_days")
+            )
+        )
+
+        # 3. Join flows_30m on ["substation_number", "target_lag_time"] to extract the exact
+        # latest_available_weekly_lag without needing pre-calculated lag_7d or lag_14d columns.
+        lag_df = flows_30m.select(
+            pl.col("substation_number"),
+            pl.col("timestamp").alias("target_lag_time"),
+            pl.col("MW_or_MVA").alias("latest_available_weekly_lag"),
+        )
+
+        df = df.join(lag_df, on=["substation_number", "target_lag_time"], how="left")
+
+        return df
+
+    def train(
         self,
         config: ModelConfig,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         substation_metadata: pt.DataFrame[SubstationMetadata],
         nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
-        **kwargs,
     ) -> XGBRegressor:
         """Train the XGBoost model.
 
@@ -98,7 +137,6 @@ class XGBoostForecaster(BaseForecaster):
             substation_power_flows: The historical power flow data.
             substation_metadata: The substation metadata containing h3 mapping.
             nwps: A dictionary of weather forecast dataframes.
-            **kwargs: Additional arguments passed to the underlying train methods.
 
         Returns:
             The trained XGBRegressor model.
@@ -114,77 +152,98 @@ class XGBoostForecaster(BaseForecaster):
         # 1. Downsample power flows to 30m and calculate target fallback
         flows_30m = downsample_power_flows(substation_power_flows)
 
-        # 2. Generate lags by shifting timestamps forward
-        lag_7d = flows_30m.select(
-            pl.col("substation_number"),
-            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
-            pl.col("MW_or_MVA").alias("power_lag_7d"),
-        )
-
-        lag_14d = flows_30m.select(
-            pl.col("substation_number"),
-            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
-            pl.col("MW_or_MVA").alias("power_lag_14d"),
-        )
-
         # Join power flows and weather data using substation metadata.
-        flows_with_h3 = flows_30m.rename({"timestamp": "valid_time"}).join(
+        joined_df_lf = flows_30m.rename({"timestamp": "valid_time"}).join(
             metadata_lf.rename({"h3_res_5": "h3_index"}),
             on="substation_number",
         )
 
-        joined_df_lf = flows_with_h3.join(
-            lag_7d, on=["substation_number", "valid_time"], how="left"
-        ).join(lag_14d, on=["substation_number", "valid_time"], how="left")
-
         if nwps:
-            for nwp_name, nwp_lf in nwps.items():
-                # Prefix columns to avoid collisions
-                prefix = f"{nwp_name.value}_"
-                rename_mapping = {
-                    col: f"{prefix}{col}"
-                    for col in nwp_lf.collect_schema().names()
-                    if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
-                }
-                prefixed_nwp = nwp_lf.rename(rename_mapping)
+            # Multi-NWP join with available_time and join_asof
+            nwp_list = []
+            for i, (nwp_name, nwp_lf) in enumerate(nwps.items()):
+                # Add weather features BEFORE prefixing
+                nwp_lf = add_weather_features(nwp_lf)
 
-                # Join on ensemble_member and init_time if they exist in both dataframes
-                join_keys = ["valid_time", "h3_index"]
-                if "ensemble_member" in joined_df_lf.collect_schema().names():
-                    join_keys.append("ensemble_member")
-                if "init_time" in joined_df_lf.collect_schema().names():
-                    join_keys.append("init_time")
+                if i == 0:
+                    # Primary NWP: no prefix
+                    prefixed_nwp = nwp_lf.with_columns(
+                        available_time=pl.col("init_time") + pl.duration(hours=3)
+                    )
+                else:
+                    # Secondary NWPs: apply prefix
+                    prefix = f"{nwp_name.value}_"
+                    rename_mapping = {
+                        col: f"{prefix}{col}"
+                        for col in nwp_lf.collect_schema().names()
+                        if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+                    }
+                    prefixed_nwp = nwp_lf.rename(rename_mapping).with_columns(
+                        available_time=pl.col("init_time") + pl.duration(hours=3)
+                    )
+                nwp_list.append(prefixed_nwp)
 
-                joined_df_lf = joined_df_lf.join(
-                    prefixed_nwp,
-                    on=join_keys,
-                    how="left",
+            # Join all NWPs together first
+            combined_nwps = nwp_list[0]
+            for other_nwp in nwp_list[1:]:
+                combined_nwps = combined_nwps.sort("available_time").join_asof(
+                    other_nwp.sort("available_time"),
+                    on="available_time",
+                    by=["valid_time", "h3_index", "ensemble_member"],
                 )
 
-        # 3. Create dynamic seasonal lag to prevent data leakage for week-2 forecasts.
-        # In production, when predicting > 7 days ahead, the 7-day lag is in the future.
-        # We switch to the 14-day lag for these horizons.
-        seven_days_h = timedelta(days=7).total_seconds() / 3600
-        joined_df_lf = (
-            joined_df_lf.with_columns(
-                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
-                / 60.0
+            joined_df_lf = joined_df_lf.join(
+                combined_nwps,
+                on=["valid_time", "h3_index"],
+                how="left",
             )
-            .with_columns(
-                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
-                .then(pl.col("power_lag_7d"))
-                .otherwise(pl.col("power_lag_14d"))
-            )
-            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
-        )
+
+        # 2. Add lags and features
+        # Handle missing init_time (e.g. for autoregressive-only models)
+        if "init_time" not in joined_df_lf.collect_schema().names():
+            joined_df_lf = joined_df_lf.with_columns(init_time=pl.col("valid_time"))
+
+        joined_df_lf = self._add_lags(joined_df_lf, substation_power_flows)
+        joined_df_lf = add_cyclical_temporal_features(joined_df_lf, time_col="valid_time")
+        # add_weather_features is now called on each NWP before prefixing
+
+        # 3. Validate schema
+        from contracts.data_schemas import SubstationFeatures
 
         joined_df = cast(pl.DataFrame, joined_df_lf.collect())
 
+        # Ensure correct dtypes before validation
+        joined_df = joined_df.with_columns(
+            [
+                pl.col("substation_number").cast(pl.Int32),
+                pl.col("MW_or_MVA").cast(pl.Float32),
+            ]
+        )
+        if "ensemble_member" in joined_df.columns:
+            joined_df = joined_df.with_columns(pl.col("ensemble_member").cast(pl.UInt8))
+
+        # Cast all floats to Float32 for Patito
+        joined_df = joined_df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
+
+        # Drop rows with missing critical features before validation
+        critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
+        joined_df = joined_df.drop_nulls(subset=critical_cols)
+
+        SubstationFeatures.validate(joined_df, drop_superfluous_columns=True)
+
         # Prepare features and target
-        X = self._prepare_features(joined_df)
+        X_lf = self._prepare_features(joined_df.lazy())
+        X = cast(pl.DataFrame, X_lf.collect())
         y = joined_df.select("MW_or_MVA").to_series()
 
-        # Save feature names as a list of strings
+        # NaN/Inf checks
+        if X.select(pl.any_horizontal(pl.all().is_nan() | pl.all().is_infinite())).sum().item() > 0:
+            raise ValueError("Input features X contain NaN or Inf values")
+
+        if y.is_nan().any() or y.is_infinite().any():
+            raise ValueError("Target y contains NaN or Inf values")
+
+        # Save feature names
         self.feature_names = X.columns
 
         self.model = XGBRegressor(**config.hyperparameters.model_dump())
@@ -192,13 +251,13 @@ class XGBoostForecaster(BaseForecaster):
 
         return self.model
 
-    def predict(  # type: ignore[override]
+    def predict(
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
         substation_power_flows: pt.LazyFrame[SubstationFlows],
         nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
-        **kwargs,
+        collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
 
@@ -207,7 +266,7 @@ class XGBoostForecaster(BaseForecaster):
             inference_params: Parameters for inference.
             substation_power_flows: The historical power flow data (for lags).
             nwps: A dictionary of weather forecast lazyframes.
-            **kwargs: Additional arguments (unused).
+            collapse_lead_times: Whether to collapse lead times (unused here).
 
         Returns:
             A Patito DataFrame containing the predictions.
@@ -221,100 +280,95 @@ class XGBoostForecaster(BaseForecaster):
         if not nwps:
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
-        # Filter NWPs to the specific init_time requested for inference
-        target_init_time = inference_params.nwp_init_time
-        filtered_nwps = {}
-        for name, lf in nwps.items():
-            # Robust "as-of" filter: take the latest run available at or before target_init_time
-            filtered_nwps[name] = (
-                lf.filter(pl.col("init_time") <= target_init_time)
+        # Filter NWPs to the specific init_time requested for inference.
+        # The 3-hour availability delay is already handled during the multi-NWP join_asof in train.
+        nwp_cutoff = inference_params.nwp_init_time
+
+        filtered_nwps_list = []
+        for i, (name, lf) in enumerate(nwps.items()):
+            # Take the latest run available at or before nwp_cutoff
+            latest_nwp = (
+                lf.filter(pl.col("init_time") <= nwp_cutoff)
                 .sort("init_time")
                 .group_by(["valid_time", "h3_index", "ensemble_member"])
                 .last()
             )
 
-        # 1. Initialize combined NWP LazyFrame with the first NWP
-        nwps_iter = iter(filtered_nwps.items())
-        first_nwp_name, first_nwp_lf = next(nwps_iter)
+            # Add weather features BEFORE prefixing
+            latest_nwp = add_weather_features(latest_nwp)
 
-        prefix = f"{first_nwp_name.value}_"
-        rename_mapping = {
-            col: f"{prefix}{col}"
-            for col in first_nwp_lf.collect_schema().names()
-            if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
-        }
-        combined_nwps_lf = first_nwp_lf.rename(rename_mapping)
+            if i == 0:
+                # Primary NWP: no prefix
+                prefixed_nwp = latest_nwp.with_columns(
+                    available_time=pl.col("init_time") + pl.duration(hours=3)
+                )
+            else:
+                # Secondary NWPs: apply prefix
+                prefix = f"{name.value}_"
+                rename_mapping = {
+                    col: f"{prefix}{col}"
+                    for col in latest_nwp.collect_schema().names()
+                    if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+                }
+                prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
+                    available_time=pl.col("init_time") + pl.duration(hours=3)
+                )
+            filtered_nwps_list.append(prefixed_nwp)
 
-        # Loop through REMAINING nwps to apply prefixes consistently
-        for nwp_name, nwp_lf in nwps_iter:
-            prefix = f"{nwp_name.value}_"
-            rename_mapping = {
-                col: f"{prefix}{col}"
-                for col in nwp_lf.collect_schema().names()
-                if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
-            }
-            prefixed_nwp = nwp_lf.rename(rename_mapping)
-
-            # Join on ensemble_member and init_time if they exist in both dataframes
-            join_keys = ["valid_time", "h3_index"]
-            if "ensemble_member" in combined_nwps_lf.collect_schema().names():
-                join_keys.append("ensemble_member")
-            if "init_time" in combined_nwps_lf.collect_schema().names():
-                join_keys.append("init_time")
-
-            combined_nwps_lf = combined_nwps_lf.join(
-                prefixed_nwp,
-                on=join_keys,
-                how="left",
+        # Join all NWPs together
+        combined_nwps_lf = filtered_nwps_list[0]
+        for other_nwp in filtered_nwps_list[1:]:
+            combined_nwps_lf = combined_nwps_lf.sort("available_time").join_asof(
+                other_nwp.sort("available_time"),
+                on="available_time",
+                by=["valid_time", "h3_index", "ensemble_member"],
             )
 
-        # 2. Join the resulting combined NWP LazyFrame with metadata_df on h3_index
+        # 2. Join with metadata
         df_lf = combined_nwps_lf.join(
             metadata_df.rename({"h3_res_5": "h3_index"}).lazy(),
             on="h3_index",
             how="inner",
         )
 
-        # 3. Apply the same lag generation logic to substation_power_flows
-        flows_30m = downsample_power_flows(substation_power_flows)
+        # 3. Add lags and features
+        df_lf = self._add_lags(df_lf, substation_power_flows)
+        df_lf = add_cyclical_temporal_features(df_lf, time_col="valid_time")
+        # add_weather_features is now called on each NWP before prefixing
 
-        # Generate lags by shifting timestamps forward
-        lag_7d = flows_30m.select(
-            pl.col("substation_number"),
-            (pl.col("timestamp") + pl.duration(days=7)).alias("valid_time"),
-            pl.col("MW_or_MVA").alias("power_lag_7d"),
-        )
-
-        lag_14d = flows_30m.select(
-            pl.col("substation_number"),
-            (pl.col("timestamp") + pl.duration(days=14)).alias("valid_time"),
-            pl.col("MW_or_MVA").alias("power_lag_14d"),
-        )
-
-        # 4. Join power flows into the feature matrix
-        df_lf = df_lf.join(lag_7d, on=["substation_number", "valid_time"], how="left").join(
-            lag_14d, on=["substation_number", "valid_time"], how="left"
-        )
-
-        # 5. Create dynamic seasonal lag (same logic as train)
-        seven_days_h = timedelta(days=7).total_seconds() / 3600
-        df_lf = (
-            df_lf.with_columns(
-                lead_time_hours_temp=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes()
-                / 60.0
-            )
-            .with_columns(
-                latest_available_weekly_lag=pl.when(pl.col("lead_time_hours_temp") <= seven_days_h)
-                .then(pl.col("power_lag_7d"))
-                .otherwise(pl.col("power_lag_14d"))
-            )
-            .drop(["power_lag_7d", "power_lag_14d", "lead_time_hours_temp"])
-        )
+        # 4. Prepare features
+        # We need a dummy MW_or_MVA for validation if we use SubstationFeatures.validate
+        df_lf = df_lf.with_columns(MW_or_MVA=pl.lit(0.0, dtype=pl.Float32))
 
         df = cast(pl.DataFrame, df_lf.collect())
 
-        # Prepare features (must match training features)
-        X = self._prepare_features(df)
+        # Ensure correct dtypes before validation
+        df = df.with_columns(
+            [
+                pl.col("substation_number").cast(pl.Int32),
+                pl.col("MW_or_MVA").cast(pl.Float32),
+            ]
+        )
+        if "ensemble_member" in df.columns:
+            df = df.with_columns(pl.col("ensemble_member").cast(pl.UInt8))
+
+        # Cast all floats to Float32 for Patito
+        df = df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
+
+        # Drop rows with missing critical features before validation
+        critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
+        df = df.drop_nulls(subset=critical_cols)
+
+        # Validate schema
+        from contracts.data_schemas import SubstationFeatures
+
+        SubstationFeatures.validate(df, drop_superfluous_columns=True)
+
+        X_lf = self._prepare_features(df.lazy())
+        X = cast(pl.DataFrame, X_lf.collect())
+
+        if X.select(pl.any_horizontal(pl.all().is_nan() | pl.all().is_infinite())).sum().item() > 0:
+            raise ValueError("Input features X contain NaN or Inf values")
 
         # Enforce exact column order from training
         if hasattr(self.model, "feature_names_in_"):
@@ -332,18 +386,17 @@ class XGBoostForecaster(BaseForecaster):
         now = datetime.now(timezone.utc)
         model_name = inference_params.power_fcst_model_name or "xgboost_global"
 
-        res = df.select(["valid_time", "substation_number", "ensemble_member"]).with_columns(
+        res = df.select(
+            ["valid_time", "substation_number", "ensemble_member", "init_time"]
+        ).with_columns(
             MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
             power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
             power_fcst_init_time=pl.lit(now).cast(pl.Datetime("us", "UTC")),
-            nwp_init_time=pl.lit(inference_params.nwp_init_time).cast(pl.Datetime("us", "UTC")),
+            nwp_init_time=pl.col("init_time").cast(pl.Datetime("us", "UTC")),
             power_fcst_init_year_month=pl.lit(now.strftime("%Y-%m")).cast(pl.String),
         )
 
         # Handle potential nulls in ensemble_member (required by schema)
-        if "ensemble_member" not in res.columns:
-            res = res.with_columns(ensemble_member=pl.lit(0).cast(pl.UInt8))
-        else:
-            res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
+        res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
 
         return pt.DataFrame[PowerForecast](res)

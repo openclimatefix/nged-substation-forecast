@@ -29,9 +29,9 @@ def test_xgboost_forecaster_train_and_predict():
         }
     )
 
-    # Create 2 weeks of data to satisfy the 14d lag
+    # Create 4 weeks of data to satisfy the dynamic lag
     timestamps = pl.datetime_range(
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 12, 15, tzinfo=timezone.utc),
         datetime(2026, 1, 15, tzinfo=timezone.utc),
         "30m",
         eager=True,
@@ -48,15 +48,23 @@ def test_xgboost_forecaster_train_and_predict():
         }
     ).lazy()
 
+    # NWPs only for the training period (Jan 1st to Jan 15th)
+    nwp_timestamps = pl.datetime_range(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 15, tzinfo=timezone.utc),
+        "30m",
+        eager=True,
+    )
+
     nwps = {
         NwpModel.ECMWF_ENS_0_25DEG: pt.DataFrame[ProcessedNwp](
             {
-                "valid_time": timestamps,
-                "init_time": timestamps,
-                "lead_time_hours": [0.0] * len(timestamps),
-                "h3_index": [123] * len(timestamps),
-                "ensemble_member": [0] * len(timestamps),
-                "temperature": [15.0] * len(timestamps),
+                "valid_time": nwp_timestamps,
+                "init_time": nwp_timestamps,
+                "lead_time_hours": [0.0] * len(nwp_timestamps),
+                "h3_index": [123] * len(nwp_timestamps),
+                "ensemble_member": [0] * len(nwp_timestamps),
+                "temperature_2m": [15.0] * len(nwp_timestamps),
             }
         ).lazy()
     }
@@ -102,7 +110,7 @@ def test_xgboost_forecaster_train_and_predict():
                 "lead_time_hours": [float(i) / 2.0 for i in range(len(predict_timestamps))],
                 "h3_index": [123] * len(predict_timestamps),
                 "ensemble_member": [0] * len(predict_timestamps),
-                "temperature": [15.0] * len(predict_timestamps),
+                "temperature_2m": [15.0] * len(predict_timestamps),
             }
         ).lazy()
     }
@@ -133,9 +141,9 @@ def test_xgboost_forecaster_predict_empty():
         }
     )
 
-    # Create 2 weeks of data to satisfy the 14d lag
+    # Create 4 weeks of data to satisfy the dynamic lag
     timestamps = pl.datetime_range(
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 12, 15, tzinfo=timezone.utc),
         datetime(2026, 1, 15, tzinfo=timezone.utc),
         "30m",
         eager=True,
@@ -152,15 +160,23 @@ def test_xgboost_forecaster_predict_empty():
         }
     ).lazy()
 
+    # NWPs only for the training period (Jan 1st to Jan 15th)
+    nwp_timestamps = pl.datetime_range(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 15, tzinfo=timezone.utc),
+        "30m",
+        eager=True,
+    )
+
     nwps = {
         NwpModel.ECMWF_ENS_0_25DEG: pt.DataFrame[ProcessedNwp](
             {
-                "valid_time": timestamps,
-                "init_time": timestamps,
-                "lead_time_hours": [0.0] * len(timestamps),
-                "h3_index": [123] * len(timestamps),
-                "ensemble_member": [0] * len(timestamps),
-                "temperature": [15.0] * len(timestamps),
+                "valid_time": nwp_timestamps,
+                "init_time": nwp_timestamps,
+                "lead_time_hours": [0.0] * len(nwp_timestamps),
+                "h3_index": [123] * len(nwp_timestamps),
+                "ensemble_member": [0] * len(nwp_timestamps),
+                "temperature_2m": [15.0] * len(nwp_timestamps),
             }
         ).lazy()
     }
@@ -191,12 +207,12 @@ def test_xgboost_forecaster_predict_empty():
     predict_nwps = {
         NwpModel.ECMWF_ENS_0_25DEG: pt.DataFrame[ProcessedNwp](
             {
-                "valid_time": timestamps,
-                "init_time": timestamps,
-                "lead_time_hours": [0.0] * len(timestamps),
-                "h3_index": [123] * len(timestamps),
-                "ensemble_member": [0] * len(timestamps),
-                "temperature": [15.0] * len(timestamps),
+                "valid_time": nwp_timestamps,
+                "init_time": nwp_timestamps,
+                "lead_time_hours": [0.0] * len(nwp_timestamps),
+                "h3_index": [123] * len(nwp_timestamps),
+                "ensemble_member": [0] * len(nwp_timestamps),
+                "temperature_2m": [15.0] * len(nwp_timestamps),
             }
         ).lazy()
     }

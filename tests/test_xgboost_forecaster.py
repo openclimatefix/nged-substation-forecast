@@ -11,10 +11,10 @@ from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
 )
+from ml_core.data import downsample_power_flows
 from xgboost_forecaster.data import (
     DataConfig,
     load_nwp_run,
-    downsample_power_flows,
     process_nwp_data,
 )
 from xgboost_forecaster.scaling import load_scaling_params
@@ -216,13 +216,20 @@ def test_process_nwp_data_interpolates_safely_within_trajectories():
 
 
 def test_prepare_training_data_prevents_row_explosion():
-    # 1 row of power flow
+    # Power flows with enough history for lags
+    valid_time = datetime(2024, 1, 3, 10, 30, tzinfo=timezone.utc)
     flows = pl.DataFrame(
         {
-            "timestamp": [datetime(2024, 1, 3, 10, 30, tzinfo=timezone.utc)],
-            "substation_number": [1],
-            "MW": [50.0],
-            "MVA": [50.0],
+            "timestamp": [
+                valid_time,
+                valid_time - timedelta(days=7),
+                valid_time - timedelta(days=14),
+                valid_time - timedelta(days=21),
+                valid_time - timedelta(days=28),
+            ],
+            "substation_number": [1] * 5,
+            "MW": [50.0] * 5,
+            "MVA": [50.0] * 5,
         }
     ).lazy()
 
@@ -236,7 +243,6 @@ def test_prepare_training_data_prevents_row_explosion():
 
     # 4 NWP forecast runs, each with 50 ensemble members
     nwp_rows = []
-    valid_time = datetime(2024, 1, 3, 10, 30, tzinfo=timezone.utc)
     for i in range(4):
         init_time = valid_time - timedelta(days=i + 1)
         for ens in range(50):
@@ -326,10 +332,12 @@ def test_latest_available_weekly_lag_prevents_leakage():
                 valid_time,  # Target row
                 valid_time - timedelta(days=7),
                 valid_time - timedelta(days=14),
+                valid_time - timedelta(days=21),
+                valid_time - timedelta(days=28),
             ],
-            "substation_number": [1, 1, 1],
-            "MW": [100.0, 77.0, 1414.0],  # Distinct values for 7d and 14d lags
-            "MVA": [100.0, 77.0, 1414.0],
+            "substation_number": [1] * 5,
+            "MW": [100.0, 77.0, 1414.0, 0.0, 0.0],  # Distinct values for 7d and 14d lags
+            "MVA": [100.0, 77.0, 1414.0, 0.0, 0.0],
         }
     ).lazy()
 
@@ -385,23 +393,26 @@ def test_latest_available_weekly_lag_prevents_leakage():
         # We need to find which row is which. We can use lead_time_hours if it's in X.
         # It should be there because it's numeric and not in exclude_cols.
 
-        row_short = X.filter(pl.col("ecmwf_ens_0_25deg_lead_time_hours") == 24.0)
+        row_short = X.filter(pl.col("lead_time_hours") == 24.0)
         assert row_short["latest_available_weekly_lag"][0] == 77.0
 
-        row_long = X.filter(pl.col("ecmwf_ens_0_25deg_lead_time_hours") == 240.0)
+        row_long = X.filter(pl.col("lead_time_hours") == 240.0)
         assert row_long["latest_available_weekly_lag"][0] == 1414.0
 
 
 def test_xgboost_predict_with_lags():
     # Setup dummy data for predict
     valid_time = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)
-    init_time = valid_time - timedelta(days=1)
+    # NWP init time must be at least 3h before valid_time to be available
+    # AND the inference_params.nwp_init_time must be at least 3h after nwp.init_time
+    nwp_init_time = valid_time - timedelta(days=1)
+    inference_nwp_init_time = nwp_init_time + timedelta(hours=4)
 
     metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
     nwp = pl.DataFrame(
         [
             {
-                "init_time": init_time,
+                "init_time": nwp_init_time,
                 "valid_time": valid_time,
                 "h3_index": 1,
                 "ensemble_member": 0,
@@ -431,7 +442,7 @@ def test_xgboost_predict_with_lags():
     # Mock the model and its feature_names_in_
     mock_model = patch("xgboost.XGBRegressor").start()
     mock_model.feature_names_in_ = [
-        "ecmwf_ens_0_25deg_temperature_2m",
+        "temperature_2m",
         "latest_available_weekly_lag",
         "hour_sin",
         "hour_cos",
@@ -443,7 +454,7 @@ def test_xgboost_predict_with_lags():
     forecaster.model = mock_model
 
     inference_params = InferenceParams(
-        nwp_init_time=init_time,
+        nwp_init_time=inference_nwp_init_time,
         power_fcst_model_name="test",
     )
 

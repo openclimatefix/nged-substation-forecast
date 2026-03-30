@@ -56,12 +56,26 @@ class SubstationFlows(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["SubstationFlows"]:
-        """Validate the given dataframe, ensuring either MW or MVA is present."""
+        """Validate the given dataframe, ensuring either MW or MVA is present and has data."""
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
             raise MissingCorePowerVariablesError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
                 f" {dataframe.columns=}, {len(dataframe)=}"
             )
+
+        # Ensure at least one of MW or MVA has non-null data
+        if isinstance(dataframe, pl.DataFrame):
+            mw_null = "MW" not in dataframe.columns or dataframe["MW"].null_count() == len(
+                dataframe
+            )
+            mva_null = "MVA" not in dataframe.columns or dataframe["MVA"].null_count() == len(
+                dataframe
+            )
+            if mw_null and mva_null:
+                raise MissingCorePowerVariablesError(
+                    "SubstationFlows dataframe must have non-null data in either 'MW' or 'MVA'."
+                )
+
         return cast(
             pt.DataFrame["SubstationFlows"],
             super().validate(
@@ -254,7 +268,11 @@ class Nwp(pt.Model):
 
 
 class ProcessedNwp(pt.Model):
-    """Weather data after ensemble selection and interpolation."""
+    """Weather data after ensemble selection and interpolation.
+
+    Note: Accumulated variables (e.g., precipitation, radiation) are already
+    de-accumulated by Dynamical.org prior to download, and should not be differenced.
+    """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -287,36 +305,43 @@ class SubstationFeatures(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
-    power_lag_7d: float = pt.Field(dtype=pl.Float32)
-    power_lag_14d: float = pt.Field(dtype=pl.Float32)
+    latest_available_weekly_lag: float = pt.Field(dtype=pl.Float32)
 
     # Weather features
     temperature_2m: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
-    pressure_surface: float = pt.Field(dtype=pl.Float32)
-    pressure_reduced_to_mean_sea_level: float = pt.Field(dtype=pl.Float32)
-    geopotential_height_500hpa: float = pt.Field(dtype=pl.Float32)
-    downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
-    categorical_precipitation_type_surface: float = pt.Field(dtype=pl.Float32)
+    dew_point_temperature_2m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_speed_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_speed_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_reduced_to_mean_sea_level: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    geopotential_height_500hpa: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_long_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    downward_short_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    precipitation_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    categorical_precipitation_type_surface: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
 
     # Physical features
-    wind_speed_10m_phys: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m_phys: float = pt.Field(dtype=pl.Float32)
-    windchill: float = pt.Field(dtype=pl.Float32)
+    wind_speed_10m_phys: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_10m_phys: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather lags/trends
-    temperature_2m_lag_7d: float | None = pt.Field(dtype=pl.Float32)
-    sw_radiation_lag_7d: float | None = pt.Field(dtype=pl.Float32)
-    temperature_2m_lag_14d: float | None = pt.Field(dtype=pl.Float32)
-    sw_radiation_lag_14d: float | None = pt.Field(dtype=pl.Float32)
-    temperature_2m_6h_ago: float | None = pt.Field(dtype=pl.Float32)
-    temp_trend_6h: float | None = pt.Field(dtype=pl.Float32)
+    temperature_2m_lag_7d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    sw_radiation_lag_7d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    temperature_2m_lag_14d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    sw_radiation_lag_14d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    temperature_2m_6h_ago: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    temp_trend_6h: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Temporal features
     hour_sin: float = pt.Field(dtype=pl.Float32)

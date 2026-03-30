@@ -126,49 +126,15 @@ def construct_historical_weather(
     return Nwp.validate(combined)
 
 
-def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
-    """Downsample power flows to 30m using period-ending semantics.
-
-    We assume that NWP data represents the average (or accumulated) value for the
-    period *ending* at `valid_time`. For example, a weather forecast for 10:00
-    describes the weather from 09:00 to 10:00 (or 09:30 to 10:00).
-
-    To align our targets with these features, we downsample power flows using
-    `closed="right", label="right"`. This ensures that power readings from
-    09:30 to 10:00 are aggregated and labeled as `10:00`.
-
-    Args:
-        flows: Historical power flow data.
-
-    Returns:
-        Downsampled power flows.
-    """
-    return (
-        flows.sort("timestamp")
-        .group_by_dynamic(
-            "timestamp",
-            every="30m",
-            group_by="substation_number",
-            closed="right",
-            label="right",
-        )
-        .agg(
-            [
-                pl.col("MW").mean(),
-                pl.col("MVA").mean(),
-            ]
-        )
-        .with_columns(
-            pl.when(pl.col("MW").is_not_null())
-            .then(pl.col("MW"))
-            .otherwise(pl.col("MVA"))
-            .alias("MW_or_MVA")
-        )
-    )
-
-
 def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
+
+    Note: Accumulated variables (e.g., precipitation, radiation) are already
+    de-accumulated by Dynamical.org prior to download, and should not be differenced.
+
+    Warning: This function collects the input LazyFrame into memory to perform
+    upsampling and interpolation. For large historical datasets, ensure the input
+    is partitioned or filtered to avoid out-of-memory errors.
 
     Args:
         nwp: Raw NWP data.
@@ -192,49 +158,37 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     )
 
     # 3. Interpolation (Fixing Nulls)
-    # To avoid OOM, we process each init_time separately.
-    init_times = cast(pl.DataFrame, lf.select("init_time").unique().collect()).to_series().to_list()
-    log.info(f"Processing {len(init_times)} NWP runs...")
+    # Vectorized approach using upsample and interpolate
+    df = cast(pl.DataFrame, lf.collect())
 
-    processed_parts = []
-    for init in init_times:
-        # Collect only this run
-        df = cast(pl.DataFrame, lf.filter(pl.col("init_time") == init).collect())
-
-        # Variables to interpolate (all numeric ones except metadata)
-        nwp_vars = [
-            col
-            for col in df.columns
-            if col not in ["valid_time", "h3_index", "lead_time", "init_time", "ensemble_member"]
-        ]
-
-        # Upsample to 30m and interpolate for each H3 index and ensemble member
-        groups = df.select(["h3_index", "ensemble_member"]).unique()
-        for group in groups.iter_rows(named=True):
-            h3 = group["h3_index"]
-            ens = group["ensemble_member"]
-            group_df = df.filter(
-                (pl.col("h3_index") == h3) & (pl.col("ensemble_member") == ens)
-            ).sort("valid_time")
-            upsampled = group_df.upsample(time_column="valid_time", every="30m")
-            # Interpolate only the weather variables
-            upsampled = upsampled.with_columns([pl.col(c).interpolate() for c in nwp_vars])
-            # Fill in the metadata columns
-            upsampled = upsampled.with_columns(
-                h3_index=pl.lit(h3, dtype=pl.UInt64),
-                ensemble_member=pl.lit(ens, dtype=pl.UInt8),
-                init_time=pl.lit(init, dtype=pl.Datetime("us", "UTC")),
-            )
-            # Recalculate lead_time_hours for the new 30m timestamps
-            upsampled = upsampled.with_columns(
-                lead_time_hours=(
-                    (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
-                ).cast(pl.Float32)
-            )
-            processed_parts.append(upsampled)
-
-    if not processed_parts:
-        # Return empty LazyFrame with correct schema
+    if df.is_empty():
         return lf.limit(0)
 
-    return pl.concat(processed_parts).lazy()
+    # Sort by valid_time as required by upsample
+    df = df.sort("valid_time")
+
+    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
+    processed = df.upsample(
+        time_column="valid_time",
+        every="30m",
+        group_by=["init_time", "h3_index", "ensemble_member"],
+    )
+
+    # Interpolate all numeric columns
+    numeric_cols = [
+        col
+        for col, dtype in processed.schema.items()
+        if dtype.is_numeric()
+        and col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+    ]
+
+    processed = processed.with_columns([pl.col(c).interpolate() for c in numeric_cols])
+
+    # Recalculate lead_time_hours for the new 30m timestamps
+    processed = processed.with_columns(
+        lead_time_hours=(
+            (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
+        ).cast(pl.Float32)
+    )
+
+    return processed.lazy()
