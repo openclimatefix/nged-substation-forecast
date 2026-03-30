@@ -55,3 +55,8 @@ docs/temp/
 
 # opencode's exploration scripts to test functionality
 exploration_scripts/
+
+
+#######################
+# Testing
+.hypothesis/
