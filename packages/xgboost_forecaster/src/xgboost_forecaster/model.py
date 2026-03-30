@@ -176,10 +176,10 @@ class XGBoostForecaster(BaseForecaster):
                     rename_mapping = {
                         col: f"{prefix}{col}"
                         for col in nwp_lf.collect_schema().names()
-                        if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+                        if col not in ["valid_time", "h3_index", "ensemble_member"]
                     }
                     prefixed_nwp = nwp_lf.rename(rename_mapping).with_columns(
-                        available_time=pl.col("init_time") + pl.duration(hours=3)
+                        available_time=pl.col(f"{prefix}init_time") + pl.duration(hours=3)
                     )
                 nwp_list.append(prefixed_nwp)
 
@@ -228,8 +228,12 @@ class XGBoostForecaster(BaseForecaster):
         # Drop rows with missing critical features before validation
         critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
         joined_df = joined_df.drop_nulls(subset=critical_cols)
+        if joined_df.is_empty():
+            raise ValueError("No training data remaining after dropping nulls in critical columns.")
 
-        SubstationFeatures.validate(joined_df, drop_superfluous_columns=True)
+        SubstationFeatures.validate(
+            joined_df, drop_superfluous_columns=False, allow_superfluous_columns=True
+        )
 
         # Prepare features and target
         X_lf = self._prepare_features(joined_df.lazy())
@@ -312,7 +316,10 @@ class XGBoostForecaster(BaseForecaster):
                 )
             else:
                 # For backtesting all lead times, use all available init_times up to nwp_cutoff
-                latest_nwp = lf_with_features.filter(pl.col("init_time") <= nwp_cutoff)
+                # Enforce the 3-hour availability delay to prevent lookahead bias
+                latest_nwp = lf_with_features.filter(
+                    pl.col("init_time") + pl.duration(hours=3) <= nwp_cutoff
+                )
 
             if i == 0:
                 # Primary NWP: no prefix
@@ -325,10 +332,10 @@ class XGBoostForecaster(BaseForecaster):
                 rename_mapping = {
                     col: f"{prefix}{col}"
                     for col in latest_nwp.collect_schema().names()
-                    if col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+                    if col not in ["valid_time", "h3_index", "ensemble_member"]
                 }
                 prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
-                    available_time=pl.col("init_time") + pl.duration(hours=3)
+                    available_time=pl.col(f"{prefix}init_time") + pl.duration(hours=3)
                 )
             filtered_nwps_list.append(prefixed_nwp)
 
@@ -375,11 +382,17 @@ class XGBoostForecaster(BaseForecaster):
         # Drop rows with missing critical features before validation
         critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
         df = df.drop_nulls(subset=critical_cols)
+        if df.is_empty():
+            raise ValueError(
+                "No inference data remaining after dropping nulls in critical columns."
+            )
 
         # Validate schema
         from contracts.data_schemas import SubstationFeatures
 
-        SubstationFeatures.validate(df, drop_superfluous_columns=True)
+        SubstationFeatures.validate(
+            df, drop_superfluous_columns=False, allow_superfluous_columns=True
+        )
 
         X_lf = self._prepare_features(df.lazy())
         X = cast(pl.DataFrame, X_lf.collect())

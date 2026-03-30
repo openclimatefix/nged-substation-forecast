@@ -161,9 +161,9 @@ def test_process_nwp_data_removes_zero_lead_time():
         {
             "init_time": [init_time, init_time, init_time],
             "valid_time": [
-                init_time,  # 0-hour
-                init_time + timedelta(hours=1),  # 1-hour
-                init_time + timedelta(hours=2),  # 2-hour
+                init_time + timedelta(hours=3),  # 3-hour
+                init_time + timedelta(hours=4),  # 4-hour
+                init_time + timedelta(hours=5),  # 5-hour
             ],
             "h3_index": [1, 1, 1],
             "ensemble_member": [0, 0, 0],
@@ -173,13 +173,15 @@ def test_process_nwp_data_removes_zero_lead_time():
 
     res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
 
-    # 0-hour is removed. Remaining valid_times: 01:00, 02:00.
-    # Upsampling to 30m will create: 01:00, 01:30, 02:00.
-    assert len(res) == 3
-    assert res["valid_time"][0] == init_time + timedelta(hours=1)
-    assert res["lead_time_hours"][0] == 1.0
-    assert res["lead_time_hours"][1] == 1.5
-    assert res["lead_time_hours"][2] == 2.0
+    # Remaining valid_times: 03:00, 04:00, 05:00.
+    # Upsampling to 30m will create: 03:00, 03:30, 04:00, 04:30, 05:00.
+    assert len(res) == 5
+    assert res["valid_time"][0] == init_time + timedelta(hours=3)
+    assert res["lead_time_hours"][0] == 3.0
+    assert res["lead_time_hours"][1] == 3.5
+    assert res["lead_time_hours"][2] == 4.0
+    assert res["lead_time_hours"][3] == 4.5
+    assert res["lead_time_hours"][4] == 5.0
 
 
 def test_process_nwp_data_interpolates_safely_within_trajectories():
@@ -288,10 +290,10 @@ def test_train_xgboost_asset_filters_to_control_member():
     # Create NWP with members 0, 1, 2
     nwp = pl.DataFrame(
         {
-            "valid_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)] * 3,
+            "valid_time": [datetime(2024, 1, 1, 3, tzinfo=timezone.utc)] * 3,
             "h3_index": [1, 1, 1],
             "ensemble_member": [0, 1, 2],
-            "init_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)] * 3,
+            "init_time": [datetime(2024, 1, 1, 0, tzinfo=timezone.utc)] * 3,
             "temperature_2m": [10.0, 11.0, 12.0],
         }
     ).lazy()

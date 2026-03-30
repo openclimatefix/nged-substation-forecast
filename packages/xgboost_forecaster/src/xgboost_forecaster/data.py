@@ -147,18 +147,26 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
 
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # We strictly exclude lead_time == 0 because accumulated variables are null there.
-    # This also prevents the model from learning from "perfect" 0-hour forecasts.
+    # We strictly exclude lead_time < 3 because NWPs have a 3-hour publication delay.
+    # This prevents the model from learning from weather data that would not be available in real-time.
     lf = (
         lf.with_columns(
             lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
         )
         .with_columns(pl.col("lead_time_hours").cast(pl.Float32))
-        .filter((pl.col("lead_time_hours") > 0) & (pl.col("lead_time_hours") <= 336))
+        .filter((pl.col("lead_time_hours") >= 3) & (pl.col("lead_time_hours") <= 336))
     )
 
     # 3. Interpolation (Fixing Nulls)
     # Vectorized approach using upsample and interpolate
+    # Add defensive check before collection
+    row_count = cast(pl.DataFrame, lf.select(pl.len()).collect()).item()
+    if row_count > 5_000_000:
+        log.warning(
+            f"Eagerly collecting a large NWP dataset ({row_count} rows) for interpolation. "
+            "This may cause OOM errors."
+        )
+
     df = cast(pl.DataFrame, lf.collect())
 
     if df.is_empty():
