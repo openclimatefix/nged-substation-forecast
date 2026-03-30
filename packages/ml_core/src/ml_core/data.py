@@ -41,7 +41,12 @@ def downsample_power_flows(
     )
 
     if target_map is not None:
-        downsampled = downsampled.join(target_map, on="substation_number", how="left")
+        # Only join the target_col from target_map to avoid bringing in extra columns like peak_capacity
+        downsampled = downsampled.join(
+            target_map.select(["substation_number", "target_col"]),
+            on="substation_number",
+            how="left",
+        )
 
         return (
             downsampled.with_columns(

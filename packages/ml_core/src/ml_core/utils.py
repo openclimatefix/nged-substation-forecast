@@ -157,6 +157,22 @@ def evaluate_and_save_model(
             how="inner",
         )
 
+        # Join the peak_capacity from the forecaster's target_map
+        if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
+            target_map_df = forecaster.target_map
+            if isinstance(target_map_df, pl.LazyFrame):
+                target_map_df = target_map_df.collect()
+            eval_df = eval_df.join(
+                target_map_df.select(["substation_number", "peak_capacity"]),
+                on="substation_number",
+                how="left",
+            )
+            # Fill missing peak_capacity with 1.0 to avoid division by zero
+            eval_df = eval_df.with_columns(pl.col("peak_capacity").fill_null(1.0))
+        else:
+            # Fallback if no target_map is available
+            eval_df = eval_df.with_columns(peak_capacity=pl.lit(1.0))
+
         if not eval_df.is_empty():
             # Filter out the lookback period to avoid data leakage in evaluation
             if isinstance(test_start, date) and not isinstance(test_start, datetime):
@@ -181,12 +197,9 @@ def evaluate_and_save_model(
                     [
                         (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean().alias("MAE"),
                         ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
-                        (
-                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
-                            / pl.col("actual").abs().clip(lower_bound=1e-3)
-                        )
+                        ((pl.col("MW_or_MVA") - pl.col("actual")).abs() / pl.col("peak_capacity"))
                         .mean()
-                        .alias("MAPE"),
+                        .alias("nMAE"),
                     ]
                 )
                 .sort("lead_time_hours")
@@ -198,7 +211,7 @@ def evaluate_and_save_model(
                     lt = int(row["lead_time_hours"])
                     mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
                     mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                    mlflow.log_metric(f"MAPE_LT_{lt}h", row["MAPE"])
+                    mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
                 # Log global metrics
                 mlflow.log_metric(
@@ -209,6 +222,14 @@ def evaluate_and_save_model(
                     "RMSE_global",
                     eval_df.select(
                         ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
+                    ).item(),
+                )
+                mlflow.log_metric(
+                    "nMAE_global",
+                    eval_df.select(
+                        (
+                            (pl.col("MW_or_MVA") - pl.col("actual")).abs() / pl.col("peak_capacity")
+                        ).mean()
                     ).item(),
                 )
 

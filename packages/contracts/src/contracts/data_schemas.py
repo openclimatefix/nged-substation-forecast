@@ -116,6 +116,7 @@ class SubstationTargetMap(pt.Model):
 
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
     target_col: str = pt.Field(dtype=pl.String)
+    peak_capacity: float = pt.Field(dtype=pl.Float32, gt=0)
 
 
 class SubstationLocations(pt.Model):
@@ -295,6 +296,11 @@ class ProcessedNwp(pt.Model):
 
     Note: Accumulated variables (e.g., precipitation, radiation) are already
     de-accumulated by Dynamical.org prior to download, and should not be differenced.
+
+    Clever Optimization:
+    To save memory, weather variables are scaled to a 0-255 range (uint8) before being saved to disk.
+    The scaling formula is: uint8_value = (physical_value - min_bound) / (max_bound - min_bound) * 255.
+    When loaded, they are cast to Float32 but retain the 0-255 scale.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -320,7 +326,14 @@ class ProcessedNwp(pt.Model):
 
 
 class SubstationFeatures(pt.Model):
-    """Final joined dataset ready for XGBoost."""
+    """Final joined dataset ready for XGBoost.
+
+    Clever Optimization:
+    Weather features are kept in their 0-255 scaled representation (e.g., `temperature_2m_uint8_scaled`)
+    to save memory and computation. XGBoost is invariant to monotonic transformations, so this does not
+    affect model performance. For SHAP analysis or EDA, use `descale_for_analysis` to convert them back
+    to physical units.
+    """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     substation_number: int = pt.Field(dtype=pl.Int32)
@@ -328,28 +341,34 @@ class SubstationFeatures(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
-    latest_available_weekly_lag: float = pt.Field(dtype=pl.Float32)
+    latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
-    temperature_2m: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    wind_speed_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    wind_direction_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    wind_speed_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    wind_direction_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    pressure_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    pressure_reduced_to_mean_sea_level: float | None = pt.Field(
+    temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    dew_point_temperature_2m_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    geopotential_height_500hpa: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    downward_long_wave_radiation_flux_surface: float | None = pt.Field(
+    wind_speed_10m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_10m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_speed_100m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_100m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_surface_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_reduced_to_mean_sea_level_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    downward_short_wave_radiation_flux_surface: float | None = pt.Field(
+    geopotential_height_500hpa_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    precipitation_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    categorical_precipitation_type_surface: float | None = pt.Field(
+    downward_long_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    downward_short_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    precipitation_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    categorical_precipitation_type_surface_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
 

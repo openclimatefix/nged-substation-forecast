@@ -175,9 +175,21 @@ def test_xgboost_forecaster_train_with_infs():
 def test_xgboost_forecaster_predict_with_nans():
     """Test that predict raises ValueError if input features contain NaNs."""
     forecaster = XGBoostForecaster()
+    # Set target_map for normalization/descaling
+    from contracts.data_schemas import SubstationTargetMap
+
+    forecaster.target_map = SubstationTargetMap.validate(
+        pl.DataFrame(
+            {
+                "substation_number": pl.Series([1], dtype=pl.Int32),
+                "target_col": ["MW"],
+                "peak_capacity": pl.Series([100.0], dtype=pl.Float32),
+            }
+        )
+    )
     mock_model = MagicMock()
     mock_model.feature_names_in_ = [
-        "temperature_2m",
+        "temperature_2m_uint8_scaled",
         "latest_available_weekly_lag",
         "hour_sin",
         "hour_cos",

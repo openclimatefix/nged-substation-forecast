@@ -238,19 +238,31 @@ class XGBoostForecaster(BaseForecaster):
             .agg(
                 mw_count=pl.col("MW").is_not_null().sum(),
                 mva_count=pl.col("MVA").is_not_null().sum(),
+                peak_capacity=pl.max_horizontal(
+                    pl.col("MW").abs().max(), pl.col("MVA").abs().max()
+                ).fill_null(1.0),
             )
             .with_columns(
                 pl.when(pl.col("mw_count") >= pl.col("mva_count"))
                 .then(pl.lit("MW"))
                 .otherwise(pl.lit("MVA"))
-                .alias("target_col")
+                .alias("target_col"),
+                pl.when(pl.col("peak_capacity") == 0.0)
+                .then(pl.lit(1.0))
+                .otherwise(pl.col("peak_capacity"))
+                .alias("peak_capacity"),
             )
-            .select(["substation_number", "target_col"])
+            .select(["substation_number", "target_col", "peak_capacity"])
             .collect(),
         )
 
         self.target_map = SubstationTargetMap.validate(
-            target_map_df.with_columns(pl.col("substation_number").cast(pl.Int32))
+            target_map_df.with_columns(
+                [
+                    pl.col("substation_number").cast(pl.Int32),
+                    pl.col("peak_capacity").cast(pl.Float32),
+                ]
+            )
         )
 
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
@@ -280,6 +292,19 @@ class XGBoostForecaster(BaseForecaster):
             )
 
         joined_df_lf = self._add_lags(joined_df_lf, flows_30m)
+        joined_df_lf = (
+            joined_df_lf.join(
+                target_map_df.lazy().select(["substation_number", "peak_capacity"]),
+                on="substation_number",
+                how="left",
+            )
+            .with_columns(
+                MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity"),
+                latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
+                / pl.col("peak_capacity"),
+            )
+            .drop("peak_capacity")
+        )
         joined_df_lf = add_cyclical_temporal_features(joined_df_lf, time_col=NwpColumns.VALID_TIME)
         # add_weather_features is now called on each NWP before prefixing
 
@@ -301,8 +326,7 @@ class XGBoostForecaster(BaseForecaster):
 
         # Drop rows with missing critical features before validation
         critical_cols = [
-            NwpColumns.TEMPERATURE_2M,
-            "latest_available_weekly_lag",
+            f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
             "MW_or_MVA",
         ]
         joined_df = joined_df.drop_nulls(subset=critical_cols)
@@ -390,10 +414,25 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # 3. Add lags and features
-        target_map_lf = self.target_map.lazy() if self.target_map is not None else None
+        if self.target_map is None:
+            raise ValueError("target_map must be set before calling predict.")
+        target_map_lf = self.target_map.lazy()
         flows_30m = downsample_power_flows(substation_power_flows, target_map=target_map_lf)
         df_lf = self._add_lags(df_lf, flows_30m)
+        df_lf = (
+            df_lf.join(
+                target_map_lf.select(["substation_number", "peak_capacity"]),
+                on="substation_number",
+                how="left",
+            )
+            .with_columns(
+                latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
+                / pl.col("peak_capacity")
+            )
+            .drop("peak_capacity")
+        )
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
+
         # add_weather_features is now called on each NWP before prefixing
 
         # 4. Prepare features
@@ -416,7 +455,7 @@ class XGBoostForecaster(BaseForecaster):
         df = df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
 
         # Drop rows with missing critical features before validation
-        critical_cols = [NwpColumns.TEMPERATURE_2M, "latest_available_weekly_lag"]
+        critical_cols = [f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled"]
         initial_len = len(df)
         df = df.drop_nulls(subset=critical_cols)
         dropped_len = initial_len - len(df)
@@ -458,6 +497,23 @@ class XGBoostForecaster(BaseForecaster):
             X = X.select(self.feature_names)
 
         preds = self.model.predict(X.to_arrow())
+
+        # Descale predictions
+        peak_capacities = (
+            df.join(
+                cast(
+                    pl.DataFrame,
+                    target_map_lf.select(["substation_number", "peak_capacity"]).collect(),
+                ),
+                on="substation_number",
+                how="left",
+            )
+            .select("peak_capacity")
+            .to_series()
+            .to_numpy()
+        )
+
+        preds = preds * peak_capacities
 
         # Return predictions with correct schema
         fcst_init_time = inference_params.nwp_init_time

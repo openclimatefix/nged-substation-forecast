@@ -388,18 +388,18 @@ def test_latest_available_weekly_lag_prevents_leakage():
         X_arrow = mock_fit.call_args[0][0]
         X = cast(pl.DataFrame, pl.from_arrow(X_arrow))
 
-        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0
-        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0
+        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0 / 1414.0
+        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0 / 1414.0 = 1.0
         # Note: Polars might reorder rows, so we filter
 
         # We need to find which row is which. We can use lead_time_hours if it's in X.
         # It should be there because it's numeric and not in exclude_cols.
 
         row_short = X.filter(pl.col("lead_time_hours") == 24.0)
-        assert row_short["latest_available_weekly_lag"][0] == 77.0
+        assert row_short["latest_available_weekly_lag"][0] == pytest.approx(77.0 / 1414.0)
 
         row_long = X.filter(pl.col("lead_time_hours") == 240.0)
-        assert row_long["latest_available_weekly_lag"][0] == 1414.0
+        assert row_long["latest_available_weekly_lag"][0] == pytest.approx(1.0)
 
 
 def test_xgboost_predict_with_lags():
@@ -441,10 +441,23 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     forecaster = XGBoostForecaster()
+    # Set target_map for normalization/descaling
+    from contracts.data_schemas import SubstationTargetMap
+
+    forecaster.target_map = SubstationTargetMap.validate(
+        pl.DataFrame(
+            {
+                "substation_number": pl.Series([1], dtype=pl.Int32),
+                "target_col": ["MW"],
+                "peak_capacity": pl.Series([100.0], dtype=pl.Float32),
+            }
+        )
+    )
+
     # Mock the model and its feature_names_in_
     mock_model = patch("xgboost.XGBRegressor").start()
     mock_model.feature_names_in_ = [
-        "temperature_2m",
+        "temperature_2m_uint8_scaled",
         "latest_available_weekly_lag",
         "hour_sin",
         "hour_cos",
@@ -452,7 +465,7 @@ def test_xgboost_predict_with_lags():
         "day_of_year_cos",
         "day_of_week",
     ]
-    mock_model.predict.return_value = [100.0]
+    mock_model.predict.return_value = [1.0]  # Normalized prediction
     forecaster.model = mock_model
 
     inference_params = InferenceParams(
