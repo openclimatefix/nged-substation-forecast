@@ -8,9 +8,9 @@ from unittest.mock import MagicMock
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
-    XGBoostHyperparameters,
     ModelFeaturesConfig,
 )
+from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
@@ -22,7 +22,7 @@ def test_prepare_features_missing_column_fails_loudly():
     """Test that _prepare_features fails when a requested feature is missing."""
     config = ModelConfig(
         power_fcst_model_name="test",
-        hyperparameters=XGBoostHyperparameters(),
+        hyperparameters=XGBoostHyperparameters().model_dump(),
         features=ModelFeaturesConfig(feature_names=["missing_feature"]),
     )
     forecaster = XGBoostForecaster()
@@ -43,7 +43,7 @@ def test_train_handles_missing_init_time():
     """Test that train handles missing init_time (e.g. for autoregressive-only models)."""
     config = ModelConfig(
         power_fcst_model_name="test",
-        hyperparameters=XGBoostHyperparameters(),
+        hyperparameters=XGBoostHyperparameters().model_dump(),
         features=ModelFeaturesConfig(nwps=[]),
     )
     forecaster = XGBoostForecaster()

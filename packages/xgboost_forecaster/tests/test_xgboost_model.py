@@ -12,8 +12,8 @@ from contracts.hydra_schemas import (
     ModelConfig,
     ModelFeaturesConfig,
     NwpModel,
-    XGBoostHyperparameters,
 )
+from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
 
@@ -72,7 +72,9 @@ def test_xgboost_forecaster_train_and_predict():
 
     config = ModelConfig(
         power_fcst_model_name="xgboost",
-        hyperparameters=XGBoostHyperparameters(learning_rate=0.1, n_estimators=10, max_depth=3),
+        hyperparameters=XGBoostHyperparameters(
+            learning_rate=0.1, n_estimators=10, max_depth=3
+        ).model_dump(),
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 
@@ -184,7 +186,9 @@ def test_xgboost_forecaster_predict_empty():
 
     config = ModelConfig(
         power_fcst_model_name="xgboost",
-        hyperparameters=XGBoostHyperparameters(learning_rate=0.1, n_estimators=10, max_depth=3),
+        hyperparameters=XGBoostHyperparameters(
+            learning_rate=0.1, n_estimators=10, max_depth=3
+        ).model_dump(),
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 

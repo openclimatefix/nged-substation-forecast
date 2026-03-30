@@ -89,7 +89,9 @@ class SubstationFlows(pt.Model):
 
     @staticmethod
     def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
-        return "MW" if dataframe["MW"].is_not_null().all() else "MVA"
+        mw_valid = dataframe["MW"].is_not_null().sum() if "MW" in dataframe.columns else 0
+        mva_valid = dataframe["MVA"].is_not_null().sum() if "MVA" in dataframe.columns else 0
+        return "MW" if mw_valid >= mva_valid else "MVA"
 
     @staticmethod
     def to_simplified_substation_flows(

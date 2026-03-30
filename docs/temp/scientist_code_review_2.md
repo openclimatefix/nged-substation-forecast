@@ -1,32 +1,26 @@
 ---
 review_iteration: 2
 reviewer: "scientist"
-total_flaws: 4
-critical_flaws: 2
+total_flaws: 3
+critical_flaws: 3
 ---
 
 # ML Rigor Review
 
-## FLAW-001: [Critical] Data Leakage in Dynamic Seasonal Lag for Lead Times > 14 Days
-* **File & Line Number:** `packages/xgboost_forecaster/src/xgboost_forecaster/model.py`, lines 140-150 and 280-290
-* **The Theoretical Issue:** The implementation plan required a dynamic lag calculation: `weeks_ahead = ceil(lead_time / 7_days)` and `lag = weeks_ahead * 7_days`. The actual implementation just switches between a 7-day and 14-day lag based on a 168-hour threshold. For lead times > 14 days (e.g., 15 days), the 14-day lag references a timestamp that is 1 day in the *future* relative to `init_time`.
-* **Concrete Failure Mode:** The model will perfectly predict the target for days 14-15 during backtesting because it is accidentally being fed the actual future power flows. In production, this data will not exist, causing catastrophic failure for week-2 forecasts.
-* **Required Architectural Fix:** The Architect must implement the dynamic lag logic as originally specified: `weeks_ahead = ceil(lead_time / 7_days)` and use `lag = weeks_ahead * 7_days`. The hardcoded 14-day lag is insufficient for 15-day ECMWF forecasts.
+## FLAW-001: Substation Number Treated as Continuous Feature (Unresolved from Loop 1)
+* **File & Line Number:** `packages/xgboost_forecaster/src/xgboost_forecaster/model.py`, lines 156-161 and 58-63
+* **The Theoretical Issue:** `substation_number` is cast to `pl.Int32` and included in the feature matrix. XGBoost treats `Int32` columns as continuous numerical features, assuming that substation 10 is mathematically "greater than" substation 5.
+* **Concrete Failure Mode:** The model will make nonsensical splits on the `substation_number` (e.g., `substation_number < 42.5`), grouping unrelated substations together and failing to learn substation-specific behaviors accurately.
+* **Required Architectural Fix:** Cast `substation_number` to `pl.Categorical` *after* schema validation (right before passing to XGBoost), or explicitly exclude it from the feature matrix and rely on static metadata features.
 
-## FLAW-002: [Critical] Lookahead Bias in Multi-NWP Join Strategy
-* **File & Line Number:** `packages/xgboost_forecaster/src/xgboost_forecaster/model.py`, lines 205-215
-* **The Theoretical Issue:** The implementation plan required defining an `available_time = init_time + publication_delay` to prevent lookahead bias. The actual implementation uses `lf.filter(pl.col("init_time") <= target_init_time)`. This ignores publication delay. A secondary NWP initialized at `target_init_time` will be included even if it wouldn't be available in production until hours later.
-* **Concrete Failure Mode:** The model will learn to rely on secondary NWP data that won't actually be available in the production environment at the time the forecast is generated.
-* **Required Architectural Fix:** The Architect must add `available_time` to the NWP schemas and use it for filtering/joining secondary NWPs, ensuring that `secondary_NWP.available_time <= primary_NWP.init_time`.
+## FLAW-002: Loss of Substation-Specific Static Features in Global Model (Unresolved from Loop 1)
+* **File & Line Number:** `packages/xgboost_forecaster/src/xgboost_forecaster/model.py`, line 112
+* **The Theoretical Issue:** The global model discards all substation metadata except `substation_number` and `h3_res_5` during the join. Furthermore, `h3_res_5` is explicitly excluded from the feature matrix in `_prepare_features`.
+* **Concrete Failure Mode:** The global model lacks any spatial or categorical context (e.g., `substation_type`, `latitude`, `longitude`) to differentiate between substations, leading to severe underfitting compared to local models.
+* **Required Architectural Fix:** Include relevant static features from `substation_metadata` (like `substation_type`, `latitude`, `longitude`) in the feature matrix when training the global model. Update `SubstationFeatures` schema to allow these columns.
 
-## FLAW-003: [Standard] Missing NWP Deaccumulation Comments
-* **File & Line Number:** `packages/xgboost_forecaster/src/xgboost_forecaster/data.py` and `packages/contracts/src/contracts/data_schemas.py`
-* **The Theoretical Issue:** The implementation plan required adding comments to explain that accumulated variables (e.g., precipitation, radiation) are de-accumulated by Dynamical.org before download. These comments were not added.
-* **Concrete Failure Mode:** Future developers or agents may attempt to "fix" the accumulation by applying `.diff()`, which would corrupt the data.
-* **Required Architectural Fix:** Add the required comments to the NWP data contract and the data loading functions.
-
-## FLAW-004: [Standard] Missing Backtesting Metrics per Lead Time
-* **File & Line Number:** `packages/ml_core/src/ml_core/utils.py`, `evaluate_and_save_model`
-* **The Theoretical Issue:** The implementation plan required calculating metrics (MAE, RMSE, MAPE) grouped by `lead_time` in `evaluate_and_save_model`. The actual implementation just returns the raw predictions `results_df` without calculating any metrics.
-* **Concrete Failure Mode:** We cannot assess how the model's performance degrades over the forecast horizon, which is critical for operational decision-making.
-* **Required Architectural Fix:** Implement the metric calculation grouped by `lead_time` as specified in the implementation plan.
+## FLAW-003: Evaluation Metrics Include Training Data (Data Leakage in Evaluation)
+* **File & Line Number:** `packages/ml_core/src/ml_core/utils.py`, lines 120-130
+* **The Theoretical Issue:** The `evaluate_and_save_model` function correctly adds a `lookback` period to `slice_start` to ensure autoregressive features can be calculated for the beginning of the test set. However, it fails to filter the resulting predictions back to the actual `test_start` before calculating evaluation metrics.
+* **Concrete Failure Mode:** The evaluation metrics (MAE, RMSE, MAPE) will be calculated over the period `[test_start - 14 days, test_end]`. Since the 14 days prior to `test_start` are typically part of the training set, the evaluation metrics will be artificially inflated by including data the model has already seen.
+* **Required Architectural Fix:** Filter `eval_df` to only include rows where `valid_time >= test_start` before calculating the metrics.

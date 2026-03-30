@@ -10,6 +10,7 @@ dependencies = [
     "patito",
     "pydantic>=2.0.0",
     "dagster",
+    "contracts",
 ]
 
 [build-system]

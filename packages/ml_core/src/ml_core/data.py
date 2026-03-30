@@ -36,9 +36,14 @@ def downsample_power_flows(flows: pl.LazyFrame) -> pl.LazyFrame:
             ]
         )
         .with_columns(
-            pl.when(pl.col("MW").is_not_null())
+            mw_count=pl.col("MW").is_not_null().sum().over("substation_number"),
+            mva_count=pl.col("MVA").is_not_null().sum().over("substation_number"),
+        )
+        .with_columns(
+            pl.when(pl.col("mw_count") >= pl.col("mva_count"))
             .then(pl.col("MW"))
             .otherwise(pl.col("MVA"))
             .alias("MW_or_MVA")
         )
+        .drop(["mw_count", "mva_count"])
     )

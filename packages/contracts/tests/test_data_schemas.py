@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import polars as pl
 import pytest
+from hypothesis import given, strategies as st
+
 from contracts.data_schemas import Nwp, PowerForecast, SubstationFlows
 
 
@@ -185,3 +187,32 @@ def test_nwp_validation():
 
     with pytest.raises(ValueError, match="Column 'precipitation_surface' contains 1 null values"):
         Nwp.validate(df_invalid)
+
+
+@given(
+    mw=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
+    | st.none(),
+    mva=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
+    | st.none(),
+)
+def test_substation_flows_property_based(mw, mva):
+    df = pl.DataFrame(
+        {
+            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "substation_number": [123],
+            "MW": [mw],
+            "MVA": [mva],
+        }
+    ).with_columns(
+        [
+            pl.col("substation_number").cast(pl.Int32),
+            pl.col("MW").cast(pl.Float32),
+            pl.col("MVA").cast(pl.Float32),
+        ]
+    )
+
+    if mw is None and mva is None:
+        with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
+            SubstationFlows.validate(df)
+    else:
+        SubstationFlows.validate(df)

@@ -2,6 +2,7 @@
 
 from datetime import date
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,15 +14,6 @@ class DataSplitConfig(BaseModel):
     train_end: date
     test_start: date
     test_end: date
-
-
-class XGBoostHyperparameters(BaseModel):
-    """Hyperparameters for the XGBoost model."""
-
-    learning_rate: float = Field(default=0.01, gt=0.0)
-    n_estimators: int = Field(default=100, gt=0)
-    max_depth: int = Field(default=6, gt=0)
-    enable_categorical: bool = Field(default=True)
 
 
 class NwpModel(str, Enum):
@@ -50,7 +42,8 @@ class ModelConfig(BaseModel):
             "'xgboost_with_solar_features')."
         ),
     )
-    hyperparameters: XGBoostHyperparameters
+    hyperparameters: dict[str, Any] = Field(default_factory=dict)
+    required_lookback_days: int = Field(default=14)
     features: ModelFeaturesConfig
 
 

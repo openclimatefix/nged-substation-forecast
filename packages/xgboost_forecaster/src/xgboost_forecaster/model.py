@@ -68,15 +68,22 @@ class XGBoostForecaster(BaseForecaster):
                 "available_time",
                 "lead_time_days",
             }
+            schema = df.collect_schema()
             feature_cols = [
                 c
-                for c, dtype in df.collect_schema().items()
+                for c, dtype in schema.items()
                 if c not in exclude_cols and (dtype.is_numeric() or dtype == pl.Categorical)
             ]
-            return df.select(feature_cols)
+            res = df.select(feature_cols)
+        else:
+            res = df.select(self.config.features.feature_names)
 
-        res = df.select(self.config.features.feature_names)
-        res.collect_schema()  # Fail loudly if columns are missing
+        res_schema = res.collect_schema()  # Fail loudly if columns are missing
+
+        # Ensure substation_number is treated as a categorical feature by XGBoost
+        if "substation_number" in res_schema.names():
+            res = res.with_columns(pl.col("substation_number").cast(pl.Categorical))
+
         return res
 
     def _add_lags(self, df: pl.LazyFrame, flows_30m: pl.LazyFrame) -> pl.LazyFrame:
@@ -167,9 +174,10 @@ class XGBoostForecaster(BaseForecaster):
                 else:
                     # Secondary NWPs: apply prefix
                     prefix = f"{nwp_name.value}_"
+                    nwp_schema_names = nwp_lf.collect_schema().names()
                     rename_mapping = {
                         col: f"{prefix}{col}"
-                        for col in nwp_lf.collect_schema().names()
+                        for col in nwp_schema_names
                         if col not in ["valid_time", "h3_index", "ensemble_member"]
                     }
                     prefixed_nwp = nwp_lf.rename(rename_mapping).with_columns(
@@ -220,7 +228,7 @@ class XGBoostForecaster(BaseForecaster):
         joined_df = joined_df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
 
         # Drop rows with missing critical features before validation
-        critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
+        critical_cols = ["temperature_2m", "latest_available_weekly_lag", "MW_or_MVA"]
         joined_df = joined_df.drop_nulls(subset=critical_cols)
         if joined_df.is_empty():
             raise ValueError("No training data remaining after dropping nulls in critical columns.")
@@ -254,7 +262,10 @@ class XGBoostForecaster(BaseForecaster):
         # Save feature names
         self.feature_names = X.columns
 
-        self.model = XGBRegressor(**config.hyperparameters.model_dump())
+        from xgboost_forecaster.config import XGBoostHyperparameters
+
+        hyperparams = XGBoostHyperparameters(**config.hyperparameters)
+        self.model = XGBRegressor(**hyperparams.model_dump())
         self.model.fit(X.to_arrow(), y.to_arrow())
 
         return self.model
@@ -323,9 +334,10 @@ class XGBoostForecaster(BaseForecaster):
             else:
                 # Secondary NWPs: apply prefix
                 prefix = f"{name.value}_"
+                nwp_schema_names = latest_nwp.collect_schema().names()
                 rename_mapping = {
                     col: f"{prefix}{col}"
-                    for col in latest_nwp.collect_schema().names()
+                    for col in nwp_schema_names
                     if col not in ["valid_time", "h3_index", "ensemble_member"]
                 }
                 prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
@@ -376,7 +388,14 @@ class XGBoostForecaster(BaseForecaster):
 
         # Drop rows with missing critical features before validation
         critical_cols = ["temperature_2m", "latest_available_weekly_lag"]
+        initial_len = len(df)
         df = df.drop_nulls(subset=critical_cols)
+        dropped_len = initial_len - len(df)
+        if dropped_len > 0:
+            log.warning(
+                f"Dropped {dropped_len} rows due to missing critical features during inference."
+            )
+
         if df.is_empty():
             raise ValueError(
                 "No inference data remaining after dropping nulls in critical columns."
@@ -434,4 +453,4 @@ class XGBoostForecaster(BaseForecaster):
         # Handle potential nulls in ensemble_member (required by schema)
         res = res.with_columns(pl.col("ensemble_member").fill_null(0).cast(pl.UInt8))
 
-        return pt.DataFrame[PowerForecast](res)
+        return PowerForecast.validate(res)

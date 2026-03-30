@@ -9,11 +9,11 @@ from contracts.data_schemas import (
 )
 from contracts.hydra_schemas import (
     ModelConfig,
-    XGBoostHyperparameters,
     ModelFeaturesConfig,
     NwpModel,
 )
-from ml_core.model import BaseForecaster, LocalForecasters
+from ml_core.model import BaseForecaster
+from ml_core.experimental import LocalForecasters
 from datetime import datetime, timezone
 
 
@@ -93,7 +93,7 @@ def test_local_forecasters():
 
     config = ModelConfig(
         power_fcst_model_name="mock",
-        hyperparameters=XGBoostHyperparameters(learning_rate=0.1, n_estimators=10, max_depth=3),
+        hyperparameters={"learning_rate": 0.1, "n_estimators": 10, "max_depth": 3},
         features=ModelFeaturesConfig(nwps=[]),
     )
 

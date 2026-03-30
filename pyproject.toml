@@ -44,6 +44,7 @@ dev = [
     "ruff>=0.14.13",
     "ty>=0.0.16",
     "unittest-xml-reporting>=4.0.0",
+    "hypothesis>=6.0.0",
 ]
 
 [project.urls]

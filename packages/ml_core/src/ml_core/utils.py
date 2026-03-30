@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Union, cast
 
 import dagster as dg
@@ -7,6 +7,7 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
+from ml_core.data import downsample_power_flows
 
 log = logging.getLogger(__name__)
 
@@ -103,12 +104,11 @@ def evaluate_and_save_model(
 
         time_col = "timestamp" if "power_flows" in key else "valid_time"
 
-        # Add a 14-day lookback for autoregressive features
-        from datetime import timedelta
-
+        # Add a configurable lookback for autoregressive features
         slice_start = test_start
         if "power_flows" in key or "nwps" in key:
-            slice_start = test_start - timedelta(days=14)
+            lookback = getattr(config.model, "required_lookback_days", 14)
+            slice_start = test_start - timedelta(days=lookback)
 
         sliced_data[key] = _slice_temporal_data(val, slice_start, test_end, time_col)
 
@@ -145,8 +145,6 @@ def evaluate_and_save_model(
     )
 
     # 3. Calculate Metrics per lead_time
-    from ml_core.data import downsample_power_flows
-
     if "substation_power_flows" in sliced_data:
         actuals = cast(
             pl.DataFrame, downsample_power_flows(sliced_data["substation_power_flows"]).collect()
@@ -160,6 +158,16 @@ def evaluate_and_save_model(
         )
 
         if not eval_df.is_empty():
+            # Filter out the lookback period to avoid data leakage in evaluation
+            if isinstance(test_start, date) and not isinstance(test_start, datetime):
+                test_start_dt = datetime.combine(test_start, datetime.min.time()).replace(
+                    tzinfo=timezone.utc
+                )
+            else:
+                test_start_dt = test_start
+
+            eval_df = eval_df.filter(pl.col("valid_time") >= test_start_dt)
+
             # Calculate lead_time_hours
             eval_df = eval_df.with_columns(
                 lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()

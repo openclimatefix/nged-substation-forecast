@@ -16,6 +16,6 @@ def test_real_xgboost_yaml_parses_successfully():
         config = TrainingConfig(**cfg_dict)
 
         assert config.model.power_fcst_model_name == "xgboost"
-        assert config.model.hyperparameters.n_estimators > 0
+        assert config.model.hyperparameters["n_estimators"] > 0
         assert config.data_split.train_start is not None
         assert config.model.features.nwps == ["ecmwf_ens_0_25deg"]

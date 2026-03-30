@@ -21,10 +21,10 @@ from xgboost_forecaster.scaling import load_scaling_params
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
-    XGBoostHyperparameters,
     ModelFeaturesConfig,
     NwpModel,
 )
+from xgboost_forecaster.config import XGBoostHyperparameters
 import dagster as dg
 from src.nged_substation_forecast.defs.xgb_assets import train_xgboost
 
@@ -262,7 +262,7 @@ def test_prepare_training_data_prevents_row_explosion():
 
     config = ModelConfig(
         power_fcst_model_name="test",
-        hyperparameters=XGBoostHyperparameters(),
+        hyperparameters=XGBoostHyperparameters().model_dump(),
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 
@@ -368,7 +368,7 @@ def test_latest_available_weekly_lag_prevents_leakage():
 
     config = ModelConfig(
         power_fcst_model_name="test",
-        hyperparameters=XGBoostHyperparameters(),
+        hyperparameters=XGBoostHyperparameters().model_dump(),
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 
