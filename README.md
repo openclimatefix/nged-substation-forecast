@@ -17,15 +17,27 @@ repo which contains multiple Python packages.
 
 ### Sub-packages
 
-- **`packages/contracts`**: Lightweight package defining data schemas (using Patito/Polars) and project settings. This package has minimal dependencies to ensure it can be used by any component without bringing in heavy ML libraries.
-- **`packages/ml_core`**: Unified ML model interface and shared utilities. This package contains the base classes for trainers and models, and shared logic like feature engineering and data splitting. It depends on `mlflow-skinny`.
-- **`packages/xgboost_forecaster`**: Implementation of the substation forecast using XGBoost, following the `ml_core` interface.
+- **`packages/contracts`**: Lightweight package defining strict data schemas (using Patito/Polars) and project settings. This package has minimal dependencies to ensure it can be used by any component without bringing in heavy ML libraries. Key contracts include `SubstationFeatures` and `PowerForecast`.
+- **`packages/ml_core`**: Unified ML model interface and shared utilities. This package contains the `BaseForecaster` protocol, which standardizes model training and inference, and shared logic like feature engineering and data splitting. It depends on `mlflow-skinny`.
+- **`packages/xgboost_forecaster`**: Implementation of the substation forecast using XGBoost, following the `BaseForecaster` interface. It includes advanced features like multi-NWP support, dynamic seasonal lags to prevent lookahead bias, and rigorous backtesting capabilities.
 - **`packages/nged_data`**: Data ingestion and processing for NGED datasets.
 - **`packages/dynamical_data`**: Handling of NWP and other time-varying datasets.
 
 ### Dependency Isolation
 
 We maintain a strict separation between `contracts` and `ml_core`. `contracts` defines the *shape* of the data, while `ml_core` defines the *machinery* for ML. By keeping them separate, we ensure that a component that only needs to validate a schema (like a data ingestion script) doesn't need to install heavy ML dependencies like MLflow.
+
+### Unified ML Model Interface
+
+The project uses a unified `BaseForecaster` protocol (defined in `ml_core.model`) to standardize how machine learning models are trained and evaluated. This allows the orchestration system (Dagster) to interact uniformly with any model type (e.g., `XGBoostForecaster`), making it easy to swap implementations or add new model architectures (like PyTorch GNNs) without changing the orchestration logic.
+
+### Advanced Forecasting Features
+
+The forecasting models implement several advanced features to ensure robustness and accuracy:
+
+1. **Multi-NWP Support**: Models can ingest forecasts from multiple Numerical Weather Prediction (NWP) providers simultaneously. Secondary NWP features are prefixed with their model name (e.g., `gfs_temperature_2m`), and all NWPs are joined using a 3-hour availability delay to simulate real-world data availability.
+2. **Dynamic Seasonal Lags**: To strictly prevent lookahead bias, autoregressive lags are calculated dynamically based on the forecast lead time. The model always uses the most recent *available* historical data for a given lead time (e.g., `lag_days = max(1, ceil(lead_time_days / 7)) * 7`).
+3. **Rigorous Backtesting**: The `predict` method includes a `collapse_lead_times` parameter. When simulating real-time inference, it filters NWP data to keep only the latest available forecast for each valid time, enforcing the 3-hour availability delay. For rigorous backtesting, it evaluates all available lead times up to the cutoff.
 
 ### Power Forecast Storage
 
