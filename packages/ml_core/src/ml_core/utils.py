@@ -208,7 +208,7 @@ def evaluate_and_save_model(
             # Log metrics to MLflow
             with mlflow.start_run(run_name=f"{model_name}_eval"):
                 for row in metrics.iter_rows(named=True):
-                    lt = int(row["lead_time_hours"])
+                    lt = float(row["lead_time_hours"])
                     mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
                     mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
                     mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])

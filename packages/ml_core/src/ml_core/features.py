@@ -40,7 +40,7 @@ def add_cyclical_temporal_features(df: T, time_col: str = "valid_time") -> T:
             day_of_year_cos=(pl.col(time_col).dt.ordinal_day() * 2 * np.pi / 365.25)
             .cos()
             .cast(pl.Float32),
-            # Day of week (0-6)
+            # Day of week (1-7)
             day_of_week=pl.col(time_col).dt.weekday().cast(pl.Int8),
         ),
     )
