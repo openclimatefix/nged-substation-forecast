@@ -39,6 +39,35 @@ def combined_actuals(
     return df
 
 
+@dg.asset_check(asset=combined_actuals)
+def check_all_zeros(
+    context: dg.AssetCheckExecutionContext, combined_actuals: pl.LazyFrame
+) -> dg.AssetCheckResult:
+    """Check if any substations have all zero values."""
+    if combined_actuals.collect_schema().names() == []:
+        return dg.AssetCheckResult(passed=True, description="No data to check.")
+
+    # Calculate max absolute value per substation
+    stats = cast(
+        pl.DataFrame,
+        combined_actuals.group_by("substation_number")
+        .agg(max_abs=pl.col("MW_or_MVA").abs().max())
+        .collect(),
+    )
+
+    zero_subs = stats.filter(pl.col("max_abs") == 0.0).get_column("substation_number").to_list()
+
+    if zero_subs:
+        return dg.AssetCheckResult(
+            passed=True,
+            severity=dg.AssetCheckSeverity.WARN,
+            description=f"Found {len(zero_subs)} substations with all zero values.",
+            metadata={"zero_substations": dg.MetadataValue.json(zero_subs[:100])},
+        )
+
+    return dg.AssetCheckResult(passed=True, description="No all-zero substations found.")
+
+
 @dg.asset
 def healthy_substations(
     context: dg.AssetExecutionContext, combined_actuals: pl.LazyFrame

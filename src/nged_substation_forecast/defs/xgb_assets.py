@@ -92,7 +92,13 @@ def train_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Filter to healthy substations and optional manual selection
-    sub_ids = config.substation_ids or healthy_substations
+    if config.substation_ids:
+        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
+        if not sub_ids:
+            raise ValueError("None of the requested substations are healthy.")
+        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+    else:
+        sub_ids = healthy_substations
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
     )
@@ -139,7 +145,13 @@ def evaluate_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Filter to healthy substations and optional manual selection
-    sub_ids = config.substation_ids or healthy_substations
+    if config.substation_ids:
+        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
+        if not sub_ids:
+            raise ValueError("None of the requested substations are healthy.")
+        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+    else:
+        sub_ids = healthy_substations
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
     )
