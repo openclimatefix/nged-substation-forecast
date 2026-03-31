@@ -60,3 +60,4 @@ exploration_scripts/
 #######################
 # Testing
 .hypothesis/
+tests/xgboost_integration_plot.html
