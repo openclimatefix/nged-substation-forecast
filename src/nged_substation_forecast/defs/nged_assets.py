@@ -290,7 +290,6 @@ def _merge_to_delta(
     partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
     check_specs=[
         AssetCheckSpec(name="all_substations_succeeded", asset="live_primary_flows"),
-        AssetCheckSpec(name="substation_data_quality", asset="live_primary_flows"),
     ],
     deps=["substation_metadata"],
 )
@@ -577,89 +576,6 @@ def substation_data_quality(
             metadata={
                 "affected_substation_count": dg.MetadataValue.int(affected_count),
                 "stuck_substation_sample": dg.MetadataValue.json(stuck_substations[:100]),
-                "insane_substation_sample": dg.MetadataValue.json(
-                    [s for s in insane_substations if s not in stuck_substations][:100]
-                ),
-            },
-            severity=dg.AssetCheckSeverity.ERROR,
-        )
-
-    return dg.AssetCheckResult(
-        passed=True,
-        description="All substations passed data quality checks",
-    )
-
-    # Materialize a sample of the data for checking (limit to avoid memory issues)
-    # Note: In production, you might want to check a representative sample
-    df = live_primary_flows.limit(100_000).collect()
-
-    if len(df) == 0:
-        return dg.AssetCheckResult(
-            passed=True,
-            description="Sample data is empty",
-            metadata={"warning": dg.MetadataValue.string("Sample materialized to empty DataFrame")},
-        )
-
-    # Define thresholds
-    stuck_std_threshold = settings.data_quality.stuck_std_threshold
-    max_mw_threshold = settings.data_quality.max_mw_threshold
-    min_mw_threshold = settings.data_quality.min_mw_threshold
-    window_size = 48  # 24 hours at 30-minute resolution
-
-    # Check for stuck sensors using rolling std (5% threshold for stuck data)
-    # Only check if MW or MVA columns exist
-    power_cols = ["MW", "MVA"]
-    cols_to_check = [col for col in power_cols if col in df.columns]
-
-    if not cols_to_check:
-        return dg.AssetCheckResult(
-            passed=True,
-            description="No power columns to check",
-        )
-
-    # Compute rolling std per column
-    stuck_count = 0
-    stuck_substations = set()
-
-    for col in cols_to_check:
-        # Compute rolling std per substation
-        stuck_mask = (
-            df.group_by("substation_number")
-            .agg(stuck_vals=pl.col(col).rolling_std(window_size).fill_null(0) < stuck_std_threshold)
-            .with_columns(num_stuck=pl.col("stuck_vals").sum())
-        )
-
-        # Substations with any stuck values
-        subst_with_stuck = stuck_mask.filter(pl.col("num_stuck") > 0)
-        stuck_count += len(subst_with_stuck)
-        stuck_substations.update(subst_with_stuck.get_column("substation_number").to_list())
-
-    # Check for insane values (outside physical bounds)
-    insane_mask = df.filter(
-        pl.col(cols_to_check).is_in(pl.lit(None)).not_()  # Non-null values
-        & (
-            (pl.col(cols_to_check[0]) < min_mw_threshold)
-            | (pl.col(cols_to_check[0]) > max_mw_threshold)
-            if len(cols_to_check) > 0
-            else pl.lit(False)
-        )
-    )
-    insane_substations = insane_mask.get_column("substation_number").unique().to_list()
-
-    # Combine affected substations
-    affected_count = len(stuck_substations) + len(set(insane_substations) - stuck_substations)
-
-    # Report result
-    if affected_count > 0:
-        return dg.AssetCheckResult(
-            passed=False,
-            description=(
-                f"Found {len(stuck_substations)} substations with stuck sensors "
-                f"and {len([s for s in insane_substations if s not in stuck_substations])} substations with insane values"
-            ),
-            metadata={
-                "affected_substation_count": dg.MetadataValue.int(affected_count),
-                "stuck_substation_sample": dg.MetadataValue.json(list(stuck_substations)[:100]),
                 "insane_substation_sample": dg.MetadataValue.json(
                     [s for s in insane_substations if s not in stuck_substations][:100]
                 ),
