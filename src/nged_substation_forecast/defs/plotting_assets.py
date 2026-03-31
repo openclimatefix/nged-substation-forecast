@@ -20,6 +20,7 @@ class PlotConfig(dg.Config):
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
         "combined_actuals": dg.AssetIn("combined_actuals"),
+        "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     compute_kind="python",
     group_name="plots",
@@ -28,10 +29,13 @@ def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
     combined_actuals: pl.LazyFrame,
+    substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
 ):
     """Generates an Altair plot comparing forecast vs actuals."""
+    # 3.1.B Specific 14-Day Forecast Selection
+    # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
     if predictions.is_empty() or combined_actuals.collect_schema().names() == []:
         context.log.warning("Empty predictions or actuals, skipping plot.")
         return
@@ -47,13 +51,34 @@ def forecast_vs_actual_plot(
         ).collect(),
     )
 
-    # 3. Filter predictions to the latest NWP run available in the set
-    max_init = predictions.get_column("nwp_init_time").max()
-    if max_init is None:
+    if actuals_30m.is_empty():
+        context.log.warning("No actuals found for the predicted substations, skipping plot.")
+        return
+
+    # Calculate target_init_time = max_actual_time - 14 days.
+    # We select the latest nwp_init_time that is <= max_actual_time - 14 days to guarantee
+    # that the entire 14-day forecast horizon has corresponding actuals for comparison.
+    max_actual_time = cast(datetime, actuals_30m.get_column("timestamp").max())
+    target_init_time = max_actual_time - timedelta(days=14)
+
+    # Select chosen_init_time: max nwp_init_time <= target_init_time
+    nwp_init_times = predictions.get_column("nwp_init_time").unique().sort()
+    valid_init_times = nwp_init_times.filter(nwp_init_times <= target_init_time)
+
+    if not valid_init_times.is_empty():
+        chosen_init_time = cast(datetime, valid_init_times.max())
+    else:
+        chosen_init_time = cast(datetime, nwp_init_times.min())
+        context.log.warning(
+            f"No NWP init time found before {target_init_time}. "
+            f"Falling back to earliest available: {chosen_init_time}"
+        )
+
+    if chosen_init_time is None:
         context.log.warning("No nwp_init_time found in predictions, skipping plot.")
         return
 
-    latest_predictions = predictions.filter(pl.col("nwp_init_time") == max_init)
+    latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
 
     # 4. Join predictions with actuals
     eval_df = latest_predictions.join(
@@ -66,15 +91,45 @@ def forecast_vs_actual_plot(
         context.log.warning("No overlapping data for plotting, skipping.")
         return
 
-    # 5. Filter plot to only show the last 2 weeks of the test set
-    max_date = cast(datetime, eval_df.get_column("valid_time").max())
-    test_start = max_date - timedelta(days=14)
-    plot_df = eval_df.filter(pl.col("valid_time") >= test_start)
+    # 5. Filter plot to 14-day horizon starting from chosen_init_time
+    horizon_end = chosen_init_time + timedelta(days=14)
+    plot_df = eval_df.filter(
+        (pl.col("valid_time") >= chosen_init_time) & (pl.col("valid_time") <= horizon_end)
+    )
+
+    # Empty Plot Window Guard: Ensure we have data in the 14-day window.
+    if plot_df.is_empty():
+        context.log.warning(
+            f"No data found in the 14-day window starting {chosen_init_time}, skipping."
+        )
+        return
+
+    # 3.1.D Substation Names in Titles
+    # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
+    # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
+    plot_df = (
+        pl.DataFrame(plot_df)
+        .join(
+            pl.DataFrame(substation_metadata).select(
+                ["substation_number", "substation_name_in_location_table"]
+            ),
+            on="substation_number",
+            how="inner",
+        )
+        .with_columns(
+            substation_name_with_id=pl.format(
+                "{} ({})",
+                pl.col("substation_name_in_location_table"),
+                pl.col("substation_number"),
+            )
+        )
+        .sort("valid_time")
+    )
 
     # Prepare a single dataframe for Altair to avoid faceting issues and duplication
     # Forecasts: 51 members
     preds_df = (
-        plot_df.select(["valid_time", "substation_number", "ensemble_member", "MW_or_MVA"])
+        plot_df.select(["valid_time", "substation_name_with_id", "ensemble_member", "MW_or_MVA"])
         .rename({"MW_or_MVA": "power"})
         .with_columns(
             type=pl.lit("Forecast"),
@@ -84,7 +139,7 @@ def forecast_vs_actual_plot(
 
     # Actuals: single line per substation (avoiding 51x duplication)
     actuals_df = (
-        plot_df.select(["valid_time", "substation_number", "actual"])
+        plot_df.select(["valid_time", "substation_name_with_id", "actual"])
         .unique()
         .rename({"actual": "power"})
         .with_columns(
@@ -117,11 +172,20 @@ def forecast_vs_actual_plot(
         strokeWidth=2, opacity=1.0
     )
 
+    # Different substations have vastly different power capacities, so independent y-axes
+    # are necessary to visualize the forecast accuracy for smaller substations.
+    # Explicitly showing the chosen_init_time as a subtitle ensures users understand
+    # the exact forecast initialization time being visualized.
     chart = (
         alt.layer(preds_layer, actuals_layer)
         .properties(width=400, height=200)
-        .facet(facet="substation_number:N", columns=2)
-        .properties(title=f"Actuals vs Predictions (Latest NWP: {max_init})")
+        .facet(facet="substation_name_with_id:N", columns=2)
+        .resolve_scale(y="independent")
+        .properties(
+            title=alt.TitleParams(
+                text="Actuals vs Predictions", subtitle=f"NWP Init Time: {chosen_init_time}"
+            )
+        )
     )
 
     chart.save(config.output_path)
@@ -131,6 +195,6 @@ def forecast_vs_actual_plot(
         metadata={
             "plot_path": dg.MetadataValue.path(config.output_path),
             "num_points": len(plot_df),
-            "latest_nwp": str(max_init),
+            "chosen_init_time": str(chosen_init_time),
         }
     )

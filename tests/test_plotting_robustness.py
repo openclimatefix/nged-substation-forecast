@@ -1,6 +1,7 @@
 import polars as pl
 from src.nged_substation_forecast.defs.plotting_assets import forecast_vs_actual_plot, PlotConfig
 from contracts.settings import Settings
+from contracts.data_schemas import SubstationMetadata
 from datetime import datetime, timezone
 import dagster as dg
 
@@ -31,6 +32,19 @@ def test_forecast_vs_actual_plot_filters_actuals():
         }
     )
 
+    # Mock substation_metadata using Patito
+    substation_metadata = SubstationMetadata.validate(
+        pl.DataFrame(
+            {
+                "substation_number": [110375],
+                "substation_name_in_location_table": ["Test Substation"],
+                "substation_type": ["Primary"],
+                "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
+            }
+        ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),
+        allow_missing_columns=True,
+    )
+
     config = PlotConfig(output_path="tests/temp_test_plot.html")
     settings = Settings()
     context = dg.build_asset_context()
@@ -41,6 +55,7 @@ def test_forecast_vs_actual_plot_filters_actuals():
             context=context,
             predictions=predictions,
             combined_actuals=actuals,
+            substation_metadata=substation_metadata,
             config=config,
             settings=settings,
         )
@@ -73,6 +88,19 @@ def test_forecast_vs_actual_plot_handles_no_overlap():
         }
     )
 
+    # Mock substation_metadata using Patito
+    substation_metadata = SubstationMetadata.validate(
+        pl.DataFrame(
+            {
+                "substation_number": [110375],
+                "substation_name_in_location_table": ["Test Substation"],
+                "substation_type": ["Primary"],
+                "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
+            }
+        ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),
+        allow_missing_columns=True,
+    )
+
     config = PlotConfig(output_path="tests/test_plot_no_overlap.html")
 
     # Use dagster's build_asset_context
@@ -82,6 +110,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap():
         context=context,
         predictions=predictions,
         combined_actuals=actuals,
+        substation_metadata=substation_metadata,
         config=config,
         settings=Settings(),
     )

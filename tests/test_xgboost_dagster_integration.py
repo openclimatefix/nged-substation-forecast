@@ -109,5 +109,29 @@ def test_xgboost_dagster_integration():
     assert plot_path.exists(), "Integration plot was not generated"
     assert plot_path.stat().st_size > 0, "Integration plot is empty"
 
+    # Read HTML content for further verification
+    html_content = plot_path.read_text()
+
+    # Verify substation name is present (110375 is Woodland Way)
+    assert "Woodland Way" in html_content, "Substation name 'Woodland Way' not found in plot HTML"
+
+    # Verify independent y-axes configuration
+    # We remove spaces to make the check more robust against formatting changes
+    assert '"resolve":{"scale":{"y":"independent"}}' in html_content.replace(" ", "").replace(
+        "\n", ""
+    ), "Independent y-axis configuration not found in plot HTML"
+
+    # Verify NWP init time is in the title/subtitle
+    # Get the materialization event for the plot asset to find the chosen_init_time
+    plot_materialization = next(
+        event
+        for event in result.get_asset_materialization_events()
+        if event.asset_key and event.asset_key.path[-1] == "forecast_vs_actual_plot"
+    )
+    chosen_init_time_str = plot_materialization.materialization.metadata["chosen_init_time"].value
+    assert f"NWP Init Time: {chosen_init_time_str}" in html_content, (
+        f"NWP Init Time '{chosen_init_time_str}' not found in plot HTML"
+    )
+
     # Clean up plot after successful test
     # os.remove(plot_path)
