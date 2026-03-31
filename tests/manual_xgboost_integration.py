@@ -19,21 +19,53 @@ from typing import Any, cast
 SUBSTATIONS = [110375, 110644, 110772, 110803, 110804]
 
 
+def get_healthy_substations(settings: Settings) -> list[int]:
+    """Filter out substations with bad telemetry."""
+    actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
+    df = pl.read_delta(str(actuals_path)).lazy()
+    df = df.filter(pl.col("substation_number").is_in(SUBSTATIONS))
+
+    health_df = cast(
+        pl.DataFrame,
+        df.with_columns(MW_or_MVA=pl.coalesce(["MW", "MVA"]), date=pl.col("timestamp").dt.date())
+        .group_by(["substation_number", "date"])
+        .agg(
+            max_abs=pl.col("MW_or_MVA").abs().max(),
+            std=pl.col("MW_or_MVA").std(),
+            count=pl.col("MW_or_MVA").count(),
+        )
+        .filter(
+            (pl.col("count") > 50)
+            & ((pl.col("max_abs") < 0.5) | (pl.col("std").fill_null(0.0) < 0.01))
+        )
+        .select("substation_number")
+        .unique()
+        .collect(),
+    )
+
+    bad_substations = health_df.get_column("substation_number").to_list()
+    print(f"Filtering out bad substations: {bad_substations}")
+
+    return [s for s in SUBSTATIONS if s not in bad_substations]
+
+
 # 2. Define filtered assets
 @dg.asset(name="substation_metadata", compute_kind="python", group_name="nged")
 def filtered_substation_metadata(settings: dg.ResourceParam[Settings]) -> pl.DataFrame:
-    """Mock substation_metadata to filter to 5 substations."""
+    """Mock substation_metadata to filter to healthy substations."""
+    healthy_subs = get_healthy_substations(settings)
     metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
     df = pl.read_parquet(metadata_path)
-    return df.filter(pl.col("substation_number").is_in(SUBSTATIONS))
+    return df.filter(pl.col("substation_number").is_in(healthy_subs))
 
 
 @dg.asset(name="combined_actuals", compute_kind="python", group_name="nged")
 def filtered_combined_actuals(settings: dg.ResourceParam[Settings]) -> pl.LazyFrame:
-    """Mock combined_actuals to filter to 5 substations."""
+    """Mock combined_actuals to filter to healthy substations."""
+    healthy_subs = get_healthy_substations(settings)
     actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
     df = pl.read_delta(str(actuals_path)).lazy()
-    return df.filter(pl.col("substation_number").is_in(SUBSTATIONS))
+    return df.filter(pl.col("substation_number").is_in(healthy_subs))
 
 
 @dg.asset(name="all_nwp_data", compute_kind="python", group_name="weather")
@@ -50,8 +82,24 @@ def mock_train_xgboost(
     substation_metadata: pl.DataFrame,
 ):
     config = load_hydra_config("xgboost")
-    config.data_split.train_start = pd.to_datetime("2026-01-01").date()
-    config.data_split.train_end = pd.to_datetime("2026-02-28").date()
+
+    # Dynamically calculate train/test split
+    max_date_df = cast(pl.DataFrame, combined_actuals.select(pl.col("timestamp").max()).collect())
+    max_date = max_date_df.item()
+
+    test_end = max_date.date()
+    test_start = test_end - timedelta(days=14)
+    train_end = test_start - timedelta(days=1)
+
+    # Use all available data before test_start for training
+    min_date_df = cast(pl.DataFrame, combined_actuals.select(pl.col("timestamp").min()).collect())
+    train_start = min_date_df.item().date()
+
+    context.log.info(f"Training period: {train_start} to {train_end}")
+
+    config.data_split.train_start = train_start
+    config.data_split.train_end = train_end
+
     nwp_train = processed_nwp_data.filter(pl.col("ensemble_member") == 0)
     return train_and_log_model(
         context=context,
@@ -73,26 +121,35 @@ def mock_evaluate_xgboost(
     substation_metadata: pl.DataFrame,
 ):
     config = load_hydra_config("xgboost")
-    config.data_split.test_start = pd.to_datetime("2026-03-01").date()
-    config.data_split.test_end = pd.to_datetime("2026-03-31").date()
+
+    # Dynamically calculate train/test split
+    max_date_df = cast(pl.DataFrame, combined_actuals.select(pl.col("timestamp").max()).collect())
+    max_date = max_date_df.item()
+
+    test_end = max_date.date()
+    test_start = test_end - timedelta(days=14)
+
+    context.log.info(f"Testing period: {test_start} to {test_end}")
+
+    config.data_split.test_start = test_start
+    config.data_split.test_end = test_end
     forecaster = train_xgboost
     forecaster.config = config.model
 
     # Do inference manually to avoid the Patito bug in evaluate_and_save_model
-    test_start = config.data_split.test_start
-    test_end = config.data_split.test_end
     lookback = getattr(config.model, "required_lookback_days", 14)
     slice_start = test_start - timedelta(days=lookback)
 
-    sliced_nwps = _slice_temporal_data(
-        processed_nwp_data, slice_start, test_end, "valid_time"
-    ).filter(pl.col("ensemble_member") == 0)
+    sliced_nwps = _slice_temporal_data(processed_nwp_data, slice_start, test_end, "valid_time")
     sliced_flows = _slice_temporal_data(combined_actuals, slice_start, test_end, "timestamp")
 
     forecast_time = datetime.now(timezone.utc)
     df = cast(pl.DataFrame, sliced_nwps.select(pl.col("init_time").max()).collect())
     if not df.is_empty():
-        forecast_time = df.item() + timedelta(hours=3)
+        max_init = df.item()
+        forecast_time = max_init + timedelta(hours=3)
+        # Only show predictions for a single NWP run (the latest one available in the test set)
+        sliced_nwps = sliced_nwps.filter(pl.col("init_time") == max_init)
 
     inference_params = InferenceParams(
         forecast_time=forecast_time,
@@ -101,7 +158,7 @@ def mock_evaluate_xgboost(
 
     results_df = forecaster.predict(
         inference_params=inference_params,
-        collapse_lead_times=True,
+        collapse_lead_times=False,  # We already filtered to a single init_time
         substation_metadata=substation_metadata,
         substation_power_flows=sliced_flows,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: sliced_nwps},
@@ -228,25 +285,40 @@ def main():
 
     # 10. Generate plot
     print("\nGenerating plot...")
-    # Convert to pandas for Altair
-    plot_df = eval_df.select(["valid_time", "substation_number", "MW_or_MVA", "actual"]).to_pandas()
-    plot_df = plot_df.melt(
-        id_vars=["valid_time", "substation_number"],
+
+    # Filter plot to only show the last 2 weeks
+    max_date_df = actuals.select(pl.col("timestamp").max()).collect()
+    max_date = max_date_df.item()
+    test_start = max_date - timedelta(days=14)
+
+    plot_df = (
+        eval_df.filter(pl.col("valid_time") >= test_start)
+        .select(["valid_time", "substation_number", "ensemble_member", "MW_or_MVA", "actual"])
+        .to_pandas()
+    )
+
+    # Melt the dataframe for Altair
+    melted_df = plot_df.melt(
+        id_vars=["valid_time", "substation_number", "ensemble_member"],
         value_vars=["MW_or_MVA", "actual"],
         var_name="type",
         value_name="power",
     )
 
     chart = (
-        alt.Chart(plot_df)
+        alt.Chart(melted_df)
         .mark_line()
         .encode(
             x="valid_time:T",
             y="power:Q",
             color="type:N",
-            facet=alt.Facet("substation_number:N", columns=2),
+            detail="ensemble_member:N",
+            strokeWidth=alt.condition(alt.datum.type == "actual", alt.value(2.0), alt.value(0.5)),
+            opacity=alt.condition(alt.datum.type == "actual", alt.value(1.0), alt.value(0.3)),
         )
-        .properties(width=400, height=200, title="Actuals vs Predictions for 5 Substations")
+        .properties(width=400, height=200)
+        .facet("substation_number:N", columns=2)
+        .properties(title="Actuals vs Predictions (51 members) for Last 2 Weeks")
     )
 
     chart.save("tests/xgboost_integration_plot.html")
