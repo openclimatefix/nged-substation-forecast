@@ -151,15 +151,30 @@ class XGBoostForecaster(BaseForecaster):
         collapse_lead_times: bool = False,
     ) -> pl.LazyFrame:
         """Prepare and join multiple NWP sources."""
+        # Get delay from config, default to 3 hours if not set
+        delay_hours = (
+            getattr(self.config, "nwp_availability_delay_hours", 3)
+            if hasattr(self, "config")
+            else 3
+        )
+
         nwp_list = []
         for i, (name, lf) in enumerate(nwps.items()):
             lf_with_features = add_weather_features(lf)
 
+            # Always filter to ensure NWP is available before valid_time
+            # This prevents lookahead bias during training
+            available_nwp = lf_with_features.filter(
+                pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
+                <= pl.col(NwpColumns.VALID_TIME)
+            )
+
             if nwp_cutoff is not None:
                 if collapse_lead_times:
                     latest_nwp = (
-                        lf_with_features.filter(
-                            pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=3) <= nwp_cutoff
+                        available_nwp.filter(
+                            pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
+                            <= nwp_cutoff
                         )
                         .sort(NwpColumns.INIT_TIME)
                         .group_by(
@@ -172,15 +187,15 @@ class XGBoostForecaster(BaseForecaster):
                         .last()
                     )
                 else:
-                    latest_nwp = lf_with_features.filter(
-                        pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=3) <= nwp_cutoff
+                    latest_nwp = available_nwp.filter(
+                        pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours) <= nwp_cutoff
                     )
             else:
-                latest_nwp = lf_with_features
+                latest_nwp = available_nwp
 
             if i == 0:
                 prefixed_nwp = latest_nwp.with_columns(
-                    available_time=pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=3)
+                    available_time=pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
                 )
             else:
                 prefix = f"{name.value}_"
@@ -196,7 +211,8 @@ class XGBoostForecaster(BaseForecaster):
                     ]
                 }
                 prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
-                    available_time=pl.col(f"{prefix}{NwpColumns.INIT_TIME}") + pl.duration(hours=3)
+                    available_time=pl.col(f"{prefix}{NwpColumns.INIT_TIME}")
+                    + pl.duration(hours=delay_hours)
                 )
             nwp_list.append(prefixed_nwp)
 

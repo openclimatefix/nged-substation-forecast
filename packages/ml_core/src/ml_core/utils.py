@@ -192,10 +192,21 @@ def evaluate_and_save_model(
             eval_df = eval_df.filter(pl.col("valid_time") >= test_start_dt)
 
             # Calculate lead_time_hours
-            eval_df = eval_df.with_columns(
-                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
-                / 60.0
-            )
+            if "nwp_init_time" in eval_df.columns:
+                eval_df = eval_df.with_columns(
+                    lead_time_hours=(
+                        pl.col("valid_time") - pl.col("nwp_init_time")
+                    ).dt.total_minutes()
+                    / 60.0
+                )
+            else:
+                # Fallback if nwp_init_time is not available
+                eval_df = eval_df.with_columns(
+                    lead_time_hours=(
+                        pl.col("valid_time") - pl.lit(forecast_time)
+                    ).dt.total_minutes()
+                    / 60.0
+                )
 
             # Group by lead_time_hours and calculate metrics
             metrics = (

@@ -84,7 +84,9 @@ def mock_evaluate_xgboost(
     lookback = getattr(config.model, "required_lookback_days", 14)
     slice_start = test_start - timedelta(days=lookback)
 
-    sliced_nwps = _slice_temporal_data(processed_nwp_data, slice_start, test_end, "valid_time")
+    sliced_nwps = _slice_temporal_data(
+        processed_nwp_data, slice_start, test_end, "valid_time"
+    ).filter(pl.col("ensemble_member") == 0)
     sliced_flows = _slice_temporal_data(combined_actuals, slice_start, test_end, "timestamp")
 
     forecast_time = datetime.now(timezone.utc)
@@ -99,7 +101,7 @@ def mock_evaluate_xgboost(
 
     results_df = forecaster.predict(
         inference_params=inference_params,
-        collapse_lead_times=False,
+        collapse_lead_times=True,
         substation_metadata=substation_metadata,
         substation_power_flows=sliced_flows,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: sliced_nwps},

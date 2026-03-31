@@ -44,6 +44,7 @@ class ModelConfig(BaseModel):
     )
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
     required_lookback_days: int = Field(default=14)
+    nwp_availability_delay_hours: int = Field(default=3)
     features: ModelFeaturesConfig
 
 
