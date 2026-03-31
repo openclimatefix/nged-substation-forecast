@@ -31,20 +31,25 @@ def test_forecast_vs_actual_plot_filters_actuals():
         }
     )
 
-    config = PlotConfig(output_path="tests/test_plot.html")
+    config = PlotConfig(output_path="tests/temp_test_plot.html")
     settings = Settings()
     context = dg.build_asset_context()
 
     # We want to verify that forecast_vs_actual_plot doesn't crash
-    result = forecast_vs_actual_plot(
-        context=context,
-        predictions=predictions,
-        combined_actuals=actuals,
-        config=config,
-        settings=settings,
-    )
+    try:
+        result = forecast_vs_actual_plot(
+            context=context,
+            predictions=predictions,
+            combined_actuals=actuals,
+            config=config,
+            settings=settings,
+        )
+        assert result is not None
+    finally:
+        import os
 
-    assert result is not None
+        if os.path.exists("tests/temp_test_plot.html"):
+            os.remove("tests/temp_test_plot.html")
 
 
 def test_forecast_vs_actual_plot_handles_no_overlap():
