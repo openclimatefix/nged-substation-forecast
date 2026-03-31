@@ -12,7 +12,6 @@ from ml_core.data import downsample_power_flows
 class PlotConfig(dg.Config):
     """Configuration for the forecast vs actual plot asset."""
 
-    substation_ids: list[int] = []
     output_path: str = "tests/xgboost_integration_plot.html"
 
 
@@ -113,11 +112,8 @@ def forecast_vs_actual_plot(
     # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
-        pl.DataFrame(plot_df)
-        .join(
-            pl.DataFrame(substation_metadata).select(
-                ["substation_number", "substation_name_in_location_table"]
-            ),
+        plot_df.join(
+            substation_metadata.select(["substation_number", "substation_name_in_location_table"]),
             on="substation_number",
             how="inner",
         )

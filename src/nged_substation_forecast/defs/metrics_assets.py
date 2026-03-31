@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 from typing import cast
 
 import dagster as dg
@@ -48,10 +49,22 @@ def check_all_zeros(
     if combined_actuals.collect_schema().names() == []:
         return dg.AssetCheckResult(passed=True, description="No data to check.")
 
-    # Calculate max absolute value per substation
+    # First, query the maximum timestamp from combined_actuals to define the 30-day window.
+    # We limit the check to the last 30 days to prevent unbounded memory/compute growth
+    # as the historical dataset expands.
+    max_timestamp = cast(
+        pl.DataFrame, combined_actuals.select(pl.col("timestamp").max()).collect()
+    ).item()
+    if max_timestamp is None:
+        return dg.AssetCheckResult(passed=True, description="No data to check.")
+
+    # Filter combined_actuals to only include rows where timestamp is within 30 days of the maximum timestamp.
+    df_recent = combined_actuals.filter(pl.col("timestamp") >= max_timestamp - timedelta(days=30))
+
+    # Calculate max absolute value per substation on this filtered 30-day window.
     stats = cast(
         pl.DataFrame,
-        combined_actuals.group_by("substation_number")
+        df_recent.group_by("substation_number")
         .agg(max_abs=pl.col("MW_or_MVA").abs().max())
         .collect(),
     )
@@ -64,11 +77,13 @@ def check_all_zeros(
         return dg.AssetCheckResult(
             passed=True,
             severity=dg.AssetCheckSeverity.WARN,
-            description=f"Found {len(zero_subs)} substations with all zero values.",
+            description=f"Found {len(zero_subs)} substations with all zero values in the last 30 days.",
             metadata={"zero_substations": dg.MetadataValue.json(zero_subs[:100])},
         )
 
-    return dg.AssetCheckResult(passed=True, description="No all-zero substations found.")
+    return dg.AssetCheckResult(
+        passed=True, description="No all-zero substations found in the last 30 days."
+    )
 
 
 @dg.asset

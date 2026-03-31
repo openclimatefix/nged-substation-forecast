@@ -73,6 +73,26 @@ def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) ->
     return config
 
 
+def _get_target_substations(
+    config: XGBoostConfig, healthy_substations: list[int], context: dg.AssetExecutionContext
+) -> list[int]:
+    """Intersects requested substation IDs with healthy ones and logs the result.
+
+    This helper centralizes the intersection and validation logic for target substations,
+    ensuring consistent behavior across training and evaluation assets.
+    """
+    if config.substation_ids:
+        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
+        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+    else:
+        sub_ids = healthy_substations
+
+    if not sub_ids and not config.allow_empty_substations:
+        raise ValueError("No healthy substations available.")
+
+    return sub_ids
+
+
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
@@ -97,24 +117,16 @@ def train_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Filter to healthy substations and optional manual selection
-    if config.substation_ids:
-        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
-    else:
-        sub_ids = healthy_substations
+    sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # If no healthy substations are found, we can either crash or return an empty model.
     # Returning an empty model allows the pipeline to continue gracefully in test
     # environments or during telemetry outages.
     if not sub_ids:
-        if config.allow_empty_substations:
-            context.log.warning(
-                "No healthy substations available for training. Returning an untrained model."
-            )
-            return XGBoostForecaster()
-        raise ValueError("No healthy substations available for training.")
-
-    if config.substation_ids:
-        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+        context.log.warning(
+            "No healthy substations available for training. Returning an untrained model."
+        )
+        return XGBoostForecaster()
 
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
@@ -162,24 +174,16 @@ def evaluate_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Filter to healthy substations and optional manual selection
-    if config.substation_ids:
-        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
-    else:
-        sub_ids = healthy_substations
+    sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # If no healthy substations are found, we can either crash or return an empty forecast.
     # Returning an empty dataframe allows the pipeline to continue gracefully in test
     # environments or during telemetry outages.
     if not sub_ids:
-        if config.allow_empty_substations:
-            context.log.warning(
-                "No healthy substations available for evaluation. Returning an empty forecast dataframe."
-            )
-            return pl.DataFrame(schema=PowerForecast.dtypes)
-        raise ValueError("No healthy substations available for evaluation.")
-
-    if config.substation_ids:
-        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+        context.log.warning(
+            "No healthy substations available for evaluation. Returning an empty forecast dataframe."
+        )
+        return pl.DataFrame(schema=PowerForecast.dtypes)
 
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
