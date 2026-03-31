@@ -369,9 +369,13 @@ class SubstationFeatures(pt.Model):
 
     # Weather lags/trends
     temperature_2m_lag_7d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    sw_radiation_lag_7d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_short_wave_radiation_flux_surface_lag_7d: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
     temperature_2m_lag_14d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    sw_radiation_lag_14d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_short_wave_radiation_flux_surface_lag_14d: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
     temperature_2m_6h_ago: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     temp_trend_6h: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 

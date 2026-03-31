@@ -263,6 +263,7 @@ def test_prepare_training_data_prevents_row_explosion():
                     "pressure_surface": 100.0,
                     "pressure_reduced_to_mean_sea_level": 101.0,
                     "geopotential_height_500hpa": 50.0,
+                    "downward_short_wave_radiation_flux_surface": 100.0,
                     "categorical_precipitation_type_surface": 0.0,
                     "lead_time_hours": (valid_time - init_time).total_seconds() / 3600,
                 }
@@ -385,6 +386,7 @@ def test_latest_available_weekly_lag_prevents_leakage():
                 "pressure_surface": 100.0,
                 "pressure_reduced_to_mean_sea_level": 101.0,
                 "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
                 "categorical_precipitation_type_surface": 0.0,
                 "lead_time_hours": 24.0,
             },
@@ -402,6 +404,7 @@ def test_latest_available_weekly_lag_prevents_leakage():
                 "pressure_surface": 100.0,
                 "pressure_reduced_to_mean_sea_level": 101.0,
                 "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
                 "categorical_precipitation_type_surface": 0.0,
                 "lead_time_hours": 240.0,
             },
@@ -469,6 +472,7 @@ def test_xgboost_predict_with_lags():
                 "pressure_surface": 100.0,
                 "pressure_reduced_to_mean_sea_level": 101.0,
                 "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
                 "categorical_precipitation_type_surface": 0.0,
             }
         ]

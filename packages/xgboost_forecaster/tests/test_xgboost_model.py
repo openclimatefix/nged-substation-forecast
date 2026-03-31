@@ -74,6 +74,7 @@ def test_xgboost_forecaster_train_and_predict():
                 "pressure_surface": [100.0] * len(nwp_timestamps),
                 "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
                 "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "downward_short_wave_radiation_flux_surface": [100.0] * len(nwp_timestamps),
                 "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()
@@ -131,6 +132,7 @@ def test_xgboost_forecaster_train_and_predict():
                 "pressure_surface": [100.0] * len(predict_timestamps),
                 "pressure_reduced_to_mean_sea_level": [101.0] * len(predict_timestamps),
                 "geopotential_height_500hpa": [50.0] * len(predict_timestamps),
+                "downward_short_wave_radiation_flux_surface": [100.0] * len(predict_timestamps),
                 "categorical_precipitation_type_surface": [0.0] * len(predict_timestamps),
             }
         ).lazy()
@@ -206,6 +208,7 @@ def test_xgboost_forecaster_predict_empty():
                 "pressure_surface": [100.0] * len(nwp_timestamps),
                 "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
                 "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "downward_short_wave_radiation_flux_surface": [100.0] * len(nwp_timestamps),
                 "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()
@@ -253,6 +256,7 @@ def test_xgboost_forecaster_predict_empty():
                 "pressure_surface": [100.0] * len(nwp_timestamps),
                 "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
                 "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "downward_short_wave_radiation_flux_surface": [100.0] * len(nwp_timestamps),
                 "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
             }
         ).lazy()

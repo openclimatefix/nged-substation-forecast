@@ -125,6 +125,7 @@ def test_xgboost_forecaster_train_with_nans():
             "pressure_surface": [100.0],
             "pressure_reduced_to_mean_sea_level": [101.0],
             "geopotential_height_500hpa": [50.0],
+            "downward_short_wave_radiation_flux_surface": [100.0],
             "categorical_precipitation_type_surface": [0.0],
             "lead_time_hours": [6.0],
         }
@@ -176,6 +177,7 @@ def test_xgboost_forecaster_train_with_infs():
             "pressure_surface": [100.0],
             "pressure_reduced_to_mean_sea_level": [101.0],
             "geopotential_height_500hpa": [50.0],
+            "downward_short_wave_radiation_flux_surface": [100.0],
             "categorical_precipitation_type_surface": [0.0],
             "lead_time_hours": [6.0],
         }
@@ -236,6 +238,7 @@ def test_xgboost_forecaster_predict_with_nans():
             "pressure_surface": [100.0],
             "pressure_reduced_to_mean_sea_level": [101.0],
             "geopotential_height_500hpa": [50.0],
+            "downward_short_wave_radiation_flux_surface": [100.0],
             "categorical_precipitation_type_surface": [0.0],
         }
     ).lazy()
@@ -301,6 +304,7 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
                 "pressure_surface": [100.0],
                 "pressure_reduced_to_mean_sea_level": [101.0],
                 "geopotential_height_500hpa": [50.0],
+                "downward_short_wave_radiation_flux_surface": [100.0],
                 "categorical_precipitation_type_surface": [0.0],
                 "lead_time_hours": [6.0],
             }

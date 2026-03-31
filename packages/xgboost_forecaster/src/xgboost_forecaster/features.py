@@ -183,8 +183,6 @@ def add_weather_features(
         by_cols = ["target_valid_time"]
         if NwpColumns.H3_INDEX in schema_names:
             by_cols.append(NwpColumns.H3_INDEX)
-        if NwpColumns.ENSEMBLE_MEMBER in schema_names:
-            by_cols.append(NwpColumns.ENSEMBLE_MEMBER)
 
         # We need to use the renamed columns if they exist
         temp_col = f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled"
@@ -197,10 +195,14 @@ def add_weather_features(
         source_cols = [NwpColumns.VALID_TIME, NwpColumns.INIT_TIME, actual_temp_col]
         if NwpColumns.H3_INDEX in schema_names:
             source_cols.append(NwpColumns.H3_INDEX)
-        if NwpColumns.ENSEMBLE_MEMBER in schema_names:
-            source_cols.append(NwpColumns.ENSEMBLE_MEMBER)
         if actual_sw_col in source_schema:
             source_cols.append(actual_sw_col)
+
+        # Filter source_df to only include ensemble_member == 0 if it exists.
+        # This ensures that lag features are consistent across all ensemble members
+        # and reduces the memory footprint of the join.
+        if NwpColumns.ENSEMBLE_MEMBER in source_schema:
+            source_df = source_df.filter(pl.col(NwpColumns.ENSEMBLE_MEMBER) == 0)
 
         right = source_df.select(source_cols).rename(
             {
@@ -209,7 +211,7 @@ def add_weather_features(
             }
         )
         if actual_sw_col in source_schema:
-            right = right.rename({actual_sw_col: f"sw_radiation_{suffix}"})
+            right = right.rename({actual_sw_col: f"{NwpColumns.SW_RADIATION}_{suffix}"})
 
         left = df.with_columns(target_valid_time=pl.col(NwpColumns.VALID_TIME) - offset)
 

@@ -411,7 +411,13 @@ class XGBoostForecaster(BaseForecaster):
         # Collect only necessary columns and drop nulls
         critical_cols = ["MW_or_MVA"]
         if nwps:
-            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
+            critical_cols.extend(
+                [
+                    f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
+                    f"{NwpColumns.SW_RADIATION}_uint8_scaled",
+                    f"{NwpColumns.WIND_SPEED_10M}_uint8_scaled",
+                ]
+            )
 
         raw_df = cast(
             pl.DataFrame,
@@ -514,7 +520,13 @@ class XGBoostForecaster(BaseForecaster):
 
         critical_cols = []
         if nwps:
-            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
+            critical_cols.extend(
+                [
+                    f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
+                    f"{NwpColumns.SW_RADIATION}_uint8_scaled",
+                    f"{NwpColumns.WIND_SPEED_10M}_uint8_scaled",
+                ]
+            )
 
         raw_df = cast(
             pl.DataFrame,
