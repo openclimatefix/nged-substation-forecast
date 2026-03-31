@@ -63,6 +63,10 @@ def forecast_vs_actual_plot(
 
     # Select chosen_init_time: max nwp_init_time <= target_init_time
     nwp_init_times = predictions.get_column("nwp_init_time").unique().sort()
+    if nwp_init_times.is_empty():
+        context.log.warning("No nwp_init_time found in predictions, skipping plot.")
+        return
+
     valid_init_times = nwp_init_times.filter(nwp_init_times <= target_init_time)
 
     if not valid_init_times.is_empty():
@@ -73,10 +77,6 @@ def forecast_vs_actual_plot(
             f"No NWP init time found before {target_init_time}. "
             f"Falling back to earliest available: {chosen_init_time}"
         )
-
-    if chosen_init_time is None:
-        context.log.warning("No nwp_init_time found in predictions, skipping plot.")
-        return
 
     latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
 
@@ -89,7 +89,10 @@ def forecast_vs_actual_plot(
         how="left",
     )
 
-    if eval_df.is_empty():
+    # Overlap Check: Because a left join guarantees rows exist, we must check if the
+    # 'actual' column consists entirely of nulls to detect when there are no actuals
+    # to plot against.
+    if eval_df.is_empty() or eval_df.get_column("actual").null_count() == len(eval_df):
         context.log.warning("No overlapping data for plotting, skipping.")
         return
 

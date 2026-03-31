@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 from pydantic import Field, field_validator
 
 from contracts.hydra_schemas import NwpModel, TrainingConfig
+from contracts.data_schemas import PowerForecast
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 
 from xgboost_forecaster.model import XGBoostForecaster
@@ -30,6 +31,10 @@ class XGBoostConfig(dg.Config):
     )
     substation_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
+    )
+    allow_empty_substations: bool = Field(
+        default=True,
+        description="Allow the pipeline to continue if no healthy substations are found.",
     )
 
     @field_validator("train_start", "train_end", "test_start", "test_end")
@@ -94,11 +99,23 @@ def train_xgboost(
     # Filter to healthy substations and optional manual selection
     if config.substation_ids:
         sub_ids = [s for s in config.substation_ids if s in healthy_substations]
-        if not sub_ids:
-            raise ValueError("None of the requested substations are healthy.")
-        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
     else:
         sub_ids = healthy_substations
+
+    # If no healthy substations are found, we can either crash or return an empty model.
+    # Returning an empty model allows the pipeline to continue gracefully in test
+    # environments or during telemetry outages.
+    if not sub_ids:
+        if config.allow_empty_substations:
+            context.log.warning(
+                "No healthy substations available for training. Returning an untrained model."
+            )
+            return XGBoostForecaster()
+        raise ValueError("No healthy substations available for training.")
+
+    if config.substation_ids:
+        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
     )
@@ -147,11 +164,23 @@ def evaluate_xgboost(
     # Filter to healthy substations and optional manual selection
     if config.substation_ids:
         sub_ids = [s for s in config.substation_ids if s in healthy_substations]
-        if not sub_ids:
-            raise ValueError("None of the requested substations are healthy.")
-        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
     else:
         sub_ids = healthy_substations
+
+    # If no healthy substations are found, we can either crash or return an empty forecast.
+    # Returning an empty dataframe allows the pipeline to continue gracefully in test
+    # environments or during telemetry outages.
+    if not sub_ids:
+        if config.allow_empty_substations:
+            context.log.warning(
+                "No healthy substations available for evaluation. Returning an empty forecast dataframe."
+            )
+            return pl.DataFrame(schema=PowerForecast.dtypes)
+        raise ValueError("No healthy substations available for evaluation.")
+
+    if config.substation_ids:
+        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
+
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("substation_number").is_in(sub_ids)
     )

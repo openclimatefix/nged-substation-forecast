@@ -116,7 +116,7 @@ def healthy_substations(
     substation_health = (
         daily_health.group_by("substation_number")
         .agg(
-            total_days=pl.count(),
+            total_days=pl.len(),
             bad_days_count=pl.col("is_bad_day").sum(),
         )
         .with_columns(bad_day_ratio=pl.col("bad_days_count") / pl.col("total_days"))
