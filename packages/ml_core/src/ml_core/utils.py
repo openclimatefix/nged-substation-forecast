@@ -57,7 +57,14 @@ def train_and_log_model(
             continue
 
         time_col = "timestamp" if "power_flows" in key else "valid_time"
-        sliced_data[key] = _slice_temporal_data(val, train_start, train_end, time_col)
+
+        # Add a configurable lookback for autoregressive features
+        slice_start = train_start
+        if "power_flows" in key or "nwps" in key:
+            lookback = getattr(config.model, "required_lookback_days", 14)
+            slice_start = train_start - timedelta(days=lookback)
+
+        sliced_data[key] = _slice_temporal_data(val, slice_start, train_end, time_col)
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
@@ -186,7 +193,7 @@ def evaluate_and_save_model(
 
             # Calculate lead_time_hours
             eval_df = eval_df.with_columns(
-                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
+                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
                 / 60.0
             )
 
