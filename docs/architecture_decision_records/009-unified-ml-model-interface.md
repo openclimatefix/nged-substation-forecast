@@ -36,7 +36,7 @@ To prevent lookahead bias when using autoregressive features (lags), we implemen
 - `lag_days = max(1, ceil(lead_time_days / 7)) * 7`
 - `target_lag_time = valid_time - lag_days`
 
-This ensures that the model always uses the most recent *available* historical data for a given lead time, strictly preventing data leakage.
+This ensures that the model always uses the most recent *available* historical data for a given lead time, strictly preventing data leakage. The `ModelConfig` specifies a `required_lookback_days` (e.g., 14 days) to ensure sufficient historical data is available for these dynamic lags.
 
 ### 2.4 Backtesting via `collapse_lead_times`
 We introduced a `collapse_lead_times` parameter in the `predict` method.
@@ -45,6 +45,14 @@ We introduced a `collapse_lead_times` parameter in the `predict` method.
 
 ### 2.5 Strict Data Contracts
 We updated the `SubstationFeatures` and `PowerForecast` data contracts in `packages/contracts` to enforce these new requirements, including validation for the dynamic `latest_available_weekly_lag` and the `ensemble_member` fields.
+
+
+### 2.6 Target Normalization by Peak Capacity
+To ensure the model learns generalized patterns across substations of varying sizes, we normalize the target variable (`MW_or_MVA`) and the autoregressive lags (`latest_available_weekly_lag`) by the substation's `peak_capacity`. This allows a single global model to effectively forecast both small and large substations.
+
+
+### 2.7 Unified Training and Evaluation Utilities
+We introduced shared utilities in `ml_core.utils` (`train_and_log_model` and `evaluate_model`) to standardize the MLOps lifecycle. These utilities handle temporal slicing of data based on the `TrainingConfig` and `InferenceParams`, execute the `BaseForecaster` methods, and log the results (models, parameters, metrics) to MLflow.
 
 ## 3. Consequences
 * **Positive:** The unified interface makes it trivial to add new model types (e.g., PyTorch GNNs) without changing the orchestration logic.
