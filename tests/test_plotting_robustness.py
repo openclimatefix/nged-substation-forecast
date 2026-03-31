@@ -22,13 +22,15 @@ def test_forecast_vs_actual_plot_filters_actuals():
         }
     )
 
-    # Mock combined_actuals with many substations
-    actuals = pl.LazyFrame(
+    # Mock cleaned_actuals with many substations
+    # Note: cleaned_actuals returns an eager DataFrame (not LazyFrame)
+    actuals = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)] * 11,
             "substation_number": list(range(10)) + [110375],
             "MW": [1.0] * 11,
             "MVA": [1.0] * 11,
+            "MW_or_MVA": [1.0] * 11,  # Include this column as it's expected by the function
         }
     )
 
@@ -54,7 +56,7 @@ def test_forecast_vs_actual_plot_filters_actuals():
         result = forecast_vs_actual_plot(
             context=context,
             predictions=predictions,
-            combined_actuals=actuals,
+            cleaned_actuals=actuals,
             substation_metadata=substation_metadata,
             config=config,
             settings=settings,
@@ -79,12 +81,13 @@ def test_forecast_vs_actual_plot_handles_no_overlap():
     )
 
     # Actuals at a different time
-    actuals = pl.LazyFrame(
+    actuals = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, 12, tzinfo=timezone.utc)],
             "substation_number": [110375],
             "MW": [1.0],
             "MVA": [1.0],
+            "MW_or_MVA": [1.0],  # Include this column as it's expected by the function
         }
     )
 
@@ -109,7 +112,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap():
     result = forecast_vs_actual_plot(
         context=context,
         predictions=predictions,
-        combined_actuals=actuals,
+        cleaned_actuals=actuals,
         substation_metadata=substation_metadata,
         config=config,
         settings=Settings(),

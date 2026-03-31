@@ -18,7 +18,7 @@ class PlotConfig(dg.Config):
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "combined_actuals": dg.AssetIn("combined_actuals"),
+        "cleaned_actuals": dg.AssetIn("cleaned_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     compute_kind="python",
@@ -27,7 +27,7 @@ class PlotConfig(dg.Config):
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    combined_actuals: pl.LazyFrame,
+    cleaned_actuals: pl.DataFrame,
     substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
@@ -35,7 +35,7 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
     # 3.1.B Specific 14-Day Forecast Selection
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
-    if predictions.is_empty() or combined_actuals.collect_schema().names() == []:
+    if predictions.is_empty() or cleaned_actuals.is_empty():
         context.log.warning("Empty predictions or actuals, skipping plot.")
         return
 
@@ -43,10 +43,11 @@ def forecast_vs_actual_plot(
     pred_substations = predictions.get_column("substation_number").unique().to_list()
 
     # 2. Downsample actuals to 30m to match predictions, filtering by substation first
+    # Note: downsample_power_flows expects LazyFrame, so we convert to lazy, process, then collect
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            combined_actuals.filter(pl.col("substation_number").is_in(pred_substations))
+            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations)).lazy()
         ).collect(),
     )
 

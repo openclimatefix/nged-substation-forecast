@@ -313,10 +313,18 @@ def test_train_xgboost_asset_filters_to_control_member():
             "substation_number": [123],
             "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
             "MW": [1.0],
+            "MVA": [None],
+            # Include MW_or_MVA since the train_xgboost asset expects it after merging
+            "MW_or_MVA": [1.0],
         }
     ).lazy()
-    metadata = pl.DataFrame({"substation_number": [123], "h3_res_5": [1]})
-    healthy_substations = [123]
+    metadata = pl.DataFrame(
+        {
+            "substation_number": [123],
+            "h3_res_5": [1],
+            "url": ["https://example.com"],  # Required by _get_target_substations
+        }
+    )
     config = XGBoostConfig()
 
     context = dg.build_asset_context()
@@ -328,7 +336,6 @@ def test_train_xgboost_asset_filters_to_control_member():
             nwp=nwp,
             substation_power_flows=flows,
             substation_metadata=metadata,
-            healthy_substations=healthy_substations,
         )
 
         # Check the nwp passed to train_and_log_model
