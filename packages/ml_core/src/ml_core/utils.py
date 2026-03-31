@@ -71,6 +71,7 @@ def train_and_log_model(
     model = trainer.train(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
+    mlflow.set_experiment(model_name)
     with mlflow.start_run(run_name=model_name) as run:
         mlflow.log_params(config.model_dump(mode="json"))
         trainer.log_model(model_name)
@@ -165,8 +166,9 @@ def evaluate_and_save_model(
             target_map_df = forecaster.target_map
             if isinstance(target_map_df, pl.LazyFrame):
                 target_map_df = target_map_df.collect()
-            eval_df = eval_df.join(
-                target_map_df.select(["substation_number", "peak_capacity"]),
+            # Cast to normal Polars DataFrame to avoid Patito type mismatch errors
+            eval_df = pl.DataFrame(eval_df).join(
+                pl.DataFrame(target_map_df).select(["substation_number", "peak_capacity"]),
                 on="substation_number",
                 how="left",
             )
@@ -220,6 +222,7 @@ def evaluate_and_save_model(
             )
 
             # Log metrics to MLflow
+            mlflow.set_experiment(model_name)
             with mlflow.start_run(run_name=f"{model_name}_eval"):
                 for row in metrics.iter_rows(named=True):
                     lt = float(row["lead_time_hours"])

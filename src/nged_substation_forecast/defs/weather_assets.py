@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+from pydantic import Field
+
 import dagster as dg
 import polars as pl
 from contracts.settings import Settings
@@ -49,6 +51,14 @@ def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
     return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
 
 
+class ProcessedNWPConfig(dg.Config):
+    """Configuration for the processed NWP data asset."""
+
+    substation_ids: list[int] | None = Field(
+        default=None, description="Optional list of substation IDs to include."
+    )
+
+
 @asset(
     ins={
         "all_nwp_data": AssetIn("all_nwp_data"),
@@ -56,9 +66,17 @@ def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
     }
 )
 def processed_nwp_data(
-    all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
+    config: ProcessedNWPConfig, all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
 ) -> pl.LazyFrame:
-    """Process NWP data: lead-time filtering and 30m interpolation for all members."""
+    """Process NWP data: lead-time filtering and 30m interpolation for all members.
+
+    WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
+    if the input NWP data or the number of substations is very large.
+    """
+    if config.substation_ids:
+        substation_metadata = substation_metadata.filter(
+            pl.col("substation_number").is_in(config.substation_ids)
+        )
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
     return process_nwp_data(all_nwp_data, h3_indices)
 

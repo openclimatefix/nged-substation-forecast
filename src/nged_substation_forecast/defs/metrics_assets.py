@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import dagster as dg
 import polars as pl
@@ -14,15 +15,13 @@ log = logging.getLogger(__name__)
 @dg.asset(deps=["live_primary_flows"])
 def combined_actuals(
     context: dg.AssetExecutionContext, settings: ResourceParam[Settings]
-) -> pl.DataFrame:
-    """Combines all live primary flows into a single dataframe."""
+) -> pl.LazyFrame:
+    """Combines all live primary flows into a single lazy dataframe."""
     actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
     if not actuals_path.exists():
-        return pl.DataFrame()
+        return pl.LazyFrame()
 
-    df = pl.read_delta(str(actuals_path))
-    if df.is_empty():
-        return pl.DataFrame()
+    df = pl.scan_delta(str(actuals_path))
 
     # Get metadata to map filenames to substation IDs
     data_config = DataConfig(
@@ -32,7 +31,7 @@ def combined_actuals(
     metadata = get_substation_metadata(data_config)
 
     # Join metadata to get substation_number
-    df = df.join(metadata.select(["substation_number"]), on="substation_number", how="inner")
+    df = df.join(metadata.select(["substation_number"]).lazy(), on="substation_number", how="inner")
 
     # Some actuals might have 'MW', others 'MVA'.
     df = df.with_columns(MW_or_MVA=pl.coalesce(["MW", "MVA"]))
@@ -42,10 +41,10 @@ def combined_actuals(
 
 @dg.asset
 def healthy_substations(
-    context: dg.AssetExecutionContext, combined_actuals: pl.DataFrame
+    context: dg.AssetExecutionContext, combined_actuals: pl.LazyFrame
 ) -> list[int]:
     """Filters for substations with healthy telemetry."""
-    if combined_actuals.is_empty():
+    if combined_actuals.collect_schema().names() == []:
         return []
 
     # Add date column for daily grouping
@@ -64,10 +63,18 @@ def healthy_substations(
     )
 
     # Get substations with ANY bad days
-    substations_with_bad_data = bad_days.select("substation_number").unique().to_series().to_list()
+    substations_with_bad_data = (
+        cast(pl.DataFrame, bad_days.select("substation_number").unique().collect())
+        .get_column("substation_number")
+        .to_list()
+    )
 
     # Get all unique substations and filter out the bad ones
-    all_substations = combined_actuals.select("substation_number").unique().to_series().to_list()
+    all_substations = (
+        cast(pl.DataFrame, combined_actuals.select("substation_number").unique().collect())
+        .get_column("substation_number")
+        .to_list()
+    )
     healthy_ids = [s for s in all_substations if s not in substations_with_bad_data]
 
     context.log.info(
@@ -92,7 +99,7 @@ def healthy_substations(
 )
 def metrics(
     context: dg.AssetExecutionContext,
-    combined_actuals: pl.DataFrame,
+    combined_actuals: pl.LazyFrame,
     settings: ResourceParam[Settings],
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation for a specific model partition."""

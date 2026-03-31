@@ -61,3 +61,5 @@ exploration_scripts/
 # Testing
 .hypothesis/
 tests/xgboost_integration_plot.html
+tests/xgboost_dagster_integration_plot.html
+test.parquet

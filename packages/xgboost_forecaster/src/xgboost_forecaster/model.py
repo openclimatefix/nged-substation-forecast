@@ -64,14 +64,14 @@ class XGBoostForecaster(BaseForecaster):
                 self.target_map.write_json(path)
                 mlflow.log_artifact(path, artifact_path="metadata")
 
-    def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
+    def _prepare_features(self, df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame | pl.LazyFrame:
         """Extract the feature matrix.
 
         Args:
             df: The joined input data with all features already added.
 
         Returns:
-            A Polars DataFrame containing only the feature columns.
+            A Polars DataFrame or LazyFrame containing only the feature columns.
         """
         # Extract feature matrix using explicit feature names from config
         if not hasattr(self, "config") or not self.config.features.feature_names:
@@ -87,7 +87,10 @@ class XGBoostForecaster(BaseForecaster):
                 "available_time",
                 "lead_time_days",
             }
-            schema = df.schema
+            if isinstance(df, pl.LazyFrame):
+                schema = df.collect_schema()
+            else:
+                schema = df.schema
             feature_cols = [
                 c
                 for c, dtype in schema.items()
@@ -97,7 +100,10 @@ class XGBoostForecaster(BaseForecaster):
         else:
             res = df.select(self.config.features.feature_names)
 
-        res_schema = res.schema  # Fail loudly if columns are missing
+        if isinstance(res, pl.LazyFrame):
+            res_schema = res.collect_schema()
+        else:
+            res_schema = res.schema  # Fail loudly if columns are missing
 
         # Ensure substation_number is treated as a categorical feature by XGBoost
         if "substation_number" in res_schema.names():
@@ -233,7 +239,7 @@ class XGBoostForecaster(BaseForecaster):
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         inference_params: InferenceParams | None = None,
         collapse_lead_times: bool = False,
-    ) -> pl.DataFrame:
+    ) -> pl.LazyFrame:
         """Prepares data for training or prediction.
 
         Args:
@@ -245,7 +251,7 @@ class XGBoostForecaster(BaseForecaster):
             collapse_lead_times: Whether to collapse lead times (only for prediction).
 
         Returns:
-            Prepared DataFrame ready for feature extraction.
+            Prepared LazyFrame ready for feature extraction.
         """
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
         target_map_lf = target_map_df.lazy()
@@ -318,54 +324,20 @@ class XGBoostForecaster(BaseForecaster):
         df_lf = df_lf.drop("peak_capacity")
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
 
-        # 4. Type casting and validation preparation
-        df = cast(pl.DataFrame, df_lf.collect())
-
-        # Ensure correct dtypes before validation
-        df = df.with_columns(
+        # 4. Type casting
+        df_lf = df_lf.with_columns(
             [
                 pl.col("substation_number").cast(pl.Int32),
                 pl.col("MW_or_MVA").cast(pl.Float32),
             ]
         )
-        if NwpColumns.ENSEMBLE_MEMBER in df.columns:
-            df = df.with_columns(pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8))
+        if NwpColumns.ENSEMBLE_MEMBER in df_lf.collect_schema().names():
+            df_lf = df_lf.with_columns(pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8))
 
         # Cast all floats to Float32 for Patito
-        df = df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
+        df_lf = df_lf.with_columns(pl.col(pl.Float64).cast(pl.Float32))
 
-        # Drop rows with missing critical features before validation
-        critical_cols = []
-        if nwps:
-            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
-        if is_training:
-            critical_cols.append("MW_or_MVA")
-
-        initial_len = len(df)
-        if critical_cols:
-            df = df.drop_nulls(subset=critical_cols)
-        dropped_len = initial_len - len(df)
-
-        if dropped_len > 0:
-            if is_training:
-                log.info(
-                    f"Dropped {dropped_len} rows due to missing critical features during training."
-                )
-            else:
-                log.warning(
-                    f"Dropped {dropped_len} rows due to missing critical features during inference."
-                )
-
-        if df.is_empty():
-            raise ValueError(
-                f"No {'training' if is_training else 'inference'} data remaining after dropping nulls in critical columns."
-            )
-
-        SubstationFeatures.validate(
-            df, drop_superfluous_columns=False, allow_superfluous_columns=True
-        )
-
-        return df
+        return df_lf
 
     def train(
         self,
@@ -425,7 +397,7 @@ class XGBoostForecaster(BaseForecaster):
             )
         )
 
-        joined_df = self._prepare_data_for_model(
+        joined_lf = self._prepare_data_for_model(
             substation_power_flows=substation_power_flows,
             substation_metadata=substation_metadata,
             target_map_df=target_map_df,
@@ -433,7 +405,34 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # Prepare features and target
-        X = self._prepare_features(joined_df)
+        feature_lf = self._prepare_features(joined_lf)
+        feature_cols = feature_lf.collect_schema().names()
+
+        # Collect only necessary columns and drop nulls
+        critical_cols = ["MW_or_MVA"]
+        if nwps:
+            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
+
+        raw_df = cast(
+            pl.DataFrame,
+            joined_lf.select(list(set(feature_cols + ["MW_or_MVA"]))).collect(),
+        )
+        joined_df = raw_df.drop_nulls(subset=critical_cols)
+
+        dropped_rows = len(raw_df) - len(joined_df)
+        if dropped_rows > 0:
+            log.warning(
+                f"Dropped {dropped_rows} rows during training due to nulls in critical columns: {critical_cols}"
+            )
+
+        if joined_df.is_empty():
+            raise ValueError("No training data remaining after dropping nulls in critical columns.")
+
+        SubstationFeatures.validate(
+            joined_df, allow_missing_columns=True, allow_superfluous_columns=True
+        )
+
+        X = cast(pl.DataFrame, self._prepare_features(joined_df))
         y = joined_df.select("MW_or_MVA").to_series()
 
         # NaN/Inf checks
@@ -493,7 +492,7 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("target_map must be set before calling predict.")
         target_map_lf = self.target_map.lazy()
 
-        df = self._prepare_data_for_model(
+        df_lf = self._prepare_data_for_model(
             substation_power_flows=substation_power_flows,
             substation_metadata=substation_metadata,
             target_map_df=self.target_map,
@@ -502,7 +501,41 @@ class XGBoostForecaster(BaseForecaster):
             collapse_lead_times=collapse_lead_times,
         )
 
-        X = self._prepare_features(df)
+        feature_lf = self._prepare_features(df_lf)
+        feature_cols = feature_lf.collect_schema().names()
+
+        # Output columns needed for the final result
+        output_cols = [
+            NwpColumns.VALID_TIME,
+            "substation_number",
+            NwpColumns.ENSEMBLE_MEMBER,
+            NwpColumns.INIT_TIME,
+        ]
+
+        critical_cols = []
+        if nwps:
+            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
+
+        raw_df = cast(
+            pl.DataFrame,
+            df_lf.select(list(set(feature_cols + output_cols + ["MW_or_MVA"]))).collect(),
+        )
+        df = raw_df.drop_nulls(subset=critical_cols)
+
+        dropped_rows = len(raw_df) - len(df)
+        if dropped_rows > 0:
+            log.warning(
+                f"Dropped {dropped_rows} rows during prediction due to nulls in critical columns: {critical_cols}"
+            )
+
+        if df.is_empty():
+            raise ValueError(
+                "No inference data remaining after dropping nulls in critical columns."
+            )
+
+        SubstationFeatures.validate(df, allow_missing_columns=True, allow_superfluous_columns=True)
+
+        X = cast(pl.DataFrame, self._prepare_features(df))
 
         if (
             X.select(

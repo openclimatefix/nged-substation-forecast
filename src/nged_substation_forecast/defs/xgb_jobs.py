@@ -131,3 +131,19 @@ def xgboost_cv_job() -> None:
     # Note: In a real Dagster job, we'd need to provide the assets as inputs.
     # This is a simplified version.
     pass
+
+
+xgboost_integration_job = dg.define_asset_job(
+    name="xgboost_integration_job",
+    selection=dg.AssetSelection.assets(
+        "substation_metadata",
+        "live_primary_flows",
+        "combined_actuals",
+        "healthy_substations",
+        "all_nwp_data",
+        "processed_nwp_data",
+        "train_xgboost",
+        "evaluate_xgboost",
+        "forecast_vs_actual_plot",
+    ),
+)

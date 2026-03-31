@@ -26,7 +26,7 @@ from contracts.hydra_schemas import (
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 import dagster as dg
-from src.nged_substation_forecast.defs.xgb_assets import train_xgboost
+from src.nged_substation_forecast.defs.xgb_assets import train_xgboost, XGBoostConfig
 
 
 @pytest.fixture
@@ -307,13 +307,28 @@ def test_train_xgboost_asset_filters_to_control_member():
         }
     ).lazy()
 
-    flows = pl.DataFrame().lazy()
-    metadata = pl.DataFrame()
+    flows = pl.DataFrame(
+        {
+            "substation_number": [123],
+            "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "MW": [1.0],
+        }
+    ).lazy()
+    metadata = pl.DataFrame({"substation_number": [123], "h3_res_5": [1]})
+    healthy_substations = [123]
+    config = XGBoostConfig()
 
     context = dg.build_asset_context()
 
     with patch("src.nged_substation_forecast.defs.xgb_assets.train_and_log_model") as mock_train:
-        train_xgboost(context, nwp, flows, metadata)
+        train_xgboost(
+            context=context,
+            config=config,
+            nwp=nwp,
+            substation_power_flows=flows,
+            substation_metadata=metadata,
+            healthy_substations=healthy_substations,
+        )
 
         # Check the nwp passed to train_and_log_model
         passed_nwps = mock_train.call_args[1]["nwps"]

@@ -49,7 +49,7 @@ def join_location_table_to_live_primaries(
 
     Returns a DataFrame that can be validated against SubstationMetadata.
     """
-    live_primaries_df = pl.DataFrame(live_primaries)
+    live_primaries_df = pl.DataFrame([r.model_dump(mode="json") for r in live_primaries])
 
     # Append a "simple_name" column to each dataframe:
     live_primaries_df = live_primaries_df.with_columns(simple_name=simplify_substation_name("name"))
