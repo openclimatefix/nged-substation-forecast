@@ -80,11 +80,13 @@ def forecast_vs_actual_plot(
 
     latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
 
-    # 4. Join predictions with actuals
+    # 4. Join predictions with actuals. We use a 'left' join with latest_predictions
+    # on the left to ensure that all 14 days of the forecast trajectory are preserved
+    # in the plot, even if actuals are missing for the later days.
     eval_df = latest_predictions.join(
         actuals_30m.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
         on=["valid_time", "substation_number"],
-        how="inner",
+        how="left",
     )
 
     if eval_df.is_empty():

@@ -8,6 +8,7 @@ from dagster import ResourceParam
 from contracts.settings import Settings
 from xgboost_forecaster import DataConfig, get_substation_metadata
 from .partitions import model_partitions
+from .xgb_assets import XGBoostConfig, _apply_config_overrides, load_hydra_config
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,9 @@ def check_all_zeros(
         .collect(),
     )
 
-    zero_subs = stats.filter(pl.col("max_abs") == 0.0).get_column("substation_number").to_list()
+    # Use a small epsilon threshold instead of exact float equality to account for
+    # floating-point inaccuracies and minor sensor noise in dead substations.
+    zero_subs = stats.filter(pl.col("max_abs") < 1e-3).get_column("substation_number").to_list()
 
     if zero_subs:
         return dg.AssetCheckResult(
@@ -70,14 +73,29 @@ def check_all_zeros(
 
 @dg.asset
 def healthy_substations(
-    context: dg.AssetExecutionContext, combined_actuals: pl.LazyFrame
+    context: dg.AssetExecutionContext, config: XGBoostConfig, combined_actuals: pl.LazyFrame
 ) -> list[int]:
     """Filters for substations with healthy telemetry."""
     if combined_actuals.collect_schema().names() == []:
         return []
 
+    # Load the hydra config for "xgboost" and apply overrides from `config` to determine
+    # the training period. This ensures substations are evaluated for health only during
+    # the training period, preventing temporal data leakage and lookahead bias.
+    hydra_config = load_hydra_config("xgboost")
+    hydra_config = _apply_config_overrides(hydra_config, config)
+    train_start = hydra_config.data_split.train_start
+    train_end = hydra_config.data_split.train_end
+
+    # Filter combined_actuals to only include data between train_start and train_end
+    # before computing health statistics.
+    df = combined_actuals.filter(
+        (pl.col("timestamp").dt.date() >= train_start)
+        & (pl.col("timestamp").dt.date() <= train_end)
+    )
+
     # Add date column for daily grouping
-    df = combined_actuals.with_columns(date=pl.col("timestamp").dt.date())
+    df = df.with_columns(date=pl.col("timestamp").dt.date())
 
     # Calculate daily stats per substation
     daily_stats = df.group_by(["substation_number", "date"]).agg(
@@ -86,25 +104,38 @@ def healthy_substations(
         count=pl.col("MW_or_MVA").count(),
     )
 
-    # Identify bad days
-    bad_days = daily_stats.filter(
-        (pl.col("count") > 50) & ((pl.col("max_abs") < 0.5) | (pl.col("std").fill_null(0.0) < 0.01))
+    # Identify bad days: days with low activity or low variance despite having enough data points.
+    daily_health = daily_stats.with_columns(
+        is_bad_day=(pl.col("count") > 50)
+        & ((pl.col("max_abs") < 0.5) | (pl.col("std").fill_null(0.0) < 0.01))
     )
 
-    # Get substations with ANY bad days
-    substations_with_bad_data = (
-        cast(pl.DataFrame, bad_days.select("substation_number").unique().collect())
-        .get_column("substation_number")
-        .to_list()
+    # Calculate the percentage of bad days relative to the total number of days the substation
+    # has data in the training period. We use a 5% tolerance threshold to tolerate real-world
+    # telemetry noise without discarding valuable training data.
+    substation_health = (
+        daily_health.group_by("substation_number")
+        .agg(
+            total_days=pl.count(),
+            bad_days_count=pl.col("is_bad_day").sum(),
+        )
+        .with_columns(bad_day_ratio=pl.col("bad_days_count") / pl.col("total_days"))
     )
 
-    # Get all unique substations and filter out the bad ones
+    # Filter for healthy substations
+    healthy_stats = cast(
+        pl.DataFrame,
+        substation_health.filter(pl.col("bad_day_ratio") <= 0.05).collect(),
+    )
+    healthy_ids = healthy_stats.get_column("substation_number").to_list()
+
+    # Get all unique substations to identify discarded ones
     all_substations = (
         cast(pl.DataFrame, combined_actuals.select("substation_number").unique().collect())
         .get_column("substation_number")
         .to_list()
     )
-    healthy_ids = [s for s in all_substations if s not in substations_with_bad_data]
+    substations_with_bad_data = [s for s in all_substations if s not in healthy_ids]
 
     context.log.info(
         f"Found {len(healthy_ids)} healthy substations out of {len(all_substations)} total. "
