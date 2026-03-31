@@ -46,9 +46,11 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
 
         exprs.append(expr)
 
-    # Handle categorical separately if present
-    if "categorical_precipitation_type_surface" in df.columns:
-        exprs.append(pl.col("categorical_precipitation_type_surface").round().cast(pl.UInt8))
+    # The categorical_precipitation_type_surface column is already handled in the loop above
+    # because it is listed in the scaling_params CSV with its own scaling parameters.
+    # No additional manual handling is needed here.
+    # Previously, this manual handling caused duplicate column creation errors because
+    # the column was being processed twice (once in the loop and once here).
 
     return df.with_columns(exprs)
 

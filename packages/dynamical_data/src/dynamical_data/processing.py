@@ -229,6 +229,10 @@ def process_ecmwf_dataset(
         Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
     )
     scaled_df = scale_to_uint8(processed_df, scaling_params)
+    # Note: The categorical_precipitation_type_surface column is now handled
+    # correctly in scale_to_uint8 - no manual processing needed here.
+    # Previously, the column was being processed twice (once in scale_to_uint8 and once
+    # in process_ecmwf_dataset), which caused this error.
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     return Nwp.validate(scaled_df, drop_superfluous_columns=True)
