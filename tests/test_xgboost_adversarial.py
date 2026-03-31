@@ -36,7 +36,7 @@ def test_prepare_features_missing_column_fails_loudly():
     )
 
     with pytest.raises(pl_exc.ColumnNotFoundError):
-        forecaster._prepare_features(df.lazy())
+        forecaster._prepare_features(df)
 
 
 def test_train_handles_missing_init_time():

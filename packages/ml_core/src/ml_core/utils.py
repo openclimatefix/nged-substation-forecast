@@ -123,24 +123,20 @@ def evaluate_and_save_model(
     # Extract the actual init_time from the provided nwps data
     forecast_time = datetime.now(timezone.utc)
     if "nwps" in sliced_data:
-        # Assuming nwps is a dictionary or list of LazyFrames
         nwps_data = sliced_data["nwps"]
+        first_nwp = None
         if isinstance(nwps_data, dict) and nwps_data:
             first_nwp = next(iter(nwps_data.values()))
-            if isinstance(first_nwp, pl.LazyFrame):
-                df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
-                if not df.is_empty():
-                    forecast_time = df.item() + timedelta(hours=3)
         elif isinstance(nwps_data, list) and nwps_data:
             first_nwp = nwps_data[0]
-            if isinstance(first_nwp, pl.LazyFrame):
-                df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
-                if not df.is_empty():
-                    forecast_time = df.item() + timedelta(hours=3)
         elif isinstance(nwps_data, pl.LazyFrame):
-            df = cast(pl.DataFrame, nwps_data.select(pl.col("init_time").max()).collect())
+            first_nwp = nwps_data
+
+        if isinstance(first_nwp, pl.LazyFrame):
+            df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
             if not df.is_empty():
-                forecast_time = df.item() + timedelta(hours=3)
+                delay_hours = getattr(config.model, "nwp_availability_delay_hours", 3)
+                forecast_time = df.item() + timedelta(hours=delay_hours)
 
     inference_params = InferenceParams(
         forecast_time=forecast_time,

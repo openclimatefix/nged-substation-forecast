@@ -64,14 +64,14 @@ class XGBoostForecaster(BaseForecaster):
                 self.target_map.write_json(path)
                 mlflow.log_artifact(path, artifact_path="metadata")
 
-    def _prepare_features(self, df: pl.LazyFrame) -> pl.LazyFrame:
+    def _prepare_features(self, df: pl.DataFrame) -> pl.DataFrame:
         """Extract the feature matrix.
 
         Args:
             df: The joined input data with all features already added.
 
         Returns:
-            A Polars LazyFrame containing only the feature columns.
+            A Polars DataFrame containing only the feature columns.
         """
         # Extract feature matrix using explicit feature names from config
         if not hasattr(self, "config") or not self.config.features.feature_names:
@@ -87,7 +87,7 @@ class XGBoostForecaster(BaseForecaster):
                 "available_time",
                 "lead_time_days",
             }
-            schema = df.collect_schema()
+            schema = df.schema
             feature_cols = [
                 c
                 for c, dtype in schema.items()
@@ -97,7 +97,7 @@ class XGBoostForecaster(BaseForecaster):
         else:
             res = df.select(self.config.features.feature_names)
 
-        res_schema = res.collect_schema()  # Fail loudly if columns are missing
+        res_schema = res.schema  # Fail loudly if columns are missing
 
         # Ensure substation_number is treated as a categorical feature by XGBoost
         if "substation_number" in res_schema.names():
@@ -335,12 +335,15 @@ class XGBoostForecaster(BaseForecaster):
         df = df.with_columns(pl.col(pl.Float64).cast(pl.Float32))
 
         # Drop rows with missing critical features before validation
-        critical_cols = [f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled"]
+        critical_cols = []
+        if nwps:
+            critical_cols.append(f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled")
         if is_training:
             critical_cols.append("MW_or_MVA")
 
         initial_len = len(df)
-        df = df.drop_nulls(subset=critical_cols)
+        if critical_cols:
+            df = df.drop_nulls(subset=critical_cols)
         dropped_len = initial_len - len(df)
 
         if dropped_len > 0:
@@ -430,8 +433,7 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # Prepare features and target
-        X_lf = self._prepare_features(joined_df.lazy())
-        X = cast(pl.DataFrame, X_lf.collect())
+        X = self._prepare_features(joined_df)
         y = joined_df.select("MW_or_MVA").to_series()
 
         # NaN/Inf checks
@@ -500,8 +502,7 @@ class XGBoostForecaster(BaseForecaster):
             collapse_lead_times=collapse_lead_times,
         )
 
-        X_lf = self._prepare_features(df.lazy())
-        X = cast(pl.DataFrame, X_lf.collect())
+        X = self._prepare_features(df)
 
         if (
             X.select(
