@@ -2,6 +2,7 @@
 
 import dataclasses
 import logging
+import math
 from datetime import date, datetime
 from pathlib import Path
 from typing import cast
@@ -182,21 +183,59 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         group_by=["init_time", "h3_index", "ensemble_member"],
     )
 
-    # Interpolate all numeric columns, but forward-fill categorical ones
+    # Interpolate all numeric columns, but forward-fill categorical ones.
+    # Circular variables (wind direction) require sine/cosine decomposition
+    # to interpolate correctly across the 0/360 boundary.
     categorical_cols = [
         c for c in ["categorical_precipitation_type_surface"] if c in processed.columns
     ]
+    circular_cols = [
+        c for c in ["wind_direction_10m", "wind_direction_100m"] if c in processed.columns
+    ]
+
+    # Decompose circular variables into sine and cosine components
+    for col in circular_cols:
+        # Map 0-255 to 0-2pi. Note: 255 is treated as 2pi, which is the same as 0.
+        processed = processed.with_columns(
+            [
+                (pl.col(col).cast(pl.Float32) / 255.0 * 2 * math.pi).sin().alias(f"{col}_sin"),
+                (pl.col(col).cast(pl.Float32) / 255.0 * 2 * math.pi).cos().alias(f"{col}_cos"),
+            ]
+        )
+
     numeric_cols = [
         col
         for col, dtype in processed.schema.items()
         if dtype.is_numeric()
         and col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
         and col not in categorical_cols
+        and col not in circular_cols
     ]
 
     processed = processed.with_columns(
         [pl.col(c).interpolate() for c in numeric_cols]
         + [pl.col(c).forward_fill() for c in categorical_cols]
+    )
+
+    # Reconstruct circular variables from interpolated sine and cosine components
+    for col in circular_cols:
+        # arctan2 returns values in [-pi, pi].
+        # We add 2pi and take modulo 2pi to get [0, 2pi].
+        # Then map back to the 0-255 scale.
+        processed = processed.with_columns(
+            (
+                (pl.arctan2(f"{col}_sin", f"{col}_cos") + 2 * math.pi)
+                % (2 * math.pi)
+                / (2 * math.pi)
+                * 255.0
+            )
+            .cast(pl.Float32)
+            .alias(col)
+        )
+
+    # Drop temporary sine and cosine columns
+    processed = processed.drop(
+        [f"{col}_{suffix}" for col in circular_cols for suffix in ["sin", "cos"]]
     )
 
     # Recalculate lead_time_hours for the new 30m timestamps

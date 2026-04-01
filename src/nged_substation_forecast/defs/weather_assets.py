@@ -113,11 +113,13 @@ def check_ecmwf_historical_bounds(
     # Lazily scan the parquet file
     lf = pl.scan_parquet(filepath)
 
-    # Find all UInt8 columns
+    # Find all UInt8 columns, excluding categorical variables which are
+    # expected to hit 0 (e.g., "no precipitation").
+    categorical_vars = ["categorical_precipitation_type_surface"]
     uint8_cols = [
         name
         for name, dtype in zip(lf.collect_schema().names(), lf.collect_schema().dtypes())
-        if dtype == pl.UInt8
+        if dtype == pl.UInt8 and name not in categorical_vars
     ]
 
     # Count how many values hit 0 or 255 in a single optimized pass
@@ -139,6 +141,54 @@ def check_ecmwf_historical_bounds(
         )
 
     return AssetCheckResult(passed=True, description="All values within historical bounds.")
+
+
+@asset_check(asset=ecmwf_ens_forecast)
+def check_ecmwf_categorical_bounds(
+    context: AssetCheckExecutionContext, settings: ResourceParam[Settings]
+) -> AssetCheckResult:
+    """Check if categorical precipitation type falls within the expected range (0-8)."""
+    partition_key = context.partition_key
+    nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    # Locate the parquet file for this partition
+    filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
+    filepath = settings.nwp_data_path / "ECMWF" / "ENS" / filename
+
+    if not filepath.exists():
+        return AssetCheckResult(passed=False, description="Parquet file not found.")
+
+    # Lazily scan the parquet file
+    lf = pl.scan_parquet(filepath)
+
+    # Check if the column exists
+    if "categorical_precipitation_type_surface" not in lf.collect_schema().names():
+        return AssetCheckResult(
+            passed=True, description="Categorical precipitation column not found."
+        )
+
+    # Count values outside [0, 8]
+    import typing
+
+    invalid_count = typing.cast(
+        pl.DataFrame,
+        lf.filter(
+            (pl.col("categorical_precipitation_type_surface") < 0)
+            | (pl.col("categorical_precipitation_type_surface") > 8)
+        )
+        .select(pl.len())
+        .collect(),
+    ).item()
+
+    if invalid_count > 0:
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.ERROR,
+            description=f"Found {invalid_count} invalid categorical precipitation values (outside 0-8).",
+            metadata={"invalid_count": invalid_count},
+        )
+
+    return AssetCheckResult(passed=True, description="All categorical values within range (0-8).")
 
 
 update_ecmwf_ens_forecast = define_asset_job(
