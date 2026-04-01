@@ -217,18 +217,29 @@ def process_ecmwf_dataset(
 
     # Aggregate to H3 resolution 5.
     # We group by h3_index, lead_time, and ensemble_member.
+    # To avoid biasing the aggregated weather variables towards zero when an H3 cell
+    # partially overlaps with missing NWP data (e.g., at the edges of the domain),
+    # we compute a true weighted average by dividing the weighted sum by the sum
+    # of the proportions of the valid (non-NaN) cells.
     processed = (
         joined.with_columns(
             [
-                (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(str(x))
+                (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
+                for x in numeric_vars
+            ]
+            + [
+                pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
+                .then(pl.col("proportion"))
+                .otherwise(0.0)
+                .alias(f"{x}_weight_sum")
                 for x in numeric_vars
             ]
         )
         .group_by(["h3_index", "lead_time", "ensemble_member"])
         .agg(
             [
-                pl.when(pl.col(str(x)).null_count() < pl.len())
-                .then(pl.col(str(x)).sum())
+                pl.when(pl.col(f"{x}_weighted").null_count() < pl.len())
+                .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
                 .otherwise(None)
                 .alias(str(x))
                 for x in numeric_vars

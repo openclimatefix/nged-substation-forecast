@@ -13,8 +13,9 @@ including temporal deduplication and error handling for malformed data.
 The generated test data includes:
 1. Valid production-like structure with 5D data variables:
    - Dimensions: (latitude, longitude, init_time, lead_time, ensemble_member)
-   - Data variables: temperature, wind components, pressure, precipitation, radiation
-   - Physical realism: accumulated precipitation is monotonic, shortwave radiation is daytime-only.
+    - Data variables: temperature, wind components, pressure, precipitation, radiation
+    - Physical realism: precipitation is de-accumulated, shortwave radiation is daytime-only.
+
 
 2. Broken test cases for validation testing:
    - Missing coordinates
@@ -347,11 +348,11 @@ def create_production_like_ecmwf_zarr(
             # MSL pressure: 97000-107000 Pa
             data = np.random.uniform(97000.0, 107000.0, size=shape).astype(np.float64)
         elif var_name == "precipitation_surface":
-            # Precipitation (m): 0-0.05m (50mm)
-            # Accumulated precipitation must be monotonically non-decreasing.
-            # We use np.cumsum over the lead_time dimension (axis 3).
-            incremental_precip = np.random.uniform(0.0, 0.01, size=shape).astype(np.float64)
-            data = np.cumsum(incremental_precip, axis=3)
+            # Precipitation (m): 0-0.01m (10mm)
+            # ECMWF data from Dynamical.org is already de-accumulated prior to download.
+            # It represents the precipitation amount for that specific time step, not the
+            # accumulated total, so we generate independent random values per step.
+            data = np.random.uniform(0.0, 0.01, size=shape).astype(np.float64)
         elif "short_wave" in var_name:
             # Shortwave radiation (W/m^2): 0-1000
             data = np.zeros(shape, dtype=np.float64)
