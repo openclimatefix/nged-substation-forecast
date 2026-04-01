@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from pydantic import Field
 
 import dagster as dg
+import patito as pt
 import polars as pl
+from contracts.data_schemas import H3GridWeights
 from contracts.settings import Settings
 from dagster import (
     AssetCheckExecutionContext,
@@ -28,12 +30,16 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 # The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
 # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
 @asset(partitions_def=weather_partitions, pool="ECMWF")
-def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[Settings]) -> None:
+def ecmwf_ens_forecast(
+    context: AssetExecutionContext,
+    settings: ResourceParam[Settings],
+    gb_h3_grid_weights: pt.DataFrame[H3GridWeights],
+) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
     partition_key = context.partition_key
     nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
-    scaled_df = download_and_scale_ecmwf(nwp_init_time)
+    scaled_df = download_and_scale_ecmwf(nwp_init_time, h3_grid=gb_h3_grid_weights)
 
     output_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     output_dir.mkdir(parents=True, exist_ok=True)

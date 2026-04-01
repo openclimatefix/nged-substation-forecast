@@ -2,7 +2,7 @@ import os
 import concurrent.futures
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Final, cast
+from typing import cast
 
 import icechunk
 import numpy as np
@@ -12,9 +12,6 @@ import xarray as xr
 from contracts.data_schemas import H3GridWeights, Nwp
 
 from .scaling import load_scaling_params, scale_to_uint8
-
-H3_RES: Final[int] = 5
-GRID_SIZE: Final[float] = 0.25
 
 DEFAULT_AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
@@ -98,15 +95,6 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         )
 
 
-def get_gb_h3_grid() -> pt.DataFrame[H3GridWeights]:
-    """Load the pre-computed H3 grid for Great Britain.
-
-    The grid is pre-computed to avoid a 30-second penalty on every ingestion.
-    """
-    grid_path = ASSETS_PATH / "gb_h3_grid.parquet"
-    return H3GridWeights.validate(pl.read_parquet(grid_path))
-
-
 def calculate_wind_speed_and_direction(
     df: pl.DataFrame, u_col: str, v_col: str, speed_name: str, dir_name: str
 ) -> pl.DataFrame:
@@ -127,9 +115,17 @@ def calculate_wind_speed_and_direction(
     )
 
 
-def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
-    h3_grid = get_gb_h3_grid()
+def download_and_scale_ecmwf(
+    nwp_init_time: datetime, h3_grid: pt.DataFrame[H3GridWeights]
+) -> pt.DataFrame[Nwp]:
+    """Download and scale ECMWF data for a specific initialization time.
 
+    Args:
+        nwp_init_time: The initialization time to download.
+        h3_grid: The H3 grid weights to use for spatial aggregation.
+            This is injected via Dagster, allowing dynamic resolution scaling
+            without hardcoding static file paths.
+    """
     # nwp_init_time is aware, we need to make it naive for the selection if it's not already.
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
 
