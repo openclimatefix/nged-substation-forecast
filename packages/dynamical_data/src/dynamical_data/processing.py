@@ -279,6 +279,11 @@ def process_ecmwf_dataset(
 
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
+    ).with_columns(
+        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+        # critical for downstream H3 operations and memory efficiency.
+        pl.col("h3_index").cast(pl.UInt64)
     )
 
     all_nwp_vars = list(loaded_ds.data_vars.keys())

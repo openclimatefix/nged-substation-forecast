@@ -224,10 +224,19 @@ class XGBoostForecaster(BaseForecaster):
 
         combined_nwps = nwp_list[0]
         for other_nwp in nwp_list[1:]:
-            combined_nwps = combined_nwps.sort("available_time").join_asof(
-                other_nwp.sort("available_time"),
-                on="available_time",
-                by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, NwpColumns.ENSEMBLE_MEMBER],
+            combined_nwps = (
+                combined_nwps.sort("available_time")
+                .join_asof(
+                    other_nwp.sort("available_time"),
+                    on="available_time",
+                    by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, NwpColumns.ENSEMBLE_MEMBER],
+                )
+                .with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                )
             )
         return combined_nwps
 
@@ -276,25 +285,53 @@ class XGBoostForecaster(BaseForecaster):
                     metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                     on=NwpColumns.H3_INDEX,
                     how="inner",
+                ).with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
                 )
             else:
                 # For training, start with flows and join metadata, then NWPs
-                df_lf = flows_30m.rename({"timestamp": NwpColumns.VALID_TIME}).join(
-                    metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
-                    on="substation_number",
+                df_lf = (
+                    flows_30m.rename({"timestamp": NwpColumns.VALID_TIME})
+                    .join(
+                        metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
+                        on="substation_number",
+                    )
+                    .with_columns(
+                        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                        # critical for downstream H3 operations and memory efficiency.
+                        pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                    )
                 )
                 df_lf = df_lf.join(
                     combined_nwps_lf,
                     on=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX],
                     how="left",
+                ).with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
                 )
         else:
             if not is_training:
                 raise ValueError("XGBoostForecaster requires NWP data for prediction.")
             # For training without NWPs
-            df_lf = flows_30m.rename({"timestamp": NwpColumns.VALID_TIME}).join(
-                metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
-                on="substation_number",
+            df_lf = (
+                flows_30m.rename({"timestamp": NwpColumns.VALID_TIME})
+                .join(
+                    metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
+                    on="substation_number",
+                )
+                .with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                )
             )
 
         # 3. Add lags and features
