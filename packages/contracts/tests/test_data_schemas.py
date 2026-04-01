@@ -14,11 +14,17 @@ def test_substation_flows_validation_mw_or_mva():
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "substation_number": [123],
             "MW": [10.0],
+            "MVA": [None],
+            "MVAr": [None],
+            "ingested_at": [None],
         }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
+            pl.col("MVA").cast(pl.Float32),
+            pl.col("MVAr").cast(pl.Float32),
+            pl.col("ingested_at").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         ]
     )
 
@@ -30,33 +36,45 @@ def test_substation_flows_validation_mw_or_mva():
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "substation_number": [123],
+            "MW": [None],
             "MVA": [10.0],
+            "MVAr": [None],
+            "ingested_at": [None],
         }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
+            pl.col("MW").cast(pl.Float32),
             pl.col("MVA").cast(pl.Float32),
+            pl.col("MVAr").cast(pl.Float32),
+            pl.col("ingested_at").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         ]
     )
 
     # Should pass
     SubstationFlows.validate(df_mva)
 
-    # Invalid: neither MW nor MVA
+    # Invalid: neither MW nor MVA has data
     df_none = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "substation_number": [123],
+            "MW": [None],
+            "MVA": [None],
             "MVAr": [5.0],
+            "ingested_at": [None],
         }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
+            pl.col("MW").cast(pl.Float32),
+            pl.col("MVA").cast(pl.Float32),
             pl.col("MVAr").cast(pl.Float32),
+            pl.col("ingested_at").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         ]
     )
 
-    with pytest.raises(ValueError, match="at least one of 'MW' or 'MVA' columns"):
+    with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
         SubstationFlows.validate(df_none)
 
 
@@ -68,12 +86,16 @@ def test_substation_flows_validation_both():
             "substation_number": [123],
             "MW": [10.0],
             "MVA": [12.0],
+            "MVAr": [5.0],
+            "ingested_at": [datetime(2026, 3, 20, tzinfo=timezone.utc)],
         }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
             pl.col("MVA").cast(pl.Float32),
+            pl.col("MVAr").cast(pl.Float32),
+            pl.col("ingested_at").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         ]
     )
 
@@ -202,12 +224,16 @@ def test_substation_flows_property_based(mw, mva):
             "substation_number": [123],
             "MW": [mw],
             "MVA": [mva],
+            "MVAr": [None],
+            "ingested_at": [None],
         }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
             pl.col("MVA").cast(pl.Float32),
+            pl.col("MVAr").cast(pl.Float32),
+            pl.col("ingested_at").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         ]
     )
 

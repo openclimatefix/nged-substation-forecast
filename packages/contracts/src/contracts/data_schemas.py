@@ -33,19 +33,19 @@ class SubstationFlows(pt.Model):
     # If we want to reduce storage space we could store kW and kVAr as Int16.
 
     # Active power:
-    MW: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MW: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # Apparent power:
-    MVA: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MVA: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # Reactive power:
-    MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MVAr: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # The datetime this data was ingested into our system. When we update our datasets, we examine
     # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
     # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
     # we didn't record when the data was ingested).
-    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE, allow_missing=True)
+    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     @classmethod
     def validate(
@@ -67,19 +67,11 @@ class SubstationFlows(pt.Model):
         data scenarios. The downstream model training logic will need to handle fully
         null target variables by either skipping training or using fallback strategies.
         """
-        if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
-            raise MissingCorePowerVariablesError(
-                "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
-                f" {dataframe.columns=}, {len(dataframe)=}"
-            )
-
         # Ensure at least one of MW or MVA has non-null data
-        # NOTE: We skip this check for fully null DataFrames to allow edge cases like
-        # all-cleaned partitions (validated in Flaw-004 fix).
         # Only raise error if there IS data but MW/MVA columns have no non-null values.
-        if isinstance(dataframe, pl.DataFrame) and len(dataframe) > 0:
-            mw_has_data = "MW" in dataframe.columns and dataframe["MW"].is_not_null().any()
-            mva_has_data = "MVA" in dataframe.columns and dataframe["MVA"].is_not_null().any()
+        if len(dataframe) > 0:
+            mw_has_data = dataframe["MW"].is_not_null().any()
+            mva_has_data = dataframe["MVA"].is_not_null().any()
 
             if not mw_has_data and not mva_has_data:
                 raise MissingCorePowerVariablesError(
@@ -100,8 +92,8 @@ class SubstationFlows(pt.Model):
 
     @staticmethod
     def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
-        mw_valid = dataframe["MW"].is_not_null().sum() if "MW" in dataframe.columns else 0
-        mva_valid = dataframe["MVA"].is_not_null().sum() if "MVA" in dataframe.columns else 0
+        mw_valid = dataframe["MW"].is_not_null().sum()
+        mva_valid = dataframe["MVA"].is_not_null().sum()
         return "MW" if mw_valid >= mva_valid else "MVA"
 
     @staticmethod
