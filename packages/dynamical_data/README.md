@@ -4,7 +4,7 @@ Download & process numerical weather predictions from Dynamical.org.
 
 We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
-![Map of Great Britain using H3 resolution 5 hexagons](map-of-Great-Britain-H3-resolution-5.png)
+![Map of Great Britain using H3 resolution 5 hexagons](../geo/assets/map-of-Great-Britain-H3-resolution-5.png)
 
 > **Note:** The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons has been extracted to the `packages/geo` package. This package (`dynamical_data`) focuses specifically on the ingestion, processing, and storage of time-varying NWP datasets like ECMWF. The H3 grid weights are provided as a Dagster asset from the `geo` package, eliminating the need for precomputed static files.
 
