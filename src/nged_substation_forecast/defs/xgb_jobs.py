@@ -138,8 +138,7 @@ xgboost_integration_job = dg.define_asset_job(
     selection=dg.AssetSelection.assets(
         "substation_metadata",
         "live_primary_flows",
-        "combined_actuals",
-        "healthy_substations",
+        "cleaned_actuals",
         "all_nwp_data",
         "processed_nwp_data",
         "train_xgboost",

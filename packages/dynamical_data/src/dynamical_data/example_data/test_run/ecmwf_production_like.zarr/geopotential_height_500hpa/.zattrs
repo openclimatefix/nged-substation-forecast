@@ -1,0 +1,12 @@
+{
+  "standard_name": "geopotential_height_500hpa",
+  "long_name": "Geopotential height at 500 hPa (m)",
+  "units": "unknown",
+  "_ARRAY_DIMENSIONS": [
+    "latitude",
+    "longitude",
+    "init_time",
+    "lead_time",
+    "ensemble_member"
+  ]
+}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    #vis.vega-embed {
+      width: 100%;
+      display: flex;
+    }
+
+    #vis.vega-embed details,
+    #vis.vega-embed details summary {
+      position: relative;
+    }
+  </style>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-lite@6.1.0"></script>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/vega-embed@7"></script>
+</head>
+<body>
+  <div id="vis"></div>
+  <script>
+    (function(vegaEmbed) {
+      var spec = {"config": {"view": {"continuousWidth": 300, "continuousHeight": 300}}, "data": {"name": "data-82c3f3f85a20968e3f825d9c017efe24"}, "facet": {"field": "substation_name_with_id", "type": "nominal"}, "spec": {"layer": [{"mark": {"type": "line", "opacity": 0.3, "strokeWidth": 0.5}, "encoding": {"color": {"field": "type", "scale": {"domain": ["Forecast", "Actual"], "range": ["blue", "black"]}, "title": "Type", "type": "nominal"}, "detail": {"field": "ensemble_member", "type": "nominal"}, "x": {"field": "valid_time", "title": "Time", "type": "temporal"}, "y": {"field": "power", "title": "Power (MW/MVA)", "type": "quantitative"}}, "transform": [{"filter": "(datum.type === 'Forecast')"}]}, {"mark": {"type": "line", "opacity": 1.0, "strokeWidth": 2}, "encoding": {"color": {"field": "type", "scale": {"domain": ["Forecast", "Actual"], "range": ["blue", "black"]}, "title": "Type", "type": "nominal"}, "x": {"field": "valid_time", "title": "Time", "type": "temporal"}, "y": {"field": "power", "title": "Power (MW/MVA)", "type": "quantitative"}}, "transform": [{"filter": "(datum.type === 'Actual')"}]}], "height": 200, "width": 400}, "columns": 2, "resolve": {"scale": {"y": "independent"}}, "title": {"text": "Actuals vs Predictions", "subtitle": "NWP Init Time: 2026-03-01 00:00:00+00:00"}, "$schema": "https://vega.github.io/schema/vega-lite/v6.1.0.json", "datasets": {"data-82c3f3f85a20968e3f825d9c017efe24": [{"valid_time": "2026-03-01T12:00:00+00:00", "substation_name_with_id": "Test (110375)", "ensemble_member": 0, "power": 10.0, "type": "Forecast"}, {"valid_time": "2026-03-01T12:00:00+00:00", "substation_name_with_id": "Test (110375)", "ensemble_member": 0, "power": null, "type": "Actual"}]}};
+      var embedOpt = {"mode": "vega-lite"};
+
+      function showError(el, error){
+          el.innerHTML = ('<div style="color:red;">'
+                          + '<p>JavaScript Error: ' + error.message + '</p>'
+                          + "<p>This usually means there's a typo in your chart specification. "
+                          + "See the javascript console for the full traceback.</p>"
+                          + '</div>');
+          throw error;
+      }
+      const el = document.getElementById('vis');
+      vegaEmbed("#vis", spec, embedOpt)
+        .catch(error => showError(el, error));
+    })(vegaEmbed);
+
+  </script>
+</body>
+</html>

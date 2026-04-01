@@ -12,14 +12,13 @@ from ml_core.data import downsample_power_flows
 class PlotConfig(dg.Config):
     """Configuration for the forecast vs actual plot asset."""
 
-    substation_ids: list[int] = []
     output_path: str = "tests/xgboost_integration_plot.html"
 
 
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "combined_actuals": dg.AssetIn("combined_actuals"),
+        "cleaned_actuals": dg.AssetIn("cleaned_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     compute_kind="python",
@@ -28,7 +27,7 @@ class PlotConfig(dg.Config):
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    combined_actuals: pl.LazyFrame,
+    cleaned_actuals: pl.DataFrame,
     substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
@@ -36,7 +35,7 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
     # 3.1.B Specific 14-Day Forecast Selection
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
-    if predictions.is_empty() or combined_actuals.collect_schema().names() == []:
+    if predictions.is_empty() or cleaned_actuals.is_empty():
         context.log.warning("Empty predictions or actuals, skipping plot.")
         return
 
@@ -44,10 +43,11 @@ def forecast_vs_actual_plot(
     pred_substations = predictions.get_column("substation_number").unique().to_list()
 
     # 2. Downsample actuals to 30m to match predictions, filtering by substation first
+    # Note: downsample_power_flows expects LazyFrame, so we convert to lazy, process, then collect
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            combined_actuals.filter(pl.col("substation_number").is_in(pred_substations))
+            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations)).lazy()
         ).collect(),
     )
 
@@ -63,6 +63,10 @@ def forecast_vs_actual_plot(
 
     # Select chosen_init_time: max nwp_init_time <= target_init_time
     nwp_init_times = predictions.get_column("nwp_init_time").unique().sort()
+    if nwp_init_times.is_empty():
+        context.log.warning("No nwp_init_time found in predictions, skipping plot.")
+        return
+
     valid_init_times = nwp_init_times.filter(nwp_init_times <= target_init_time)
 
     if not valid_init_times.is_empty():
@@ -74,20 +78,21 @@ def forecast_vs_actual_plot(
             f"Falling back to earliest available: {chosen_init_time}"
         )
 
-    if chosen_init_time is None:
-        context.log.warning("No nwp_init_time found in predictions, skipping plot.")
-        return
-
     latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
 
-    # 4. Join predictions with actuals
+    # 4. Join predictions with actuals. We use a 'left' join with latest_predictions
+    # on the left to ensure that all 14 days of the forecast trajectory are preserved
+    # in the plot, even if actuals are missing for the later days.
     eval_df = latest_predictions.join(
         actuals_30m.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
         on=["valid_time", "substation_number"],
-        how="inner",
+        how="left",
     )
 
-    if eval_df.is_empty():
+    # Overlap Check: Because a left join guarantees rows exist, we must check if the
+    # 'actual' column consists entirely of nulls to detect when there are no actuals
+    # to plot against.
+    if eval_df.is_empty() or eval_df.get_column("actual").null_count() == len(eval_df):
         context.log.warning("No overlapping data for plotting, skipping.")
         return
 
@@ -108,11 +113,8 @@ def forecast_vs_actual_plot(
     # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
-        pl.DataFrame(plot_df)
-        .join(
-            pl.DataFrame(substation_metadata).select(
-                ["substation_number", "substation_name_in_location_table"]
-            ),
+        plot_df.join(
+            substation_metadata.select(["substation_number", "substation_name_in_location_table"]),
             on="substation_number",
             how="inner",
         )

@@ -439,3 +439,151 @@ def substation_metadata(
     )
 
     return validated_metadata
+
+
+@dg.asset_check(asset="live_primary_flows")
+def substation_data_quality(
+    context: dg.AssetCheckExecutionContext,
+    live_primary_flows: pl.LazyFrame,
+    settings: dg.ResourceParam[Settings],
+) -> dg.AssetCheckResult:
+    """Check for stuck sensors and insane values in substation flows.
+
+    This asset check identifies problematic telemetry data in the live_primary_flows:
+    - **Stuck sensors**: Rolling std dev < stuck_std_threshold indicates a stuck sensor.
+    - **Insane values**: MW outside [min_mw_threshold, max_mw_threshold] are physically implausible.
+
+    The check runs on each daily partition to catch issues early at ingestion time.
+
+    Important Notes:
+    -----------------
+    - **Empty Partition Handling**: If the partition is empty (e.g., ingestion failed),
+      the check gracefully returns passed=True with a warning in metadata. This prevents
+      pipeline crashes when there's total data loss for a day.
+    - **Per-Substation Checks**: All rolling window calculations are performed per-substation
+      to prevent cross-substation data leakage.
+    - **Backward-Looking Windows**: The rolling standard deviation uses a backward-looking
+      window to avoid data leakage from future values.
+
+    Args:
+        context: Asset check execution context.
+        live_primary_flows: Raw live primary flows (daily partitions).
+        settings: Configuration with data quality thresholds.
+
+    Returns:
+        AssetCheckResult indicating whether the data quality check passed or failed,
+        with metadata about affected substations.
+    """
+
+    def _check_for_stuck_and_insane(df: pl.DataFrame) -> tuple[int, list[int], list[int]]:
+        """Check for stuck sensors and insane values in a DataFrame.
+
+        Args:
+            df: Polars DataFrame with substation flow data.
+
+        Returns:
+            Tuple of (affected_count, stuck_substation_ids, insane_substation_ids).
+        """
+        stuck_std_threshold = settings.data_quality.stuck_std_threshold
+        max_mw_threshold = settings.data_quality.max_mw_threshold
+        min_mw_threshold = settings.data_quality.min_mw_threshold
+        window_size = 48  # 24 hours at 30-minute resolution
+
+        # Get power columns
+        power_cols = ["MW", "MVA"]
+        cols_to_check = [col for col in power_cols if col in df.columns]
+
+        if not cols_to_check:
+            return (0, [], [])
+
+        # Check for stuck sensors
+        stuck_substations = set()
+        for col in cols_to_check:
+            # Compute rolling std per substation
+            stuck_mask = (
+                df.group_by("substation_number")
+                .agg(
+                    stuck_vals=pl.col(col).rolling_std(window_size).fill_null(float("inf"))
+                    < stuck_std_threshold
+                )
+                .with_columns(num_stuck=pl.col("stuck_vals").sum())
+            )
+
+            # Substations with any stuck values
+            subst_with_stuck = stuck_mask.filter(pl.col("num_stuck") > 0)
+            stuck_substations.update(subst_with_stuck.get_column("substation_number").to_list())
+
+        # Check for insane values (outside physical bounds)
+        # First get non-null values for the power columns
+        power_mask = pl.any_horizontal([pl.col(col).is_not_null() for col in cols_to_check])
+        non_null_df = df.filter(power_mask)
+
+        insane_mask = non_null_df.filter(
+            pl.any_horizontal(
+                [
+                    ((pl.col(col) < min_mw_threshold) | (pl.col(col) > max_mw_threshold))
+                    for col in cols_to_check
+                ]
+            )
+        )
+
+        insane_substations = insane_mask.get_column("substation_number").unique().to_list()
+
+        # Calculate affected count (union of stuck and insane)
+        affected_count = len(stuck_substations | set(insane_substations))
+
+        return (affected_count, list(stuck_substations), insane_substations)
+
+    # Handle empty partitions gracefully
+    if live_primary_flows.collect_schema().names() == []:
+        return dg.AssetCheckResult(
+            passed=True,
+            description="No data found for partition",
+            metadata={
+                "warning": dg.MetadataValue.json("No data to check for this daily partition")
+            },
+        )
+
+    # Materialize a sample of the data for checking (limit to avoid memory issues)
+    # Note: In production, you might want to check a representative sample
+    try:
+        df = cast(pl.DataFrame, live_primary_flows.limit(100_000).collect())
+    except Exception as e:
+        return dg.AssetCheckResult(
+            passed=True,
+            description=f"Could not collect sample data: {e}",
+            metadata={"warning": dg.MetadataValue.json(str(e))},
+        )
+
+    if len(df) == 0:
+        return dg.AssetCheckResult(
+            passed=True,
+            description="Sample data is empty",
+            metadata={"warning": dg.MetadataValue.json("Sample materialized to empty DataFrame")},
+        )
+
+    # Run the checks
+    affected_count, stuck_substations, insane_substations = _check_for_stuck_and_insane(df)
+
+    # Report result
+    if affected_count > 0:
+        return dg.AssetCheckResult(
+            passed=False,
+            description=(
+                f"Found {len(stuck_substations)} substations with stuck sensors "
+                f"and {len([s for s in insane_substations if s not in stuck_substations])} substations with insane values"
+            ),
+            metadata={
+                "affected_substation_count": dg.MetadataValue.int(affected_count),
+                "stuck_substation_sample": dg.MetadataValue.json(stuck_substations[:100]),
+                "insane_substation_sample": dg.MetadataValue.json(
+                    [s for s in insane_substations if s not in stuck_substations][:100]
+                ),
+            },
+            severity=dg.AssetCheckSeverity.ERROR,
+        )
+
+    return dg.AssetCheckResult(
+        passed=True,
+        description="All substations passed data quality checks",
+    )

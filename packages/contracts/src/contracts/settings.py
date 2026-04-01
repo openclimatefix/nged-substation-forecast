@@ -18,11 +18,57 @@ def find_project_root() -> Path:
 PROJECT_ROOT = find_project_root()
 
 
+class DataQualitySettings(BaseSettings):
+    """Settings for data quality thresholds in substation flow processing.
+
+    These thresholds are used to identify problematic telemetry data:
+    - `stuck_std_threshold`: When the rolling standard deviation falls below this value
+      (across a 48-period/24-hour window), the sensor is likely stuck. We replace such
+      values with null to preserve the temporal grid. A value of 0.01 MW was chosen
+      because substations with normal operation typically have much higher variability.
+
+    - `max_mw_threshold`: Active power above this value is considered physically
+      unrealistic for primary substations in the NGED portfolio. A threshold of 100.0 MW
+      was chosen because typical primary substations operate in the tens of MW range,
+      and values exceeding 100 MW are extremely rare anomalies.
+
+    - `min_mw_threshold`: Active power below this value is potentially erroneous
+      (negative values can occur at times of high renewable generation). A threshold of
+      -20.0 MW was chosen to allow for reverse power flow during high renewable
+      generation periods while still catching implausible extreme negative values.
+
+    Centralizing these in Settings allows them to be configurable per environment
+    (dev/staging/prod) while preventing logic drift between asset checks and data
+    cleaning steps. All code that references these thresholds should import them from
+    here, not define them locally.
+    """
+
+    stuck_std_threshold: float = 0.01
+    max_mw_threshold: float = 100.0
+    min_mw_threshold: float = -20.0
+
+
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
 
     # NGED Connected Data
     nged_ckan_token: str = Field(...)
+
+    # NWP Data Settings
+    nwp_ensemble_member: int = Field(
+        default=0, description="Which ensemble member to use (0=control member)."
+    )
+
+    # ML Model Settings
+    ml_model_ensemble_size: int = Field(
+        default=10, description="Number of ensemble members for ML model."
+    )
+
+    # Data Quality Settings
+    data_quality: DataQualitySettings = Field(
+        default_factory=DataQualitySettings,
+        description="Configurable thresholds for data quality checks.",
+    )
 
     # S3 Storage
     nged_s3_bucket_url: str = Field(...)
