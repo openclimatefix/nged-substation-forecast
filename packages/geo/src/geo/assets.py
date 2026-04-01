@@ -3,9 +3,11 @@ from pathlib import Path
 import h3.api.numpy_int as h3
 import patito as pt
 import polars as pl
+import pyproj
 import shapely
 from dagster import AssetExecutionContext, Config, asset
 from shapely.geometry.base import BaseGeometry
+from shapely.ops import transform
 
 from contracts.data_schemas import H3GridWeights
 from geo.h3 import compute_h3_grid_weights
@@ -30,8 +32,9 @@ class H3GridConfig(Config):
 def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
     """Loads the UK boundary geometry from a local GeoJSON file.
 
-    The boundary is buffered by 0.25 degrees to ensure that coastal substations
-    and nearby islands are included in the resulting H3 grid.
+    The boundary is projected to EPSG:27700 (British National Grid) and buffered
+    by 25,000 meters to ensure that coastal substations and nearby islands are
+    included in the resulting H3 grid without spatial distortion.
     """
     geojson_path = (
         Path(__file__).resolve().parent.parent.parent / "assets" / "england_scotland_wales.geojson"
@@ -42,9 +45,21 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
         file_contents = f.read()
 
     shape: BaseGeometry = shapely.from_geojson(file_contents)
-    # Buffer by 0.25 degrees to catch islands/coasts, ensuring coastal substations
-    # are properly covered by the resulting H3 grid.
-    return shape.buffer(0.25)
+
+    # Project to OSGB36 (EPSG:27700) for metric buffering
+    project_to_osgb = pyproj.Transformer.from_crs(
+        "EPSG:4326", "EPSG:27700", always_xy=True
+    ).transform
+    project_to_wgs84 = pyproj.Transformer.from_crs(
+        "EPSG:27700", "EPSG:4326", always_xy=True
+    ).transform
+
+    shape_osgb = transform(project_to_osgb, shape)
+    # Buffer by 25000 meters (25km) to catch islands/coasts without spatial distortion
+    shape_osgb_buffered = shape_osgb.buffer(25000)
+    shape_buffered = transform(project_to_wgs84, shape_osgb_buffered)
+
+    return shape_buffered
 
 
 @asset(group_name="reference_data")

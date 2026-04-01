@@ -353,7 +353,7 @@ class ProcessedNwp(pt.Model):
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
-    categorical_precipitation_type_surface: float = pt.Field(dtype=pl.Float32)
+    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
 
 class SubstationFeatures(pt.Model):
@@ -393,7 +393,7 @@ class SubstationFeatures(pt.Model):
     precipitation_surface_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    categorical_precipitation_type_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
     # Physical features
     windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)

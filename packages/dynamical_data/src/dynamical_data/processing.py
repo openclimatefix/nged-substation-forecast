@@ -192,6 +192,11 @@ def download_ecmwf(
     # can sometimes be misidentified as returning a DataArray.
     ds = cast(xr.Dataset, ds[list(required_vars)])
 
+    # Roll longitude from 0-360 to -180 to 180 to match h3_grid
+    # This must be done before calculating spatial bounds and slicing
+    ds = ds.assign_coords(longitude=(((ds.longitude + 180) % 360) - 180))
+    ds = ds.sortby("longitude")
+
     # Find spatial bounds from grid
     min_lat, max_lat, min_lng, max_lng = h3_grid.select(
         min_lat=pl.col("nwp_lat").min(),
@@ -256,7 +261,7 @@ def process_ecmwf_dataset(
     )
 
     joined = h3_grid.join(
-        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
+        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
     ).with_columns(
         # Explicitly cast h3_index to UInt64 after the join to prevent silent type
         # coercion (e.g., to Float64 or Int64) during Polars joins, which is
@@ -297,7 +302,7 @@ def process_ecmwf_dataset(
                 .alias(str(x))
                 for x in numeric_vars
             ]
-            + [pl.col(categorical_vars).mode().first()],
+            + [pl.col(c).mode().first().cast(pl.UInt8) for c in categorical_vars],
         )
     )
 
@@ -347,6 +352,11 @@ def process_ecmwf_dataset(
     # Load scaling parameters
     scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
     scaling_params = load_scaling_params(scaling_params_path)
+
+    # Exclude categorical variables from min-max scaling to preserve their discrete state
+    scaling_params = scaling_params.filter(
+        ~pl.col("col_name").is_in(["categorical_precipitation_type_surface"])
+    )
 
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])

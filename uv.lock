@@ -908,6 +908,7 @@ dependencies = [
     { name = "h3" },
     { name = "polars" },
     { name = "polars-h3" },
+    { name = "pyproj" },
     { name = "shapely" },
 ]
 
@@ -923,6 +924,7 @@ requires-dist = [
     { name = "h3", specifier = ">=4.4.2" },
     { name = "polars", specifier = ">=1.38.1" },
     { name = "polars-h3", specifier = ">=0.6.1" },
+    { name = "pyproj", specifier = ">=3.6.0" },
     { name = "shapely", specifier = ">=2.1.2" },
 ]
 

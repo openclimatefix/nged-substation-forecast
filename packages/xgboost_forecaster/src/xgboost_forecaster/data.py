@@ -182,15 +182,22 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         group_by=["init_time", "h3_index", "ensemble_member"],
     )
 
-    # Interpolate all numeric columns
+    # Interpolate all numeric columns, but forward-fill categorical ones
+    categorical_cols = [
+        c for c in ["categorical_precipitation_type_surface"] if c in processed.columns
+    ]
     numeric_cols = [
         col
         for col, dtype in processed.schema.items()
         if dtype.is_numeric()
         and col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+        and col not in categorical_cols
     ]
 
-    processed = processed.with_columns([pl.col(c).interpolate() for c in numeric_cols])
+    processed = processed.with_columns(
+        [pl.col(c).interpolate() for c in numeric_cols]
+        + [pl.col(c).forward_fill() for c in categorical_cols]
+    )
 
     # Recalculate lead_time_hours for the new 30m timestamps
     processed = processed.with_columns(
