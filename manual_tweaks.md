@@ -12,4 +12,12 @@ later in the method?
 because these reference IDs are temporary.
 - Line 80: Do we really need to check `if isinstance(dataframe, pl.DataFrame)`? In our code,
 `dataframe` will never be a Pandas dataframe.
--
+- Lines 81 & 82: If the data contract guarantees that MW and MVA columns will always be present,
+then remove the `in dataframe.columns` checks.
+
+## General
+
+- Throughout the code, please ensure that H3 discrete indices are ALWAYS 64-bit unsigned integers
+(e.g. all columns named `h3_index` or `h3_res_5`). Make sure that these data types are retained
+throughout joins.
+- 
