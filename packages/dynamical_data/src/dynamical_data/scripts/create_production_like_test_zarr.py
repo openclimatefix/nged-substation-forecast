@@ -147,7 +147,7 @@ DATA_VARIABLES: dict[str, dict] = {
     },
     "categorical_precipitation_type_surface": {
         "dtype": np.uint8,
-        "fill_value": np.nan,
+        "fill_value": 0,
         "description": "Precipitation type classification (categorical)",
     },
 }

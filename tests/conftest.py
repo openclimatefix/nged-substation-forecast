@@ -4,15 +4,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from pathlib import Path
-import sys
-import os
-
-# Add packages to path so we can import the generator
-sys.path.append(
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "packages", "dynamical_data", "src")
-    )
-)
 
 from dynamical_data.scripts.create_production_like_test_zarr import (
     create_production_like_ecmwf_zarr,

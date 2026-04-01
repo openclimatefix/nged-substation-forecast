@@ -71,7 +71,7 @@ def test_valid_production_like_zarr_loading(production_like_zarr_path, h3_grid):
 
     # 1. Test download_ecmwf (slicing and selection)
     init_time = ds.init_time.values[0]
-    downloaded_ds = download_ecmwf(init_time, ds, h3_grid)
+    downloaded_ds = download_ecmwf(init_time, h3_grid, ds)
 
     assert isinstance(downloaded_ds, xr.Dataset)
     assert "temperature_2m" in downloaded_ds.data_vars
@@ -126,7 +126,7 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
 
     # Depending on the broken type, different parts of the pipeline should fail
     with pytest.raises(expected_exc):
-        downloaded_ds = download_ecmwf(init_time, ds, h3_grid)
+        downloaded_ds = download_ecmwf(init_time, h3_grid, ds)
 
         init_dt = datetime.fromtimestamp(
             init_time.astype("datetime64[s]").astype(int), tz=timezone.utc
@@ -163,10 +163,10 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
     dt2 = datetime.fromisoformat(init_time_2).replace(tzinfo=timezone.utc)
 
     df1 = process_ecmwf_dataset(
-        dt1, download_ecmwf(np.datetime64(init_time_1), ds1, h3_grid), h3_grid
+        dt1, download_ecmwf(np.datetime64(init_time_1), h3_grid, ds1), h3_grid
     )
     df2 = process_ecmwf_dataset(
-        dt2, download_ecmwf(np.datetime64(init_time_2), ds2, h3_grid), h3_grid
+        dt2, download_ecmwf(np.datetime64(init_time_2), h3_grid, ds2), h3_grid
     )
 
     # 3. Combine and deduplicate using XGBoostForecaster logic
@@ -201,7 +201,9 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
         # We use .filter() on the collected DataFrame
         init_times = combined_df.filter(pl.col("valid_time") == vt).select("init_time").unique()
         assert len(init_times) == 1
-        assert init_times.item() == dt2
+        # Normalize both timestamps to np.datetime64[us] to prevent flaky tests caused by
+        # precision or timezone representation differences between Polars and Python datetimes.
+        assert np.datetime64(init_times.item(), "us") == np.datetime64(dt2, "us")
 
 
 def test_single_point_forecast_ingestion(tmp_path, h3_grid):
@@ -263,7 +265,7 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     ds_loaded = xr.open_zarr(zarr_path)
 
     # This should NOT raise an IndexError
-    downloaded_ds = download_ecmwf(init_time, ds_loaded, h3_grid)
+    downloaded_ds = download_ecmwf(init_time, h3_grid, ds_loaded)
 
     assert downloaded_ds.latitude.size == 1
     assert downloaded_ds.longitude.size == 1
