@@ -14,7 +14,7 @@ def test_h3_equivalence():
     # Synthetic input: a few H3 res 5 cells around London
     # Use h3_raw to get valid res 5 cells
     # London: 51.5074° N, 0.1278° W
-    # Note: h3.api.basic_int.geo_to_cells expects (lat, lng) or a shape.
+    # Note: h3.geo_to_cells expects (lat, lng) or a shape.
     # Actually geo_to_cells(shape) is what processing.py uses.
     # For synthetic test, let's just get a few cells.
     cells = [h3_raw.latlng_to_cell(51.5, 0.1, H3_RES), h3_raw.latlng_to_cell(52.5, -0.1, H3_RES)]

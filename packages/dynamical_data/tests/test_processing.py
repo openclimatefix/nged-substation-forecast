@@ -143,7 +143,8 @@ def test_download_ecmwf_empty_h3_grid():
         download_ecmwf(init_time, h3_grid)
 
 
-def test_download_ecmwf_longitude_rolling():
+def test_download_ecmwf_longitude_validation():
+    """Assert that download_ecmwf raises a ValueError if longitudes are out of bounds."""
     h3_grid = H3GridWeights.validate(
         pl.DataFrame(
             {
@@ -166,9 +167,8 @@ def test_download_ecmwf_longitude_rolling():
     )
 
     init_time = pd.Timestamp("2024-04-01", tz="UTC")
-    # Provide longitude 359.0 in the source dataset
+    # Provide longitude 359.0 in the source dataset, which is out of the [-180, 180] range
     ds = create_mock_ds([51.5], [359.0], init_time, [pd.Timedelta(hours=0)], [0])
 
-    result_ds = download_ecmwf(init_time.to_datetime64(), h3_grid, ds=ds)
-
-    assert result_ds.longitude.values[0] == -1.0
+    with pytest.raises(ValueError, match=r"Dataset longitude must be in the range \[-180, 180\]"):
+        download_ecmwf(init_time.to_datetime64(), h3_grid, ds=ds)

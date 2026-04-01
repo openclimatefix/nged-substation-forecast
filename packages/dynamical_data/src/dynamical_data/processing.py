@@ -195,10 +195,13 @@ def download_ecmwf(
     # can sometimes be misidentified as returning a DataArray.
     ds = cast(xr.Dataset, ds[list(required_vars)])
 
-    # Roll longitude from 0-360 to -180 to 180 to match h3_grid
-    # This must be done before calculating spatial bounds and slicing
-    ds = ds.assign_coords(longitude=(((ds.longitude + 180) % 360) - 180))
-    ds = ds.sortby("longitude")
+    # Validate longitude range.
+    # NOTE: The ECMWF ENS dataset from Dynamical.org already uses the [-180, 180]
+    # range for longitude. We only validate this here to ensure the upstream
+    # data format hasn't changed unexpectedly, rather than rolling the
+    # coordinates ourselves.
+    if ds.longitude.min() < -180 or ds.longitude.max() > 180:
+        raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
     # Find spatial bounds from grid
     min_lat, max_lat, min_lng, max_lng = h3_grid.select(
@@ -248,8 +251,11 @@ def process_ecmwf_dataset(
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
     # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
     # available as columns.
+    #
     # NOTE: This conversion is a known performance and memory bottleneck.
-    # For large datasets, this can cause OOM errors.
+    # For large datasets, this can cause OOM errors. Future optimizations should
+    # consider using Xarray's native chunking or direct conversion to Arrow/Polars
+    # without Pandas as an intermediary.
     nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
     # Perform a single spatial join with the pre-computed h3_grid.
