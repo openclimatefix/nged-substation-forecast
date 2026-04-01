@@ -1,12 +1,16 @@
+from functools import lru_cache
 from pathlib import Path
 
+import patito as pt
 import polars as pl
+from contracts.data_schemas import ScalingParams
 
 # TODO: Most of (maybe *all of*) this file should be moved to packages/dynamical_data/scaling/
 scaling_params_path = Path("packages/dynamical_data/scaling/ecmwf_scaling_params.csv")
 
 
-def load_scaling_params(path: Path | None = None) -> pl.DataFrame:
+@lru_cache(maxsize=1)
+def load_scaling_params(path: Path | None = None) -> pt.DataFrame[ScalingParams]:
     if path is None:
         path = scaling_params_path
     if not path.exists():
@@ -17,27 +21,7 @@ def load_scaling_params(path: Path | None = None) -> pl.DataFrame:
             raise FileNotFoundError(
                 f"Scaling params not found at {path}. Please set the XGBOOST_SCALING_PARAMS_PATH environment variable."
             )
-        return pl.read_csv(alt_path)
-    return pl.read_csv(path)
-
-
-def uint8_to_physical_unit(params: pl.DataFrame) -> list[pl.Expr]:
-    """Convert uint8 columns back to physical units (Float32).
-
-    Args:
-        params: DataFrame with scaling parameters (col_name, buffered_min, buffered_range).
-
-    Returns:
-        List of Polars expressions for the conversion.
-    """
-    exprs = []
-    for row in params.iter_rows(named=True):
-        col = row["col_name"]
-        b_min = row["buffered_min"]
-        b_range = row["buffered_range"]
-
-        # UInt8 -> Raw (Float32)
-        expr = ((pl.col(col).cast(pl.Float32) / 255 * b_range) + b_min).alias(col)
-        exprs.append(expr)
-
-    return exprs
+        df = pl.read_csv(alt_path).with_columns(pl.col(pl.Float64).cast(pl.Float32))
+        return ScalingParams.validate(df, drop_superfluous_columns=True)
+    df = pl.read_csv(path).with_columns(pl.col(pl.Float64).cast(pl.Float32))
+    return ScalingParams.validate(df, drop_superfluous_columns=True)

@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     import pandas as pd
 
 
+# Define our standard datetime type for all schemas
+UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
+
+
 class MissingCorePowerVariablesError(ValueError):
     """Raised when a substation CSV lacks both MW and MVA data."""
 
@@ -19,7 +23,7 @@ class MissingCorePowerVariablesError(ValueError):
 
 
 class SubstationFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     # The unique identifier for the substation.
     substation_number: int = pt.Field(dtype=pl.Int32)
@@ -37,11 +41,11 @@ class SubstationFlows(pt.Model):
     # Reactive power:
     MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
 
-    # When this data was ingested into our system. When we update our datasets, we examine
+    # The datetime this data was ingested into our system. When we update our datasets, we examine
     # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
     # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
     # we didn't record when the data was ingested).
-    ingested_at: datetime | None = pt.Field(dtype=pl.Datetime(time_zone="UTC"), allow_missing=True)
+    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE, allow_missing=True)
 
     @classmethod
     def validate(
@@ -52,12 +56,26 @@ class SubstationFlows(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["SubstationFlows"]:
-        """Validate the given dataframe, ensuring either MW or MVA is present."""
+        """Validate the given dataframe, ensuring either MW or MVA is present and has data."""
         if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
             raise MissingCorePowerVariablesError(
                 "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
                 f" {dataframe.columns=}, {len(dataframe)=}"
             )
+
+        # Ensure at least one of MW or MVA has non-null data
+        if isinstance(dataframe, pl.DataFrame):
+            mw_null = "MW" not in dataframe.columns or dataframe["MW"].null_count() == len(
+                dataframe
+            )
+            mva_null = "MVA" not in dataframe.columns or dataframe["MVA"].null_count() == len(
+                dataframe
+            )
+            if mw_null and mva_null:
+                raise MissingCorePowerVariablesError(
+                    "SubstationFlows dataframe must have non-null data in either 'MW' or 'MVA'."
+                )
+
         return cast(
             pt.DataFrame["SubstationFlows"],
             super().validate(
@@ -71,7 +89,9 @@ class SubstationFlows(pt.Model):
 
     @staticmethod
     def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
-        return "MW" if dataframe["MW"].is_not_null().all() else "MVA"
+        mw_valid = dataframe["MW"].is_not_null().sum() if "MW" in dataframe.columns else 0
+        mva_valid = dataframe["MVA"].is_not_null().sum() if "MVA" in dataframe.columns else 0
+        return "MW" if mw_valid >= mva_valid else "MVA"
 
     @staticmethod
     def to_simplified_substation_flows(
@@ -87,11 +107,21 @@ class SubstationFlows(pt.Model):
 
 
 class SimplifiedSubstationFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
+class SubstationTargetMap(pt.Model):
+    """Map of substation_number to the target column (MW or MVA) to use."""
+
+    substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
+    target_col: str = pt.Field(dtype=pl.String)
+    peak_capacity: float = pt.Field(dtype=pl.Float32, gt=0)
+
+
 class SubstationLocations(pt.Model):
+    """The data structure of the raw substation location data from NGED."""
+
     # NGED has 192,000 substations.
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
 
@@ -133,39 +163,55 @@ class SubstationMetadata(pt.Model):
     h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
 
     # When this metadata record was last updated from the upstream NGED datasets.
-    last_updated: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema."""
+    """Forecast data schema for deterministic ensemble forecasts."""
 
-    nwp_init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     substation_number: int = pt.Field(dtype=pl.Int32)
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
     # Identifier for our ML-based power forecasting model.
-    # Returned by `Forecaster.model_name_and_version()`.
-    power_fcst_model: str = pt.Field(dtype=pl.Categorical)
+    power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
+
+    # The datetime that the power forecast was initialised.
+    power_fcst_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
+    # The datetime that the underlying weather forecast was initialised.
+    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
+    # Year and month of the power forecast initialisation (for partitioning).
+    power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
     # Active power (megawatts) or apparent power (mega volt amp).
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
-    # TODO: Capture probabilistic information.
+
+class ScalingParams(pt.Model):
+    """Schema for weather variable scaling parameters.
+
+    Used when scaling between physical units (e.g. degrees C) and their unsigned 8-bit integer
+    (uint8) representations (in the range [0, 255])."""
+
+    col_name: str = pt.Field(dtype=pl.String)
+    buffered_min: float = pt.Field(dtype=pl.Float32)
+    buffered_range: float = pt.Field(dtype=pl.Float32)
 
 
 class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 
-    nwp_init_time: datetime
-    power_fcst_model: str | None = None
+    forecast_time: datetime
+    power_fcst_model_name: str | None = None
 
 
 class Nwp(pt.Model):
     """Weather data schema for NWP forecasts."""
 
-    init_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_zone="UTC"))
+    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
@@ -231,10 +277,35 @@ class Nwp(pt.Model):
         return cast(pt.DataFrame["Nwp"], validated_df)
 
 
-class ProcessedNwp(pt.Model):
-    """Weather data after ensemble selection and interpolation."""
+class NwpColumns:
+    """Constants for NWP column names."""
 
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    VALID_TIME = "valid_time"
+    INIT_TIME = "init_time"
+    LEAD_TIME_HOURS = "lead_time_hours"
+    H3_INDEX = "h3_index"
+    ENSEMBLE_MEMBER = "ensemble_member"
+    TEMPERATURE_2M = "temperature_2m"
+    WIND_SPEED_10M = "wind_speed_10m"
+    WIND_DIRECTION_10M = "wind_direction_10m"
+    SW_RADIATION = "downward_short_wave_radiation_flux_surface"
+
+
+class ProcessedNwp(pt.Model):
+    """Weather data after ensemble selection and interpolation.
+
+    Note: Accumulated variables (e.g., precipitation, radiation) are already
+    de-accumulated by Dynamical.org prior to download, and should not be differenced.
+
+    Clever Optimization:
+    To save memory, weather variables are scaled to a 0-255 range (uint8) before being saved to disk.
+    The scaling formula is: uint8_value = (physical_value - min_bound) / (max_bound - min_bound) * 255.
+    When loaded, they are cast to Float32 but retain the 0-255 scale.
+    """
+
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
     h3_index: int = pt.Field(dtype=pl.UInt64)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
 
@@ -255,44 +326,58 @@ class ProcessedNwp(pt.Model):
 
 
 class SubstationFeatures(pt.Model):
-    """Final joined dataset ready for XGBoost."""
+    """Final joined dataset ready for XGBoost.
 
-    valid_time: datetime = pt.Field(dtype=pl.Datetime(time_unit="us", time_zone="UTC"))
+    Clever Optimization:
+    Weather features are kept in their 0-255 scaled representation (e.g., `temperature_2m_uint8_scaled`)
+    to save memory and computation. XGBoost is invariant to monotonic transformations, so this does not
+    affect model performance. For SHAP analysis or EDA, use `descale_for_analysis` to convert them back
+    to physical units.
+    """
+
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
-    power_lag_7d: float = pt.Field(dtype=pl.Float32)
-    power_lag_14d: float = pt.Field(dtype=pl.Float32)
+    latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
-    temperature_2m: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
-    pressure_surface: float = pt.Field(dtype=pl.Float32)
-    pressure_reduced_to_mean_sea_level: float = pt.Field(dtype=pl.Float32)
-    geopotential_height_500hpa: float = pt.Field(dtype=pl.Float32)
-    downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
-    categorical_precipitation_type_surface: float = pt.Field(dtype=pl.Float32)
+    temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    dew_point_temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    wind_speed_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    wind_direction_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    wind_speed_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    wind_direction_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    pressure_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    pressure_reduced_to_mean_sea_level_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    geopotential_height_500hpa_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    downward_long_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    downward_short_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    precipitation_surface_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    categorical_precipitation_type_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
 
     # Physical features
-    wind_speed_10m_phys: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m_phys: float = pt.Field(dtype=pl.Float32)
-    windchill: float = pt.Field(dtype=pl.Float32)
+    windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather lags/trends
-    temperature_2m_lag_7d: float | None = pt.Field(dtype=pl.Float32)
-    sw_radiation_lag_7d: float | None = pt.Field(dtype=pl.Float32)
-    temperature_2m_lag_14d: float | None = pt.Field(dtype=pl.Float32)
-    sw_radiation_lag_14d: float | None = pt.Field(dtype=pl.Float32)
-    temperature_2m_6h_ago: float | None = pt.Field(dtype=pl.Float32)
-    temp_trend_6h: float | None = pt.Field(dtype=pl.Float32)
+    temperature_2m_lag_7d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_short_wave_radiation_flux_surface_lag_7d: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    temperature_2m_lag_14d: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_short_wave_radiation_flux_surface_lag_14d: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    temperature_2m_6h_ago: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    temp_trend_6h: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Temporal features
     hour_sin: float = pt.Field(dtype=pl.Float32)

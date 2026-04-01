@@ -58,8 +58,13 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
                 break
 
         if current_col and volts_col:
+            # Check if voltage is likely in Volts rather than kV
+            # If max voltage > 1000, assume it's in Volts
+            max_volts = df.select(pl.col(volts_col).max()).item()
+            divisor = 1_000_000 if max_volts and max_volts > 1000 else 1000
+
             df = df.with_columns(
-                (math.sqrt(3) * pl.col(volts_col) * pl.col(current_col) / 1000).alias("MVA")
+                (math.sqrt(3) * pl.col(volts_col) * pl.col(current_col) / divisor).alias("MVA")
             )
 
     columns = [col for col in SubstationFlows.columns if col in df.columns]

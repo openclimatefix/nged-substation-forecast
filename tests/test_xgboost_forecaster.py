@@ -1,12 +1,32 @@
 import pytest
+import polars as pl
+import patito as pt
+from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
+from typing import cast
 
-
+from contracts.data_schemas import (
+    InferenceParams,
+    ProcessedNwp,
+    SubstationFlows,
+    SubstationMetadata,
+)
+from ml_core.data import downsample_power_flows
 from xgboost_forecaster.data import (
     DataConfig,
-    load_substation_power,
     load_nwp_run,
+    process_nwp_data,
 )
 from xgboost_forecaster.scaling import load_scaling_params
+from xgboost_forecaster.model import XGBoostForecaster
+from contracts.hydra_schemas import (
+    ModelConfig,
+    ModelFeaturesConfig,
+    NwpModel,
+)
+from xgboost_forecaster.config import XGBoostHyperparameters
+import dagster as dg
+from src.nged_substation_forecast.defs.xgb_assets import train_xgboost, XGBoostConfig
 
 
 @pytest.fixture
@@ -82,11 +102,6 @@ def data_config(tmp_path):
     )
 
 
-def test_load_substation_power_with_config(data_config):
-    # Test that the function loads data without errors
-    load_substation_power(123, config=data_config)
-
-
 def test_load_nwp_run_with_config(data_config):
     from datetime import datetime
 
@@ -110,3 +125,418 @@ def test_load_scaling_params_with_config(tmp_path):
         load_scaling_params()
     except Exception as e:
         assert False, f"Failed to load scaling params: {e}"
+
+
+def test_downsample_power_flows_uses_period_ending_semantics():
+    # Create power flows at 10:01, 10:15, 10:29
+    df = pl.DataFrame(
+        {
+            "timestamp": [
+                datetime(2024, 1, 1, 10, 1, tzinfo=timezone.utc),
+                datetime(2024, 1, 1, 10, 15, tzinfo=timezone.utc),
+                datetime(2024, 1, 1, 10, 29, tzinfo=timezone.utc),
+                datetime(2024, 1, 1, 10, 31, tzinfo=timezone.utc),  # Next period
+            ],
+            "substation_number": [1, 1, 1, 1],
+            "MW": [10.0, 20.0, 30.0, 40.0],
+            "MVA": [10.0, 20.0, 30.0, 40.0],
+        }
+    ).lazy()
+
+    res = cast(pl.DataFrame, downsample_power_flows(df).collect())
+
+    # The first three should be aggregated into 10:30
+    assert len(res) == 2
+    assert res["timestamp"][0] == datetime(2024, 1, 1, 10, 30, tzinfo=timezone.utc)
+    assert res["MW"][0] == 20.0  # (10+20+30)/3
+
+    # The last one should be aggregated into 11:00
+    assert res["timestamp"][1] == datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)
+    assert res["MW"][1] == 40.0
+
+
+def test_process_nwp_data_removes_zero_lead_time():
+    init_time = datetime(2024, 1, 1, 0, tzinfo=timezone.utc)
+    df = pl.DataFrame(
+        {
+            "init_time": [init_time, init_time, init_time],
+            "valid_time": [
+                init_time + timedelta(hours=3),  # 3-hour
+                init_time + timedelta(hours=4),  # 4-hour
+                init_time + timedelta(hours=5),  # 5-hour
+            ],
+            "h3_index": [1, 1, 1],
+            "ensemble_member": [0, 0, 0],
+            "temperature_2m": [10.0, 12.0, 14.0],
+        }
+    ).lazy()
+
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
+
+    # Remaining valid_times: 03:00, 04:00, 05:00.
+    # Upsampling to 30m will create: 03:00, 03:30, 04:00, 04:30, 05:00.
+    assert len(res) == 5
+    assert res["valid_time"][0] == init_time + timedelta(hours=3)
+    assert res["lead_time_hours"][0] == 3.0
+    assert res["lead_time_hours"][1] == 3.5
+    assert res["lead_time_hours"][2] == 4.0
+    assert res["lead_time_hours"][3] == 4.5
+    assert res["lead_time_hours"][4] == 5.0
+
+
+def test_process_nwp_data_interpolates_safely_within_trajectories():
+    init_time_1 = datetime(2024, 1, 1, 0, tzinfo=timezone.utc)
+    init_time_2 = datetime(2024, 1, 2, 0, tzinfo=timezone.utc)
+
+    # Both forecast runs predict for the same valid_times
+    valid_time_1 = datetime(2024, 1, 3, 0, tzinfo=timezone.utc)
+    valid_time_2 = datetime(2024, 1, 3, 1, tzinfo=timezone.utc)
+
+    df = pl.DataFrame(
+        {
+            "init_time": [init_time_1, init_time_1, init_time_2, init_time_2],
+            "valid_time": [valid_time_1, valid_time_2, valid_time_1, valid_time_2],
+            "h3_index": [1, 1, 1, 1],
+            "ensemble_member": [0, 0, 0, 0],
+            "temperature_2m": [10.0, 20.0, 100.0, 200.0],  # Very different predictions
+        }
+    ).lazy()
+
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
+
+    # We should have 3 rows for init_time_1 (00:00, 00:30, 01:00)
+    # and 3 rows for init_time_2 (00:00, 00:30, 01:00)
+    assert len(res) == 6
+
+    # Check interpolation for init_time_1
+    res_1 = res.filter(pl.col("init_time") == init_time_1).sort("valid_time")
+    assert res_1["temperature_2m"][1] == 15.0  # Midpoint of 10 and 20
+
+    # Check interpolation for init_time_2
+    res_2 = res.filter(pl.col("init_time") == init_time_2).sort("valid_time")
+    assert res_2["temperature_2m"][1] == 150.0  # Midpoint of 100 and 200
+
+
+def test_prepare_training_data_prevents_row_explosion():
+    # Power flows with enough history for lags
+    valid_time = datetime(2024, 1, 3, 10, 30, tzinfo=timezone.utc)
+    flows = pl.DataFrame(
+        {
+            "timestamp": [
+                valid_time,
+                valid_time - timedelta(days=7),
+                valid_time - timedelta(days=14),
+                valid_time - timedelta(days=21),
+                valid_time - timedelta(days=28),
+            ],
+            "substation_number": [1] * 5,
+            "MW": [50.0] * 5,
+            "MVA": [50.0] * 5,
+        }
+    ).lazy()
+
+    # Metadata
+    metadata = pl.DataFrame(
+        {
+            "substation_number": [1],
+            "h3_res_5": [1],
+        }
+    )
+
+    # 4 NWP forecast runs, each with 50 ensemble members
+    nwp_rows = []
+    for i in range(4):
+        init_time = valid_time - timedelta(days=i + 1)
+        for ens in range(50):
+            nwp_rows.append(
+                {
+                    "init_time": init_time,
+                    "valid_time": valid_time,
+                    "h3_index": 1,
+                    "ensemble_member": ens,
+                    "temperature_2m": 10.0,
+                    "dew_point_temperature_2m": 5.0,
+                    "wind_speed_10m": 2.0,
+                    "wind_direction_10m": 180.0,
+                    "wind_speed_100m": 3.0,
+                    "wind_direction_100m": 185.0,
+                    "pressure_surface": 100.0,
+                    "pressure_reduced_to_mean_sea_level": 101.0,
+                    "geopotential_height_500hpa": 50.0,
+                    "downward_short_wave_radiation_flux_surface": 100.0,
+                    "categorical_precipitation_type_surface": 0.0,
+                    "lead_time_hours": (valid_time - init_time).total_seconds() / 3600,
+                }
+            )
+    nwp = pl.DataFrame(nwp_rows).lazy()
+
+    config = ModelConfig(
+        power_fcst_model_name="test",
+        hyperparameters=XGBoostHyperparameters().model_dump(),
+        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+    )
+
+    forecaster = XGBoostForecaster()
+
+    import patito as pt
+    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+
+    with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.train(
+            config=config,
+            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+        )
+
+        # Get the X dataframe passed to fit
+        X = mock_fit.call_args[0][0]
+
+        # 1 power flow row * 4 init_times * 50 ensemble members = 200 rows
+        assert X.shape[0] == 200
+
+
+def test_train_xgboost_asset_filters_to_control_member():
+    # Create NWP with members 0, 1, 2
+    nwp = pl.DataFrame(
+        {
+            "valid_time": [datetime(2024, 1, 1, 3, tzinfo=timezone.utc)] * 3,
+            "h3_index": [1, 1, 1],
+            "ensemble_member": [0, 1, 2],
+            "init_time": [datetime(2024, 1, 1, 0, tzinfo=timezone.utc)] * 3,
+            "temperature_2m": [10.0, 11.0, 12.0],
+        }
+    ).lazy()
+
+    flows = pl.DataFrame(
+        {
+            "substation_number": [123],
+            "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "MW": [1.0],
+        }
+    ).lazy()
+    metadata = pl.DataFrame({"substation_number": [123], "h3_res_5": [1]})
+    healthy_substations = [123]
+    config = XGBoostConfig()
+
+    context = dg.build_asset_context()
+
+    with patch("src.nged_substation_forecast.defs.xgb_assets.train_and_log_model") as mock_train:
+        train_xgboost(
+            context=context,
+            config=config,
+            nwp=nwp,
+            substation_power_flows=flows,
+            substation_metadata=metadata,
+            healthy_substations=healthy_substations,
+        )
+
+        # Check the nwp passed to train_and_log_model
+        passed_nwps = mock_train.call_args[1]["nwps"]
+        passed_nwp = passed_nwps[NwpModel.ECMWF_ENS_0_25DEG].collect()
+
+        # Should only contain member 0
+        assert len(passed_nwp) == 1
+        assert passed_nwp["ensemble_member"][0] == 0
+
+
+def test_latest_available_weekly_lag_prevents_leakage():
+    # Test that the dynamic lag logic correctly switches from 7d to 14d
+    # when lead_time_hours > 168 (7 days)
+
+    valid_time = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)
+
+    # Case 1: lead_time = 24h (1 day) -> should use 7d lag
+    init_time_short = valid_time - timedelta(days=1)
+
+    # Case 2: lead_time = 240h (10 days) -> should use 14d lag
+    init_time_long = valid_time - timedelta(days=10)
+
+    # Power flows
+    flows = pl.DataFrame(
+        {
+            "timestamp": [
+                valid_time,  # Target row
+                valid_time - timedelta(days=7),
+                valid_time - timedelta(days=14),
+                valid_time - timedelta(days=21),
+                valid_time - timedelta(days=28),
+            ],
+            "substation_number": [1] * 5,
+            "MW": [100.0, 77.0, 1414.0, 0.0, 0.0],  # Distinct values for 7d and 14d lags
+            "MVA": [100.0, 77.0, 1414.0, 0.0, 0.0],
+        }
+    ).lazy()
+
+    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+
+    nwp = pl.DataFrame(
+        [
+            {
+                "init_time": init_time_short,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
+                "categorical_precipitation_type_surface": 0.0,
+                "lead_time_hours": 24.0,
+            },
+            {
+                "init_time": init_time_long,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
+                "categorical_precipitation_type_surface": 0.0,
+                "lead_time_hours": 240.0,
+            },
+        ]
+    ).lazy()
+
+    config = ModelConfig(
+        power_fcst_model_name="test",
+        hyperparameters=XGBoostHyperparameters().model_dump(),
+        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+    )
+
+    forecaster = XGBoostForecaster()
+
+    import patito as pt
+    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+
+    with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.train(
+            config=config,
+            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+        )
+
+        X_arrow = mock_fit.call_args[0][0]
+        X = cast(pl.DataFrame, pl.from_arrow(X_arrow))
+
+        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0 / 1414.0
+        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0 / 1414.0 = 1.0
+        # Note: Polars might reorder rows, so we filter
+
+        # We need to find which row is which. We can use lead_time_hours if it's in X.
+        # It should be there because it's numeric and not in exclude_cols.
+
+        row_short = X.filter(pl.col("lead_time_hours") == 24.0)
+        assert row_short["latest_available_weekly_lag"][0] == pytest.approx(77.0 / 1414.0)
+
+        row_long = X.filter(pl.col("lead_time_hours") == 240.0)
+        assert row_long["latest_available_weekly_lag"][0] == pytest.approx(1.0)
+
+
+def test_xgboost_predict_with_lags():
+    # Setup dummy data for predict
+    valid_time = datetime(2024, 1, 20, 12, 0, tzinfo=timezone.utc)
+    # NWP init time must be at least 3h before valid_time to be available
+    # AND the inference_params.nwp_init_time must be at least 3h after nwp.init_time
+    nwp_init_time = valid_time - timedelta(days=1)
+    inference_nwp_init_time = nwp_init_time + timedelta(hours=4)
+
+    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    nwp = pl.DataFrame(
+        [
+            {
+                "init_time": nwp_init_time,
+                "valid_time": valid_time,
+                "h3_index": 1,
+                "ensemble_member": 0,
+                "temperature_2m": 10.0,
+                "dew_point_temperature_2m": 5.0,
+                "wind_speed_10m": 2.0,
+                "wind_direction_10m": 180.0,
+                "wind_speed_100m": 3.0,
+                "wind_direction_100m": 185.0,
+                "pressure_surface": 100.0,
+                "pressure_reduced_to_mean_sea_level": 101.0,
+                "geopotential_height_500hpa": 50.0,
+                "downward_short_wave_radiation_flux_surface": 100.0,
+                "categorical_precipitation_type_surface": 0.0,
+            }
+        ]
+    ).lazy()
+
+    flows = pl.DataFrame(
+        [
+            {
+                "timestamp": valid_time - timedelta(days=7),
+                "substation_number": 1,
+                "MW": 77.0,
+                "MVA": 77.0,
+            },
+            {
+                "timestamp": valid_time - timedelta(days=14),
+                "substation_number": 1,
+                "MW": 1414.0,
+                "MVA": 1414.0,
+            },
+        ]
+    ).lazy()
+
+    forecaster = XGBoostForecaster()
+    # Set target_map for normalization/descaling
+    from contracts.data_schemas import SubstationTargetMap
+
+    forecaster.target_map = SubstationTargetMap.validate(
+        pl.DataFrame(
+            {
+                "substation_number": pl.Series([1], dtype=pl.Int32),
+                "target_col": ["MW"],
+                "peak_capacity": pl.Series([100.0], dtype=pl.Float32),
+            }
+        )
+    )
+
+    # Mock the model and its feature_names_in_
+    mock_model = patch("xgboost.XGBRegressor").start()
+    mock_model.feature_names_in_ = [
+        "temperature_2m_uint8_scaled",
+        "latest_available_weekly_lag",
+        "hour_sin",
+        "hour_cos",
+        "day_of_year_sin",
+        "day_of_year_cos",
+        "day_of_week",
+    ]
+    mock_model.predict.return_value = [1.0]  # Normalized prediction
+    forecaster.model = mock_model
+
+    inference_params = InferenceParams(
+        forecast_time=inference_nwp_init_time,
+        power_fcst_model_name="test",
+    )
+
+    preds = forecaster.predict(
+        substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+        inference_params=inference_params,
+        nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+        substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+    )
+
+    assert len(preds) == 1
+    assert preds["MW_or_MVA"][0] == 100.0
+    # Check that the lag was correctly picked up (77.0 for 1-day lead time)
+    # We can't easily check the internal X dataframe without more patching,
+    # but the fact that it didn't crash is a good sign.

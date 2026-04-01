@@ -134,7 +134,7 @@ def package_search(query: str, api_key: str) -> PackageSearchResult:
 def httpx_get_with_auth(
     url: str, api_key: str, max_retries: int = 3, client: httpx.Client | None = None, **kwargs: Any
 ) -> httpx.Response:
-    auth_headers = {"Authorization": api_key}
+    auth_headers = {"Authorization": api_key} if api_key else {}
     for attempt in range(max_retries):
         try:
             if client:

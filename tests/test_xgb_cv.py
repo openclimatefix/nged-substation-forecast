@@ -1,5 +1,6 @@
+from datetime import date
 from src.nged_substation_forecast.defs.xgb_jobs import generate_expanding_windows, CVConfig
-from src.nged_substation_forecast.defs.xgb_assets import XGBoostTrainingParams
+from contracts.hydra_schemas import TrainingConfig
 
 
 def test_generate_expanding_windows():
@@ -10,22 +11,22 @@ def test_generate_expanding_windows():
 
     # Fold 1
     fold1 = outputs[0].value
-    assert isinstance(fold1, XGBoostTrainingParams)
-    assert fold1.train_start_date == "2025-01-01"
-    assert fold1.train_end_date == "2025-02-01"
-    assert fold1.test_end_date == "2025-03-01"
+    assert isinstance(fold1, TrainingConfig)
+    assert fold1.data_split.train_start == date(2025, 1, 1)
+    assert fold1.data_split.train_end == date(2025, 2, 1)
+    assert fold1.data_split.test_end == date(2025, 3, 1)
 
     # Fold 2
     fold2 = outputs[1].value
-    assert fold2.train_start_date == "2025-01-01"
-    assert fold2.train_end_date == "2025-03-01"
-    assert fold2.test_end_date == "2025-04-01"
+    assert fold2.data_split.train_start == date(2025, 1, 1)
+    assert fold2.data_split.train_end == date(2025, 3, 1)
+    assert fold2.data_split.test_end == date(2025, 4, 1)
 
     # Fold 3
     fold3 = outputs[2].value
-    assert fold3.train_start_date == "2025-01-01"
-    assert fold3.train_end_date == "2025-04-01"
-    assert fold3.test_end_date == "2025-04-01"
+    assert fold3.data_split.train_start == date(2025, 1, 1)
+    assert fold3.data_split.train_end == date(2025, 4, 1)
+    assert fold3.data_split.test_end == date(2025, 4, 1)
 
 
 def test_generate_expanding_windows_short():
@@ -33,6 +34,5 @@ def test_generate_expanding_windows_short():
     outputs = list(generate_expanding_windows(config))
 
     assert len(outputs) == 1
-    assert outputs[0].value.train_start_date == "2025-01-01"
-    assert outputs[0].value.train_end_date == "2025-01-15"
-    assert outputs[0].value.test_end_date is None
+    assert outputs[0].value.data_split.train_start == date(2025, 1, 1)
+    assert outputs[0].value.data_split.train_end == date(2025, 1, 15)

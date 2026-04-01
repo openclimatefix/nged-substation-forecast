@@ -45,3 +45,21 @@ mlruns/
 # searching/filtering than the file backend), this database file stores the run metadata. Like any
 # database file, it shouldn't be versioned.
 mlflow.db
+
+
+#######################
+# opencode agents
+
+# Implementation plans and code reviews.
+docs/temp/
+
+# opencode's exploration scripts to test functionality
+exploration_scripts/
+
+
+#######################
+# Testing
+.hypothesis/
+tests/xgboost_integration_plot.html
+tests/xgboost_dagster_integration_plot.html
+test.parquet
