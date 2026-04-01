@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import h3.api.numpy_int as h3
+import h3.api.basic_int as h3
 import patito as pt
 import polars as pl
 import pyproj
@@ -41,8 +41,7 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
     )
 
     context.log.info(f"Loading UK boundary from {geojson_path}")
-    with open(geojson_path) as f:
-        file_contents = f.read()
+    file_contents = geojson_path.read_text()
 
     shape: BaseGeometry = shapely.from_geojson(file_contents)
 
@@ -90,6 +89,12 @@ def gb_h3_grid_weights(
     # is an alias for `h3shape_to_cells` and expects an internal H3Shape object,
     # which would fail here.
     cells = h3.geo_to_cells(uk_boundary, res=h3_res)
+    if not cells:
+        raise ValueError(
+            f"No H3 cells found for the given boundary at resolution {h3_res}. "
+            "Check if the boundary geometry is valid and covers the expected area."
+        )
+
     df = pl.DataFrame({"h3_index": list(cells)}, schema={"h3_index": pl.UInt64}).sort("h3_index")
 
     context.log.info(

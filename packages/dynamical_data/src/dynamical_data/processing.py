@@ -248,6 +248,8 @@ def process_ecmwf_dataset(
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
     # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
     # available as columns.
+    # NOTE: This conversion is a known performance and memory bottleneck.
+    # For large datasets, this can cause OOM errors.
     nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
     # Perform a single spatial join with the pre-computed h3_grid.

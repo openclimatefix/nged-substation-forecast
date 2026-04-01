@@ -1,6 +1,6 @@
 """H3-related utilities for geospatial operations."""
 
-import h3.api.numpy_int as h3
+import h3.api.basic_int as h3
 import polars as pl
 import polars_h3 as plh3
 from contracts.data_schemas import H3GridWeights

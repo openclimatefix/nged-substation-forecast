@@ -54,7 +54,15 @@ def ecmwf_ens_forecast(
 @asset(deps=[ecmwf_ens_forecast])
 def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
     """Provides a LazyFrame scanning all downloaded NWP data."""
-    return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
+    nwp_dir = settings.nwp_data_path / "ECMWF" / "ENS"
+    if not nwp_dir.exists():
+        # Return an empty LazyFrame with the expected schema if the directory doesn't exist.
+        # This prevents the pipeline from crashing before any data has been downloaded.
+        from contracts.data_schemas import Nwp
+
+        return pl.LazyFrame(schema=Nwp.dtypes)
+
+    return pl.scan_parquet(nwp_dir / "*.parquet")
 
 
 class ProcessedNWPConfig(dg.Config):

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 import dagster as dg
-import h3.api.numpy_int as h3
+import h3.api.basic_int as h3
 import httpx
 import polars as pl
 from contracts.data_schemas import (
