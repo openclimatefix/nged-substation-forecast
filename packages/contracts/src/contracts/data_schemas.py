@@ -427,8 +427,8 @@ class H3GridWeights(pt.Model):
     """
 
     h3_index: int = pt.Field(dtype=pl.UInt64)
-    nwp_lat: float = pt.Field(dtype=pl.Float64)
-    nwp_lng: float = pt.Field(dtype=pl.Float64)
+    nwp_lat: float = pt.Field(dtype=pl.Float64, ge=-90, le=90)
+    nwp_lng: float = pt.Field(dtype=pl.Float64, ge=-180, le=180)
     len: int = pt.Field(dtype=pl.UInt32)
     total: int = pt.Field(dtype=pl.UInt32)
     proportion: float = pt.Field(dtype=pl.Float64)

@@ -146,6 +146,9 @@ def download_ecmwf(
         ds: Optional xarray Dataset. If None, connects to the production icechunk store.
             This allows dependency injection during testing.
     """
+    if h3_grid.is_empty():
+        raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
+
     if ds is None:
         # Connect to the production icechunk store
         storage = icechunk.s3_storage(

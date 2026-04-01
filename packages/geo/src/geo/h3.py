@@ -1,5 +1,6 @@
 """H3-related utilities for geospatial operations."""
 
+import h3.api.numpy_int as h3
 import polars as pl
 import polars_h3 as plh3
 from contracts.data_schemas import H3GridWeights
@@ -19,7 +20,7 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
         df: A Polars DataFrame containing an 'h3_index' column (UInt64).
         grid_size: The size of the regular lat/lng grid in degrees (e.g., 0.25).
         child_res: The H3 resolution to use for the underlying points. Must be
-            finer than or equal to the resolution of the input 'h3_index' column.
+            strictly greater than the resolution of the input 'h3_index' column.
             Defaults to 7.
 
     Returns:
@@ -32,22 +33,13 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
             - proportion: The proportion of the H3 cell that falls into this grid cell.
     """
     if df.is_empty():
-        return pl.DataFrame(
-            schema={
-                "h3_index": pl.UInt64,
-                "nwp_lat": pl.Float64,
-                "nwp_lng": pl.Float64,
-                "len": pl.UInt32,
-                "total": pl.UInt32,
-                "proportion": pl.Float64,
-            }
-        )
+        raise ValueError("Input DataFrame is empty.")
 
-    # We use child_res to sample the H3 cell. child_res must be finer than the
-    # resolution of the input h3_index.
-    # Note: We don't explicitly check the resolution of the input h3_index here
-    # for performance reasons, but downstream users should ensure child_res is
-    # appropriate.
+    # Check resolution
+    first_h3 = df["h3_index"][0]
+    h3_res = h3.get_resolution(first_h3)
+    if child_res <= h3_res:
+        raise ValueError(f"child_res ({child_res}) must be strictly greater than h3_res ({h3_res})")
 
     weights_df = (
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_res))
@@ -62,10 +54,10 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
         .len()
         .with_columns(
             total=pl.col("len").sum().over("h3_index"),
-            # Ensure len and total are UInt32 as per contract
-            len=pl.col("len").cast(pl.UInt32),
         )
         .with_columns(
+            # Ensure len and total are UInt32 as per contract
+            len=pl.col("len").cast(pl.UInt32),
             total=pl.col("total").cast(pl.UInt32),
             proportion=pl.col("len") / pl.col("total"),
         )
