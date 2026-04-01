@@ -3,7 +3,7 @@ import polars.testing
 import polars_h3 as plh3
 import numpy as np
 import h3.api.numpy_int as h3_raw
-from dynamical_data.processing import compute_h3_grid_weights
+from geo.h3 import compute_h3_grid_weights
 
 
 def test_h3_equivalence():
@@ -75,6 +75,13 @@ def test_h3_equivalence():
     polars.testing.assert_frame_equal(old_result, new_result)
 
     # Library implementation
-    lib_result = compute_h3_grid_weights(df).sort(["h3_index", "nwp_lat", "nwp_lng"])
+    lib_result = compute_h3_grid_weights(df, grid_size=GRID_SIZE, child_res=CHILD_RES).sort(
+        ["h3_index", "nwp_lat", "nwp_lng"]
+    )
+
+    # The library implementation returns UInt32 for len and total, so we cast for comparison
+    new_result = new_result.with_columns(
+        len=pl.col("len").cast(pl.UInt32), total=pl.col("total").cast(pl.UInt32)
+    )
 
     polars.testing.assert_frame_equal(new_result, lib_result)

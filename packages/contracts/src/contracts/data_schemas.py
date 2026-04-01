@@ -416,3 +416,14 @@ class SubstationFeatures(pt.Model):
     day_of_year_sin: float = pt.Field(dtype=pl.Float32)
     day_of_year_cos: float = pt.Field(dtype=pl.Float32)
     day_of_week: int = pt.Field(dtype=pl.Int8)
+
+
+class H3GridWeights(pt.Model):
+    """Schema for the pre-computed H3 grid weights."""
+
+    h3_index: int = pt.Field(dtype=pl.UInt64)
+    nwp_lat: float = pt.Field(dtype=pl.Float64)
+    nwp_lng: float = pt.Field(dtype=pl.Float64)
+    len: int = pt.Field(dtype=pl.UInt32)
+    total: int = pt.Field(dtype=pl.UInt32)
+    proportion: float = pt.Field(dtype=pl.Float64)

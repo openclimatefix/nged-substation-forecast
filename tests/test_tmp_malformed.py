@@ -1,6 +1,7 @@
 import xarray as xr
 import pytest
 import polars as pl
+from contracts.data_schemas import H3GridWeights
 from datetime import datetime, timezone
 from dynamical_data.processing import download_ecmwf, process_ecmwf_dataset
 
@@ -14,19 +15,25 @@ def test_malformed_data_fails(broken_zarr_factory):
     ds = xr.open_zarr(zarr_path, decode_timedelta=True)
     init_time = ds.init_time.values[0]
 
-    h3_grid = pl.DataFrame(
-        {
-            "h3_index": [123456789],
-            "nwp_lat": [56.0],
-            "nwp_lng": [-3.25],
-            "proportion": [1.0],
-        },
-        schema={
-            "h3_index": pl.UInt64,
-            "nwp_lat": pl.Float32,
-            "nwp_lng": pl.Float32,
-            "proportion": pl.Float32,
-        },
+    h3_grid = H3GridWeights.validate(
+        pl.DataFrame(
+            {
+                "h3_index": [123456789],
+                "nwp_lat": [56.0],
+                "nwp_lng": [-3.25],
+                "len": [1],
+                "total": [1],
+                "proportion": [1.0],
+            },
+            schema={
+                "h3_index": pl.UInt64,
+                "nwp_lat": pl.Float64,
+                "nwp_lng": pl.Float64,
+                "len": pl.UInt32,
+                "total": pl.UInt32,
+                "proportion": pl.Float64,
+            },
+        )
     )
 
     downloaded_ds = download_ecmwf(init_time, h3_grid, ds)

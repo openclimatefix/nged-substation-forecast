@@ -1,0 +1,26 @@
+[project]
+name = "geo"
+version = "0.1.0"
+description = "Generic geospatial logic and data"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "h3>=4.4.2",
+    "polars>=1.38.1",
+    "polars-h3>=0.6.1",
+    "shapely>=2.1.2",
+    "contracts",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.28,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov",
+]

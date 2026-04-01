@@ -30,6 +30,7 @@ dependencies = [
     "xgboost_forecaster",
     "hydra-core",
     "deltalake",
+    "geo",
 ]
 
 [build-system]
@@ -62,6 +63,7 @@ contracts = { workspace = true }
 ml_core = { workspace = true }
 xgboost_forecaster = { workspace = true }
 dynamical_data = { workspace = true }
+geo = { workspace = true }
 
 # --- DAGSTER ---
 

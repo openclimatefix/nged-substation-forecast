@@ -8,9 +8,8 @@ import icechunk
 import numpy as np
 import patito as pt
 import polars as pl
-import polars_h3 as plh3
 import xarray as xr
-from contracts.data_schemas import Nwp
+from contracts.data_schemas import H3GridWeights, Nwp
 
 from .scaling import load_scaling_params, scale_to_uint8
 
@@ -99,31 +98,13 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         )
 
 
-def get_gb_h3_grid() -> pl.DataFrame:
+def get_gb_h3_grid() -> pt.DataFrame[H3GridWeights]:
     """Load the pre-computed H3 grid for Great Britain.
 
     The grid is pre-computed to avoid a 30-second penalty on every ingestion.
     """
     grid_path = ASSETS_PATH / "gb_h3_grid.parquet"
-    return pl.read_parquet(grid_path)
-
-
-def compute_h3_grid_weights(df: pl.DataFrame) -> pl.DataFrame:
-    """Computes the proportion mapping for H3 grid cells."""
-    return (
-        df.with_columns(h3_res7=plh3.cell_to_children("h3_index", 7))
-        .explode("h3_res7")
-        .with_columns(
-            nwp_lat=((plh3.cell_to_lat("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
-            * GRID_SIZE,
-            nwp_lng=((plh3.cell_to_lng("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
-            * GRID_SIZE,
-        )
-        .group_by(["h3_index", "nwp_lat", "nwp_lng"])
-        .len()
-        .with_columns(total=pl.col("len").sum().over("h3_index"))
-        .with_columns(proportion=pl.col("len") / pl.col("total"))
-    )
+    return H3GridWeights.validate(pl.read_parquet(grid_path))
 
 
 def calculate_wind_speed_and_direction(
@@ -158,7 +139,7 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
 
 def download_ecmwf(
     nwp_init_time: np.datetime64,
-    h3_grid: pl.DataFrame,
+    h3_grid: pt.DataFrame[H3GridWeights],
     ds: xr.Dataset | None = None,
 ) -> xr.Dataset:
     """Download and process ECMWF data for a specific initialization time.
@@ -256,7 +237,7 @@ def download_ecmwf(
 def process_ecmwf_dataset(
     nwp_init_time: datetime,
     loaded_ds: xr.Dataset,
-    h3_grid: pl.DataFrame,
+    h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
     # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
