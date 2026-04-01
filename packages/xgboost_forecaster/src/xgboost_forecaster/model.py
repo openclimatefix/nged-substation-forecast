@@ -109,6 +109,14 @@ class XGBoostForecaster(BaseForecaster):
         if "substation_number" in res_schema.names():
             res = res.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
 
+        # Ensure categorical precipitation is treated as a categorical feature
+        if "categorical_precipitation_type_surface" in res_schema.names():
+            res = res.with_columns(
+                pl.col("categorical_precipitation_type_surface")
+                .cast(pl.String)
+                .cast(pl.Categorical)
+            )
+
         return res
 
     def _add_lags(self, df: pl.LazyFrame, flows_30m: pl.LazyFrame) -> pl.LazyFrame:
@@ -372,6 +380,13 @@ class XGBoostForecaster(BaseForecaster):
         )
         if NwpColumns.ENSEMBLE_MEMBER in df_lf.collect_schema().names():
             df_lf = df_lf.with_columns(pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8))
+
+        # DATA TYPE RATIONALE:
+        # Weather features are kept as Float32 in memory rather than UInt8 to:
+        # 1. Preserve precision from 30-minute interpolation (avoiding "staircase" effects).
+        # 2. Prevent silent underflow during feature engineering (e.g., calculating trends
+        #    via subtraction).
+        # 3. Align with XGBoost's native internal data type (Float32).
 
         # Cast all floats to Float32 for Patito
         df_lf = df_lf.with_columns(pl.col(pl.Float64).cast(pl.Float32))

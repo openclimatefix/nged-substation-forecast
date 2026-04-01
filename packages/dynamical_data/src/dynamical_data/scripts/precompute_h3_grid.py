@@ -38,7 +38,7 @@ def main():
     This script avoids the 30-second penalty of generating the grid at runtime.
     """
     # Path resolution relative to this script
-    assets_path = Path(__file__).parent.parent / "assets"
+    assets_path = Path(__file__).resolve().parent.parent.parent.parent / "assets"
     geojson_path = assets_path / "england_scotland_wales.geojson"
     output_path = assets_path / "gb_h3_grid.parquet"
 

@@ -1,7 +1,7 @@
 import os
 import concurrent.futures
-import importlib.resources
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Final, cast
 
 import icechunk
@@ -18,6 +18,8 @@ H3_RES: Final[int] = 5
 GRID_SIZE: Final[float] = 0.25
 
 DEFAULT_AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
+ASSETS_PATH = Path(__file__).resolve().parent.parent.parent / "assets"
 
 
 class MalformedZarrError(ValueError):
@@ -102,9 +104,8 @@ def get_gb_h3_grid() -> pl.DataFrame:
 
     The grid is pre-computed to avoid a 30-second penalty on every ingestion.
     """
-    grid_path = importlib.resources.files("dynamical_data.assets").joinpath("gb_h3_grid.parquet")
-    with importlib.resources.as_file(grid_path) as path:
-        return pl.read_parquet(path)
+    grid_path = ASSETS_PATH / "gb_h3_grid.parquet"
+    return pl.read_parquet(grid_path)
 
 
 def compute_h3_grid_weights(df: pl.DataFrame) -> pl.DataFrame:
@@ -352,12 +353,23 @@ def process_ecmwf_dataset(
     # Drop raw wind components
     processed = processed.drop(["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"])
 
-    # Load scaling parameters using importlib.resources
-    scaling_params_path = importlib.resources.files("dynamical_data.assets").joinpath(
-        "ecmwf_scaling_params.csv"
-    )
-    with importlib.resources.as_file(scaling_params_path) as path:
-        scaling_params = load_scaling_params(path)
+    # DATA TYPE TRANSITION RATIONALE:
+    # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
+    #    space and bandwidth.
+    # 2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
+    #    to maintain precision and avoid rounding errors during aggregation.
+    # 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
+    #    in the ML model.
+    #
+    # CRITICAL: We do NOT cast back to UInt8 in memory because:
+    # - It would cause a "staircase" effect by quantizing interpolated values, defeating
+    #   the purpose of 30-minute upsampling.
+    # - It risks silent underflow during differencing operations (e.g., calculating trends
+    #   like temp_trend_6h = current - lagged).
+
+    # Load scaling parameters
+    scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
+    scaling_params = load_scaling_params(scaling_params_path)
 
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])

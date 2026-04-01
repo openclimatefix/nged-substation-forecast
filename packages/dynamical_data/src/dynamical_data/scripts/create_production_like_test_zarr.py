@@ -188,7 +188,7 @@ def get_output_directory() -> Path:
     Returns:
         Path to the example_data directory relative to script location.
     """
-    return get_script_directory().parent / "example_data"
+    return get_script_directory().parent.parent.parent / "example_data"
 
 
 def validate_xr_structure(ds: xr.Dataset) -> tuple[bool, list[str]]:
