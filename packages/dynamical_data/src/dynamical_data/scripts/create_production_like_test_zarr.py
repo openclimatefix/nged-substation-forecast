@@ -5,16 +5,23 @@ This script creates deterministic, synthetic Zarr datasets that match the exact
 coordinate structure and data format expected by the production ECMWF download
 pipeline (see `dynamical_data.processing.download_ecmwf`).
 
+The script is designed to be complex enough to generate production-like data
+without requiring actual network calls or access to the Dynamical.org API.
+This allows for robust, deterministic testing of the ingestion pipeline,
+including temporal deduplication and error handling for malformed data.
+
 The generated test data includes:
 1. Valid production-like structure with 5D data variables:
    - Dimensions: (latitude, longitude, init_time, lead_time, ensemble_member)
-   - Data variables: temperature, wind speed/direction, pressure, precipitation, radiation
+   - Data variables: temperature, wind components, pressure, precipitation, radiation
+   - Physical realism: accumulated precipitation is monotonic, shortwave radiation is daytime-only.
 
 2. Broken test cases for validation testing:
    - Missing coordinates
    - Mismatched dimension ordering
    - Malformed data arrays
    - Wrong dtypes and encodings
+   - Inconsistent shapes
 
 Usage:
     # Run with defaults
@@ -32,10 +39,11 @@ Usage:
     uv run python packages/dynamical_data/src/dynamical_data/scripts/create_production_like_test_zarr.py \
         --broken-types missing_coords,missing_vars
 
-The generated data passes validation in processing.py:110-147 and can be used for:
+The generated data passes validation in processing.py and can be used for:
 - CI testing without network calls
 - Testing the download_ecmwf function
 - Testing data validation logic
+- Testing temporal deduplication (overlapping forecasts)
 """
 
 from __future__ import annotations
@@ -47,6 +55,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 
 
@@ -71,7 +80,7 @@ BROKEN_TEST_CASE_TYPES: dict[str, str] = {
 LATITUDE_VALUES = np.array([55.8, 55.9, 56.0], dtype=np.float32)
 LONGITUDE_VALUES = np.array([-3.4, -3.2, -3.0], dtype=np.float32)
 INIT_TIME_VALUE = np.datetime64("2026-03-01T00:00:00.000000000")
-LEAD_TIME_VALUES = np.array([0.5, 1.0], dtype=np.float32)  # 30-min and 1-hour forecasts
+LEAD_TIME_VALUES = np.array([0.0, 6.0, 12.0], dtype=np.float32)  # 0, 6, and 12-hour forecasts
 ENSEMBLE_MEMBER_VALUES = np.array([0, 1], dtype=np.uint8)
 
 # Expected data variable names (matching ECMWF IFS convention)
@@ -86,25 +95,25 @@ DATA_VARIABLES: dict[str, dict] = {
         "fill_value": np.nan,
         "description": "Dew point temperature at 2m (K)",
     },
-    "wind_speed_10m": {
+    "wind_u_10m": {
         "dtype": np.float64,
         "fill_value": np.nan,
-        "description": "Wind speed at 10m (m/s)",
+        "description": "U-component of wind at 10m (m/s)",
     },
-    "wind_direction_10m": {
+    "wind_v_10m": {
         "dtype": np.float64,
         "fill_value": np.nan,
-        "description": "Wind direction at 10m (degrees from North)",
+        "description": "V-component of wind at 10m (m/s)",
     },
-    "wind_speed_100m": {
+    "wind_u_100m": {
         "dtype": np.float64,
         "fill_value": np.nan,
-        "description": "Wind speed at 100m (m/s)",
+        "description": "U-component of wind at 100m (m/s)",
     },
-    "wind_direction_100m": {
+    "wind_v_100m": {
         "dtype": np.float64,
         "fill_value": np.nan,
-        "description": "Wind direction at 100m (degrees from North)",
+        "description": "V-component of wind at 100m (m/s)",
     },
     "pressure_surface": {
         "dtype": np.float64,
@@ -208,18 +217,18 @@ def validate_xr_structure(ds: xr.Dataset) -> tuple[bool, list[str]]:
             errors.append(f"Missing required coordinate: {coord}")
 
     # Check data variables and their shapes
-    if ds.data_vars:
-        first_var = next(iter(ds.data_vars))
-        expected_shape = (
-            len(ds.latitude),
-            len(ds.longitude),
-            len(ds.init_time),
-            len(ds.lead_time),
-            len(ds.ensemble_member),
-        )
-        if ds[first_var].shape != expected_shape:
+    expected_shape = (
+        len(ds.latitude) if "latitude" in ds.dims else 0,
+        len(ds.longitude) if "longitude" in ds.dims else 0,
+        len(ds.init_time) if "init_time" in ds.dims else 0,
+        len(ds.lead_time) if "lead_time" in ds.dims else 0,
+        len(ds.ensemble_member) if "ensemble_member" in ds.dims else 0,
+    )
+
+    for var_name in ds.data_vars:
+        if ds[var_name].shape != expected_shape:
             errors.append(
-                f"Data variable '{first_var}' has shape {ds[first_var].shape}, "
+                f"Data variable '{var_name}' has shape {ds[var_name].shape}, "
                 f"expected {expected_shape}"
             )
 
@@ -240,7 +249,11 @@ def validate_xr_structure(ds: xr.Dataset) -> tuple[bool, list[str]]:
 # =============================================================================
 
 
-def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.Dataset:
+def create_production_like_ecmwf_zarr(
+    output_path: Path,
+    seed: int = 42,
+    init_time: str | np.datetime64 = INIT_TIME_VALUE,
+) -> xr.Dataset:
     """Create a synthetic NWP Zarr dataset matching production ECMWF structure.
 
     This creates a small but structurally complete dataset that:
@@ -252,11 +265,17 @@ def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.D
     Args:
         output_path: Path where the Zarr store will be created.
         seed: Random seed for reproducibility (default: 42).
+        init_time: The initialization time for the forecast. Parameterized to allow
+            testing of temporal deduplication (overlapping forecasts).
 
     Returns:
         The created Xarray Dataset.
     """
     np.random.seed(seed)
+
+    # Ensure init_time is np.datetime64
+    if isinstance(init_time, str):
+        init_time = np.datetime64(init_time)
 
     # Create the dataset with proper coordinate dimensions
     ds = xr.Dataset(
@@ -274,7 +293,7 @@ def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.D
             ),
             "init_time": (
                 ["init_time"],
-                [INIT_TIME_VALUE],
+                [init_time],
                 {
                     "standard_name": "forecast_reference_time",
                     "long_name": "Initiation time",
@@ -303,7 +322,6 @@ def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.D
     # Generate synthetic data for each variable
     for var_name, var_info in DATA_VARIABLES.items():
         # Generate synthetic data with realistic ranges
-        # Note: INIT_TIME_VALUE is a scalar datetime64, not an array, so we use 1
         shape = (
             len(LATITUDE_VALUES),
             len(LONGITUDE_VALUES),
@@ -319,21 +337,9 @@ def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.D
             # Dew point: slightly lower than temperature
             data = np.random.uniform(265.0, 295.0, size=shape).astype(np.float64)
             data = np.minimum(data, ds["temperature_2m"].values - 2.0)  # Ensure below temp
-        elif "wind_speed_10m" in var_name:
-            # Wind speed: 0-20 m/s
-            data = np.random.uniform(0.0, 20.0, size=shape).astype(np.float64)
-        elif "wind_direction_10m" in var_name:
-            # Wind direction: 0-360 degrees
-            data = np.random.uniform(0.0, 360.0, size=shape).astype(np.float64)
-        elif "wind_speed_100m" in var_name:
-            # 100m wind should generally be higher than 10m
-            data = np.random.uniform(1.0, 30.0, size=shape).astype(np.float64)
-            data = np.maximum(data, ds["wind_speed_10m"].values * 1.2)
-        elif "wind_direction_100m" in var_name:
-            # 100m wind direction similar to 10m but with some noise
-            data = (ds["wind_direction_10m"].values + np.random.normal(0, 15, size=shape)).astype(
-                np.float64
-            )
+        elif "wind_u" in var_name or "wind_v" in var_name:
+            # Wind components: -15 to 15 m/s
+            data = np.random.uniform(-15.0, 15.0, size=shape).astype(np.float64)
         elif var_name == "pressure_surface":
             # Surface pressure: 95000-105000 Pa
             data = np.random.uniform(95000.0, 105000.0, size=shape).astype(np.float64)
@@ -342,19 +348,23 @@ def create_production_like_ecmwf_zarr(output_path: Path, seed: int = 42) -> xr.D
             data = np.random.uniform(97000.0, 107000.0, size=shape).astype(np.float64)
         elif var_name == "precipitation_surface":
             # Precipitation (m): 0-0.05m (50mm)
-            # Set first lead time to small or zero (accumulated over previous interval)
-            data = np.zeros(shape, dtype=np.float64)
-            # Fill the second lead time (index 1) with values
-            # Slice shape is (shape[0], shape[1], shape[2], shape[4]) = (3, 3, 1, 2)
-            data[:, :, :, 1, :] = np.random.uniform(
-                0.0, 0.05, size=(shape[0], shape[1], shape[2], shape[4])
-            )
+            # Accumulated precipitation must be monotonically non-decreasing.
+            # We use np.cumsum over the lead_time dimension (axis 3).
+            incremental_precip = np.random.uniform(0.0, 0.01, size=shape).astype(np.float64)
+            data = np.cumsum(incremental_precip, axis=3)
         elif "short_wave" in var_name:
             # Shortwave radiation (W/m^2): 0-1000
             data = np.zeros(shape, dtype=np.float64)
-            # Add some daytime values for first lead time
-            # Shape is (lat, lon, init_time=1, lead_time, ensemble)
-            data[:, :, :, :, :] = np.random.uniform(0.0, 800.0, shape)
+            # Shortwave radiation is only non-zero during daytime hours.
+            # For simplicity, we assume lead times between 6:00 and 18:00 are daytime.
+            # We need to calculate the actual time for each lead time.
+            init_dt = pd.to_datetime(init_time).to_pydatetime()
+            for i, lt in enumerate(LEAD_TIME_VALUES):
+                valid_time = init_dt + (lt * 3600).astype("timedelta64[s]").item()
+                if 6 <= valid_time.hour < 18:
+                    data[:, :, :, i, :] = np.random.uniform(
+                        200.0, 800.0, size=(shape[0], shape[1], shape[2], shape[4])
+                    )
         elif "long_wave" in var_name:
             # Longwave radiation (W/m^2): 200-400
             data = np.random.uniform(200.0, 400.0, size=shape).astype(np.float64)
@@ -460,18 +470,29 @@ def create_broken_ecmwf_zarrs(
         print(f"  Created broken case: {broken_type}")
 
 
-def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42) -> xr.Dataset:
+def create_broken_ecmwf_zarr(
+    output_path: Path,
+    broken_type: str,
+    seed: int = 42,
+    init_time: str | np.datetime64 = INIT_TIME_VALUE,
+) -> xr.Dataset:
     """Create a single broken Zarr dataset for a specific failure mode.
 
     Args:
         output_path: Path for the broken Zarr store.
         broken_type: Type of broken case to create.
         seed: Random seed for reproducibility.
+        init_time: The initialization time for the forecast. Parameterized to allow
+            testing of temporal deduplication (overlapping forecasts).
 
     Returns:
         The created (broken) xarray Dataset.
     """
     np.random.seed(seed)
+
+    # Ensure init_time is np.datetime64
+    if isinstance(init_time, str):
+        init_time = np.datetime64(init_time)
 
     output_dir = Path(output_path).parent
     os.makedirs(output_dir, exist_ok=True)
@@ -481,7 +502,7 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
         {
             "latitude": (["latitude"], LATITUDE_VALUES),
             "longitude": (["longitude"], LONGITUDE_VALUES),
-            "init_time": (["init_time"], [INIT_TIME_VALUE]),
+            "init_time": (["init_time"], [init_time]),
             "lead_time": (["lead_time"], LEAD_TIME_VALUES),
             "ensemble_member": (["ensemble_member"], ENSEMBLE_MEMBER_VALUES),
         }
@@ -499,7 +520,7 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
 
     # Add some default data variables so we have something to break/validate
     # These will be overwritten or removed by specific broken_type cases
-    for var_name in ["temperature_2m", "wind_speed_10m"]:
+    for var_name in ["temperature_2m", "wind_u_10m"]:
         ds[var_name] = xr.DataArray(
             np.random.uniform(270.0, 300.0, size=shape).astype(np.float64),
             dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
@@ -518,7 +539,7 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
         case "wrong_dim_order":
             # Create data variables with wrong dimension ordering
             # This tests that the validation catches dimension mismatches
-            for var_name in ["temperature_2m", "wind_speed_10m"]:
+            for var_name in ["temperature_2m", "wind_u_10m"]:
                 data = np.random.uniform(0.0, 1.0, size=shape).astype(np.float64)
                 # WRONG: swap the first two dimensions
                 data_swapped = np.transpose(data, axes=(1, 0, 2, 3, 4))
@@ -546,10 +567,10 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
             # Add wind speed with inf values
             wind_data = np.random.uniform(0.0, 20.0, size=shape).astype(np.float64)
             wind_data[0, 0, 0, 0, 0] = np.inf
-            ds["wind_speed_10m"] = xr.DataArray(
+            ds["wind_u_10m"] = xr.DataArray(
                 wind_data,
                 dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
-                attrs={"description": "Wind speed 10m"},
+                attrs={"description": "Wind U 10m"},
             )
 
         case "missing_vars":
@@ -559,8 +580,8 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
                 [
                     "temperature_2m",
                     "dew_point_temperature_2m",
-                    "wind_speed_10m",
-                    "wind_direction_10m",
+                    "wind_u_10m",
+                    "wind_v_10m",
                 ],
             )
 
@@ -579,14 +600,36 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
         case "inconsistent_shape":
             # Create data variables with mismatched shapes
             # This should cause validation to fail
+            # We use a different size for one of the dimensions to trigger the error
+            # but we must use a different dimension name to avoid xarray alignment errors during assignment
             ds["temperature_2m"] = xr.DataArray(
-                np.random.uniform(0.0, 300.0, size=(3, 3, 2, 2, 2)).astype(np.float64),
-                # Add an extra dimension!
-                dims=["latitude", "longitude", "init_time_extra", "lead_time", "ensemble_member"],
+                np.random.uniform(
+                    0.0,
+                    300.0,
+                    size=(
+                        len(LATITUDE_VALUES),
+                        len(LONGITUDE_VALUES),
+                        1,
+                        len(LEAD_TIME_VALUES) + 1,
+                        len(ENSEMBLE_MEMBER_VALUES),
+                    ),
+                ).astype(np.float64),
+                dims=["latitude", "longitude", "init_time", "wrong_lead_time", "ensemble_member"],
                 attrs={"description": "Temperature 2m"},
             )
-            ds["wind_speed_10m"] = xr.DataArray(
-                np.random.uniform(0.0, 20.0, size=(3, 3, 1, 2, 2, 1)).astype(np.float64),
+            ds["wind_u_10m"] = xr.DataArray(
+                np.random.uniform(
+                    0.0,
+                    20.0,
+                    size=(
+                        len(LATITUDE_VALUES),
+                        len(LONGITUDE_VALUES),
+                        1,
+                        len(LEAD_TIME_VALUES),
+                        len(ENSEMBLE_MEMBER_VALUES),
+                        2,
+                    ),
+                ).astype(np.float64),
                 # Wrong shape entirely
                 dims=[
                     "latitude",
@@ -594,9 +637,9 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
                     "init_time",
                     "lead_time",
                     "ensemble_member",
-                    "extra",
+                    "extra_dim",
                 ],
-                attrs={"description": "Wind speed 10m"},
+                attrs={"description": "Wind U 10m"},
             )
 
         case _:
