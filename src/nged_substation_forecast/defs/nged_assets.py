@@ -122,13 +122,6 @@ def _download_and_process_substation(
         ]
     )
 
-    # Ensure uniform schema
-    for col in ["MW", "MVA", "MVAr"]:
-        if col not in new_df.columns:
-            new_df = new_df.with_columns(pl.lit(None).cast(pl.Float32).alias(col))
-        else:
-            new_df = new_df.with_columns(pl.col(col).cast(pl.Float32))
-
     new_df = new_df.select(["timestamp", "substation_number", "MW", "MVA", "MVAr", "ingested_at"])
 
     return SubstationIngestionResult(

@@ -29,7 +29,7 @@ throughout joins.
 
 ### In `SubstationTargetMap`
 - let's use an Enum or Literal for `target_col`, as `target_col` can only be `MW` or
-  `MVA`. 
+  `MVA`.
 - And let's also ensure that `choose_power_column` returns this stricter type.
 - Rename `target_col` to `power_col`
 - What unit is `peak_capacity` in? MW? MVA? Either? At the very least, let's add a comment. Even
@@ -74,3 +74,13 @@ to `pl.UInt8`.
 
 ### In `def test_substation_flows_property_based`
 - Replace the `.with_columns` with `.cast`. It's more readable.
+
+## In `packages/dynamical_data/src/dynamical_data/assets/ecmwf_scaling_params.csv`
+- Why do we need a scaling param for `categorical_precipitation_type_surface`? Surely this is
+already an integer, which - if I remember correctly - is always in the range of roughly [0, 12].
+
+## In `packages/dynamical_data/`
+- Please remove `src/dynamical_data/example_data` from git.
+- I think it makes more sense for `packages/dynamical_data/src/dynamical_data/assets/` and `packages/dynamical_data/src/dynamical_data/example_data/` to be moved to `packages/dynamical_data/assets/` and `packages/dynamical_data/example_data/` because this stuff isn't _source_ code (so shouldn't go into the `src` directory)
+- Please add some docs (maybe in `packages/dynamical_data/assets/README.md`) to explain where all the files
+  in the `assets/` directory come from.
