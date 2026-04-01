@@ -497,13 +497,23 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
         len(ENSEMBLE_MEMBER_VALUES),
     )
 
+    # Add some default data variables so we have something to break/validate
+    # These will be overwritten or removed by specific broken_type cases
+    for var_name in ["temperature_2m", "wind_speed_10m"]:
+        ds[var_name] = xr.DataArray(
+            np.random.uniform(270.0, 300.0, size=shape).astype(np.float64),
+            dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
+            attrs={"description": f"Default {var_name}"},
+        )
+
     match broken_type:
         case "missing_coords":
             # Create data without proper coordinate references
             # Data is there, but coordinates don't match
 
-            # Temp values with missing temperature_2m variable (critical for validation)
-            ds = remove_variables(ds, ["temperature_2m", "wind_speed_10m"])
+            # Drop the coordinate variables (latitude, longitude)
+            # This leaves the dimensions but removes the coordinate values
+            ds = ds.drop_vars(["latitude", "longitude"])
 
         case "wrong_dim_order":
             # Create data variables with wrong dimension ordering
@@ -607,7 +617,7 @@ def create_broken_ecmwf_zarr(output_path: Path, broken_type: str, seed: int = 42
 
 
 def remove_variables(ds: xr.Dataset, vars_to_remove: list[str]) -> xr.Dataset:
-    """Remove specified variables from the dataset.
+    """Remove specified variables (data or coordinates) from the dataset.
 
     Args:
         ds: Xarray Dataset to modify.
@@ -616,9 +626,10 @@ def remove_variables(ds: xr.Dataset, vars_to_remove: list[str]) -> xr.Dataset:
     Returns:
         Dataset with specified variables removed.
     """
-    for var in vars_to_remove:
-        if var in ds.data_vars:
-            ds = ds.drop_vars(var)
+    # Use drop_vars for any variable that exists in the dataset (data or coord)
+    existing_vars = [v for v in vars_to_remove if v in ds.variables]
+    if existing_vars:
+        ds = ds.drop_vars(existing_vars)
     return ds
 
 
