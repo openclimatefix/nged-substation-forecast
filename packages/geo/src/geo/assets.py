@@ -1,4 +1,4 @@
-from pathlib import Path
+import importlib.resources
 
 import h3.api.basic_int as h3
 import patito as pt
@@ -36,8 +36,8 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
     by 25,000 meters to ensure that coastal substations and nearby islands are
     included in the resulting H3 grid without spatial distortion.
     """
-    geojson_path = (
-        Path(__file__).resolve().parent.parent.parent / "assets" / "england_scotland_wales.geojson"
+    geojson_path = importlib.resources.files("geo").joinpath(
+        "assets/england_scotland_wales.geojson"
     )
 
     context.log.info(f"Loading UK boundary from {geojson_path}")

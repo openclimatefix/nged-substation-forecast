@@ -111,9 +111,6 @@ def construct_historical_weather(
         df = pl.read_parquet(f)
         df = df.filter(pl.col("h3_index").is_in(h3_indices))
 
-        if df.is_empty():
-            continue
-
         if not df.is_empty():
             weather_dfs.append(df)
 
@@ -181,7 +178,7 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         time_column="valid_time",
         every="30m",
         group_by=["init_time", "h3_index", "ensemble_member"],
-    )
+    ).sort(["init_time", "h3_index", "ensemble_member", "valid_time"])
 
     # Interpolate all numeric columns, but forward-fill categorical ones.
     # Circular variables (wind direction) require sine/cosine decomposition
@@ -207,14 +204,27 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         col
         for col, dtype in processed.schema.items()
         if dtype.is_numeric()
-        and col not in ["valid_time", "h3_index", "ensemble_member", "init_time"]
+        and col
+        not in [
+            "valid_time",
+            "h3_index",
+            "ensemble_member",
+            "init_time",
+            "lead_time_hours",
+        ]
         and col not in categorical_cols
         and col not in circular_cols
     ]
 
     processed = processed.with_columns(
-        [pl.col(c).interpolate() for c in numeric_cols]
-        + [pl.col(c).forward_fill() for c in categorical_cols]
+        [
+            pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
+            for c in numeric_cols
+        ]
+        + [
+            pl.col(c).forward_fill().over(["init_time", "h3_index", "ensemble_member"])
+            for c in categorical_cols
+        ]
     )
 
     # Reconstruct circular variables from interpolated sine and cosine components
