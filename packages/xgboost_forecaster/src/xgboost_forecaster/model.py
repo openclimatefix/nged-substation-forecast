@@ -343,22 +343,24 @@ class XGBoostForecaster(BaseForecaster):
 
         # Normalize by peak capacity
         df_lf = df_lf.join(
-            target_map_lf.select(["substation_number", "peak_capacity"]),
+            target_map_lf.select(["substation_number", "peak_capacity_MW_or_MVA"]),
             on="substation_number",
             how="left",
         ).with_columns(
             latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
-            / pl.col("peak_capacity")
+            / pl.col("peak_capacity_MW_or_MVA")
         )
 
         if is_training:
             # For training, also normalize target
-            df_lf = df_lf.with_columns(MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity"))
+            df_lf = df_lf.with_columns(
+                MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity_MW_or_MVA")
+            )
         else:
             # For prediction, add dummy target for validation
             df_lf = df_lf.with_columns(MW_or_MVA=pl.lit(0.0, dtype=pl.Float32))
 
-        df_lf = df_lf.drop("peak_capacity")
+        df_lf = df_lf.drop("peak_capacity_MW_or_MVA")
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
 
         # 4. Type casting
@@ -407,7 +409,7 @@ class XGBoostForecaster(BaseForecaster):
             .agg(
                 mw_count=pl.col("MW").is_not_null().sum(),
                 mva_count=pl.col("MVA").is_not_null().sum(),
-                peak_capacity=pl.max_horizontal(
+                peak_capacity_MW_or_MVA=pl.max_horizontal(
                     pl.col("MW").abs().max(), pl.col("MVA").abs().max()
                 ).fill_null(1.0),
             )
@@ -415,13 +417,13 @@ class XGBoostForecaster(BaseForecaster):
                 pl.when(pl.col("mw_count") >= pl.col("mva_count"))
                 .then(pl.lit("MW"))
                 .otherwise(pl.lit("MVA"))
-                .alias("target_col"),
-                pl.when(pl.col("peak_capacity") == 0.0)
+                .alias("power_col"),
+                pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
                 .then(pl.lit(1.0))
-                .otherwise(pl.col("peak_capacity"))
-                .alias("peak_capacity"),
+                .otherwise(pl.col("peak_capacity_MW_or_MVA"))
+                .alias("peak_capacity_MW_or_MVA"),
             )
-            .select(["substation_number", "target_col", "peak_capacity"])
+            .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
             .collect(),
         )
 
@@ -429,7 +431,7 @@ class XGBoostForecaster(BaseForecaster):
             target_map_df.with_columns(
                 [
                     pl.col("substation_number").cast(pl.Int32),
-                    pl.col("peak_capacity").cast(pl.Float32),
+                    pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
                 ]
             )
         )
@@ -618,13 +620,15 @@ class XGBoostForecaster(BaseForecaster):
             .join(
                 cast(
                     pl.DataFrame,
-                    target_map_lf.select(["substation_number", "peak_capacity"]).collect(),
+                    target_map_lf.select(
+                        ["substation_number", "peak_capacity_MW_or_MVA"]
+                    ).collect(),
                 ),
                 on="substation_number",
                 how="left",
             )
             .with_columns(
-                MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity"),
+                MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity_MW_or_MVA"),
                 power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
                 power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
                 nwp_init_time=pl.col(NwpColumns.INIT_TIME).cast(pl.Datetime("us", "UTC")),

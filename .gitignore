@@ -65,3 +65,4 @@ tests/xgboost_dagster_integration_plot.html
 test.parquet
 *.zarr/
 example_data/
+packages/dynamical_data/example_data

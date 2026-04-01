@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import patito as pt
 import polars as pl
@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 # Define our standard datetime type for all schemas
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
+
+PowerColumn = Literal["MW", "MVA"]
 
 
 class MissingCorePowerVariablesError(ValueError):
@@ -70,8 +72,8 @@ class SubstationFlows(pt.Model):
         # Ensure at least one of MW or MVA has non-null data
         # Only raise error if there IS data but MW/MVA columns have no non-null values.
         if len(dataframe) > 0:
-            mw_has_data = dataframe["MW"].is_not_null().any()
-            mva_has_data = dataframe["MVA"].is_not_null().any()
+            mw_has_data = "MW" in dataframe.columns and dataframe["MW"].is_not_null().any()
+            mva_has_data = "MVA" in dataframe.columns and dataframe["MVA"].is_not_null().any()
 
             if not mw_has_data and not mva_has_data:
                 raise MissingCorePowerVariablesError(
@@ -91,7 +93,7 @@ class SubstationFlows(pt.Model):
         )
 
     @staticmethod
-    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
+    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> PowerColumn:
         mw_valid = dataframe["MW"].is_not_null().sum()
         mva_valid = dataframe["MVA"].is_not_null().sum()
         return "MW" if mw_valid >= mva_valid else "MVA"
@@ -110,16 +112,26 @@ class SubstationFlows(pt.Model):
 
 
 class SimplifiedSubstationFlows(pt.Model):
+    """Standardized, single-column representation of power flows.
+
+    This model is used after the best available power column (MW or MVA) has been
+    selected and renamed to 'MW_or_MVA'.
+    """
+
     timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
 class SubstationTargetMap(pt.Model):
-    """Map of substation_number to the target column (MW or MVA) to use."""
+    """Maps substations to their primary power column and stores their peak capacity.
+
+    This model is used to determine whether to use MW or MVA as the target variable
+    for a given substation, and provides the peak capacity for scaling and validation.
+    """
 
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
-    target_col: str = pt.Field(dtype=pl.String)
-    peak_capacity: float = pt.Field(dtype=pl.Float32, gt=0)
+    power_col: PowerColumn = pt.Field(dtype=pl.String)
+    peak_capacity_MW_or_MVA: float = pt.Field(dtype=pl.Float32, gt=0)
 
 
 class SubstationLocations(pt.Model):
@@ -215,7 +227,8 @@ class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 
     # The time that we create our power forecast. This might be called `t0` in some other OCF
-    # projects. When running backtests, we cannot use any NWPs initialsed after `forecast_time`.
+    # projects. When running backtests, we cannot use any NWPs available after `forecast_time`
+    # (i.e. init_time + delay > forecast_time).
     forecast_time: datetime
 
     power_fcst_model_name: str | None = None
@@ -268,9 +281,6 @@ class Nwp(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        if not isinstance(validated_df, pl.DataFrame):
-            return cast(pt.DataFrame["Nwp"], validated_df)
-
         # Check for nulls from second forecast step onwards
         # (i.e. where valid_time > init_time)
         cols_to_check = [
@@ -294,7 +304,10 @@ class Nwp(pt.Model):
 
 
 class NwpColumns:
-    """Constants for NWP column names."""
+    """Centralized constants for NWP column names.
+
+    Used to prevent typos and ensure consistency across feature engineering and model training.
+    """
 
     VALID_TIME = "valid_time"
     INIT_TIME = "init_time"

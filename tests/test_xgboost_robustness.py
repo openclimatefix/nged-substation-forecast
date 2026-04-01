@@ -202,8 +202,8 @@ def test_xgboost_forecaster_predict_with_nans():
         pl.DataFrame(
             {
                 "substation_number": pl.Series([1], dtype=pl.Int32),
-                "target_col": ["MW"],
-                "peak_capacity": pl.Series([100.0], dtype=pl.Float32),
+                "power_col": ["MW"],
+                "peak_capacity_MW_or_MVA": pl.Series([100.0], dtype=pl.Float32),
             }
         )
     )

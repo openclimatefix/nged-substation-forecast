@@ -56,12 +56,20 @@ class Settings(BaseSettings):
 
     # NWP Data Settings
     nwp_ensemble_member: int = Field(
-        default=0, description="Which ensemble member to use (0=control member)."
+        default=0,
+        description=(
+            "Which NWP ensemble member to use for training the ML model (typically 0, the "
+            "control member)."
+        ),
     )
 
     # ML Model Settings
     ml_model_ensemble_size: int = Field(
-        default=10, description="Number of ensemble members for ML model."
+        default=10,
+        description=(
+            "Number of ML models to train in an ensemble (e.g. using different random seeds) "
+            "to improve robustness and provide uncertainty estimates at inference time."
+        ),
     )
 
     # Data Quality Settings
