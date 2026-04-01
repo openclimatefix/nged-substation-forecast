@@ -1,15 +1,19 @@
+# Dynamical Data Package
+
 Download & process numerical weather predictions from Dynamical.org.
 
 We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
 ![Map of Great Britain using H3 resolution 5 hexagons](map-of-Great-Britain-H3-resolution-5.png)
 
+> **Note:** The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons has been extracted to the `packages/geo` package. This package (`dynamical_data`) focuses specifically on the ingestion, processing, and storage of time-varying NWP datasets like ECMWF.
+
 ## Data storage experiments
 
 All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.
 
 The conclusion is to:
-- sort by "init_time", "lead_time", "ensemble_member", "h3_index" 
+- sort by "init_time", "lead_time", "ensemble_member", "h3_index"
 - compression="zstd", compression_level=14 = 51 MB
 
 As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression

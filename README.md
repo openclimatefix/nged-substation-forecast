@@ -21,6 +21,7 @@ repo which contains multiple Python packages.
 - **`packages/ml_core`**: Unified ML model interface and shared utilities. This package contains the `BaseForecaster` protocol, which standardizes model training and inference, and shared logic like feature engineering and data splitting. It depends on `mlflow-skinny`.
 - **`packages/xgboost_forecaster`**: Implementation of the substation forecast using XGBoost, following the `BaseForecaster` interface. It includes advanced features like multi-NWP support, dynamic seasonal lags to prevent lookahead bias, and rigorous backtesting capabilities.
 - **`packages/nged_data`**: Data ingestion and processing for NGED datasets.
+- **`packages/geo`**: Generic geospatial utilities, including H3 grid mapping and spatial operations.
 - **`packages/dynamical_data`**: Handling of NWP and other time-varying datasets.
 
 ### Dependency Isolation
