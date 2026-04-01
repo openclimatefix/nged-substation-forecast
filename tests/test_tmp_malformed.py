@@ -8,7 +8,10 @@ from dynamical_data.processing import download_ecmwf, process_ecmwf_dataset
 def test_malformed_data_fails(broken_zarr_factory):
     """Verify that malformed data (NaNs in forbidden places) fails validation."""
     zarr_path = broken_zarr_factory("malformed_data")
-    ds = xr.open_zarr(zarr_path)
+    # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+    # deprecated automatic decoding of time units, ensuring lead_time is
+    # correctly parsed as timedelta64[ns].
+    ds = xr.open_zarr(zarr_path, decode_timedelta=True)
     init_time = ds.init_time.values[0]
 
     h3_grid = pl.DataFrame(

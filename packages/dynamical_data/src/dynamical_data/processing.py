@@ -1,7 +1,8 @@
+import os
 import concurrent.futures
 import importlib.resources
 from datetime import datetime, timezone
-from typing import Final
+from typing import Final, cast
 
 import icechunk
 import numpy as np
@@ -15,6 +16,8 @@ from .scaling import load_scaling_params, scale_to_uint8
 
 H3_RES: Final[int] = 5
 GRID_SIZE: Final[float] = 0.25
+
+DEFAULT_AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
 
 class MalformedZarrError(ValueError):
@@ -170,17 +173,46 @@ def download_ecmwf(
         storage = icechunk.s3_storage(
             bucket="dynamical-ecmwf-ifs-ens",
             prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
-            region="us-west-2",
+            region=DEFAULT_AWS_REGION,
             anonymous=True,
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
-        ds = xr.open_zarr(session.store, chunks=None)
+        # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+        # deprecated automatic decoding of time units, ensuring lead_time is
+        # correctly parsed as timedelta64[ns].
+        ds = xr.open_zarr(session.store, chunks=None, decode_timedelta=True)
+
+    if ds is None:
+        raise MalformedZarrError("Dataset could not be loaded")
 
     validate_dataset_schema(ds)
 
     if nwp_init_time not in ds.init_time.values:
         raise ValueError(f"{nwp_init_time} is not in ds.init_time.values")
+
+    # We subset the dataset to only the required variables defined in the Nwp schema
+    # to save network bandwidth and memory during the download process.
+    # We also include the raw wind components (10u, 10v, 100u, 100v) which are
+    # needed for calculating wind speed and direction later.
+    required_vars = {
+        "temperature_2m",
+        "dew_point_temperature_2m",
+        "wind_u_10m",
+        "wind_v_10m",
+        "wind_u_100m",
+        "wind_v_100m",
+        "pressure_surface",
+        "pressure_reduced_to_mean_sea_level",
+        "geopotential_height_500hpa",
+        "downward_long_wave_radiation_flux_surface",
+        "downward_short_wave_radiation_flux_surface",
+        "precipitation_surface",
+        "categorical_precipitation_type_surface",
+    }
+    # Cast to xr.Dataset to satisfy the type checker, as indexing with a list
+    # can sometimes be misidentified as returning a DataArray.
+    ds = cast(xr.Dataset, ds[list(required_vars)])
 
     # Find spatial bounds from grid
     min_lat, max_lat, min_lng, max_lng = h3_grid.select(
@@ -226,8 +258,6 @@ def process_ecmwf_dataset(
     h3_grid: pl.DataFrame,
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
-    validate_dataset_schema(loaded_ds)
-
     # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
     # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)

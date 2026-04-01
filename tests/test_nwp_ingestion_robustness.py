@@ -40,7 +40,7 @@ GEOJSON_PATH = Path("packages/dynamical_data/england_scotland_wales.geojson")
 
 
 @pytest.fixture
-def h3_grid():
+def h3_grid() -> pl.DataFrame:
     """Fixture to provide a small dummy H3 grid for testing.
 
     We don't use the full GB grid because it's too slow to generate for tests.
@@ -67,7 +67,10 @@ def test_valid_production_like_zarr_loading(production_like_zarr_path, h3_grid):
     We test the actual production ingestion functions (download_ecmwf and
     process_ecmwf_dataset) to ensure they work correctly with our synthetic data.
     """
-    ds = xr.open_zarr(production_like_zarr_path)
+    # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+    # deprecated automatic decoding of time units, ensuring lead_time is
+    # correctly parsed as timedelta64[ns].
+    ds = xr.open_zarr(production_like_zarr_path, decode_timedelta=True)
 
     # 1. Test download_ecmwf (slicing and selection)
     init_time = ds.init_time.values[0]
@@ -110,7 +113,10 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
     expected exception to prevent broad exception catching from hiding unrelated bugs.
     """
     zarr_path = broken_zarr_factory(broken_type)
-    ds = xr.open_zarr(zarr_path)
+    # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+    # deprecated automatic decoding of time units, ensuring lead_time is
+    # correctly parsed as timedelta64[ns].
+    ds = xr.open_zarr(zarr_path, decode_timedelta=True)
     init_time = ds.init_time.values[0]
 
     # Map broken types to expected exceptions
@@ -156,8 +162,11 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
     create_production_like_ecmwf_zarr(zarr_path_2, init_time=init_time_2, seed=43)
 
     # 2. Process both forecasts
-    ds1 = xr.open_zarr(zarr_path_1)
-    ds2 = xr.open_zarr(zarr_path_2)
+    # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+    # deprecated automatic decoding of time units, ensuring lead_time is
+    # correctly parsed as timedelta64[ns].
+    ds1 = xr.open_zarr(zarr_path_1, decode_timedelta=True)
+    ds2 = xr.open_zarr(zarr_path_2, decode_timedelta=True)
 
     dt1 = datetime.fromisoformat(init_time_1).replace(tzinfo=timezone.utc)
     dt2 = datetime.fromisoformat(init_time_2).replace(tzinfo=timezone.utc)
@@ -269,7 +278,10 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     ds.to_zarr(zarr_path)
 
     # 2. Process it
-    ds_loaded = xr.open_zarr(zarr_path)
+    # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
+    # deprecated automatic decoding of time units, ensuring lead_time is
+    # correctly parsed as timedelta64[ns].
+    ds_loaded = xr.open_zarr(zarr_path, decode_timedelta=True)
 
     # This should NOT raise an IndexError
     downloaded_ds = download_ecmwf(init_time, h3_grid, ds_loaded)

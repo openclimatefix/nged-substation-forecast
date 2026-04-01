@@ -1,6 +1,10 @@
+# For Jack to do:
+
+- `rm -r docs/temp/*`
+
 ## In `packages/contracts/src/contracts/data_schemas.py`
 
-### In `SubstationFlows`
+### In `class SubstationFlows`
 
 - The data contract says that several columns are allowed to be missing.
 Please check the remainder of the code. Are we *sure* that we still want to allow these columns to
@@ -20,4 +24,4 @@ then remove the `in dataframe.columns` checks.
 - Throughout the code, please ensure that H3 discrete indices are ALWAYS 64-bit unsigned integers
 (e.g. all columns named `h3_index` or `h3_res_5`). Make sure that these data types are retained
 throughout joins.
-- 
+-
