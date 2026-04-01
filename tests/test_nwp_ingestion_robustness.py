@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-from dynamical_data.processing import download_ecmwf, process_ecmwf_dataset
+from dynamical_data.processing import MalformedZarrError, download_ecmwf, process_ecmwf_dataset
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import NwpModel, ModelConfig, ModelFeaturesConfig
 
@@ -106,14 +106,26 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
     """Verify that the pipeline fails loudly when encountering malformed Zarr data.
 
     We test that the actual production ingestion functions raise appropriate
-    exceptions when given broken data.
+    exceptions when given broken data. We map each broken type to a specific
+    expected exception to prevent broad exception catching from hiding unrelated bugs.
     """
     zarr_path = broken_zarr_factory(broken_type)
     ds = xr.open_zarr(zarr_path)
     init_time = ds.init_time.values[0]
 
+    # Map broken types to expected exceptions
+    expected_exceptions = {
+        "missing_coords": MalformedZarrError,
+        "wrong_dim_order": MalformedZarrError,
+        "missing_vars": MalformedZarrError,
+        "wrong_dtype": MalformedZarrError,
+        "inconsistent_shape": (ValueError, MalformedZarrError),
+    }
+
+    expected_exc = expected_exceptions.get(broken_type, Exception)
+
     # Depending on the broken type, different parts of the pipeline should fail
-    with pytest.raises((KeyError, ValueError, AttributeError, TypeError, Exception)):
+    with pytest.raises(expected_exc):
         downloaded_ds = download_ecmwf(init_time, ds, h3_grid)
 
         init_dt = datetime.fromtimestamp(
@@ -190,3 +202,69 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
         init_times = combined_df.filter(pl.col("valid_time") == vt).select("init_time").unique()
         assert len(init_times) == 1
         assert init_times.item() == dt2
+
+
+def test_single_point_forecast_ingestion(tmp_path, h3_grid):
+    """Verify the pipeline can handle single-point forecasts without IndexError.
+
+    This test creates a Zarr dataset with only one latitude and longitude value,
+    and passes it through download_ecmwf. It verifies the fix for FLAW-001
+    where length-1 latitude arrays caused an IndexError during spatial slicing.
+    """
+
+    # 1. Create a single-point forecast Zarr
+    # We need to monkeypatch the constants in the script to create a single-point Zarr
+    # or just create it manually. Let's try to create it manually for simplicity.
+    init_time = np.datetime64("2026-03-01T00:00:00")
+    zarr_path = tmp_path / "single_point.zarr"
+
+    # Create a minimal dataset with only one lat/lon
+    ds = xr.Dataset(
+        {
+            "latitude": (
+                ["latitude"],
+                np.array([55.9], dtype=np.float32),
+                {"units": "degrees_north"},
+            ),
+            "longitude": (
+                ["longitude"],
+                np.array([-3.2], dtype=np.float32),
+                {"units": "degrees_east"},
+            ),
+            "init_time": (["init_time"], [init_time]),
+            "lead_time": (["lead_time"], [0.0, 6.0]),
+            "ensemble_member": (["ensemble_member"], [0]),
+        }
+    )
+
+    # Add dummy variables
+    shape = (1, 1, 1, 2, 1)
+    required_vars = [
+        "temperature_2m",
+        "wind_u_10m",
+        "wind_v_10m",
+        "wind_u_100m",
+        "wind_v_100m",
+    ]
+    for var in required_vars:
+        ds[var] = xr.DataArray(
+            np.random.uniform(270.0, 300.0, size=shape),
+            dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
+        )
+
+    ds["categorical_precipitation_type_surface"] = xr.DataArray(
+        np.zeros(shape, dtype=np.uint8),
+        dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
+    )
+
+    ds.to_zarr(zarr_path)
+
+    # 2. Process it
+    ds_loaded = xr.open_zarr(zarr_path)
+
+    # This should NOT raise an IndexError
+    downloaded_ds = download_ecmwf(init_time, ds_loaded, h3_grid)
+
+    assert downloaded_ds.latitude.size == 1
+    assert downloaded_ds.longitude.size == 1
+    assert "temperature_2m" in downloaded_ds.data_vars

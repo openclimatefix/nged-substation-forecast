@@ -20,6 +20,54 @@ H3_RES: Final[int] = 5
 GRID_SIZE: Final[float] = 0.25
 
 
+class MalformedZarrError(ValueError):
+    """Raised when an ECMWF Zarr store does not match the expected schema."""
+
+
+def validate_dataset_schema(ds: xr.Dataset) -> None:
+    """Enforces the data contract for incoming ECMWF Zarr stores.
+
+    Ensures all required spatial and temporal dimensions and coordinates exist
+    before processing begins.
+
+    Args:
+        ds: The xarray Dataset to validate.
+
+    Raises:
+        MalformedZarrError: If any required coordinates or variables are missing.
+    """
+    required_coords = {"latitude", "longitude", "init_time", "lead_time", "ensemble_member"}
+    missing_coords = required_coords - set(ds.coords)
+    if missing_coords:
+        raise MalformedZarrError(f"Dataset is missing required coordinates: {missing_coords}")
+
+    # Check for a minimal set of required data variables
+    required_vars = {
+        "temperature_2m",
+        "wind_u_10m",
+        "wind_v_10m",
+        "wind_u_100m",
+        "wind_v_100m",
+        "categorical_precipitation_type_surface",
+    }
+    missing_vars = required_vars - set(ds.data_vars)
+    if missing_vars:
+        raise MalformedZarrError(f"Dataset is missing required data variables: {missing_vars}")
+
+    # Check that all data variables have the expected dimensions
+    for var_name, da in ds.data_vars.items():
+        missing_dims = required_coords - set(da.dims)
+        if missing_dims:
+            # Note: init_time might be a scalar coordinate after selection,
+            # so we allow it to be missing from dimensions of the DataArray
+            # if it's present in the Dataset coordinates.
+            actual_missing = missing_dims - {"init_time"}
+            if actual_missing:
+                raise MalformedZarrError(
+                    f"Variable '{var_name}' is missing required dimensions: {actual_missing}"
+                )
+
+
 def get_gb_h3_grid(geojson_path: Path) -> pl.DataFrame:
     """Generate H3 grid for Great Britain from a GeoJSON file."""
     with open(geojson_path) as f:
@@ -113,6 +161,7 @@ def download_ecmwf(
     h3_grid: pl.DataFrame,
 ) -> xr.Dataset:
     """Download and process ECMWF data for a specific initialization time."""
+    validate_dataset_schema(ds)
 
     # Find spatial bounds from grid
     min_lat, max_lat, min_lng, max_lng = h3_grid.select(
@@ -124,8 +173,13 @@ def download_ecmwf(
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
     # We check the first two elements to determine if latitude is ascending or descending.
-    lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
-    lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
+    # Single-point forecasts (length 1) do not have a direction, so we bypass the
+    # ascending/descending check to avoid an IndexError.
+    if len(ds.latitude.values) > 1:
+        lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
+        lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
+    else:
+        lat_slice = slice(min_lat, max_lat)
 
     # Xarray datasets from Dynamical are usually tz-naive UTC.
     # If nwp_init_time is aware, we need to make it naive for the selection.
@@ -152,6 +206,7 @@ def process_ecmwf_dataset(
     loaded_ds: xr.Dataset,
     h3_grid: pl.DataFrame,
 ) -> pt.DataFrame[Nwp]:
+    validate_dataset_schema(loaded_ds)
     lat_grid, lon_grid = np.meshgrid(
         loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
     )
