@@ -36,11 +36,14 @@ This plan addresses a duplication bug in the ECMWF ingestion pipeline, introduce
     *   **Logic:** Generate synthetic NWP data with dimensions `(latitude, longitude, init_time, lead_time, ensemble_member)` and 13 data variables matching production specifications. Include a CLI for generating both valid and broken test cases (missing coords, wrong dim order, malformed data, etc.).
     *   **Commenting Mandate:** Explain *why* we are creating a production-like Zarr sample (to ensure fast, reliable, and deterministic CI runs that can mathematically test temporal duplication bugs and validation logic without hitting the real API).
     *   **Consolidation:** Remove redundant scripts `create_ecmwf_test_zarr.py` and `create_production_like_ecmwf_zarr.py` to prevent maintenance rot.
+*   **Target File:** `tests/conftest.py`
+    *   **Action:** Refactor test data generation into `pytest` fixtures (`production_like_zarr_path`, `broken_zarr_factory`) using `tmp_path` for on-the-fly generation.
+    *   **Logic:** This avoids committing binary artifacts to git while still testing the full serialization stack (reading from a real filesystem).
 *   **Target File:** `tests/test_nwp_ingestion_robustness.py` (New File)
     *   **Action:** Create a new integration test to verify that `download_and_scale_ecmwf` runs without duplication errors when merging multiple forecast steps.
-    *   **Action:** Expand the test suite to include edge cases for Zarr ingestion failures. Create tests that deliberately provide "broken" Zarr samples (e.g., empty datasets, missing expected variables like `wind_u_10m`, and missing/malformed coordinates like `lead_time` or `ensemble_member`).
-    *   **Logic:** Update the test to use the local Zarr file (`packages/dynamical_data/example_data/ecmwf_sample.zarr`) instead of mocking the API or downloading fresh data. Ensure the ingestion pipeline fails loudly with informative, specific error messages (or custom exceptions) rather than cryptic `KeyError` or `ValueError` exceptions when encountering malformed inputs.
-    *   **Commenting Mandate:** Explicitly comment *why* we use the local Zarr sample for testing (to test the actual xarray/zarr logic and temporal merging without external network dependencies), and *why* we test broken Zarrs (to ensure robust error handling for upstream data issues).
+    *   **Action:** Expand the test suite to include edge cases for Zarr ingestion failures. Use the `broken_zarr_factory` fixture to test "broken" Zarr samples (e.g., missing coordinates, missing variables, wrong dtypes).
+    *   **Logic:** Update the test to use the `pytest` fixtures instead of static file paths. Ensure the ingestion pipeline fails loudly with informative, specific error messages.
+    *   **Commenting Mandate:** Explicitly comment *why* we use on-the-fly Zarr generation for testing (to test the actual xarray/zarr logic and temporal merging without external network dependencies or binary bloat).
 
 ### 3. Asset & Check Refactoring
 *   **Target File:** `src/nged_substation_forecast/defs/metrics_assets.py`
