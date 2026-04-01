@@ -503,7 +503,7 @@ def substation_data_quality(
             stuck_mask = (
                 df.group_by("substation_number")
                 .agg(
-                    stuck_vals=pl.col(col).rolling_std(window_size).fill_null(0)
+                    stuck_vals=pl.col(col).rolling_std(window_size).fill_null(float("inf"))
                     < stuck_std_threshold
                 )
                 .with_columns(num_stuck=pl.col("stuck_vals").sum())

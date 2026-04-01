@@ -1,0 +1,7 @@
+{
+  "broken_test_info": {
+    "type": "wrong_dim_order",
+    "description": "Data variables with wrong dimension order",
+    "created_at": "2026-04-01T07:45:18.481356+00:00"
+  }
+}

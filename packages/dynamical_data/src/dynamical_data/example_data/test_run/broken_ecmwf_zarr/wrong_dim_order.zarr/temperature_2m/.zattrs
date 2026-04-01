@@ -1,0 +1,10 @@
+{
+  "description": "Variable temperature_2m",
+  "_ARRAY_DIMENSIONS": [
+    "longitude",
+    "latitude",
+    "init_time",
+    "lead_time",
+    "ensemble_member"
+  ]
+}

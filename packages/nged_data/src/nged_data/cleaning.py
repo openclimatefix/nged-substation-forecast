@@ -83,7 +83,10 @@ def clean_substation_flows(
             grouped by substation_number for per-substation rolling calculations.
         """
         return (
-            pl.col(power_col).rolling_std(window_size).fill_null(0).over("substation_number")
+            pl.col(power_col)
+            .rolling_std(window_size)
+            .fill_null(float("inf"))
+            .over("substation_number")
             < std_threshold
         )
 

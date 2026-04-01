@@ -179,14 +179,6 @@ def train_xgboost(
             .unique()
             .to_list()
         )
-    healthy_substations: list[int] = []
-    if len(substation_power_flows_df) > 0:
-        healthy_substations = (
-            substation_power_flows_df.filter(pl.col("MW_or_MVA").is_not_null())
-            .get_column("substation_number")
-            .unique()
-            .to_list()
-        )
 
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)

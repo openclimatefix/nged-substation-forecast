@@ -1,0 +1,7 @@
+{
+  "standard_name": "ensemble_member",
+  "long_name": "Ensemble member number",
+  "_ARRAY_DIMENSIONS": [
+    "ensemble_member"
+  ]
+}

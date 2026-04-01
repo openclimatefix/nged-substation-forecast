@@ -1,0 +1,10 @@
+{
+  "description": "Temperature 2m",
+  "_ARRAY_DIMENSIONS": [
+    "latitude",
+    "longitude",
+    "init_time_extra",
+    "lead_time",
+    "ensemble_member"
+  ]
+}

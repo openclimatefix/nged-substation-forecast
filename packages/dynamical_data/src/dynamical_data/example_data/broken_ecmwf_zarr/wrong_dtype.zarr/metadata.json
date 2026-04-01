@@ -1,0 +1,7 @@
+{
+  "broken_test_info": {
+    "type": "wrong_dtype",
+    "description": "Wrong data type for coordinates",
+    "created_at": "2026-04-01T07:44:17.018689+00:00"
+  }
+}

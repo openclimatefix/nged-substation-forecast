@@ -1,0 +1,7 @@
+{
+  "broken_test_info": {
+    "type": "malformed_data",
+    "description": "Data arrays with malformed values (NaNs in wrong places)",
+    "created_at": "2026-04-01T07:44:16.971738+00:00"
+  }
+}

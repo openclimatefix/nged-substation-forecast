@@ -37,6 +37,7 @@ have 48 periods (24 hours) of historical data available, even at the partition b
 import dagster as dg
 import polars as pl
 from typing import cast
+from datetime import datetime, timedelta
 from dagster import (
     AssetIn,
     ResourceParam,
@@ -139,6 +140,25 @@ def cleaned_actuals(
     validated_df = SubstationFlows.validate(df_cleaned)
 
     context.log.info(f"Validated data shape: {validated_df.shape}")
+
+    # CRITICAL FIX for Flaw-001: Filter validated_df to current partition's time window.
+    # The TimeWindowPartitionMapping includes historical data for lookback (previous partitions),
+    # but we must only append data for the current partition to avoid data duplication in the
+    # Delta table. Example: For partition "2026-03-10", we only include rows with timestamp
+    # in [2026-03-10 00:00:00 UTC, 2026-03-11 00:00:00 UTC).
+    partition_start = datetime.fromisoformat(partition_key)
+    partition_end = partition_start + timedelta(days=1)
+
+    # Apply filter only for the current partition's time range
+    validated_df = validated_df.filter(
+        pl.col("timestamp").is_between(partition_start, partition_end, closed="left")
+    )
+
+    context.log.info(
+        f"Filtered cleaned actuals to current partition. "
+        f"Partition range: [{partition_start}, {partition_end}). "
+        f"Data shape: {validated_df.shape}"
+    )
 
     # Save to Delta table
     delta_path = _get_delta_path(settings, "cleaned_actuals")
