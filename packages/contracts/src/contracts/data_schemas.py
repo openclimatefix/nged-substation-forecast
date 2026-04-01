@@ -222,6 +222,9 @@ class ScalingParams(pt.Model):
     # The range from the actual values, plus a small buffer.
     buffered_range: float = pt.Field(dtype=pl.Float32)
 
+    # The maximum from the actual values, plus a small buffer.
+    buffered_max: float = pt.Field(dtype=pl.Float32)
+
 
 class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
