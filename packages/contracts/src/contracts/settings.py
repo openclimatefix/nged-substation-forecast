@@ -51,7 +51,7 @@ class DataQualitySettings(BaseSettings):
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
 
-    # NGED Connected Data
+    # NGED Connected Data CKAN token
     nged_ckan_token: str = Field(...)
 
     # NWP Data Settings

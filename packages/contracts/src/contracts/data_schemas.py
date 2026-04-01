@@ -158,6 +158,9 @@ class SubstationMetadata(pt.Model):
     # NGED has 192,000 substations.
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
 
+    # NGED's CKAN portal uses slightly different names for some substations in their location table
+    # versus in their live primary flows data. These names are matched by code in
+    # `packages/nged_data/src/nged_data/substation_names/`
     substation_name_in_location_table: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
 
     # This will be null if the substation doesn't have live telemetry.
@@ -171,7 +174,7 @@ class SubstationMetadata(pt.Model):
     substation_type: str = pt.Field(dtype=pl.Categorical)
     latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
+    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)  # H3 discrete spatial index
 
     # When this metadata record was last updated from the upstream NGED datasets.
     last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -184,19 +187,20 @@ class PowerForecast(pt.Model):
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
+    # The datetime that the underlying weather forecast was initialised.
+    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
     # Identifier for our ML-based power forecasting model.
+    # This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`.
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
 
     # The datetime that the power forecast was initialised.
     power_fcst_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
-    # The datetime that the underlying weather forecast was initialised.
-    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-
     # Year and month of the power forecast initialisation (for partitioning).
     power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
-    # Active power (megawatts) or apparent power (mega volt amp).
+    # The power forecast itself in units of MW (active power) or MVA (apparent power).
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
 
@@ -204,17 +208,24 @@ class ScalingParams(pt.Model):
     """Schema for weather variable scaling parameters.
 
     Used when scaling between physical units (e.g. degrees C) and their unsigned 8-bit integer
-    (uint8) representations (in the range [0, 255])."""
+    (uint8) representations. uint8 represents integers in the range [0, 255]."""
 
     col_name: str = pt.Field(dtype=pl.String)
+
+    # The minimum from the actual values, minus a small buffer.
     buffered_min: float = pt.Field(dtype=pl.Float32)
+
+    # The range from the actual values, plus a small buffer.
     buffered_range: float = pt.Field(dtype=pl.Float32)
 
 
 class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 
+    # The time that we create our power forecast. This might be called `t0` in some other OCF
+    # projects. When running backtests, we cannot use any NWPs initialsed after `forecast_time`.
     forecast_time: datetime
+
     power_fcst_model_name: str | None = None
 
 
@@ -237,8 +248,10 @@ class Nwp(pt.Model):
     pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
     geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
 
-    # Precipitation and radiation variables are null for the first forecast step (lead time 0)
-    # in ECMWF ENS, as they are accumulated over the previous interval.
+    # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
+    # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
+    # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
+    # values before we receive them. So these are true _rates_.
     downward_long_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
     downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
     precipitation_surface: int | None = pt.Field(dtype=pl.UInt8)
@@ -310,7 +323,9 @@ class ProcessedNwp(pt.Model):
 
     Clever Optimization:
     To save memory, weather variables are scaled to a 0-255 range (uint8) before being saved to disk.
-    The scaling formula is: uint8_value = (physical_value - min_bound) / (max_bound - min_bound) * 255.
+    The scaling formula is:
+        uint8_value = round(((physical_value - buffered_min) / buffered_range) * 255).
+
     When loaded, they are cast to Float32 but retain the 0-255 scale.
     """
 
