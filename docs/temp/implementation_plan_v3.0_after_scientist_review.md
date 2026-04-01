@@ -31,9 +31,11 @@ This plan addresses a duplication bug in the ECMWF ingestion pipeline, introduce
     *   **Commenting Mandate:** You must add comments explaining *why* the duplication was occurring and *why* the chosen fix resolves it. Connect this logic to the broader NWP ingestion strategy.
 
 #### Required Implementation for FLAW-003 (Missing NWP Robustness Tests)
-*   **Target File:** `packages/dynamical_data/scripts/create_ecmwf_test_zarr.py` (New File)
-    *   **Action:** Create a script to download at least **two consecutive forecast steps** (e.g., `step=0` and `step=1`) (GB only) from Dynamical.org and save it as a small Zarr archive at `packages/dynamical_data/example_data/ecmwf_sample.zarr`. Note: This script belongs in `packages/dynamical_data/scripts/`, NOT `exploration_scripts/`.
-    *   **Commenting Mandate:** Explain *why* we are creating a static Zarr sample with multiple steps (to ensure fast, reliable, and deterministic CI runs that can mathematically test temporal duplication bugs during merging without hitting the real API).
+*   **Target File:** `packages/dynamical_data/src/dynamical_data/scripts/create_production_like_test_zarr.py` (New File)
+    *   **Action:** Create a comprehensive test Zarr generator script that produces NWP data with the exact same coordinate structure as the production code expects (latitude, longitude, and time coordinates).
+    *   **Logic:** Generate synthetic NWP data with dimensions `(latitude, longitude, init_time, lead_time, ensemble_member)` and 13 data variables matching production specifications. Include a CLI for generating both valid and broken test cases (missing coords, wrong dim order, malformed data, etc.).
+    *   **Commenting Mandate:** Explain *why* we are creating a production-like Zarr sample (to ensure fast, reliable, and deterministic CI runs that can mathematically test temporal duplication bugs and validation logic without hitting the real API).
+    *   **Consolidation:** Remove redundant scripts `create_ecmwf_test_zarr.py` and `create_production_like_ecmwf_zarr.py` to prevent maintenance rot.
 *   **Target File:** `tests/test_nwp_ingestion_robustness.py` (New File)
     *   **Action:** Create a new integration test to verify that `download_and_scale_ecmwf` runs without duplication errors when merging multiple forecast steps.
     *   **Action:** Expand the test suite to include edge cases for Zarr ingestion failures. Create tests that deliberately provide "broken" Zarr samples (e.g., empty datasets, missing expected variables like `wind_u_10m`, and missing/malformed coordinates like `lead_time` or `ensemble_member`).
