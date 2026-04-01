@@ -78,8 +78,10 @@ BROKEN_TEST_CASE_TYPES: dict[str, str] = {
 }
 
 # Coordinate values for Great Britain region (matching production data)
-LATITUDE_VALUES = np.array([55.8, 55.9, 56.0], dtype=np.float32)
-LONGITUDE_VALUES = np.array([-3.4, -3.2, -3.0], dtype=np.float32)
+# We use strict multiples of 0.25 to match the physical reality of the
+# ECMWF IFS 0.25-degree grid.
+LATITUDE_VALUES = np.array([55.75, 56.0, 56.25], dtype=np.float32)
+LONGITUDE_VALUES = np.array([-3.5, -3.25, -3.0], dtype=np.float32)
 INIT_TIME_VALUE = np.datetime64("2026-03-01T00:00:00.000000000")
 LEAD_TIME_VALUES = np.array([0.0, 6.0, 12.0], dtype=np.float32)  # 0, 6, and 12-hour forecasts
 ENSEMBLE_MEMBER_VALUES = np.array([0, 1], dtype=np.uint8)
@@ -521,9 +523,31 @@ def create_broken_ecmwf_zarr(
 
     # Add some default data variables so we have something to break/validate
     # These will be overwritten or removed by specific broken_type cases
-    for var_name in ["temperature_2m", "wind_u_10m"]:
+    required_vars = [
+        "temperature_2m",
+        "dew_point_temperature_2m",
+        "wind_u_10m",
+        "wind_v_10m",
+        "wind_u_100m",
+        "wind_v_100m",
+        "pressure_surface",
+        "pressure_reduced_to_mean_sea_level",
+        "geopotential_height_500hpa",
+        "downward_long_wave_radiation_flux_surface",
+        "downward_short_wave_radiation_flux_surface",
+        "precipitation_surface",
+        "categorical_precipitation_type_surface",
+    ]
+    for var_name in required_vars:
+        var_info = DATA_VARIABLES[var_name]
+        dtype = var_info["dtype"]
+        if dtype == np.uint8:
+            data = np.zeros(shape, dtype=np.uint8)
+        else:
+            data = np.random.uniform(270.0, 300.0, size=shape).astype(dtype)
+
         ds[var_name] = xr.DataArray(
-            np.random.uniform(270.0, 300.0, size=shape).astype(np.float64),
+            data,
             dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
             attrs={"description": f"Default {var_name}"},
         )

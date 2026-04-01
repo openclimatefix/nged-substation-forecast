@@ -39,30 +39,59 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         raise MalformedZarrError(f"Dataset is missing required coordinates: {missing_coords}")
 
     # Check for a minimal set of required data variables
+    # These are the variables required by the Nwp schema in contracts.data_schemas
     required_vars = {
         "temperature_2m",
+        "dew_point_temperature_2m",
         "wind_u_10m",
         "wind_v_10m",
         "wind_u_100m",
         "wind_v_100m",
+        "pressure_surface",
+        "pressure_reduced_to_mean_sea_level",
+        "geopotential_height_500hpa",
+        "downward_long_wave_radiation_flux_surface",
+        "downward_short_wave_radiation_flux_surface",
+        "precipitation_surface",
         "categorical_precipitation_type_surface",
     }
     missing_vars = required_vars - set(ds.data_vars)
     if missing_vars:
         raise MalformedZarrError(f"Dataset is missing required data variables: {missing_vars}")
 
-    # Check that all data variables have the expected dimensions
+    # Check that all data variables have the expected dimensions and order
+    # Note: init_time might be a scalar coordinate after selection, so we allow it to be missing
+    # from dimensions of the DataArray if it's present in the Dataset coordinates.
+    expected_dims = ("latitude", "longitude", "init_time", "lead_time", "ensemble_member")
     for var_name, da in ds.data_vars.items():
-        missing_dims = required_coords - set(da.dims)
+        # Check for missing dimensions (excluding init_time)
+        missing_dims = required_coords - set(da.dims) - {"init_time"}
         if missing_dims:
-            # Note: init_time might be a scalar coordinate after selection,
-            # so we allow it to be missing from dimensions of the DataArray
-            # if it's present in the Dataset coordinates.
-            actual_missing = missing_dims - {"init_time"}
-            if actual_missing:
+            raise MalformedZarrError(
+                f"Variable '{var_name}' is missing required dimensions: {missing_dims}"
+            )
+
+        # Check dimension order for variables that have all dimensions
+        if set(da.dims) == set(expected_dims):
+            if da.dims != expected_dims:
                 raise MalformedZarrError(
-                    f"Variable '{var_name}' is missing required dimensions: {actual_missing}"
+                    f"Variable '{var_name}' has wrong dimension order: {da.dims}, "
+                    f"expected {expected_dims}"
                 )
+
+    # Check coordinate dtypes
+    if not np.issubdtype(ds.latitude.dtype, np.floating):
+        raise MalformedZarrError(
+            f"latitude has wrong dtype: {ds.latitude.dtype}, expected floating"
+        )
+    if not np.issubdtype(ds.longitude.dtype, np.floating):
+        raise MalformedZarrError(
+            f"longitude has wrong dtype: {ds.longitude.dtype}, expected floating"
+        )
+    if not np.issubdtype(ds.init_time.dtype, np.datetime64):
+        raise MalformedZarrError(
+            f"init_time has wrong dtype: {ds.init_time.dtype}, expected datetime64"
+        )
 
 
 def get_gb_h3_grid() -> pl.DataFrame:
@@ -207,6 +236,17 @@ def process_ecmwf_dataset(
 
     # Perform a single spatial join with the pre-computed h3_grid.
     # The join is on latitude and longitude.
+    # We cast coordinates to Float32 before the join to ensure exact bit-level matching.
+    # Polars performs exact equality checks for joins, and floating-point precision
+    # differences between Float32 (often used in Zarr) and Float64 (used in the H3 grid)
+    # can cause the join to fail silently.
+    nwp_df = nwp_df.with_columns(
+        [pl.col("longitude").cast(pl.Float32), pl.col("latitude").cast(pl.Float32)]
+    )
+    h3_grid = h3_grid.with_columns(
+        [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
+    )
+
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
     )

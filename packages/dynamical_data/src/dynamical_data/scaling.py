@@ -37,6 +37,10 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
         if buffered_range == 0.0:
             expr = pl.lit(0, dtype=pl.UInt8).alias(col_name)
         else:
+            # Categorical variables like precipitation type are handled natively by this loop
+            # because their `buffered_min` is 0.0 and `buffered_range` is 255.0 in the
+            # scaling parameters, which naturally simplifies to a direct cast to UInt8
+            # without scaling artifacts.
             expr = (
                 (((clipped_col - buffered_min) / buffered_range) * 255)
                 .round()
@@ -45,12 +49,6 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
             )
 
         exprs.append(expr)
-
-    # The categorical_precipitation_type_surface column is already handled in the loop above
-    # because it is listed in the scaling_params CSV with its own scaling parameters.
-    # No additional manual handling is needed here.
-    # Previously, this manual handling caused duplicate column creation errors because
-    # the column was being processed twice (once in the loop and once here).
 
     return df.with_columns(exprs)
 

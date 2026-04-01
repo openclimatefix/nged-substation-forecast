@@ -48,8 +48,8 @@ def h3_grid():
     return pl.DataFrame(
         {
             "h3_index": [123456789],  # Dummy index
-            "nwp_lat": [55.9],
-            "nwp_lng": [-3.2],
+            "nwp_lat": [56.0],
+            "nwp_lng": [-3.25],
             "proportion": [1.0],
         },
         schema={
@@ -225,12 +225,12 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
         {
             "latitude": (
                 ["latitude"],
-                np.array([55.9], dtype=np.float32),
+                np.array([56.0], dtype=np.float32),
                 {"units": "degrees_north"},
             ),
             "longitude": (
                 ["longitude"],
-                np.array([-3.2], dtype=np.float32),
+                np.array([-3.25], dtype=np.float32),
                 {"units": "degrees_east"},
             ),
             "init_time": (["init_time"], [init_time]),
@@ -243,10 +243,17 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     shape = (1, 1, 1, 2, 1)
     required_vars = [
         "temperature_2m",
+        "dew_point_temperature_2m",
         "wind_u_10m",
         "wind_v_10m",
         "wind_u_100m",
         "wind_v_100m",
+        "pressure_surface",
+        "pressure_reduced_to_mean_sea_level",
+        "geopotential_height_500hpa",
+        "downward_long_wave_radiation_flux_surface",
+        "downward_short_wave_radiation_flux_surface",
+        "precipitation_surface",
     ]
     for var in required_vars:
         ds[var] = xr.DataArray(

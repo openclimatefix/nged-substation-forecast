@@ -1,0 +1,36 @@
+import xarray as xr
+import pytest
+import polars as pl
+from datetime import datetime, timezone
+from dynamical_data.processing import download_ecmwf, process_ecmwf_dataset
+
+
+def test_malformed_data_fails(broken_zarr_factory):
+    """Verify that malformed data (NaNs in forbidden places) fails validation."""
+    zarr_path = broken_zarr_factory("malformed_data")
+    ds = xr.open_zarr(zarr_path)
+    init_time = ds.init_time.values[0]
+
+    h3_grid = pl.DataFrame(
+        {
+            "h3_index": [123456789],
+            "nwp_lat": [56.0],
+            "nwp_lng": [-3.25],
+            "proportion": [1.0],
+        },
+        schema={
+            "h3_index": pl.UInt64,
+            "nwp_lat": pl.Float32,
+            "nwp_lng": pl.Float32,
+            "proportion": pl.Float32,
+        },
+    )
+
+    downloaded_ds = download_ecmwf(init_time, h3_grid, ds)
+    init_dt = datetime.fromtimestamp(init_time.astype("datetime64[s]").astype(int), tz=timezone.utc)
+
+    # This should raise a validation error from Patito/Nwp.validate
+    with pytest.raises(Exception) as excinfo:
+        process_ecmwf_dataset(nwp_init_time=init_dt, loaded_ds=downloaded_ds, h3_grid=h3_grid)
+
+    print(f"Caught expected exception: {type(excinfo.value).__name__}: {excinfo.value}")
