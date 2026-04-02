@@ -71,10 +71,10 @@ This partitioning strategy allows for efficient querying of specific model runs 
 To verify the XGBoost forecaster and the ML core utilities without running the full Dagster pipeline, you can run the manual integration test. This script trains and evaluates the model on a small subset of 5 substations:
 
 ```bash
-uv run python tests/manual_xgboost_integration.py
+uv run pytest tests/test_xgboost_dagster_integration.py -v -m manual
 ```
 
-This test demonstrates the usage of the `BaseForecaster` interface, the `train_and_log_model` utility, and the dynamic lag calculation.
+This test executes the actual Dagster assets in-process using an in-memory I/O manager, ensuring the production pipeline logic is fully tested without requiring a heavy infrastructure setup.
 
 ### Downstream Analysis
 

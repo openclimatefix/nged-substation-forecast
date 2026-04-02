@@ -68,12 +68,13 @@ models, comparing the models, and pushing models into production.
 differentiable phyics, etc) will have their own Python package within the `uv workspace`.
 
 ### The Universal Model Architecture
-To maximize developer velocity and model robustness, we have transitioned from horizon-specific models (e.g., separate models for 1-hour ahead, 2-hour ahead) to a **Single Universal Model** architecture.
+To maximize developer velocity and model robustness, we have transitioned from horizon-specific models (e.g., separate models for 1-hour ahead, 2-hour ahead) to a **Single Universal Model** architecture. This explicitly supersedes the `LocalForecasters` approach outlined in ADR-002.
 
 **Key Characteristics:**
 - **Horizon-Agnostic Training**: A single model is trained on a "long-format" dataset where each row represents a unique combination of (substation, initialization time, valid time).
 - **Lead Time as a Feature**: The model explicitly receives `lead_time_hours` (the time between the NWP initialization and the target timestamp) as a primary feature. This allows the model to learn how the relationship between weather and power evolves as the forecast horizon increases.
 - **Global Substation Training**: The model is trained across all substations simultaneously, using `substation_number` as a categorical feature.
+- **Ensemble Support**: The architecture natively supports probabilistic forecasting by running inference over each NWP ensemble member individually, generating a distribution of power forecasts.
 
 **Rationale and Benefits:**
 - **Reduced Operational Complexity**: Managing one model artifact in MLflow is significantly simpler than managing hundreds of horizon-specific models.
