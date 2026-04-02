@@ -22,7 +22,14 @@ def _slice_temporal_data(data: Any, start: date | str, end: date | str, time_col
         if time_col not in cols:
             return data
 
-        return data.filter(pl.col(time_col).is_between(start, end))
+        # If end is a date (but not a datetime), we want to include the entire day.
+        # Polars' is_between is inclusive, but if the column is datetime and end is date,
+        # it might only include up to 00:00:00 of that date.
+        if isinstance(end, date) and not isinstance(end, datetime):
+            end_filter = end + timedelta(days=1)
+            return data.filter((pl.col(time_col) >= start) & (pl.col(time_col) < end_filter))
+        else:
+            return data.filter(pl.col(time_col).is_between(start, end))
 
     return data
 
@@ -135,7 +142,7 @@ def evaluate_and_save_model(
 
         if isinstance(first_nwp, pl.LazyFrame):
             df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
-            if not df.is_empty():
+            if not df.is_empty() and df.item() is not None:
                 delay_hours = getattr(config.model, "nwp_availability_delay_hours", 3)
                 forecast_time = df.item() + timedelta(hours=delay_hours)
 
@@ -231,30 +238,34 @@ def evaluate_and_save_model(
             with mlflow.start_run(run_name=f"{model_name}_eval"):
                 for row in metrics.iter_rows(named=True):
                     lt = float(row["lead_time_hours"])
-                    mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
-                    mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                    mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+                    if row["MAE"] is not None:
+                        mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                    if row["RMSE"] is not None:
+                        mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                    if row["nMAE"] is not None:
+                        mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
                 # Log global metrics
-                mlflow.log_metric(
-                    "MAE_global",
-                    eval_df.select((pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()).item(),
-                )
-                mlflow.log_metric(
-                    "RMSE_global",
-                    eval_df.select(
-                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
-                    ).item(),
-                )
-                mlflow.log_metric(
-                    "nMAE_global",
-                    eval_df.select(
-                        (
-                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
-                            / pl.col("peak_capacity_MW_or_MVA")
-                        ).mean()
-                    ).item(),
-                )
+                mae_global = eval_df.select(
+                    (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()
+                ).item()
+                if mae_global is not None:
+                    mlflow.log_metric("MAE_global", mae_global)
+
+                rmse_global = eval_df.select(
+                    ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
+                ).item()
+                if rmse_global is not None:
+                    mlflow.log_metric("RMSE_global", rmse_global)
+
+                nmae_global = eval_df.select(
+                    (
+                        (pl.col("MW_or_MVA") - pl.col("actual")).abs()
+                        / pl.col("peak_capacity_MW_or_MVA")
+                    ).mean()
+                ).item()
+                if nmae_global is not None:
+                    mlflow.log_metric("nMAE_global", nmae_global)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:

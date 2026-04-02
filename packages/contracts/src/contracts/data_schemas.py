@@ -384,18 +384,24 @@ class SubstationFeatures(pt.Model):
     latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
-    temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    temperature_2m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    dew_point_temperature_2m_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
     # PHYSICAL WIND FEATURES:
     # These are calculated from interpolated U/V components in the forecasting
     # pipeline, ensuring physically realistic wind speed and direction.
-    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
-    pressure_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    pressure_reduced_to_mean_sea_level_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    geopotential_height_500hpa_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    wind_speed_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_speed_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    wind_direction_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_surface_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_reduced_to_mean_sea_level_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
+    geopotential_height_500hpa_uint8_scaled: float | None = pt.Field(
+        dtype=pl.Float32, allow_missing=True
+    )
     downward_long_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
@@ -405,7 +411,9 @@ class SubstationFeatures(pt.Model):
     precipitation_surface_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
+    categorical_precipitation_type_surface: int | None = pt.Field(
+        dtype=pl.UInt8, allow_missing=True
+    )
 
     # Physical features
     windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
