@@ -85,7 +85,6 @@ class XGBoostForecaster(BaseForecaster):
                 "ensemble_member",
                 "init_time",
                 "available_time",
-                "lead_time_days",
             }
             if isinstance(df, pl.LazyFrame):
                 schema = df.collect_schema()
@@ -129,6 +128,11 @@ class XGBoostForecaster(BaseForecaster):
         Returns:
             LazyFrame with added lag features.
         """
+        # Get telemetry delay from config, default to 24 hours if not set
+        telemetry_delay_hours = (
+            getattr(self.config, "telemetry_delay_hours", 24) if hasattr(self, "config") else 24
+        )
+
         # 2. Calculate the required lag dynamically to strictly prevent lookahead bias
         df = (
             df.with_columns(
@@ -137,7 +141,10 @@ class XGBoostForecaster(BaseForecaster):
             )
             .with_columns(
                 lag_days=pl.max_horizontal(
-                    pl.lit(1), (pl.col("lead_time_days") / 7.0).ceil().cast(pl.Int32)
+                    pl.lit(1),
+                    ((pl.col("lead_time_days") + telemetry_delay_hours / 24.0) / 7.0)
+                    .ceil()
+                    .cast(pl.Int32),
                 )
                 * 7
             )
@@ -213,6 +220,12 @@ class XGBoostForecaster(BaseForecaster):
                 )
             else:
                 prefix = f"{name.value}_"
+                # For secondary NWP models, filter to ensemble_member == 0 (control member)
+                # and drop the column to avoid arbitrary pairing with primary NWP members.
+                latest_nwp = latest_nwp.filter(pl.col(NwpColumns.ENSEMBLE_MEMBER) == 0).drop(
+                    NwpColumns.ENSEMBLE_MEMBER
+                )
+
                 nwp_schema_names = latest_nwp.collect_schema().names()
                 rename_mapping = {
                     col: f"{prefix}{col}"
@@ -221,7 +234,6 @@ class XGBoostForecaster(BaseForecaster):
                     not in [
                         NwpColumns.VALID_TIME,
                         NwpColumns.H3_INDEX,
-                        NwpColumns.ENSEMBLE_MEMBER,
                     ]
                 }
                 prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
@@ -237,7 +249,7 @@ class XGBoostForecaster(BaseForecaster):
                 .join_asof(
                     other_nwp.sort("available_time"),
                     on="available_time",
-                    by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, NwpColumns.ENSEMBLE_MEMBER],
+                    by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX],
                 )
                 .with_columns(
                     # Explicitly cast h3_index to UInt64 after the join to prevent silent type

@@ -378,6 +378,7 @@ class SubstationFeatures(pt.Model):
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
     lead_time_hours: float = pt.Field(dtype=pl.Float32)
+    lead_time_days: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
     latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
