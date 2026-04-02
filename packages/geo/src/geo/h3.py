@@ -1,6 +1,5 @@
 """H3-related utilities for geospatial operations."""
 
-import h3.api.basic_int as h3
 import polars as pl
 import polars_h3 as plh3
 from contracts.data_schemas import H3GridWeights
@@ -40,9 +39,18 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
     if df.is_empty():
         raise ValueError("Input DataFrame is empty.")
 
-    # Check resolution
-    first_h3 = df["h3_index"][0]
-    h3_res = h3.get_resolution(first_h3)
+    # FLAW-001: Ensure grid_size is strictly positive to avoid division by zero
+    # or nonsensical snapping.
+    if grid_size <= 0:
+        raise ValueError("grid_size must be strictly positive")
+
+    # FLAW-006: Check resolution of all H3 indices to ensure consistency.
+    # Using polars_h3.get_resolution for vectorized check.
+    h3_res_unique = df.select(plh3.get_resolution("h3_index")).unique()
+    if h3_res_unique.height > 1:
+        raise ValueError("All H3 indices must have the same resolution.")
+    h3_res = h3_res_unique.item()
+
     if child_res <= h3_res:
         raise ValueError(f"child_res ({child_res}) must be strictly greater than h3_res ({h3_res})")
 

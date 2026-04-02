@@ -180,6 +180,10 @@ def download_ecmwf(
     # can sometimes be misidentified as returning a DataArray.
     ds = cast(xr.Dataset, ds[list(required_vars)])
 
+    # FLAW-003: Check for empty coordinates before computing bounds to fail gracefully.
+    if ds.longitude.size == 0 or ds.latitude.size == 0:
+        raise ValueError("Dataset has empty longitude or latitude coordinates.")
+
     # Validate longitude range.
     # NOTE: The ECMWF ENS dataset from Dynamical.org already uses the [-180, 180]
     # range for longitude. We only validate this here to ensure the upstream
@@ -189,11 +193,9 @@ def download_ecmwf(
         raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
     # Find spatial bounds from grid
-    min_lat, max_lat, min_lng, max_lng = h3_grid.select(
-        min_lat=pl.col("nwp_lat").min(),
-        max_lat=pl.col("nwp_lat").max(),
-        min_lng=pl.col("nwp_lng").min(),
-        max_lng=pl.col("nwp_lng").max(),
+    min_lat, max_lat = h3_grid.select(
+        pl.col("nwp_lat").min().alias("min_lat"),
+        pl.col("nwp_lat").max().alias("max_lat"),
     ).row(0)
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
@@ -206,11 +208,42 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # Xarray datasets from Dynamical are usually tz-naive UTC.
-    # If nwp_init_time is aware, we need to make it naive for the selection.
-    ds_cropped = ds.sel(
-        latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
-    )
+    # FLAW-002: Implement wrap-around aware slicing for longitudes.
+    # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
+    lngs = h3_grid.get_column("nwp_lng").unique().sort()
+    diffs = lngs.diff().drop_nulls()
+
+    # We check if the maximum difference between adjacent longitudes is greater than 180.
+    # If it is, we assume the grid crosses the anti-meridian.
+    # We use cast(float, ...) to satisfy the type checker as diffs.max() can return
+    # multiple types, but here we know it's a float.
+    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
+
+    if crosses_antimeridian:
+        gap_idx = diffs.arg_max()
+        if gap_idx is None:
+            # This should be impossible given len(diffs) > 0
+            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
+
+        max_neg_lng = lngs[gap_idx]
+        min_pos_lng = lngs[gap_idx + 1]
+        ds_neg = ds.sel(
+            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
+        )
+        ds_pos = ds.sel(
+            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
+        )
+        ds_cropped = xr.concat([ds_pos, ds_neg], dim="longitude")
+    else:
+        min_lng, max_lng = lngs[0], lngs[-1]
+        ds_cropped = ds.sel(
+            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
+        )
+
+    # FLAW-004: Explicitly check for an empty spatial intersection after slicing.
+    # This prevents downstream KeyErrors during DataFrame conversion.
+    if ds_cropped.longitude.size == 0 or ds_cropped.latitude.size == 0:
+        raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}

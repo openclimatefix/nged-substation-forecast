@@ -196,6 +196,20 @@ def process_nwp_data(
     if df.is_empty():
         return lf.limit(0)
 
+    # FLAW-005: Ensure each group has at least two points for interpolation.
+    # Groups with only 1 row cannot be interpolated and would violate the
+    # 30-minute temporal resolution contract.
+    group_counts = df.group_by(["init_time", "h3_index", "ensemble_member"]).len()
+    single_row_groups = group_counts.filter(pl.col("len") == 1)
+    if single_row_groups.height > 0:
+        log.warning(
+            f"Dropping {single_row_groups.height} groups with only 1 row as they cannot be interpolated."
+        )
+        df = df.filter(pl.len().over(["init_time", "h3_index", "ensemble_member"]) > 1)
+
+    if df.is_empty():
+        return lf.limit(0)
+
     # Sort by valid_time as required by upsample
     df = df.sort("valid_time")
 
