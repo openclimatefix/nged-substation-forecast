@@ -272,7 +272,6 @@ def test_prepare_training_data_prevents_row_explosion():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
@@ -312,8 +311,8 @@ def test_prepare_training_data_prevents_row_explosion():
         # Get the X dataframe passed to fit
         X = mock_fit.call_args[0][0]
 
-        # 1 power flow row * 4 init_times * 50 ensemble members = 200 rows
-        assert X.shape[0] == 200
+        # 1 power flow row * 4 init_times * 1 ensemble member (control) = 4 rows
+        assert X.shape[0] == 4
 
 
 def test_train_xgboost_asset_filters_to_control_member():
@@ -441,7 +440,6 @@ def test_latest_available_weekly_lag_prevents_leakage():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[

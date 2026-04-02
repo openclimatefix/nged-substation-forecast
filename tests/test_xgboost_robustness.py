@@ -95,7 +95,6 @@ def test_xgboost_forecaster_train_with_nans():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
@@ -168,7 +167,6 @@ def test_xgboost_forecaster_train_with_infs():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
@@ -319,7 +317,6 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[

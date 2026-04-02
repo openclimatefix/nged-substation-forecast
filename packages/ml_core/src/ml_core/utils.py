@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Union, cast
 
@@ -260,20 +262,25 @@ def evaluate_and_save_model(
             # Log metrics to MLflow
             mlflow.set_experiment(model_name)
             with mlflow.start_run(run_name=f"{model_name}_eval"):
+                # 1. Metric Thinning: Log only key operational horizons
+                key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
                 for row in metrics.iter_rows(named=True):
-                    lt = float(row["lead_time_hours"])
-                    if row["MAE"] is not None:
-                        mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
-                    if row["RMSE"] is not None:
-                        mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                    if row["nMAE"] is not None:
-                        mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+                    lt = round(float(row["lead_time_hours"]), 1)
+                    if lt in key_horizons:
+                        if row["MAE"] is not None:
+                            mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                        if row["RMSE"] is not None:
+                            mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                        if row["nMAE"] is not None:
+                            mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
-                # Log global metrics
+                # 2. Log global aggregate metrics
                 mae_global = eval_df.select(
                     (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()
                 ).item()
                 if mae_global is not None:
+                    mlflow.log_metric("mean_mae_all_horizons", mae_global)
+                    # Keep MAE_global for backward compatibility
                     mlflow.log_metric("MAE_global", mae_global)
 
                 rmse_global = eval_df.select(
@@ -290,6 +297,12 @@ def evaluate_and_save_model(
                 ).item()
                 if nmae_global is not None:
                     mlflow.log_metric("nMAE_global", nmae_global)
+
+                # 3. Save full granular evaluation dataframe as Parquet artifact
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
+                    eval_df.write_parquet(eval_df_path)
+                    mlflow.log_artifact(eval_df_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:

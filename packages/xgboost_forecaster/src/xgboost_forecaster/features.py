@@ -9,12 +9,6 @@ from contracts.data_schemas import NwpColumns
 
 log = logging.getLogger(__name__)
 
-# TODO: All the functions in this file should be moved into a common package, so other ML models can
-# also use these features.
-
-# TODO: All the functions in this file should use `pt.DataFrame[...]` type hints for both the input
-# and output.
-
 
 def add_autoregressive_lags(
     df: pl.LazyFrame, flows_30m: pl.LazyFrame, telemetry_delay_hours: int = 24
@@ -26,12 +20,12 @@ def add_autoregressive_lags(
     would have been available at the time the forecast was made.
 
     Args:
-        df: The input LazyFrame (must contain valid_time and init_time).
+        df: The input LazyFrame (schema: SubstationFeatures).
         flows_30m: Historical power flows downsampled to 30m.
         telemetry_delay_hours: Delay in hours for telemetry availability.
 
     Returns:
-        LazyFrame with added lag features.
+        LazyFrame with added lag features (schema: SubstationFeatures).
     """
     # 1. Calculate the required lag dynamically to strictly prevent lookahead bias
     df = (
@@ -72,15 +66,18 @@ def add_weather_features(
     """Add lags and trends to weather data.
 
     Args:
-        weather: Current weather forecast.
+        weather: Current weather forecast (schema: ProcessedNwp).
         history: Historical weather data (optional, used for lags).
 
     Returns:
-        LazyFrame with added weather features.
+        LazyFrame with added weather features (schema: ProcessedNwp).
     """
     schema_names = weather.collect_schema().names()
     if NwpColumns.TEMPERATURE_2M not in schema_names:
-        return weather
+        raise ValueError(
+            f"Required weather column '{NwpColumns.TEMPERATURE_2M}' is missing from the input "
+            f"LazyFrame. Available columns: {schema_names}"
+        )
 
     # Add windchill if both temperature and wind speed are present
     if NwpColumns.TEMPERATURE_2M in schema_names and NwpColumns.WIND_SPEED_10M in schema_names:
@@ -177,4 +174,23 @@ def add_weather_features(
             pl.col(NwpColumns.TEMPERATURE_2M).cast(pl.Float32)
             - pl.col(f"{NwpColumns.TEMPERATURE_2M}_6h_ago").cast(pl.Float32)
         ).cast(pl.Float32)
+    )
+
+
+def add_time_features(df: pl.LazyFrame) -> pl.LazyFrame:
+    """Add lead_time_hours and nwp_init_hour features.
+
+    Args:
+        df: The input LazyFrame (schema: SubstationFeatures).
+
+    Returns:
+        LazyFrame with added time features (schema: SubstationFeatures).
+    """
+
+    return df.with_columns(
+        lead_time_hours=(
+            pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
+        ).dt.total_minutes()
+        / 60.0,
+        nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
     )

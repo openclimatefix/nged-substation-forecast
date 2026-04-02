@@ -112,6 +112,8 @@ def test_power_forecast_validation():
             "power_fcst_model_name": ["xgboost"],
             "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "nwp_init_hour": [0],
+            "lead_time_hours": [24.0],
             "power_fcst_init_year_month": ["2026-01"],
             "MW_or_MVA": [50.5],
         }
@@ -120,6 +122,8 @@ def test_power_forecast_validation():
             "substation_number": pl.Int32,
             "ensemble_member": pl.UInt8,
             "power_fcst_model_name": pl.Categorical,
+            "nwp_init_hour": pl.Int32,
+            "lead_time_hours": pl.Float32,
             "MW_or_MVA": pl.Float32,
         }
     )

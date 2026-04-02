@@ -3,12 +3,13 @@ hyperparameters:
   learning_rate: 0.05
   n_estimators: 500
   max_depth: 6
-target_horizon_hours: 24
 features:
   nwps:
     - "ecmwf_ens_0_25deg"
   feature_names:
     - "substation_number"
+    - "lead_time_hours"
+    - "nwp_init_hour"
     - "latest_available_weekly_lag"
     - "temperature_2m"
     - "dew_point_temperature_2m"

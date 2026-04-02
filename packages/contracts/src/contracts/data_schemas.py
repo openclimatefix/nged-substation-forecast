@@ -194,6 +194,12 @@ class PowerForecast(pt.Model):
     # The datetime that the underlying weather forecast was initialised.
     nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
+    # The hour of the day that the weather forecast was initialised (0, 6, 12, 18).
+    nwp_init_hour: int = pt.Field(dtype=pl.Int32)
+
+    # The number of hours between the weather forecast initialisation and the valid time.
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
+
     # Identifier for our ML-based power forecasting model.
     # This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`.
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
@@ -376,6 +382,7 @@ class SubstationFeatures(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
     lead_time_hours: float = pt.Field(dtype=pl.Float32)
     lead_time_days: float = pt.Field(dtype=pl.Float32)
+    nwp_init_hour: int = pt.Field(dtype=pl.Int32)
 
     # Power lags
     latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)

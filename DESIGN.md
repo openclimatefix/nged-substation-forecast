@@ -67,6 +67,20 @@ models, comparing the models, and pushing models into production.
 - **Defining the ML models**: The major categories of model (XGBoost, ARIMA, GNN, TFT,
 differentiable phyics, etc) will have their own Python package within the `uv workspace`.
 
+### The Universal Model Architecture
+To maximize developer velocity and model robustness, we have transitioned from horizon-specific models (e.g., separate models for 1-hour ahead, 2-hour ahead) to a **Single Universal Model** architecture.
+
+**Key Characteristics:**
+- **Horizon-Agnostic Training**: A single model is trained on a "long-format" dataset where each row represents a unique combination of (substation, initialization time, valid time).
+- **Lead Time as a Feature**: The model explicitly receives `lead_time_hours` (the time between the NWP initialization and the target timestamp) as a primary feature. This allows the model to learn how the relationship between weather and power evolves as the forecast horizon increases.
+- **Global Substation Training**: The model is trained across all substations simultaneously, using `substation_number` as a categorical feature.
+
+**Rationale and Benefits:**
+- **Reduced Operational Complexity**: Managing one model artifact in MLflow is significantly simpler than managing hundreds of horizon-specific models.
+- **Improved Generalization**: By seeing data from all horizons, the model can learn shared temporal patterns and weather sensitivities more effectively.
+- **Smoother Forecasts**: Horizon-specific models often produce "jumps" or discontinuities at the boundaries between models. A universal model produces a naturally smooth forecast across the entire 14-day horizon.
+- **Data Efficiency**: The model can leverage the full diversity of the dataset in a single training pass, reducing the risk of overfitting to small, horizon-specific slices of data.
+
 ### The Universal Model Interface (MLflow PyFunc)
 To decouple the Dagster data pipeline from the ML code, all models are saved as [custom MLflow `pyfunc`](https://mlflow.org/docs/latest/ml/traditional-ml/tutorials/creating-custom-pyfunc/part2-pyfunc-components/) artifacts.
 
@@ -112,12 +126,12 @@ like ML training or back-tests.
 
 ## **4\. Phased Implementation Plan**
 
-### **Phase 1: Infrastructure Plumbing & The "Naive" XGBoost Baseline**
+### **Phase 1: Infrastructure Plumbing & The "Universal" XGBoost Baseline**
 
 *Before attempting to detect complex switching events, we must prove the data engineering, MLflow tracking, and Dagster orchestration work end-to-end in a production environment.*
 
 * **Ingestion:** Download NGED data and ECMWF ensemble NWP (done). Convert NGED data to Delta Lake and index via H3 (done). Convert ECMWF to Parquet and index via H3 (done, but needs some optimisation).
-* **The "Naive" Model:** Build a very simple XGBoost forecast for the ~50 trial sites (including substations and some customer meters). Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 70% done, but needs some tidying).
+* **The "Universal" Model:** Build a single XGBoost forecast for the ~50 trial sites (including substations and some customer meters). This model is "universal" in two ways: it is trained globally across all substations and across all forecast horizons (0-14 days) using `lead_time_hours` as a feature. Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc` so the inference code can be completely agnostic to the ML model (this is 70% done, but needs some tidying).
 * **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure: validating live data reading, [Polars `asof` joins](https://docs.pola.rs/api/python/stable/reference/dataframe/api/polars.DataFrame.join_asof.html), MLflow PyFunc model serving, and Marimo visualisations.
 * **Additional features**:
     - Define a standard data contract for all power forecasts.
@@ -143,7 +157,7 @@ like ML training or back-tests.
 
 *With clean switching labels, build the robust statistical baseline.*
 
-* **Substation NRA (normal running arrangement) Forecast (Global Model):** Train one global demand forecast XGBoost model across all substations. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude. Only use "true" NRA data as the training target.
+* **Substation NRA (normal running arrangement) Forecast (Universal Model):** Train one universal demand forecast XGBoost model across all substations and horizons. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude. Only use "true" NRA data as the training target.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type. Discard exact point-lags (which cause "phantom echoes" of random machine outages). Replace with **State-Lags**: 2-hour rolling max/min, 3-hour windowed mean, and weekly rolling medians.
 
 **Target completion date**: End of July 2026.
@@ -259,7 +273,7 @@ nged-substation-forecast/
 │   ├── performance_evaluation/ ← Scriptable evaluation (wMAPE, CRPS, Super-Node tests)
 │   ├── loss_functions/         ← PyTorch native metrics (Quantile Loss, GMM NLL)
 │   ├── weather_encoder/        ← Base encoders for NWP data
-│   ├── xgboost_forecaster/     ← Model package (Naive, MVP, State-Lag logic)
+│   ├── xgboost_forecaster/     ← Model package (Universal, MVP, State-Lag logic)
 │   ├── solar_torch/            ← Differentiable physics for PV (tilt, azimuth inference)
 │   └── st_gnn_forecaster/      ← Spatial-Temporal GNN implementation
 ├── conf/                       ← Hydra Configuration Directory

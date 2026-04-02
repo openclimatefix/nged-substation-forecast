@@ -47,7 +47,6 @@ def test_train_handles_missing_init_time():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[]),
     )
     forecaster = XGBoostForecaster()
