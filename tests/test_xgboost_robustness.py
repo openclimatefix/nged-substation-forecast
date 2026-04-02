@@ -17,6 +17,7 @@ from contracts.hydra_schemas import (
     ModelFeaturesConfig,
     NwpModel,
 )
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
@@ -68,19 +69,19 @@ def test_nwp_validation_missing_accumulated_variables_at_step_1():
         [
             pl.col("ensemble_member").cast(pl.UInt8),
             pl.col("h3_index").cast(pl.UInt64),
-            pl.col("temperature_2m").cast(pl.UInt8),
-            pl.col("dew_point_temperature_2m").cast(pl.UInt8),
+            pl.col("temperature_2m").cast(pl.Float32),
+            pl.col("dew_point_temperature_2m").cast(pl.Float32),
             pl.col("wind_u_10m").cast(pl.Float32),
             pl.col("wind_v_10m").cast(pl.Float32),
             pl.col("wind_u_100m").cast(pl.Float32),
             pl.col("wind_v_100m").cast(pl.Float32),
-            pl.col("pressure_surface").cast(pl.UInt8),
-            pl.col("pressure_reduced_to_mean_sea_level").cast(pl.UInt8),
-            pl.col("geopotential_height_500hpa").cast(pl.UInt8),
+            pl.col("pressure_surface").cast(pl.Float32),
+            pl.col("pressure_reduced_to_mean_sea_level").cast(pl.Float32),
+            pl.col("geopotential_height_500hpa").cast(pl.Float32),
             pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
-            pl.col("precipitation_surface").cast(pl.UInt8),
-            pl.col("downward_short_wave_radiation_flux_surface").cast(pl.UInt8),
-            pl.col("downward_long_wave_radiation_flux_surface").cast(pl.UInt8),
+            pl.col("precipitation_surface").cast(pl.Float32),
+            pl.col("downward_short_wave_radiation_flux_surface").cast(pl.Float32),
+            pl.col("downward_long_wave_radiation_flux_surface").cast(pl.Float32),
         ]
     )
 
@@ -95,7 +96,22 @@ def test_xgboost_forecaster_train_with_nans():
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     # Mock data with NaN in temperature_2m
@@ -132,10 +148,15 @@ def test_xgboost_forecaster_train_with_nans():
         }
     ).lazy()
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -148,7 +169,22 @@ def test_xgboost_forecaster_train_with_infs():
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     # Mock data with Inf in temperature_2m
@@ -185,10 +221,15 @@ def test_xgboost_forecaster_train_with_infs():
         }
     ).lazy()
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -211,7 +252,7 @@ def test_xgboost_forecaster_predict_with_nans():
     )
     mock_model = MagicMock()
     mock_model.feature_names_in_ = [
-        "temperature_2m_uint8_scaled",
+        "temperature_2m",
         "latest_available_weekly_lag",
         "hour_sin",
         "hour_cos",
@@ -220,6 +261,7 @@ def test_xgboost_forecaster_predict_with_nans():
         "day_of_week",
     ]
     forecaster.model = cast(Any, mock_model)
+    forecaster.feature_names = mock_model.feature_names_in_
 
     valid_time = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
     metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
@@ -259,12 +301,15 @@ def test_xgboost_forecaster_predict_with_nans():
         power_fcst_model_name="test",
     )
 
+    # Centralized data preparation
+    flows_30m = downsample_power_flows(flows, target_map=forecaster.target_map.lazy())
+
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.predict(
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             inference_params=inference_params,
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
         )
 
 
@@ -275,7 +320,22 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     # Mock data with null in temperature_2m (which is a critical column)
@@ -316,10 +376,15 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
         .lazy()
     )
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     with pytest.raises(ValueError, match="No training data remaining after dropping nulls"):
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )

@@ -5,6 +5,7 @@ import patito as pt
 from datetime import datetime, timezone
 from typing import cast
 from unittest.mock import MagicMock
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
@@ -74,11 +75,19 @@ def test_train_handles_missing_init_time():
         }
     )
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     # This should no longer raise ColumnNotFoundError for init_time
     # It might fail later due to missing features in the mock setup, but not on init_time
     try:
+        forecaster.target_map = target_map
         forecaster.train(
-            config=config, substation_power_flows=flows, substation_metadata=metadata, nwps={}
+            config=config,
+            flows_30m=cast(pt.LazyFrame, flows_30m),
+            substation_metadata=metadata,
+            nwps={},
         )
     except pl_exc.ColumnNotFoundError as e:
         assert "init_time" not in str(e)
@@ -151,6 +160,7 @@ def test_predict_with_missing_feature_column_fails_loudly():
     mock_model = MagicMock()
     mock_model.feature_names_in_ = ["feature_a", "feature_b"]
     forecaster.model = mock_model
+    forecaster.feature_names = ["feature_a", "feature_b"]
 
     # Mock target map
     forecaster.target_map = pl.DataFrame(
@@ -207,25 +217,27 @@ def test_predict_with_missing_feature_column_fails_loudly():
         .lazy(),
     )
 
+    flows = (
+        pl.DataFrame(
+            {
+                "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+                "substation_number": [1],
+                "MW": [50.0],
+                "MVA": [50.0],
+                "MVAr": [0.0],
+                "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+            }
+        )
+        .with_columns(pl.col("substation_number").cast(pl.Int32))
+        .lazy()
+    )
+    flows_30m = downsample_power_flows(flows, target_map=forecaster.target_map.lazy())
+
     # This should fail because feature_a and feature_b are missing from the prepared data
     with pytest.raises(pl_exc.ColumnNotFoundError):
         forecaster.predict(
             substation_metadata=metadata,
             inference_params=inference_params,
-            substation_power_flows=cast(
-                pt.LazyFrame[SubstationFlows],
-                pl.DataFrame(
-                    {
-                        "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
-                        "substation_number": [1],
-                        "MW": [50.0],
-                        "MVA": [50.0],
-                        "MVAr": [0.0],
-                        "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
-                    }
-                )
-                .with_columns(pl.col("substation_number").cast(pl.Int32))
-                .lazy(),
-            ),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         )

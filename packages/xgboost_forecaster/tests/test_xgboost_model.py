@@ -13,6 +13,7 @@ from contracts.hydra_schemas import (
     ModelFeaturesConfig,
     NwpModel,
 )
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
@@ -48,6 +49,10 @@ def test_xgboost_forecaster_train_and_predict():
             "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
         }
     ).lazy()
+
+    # Centralized data preparation
+    target_map = calculate_target_map(sub_flows)
+    flows_30m = downsample_power_flows(sub_flows, target_map=target_map.lazy())
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -86,16 +91,32 @@ def test_xgboost_forecaster_train_and_predict():
             learning_rate=0.1, n_estimators=10, max_depth=3
         ).model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     # Initialize Forecaster
     forecaster = XGBoostForecaster()
+    forecaster.target_map = target_map
 
     # Train
     forecaster.train(
         config=config,
-        substation_power_flows=sub_flows,
+        flows_30m=flows_30m,
         substation_metadata=sub_meta,
         nwps=nwps,
     )
@@ -143,7 +164,7 @@ def test_xgboost_forecaster_train_and_predict():
         substation_metadata=sub_meta,
         inference_params=inference_params,
         nwps=predict_nwps,
-        substation_power_flows=sub_flows,
+        flows_30m=flows_30m,
     )
 
     assert len(preds) == len(predict_timestamps)
@@ -184,6 +205,10 @@ def test_xgboost_forecaster_predict_empty():
         }
     ).lazy()
 
+    # Centralized data preparation
+    target_map = calculate_target_map(sub_flows)
+    flows_30m = downsample_power_flows(sub_flows, target_map=target_map.lazy())
+
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
         datetime(2026, 1, 1, tzinfo=timezone.utc),
@@ -221,16 +246,32 @@ def test_xgboost_forecaster_predict_empty():
             learning_rate=0.1, n_estimators=10, max_depth=3
         ).model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     # Initialize Forecaster
     forecaster = XGBoostForecaster()
+    forecaster.target_map = target_map
 
     # Train
     forecaster.train(
         config=config,
-        substation_power_flows=sub_flows,
+        flows_30m=flows_30m,
         substation_metadata=sub_meta,
         nwps=nwps,
     )
@@ -269,5 +310,5 @@ def test_xgboost_forecaster_predict_empty():
             substation_metadata=sub_meta,
             inference_params=inference_params,
             nwps=predict_nwps,
-            substation_power_flows=sub_flows,
+            flows_30m=flows_30m,
         )

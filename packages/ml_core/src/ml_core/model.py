@@ -2,14 +2,14 @@
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any
 
+import polars as pl
 import patito as pt
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    ProcessedNwp,
-    SubstationFlows,
     SubstationMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
@@ -32,15 +32,15 @@ class BaseForecaster(ABC):
     def train(
         self,
         config: ModelConfig,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        flows_30m: pl.LazyFrame,
         substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> Any:
         """Train the model.
 
         Args:
             config: Model configuration object.
-            substation_power_flows: The historical power flow data.
+            flows_30m: Historical power flow data downsampled to 30m.
             substation_metadata: The substation metadata.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -54,8 +54,8 @@ class BaseForecaster(ABC):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        flows_30m: pl.LazyFrame,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts.
@@ -63,7 +63,7 @@ class BaseForecaster(ABC):
         Args:
             substation_metadata: The substation metadata.
             inference_params: Parameters for inference.
-            substation_power_flows: The historical power flow data (for lags).
+            flows_30m: Historical power flow data downsampled to 30m (for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 

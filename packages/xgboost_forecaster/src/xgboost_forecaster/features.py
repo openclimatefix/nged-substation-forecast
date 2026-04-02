@@ -6,8 +6,6 @@ from datetime import timedelta
 import polars as pl
 
 from contracts.data_schemas import NwpColumns
-from ml_core.scaling import uint8_to_physical_unit
-from xgboost_forecaster.scaling import load_scaling_params
 
 log = logging.getLogger(__name__)
 
@@ -18,113 +16,52 @@ log = logging.getLogger(__name__)
 # and output.
 
 
-def add_physical_features(df: pl.LazyFrame) -> pl.LazyFrame:
-    """Add windchill and rename weather variables to indicate their uint8 scaling.
+def add_autoregressive_lags(
+    df: pl.LazyFrame, flows_30m: pl.LazyFrame, telemetry_delay_hours: int = 24
+) -> pl.LazyFrame:
+    """Add autoregressive lags to the feature matrix.
 
-    Clever Optimization:
-    Weather variables are kept in their 0-255 scaled representation (e.g., `temperature_2m_uint8_scaled`)
-    to save memory and computation. XGBoost is invariant to monotonic transformations, so this does not
-    affect model performance. For SHAP analysis or EDA, use `descale_for_analysis` to convert them back
-    to physical units.
-    """
-    schema_names = df.collect_schema().names()
-    params = load_scaling_params()
-
-    scaling_cols_df = params.select("col_name")
-    scaling_cols = scaling_cols_df.to_series().to_list()
-
-    # Wind columns are stored as Float32 physical values, not uint8 scaled.
-    wind_cols = ["wind_speed_10m", "wind_direction_10m", "wind_speed_100m", "wind_direction_100m"]
-    existing_cols = [c for c in scaling_cols if c in schema_names and c not in wind_cols]
-
-    if not existing_cols:
-        return df
-
-    # Calculate windchill if both temperature and wind speed are present
-    if NwpColumns.TEMPERATURE_2M in existing_cols and NwpColumns.WIND_SPEED_10M in schema_names:
-        # Temporarily descale just for windchill calculation
-        descale_exprs = uint8_to_physical_unit(
-            params.filter(pl.col("col_name").is_in([NwpColumns.TEMPERATURE_2M]))
-        )
-
-        temp_exprs = [
-            expr.alias(f"temp_descale_{expr.meta.output_name()}") for expr in descale_exprs
-        ]
-        df = df.with_columns(temp_exprs)
-
-        v_kmh = pl.col(NwpColumns.WIND_SPEED_10M) * 3.6
-        temp = pl.col(f"temp_descale_{NwpColumns.TEMPERATURE_2M}")
-
-        df = df.with_columns(
-            windchill=(
-                13.12 + 0.6215 * temp - 11.37 * (v_kmh**0.16) + 0.3965 * temp * (v_kmh**0.16)
-            ).cast(pl.Float32)
-        ).drop(
-            [
-                f"temp_descale_{NwpColumns.TEMPERATURE_2M}",
-            ]
-        )
-
-    # Rename all scaled columns to *_uint8_scaled, except categorical ones
-    categorical_cols = ["categorical_precipitation_type_surface"]
-    rename_mapping = {c: f"{c}_uint8_scaled" for c in existing_cols if c not in categorical_cols}
-    df = df.rename(rename_mapping)
-
-    # Ensure categorical columns are UInt8 to match the SubstationFeatures schema
-    df = df.with_columns(
-        [pl.col(c).cast(pl.UInt8) for c in categorical_cols if c in df.collect_schema().names()]
-    )
-
-    return df
-
-
-def descale_for_analysis(df: pl.LazyFrame) -> pl.LazyFrame:
-    """Descale *_uint8_scaled columns back to physical units for SHAP/EDA.
-
-    This utility function is designed for data scientists and engineers who need to
-    inspect the model's features in their original physical units (e.g., degrees Celsius, m/s).
-    It automatically detects any column ending in `_uint8_scaled`, looks up the correct
-    scaling parameters, and converts the values back to their physical representation.
-
-    Example Usage:
-        ```python
-        # Load the feature dataset
-        features_df = pl.scan_parquet("data/features/*.parquet")
-
-        # Descale the weather features for exploratory data analysis
-        descaled_df = descale_for_analysis(features_df)
-
-        # Now you can plot temperature in Celsius instead of 0-255!
-        descaled_df.select("temperature_2m").collect().plot()
-        ```
+    This function calculates the required lag dynamically to strictly prevent
+    lookahead bias, ensuring that the model only uses power flow data that
+    would have been available at the time the forecast was made.
 
     Args:
-        df: A Polars LazyFrame containing `_uint8_scaled` columns.
+        df: The input LazyFrame (must contain valid_time and init_time).
+        flows_30m: Historical power flows downsampled to 30m.
+        telemetry_delay_hours: Delay in hours for telemetry availability.
 
     Returns:
-        A Polars LazyFrame with the scaled columns replaced by their physical unit equivalents.
+        LazyFrame with added lag features.
     """
-    schema_names = df.collect_schema().names()
-    params = load_scaling_params()
+    # 1. Calculate the required lag dynamically to strictly prevent lookahead bias
+    df = (
+        df.with_columns(
+            lead_time_days=(pl.col("valid_time") - pl.col("init_time")).dt.total_seconds()
+            / (24 * 3600)
+        )
+        .with_columns(
+            lag_days=pl.max_horizontal(
+                pl.lit(1),
+                ((pl.col("lead_time_days") + telemetry_delay_hours / 24.0) / 7.0)
+                .ceil()
+                .cast(pl.Int32),
+            )
+            * 7
+        )
+        .with_columns(
+            target_lag_time=pl.col("valid_time") - pl.duration(days=1) * pl.col("lag_days")
+        )
+    )
 
-    descale_exprs = []
-    cols_to_drop = []
-    for col in schema_names:
-        if col.endswith("_uint8_scaled"):
-            base_col = col.replace("_uint8_scaled", "")
-            # Find the matching scaling param by checking if base_col ends with the param's col_name
-            for row in params.iter_rows(named=True):
-                param_col = row["col_name"]
-                if base_col.endswith(param_col):
-                    b_min = row["buffered_min"]
-                    b_range = row["buffered_range"]
-                    expr = ((pl.col(col).cast(pl.Float32) / 255 * b_range) + b_min).alias(base_col)
-                    descale_exprs.append(expr)
-                    cols_to_drop.append(col)
-                    break
+    # 2. Join flows_30m on ["substation_number", "target_lag_time"] to extract the exact
+    # latest_available_weekly_lag without needing pre-calculated lag_7d or lag_14d columns.
+    lag_df = flows_30m.select(
+        pl.col("substation_number"),
+        pl.col("timestamp").alias("target_lag_time"),
+        pl.col("MW_or_MVA").alias("latest_available_weekly_lag"),
+    )
 
-    if descale_exprs:
-        df = df.with_columns(descale_exprs).drop(cols_to_drop)
+    df = df.join(lag_df, on=["substation_number", "target_lag_time"], how="left")
 
     return df
 
@@ -145,9 +82,19 @@ def add_weather_features(
     if NwpColumns.TEMPERATURE_2M not in schema_names:
         return weather
 
-    weather = add_physical_features(weather).sort(NwpColumns.INIT_TIME)
+    # Add windchill if both temperature and wind speed are present
+    if NwpColumns.TEMPERATURE_2M in schema_names and NwpColumns.WIND_SPEED_10M in schema_names:
+        v_kmh = pl.col(NwpColumns.WIND_SPEED_10M) * 3.6
+        temp = pl.col(NwpColumns.TEMPERATURE_2M)
+
+        weather = weather.with_columns(
+            windchill=(
+                13.12 + 0.6215 * temp - 11.37 * (v_kmh**0.16) + 0.3965 * temp * (v_kmh**0.16)
+            ).cast(pl.Float32)
+        )
+
+    weather = weather.sort(NwpColumns.INIT_TIME)
     if history is not None:
-        history = add_physical_features(history)
         full_weather = pl.concat([history, weather], how="diagonal").sort(NwpColumns.INIT_TIME)
     else:
         full_weather = weather
@@ -190,13 +137,9 @@ def add_weather_features(
         if NwpColumns.H3_INDEX in schema_names:
             by_cols.append(NwpColumns.H3_INDEX)
 
-        # We need to use the renamed columns if they exist
-        temp_col = f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled"
-        sw_col = f"{NwpColumns.SW_RADIATION}_uint8_scaled"
-
         source_schema = source_df.collect_schema().names()
-        actual_temp_col = temp_col if temp_col in source_schema else NwpColumns.TEMPERATURE_2M
-        actual_sw_col = sw_col if sw_col in source_schema else NwpColumns.SW_RADIATION
+        actual_temp_col = NwpColumns.TEMPERATURE_2M
+        actual_sw_col = NwpColumns.SW_RADIATION
 
         source_cols = [NwpColumns.VALID_TIME, NwpColumns.INIT_TIME, actual_temp_col]
         if NwpColumns.H3_INDEX in schema_names:
@@ -229,14 +172,9 @@ def add_weather_features(
     weather = _add_lag_asof(weather, full_weather, timedelta(days=14), "lag_14d")
     weather = _add_lag_asof(weather, full_weather, timedelta(hours=6), "6h_ago")
 
-    # We need to use the renamed column for the trend calculation
-    temp_col = f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled"
-    weather_schema = weather.collect_schema().names()
-    actual_temp_col = temp_col if temp_col in weather_schema else NwpColumns.TEMPERATURE_2M
-
     return weather.with_columns(
         temp_trend_6h=(
-            pl.col(actual_temp_col).cast(pl.Float32)
+            pl.col(NwpColumns.TEMPERATURE_2M).cast(pl.Float32)
             - pl.col(f"{NwpColumns.TEMPERATURE_2M}_6h_ago").cast(pl.Float32)
         ).cast(pl.Float32)
     )

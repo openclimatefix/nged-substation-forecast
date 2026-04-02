@@ -7,7 +7,7 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_target_map, downsample_power_flows
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +75,18 @@ def train_and_log_model(
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
+    # We downsample power flows to 30m and calculate the target map here to centralize
+    # data preparation and ensure consistency across models.
+    if "substation_power_flows" in sliced_data:
+        flows = sliced_data.pop("substation_power_flows")
+        target_map = calculate_target_map(flows)
+        flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+        sliced_data["flows_30m"] = flows_30m
+
+        # Store target_map on the trainer if it supports it
+        if hasattr(trainer, "target_map"):
+            trainer.target_map = target_map
+
     model = trainer.train(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
@@ -151,17 +163,23 @@ def evaluate_and_save_model(
         power_fcst_model_name=model_name,
     )
 
+    # Downsample power flows to 30m for inference (lags)
+    if "substation_power_flows" in sliced_data:
+        flows = sliced_data.pop("substation_power_flows")
+        # Use the forecaster's existing target_map for consistency
+        target_map_lf = forecaster.target_map.lazy() if hasattr(forecaster, "target_map") else None
+        flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
+        sliced_data["flows_30m"] = flows_30m
+
     results_df = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     )
 
     # 3. Calculate Metrics per lead_time
-    if "substation_power_flows" in sliced_data:
+    if "flows_30m" in sliced_data:
         actuals = cast(
             pl.DataFrame,
-            downsample_power_flows(
-                sliced_data["substation_power_flows"], target_map=forecaster.target_map.lazy()
-            ).collect(),
+            sliced_data["flows_30m"].collect(),
         )
 
         # Join predictions with actuals

@@ -8,10 +8,9 @@ from typing import cast
 from contracts.data_schemas import (
     InferenceParams,
     ProcessedNwp,
-    SubstationFlows,
     SubstationMetadata,
 )
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.data import (
     DataConfig,
     load_nwp_run,
@@ -274,18 +273,38 @@ def test_prepare_training_data_prevents_row_explosion():
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -423,18 +442,38 @@ def test_latest_available_weekly_lag_prevents_leakage():
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
         target_horizon_hours=0,
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -504,24 +543,19 @@ def test_xgboost_predict_with_lags():
         ]
     ).lazy()
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     forecaster = XGBoostForecaster()
     # Set target_map for normalization/descaling
-    from contracts.data_schemas import SubstationTargetMap
 
-    forecaster.target_map = SubstationTargetMap.validate(
-        pl.DataFrame(
-            {
-                "substation_number": pl.Series([1], dtype=pl.Int32),
-                "power_col": ["MW"],
-                "peak_capacity_MW_or_MVA": pl.Series([100.0], dtype=pl.Float32),
-            }
-        )
-    )
+    forecaster.target_map = target_map
 
     # Mock the model and its feature_names_in_
     mock_model = patch("xgboost.XGBRegressor").start()
     mock_model.feature_names_in_ = [
-        "temperature_2m_uint8_scaled",
+        "temperature_2m",
         "latest_available_weekly_lag",
         "hour_sin",
         "hour_cos",
@@ -531,6 +565,7 @@ def test_xgboost_predict_with_lags():
     ]
     mock_model.predict.return_value = [1.0]  # Normalized prediction
     forecaster.model = mock_model
+    forecaster.feature_names = mock_model.feature_names_in_
 
     inference_params = InferenceParams(
         forecast_time=inference_nwp_init_time,
@@ -541,11 +576,11 @@ def test_xgboost_predict_with_lags():
         substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
         inference_params=inference_params,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-        substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+        flows_30m=cast(pt.LazyFrame, flows_30m),
     )
 
     assert len(preds) == 1
-    assert preds["MW_or_MVA"][0] == 100.0
+    assert preds["MW_or_MVA"][0] == 1414.0
     # Check that the lag was correctly picked up (77.0 for 1-day lead time)
     # We can't easily check the internal X dataframe without more patching,
     # but the fact that it didn't crash is a good sign.

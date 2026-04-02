@@ -245,9 +245,9 @@ class Nwp(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
-    # Variables stored as uint8 on disk
-    temperature_2m: int = pt.Field(dtype=pl.UInt8)
-    dew_point_temperature_2m: int = pt.Field(dtype=pl.UInt8)
+    # Variables stored as Float32 in memory (descaled from uint8 on disk)
+    temperature_2m: float = pt.Field(dtype=pl.Float32)
+    dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
     # WIND VECTOR COMPONENTS:
     # We store raw U and V components as Float32 to allow physically realistic
     # linear interpolation in the forecasting pipeline, avoiding the "phantom high wind"
@@ -256,17 +256,17 @@ class Nwp(pt.Model):
     wind_v_10m: float = pt.Field(dtype=pl.Float32)
     wind_u_100m: float = pt.Field(dtype=pl.Float32)
     wind_v_100m: float = pt.Field(dtype=pl.Float32)
-    pressure_surface: int = pt.Field(dtype=pl.UInt8)
-    pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
-    geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
+    pressure_surface: float = pt.Field(dtype=pl.Float32)
+    pressure_reduced_to_mean_sea_level: float = pt.Field(dtype=pl.Float32)
+    geopotential_height_500hpa: float = pt.Field(dtype=pl.Float32)
 
     # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
     # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
     # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
     # values before we receive them. So these are true _rates_.
-    downward_long_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
-    downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
-    precipitation_surface: int | None = pt.Field(dtype=pl.UInt8)
+    downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
+    downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
+    precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
 
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
@@ -366,11 +366,8 @@ class ProcessedNwp(pt.Model):
 class SubstationFeatures(pt.Model):
     """Final joined dataset ready for XGBoost.
 
-    Clever Optimization:
-    Weather features are kept in their 0-255 scaled representation (e.g., `temperature_2m_uint8_scaled`)
-    to save memory and computation. XGBoost is invariant to monotonic transformations, so this does not
-    affect model performance. For SHAP analysis or EDA, use `descale_for_analysis` to convert them back
-    to physical units.
+    Weather features are kept in their physical units (e.g., degrees Celsius, m/s)
+    to ensure precision during interpolation and feature engineering.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -384,10 +381,8 @@ class SubstationFeatures(pt.Model):
     latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
-    temperature_2m_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    dew_point_temperature_2m_uint8_scaled: float | None = pt.Field(
-        dtype=pl.Float32, allow_missing=True
-    )
+    temperature_2m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    dew_point_temperature_2m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     # PHYSICAL WIND FEATURES:
     # These are calculated from interpolated U/V components in the forecasting
     # pipeline, ensuring physically realistic wind speed and direction.
@@ -395,22 +390,18 @@ class SubstationFeatures(pt.Model):
     wind_direction_10m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     wind_speed_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     wind_direction_100m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    pressure_surface_uint8_scaled: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    pressure_reduced_to_mean_sea_level_uint8_scaled: float | None = pt.Field(
+    pressure_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    pressure_reduced_to_mean_sea_level: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    geopotential_height_500hpa_uint8_scaled: float | None = pt.Field(
+    geopotential_height_500hpa: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    downward_long_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    downward_long_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
+    downward_short_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    downward_short_wave_radiation_flux_surface_uint8_scaled: float | None = pt.Field(
-        dtype=pl.Float32, allow_missing=True
-    )
-    precipitation_surface_uint8_scaled: float | None = pt.Field(
-        dtype=pl.Float32, allow_missing=True
-    )
+    precipitation_surface: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
     categorical_precipitation_type_surface: int | None = pt.Field(
         dtype=pl.UInt8, allow_missing=True
     )

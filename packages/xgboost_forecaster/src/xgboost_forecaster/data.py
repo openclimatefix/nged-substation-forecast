@@ -14,6 +14,8 @@ from contracts.data_schemas import (
     SubstationMetadata,
 )
 from contracts.settings import Settings
+from ml_core.scaling import uint8_to_physical_unit
+from xgboost_forecaster.scaling import load_scaling_params
 
 
 log = logging.getLogger(__name__)
@@ -91,6 +93,17 @@ def load_nwp_run(
     if df.is_empty():
         raise RuntimeError(f"No data found for requested H3 indices in {file_path}")
 
+    # Descale data immediately to physical units (Float32)
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+    existing_cols = [c for c in scaling_cols if c in df.columns]
+
+    if existing_cols:
+        descale_exprs = uint8_to_physical_unit(
+            params.filter(pl.col("col_name").is_in(existing_cols))
+        )
+        df = df.with_columns(descale_exprs)
+
     return Nwp.validate(df)
 
 
@@ -143,6 +156,17 @@ def construct_historical_weather(
     # Combine all forecasts to retain a distribution of lead times
     combined = pl.concat(weather_dfs, how="diagonal")
     combined = combined.sort(["h3_index", "ensemble_member", "valid_time", "init_time"])
+
+    # Descale data immediately to physical units (Float32)
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+    existing_cols = [c for c in scaling_cols if c in combined.columns]
+
+    if existing_cols:
+        descale_exprs = uint8_to_physical_unit(
+            params.filter(pl.col("col_name").is_in(existing_cols))
+        )
+        combined = combined.with_columns(descale_exprs)
 
     return Nwp.validate(combined)
 
@@ -262,8 +286,12 @@ def process_nwp_data(
         )
         return processed
 
-    # Apply upsample and interpolate lazily via map_batches
-    processed_lf = lf.map_batches(_upsample_and_interpolate)
+    # Apply upsample and interpolate lazily via group_by(...).map_groups(...)
+    # This is more memory-efficient than map_batches as it processes each group
+    # independently and allows Polars to optimize the execution.
+    processed_lf = lf.group_by(["init_time", "h3_index", "ensemble_member"]).map_groups(
+        _upsample_and_interpolate, schema=lf.collect_schema()
+    )
 
     # PHYSICAL WIND CALCULATION (Lazy):
     # After interpolating U and V components, we calculate physical wind speed

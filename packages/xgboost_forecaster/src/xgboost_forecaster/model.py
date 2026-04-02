@@ -15,19 +15,15 @@ from contracts.data_schemas import (
     InferenceParams,
     NwpColumns,
     PowerForecast,
-    ProcessedNwp,
     SubstationFeatures,
-    SubstationFlows,
     SubstationMetadata,
-    SubstationTargetMap,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
-from ml_core.data import downsample_power_flows
 from ml_core.features import add_cyclical_temporal_features
 from ml_core.model import BaseForecaster
 from xgboost import XGBRegressor
 from xgboost_forecaster.config import XGBoostHyperparameters
-from xgboost_forecaster.features import add_weather_features
+from xgboost_forecaster.features import add_autoregressive_lags, add_weather_features
 
 log = logging.getLogger(__name__)
 
@@ -79,27 +75,11 @@ class XGBoostForecaster(BaseForecaster):
         elif hasattr(self, "config") and self.config.features.feature_names:
             res = df.select(self.config.features.feature_names)
         else:
-            # Fallback: keep only numeric and categorical columns, excluding the target and metadata
-            exclude_cols = {
-                "MW",
-                "MVA",
-                "MVAr",
-                "MW_or_MVA",
-                "h3_index",
-                "ensemble_member",
-                "init_time",
-                "available_time",
-            }
-            if isinstance(df, pl.LazyFrame):
-                schema = df.collect_schema()
-            else:
-                schema = df.schema
-            feature_cols = [
-                c
-                for c, dtype in schema.items()
-                if c not in exclude_cols and (dtype.is_numeric() or dtype == pl.Categorical)
-            ]
-            res = df.select(feature_cols)
+            raise ValueError(
+                "Feature names must be explicitly provided either in the config or "
+                "during training. Fallback feature selection is disabled to prevent "
+                "silent model degradation."
+            )
 
         if isinstance(res, pl.LazyFrame):
             res_schema = res.collect_schema()
@@ -119,53 +99,6 @@ class XGBoostForecaster(BaseForecaster):
             )
 
         return res
-
-    def _add_lags(self, df: pl.LazyFrame, flows_30m: pl.LazyFrame) -> pl.LazyFrame:
-        """Add autoregressive lags to the feature matrix.
-
-        Args:
-            df: The input LazyFrame (must contain valid_time and init_time).
-            flows_30m: Historical power flows downsampled to 30m.
-
-        Returns:
-            LazyFrame with added lag features.
-        """
-        # Get telemetry delay from config, default to 24 hours if not set
-        telemetry_delay_hours = (
-            getattr(self.config, "telemetry_delay_hours", 24) if hasattr(self, "config") else 24
-        )
-
-        # 2. Calculate the required lag dynamically to strictly prevent lookahead bias
-        df = (
-            df.with_columns(
-                lead_time_days=(pl.col("valid_time") - pl.col("init_time")).dt.total_seconds()
-                / (24 * 3600)
-            )
-            .with_columns(
-                lag_days=pl.max_horizontal(
-                    pl.lit(1),
-                    ((pl.col("lead_time_days") + telemetry_delay_hours / 24.0) / 7.0)
-                    .ceil()
-                    .cast(pl.Int32),
-                )
-                * 7
-            )
-            .with_columns(
-                target_lag_time=pl.col("valid_time") - pl.duration(days=1) * pl.col("lag_days")
-            )
-        )
-
-        # 3. Join flows_30m on ["substation_number", "target_lag_time"] to extract the exact
-        # latest_available_weekly_lag without needing pre-calculated lag_7d or lag_14d columns.
-        lag_df = flows_30m.select(
-            pl.col("substation_number"),
-            pl.col("timestamp").alias("target_lag_time"),
-            pl.col("MW_or_MVA").alias("latest_available_weekly_lag"),
-        )
-
-        df = df.join(lag_df, on=["substation_number", "target_lag_time"], how="left")
-
-        return df
 
     def _prepare_and_join_nwps(
         self,
@@ -276,7 +209,7 @@ class XGBoostForecaster(BaseForecaster):
 
     def _prepare_data_for_model(
         self,
-        substation_power_flows: pl.LazyFrame,
+        flows_30m: pl.LazyFrame,
         substation_metadata: pl.LazyFrame | pl.DataFrame,
         target_map_df: pl.DataFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
@@ -286,7 +219,7 @@ class XGBoostForecaster(BaseForecaster):
         """Prepares data for training or prediction.
 
         Args:
-            substation_power_flows: Historical power flows.
+            flows_30m: Historical power flows downsampled to 30m.
             substation_metadata: Substation metadata.
             target_map_df: Target mapping dataframe.
             nwps: Dictionary of NWP data.
@@ -299,10 +232,7 @@ class XGBoostForecaster(BaseForecaster):
         metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
         target_map_lf = target_map_df.lazy()
 
-        # 1. Downsample power flows to 30m and calculate target fallback
-        flows_30m = downsample_power_flows(substation_power_flows, target_map=target_map_lf)
-
-        # 2. Prepare NWPs and join
+        # 1. Prepare NWPs and join
         is_training = inference_params is None
 
         if nwps:
@@ -373,7 +303,13 @@ class XGBoostForecaster(BaseForecaster):
         if NwpColumns.INIT_TIME not in df_lf.collect_schema().names():
             df_lf = df_lf.with_columns(**{NwpColumns.INIT_TIME: pl.col(NwpColumns.VALID_TIME)})
 
-        df_lf = self._add_lags(df_lf, flows_30m)
+        # Get telemetry delay from config, default to 24 hours if not set
+        telemetry_delay_hours = (
+            getattr(self.config, "telemetry_delay_hours", 24) if hasattr(self, "config") else 24
+        )
+        df_lf = add_autoregressive_lags(
+            df_lf, flows_30m, telemetry_delay_hours=telemetry_delay_hours
+        )
 
         # Normalize by peak capacity
         df_lf = df_lf.join(
@@ -422,15 +358,15 @@ class XGBoostForecaster(BaseForecaster):
     def train(
         self,
         config: ModelConfig,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        flows_30m: pl.LazyFrame,
         substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> "XGBoostForecaster":
         """Train the XGBoost model.
 
         Args:
             config: The model configuration object.
-            substation_power_flows: The historical power flow data.
+            flows_30m: Historical power flow data downsampled to 30m.
             substation_metadata: The substation metadata containing h3 mapping.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -443,44 +379,13 @@ class XGBoostForecaster(BaseForecaster):
         if len(config.features.nwps) > 0 and not nwps:
             raise ValueError("Model config requires NWPs, but none were provided.")
 
-        # Calculate target map based on the training data
-        target_map_df = cast(
-            pl.DataFrame,
-            substation_power_flows.group_by("substation_number")
-            .agg(
-                mw_count=pl.col("MW").is_not_null().sum(),
-                mva_count=pl.col("MVA").is_not_null().sum(),
-                peak_capacity_MW_or_MVA=pl.max_horizontal(
-                    pl.col("MW").abs().max(), pl.col("MVA").abs().max()
-                ).fill_null(1.0),
-            )
-            .with_columns(
-                pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-                .then(pl.lit("MW"))
-                .otherwise(pl.lit("MVA"))
-                .alias("power_col"),
-                pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
-                .then(pl.lit(1.0))
-                .otherwise(pl.col("peak_capacity_MW_or_MVA"))
-                .alias("peak_capacity_MW_or_MVA"),
-            )
-            .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
-            .collect(),
-        )
-
-        self.target_map = SubstationTargetMap.validate(
-            target_map_df.with_columns(
-                [
-                    pl.col("substation_number").cast(pl.Int32),
-                    pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
-                ]
-            )
-        )
+        if self.target_map is None:
+            raise ValueError("target_map must be set before calling train.")
 
         joined_lf = self._prepare_data_for_model(
-            substation_power_flows=substation_power_flows,
+            flows_30m=flows_30m,
             substation_metadata=substation_metadata,
-            target_map_df=target_map_df,
+            target_map_df=self.target_map,
             nwps=nwps,
         )
 
@@ -493,8 +398,8 @@ class XGBoostForecaster(BaseForecaster):
         if nwps:
             critical_cols.extend(
                 [
-                    f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
-                    f"{NwpColumns.SW_RADIATION}_uint8_scaled",
+                    NwpColumns.TEMPERATURE_2M,
+                    NwpColumns.SW_RADIATION,
                     NwpColumns.WIND_SPEED_10M,
                 ]
             )
@@ -552,8 +457,8 @@ class XGBoostForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        flows_30m: pl.LazyFrame,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -561,7 +466,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             substation_metadata: The substation metadata containing h3 mapping.
             inference_params: Parameters for inference.
-            substation_power_flows: The historical power flow data (for lags).
+            flows_30m: Historical power flow data downsampled to 30m (for lags).
             nwps: A dictionary of weather forecast lazyframes.
             collapse_lead_times: Whether to collapse lead times to simulate real-time inference by keeping only the latest available NWP forecast for each valid time.
 
@@ -576,10 +481,9 @@ class XGBoostForecaster(BaseForecaster):
 
         if self.target_map is None:
             raise ValueError("target_map must be set before calling predict.")
-        target_map_lf = self.target_map.lazy()
 
         df_lf = self._prepare_data_for_model(
-            substation_power_flows=substation_power_flows,
+            flows_30m=flows_30m,
             substation_metadata=substation_metadata,
             target_map_df=self.target_map,
             nwps=nwps,
@@ -643,9 +547,9 @@ class XGBoostForecaster(BaseForecaster):
             .join(
                 cast(
                     pl.DataFrame,
-                    target_map_lf.select(
-                        ["substation_number", "peak_capacity_MW_or_MVA"]
-                    ).collect(),
+                    self.target_map.lazy()
+                    .select(["substation_number", "peak_capacity_MW_or_MVA"])
+                    .collect(),
                 ),
                 on="substation_number",
                 how="left",
