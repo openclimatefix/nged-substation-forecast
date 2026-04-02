@@ -62,3 +62,11 @@ Scale to 2⁹  - 1, and save as UInt16 =  62 MB
 Scale to 2⁸  - 1, and save as UInt16 =  51 MB
 Scale to 2⁸  - 1, and save as UInt8  =  51 MB
 ```
+
+## Physical Wind Logic
+
+To ensure physically realistic wind speed and direction, we interpolate the Cartesian `u` and `v` components linearly instead of using circular interpolation on speed and direction. This approach avoids "phantom high wind" artifacts that can occur during rapid direction shifts (e.g., from 359 to 1 degree). Wind speed and direction are reconstructed from the interpolated `u` and `v` components after the interpolation step.
+
+## Anti-Meridian Wrap-Around
+
+The NWP ingestion pipeline correctly handles anti-meridian wrap-around for global datasets. When a dataset spans the 180-degree longitude boundary, the pipeline identifies the gap, slices the dataset into negative and positive longitude blocks, and concatenates them to ensure a continuous spatial representation. This prevents massive unnecessary downloads and ensures physical correctness for global models.
