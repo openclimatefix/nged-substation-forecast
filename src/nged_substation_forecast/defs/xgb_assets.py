@@ -169,7 +169,7 @@ def train_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("MW_or_MVA").is_not_null())
+            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
             .select("substation_number")
             .unique()
             .collect(),
@@ -245,7 +245,7 @@ def evaluate_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("MW_or_MVA").is_not_null())
+            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
             .select("substation_number")
             .unique()
             .collect(),

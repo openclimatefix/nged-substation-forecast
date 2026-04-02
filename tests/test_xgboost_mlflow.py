@@ -224,6 +224,7 @@ def test_evaluate_and_save_model_logs_metrics():
         patch("mlflow.log_params") as mock_log_params,
         patch("mlflow.set_experiment") as mock_set_experiment,
         patch("mlflow.xgboost.log_model") as mock_log_model,
+        patch("mlflow.log_artifact") as mock_log_artifact,
     ):
         # Mock the run object returned by start_run
         mock_run = MagicMock()
@@ -244,4 +245,5 @@ def test_evaluate_and_save_model_logs_metrics():
         mock_start_run.assert_called_once()
         mock_log_params.assert_called_once()
         mock_log_model.assert_called_once()
+        mock_log_artifact.assert_called_once()
         context.add_output_metadata.assert_called_once_with({"mlflow_run_id": "test_run_id"})

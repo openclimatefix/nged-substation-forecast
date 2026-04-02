@@ -481,7 +481,7 @@ class XGBoostForecaster(BaseForecaster):
                 [
                     f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
                     f"{NwpColumns.SW_RADIATION}_uint8_scaled",
-                    f"{NwpColumns.WIND_SPEED_10M}_uint8_scaled",
+                    NwpColumns.WIND_SPEED_10M,
                 ]
             )
 
@@ -590,7 +590,7 @@ class XGBoostForecaster(BaseForecaster):
                 [
                     f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
                     f"{NwpColumns.SW_RADIATION}_uint8_scaled",
-                    f"{NwpColumns.WIND_SPEED_10M}_uint8_scaled",
+                    NwpColumns.WIND_SPEED_10M,
                 ]
             )
 

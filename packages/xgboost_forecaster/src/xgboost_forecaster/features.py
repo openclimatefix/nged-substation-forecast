@@ -33,17 +33,18 @@ def add_physical_features(df: pl.LazyFrame) -> pl.LazyFrame:
     scaling_cols_df = params.select("col_name")
     scaling_cols = scaling_cols_df.to_series().to_list()
 
-    existing_cols = [c for c in scaling_cols if c in schema_names]
+    # Wind columns are stored as Float32 physical values, not uint8 scaled.
+    wind_cols = ["wind_speed_10m", "wind_direction_10m", "wind_speed_100m", "wind_direction_100m"]
+    existing_cols = [c for c in scaling_cols if c in schema_names and c not in wind_cols]
+
     if not existing_cols:
         return df
 
     # Calculate windchill if both temperature and wind speed are present
-    if NwpColumns.TEMPERATURE_2M in existing_cols and NwpColumns.WIND_SPEED_10M in existing_cols:
+    if NwpColumns.TEMPERATURE_2M in existing_cols and NwpColumns.WIND_SPEED_10M in schema_names:
         # Temporarily descale just for windchill calculation
         descale_exprs = uint8_to_physical_unit(
-            params.filter(
-                pl.col("col_name").is_in([NwpColumns.TEMPERATURE_2M, NwpColumns.WIND_SPEED_10M])
-            )
+            params.filter(pl.col("col_name").is_in([NwpColumns.TEMPERATURE_2M]))
         )
 
         temp_exprs = [
@@ -51,7 +52,7 @@ def add_physical_features(df: pl.LazyFrame) -> pl.LazyFrame:
         ]
         df = df.with_columns(temp_exprs)
 
-        v_kmh = pl.col(f"temp_descale_{NwpColumns.WIND_SPEED_10M}") * 3.6
+        v_kmh = pl.col(NwpColumns.WIND_SPEED_10M) * 3.6
         temp = pl.col(f"temp_descale_{NwpColumns.TEMPERATURE_2M}")
 
         df = df.with_columns(
@@ -61,7 +62,6 @@ def add_physical_features(df: pl.LazyFrame) -> pl.LazyFrame:
         ).drop(
             [
                 f"temp_descale_{NwpColumns.TEMPERATURE_2M}",
-                f"temp_descale_{NwpColumns.WIND_SPEED_10M}",
             ]
         )
 
