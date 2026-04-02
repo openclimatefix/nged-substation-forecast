@@ -94,6 +94,7 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data():
         train_end="2026-01-10",
         test_start="2026-01-11",
         test_end="2026-01-15",
+        target_horizon_hours=0,
     )
 
     # Mock MLflow to avoid actual logging

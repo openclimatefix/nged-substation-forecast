@@ -85,6 +85,7 @@ def test_xgboost_forecaster_train_and_predict():
         hyperparameters=XGBoostHyperparameters(
             learning_rate=0.1, n_estimators=10, max_depth=3
         ).model_dump(),
+        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 
@@ -219,6 +220,7 @@ def test_xgboost_forecaster_predict_empty():
         hyperparameters=XGBoostHyperparameters(
             learning_rate=0.1, n_estimators=10, max_depth=3
         ).model_dump(),
+        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 

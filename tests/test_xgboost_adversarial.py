@@ -46,6 +46,7 @@ def test_train_handles_missing_init_time():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
+        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[]),
     )
     forecaster = XGBoostForecaster()
@@ -138,7 +139,7 @@ def test_process_nwp_data_empty_input():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
     assert res.is_empty()
 
 

@@ -80,6 +80,7 @@ def test_evaluate_and_save_model_logs_metrics():
         model=ModelConfig(
             power_fcst_model_name="xgboost",
             hyperparameters=XGBoostHyperparameters().model_dump(),
+            target_horizon_hours=0,
             features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
         ),
         data_split=DataSplitConfig(
@@ -206,6 +207,7 @@ def test_evaluate_and_save_model_logs_metrics():
         model=ModelConfig(
             power_fcst_model_name="xgboost",
             hyperparameters=XGBoostHyperparameters().model_dump(),
+            target_horizon_hours=0,
             features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
         ),
         data_split=DataSplitConfig(

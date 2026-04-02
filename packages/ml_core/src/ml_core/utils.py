@@ -158,7 +158,10 @@ def evaluate_and_save_model(
     # 3. Calculate Metrics per lead_time
     if "substation_power_flows" in sliced_data:
         actuals = cast(
-            pl.DataFrame, downsample_power_flows(sliced_data["substation_power_flows"]).collect()
+            pl.DataFrame,
+            downsample_power_flows(
+                sliced_data["substation_power_flows"], target_map=forecaster.target_map.lazy()
+            ).collect(),
         )
 
         # Join predictions with actuals

@@ -171,7 +171,7 @@ def test_process_nwp_data_removes_zero_lead_time():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
 
     # Remaining valid_times: 03:00, 04:00, 05:00.
     # Upsampling to 30m will create: 03:00, 03:30, 04:00, 04:30, 05:00.
@@ -202,7 +202,7 @@ def test_process_nwp_data_interpolates_safely_within_trajectories():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
 
     # We should have 3 rows for init_time_1 (00:00, 00:30, 01:00)
     # and 3 rows for init_time_2 (00:00, 00:30, 01:00)
@@ -273,6 +273,7 @@ def test_prepare_training_data_prevents_row_explosion():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
+        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 
@@ -421,6 +422,7 @@ def test_latest_available_weekly_lag_prevents_leakage():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
+        target_horizon_hours=0,
         features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
     )
 

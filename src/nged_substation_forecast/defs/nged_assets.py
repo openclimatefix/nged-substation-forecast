@@ -494,12 +494,13 @@ def substation_data_quality(
         for col in cols_to_check:
             # Compute rolling std per substation
             stuck_mask = (
-                df.group_by("substation_number")
+                df.sort("timestamp")
+                .group_by("substation_number", maintain_order=True)
                 .agg(
                     stuck_vals=pl.col(col).rolling_std(window_size).fill_null(float("inf"))
                     < stuck_std_threshold
                 )
-                .with_columns(num_stuck=pl.col("stuck_vals").sum())
+                .with_columns(num_stuck=pl.col("stuck_vals").list.sum())
             )
 
             # Substations with any stuck values

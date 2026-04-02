@@ -36,6 +36,9 @@ class XGBoostConfig(dg.Config):
         default=True,
         description="Allow the pipeline to continue if no healthy substations are found.",
     )
+    target_horizon_hours: int | None = Field(
+        default=None, description="Optional override for the target forecast horizon."
+    )
 
     @field_validator("train_start", "train_end", "test_start", "test_end")
     @classmethod
@@ -70,6 +73,8 @@ def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) ->
         config.data_split.test_start = date.fromisoformat(dg_config.test_start)
     if dg_config.test_end:
         config.data_split.test_end = date.fromisoformat(dg_config.test_end)
+    if dg_config.target_horizon_hours is not None:
+        config.model.target_horizon_hours = dg_config.target_horizon_hours
     return config
 
 

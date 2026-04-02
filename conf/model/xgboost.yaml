@@ -3,6 +3,7 @@ hyperparameters:
   learning_rate: 0.05
   n_estimators: 500
   max_depth: 6
+target_horizon_hours: 24
 features:
   nwps:
     - "ecmwf_ens_0_25deg"

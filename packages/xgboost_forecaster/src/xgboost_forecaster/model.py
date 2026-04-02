@@ -183,12 +183,24 @@ class XGBoostForecaster(BaseForecaster):
         for i, (name, lf) in enumerate(nwps.items()):
             lf_with_features = add_weather_features(lf)
 
+            target_horizon_hours = (
+                getattr(self.config, "target_horizon_hours", 24) if hasattr(self, "config") else 24
+            )
+
             # Always filter to ensure NWP is available before valid_time
             # This prevents lookahead bias during training
             available_nwp = lf_with_features.filter(
                 pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
                 <= pl.col(NwpColumns.VALID_TIME)
             )
+
+            if nwp_cutoff is None:
+                # During training, we parameterize the lead time filter by the target horizon
+                # to eliminate lookahead bias. This ensures the model is trained on forecasts
+                # with the exact same accuracy as those available in production.
+                available_nwp = available_nwp.filter(
+                    pl.col("lead_time_hours") >= (target_horizon_hours + delay_hours)
+                )
 
             if nwp_cutoff is not None:
                 if collapse_lead_times:

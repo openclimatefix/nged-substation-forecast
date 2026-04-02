@@ -43,7 +43,8 @@ class ModelConfig(BaseModel):
         ),
     )
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
-    required_lookback_days: int = Field(default=14)
+    target_horizon_hours: int = Field(default=24)
+    required_lookback_days: int = Field(default=21)
     features: ModelFeaturesConfig
 
     # The latency between the NWP init time and when the NWP is actually downloaded and processed

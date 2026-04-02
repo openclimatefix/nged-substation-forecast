@@ -31,7 +31,7 @@ def test_process_nwp_data_interpolation():
     lf = pl.LazyFrame(data)
 
     # Process data (should interpolate to 30m steps)
-    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
+    processed_lf = process_nwp_data(lf, [h3_index])
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     # Check number of rows: 3h to 9h is 6 hours. 6 hours / 30m = 12 steps + 1 = 13 rows.
@@ -87,7 +87,7 @@ def test_process_nwp_data_circular_boundary():
     }
     lf = pl.LazyFrame(data)
 
-    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
+    processed_lf = process_nwp_data(lf, [h3_index])
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     # Midway: U=-5, V=5
@@ -113,7 +113,7 @@ def test_process_nwp_data_lead_time_filter():
     data = {
         "init_time": [init_time] * 4,
         "valid_time": [
-            init_time + timedelta(hours=0),  # Should be filtered out (< 3h)
+            init_time + timedelta(hours=0),  # Should NOT be filtered out anymore
             init_time + timedelta(hours=3),
             init_time + timedelta(hours=6),
             init_time + timedelta(hours=400),  # Should be filtered out (> 336h)
@@ -124,13 +124,12 @@ def test_process_nwp_data_lead_time_filter():
     }
     lf = pl.LazyFrame(data)
 
-    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
+    processed_lf = process_nwp_data(lf, [h3_index])
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
-    # Only 3h and 6h should remain, plus interpolated steps between them.
-    # 3h to 6h is 3 hours = 6 steps + 1 = 7 rows.
-    assert len(processed_df) == 7
-    assert processed_df["valid_time"].min() == init_time + timedelta(hours=3)
+    # 0h to 6h is 6 hours = 12 steps + 1 = 13 rows.
+    assert len(processed_df) == 13
+    assert processed_df["valid_time"].min() == init_time + timedelta(hours=0)
     assert processed_df["valid_time"].max() == init_time + timedelta(hours=6)
 
 
@@ -145,7 +144,7 @@ def test_process_nwp_data_empty_input():
         }
     )
 
-    processed_lf = process_nwp_data(lf, [12345], target_horizon_hours=0)
+    processed_lf = process_nwp_data(lf, [12345])
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     assert len(processed_df) == 0

@@ -150,8 +150,6 @@ def construct_historical_weather(
 def process_nwp_data(
     nwp: pl.LazyFrame,
     h3_indices: list[int],
-    target_horizon_hours: int,
-    publication_delay_hours: int = 3,
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
@@ -165,8 +163,6 @@ def process_nwp_data(
     Args:
         nwp: Raw NWP data.
         h3_indices: List of H3 indices to filter for.
-        target_horizon_hours: The forecast horizon we are targeting (e.g., 24).
-        publication_delay_hours: The delay between NWP initialization and availability.
 
     Returns:
         Processed NWP data.
@@ -175,21 +171,15 @@ def process_nwp_data(
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
 
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # We parameterize the lead time filter by the target horizon to eliminate
-    # lookahead bias. This ensures the model is trained on forecasts with the
-    # exact same accuracy as those available in production.
+    # We cap the lead time at 336 hours (14 days) because ECMWF ENS
+    # reliability drops significantly after day 14, and the model is only
+    # validated for a 14-day horizon.
     lf = (
         lf.with_columns(
             lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
         )
         .with_columns(pl.col("lead_time_hours").cast(pl.Float32))
-        # We cap the lead time at 336 hours (14 days) because ECMWF ENS
-        # reliability drops significantly after day 14, and the model is only
-        # validated for a 14-day horizon.
-        .filter(
-            (pl.col("lead_time_hours") >= (target_horizon_hours + publication_delay_hours))
-            & (pl.col("lead_time_hours") <= 336)
-        )
+        .filter(pl.col("lead_time_hours") <= 336)
     )
 
     # 3. Interpolation (Fixing Nulls)
