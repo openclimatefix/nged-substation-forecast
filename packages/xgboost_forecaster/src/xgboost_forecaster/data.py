@@ -39,11 +39,17 @@ def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[Su
     metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
     metadata_df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
 
-    # Only return substations we have local power data for in Delta Lake
+    # Only return substations we have local power data for in Delta Lake.
+    # We use `scan_delta` to perform a lazy, optimized scan of the Delta Lake
+    # table, which is more memory-efficient than `read_delta` for large tables.
     substations_with_telemetry = (
-        pl.read_delta(str(config.base_power_path))
-        .select("substation_number")
-        .unique()
+        cast(
+            pl.DataFrame,
+            pl.scan_delta(str(config.base_power_path))
+            .select("substation_number")
+            .unique()
+            .collect(),
+        )
         .to_series()
         .to_list()
     )
@@ -107,12 +113,18 @@ def construct_historical_weather(
     """
     config = config or DataConfig()
     # We expect NWP files to follow the `YYYY-MM-DDTHHZ.parquet` naming contract.
+    # We use a robust parsing mechanism to ignore files that do not match this
+    # format, preventing crashes from unexpected files in the directory.
     files = sorted(config.base_weather_path.glob("*.parquet"))
-    relevant_files = [
-        f
-        for f in files
-        if start_date <= datetime.strptime(f.stem[:10], "%Y-%m-%d").date() <= end_date
-    ]
+    relevant_files = []
+    for f in files:
+        try:
+            file_date = datetime.strptime(f.stem[:10], "%Y-%m-%d").date()
+            if start_date <= file_date <= end_date:
+                relevant_files.append(f)
+        except ValueError:
+            # Skip files that don't match the expected date format
+            continue
 
     if not relevant_files:
         raise RuntimeError(f"No NWP files found between {start_date} and {end_date}")
@@ -200,10 +212,13 @@ def process_nwp_data(
     # Groups with only 1 row cannot be interpolated and would violate the
     # 30-minute temporal resolution contract.
     group_counts = df.group_by(["init_time", "h3_index", "ensemble_member"]).len()
+    total_groups = group_counts.height
     single_row_groups = group_counts.filter(pl.col("len") == 1)
+
     if single_row_groups.height > 0:
+        dropped_pct = (single_row_groups.height / total_groups) * 100 if total_groups > 0 else 0
         log.warning(
-            f"Dropping {single_row_groups.height} groups with only 1 row as they cannot be interpolated."
+            f"Dropping {single_row_groups.height} groups ({dropped_pct:.2f}%) with only 1 row as they cannot be interpolated."
         )
         df = df.filter(pl.len().over(["init_time", "h3_index", "ensemble_member"]) > 1)
 

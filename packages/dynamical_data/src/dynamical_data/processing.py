@@ -10,8 +10,29 @@ import patito as pt
 import polars as pl
 import xarray as xr
 from contracts.data_schemas import H3GridWeights, Nwp
+from contracts.settings import Settings
 
 from .scaling import load_scaling_params, scale_to_uint8
+
+_SETTINGS = Settings()
+
+# FLAW-004: Centralized list of required NWP variables to ensure consistency
+# between validation and download steps, preventing logic drift.
+REQUIRED_NWP_VARS = {
+    "temperature_2m",
+    "dew_point_temperature_2m",
+    "wind_u_10m",
+    "wind_v_10m",
+    "wind_u_100m",
+    "wind_v_100m",
+    "pressure_surface",
+    "pressure_reduced_to_mean_sea_level",
+    "geopotential_height_500hpa",
+    "downward_long_wave_radiation_flux_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "precipitation_surface",
+    "categorical_precipitation_type_surface",
+}
 
 DEFAULT_AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
@@ -41,22 +62,7 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
 
     # Check for a minimal set of required data variables
     # These are the variables required by the Nwp schema in contracts.data_schemas
-    required_vars = {
-        "temperature_2m",
-        "dew_point_temperature_2m",
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_u_100m",
-        "wind_v_100m",
-        "pressure_surface",
-        "pressure_reduced_to_mean_sea_level",
-        "geopotential_height_500hpa",
-        "downward_long_wave_radiation_flux_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "precipitation_surface",
-        "categorical_precipitation_type_surface",
-    }
-    missing_vars = required_vars - set(ds.data_vars)
+    missing_vars = REQUIRED_NWP_VARS - set(ds.data_vars)
     if missing_vars:
         raise MalformedZarrError(f"Dataset is missing required data variables: {missing_vars}")
 
@@ -132,8 +138,8 @@ def download_ecmwf(
     if ds is None:
         # Connect to the production icechunk store
         storage = icechunk.s3_storage(
-            bucket="dynamical-ecmwf-ifs-ens",
-            prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+            bucket=_SETTINGS.ecmwf_s3_bucket,
+            prefix=_SETTINGS.ecmwf_s3_prefix,
             region=DEFAULT_AWS_REGION,
             anonymous=True,
         )
@@ -161,24 +167,9 @@ def download_ecmwf(
     # to save network bandwidth and memory during the download process.
     # We also include the raw wind components (10u, 10v, 100u, 100v) which are
     # needed for calculating wind speed and direction later.
-    required_vars = {
-        "temperature_2m",
-        "dew_point_temperature_2m",
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_u_100m",
-        "wind_v_100m",
-        "pressure_surface",
-        "pressure_reduced_to_mean_sea_level",
-        "geopotential_height_500hpa",
-        "downward_long_wave_radiation_flux_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "precipitation_surface",
-        "categorical_precipitation_type_surface",
-    }
     # Cast to xr.Dataset to satisfy the type checker, as indexing with a list
     # can sometimes be misidentified as returning a DataArray.
-    ds = cast(xr.Dataset, ds[list(required_vars)])
+    ds = cast(xr.Dataset, ds[list(REQUIRED_NWP_VARS)])
 
     # FLAW-003: Check for empty coordinates before computing bounds to fail gracefully.
     if ds.longitude.size == 0 or ds.latitude.size == 0:
