@@ -11,15 +11,15 @@ from nged_substation_forecast.definitions import defs
 
 @pytest.mark.integration
 @pytest.mark.manual
-def test_xgboost_dagster_integration(tmp_path: Path) -> None:
+def test_xgboost_dagster_integration() -> None:
     """True integration test for XGBoost pipeline inside Dagster.
 
     Note: This test requires actual data in the Delta tables. In CI/CD environments
     without real NGED data, this test is skipped. Run manually with:
         uv run pytest tests/test_xgboost_dagster_integration.py -v -m manual
 
-    Args:
-        tmp_path: Path to a temporary directory provided by pytest.
+    The generated plot is saved to `tests/xgboost_dagster_integration_plot.html`
+    for manual inspection.
     """
     # 1. Get the job from definitions
     job = defs.get_job_def("xgboost_integration_job")
@@ -33,28 +33,28 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
 
     df = pl.scan_delta(str(actuals_path))
     max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
-    max_dt = cast(datetime | None, max_dt_df.get_column("timestamp").max())
+    max_dt = max_dt_df.get_column("timestamp").max()
 
     if max_dt is None:
         pytest.skip("No maximum timestamp found in data.")
 
     min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
-    min_dt = cast(datetime | None, min_dt_df.get_column("timestamp").min())
+    min_dt = min_dt_df.get_column("timestamp").min()
 
     if min_dt is None:
         pytest.skip("No minimum timestamp found in data.")
 
     # Check for sufficient data duration
-    total_duration = max_dt - min_dt
+    total_duration = cast(datetime, max_dt) - cast(datetime, min_dt)
     if total_duration < timedelta(days=30):
         pytest.skip(
             f"Insufficient data for integration test. Found {total_duration.days} days, require at least 30."
         )
 
-    test_end = max_dt.date()
+    test_end = cast(datetime, max_dt).date()
     test_start = test_end - timedelta(days=14)
     train_end = test_start - timedelta(days=1)
-    train_start = min_dt.date()
+    train_start = cast(datetime, min_dt).date()
 
     # Safety check: ensure train_start <= train_end
     if train_start > train_end:
@@ -63,14 +63,23 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
     # 3. Define the 5 substations for the test
     substations = [110375, 110644, 110772, 110803, 110804]
 
-    # 4. Define plot output path in temporary directory
-    plot_path = tmp_path / "xgboost_dagster_integration_plot.html"
+    # 4. Define plot output path
+    plot_path = Path("tests/xgboost_dagster_integration_plot.html")
 
     # 5. Provide run configuration
     run_config = {
         "ops": {
-            "live_primary_flows": {"config": {"substation_numbers": substations, "limit": 5}},
-            "processed_nwp_data": {"config": {"substation_ids": substations}},
+            "live_primary_flows": {
+                "config": {
+                    "substation_numbers": substations,
+                    "limit": 5,
+                }
+            },
+            "processed_nwp_data": {
+                "config": {
+                    "substation_ids": substations,
+                }
+            },
             "train_xgboost": {
                 "config": {
                     "train_start": str(train_start),
@@ -85,7 +94,11 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
                     "substation_ids": substations,
                 }
             },
-            "forecast_vs_actual_plot": {"config": {"output_path": str(plot_path)}},
+            "forecast_vs_actual_plot": {
+                "config": {
+                    "output_path": str(plot_path),
+                }
+            },
         }
     }
 
