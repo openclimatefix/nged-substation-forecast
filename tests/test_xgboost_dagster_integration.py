@@ -28,24 +28,32 @@ def test_xgboost_dagster_integration():
     if actuals_path.exists():
         df = pl.scan_delta(str(actuals_path))
         max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
-        max_dt = max_dt_df.get_column("timestamp").max()
+        max_dt = cast(datetime | None, max_dt_df.get_column("timestamp").max())
         if max_dt is None:
             train_start, train_end = date(2026, 1, 1), date(2026, 2, 28)
             test_start, test_end = date(2026, 3, 1), date(2026, 3, 14)
         else:
-            test_end = cast(datetime, max_dt).date()
+            min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
+            min_dt = cast(datetime | None, min_dt_df.get_column("timestamp").min())
+
+            if min_dt is None:
+                pytest.skip("No minimum timestamp found in data.")
+
+            # Check for sufficient data duration
+            total_duration = max_dt - min_dt
+            if total_duration < timedelta(days=30):
+                pytest.skip(
+                    f"Insufficient data for integration test. Found {total_duration.days} days, require at least 30."
+                )
+
+            test_end = max_dt.date()
             test_start = test_end - timedelta(days=14)
             train_end = test_start - timedelta(days=1)
-            min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
-            min_dt = min_dt_df.get_column("timestamp").min()
-            if min_dt is not None:
-                train_start = cast(datetime, min_dt).date()
-            else:
-                train_start = train_end - timedelta(days=60)
+            train_start = min_dt.date()
 
             # Safety check: ensure train_start <= train_end
             if train_start > train_end:
-                train_start = train_end - timedelta(days=30)
+                pytest.skip("Calculated train_start is after train_end. Insufficient data.")
     else:
         train_start = date(2026, 1, 1)
         train_end = date(2026, 2, 28)
@@ -103,6 +111,12 @@ def test_xgboost_dagster_integration():
 
     # 6. Assertions
     assert result.success, "Dagster job failed"
+
+    # Verify ensemble forecasts
+    predictions = result.output_for_node("evaluate_xgboost")
+    assert predictions["ensemble_member"].n_unique() > 1, (
+        "Model did not output multiple ensemble members"
+    )
 
     # Verify plot generation
     plot_path = Path("tests/xgboost_dagster_integration_plot.html")
