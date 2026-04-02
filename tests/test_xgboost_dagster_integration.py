@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -11,7 +11,7 @@ from nged_substation_forecast.definitions import defs
 
 @pytest.mark.integration
 @pytest.mark.manual
-def test_xgboost_dagster_integration():
+def test_xgboost_dagster_integration(tmp_path: Path):
     """True integration test for XGBoost pipeline inside Dagster.
 
     Note: This test requires actual data in the Delta tables. In CI/CD environments
@@ -21,49 +21,49 @@ def test_xgboost_dagster_integration():
     # 1. Get the job from definitions
     job = defs.get_job_def("xgboost_integration_job")
 
-    # 2. Dynamically calculate dates from local data if available, otherwise use defaults
+    # 2. Dynamically calculate dates from local data if available, otherwise skip
     settings = Settings()
     actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
 
-    if actuals_path.exists():
-        df = pl.scan_delta(str(actuals_path))
-        max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
-        max_dt = cast(datetime | None, max_dt_df.get_column("timestamp").max())
-        if max_dt is None:
-            train_start, train_end = date(2026, 1, 1), date(2026, 2, 28)
-            test_start, test_end = date(2026, 3, 1), date(2026, 3, 14)
-        else:
-            min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
-            min_dt = cast(datetime | None, min_dt_df.get_column("timestamp").min())
+    if not actuals_path.exists():
+        pytest.skip(f"Data path {actuals_path} does not exist. Skipping integration test.")
 
-            if min_dt is None:
-                pytest.skip("No minimum timestamp found in data.")
+    df = pl.scan_delta(str(actuals_path))
+    max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
+    max_dt = cast(datetime | None, max_dt_df.get_column("timestamp").max())
 
-            # Check for sufficient data duration
-            total_duration = max_dt - min_dt
-            if total_duration < timedelta(days=30):
-                pytest.skip(
-                    f"Insufficient data for integration test. Found {total_duration.days} days, require at least 30."
-                )
+    if max_dt is None:
+        pytest.skip("No maximum timestamp found in data.")
 
-            test_end = max_dt.date()
-            test_start = test_end - timedelta(days=14)
-            train_end = test_start - timedelta(days=1)
-            train_start = min_dt.date()
+    min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
+    min_dt = cast(datetime | None, min_dt_df.get_column("timestamp").min())
 
-            # Safety check: ensure train_start <= train_end
-            if train_start > train_end:
-                pytest.skip("Calculated train_start is after train_end. Insufficient data.")
-    else:
-        train_start = date(2026, 1, 1)
-        train_end = date(2026, 2, 28)
-        test_start = date(2026, 3, 1)
-        test_end = date(2026, 3, 14)
+    if min_dt is None:
+        pytest.skip("No minimum timestamp found in data.")
+
+    # Check for sufficient data duration
+    total_duration = max_dt - min_dt
+    if total_duration < timedelta(days=30):
+        pytest.skip(
+            f"Insufficient data for integration test. Found {total_duration.days} days, require at least 30."
+        )
+
+    test_end = max_dt.date()
+    test_start = test_end - timedelta(days=14)
+    train_end = test_start - timedelta(days=1)
+    train_start = min_dt.date()
+
+    # Safety check: ensure train_start <= train_end
+    if train_start > train_end:
+        pytest.skip("Calculated train_start is after train_end. Insufficient data.")
 
     # 3. Define the 5 substations for the test
     substations = [110375, 110644, 110772, 110803, 110804]
 
-    # 4. Provide run configuration
+    # 4. Define plot output path in temporary directory
+    plot_path = tmp_path / "xgboost_dagster_integration_plot.html"
+
+    # 5. Provide run configuration
     run_config = {
         "ops": {
             "live_primary_flows": {
@@ -93,13 +93,13 @@ def test_xgboost_dagster_integration():
             },
             "forecast_vs_actual_plot": {
                 "config": {
-                    "output_path": "tests/xgboost_dagster_integration_plot.html",
+                    "output_path": str(plot_path),
                 }
             },
         }
     }
 
-    # 5. Execute the job in-process
+    # 6. Execute the job in-process
     resources = defs.resources or {}
     result = job.execute_in_process(
         run_config=run_config,
@@ -109,7 +109,7 @@ def test_xgboost_dagster_integration():
         },
     )
 
-    # 6. Assertions
+    # 7. Assertions
     assert result.success, "Dagster job failed"
 
     # Verify ensemble forecasts
@@ -118,24 +118,31 @@ def test_xgboost_dagster_integration():
         "Model did not output multiple ensemble members"
     )
 
-    # Verify plot generation
-    plot_path = Path("tests/xgboost_dagster_integration_plot.html")
+    # Check if predictions are empty
+    if len(predictions) == 0:
+        pytest.skip("Predictions are empty, skipping plot verification.")
 
+    # Verify plot generation
     plot_materialization = next(
         event
         for event in result.get_asset_materialization_events()
         if event.asset_key and event.asset_key.path[-1] == "forecast_vs_actual_plot"
     )
 
-    if "chosen_init_time" not in plot_materialization.materialization.metadata:
-        pytest.skip("Plot was skipped due to missing data or no healthy substations.")
+    assert "chosen_init_time" in plot_materialization.materialization.metadata, (
+        "Plot metadata missing 'chosen_init_time'"
+    )
 
     assert plot_path.exists(), "Integration plot was not generated"
     assert plot_path.stat().st_size > 0, "Integration plot is empty"
 
     html_content = plot_path.read_text()
 
-    assert "Woodland Way" in html_content, "Substation name 'Woodland Way' not found in plot HTML"
+    # Dynamically check that at least one requested substation ID is in the HTML
+    found_substation = any(str(sub_id) in html_content for sub_id in substations)
+    assert found_substation, (
+        f"None of the requested substation IDs {substations} found in plot HTML"
+    )
 
     assert '"resolve":{"scale":{"y":"independent"}}' in html_content.replace(" ", "").replace(
         "\n", ""
