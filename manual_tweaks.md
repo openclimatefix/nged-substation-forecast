@@ -1,5 +1,4 @@
 # In `conf/model/xgboost.yaml`
-
 - Rename `latest_available_weekly_lag` to `latest_available_weekly_power_lag`
 
 # In `packages/dynamical_data/src/dynamical_data/processing.py`
@@ -10,3 +9,8 @@ appreciate that a new complexity is that the `Nwp` data contract uses float32, b
 `uint8`. Maybe the simplest answer that `process_ecmwf_dataset` does everything up to (but not
 including) the 8-bit rescaling? So it can validate and return a `pt.DataFrame[Nwp]` object? And we
 call `scale_to_uint8` from `download_and_scale_ecmwf`?
+
+
+# In `contracts`
+- Rename `SubstationFlows` to `SubstationPowerFlows`.
+
