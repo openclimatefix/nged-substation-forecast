@@ -7,6 +7,7 @@ from dagster import ResourceParam
 
 from contracts.settings import Settings
 from ml_core.data import downsample_power_flows
+from nged_data import clean_substation_flows
 
 
 class PlotConfig(dg.Config):
@@ -18,16 +19,15 @@ class PlotConfig(dg.Config):
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "cleaned_actuals": dg.AssetIn("cleaned_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
+    deps=["live_primary_flows"],
     compute_kind="python",
     group_name="plots",
 )
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    cleaned_actuals: pl.DataFrame,
     substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
@@ -35,6 +35,10 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
     # 3.1.B Specific 14-Day Forecast Selection
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
+    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
+    raw_flows = pl.scan_delta(delta_path)
+    cleaned_actuals = clean_substation_flows(cast(pl.DataFrame, raw_flows.collect()), settings)
+
     if predictions.is_empty() or cleaned_actuals.is_empty():
         context.log.warning("Empty predictions or actuals, skipping plot.")
         return
