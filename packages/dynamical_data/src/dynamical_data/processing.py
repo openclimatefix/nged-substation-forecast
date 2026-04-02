@@ -103,7 +103,7 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
 
 def download_and_scale_ecmwf(
     nwp_init_time: datetime, h3_grid: pt.DataFrame[H3GridWeights]
-) -> pt.DataFrame[Nwp]:
+) -> pl.DataFrame:
     """Download and scale ECMWF data for a specific initialization time.
 
     Args:
@@ -258,7 +258,7 @@ def process_ecmwf_dataset(
     nwp_init_time: datetime,
     loaded_ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
-) -> pt.DataFrame[Nwp]:
+) -> pl.DataFrame:
     """Vectorized processing of ECMWF dataset to H3 grid."""
     # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
@@ -355,6 +355,10 @@ def process_ecmwf_dataset(
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
 
+    # Validate before scaling to ensure the interpolated data matches the expected schema
+    # (The Nwp schema expects Float32 for weather variables)
+    processed = Nwp.validate(processed, drop_superfluous_columns=True)
+
     # DATA TYPE TRANSITION RATIONALE:
     # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
     #    space and bandwidth.
@@ -392,4 +396,4 @@ def process_ecmwf_dataset(
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
-    return Nwp.validate(scaled_df, drop_superfluous_columns=True)
+    return scaled_df

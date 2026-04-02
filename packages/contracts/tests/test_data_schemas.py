@@ -150,20 +150,20 @@ def test_nwp_validation():
         col: pl.UInt8
         for col in [
             "ensemble_member",
-            "temperature_2m",
-            "dew_point_temperature_2m",
-            "pressure_surface",
-            "pressure_reduced_to_mean_sea_level",
-            "geopotential_height_500hpa",
             "categorical_precipitation_type_surface",
-            "precipitation_surface",
-            "downward_short_wave_radiation_flux_surface",
-            "downward_long_wave_radiation_flux_surface",
         ]
     }
     nwp_vars_to_float32 = {
         col: pl.Float32
         for col in [
+            "temperature_2m",
+            "dew_point_temperature_2m",
+            "pressure_surface",
+            "pressure_reduced_to_mean_sea_level",
+            "geopotential_height_500hpa",
+            "precipitation_surface",
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
             "wind_u_10m",
             "wind_v_10m",
             "wind_u_100m",
