@@ -42,8 +42,8 @@ def forecast_vs_actual_plot(
         context.log.warning("Empty predictions, skipping plot.")
         return
 
-    # Extract unique substation numbers from predictions
-    pred_substations = predictions.get_column("substation_number").unique().to_list()
+    # Extract unique substation numbers from predictions and limit to 6 for plotting.
+    pred_substations = predictions.get_column("substation_number").unique().to_list()[:6]
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
     cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)

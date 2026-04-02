@@ -84,7 +84,15 @@ def get_cleaned_actuals_lazy(
     # We fetch the schema to force an immediate failure if the table is missing,
     # as pl.scan_delta() is lazy and might not fail until collection.
     lf = pl.scan_delta(delta_path)
-    lf.collect_schema()
+    schema = lf.collect_schema()
+
+    # Ensure timestamp has UTC timezone. Delta tables sometimes lose timezone info.
+    timestamp_dtype = schema["timestamp"]
+    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
+        lf = lf.with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))
+    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
+        lf = lf.with_columns(pl.col("timestamp").dt.convert_time_zone("UTC"))
+
     if context:
         context.log.info(f"Reading cleaned actuals from {delta_path}")
     return cast(pt.LazyFrame[SubstationPowerFlows], lf)
@@ -151,7 +159,7 @@ def cleaned_actuals(
     )
 
     # If the LazyFrame is empty, return empty validated DataFrame
-    if live_primary_flows.collect_schema().names() == []:
+    if cast(pl.DataFrame, live_primary_flows.select(pl.len()).collect()).item() == 0:
         context.log.warning("Input LazyFrame is empty, returning empty validated DataFrame.")
         empty_df = pl.DataFrame(schema=SubstationPowerFlows.dtypes)
         validated_empty = SubstationPowerFlows.validate(empty_df)
@@ -203,11 +211,24 @@ def cleaned_actuals(
         f"Data shape: {validated_df.shape}"
     )
 
-    # Save to Delta table
+    # Save to Delta table using overwrite with replace_where to ensure idempotency
+    # within the partition's time range.
+    min_time = cast(datetime, validated_df.get_column("timestamp").min())
+    max_time = cast(datetime, validated_df.get_column("timestamp").max())
+
     delta_path = _get_delta_path(settings, "cleaned_actuals")
-    validated_df.write_delta(
-        delta_path, mode="append", delta_write_options={"partition_by": ["substation_number"]}
-    )
+
+    if validated_df.is_empty():
+        context.log.info("No data to write to Delta table for this partition.")
+    else:
+        validated_df.write_delta(
+            delta_path,
+            mode="overwrite",
+            delta_write_options={
+                "partition_by": ["substation_number"],
+                "predicate": f"timestamp >= '{min_time.isoformat()}' AND timestamp <= '{max_time.isoformat()}'",
+            },
+        )
 
     context.log.info(f"Saved cleaned actuals to Delta table at {delta_path}")
 
