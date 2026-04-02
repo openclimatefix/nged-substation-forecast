@@ -1,5 +1,5 @@
 ---
-status: "Accepted"
+status: "Superseded by ADR-016"
 date: "2026-03-27"
 author: "Jack & opencode (gemini-3.1-pro-preview)"
 tags: ["mlops", "architecture", "interfaces", "polars"]
@@ -21,7 +21,7 @@ We need to support various machine learning model architectures (e.g., XGBoost, 
 * **Why it was rejected:** Violates the Open/Closed Principle. The class would grow infinitely and become unmaintainable as new model types are added.
 
 ### Option C: Abstract `BaseForecaster` with `LocalForecasters` Wrapper
-* **Description:** 
+* **Description:**
   1. Define a `BaseForecaster` abstract base class defining `fit()` and `predict()` methods operating on Polars DataFrames.
   2. Implement concrete model classes (e.g., `XGBoostForecaster`) inheriting from `BaseForecaster`.
   3. Create a `LocalForecasters` class (also adhering to a similar interface) that acts as a router/manager. It takes a configuration, instantiates the correct concrete model *per substation*, and handles the orchestration of training/predicting across multiple locations.

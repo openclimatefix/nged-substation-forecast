@@ -4,10 +4,10 @@ import polars as pl
 import pytest
 from hypothesis import given, strategies as st
 
-from contracts.data_schemas import Nwp, PowerForecast, SubstationFlows
+from contracts.data_schemas import Nwp, PowerForecast, SubstationPowerFlows
 
 
-def test_substation_flows_validation_mw_or_mva():
+def test_substation_power_flows_validation_mw_or_mva():
     # Valid with MW
     df_mw = pl.DataFrame(
         {
@@ -29,7 +29,7 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     # Should pass
-    SubstationFlows.validate(df_mw)
+    SubstationPowerFlows.validate(df_mw)
 
     # Valid with MVA
     df_mva = pl.DataFrame(
@@ -52,7 +52,7 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     # Should pass
-    SubstationFlows.validate(df_mva)
+    SubstationPowerFlows.validate(df_mva)
 
     # Invalid: neither MW nor MVA has data
     df_none = pl.DataFrame(
@@ -75,10 +75,10 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-        SubstationFlows.validate(df_none)
+        SubstationPowerFlows.validate(df_none)
 
 
-def test_substation_flows_validation_both():
+def test_substation_power_flows_validation_both():
     # Valid with both
     df_both = pl.DataFrame(
         {
@@ -100,7 +100,7 @@ def test_substation_flows_validation_both():
     )
 
     # Should pass
-    SubstationFlows.validate(df_both)
+    SubstationPowerFlows.validate(df_both)
 
 
 def test_power_forecast_validation():
@@ -112,6 +112,8 @@ def test_power_forecast_validation():
             "power_fcst_model_name": ["xgboost"],
             "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "nwp_init_hour": [0],
+            "lead_time_hours": [24.0],
             "power_fcst_init_year_month": ["2026-01"],
             "MW_or_MVA": [50.5],
         }
@@ -120,6 +122,8 @@ def test_power_forecast_validation():
             "substation_number": pl.Int32,
             "ensemble_member": pl.UInt8,
             "power_fcst_model_name": pl.Categorical,
+            "nwp_init_hour": pl.Int32,
+            "lead_time_hours": pl.Float32,
             "MW_or_MVA": pl.Float32,
         }
     )
@@ -150,20 +154,20 @@ def test_nwp_validation():
         col: pl.UInt8
         for col in [
             "ensemble_member",
-            "temperature_2m",
-            "dew_point_temperature_2m",
-            "pressure_surface",
-            "pressure_reduced_to_mean_sea_level",
-            "geopotential_height_500hpa",
             "categorical_precipitation_type_surface",
-            "precipitation_surface",
-            "downward_short_wave_radiation_flux_surface",
-            "downward_long_wave_radiation_flux_surface",
         ]
     }
     nwp_vars_to_float32 = {
         col: pl.Float32
         for col in [
+            "temperature_2m",
+            "dew_point_temperature_2m",
+            "pressure_surface",
+            "pressure_reduced_to_mean_sea_level",
+            "geopotential_height_500hpa",
+            "precipitation_surface",
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
             "wind_u_10m",
             "wind_v_10m",
             "wind_u_100m",
@@ -206,7 +210,7 @@ def test_nwp_validation():
     mva=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
     | st.none(),
 )
-def test_substation_flows_property_based(mw, mva):
+def test_substation_power_flows_property_based(mw, mva):
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
@@ -228,6 +232,6 @@ def test_substation_flows_property_based(mw, mva):
 
     if mw is None and mva is None:
         with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-            SubstationFlows.validate(df)
+            SubstationPowerFlows.validate(df)
     else:
-        SubstationFlows.validate(df)
+        SubstationPowerFlows.validate(df)

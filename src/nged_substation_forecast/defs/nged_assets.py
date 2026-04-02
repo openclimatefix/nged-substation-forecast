@@ -4,7 +4,7 @@ import random
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, NamedTuple, cast
@@ -28,7 +28,7 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from nged_data import ckan, process_live_primary_substation_flows
+from nged_data import ckan, process_live_primary_substation_power_flows
 from nged_data.substation_names import align
 
 
@@ -89,7 +89,7 @@ def _download_and_process_substation(
 
     # Process
     try:
-        new_df = process_live_primary_substation_flows(csv_data)
+        new_df = process_live_primary_substation_power_flows(csv_data)
     except MissingCorePowerVariablesError:
         log.info(f"Skipping substation {substation_number} because it lacks MW/MVA data.")
         # Return success but with no dataframe, so it gets recorded as processed
@@ -437,7 +437,6 @@ def substation_metadata(
 @dg.asset_check(asset="live_primary_flows")
 def substation_data_quality(
     context: dg.AssetCheckExecutionContext,
-    live_primary_flows: pl.LazyFrame,
     settings: dg.ResourceParam[Settings],
 ) -> dg.AssetCheckResult:
     """Check for stuck sensors and insane values in substation flows.
@@ -460,13 +459,28 @@ def substation_data_quality(
 
     Args:
         context: Asset check execution context.
-        live_primary_flows: Raw live primary flows (daily partitions).
         settings: Configuration with data quality thresholds.
 
     Returns:
         AssetCheckResult indicating whether the data quality check passed or failed,
         with metadata about affected substations.
     """
+    partition_key = context.partition_key
+    partition_date = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    delta_path = str(_get_delta_path(settings))
+
+    if not Path(delta_path).exists():
+        return dg.AssetCheckResult(
+            passed=True,
+            description="Delta table not found",
+            metadata={"warning": dg.MetadataValue.json("Delta table does not exist yet")},
+        )
+
+    # Manually load from Delta table and filter to the required ingested_at date.
+    # This fix is needed because live_primary_flows is a side-effect only asset.
+    live_primary_flows = pl.scan_delta(delta_path).filter(
+        pl.col("ingested_at") == pl.lit(partition_date)
+    )
 
     def _check_for_stuck_and_insane(df: pl.DataFrame) -> tuple[int, list[int], list[int]]:
         """Check for stuck sensors and insane values in a DataFrame.
@@ -494,12 +508,13 @@ def substation_data_quality(
         for col in cols_to_check:
             # Compute rolling std per substation
             stuck_mask = (
-                df.group_by("substation_number")
+                df.sort("timestamp")
+                .group_by("substation_number", maintain_order=True)
                 .agg(
                     stuck_vals=pl.col(col).rolling_std(window_size).fill_null(float("inf"))
                     < stuck_std_threshold
                 )
-                .with_columns(num_stuck=pl.col("stuck_vals").sum())
+                .with_columns(num_stuck=pl.col("stuck_vals").list.sum())
             )
 
             # Substations with any stuck values

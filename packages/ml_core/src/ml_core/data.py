@@ -1,10 +1,62 @@
 """Shared data processing logic for ML models."""
 
+from typing import cast
+
 import polars as pl
+
+from contracts.data_schemas import SubstationTargetMap
+
+
+def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
+    """Calculate the target map (power_col and peak_capacity) for each substation.
+
+    This function analyzes historical power flows to determine whether MW or MVA
+    is the more reliable target variable (based on data availability) and
+    calculates the peak capacity for normalization.
+
+    Args:
+        flows: Historical power flow data (LazyFrame or DataFrame).
+
+    Returns:
+        A Patito DataFrame containing the target map for each substation.
+    """
+    target_map_df = cast(
+        pl.DataFrame,
+        flows.lazy()
+        .group_by("substation_number")
+        .agg(
+            mw_count=pl.col("MW").is_not_null().sum(),
+            mva_count=pl.col("MVA").is_not_null().sum(),
+            peak_capacity_MW_or_MVA=pl.max_horizontal(
+                pl.col("MW").abs().max(), pl.col("MVA").abs().max()
+            ).fill_null(1.0),
+        )
+        .with_columns(
+            pl.when(pl.col("mw_count") >= pl.col("mva_count"))
+            .then(pl.lit("MW"))
+            .otherwise(pl.lit("MVA"))
+            .alias("power_col"),
+            pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
+            .then(pl.lit(1.0))
+            .otherwise(pl.col("peak_capacity_MW_or_MVA"))
+            .alias("peak_capacity_MW_or_MVA"),
+        )
+        .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
+        .collect(),
+    )
+
+    target_map_df = target_map_df.with_columns(
+        [
+            pl.col("substation_number").cast(pl.Int32),
+            pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
+        ]
+    )
+
+    return SubstationTargetMap.validate(target_map_df)
 
 
 def downsample_power_flows(
-    flows: pl.LazyFrame, target_map: pl.LazyFrame | None = None
+    flows: pl.LazyFrame | pl.DataFrame, target_map: pl.LazyFrame | pl.DataFrame | None = None
 ) -> pl.LazyFrame:
     """Downsample power flows to 30m using period-ending semantics.
 
@@ -24,7 +76,8 @@ def downsample_power_flows(
         Downsampled power flows.
     """
     downsampled = (
-        flows.sort("timestamp")
+        flows.lazy()
+        .sort("timestamp")
         .group_by_dynamic(
             "timestamp",
             every="30m",
@@ -43,7 +96,7 @@ def downsample_power_flows(
     if target_map is not None:
         # Only join the power_col from target_map to avoid bringing in extra columns like peak_capacity
         downsampled = downsampled.join(
-            target_map.select(["substation_number", "power_col"]),
+            target_map.lazy().select(["substation_number", "power_col"]),
             on="substation_number",
             how="left",
         )

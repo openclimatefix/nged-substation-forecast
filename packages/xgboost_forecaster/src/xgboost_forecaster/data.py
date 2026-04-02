@@ -14,6 +14,8 @@ from contracts.data_schemas import (
     SubstationMetadata,
 )
 from contracts.settings import Settings
+from ml_core.scaling import uint8_to_physical_unit
+from xgboost_forecaster.scaling import load_scaling_params
 
 
 log = logging.getLogger(__name__)
@@ -91,6 +93,18 @@ def load_nwp_run(
     if df.is_empty():
         raise RuntimeError(f"No data found for requested H3 indices in {file_path}")
 
+    # Descale data immediately to physical units (Float32)
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    schema = df.schema
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
+        df = df.with_columns(descale_exprs)
+
     return Nwp.validate(df)
 
 
@@ -144,14 +158,24 @@ def construct_historical_weather(
     combined = pl.concat(weather_dfs, how="diagonal")
     combined = combined.sort(["h3_index", "ensemble_member", "valid_time", "init_time"])
 
+    # Descale data immediately to physical units (Float32)
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    schema = combined.schema
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
+        combined = combined.with_columns(descale_exprs)
+
     return Nwp.validate(combined)
 
 
 def process_nwp_data(
     nwp: pl.LazyFrame,
     h3_indices: list[int],
-    target_horizon_hours: int,
-    publication_delay_hours: int = 3,
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
@@ -165,8 +189,6 @@ def process_nwp_data(
     Args:
         nwp: Raw NWP data.
         h3_indices: List of H3 indices to filter for.
-        target_horizon_hours: The forecast horizon we are targeting (e.g., 24).
-        publication_delay_hours: The delay between NWP initialization and availability.
 
     Returns:
         Processed NWP data.
@@ -174,126 +196,128 @@ def process_nwp_data(
     # 1. Filter by H3 indices to reduce data size
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
 
+    # Descale data immediately to physical units (Float32) before any interpolation
+    # or feature engineering. This ensures that interpolation happens in the
+    # physical space and prevents mixing scaled (UInt8) and unscaled variables
+    # in downstream calculations (like windchill or wind speed).
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    # (e.g., if the function is called with already-descaled data in tests).
+    schema = lf.collect_schema()
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
+        lf = lf.with_columns(descale_exprs)
+
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # We parameterize the lead time filter by the target horizon to eliminate
-    # lookahead bias. This ensures the model is trained on forecasts with the
-    # exact same accuracy as those available in production.
+    # We cap the lead time at 336 hours (14 days) because ECMWF ENS
+    # reliability drops significantly after day 14, and the model is only
+    # validated for a 14-day horizon.
     lf = (
         lf.with_columns(
             lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
         )
         .with_columns(pl.col("lead_time_hours").cast(pl.Float32))
-        # We cap the lead time at 336 hours (14 days) because ECMWF ENS
-        # reliability drops significantly after day 14, and the model is only
-        # validated for a 14-day horizon.
-        .filter(
-            (pl.col("lead_time_hours") >= (target_horizon_hours + publication_delay_hours))
-            & (pl.col("lead_time_hours") <= 336)
-        )
+        .filter(pl.col("lead_time_hours") <= 336)
     )
 
     # 3. Interpolation (Fixing Nulls)
-    # Vectorized approach using upsample and interpolate
-    # Add defensive check before collection
-    row_count = cast(pl.DataFrame, lf.select(pl.len()).collect()).item()
-    if row_count > 5_000_000:
-        log.warning(
-            f"Eagerly collecting a large NWP dataset ({row_count} rows) for interpolation. "
-            "This may cause OOM errors."
+    def _upsample_and_interpolate(df: pl.DataFrame) -> pl.DataFrame:
+        """Helper function to upsample and interpolate a batch of NWP data.
+
+        This function is applied lazily via map_batches to avoid eager collection
+        of the entire dataset.
+        """
+        if df.is_empty():
+            return df
+
+        # Ensure each group has at least two points for interpolation.
+        # Groups with only 1 row cannot be interpolated and would violate the
+        # 30-minute temporal resolution contract.
+        group_counts = df.group_by(["init_time", "h3_index", "ensemble_member"]).len()
+        total_groups = group_counts.height
+        single_row_groups = group_counts.filter(pl.col("len") == 1)
+
+        if single_row_groups.height > 0:
+            dropped_pct = (single_row_groups.height / total_groups) * 100 if total_groups > 0 else 0
+            log.warning(
+                f"Dropping {single_row_groups.height} groups ({dropped_pct:.2f}%) with only 1 row as they cannot be interpolated."
+            )
+            df = df.filter(pl.len().over(["init_time", "h3_index", "ensemble_member"]) > 1)
+
+        if df.is_empty():
+            return df
+
+        # Sort by valid_time as required by upsample
+        df = df.sort("valid_time")
+
+        # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
+        processed = df.upsample(
+            time_column="valid_time",
+            every="30m",
+            group_by=["init_time", "h3_index", "ensemble_member"],
+        ).sort(["init_time", "h3_index", "ensemble_member", "valid_time"])
+
+        # Interpolate all numeric columns, but forward-fill categorical ones.
+        categorical_cols = [
+            c for c in ["categorical_precipitation_type_surface"] if c in processed.columns
+        ]
+
+        numeric_cols = [
+            col
+            for col, dtype in processed.schema.items()
+            if dtype.is_numeric()
+            and col
+            not in [
+                "valid_time",
+                "h3_index",
+                "ensemble_member",
+                "init_time",
+                "lead_time_hours",
+            ]
+            and col not in categorical_cols
+        ]
+
+        # TEMPORAL INTERPOLATION & LEAKAGE:
+        # Interpolating over `valid_time` within a single `init_time` is NOT data leakage.
+        # All `valid_time` predictions in a single forecast run are generated simultaneously
+        # at `init_time`. We are not looking into the future of when the forecast was made,
+        # but merely interpolating the forecast's own future predictions to a higher
+        # temporal resolution (30m).
+        processed = processed.with_columns(
+            [
+                pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
+                for c in numeric_cols
+            ]
+            + [
+                # CATEGORICAL FORWARD-FILL:
+                # Linear interpolation is physically meaningless for categorical variables.
+                # For example, a value of 1.5 between 'rain' (1) and 'snow' (2) has no
+                # physical interpretation. We use forward-fill to maintain the discrete
+                # state of the weather condition until the next forecast step.
+                pl.col(c).forward_fill().over(["init_time", "h3_index", "ensemble_member"])
+                for c in categorical_cols
+            ]
         )
+        return processed
 
-    df = cast(pl.DataFrame, lf.collect())
-
-    if df.is_empty():
-        return lf.limit(0)
-
-    # Ensure each group has at least two points for interpolation.
-    # Groups with only 1 row cannot be interpolated and would violate the
-    # 30-minute temporal resolution contract.
-    group_counts = df.group_by(["init_time", "h3_index", "ensemble_member"]).len()
-    total_groups = group_counts.height
-    single_row_groups = group_counts.filter(pl.col("len") == 1)
-
-    if single_row_groups.height > 0:
-        dropped_pct = (single_row_groups.height / total_groups) * 100 if total_groups > 0 else 0
-        log.warning(
-            f"Dropping {single_row_groups.height} groups ({dropped_pct:.2f}%) with only 1 row as they cannot be interpolated."
-        )
-        df = df.filter(pl.len().over(["init_time", "h3_index", "ensemble_member"]) > 1)
-
-    if df.is_empty():
-        return lf.limit(0)
-
-    # Sort by valid_time as required by upsample
-    df = df.sort("valid_time")
-
-    # Upsample to 30m and interpolate for each H3 index, ensemble member, and init_time
-    processed = df.upsample(
-        time_column="valid_time",
-        every="30m",
-        group_by=["init_time", "h3_index", "ensemble_member"],
-    ).sort(["init_time", "h3_index", "ensemble_member", "valid_time"])
-
-    # Interpolate all numeric columns, but forward-fill categorical ones.
-    categorical_cols = [
-        c for c in ["categorical_precipitation_type_surface"] if c in processed.columns
-    ]
-
-    numeric_cols = [
-        col
-        for col, dtype in processed.schema.items()
-        if dtype.is_numeric()
-        and col
-        not in [
-            "valid_time",
-            "h3_index",
-            "ensemble_member",
-            "init_time",
-            "lead_time_hours",
-        ]
-        and col not in categorical_cols
-    ]
-
-    # TEMPORAL INTERPOLATION & LEAKAGE:
-    # Interpolating over `valid_time` within a single `init_time` is NOT data leakage.
-    # All `valid_time` predictions in a single forecast run are generated simultaneously
-    # at `init_time`. We are not looking into the future of when the forecast was made,
-    # but merely interpolating the forecast's own future predictions to a higher
-    # temporal resolution (30m).
-    #
-    # WIND VECTOR INTERPOLATION:
-    # We interpolate Cartesian components (u, v) linearly, which is physically
-    # realistic and avoids phantom high winds during direction shifts.
-    #
-    # RADIATION INTERPOLATION CAVEAT:
-    # Linear interpolation for solar radiation (`downward_short_wave_radiation_flux_surface`)
-    # between 3-hourly NWP points will "cut the corners" of the diurnal solar
-    # cycle, potentially underestimating peak solar generation. It is used as a
-    # baseline, and future iterations could use a clear-sky model to better
-    # preserve the diurnal cycle.
-    processed = processed.with_columns(
-        [
-            pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
-            for c in numeric_cols
-        ]
-        + [
-            # CATEGORICAL FORWARD-FILL:
-            # Linear interpolation is physically meaningless for categorical variables.
-            # For example, a value of 1.5 between 'rain' (1) and 'snow' (2) has no
-            # physical interpretation. We use forward-fill to maintain the discrete
-            # state of the weather condition until the next forecast step.
-            pl.col(c).forward_fill().over(["init_time", "h3_index", "ensemble_member"])
-            for c in categorical_cols
-        ]
+    # Apply upsample and interpolate lazily via group_by(...).map_groups(...)
+    # This is more memory-efficient than map_batches as it processes each group
+    # independently and allows Polars to optimize the execution.
+    processed_lf = lf.group_by(["init_time", "h3_index", "ensemble_member"]).map_groups(
+        _upsample_and_interpolate, schema=lf.collect_schema()
     )
 
-    # PHYSICAL WIND CALCULATION:
+    # PHYSICAL WIND CALCULATION (Lazy):
     # After interpolating U and V components, we calculate physical wind speed
     # and direction. This ensures the circular topology of wind direction is
     # preserved without needing complex circular interpolation logic.
     wind_cols = ["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"]
-    if all(c in processed.columns for c in wind_cols):
-        processed = processed.with_columns(
+    if all(c in processed_lf.collect_schema().names() for c in wind_cols):
+        processed_lf = processed_lf.with_columns(
             [
                 (pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2)
                 .sqrt()
@@ -311,10 +335,23 @@ def process_nwp_data(
         ).drop(wind_cols)
 
     # Recalculate lead_time_hours for the new 30m timestamps
-    processed = processed.with_columns(
+    processed_lf = processed_lf.with_columns(
         lead_time_hours=(
             (pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
         ).cast(pl.Float32)
     )
 
-    return processed.lazy()
+    # Final cast to Float32 for all physical variables to satisfy data contracts.
+    # We exclude H3 index and ensemble member as they are identifiers, and
+    # categorical columns which must remain as integers.
+    categorical_cols = ["categorical_precipitation_type_surface"]
+    physical_cols = [
+        col
+        for col, dtype in processed_lf.collect_schema().items()
+        if dtype.is_numeric()
+        and col not in ["h3_index", "ensemble_member"]
+        and col not in categorical_cols
+    ]
+    processed_lf = processed_lf.with_columns([pl.col(c).cast(pl.Float32) for c in physical_cols])
+
+    return processed_lf

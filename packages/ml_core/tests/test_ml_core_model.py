@@ -1,10 +1,10 @@
 import patito as pt
 import polars as pl
+from collections.abc import Mapping
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    ProcessedNwp,
-    SubstationFlows,
+    SubstationPowerFlows,
     SubstationMetadata,
 )
 from contracts.hydra_schemas import (
@@ -25,9 +25,9 @@ class MockForecaster(BaseForecaster):
     def train(
         self,
         config: ModelConfig,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
+        flows_30m: pl.LazyFrame,
         substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ):
         self.trained = True
         return self
@@ -36,8 +36,8 @@ class MockForecaster(BaseForecaster):
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
         inference_params: InferenceParams,
-        substation_power_flows: pt.LazyFrame[SubstationFlows],
-        nwps: dict[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
+        flows_30m: pl.LazyFrame,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
@@ -80,7 +80,7 @@ def test_local_forecasters():
         }
     )
 
-    sub_flows = pt.DataFrame[SubstationFlows](
+    sub_flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
             "substation_number": [1, 2],
@@ -103,7 +103,7 @@ def test_local_forecasters():
     # Train
     local_forecasters.train(
         config=config,
-        substation_power_flows=sub_flows,
+        flows_30m=sub_flows,
         substation_metadata=sub_meta,
     )
 
@@ -123,7 +123,7 @@ def test_local_forecasters():
     preds = local_forecasters.predict(
         substation_metadata=sub_meta,
         inference_params=inference_params,
-        substation_power_flows=sub_flows,
+        flows_30m=sub_flows,
     )
 
     assert len(preds) == 2

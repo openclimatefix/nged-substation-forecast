@@ -4,10 +4,10 @@ from pathlib import Path
 import patito as pt
 import polars as pl
 from contracts.data_schemas import ScalingParams
+from contracts.settings import PROJECT_ROOT
 
 # The scaling parameters are stored in the dynamical_data package assets.
-ASSETS_PATH = Path(__file__).resolve().parent.parent.parent.parent / "dynamical_data" / "assets"
-scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
+scaling_params_path = PROJECT_ROOT / "packages/dynamical_data/assets/ecmwf_scaling_params.csv"
 
 
 @lru_cache(maxsize=1)
@@ -17,14 +17,8 @@ def load_scaling_params(path: Path | None = None) -> pt.DataFrame[ScalingParams]
         return ScalingParams.validate(df, drop_superfluous_columns=True)
 
     if not scaling_params_path.exists():
-        # Fallback for if we are running from root or package
-        alt_path = Path("packages/xgboost_forecaster/scaling_params.csv")
-        if not alt_path.exists():
-            # If it still doesn't exist, we might be in trouble, but let's try to find it
-            raise FileNotFoundError(
-                f"Scaling params not found at {scaling_params_path}. Please set the XGBOOST_SCALING_PARAMS_PATH environment variable."
-            )
-        df = pl.read_csv(alt_path).with_columns(pl.col(pl.Float64).cast(pl.Float32))
-        return ScalingParams.validate(df, drop_superfluous_columns=True)
+        raise FileNotFoundError(
+            f"Scaling params not found at {scaling_params_path}. Please check the path."
+        )
     df = pl.read_csv(scaling_params_path).with_columns(pl.col(pl.Float64).cast(pl.Float32))
     return ScalingParams.validate(df, drop_superfluous_columns=True)

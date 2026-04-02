@@ -1,4 +1,6 @@
 import logging
+import os
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Union, cast
 
@@ -7,7 +9,7 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_target_map, downsample_power_flows
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +24,14 @@ def _slice_temporal_data(data: Any, start: date | str, end: date | str, time_col
         if time_col not in cols:
             return data
 
-        return data.filter(pl.col(time_col).is_between(start, end))
+        # If end is a date (but not a datetime), we want to include the entire day.
+        # Polars' is_between is inclusive, but if the column is datetime and end is date,
+        # it might only include up to 00:00:00 of that date.
+        if isinstance(end, date) and not isinstance(end, datetime):
+            end_filter = end + timedelta(days=1)
+            return data.filter((pl.col(time_col) >= start) & (pl.col(time_col) < end_filter))
+        else:
+            return data.filter(pl.col(time_col).is_between(start, end))
 
     return data
 
@@ -68,6 +77,18 @@ def train_and_log_model(
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
+    # We downsample power flows to 30m and calculate the target map here to centralize
+    # data preparation and ensure consistency across models.
+    if "substation_power_flows" in sliced_data:
+        flows = sliced_data.pop("substation_power_flows")
+        target_map = calculate_target_map(flows)
+        flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+        sliced_data["flows_30m"] = flows_30m
+
+        # Store target_map on the trainer if it supports it
+        if hasattr(trainer, "target_map"):
+            trainer.target_map = target_map
+
     model = trainer.train(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
@@ -135,7 +156,7 @@ def evaluate_and_save_model(
 
         if isinstance(first_nwp, pl.LazyFrame):
             df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
-            if not df.is_empty():
+            if not df.is_empty() and df.item() is not None:
                 delay_hours = getattr(config.model, "nwp_availability_delay_hours", 3)
                 forecast_time = df.item() + timedelta(hours=delay_hours)
 
@@ -144,14 +165,23 @@ def evaluate_and_save_model(
         power_fcst_model_name=model_name,
     )
 
+    # Downsample power flows to 30m for inference (lags)
+    if "substation_power_flows" in sliced_data:
+        flows = sliced_data.pop("substation_power_flows")
+        # Use the forecaster's existing target_map for consistency
+        target_map_lf = forecaster.target_map.lazy() if hasattr(forecaster, "target_map") else None
+        flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
+        sliced_data["flows_30m"] = flows_30m
+
     results_df = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     )
 
     # 3. Calculate Metrics per lead_time
-    if "substation_power_flows" in sliced_data:
+    if "flows_30m" in sliced_data:
         actuals = cast(
-            pl.DataFrame, downsample_power_flows(sliced_data["substation_power_flows"]).collect()
+            pl.DataFrame,
+            sliced_data["flows_30m"].collect(),
         )
 
         # Join predictions with actuals
@@ -166,7 +196,10 @@ def evaluate_and_save_model(
             target_map_df = forecaster.target_map
             if isinstance(target_map_df, pl.LazyFrame):
                 target_map_df = target_map_df.collect()
-            # Cast to normal Polars DataFrame to avoid Patito type mismatch errors
+
+            # We cast to pl.DataFrame here because eval_df and target_map_df are
+            # different Patito models. Polars' join method on Patito subclasses
+            # enforces that both sides have the same type, which would fail here.
             eval_df = pl.DataFrame(eval_df).join(
                 pl.DataFrame(target_map_df).select(
                     ["substation_number", "peak_capacity_MW_or_MVA"]
@@ -229,32 +262,47 @@ def evaluate_and_save_model(
             # Log metrics to MLflow
             mlflow.set_experiment(model_name)
             with mlflow.start_run(run_name=f"{model_name}_eval"):
+                # 1. Metric Thinning: Log only key operational horizons
+                key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
                 for row in metrics.iter_rows(named=True):
-                    lt = float(row["lead_time_hours"])
-                    mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
-                    mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                    mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+                    lt = round(float(row["lead_time_hours"]), 1)
+                    if lt in key_horizons:
+                        if row["MAE"] is not None:
+                            mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                        if row["RMSE"] is not None:
+                            mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                        if row["nMAE"] is not None:
+                            mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
-                # Log global metrics
-                mlflow.log_metric(
-                    "MAE_global",
-                    eval_df.select((pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()).item(),
-                )
-                mlflow.log_metric(
-                    "RMSE_global",
-                    eval_df.select(
-                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
-                    ).item(),
-                )
-                mlflow.log_metric(
-                    "nMAE_global",
-                    eval_df.select(
-                        (
-                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
-                            / pl.col("peak_capacity_MW_or_MVA")
-                        ).mean()
-                    ).item(),
-                )
+                # 2. Log global aggregate metrics
+                mae_global = eval_df.select(
+                    (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()
+                ).item()
+                if mae_global is not None:
+                    mlflow.log_metric("mean_mae_all_horizons", mae_global)
+                    # Keep MAE_global for backward compatibility
+                    mlflow.log_metric("MAE_global", mae_global)
+
+                rmse_global = eval_df.select(
+                    ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
+                ).item()
+                if rmse_global is not None:
+                    mlflow.log_metric("RMSE_global", rmse_global)
+
+                nmae_global = eval_df.select(
+                    (
+                        (pl.col("MW_or_MVA") - pl.col("actual")).abs()
+                        / pl.col("peak_capacity_MW_or_MVA")
+                    ).mean()
+                ).item()
+                if nmae_global is not None:
+                    mlflow.log_metric("nMAE_global", nmae_global)
+
+                # 3. Save full granular evaluation dataframe as Parquet artifact
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
+                    eval_df.write_parquet(eval_df_path)
+                    mlflow.log_artifact(eval_df_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:

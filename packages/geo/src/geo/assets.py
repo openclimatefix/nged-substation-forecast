@@ -1,7 +1,6 @@
 import importlib.resources
 
 import h3.api.basic_int as h3
-import patito as pt
 import polars as pl
 import pyproj
 import shapely
@@ -67,7 +66,7 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
 @asset(group_name="reference_data")
 def gb_h3_grid_weights(
     context: AssetExecutionContext, config: H3GridConfig, uk_boundary: BaseGeometry
-) -> pt.DataFrame[H3GridWeights]:
+) -> pl.DataFrame:
     """Computes the H3 grid weights for Great Britain based on the UK boundary.
 
     This asset dynamically generates the spatial mapping between the hexagonal H3 grid

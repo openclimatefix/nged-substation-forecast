@@ -103,7 +103,7 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
 
 def download_and_scale_ecmwf(
     nwp_init_time: datetime, h3_grid: pt.DataFrame[H3GridWeights]
-) -> pt.DataFrame[Nwp]:
+) -> pl.DataFrame:
     """Download and scale ECMWF data for a specific initialization time.
 
     Args:
@@ -116,7 +116,45 @@ def download_and_scale_ecmwf(
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
 
     loaded_ds = download_ecmwf(utc_nwp_init_time, h3_grid=h3_grid)
-    return process_ecmwf_dataset(nwp_init_time=nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid)
+    processed = process_ecmwf_dataset(
+        nwp_init_time=nwp_init_time, loaded_ds=loaded_ds, h3_grid=h3_grid
+    )
+
+    # DATA TYPE TRANSITION RATIONALE:
+    # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
+    #    space and bandwidth.
+    # 2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
+    #    to maintain precision and avoid rounding errors during aggregation.
+    # 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
+    #    in the ML model.
+    #
+    # We do NOT cast back to UInt8 in memory because:
+    # - It would cause a "staircase" effect by quantizing interpolated values, defeating
+    #   the purpose of 30-minute upsampling.
+    # - It risks silent underflow during differencing operations (e.g., calculating trends
+    #   like temp_trend_6h = current - lagged).
+
+    # Load scaling parameters
+    scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
+    scaling_params = load_scaling_params(scaling_params_path)
+
+    # CIRCULAR VARIABLE SCALING:
+    # Exclude categorical variables and wind components from empirical min-max scaling.
+    # Storing wind components as Float32 avoids destroying circular topology via
+    # min-max scaling and simplifies downstream processing.
+    scaling_params = scaling_params.filter(
+        ~pl.col("col_name").is_in(
+            [
+                "categorical_precipitation_type_surface",
+                "wind_u_10m",
+                "wind_v_10m",
+                "wind_u_100m",
+                "wind_v_100m",
+            ]
+        )
+    )
+
+    return scale_to_uint8(processed, scaling_params)
 
 
 def download_ecmwf(
@@ -355,41 +393,9 @@ def process_ecmwf_dataset(
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
 
-    # DATA TYPE TRANSITION RATIONALE:
-    # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
-    #    space and bandwidth.
-    # 2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
-    #    to maintain precision and avoid rounding errors during aggregation.
-    # 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
-    #    in the ML model.
-    #
-    # We do NOT cast back to UInt8 in memory because:
-    # - It would cause a "staircase" effect by quantizing interpolated values, defeating
-    #   the purpose of 30-minute upsampling.
-    # - It risks silent underflow during differencing operations (e.g., calculating trends
-    #   like temp_trend_6h = current - lagged).
+    # Sort before validation to ensure consistent output order
+    processed = processed.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
-    # Load scaling parameters
-    scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
-    scaling_params = load_scaling_params(scaling_params_path)
-
-    # CIRCULAR VARIABLE SCALING:
-    # Exclude categorical variables and wind components from empirical min-max scaling.
-    # Storing wind components as Float32 avoids destroying circular topology via
-    # min-max scaling and simplifies downstream processing.
-    scaling_params = scaling_params.filter(
-        ~pl.col("col_name").is_in(
-            [
-                "categorical_precipitation_type_surface",
-                "wind_u_10m",
-                "wind_v_10m",
-                "wind_u_100m",
-                "wind_v_100m",
-            ]
-        )
-    )
-
-    scaled_df = scale_to_uint8(processed, scaling_params)
-    scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
-
-    return Nwp.validate(scaled_df, drop_superfluous_columns=True)
+    # Validate to ensure the interpolated data matches the expected schema
+    # (The Nwp schema expects Float32 for weather variables)
+    return Nwp.validate(processed, drop_superfluous_columns=True)

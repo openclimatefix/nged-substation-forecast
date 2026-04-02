@@ -8,10 +8,9 @@ from typing import cast
 from contracts.data_schemas import (
     InferenceParams,
     ProcessedNwp,
-    SubstationFlows,
     SubstationMetadata,
 )
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.data import (
     DataConfig,
     load_nwp_run,
@@ -25,6 +24,7 @@ from contracts.hydra_schemas import (
     NwpModel,
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
+from contracts.settings import Settings
 import dagster as dg
 from src.nged_substation_forecast.defs.xgb_assets import train_xgboost, XGBoostConfig
 
@@ -171,7 +171,7 @@ def test_process_nwp_data_removes_zero_lead_time():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
 
     # Remaining valid_times: 03:00, 04:00, 05:00.
     # Upsampling to 30m will create: 03:00, 03:30, 04:00, 04:30, 05:00.
@@ -202,7 +202,7 @@ def test_process_nwp_data_interpolates_safely_within_trajectories():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
 
     # We should have 3 rows for init_time_1 (00:00, 00:30, 01:00)
     # and 3 rows for init_time_2 (00:00, 00:30, 01:00)
@@ -273,18 +273,38 @@ def test_prepare_training_data_prevents_row_explosion():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_power_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -292,11 +312,11 @@ def test_prepare_training_data_prevents_row_explosion():
         # Get the X dataframe passed to fit
         X = mock_fit.call_args[0][0]
 
-        # 1 power flow row * 4 init_times * 50 ensemble members = 200 rows
-        assert X.shape[0] == 200
+        # 1 power flow row * 4 init_times * 1 ensemble member (control) = 4 rows
+        assert X.shape[0] == 4
 
 
-def test_train_xgboost_asset_filters_to_control_member():
+def test_train_xgboost_asset_filters_to_control_member(tmp_path):
     # Create NWP with members 0, 1, 2
     nwp = pl.DataFrame(
         {
@@ -317,7 +337,16 @@ def test_train_xgboost_asset_filters_to_control_member():
             # Include MW_or_MVA since the train_xgboost asset expects it after merging
             "MW_or_MVA": [1.0],
         }
-    ).lazy()
+    ).with_columns(pl.col("MVA").cast(pl.Float64))
+
+    # Write flows to Delta as the asset now loads from Delta
+    delta_dir = tmp_path / "delta"
+    live_flows_path = delta_dir / "live_primary_flows"
+    live_flows_path.mkdir(parents=True)
+    flows.write_delta(str(live_flows_path))
+
+    settings = Settings(nged_data_path=tmp_path)
+
     metadata = pl.DataFrame(
         {
             "substation_number": [123],
@@ -333,8 +362,8 @@ def test_train_xgboost_asset_filters_to_control_member():
         train_xgboost(
             context=context,
             config=config,
+            settings=settings,
             nwp=nwp,
-            substation_power_flows=flows,
             substation_metadata=metadata,
         )
 
@@ -347,7 +376,7 @@ def test_train_xgboost_asset_filters_to_control_member():
         assert passed_nwp["ensemble_member"][0] == 0
 
 
-def test_latest_available_weekly_lag_prevents_leakage():
+def test_latest_available_weekly_power_lag_prevents_leakage():
     # Test that the dynamic lag logic correctly switches from 7d to 14d
     # when lead_time_hours > 168 (7 days)
 
@@ -421,18 +450,38 @@ def test_latest_available_weekly_lag_prevents_leakage():
     config = ModelConfig(
         power_fcst_model_name="test",
         hyperparameters=XGBoostHyperparameters().model_dump(),
-        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG]),
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG],
+            feature_names=[
+                "substation_number",
+                "lead_time_hours",
+                "latest_available_weekly_power_lag",
+                "temperature_2m",
+                "downward_short_wave_radiation_flux_surface",
+                "wind_speed_10m",
+                "hour_sin",
+                "hour_cos",
+                "day_of_year_sin",
+                "day_of_year_cos",
+                "day_of_week",
+            ],
+        ),
     )
 
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationFlows, SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
+        forecaster.target_map = target_map
         forecaster.train(
             config=config,
-            substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+            flows_30m=cast(pt.LazyFrame, flows_30m),
             substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -440,18 +489,18 @@ def test_latest_available_weekly_lag_prevents_leakage():
         X_arrow = mock_fit.call_args[0][0]
         X = cast(pl.DataFrame, pl.from_arrow(X_arrow))
 
-        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0 / 1414.0
-        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0 / 1414.0 = 1.0
+        # Row 0: lead_time=24 -> should have latest_available_weekly_power_lag = 77.0 / 1414.0
+        # Row 1: lead_time=240 -> should have latest_available_weekly_power_lag = 1414.0 / 1414.0 = 1.0
         # Note: Polars might reorder rows, so we filter
 
         # We need to find which row is which. We can use lead_time_hours if it's in X.
         # It should be there because it's numeric and not in exclude_cols.
 
         row_short = X.filter(pl.col("lead_time_hours") == 24.0)
-        assert row_short["latest_available_weekly_lag"][0] == pytest.approx(77.0 / 1414.0)
+        assert row_short["latest_available_weekly_power_lag"][0] == pytest.approx(77.0 / 1414.0)
 
         row_long = X.filter(pl.col("lead_time_hours") == 240.0)
-        assert row_long["latest_available_weekly_lag"][0] == pytest.approx(1.0)
+        assert row_long["latest_available_weekly_power_lag"][0] == pytest.approx(1.0)
 
 
 def test_xgboost_predict_with_lags():
@@ -502,25 +551,20 @@ def test_xgboost_predict_with_lags():
         ]
     ).lazy()
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     forecaster = XGBoostForecaster()
     # Set target_map for normalization/descaling
-    from contracts.data_schemas import SubstationTargetMap
 
-    forecaster.target_map = SubstationTargetMap.validate(
-        pl.DataFrame(
-            {
-                "substation_number": pl.Series([1], dtype=pl.Int32),
-                "power_col": ["MW"],
-                "peak_capacity_MW_or_MVA": pl.Series([100.0], dtype=pl.Float32),
-            }
-        )
-    )
+    forecaster.target_map = target_map
 
     # Mock the model and its feature_names_in_
     mock_model = patch("xgboost.XGBRegressor").start()
     mock_model.feature_names_in_ = [
-        "temperature_2m_uint8_scaled",
-        "latest_available_weekly_lag",
+        "temperature_2m",
+        "latest_available_weekly_power_lag",
         "hour_sin",
         "hour_cos",
         "day_of_year_sin",
@@ -529,6 +573,7 @@ def test_xgboost_predict_with_lags():
     ]
     mock_model.predict.return_value = [1.0]  # Normalized prediction
     forecaster.model = mock_model
+    forecaster.feature_names = mock_model.feature_names_in_
 
     inference_params = InferenceParams(
         forecast_time=inference_nwp_init_time,
@@ -539,11 +584,11 @@ def test_xgboost_predict_with_lags():
         substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
         inference_params=inference_params,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-        substation_power_flows=cast(pt.LazyFrame[SubstationFlows], flows),
+        flows_30m=cast(pt.LazyFrame, flows_30m),
     )
 
     assert len(preds) == 1
-    assert preds["MW_or_MVA"][0] == 100.0
+    assert preds["MW_or_MVA"][0] == 1414.0
     # Check that the lag was correctly picked up (77.0 for 1-day lead time)
     # We can't easily check the internal X dataframe without more patching,
     # but the fact that it didn't crash is a good sign.

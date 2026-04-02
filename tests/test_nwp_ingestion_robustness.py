@@ -89,10 +89,9 @@ def test_valid_production_like_zarr_loading(production_like_zarr_path, h3_grid):
 
     assert isinstance(processed_df, pl.DataFrame)
     assert not processed_df.is_empty()
-    # Check for scaled columns (uint8)
-    # Note: process_ecmwf_dataset returns Nwp-validated DF, which has original names but uint8 dtype
+    # Check for Float32 columns (as per Nwp schema)
     assert "temperature_2m" in processed_df.columns
-    assert processed_df["temperature_2m"].dtype == pl.UInt8
+    assert processed_df["temperature_2m"].dtype == pl.Float32
 
 
 @pytest.mark.parametrize(

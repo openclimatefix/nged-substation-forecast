@@ -2,15 +2,17 @@ import dagster as dg
 import polars as pl
 from typing import cast
 from datetime import date
-from hydra import compose, initialize
+from hydra import compose, initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 from pydantic import Field, field_validator
 
 from contracts.hydra_schemas import NwpModel, TrainingConfig
 from contracts.data_schemas import PowerForecast
+from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 
+from nged_data import clean_substation_flows
 from xgboost_forecaster.model import XGBoostForecaster
 
 
@@ -53,11 +55,11 @@ class XGBoostConfig(dg.Config):
 
 def load_hydra_config(model_name: str) -> TrainingConfig:
     """Load the Hydra configuration for a specific model."""
-    if not GlobalHydra.instance().is_initialized():
-        initialize(version_base=None, config_path="../../../conf")
-    cfg = compose(config_name="config", overrides=[f"model={model_name}"])
-    cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
-    return TrainingConfig(**cfg_dict)
+    GlobalHydra.instance().clear()
+    with initialize_config_dir(config_dir=str(PROJECT_ROOT / "conf"), version_base=None):
+        cfg = compose(config_name="config", overrides=[f"model={model_name}"])
+        cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
+        return TrainingConfig(**cfg_dict)
 
 
 def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) -> TrainingConfig:
@@ -133,17 +135,17 @@ def _get_target_substations(
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "substation_power_flows": dg.AssetIn("cleaned_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="models",
 )
 def train_xgboost(
     context: dg.AssetExecutionContext,
     config: XGBoostConfig,
+    settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
-    substation_power_flows: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
@@ -164,21 +166,30 @@ def train_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Collect to get a DataFrame for metadata operations
-    # Note: The actuals may still have nulls; these will be dropped after feature engineering
-    from typing import cast as type_cast
+    # Manually load from Delta table to ensure we have the full training range.
+    # We use live_primary_flows as the source because cleaned_actuals is partitioned
+    # and might not have been backfilled for the entire range.
+    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
+    raw_flows = pl.scan_delta(delta_path)
 
-    substation_power_flows_df: pl.DataFrame = type_cast(
-        pl.DataFrame, substation_power_flows.collect()
-    )
-    healthy_substations: list[int] = []
-    if len(substation_power_flows_df) > 0:
-        healthy_substations = (
-            substation_power_flows_df.filter(pl.col("MW_or_MVA").is_not_null())
-            .get_column("substation_number")
+    # Clean the data to ensure consistency with the cleaned_actuals asset
+    substation_power_flows = clean_substation_flows(
+        cast(pl.DataFrame, raw_flows.collect()), settings
+    ).lazy()
+
+    # Identify healthy substations using lazy evaluation to avoid massive eager collection
+    # Note: The actuals may still have nulls; these will be dropped after feature engineering
+    healthy_substations = (
+        cast(
+            pl.DataFrame,
+            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
+            .select("substation_number")
             .unique()
-            .to_list()
+            .collect(),
         )
+        .get_column("substation_number")
+        .to_list()
+    )
 
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)
@@ -217,18 +228,18 @@ def train_xgboost(
     ins={
         "model": dg.AssetIn("train_xgboost"),
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "substation_power_flows": dg.AssetIn("cleaned_actuals"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="models",
 )
 def evaluate_xgboost(
     context: dg.AssetExecutionContext,
     config: XGBoostConfig,
+    settings: dg.ResourceParam[Settings],
     model: XGBoostForecaster,
     nwp: pl.LazyFrame,
-    substation_power_flows: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
 ):
     """Evaluate the XGBoost model and generate forecasts.
@@ -243,18 +254,22 @@ def evaluate_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Collect to determine healthy substations from the actuals data
-    substation_power_flows_df: pl.DataFrame = __import__("typing").cast(
-        pl.DataFrame, substation_power_flows.collect()
-    )
-    healthy_substations: list[int] = []
-    if len(substation_power_flows_df) > 0:
-        healthy_substations = (
-            substation_power_flows_df.filter(pl.col("MW_or_MVA").is_not_null())
-            .get_column("substation_number")
+    # Manually load from Delta table to ensure we have the full evaluation range.
+    delta_path = str(settings.nged_data_path / "delta" / "cleaned_actuals")
+    substation_power_flows = pl.scan_delta(delta_path)
+
+    # Identify healthy substations using lazy evaluation to avoid massive eager collection
+    healthy_substations = (
+        cast(
+            pl.DataFrame,
+            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
+            .select("substation_number")
             .unique()
-            .to_list()
+            .collect(),
         )
+        .get_column("substation_number")
+        .to_list()
+    )
 
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)

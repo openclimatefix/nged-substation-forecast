@@ -5,16 +5,19 @@ import patito as pt
 from datetime import datetime, timezone
 from typing import cast
 from unittest.mock import MagicMock
+from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
     ModelFeaturesConfig,
+    NwpModel,
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
-    SubstationFlows,
+    SubstationPowerFlows,
     SubstationMetadata,
     InferenceParams,
+    ProcessedNwp,
 )
 
 
@@ -48,7 +51,7 @@ def test_train_handles_missing_init_time():
     )
     forecaster = XGBoostForecaster()
 
-    flows = pt.DataFrame[SubstationFlows](
+    flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
             "substation_number": [1],
@@ -71,11 +74,19 @@ def test_train_handles_missing_init_time():
         }
     )
 
+    # Centralized data preparation
+    target_map = calculate_target_map(flows)
+    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+
     # This should no longer raise ColumnNotFoundError for init_time
     # It might fail later due to missing features in the mock setup, but not on init_time
     try:
+        forecaster.target_map = target_map
         forecaster.train(
-            config=config, substation_power_flows=flows, substation_metadata=metadata, nwps={}
+            config=config,
+            flows_30m=cast(pt.LazyFrame, flows_30m),
+            substation_metadata=metadata,
+            nwps={},
         )
     except pl_exc.ColumnNotFoundError as e:
         assert "init_time" not in str(e)
@@ -93,8 +104,8 @@ def test_train_handles_missing_init_time():
         (None, None, True),
     ],
 )
-def test_substation_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
-    """Test SubstationFlows validation with various MW/MVA combinations."""
+def test_substation_power_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
+    """Test SubstationPowerFlows validation with various MW/MVA combinations."""
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
@@ -117,9 +128,9 @@ def test_substation_flows_validation_mw_mva_combinations(mw, mva, expected_fail)
 
     if expected_fail:
         with pytest.raises(MissingCorePowerVariablesError):
-            SubstationFlows.validate(df)
+            SubstationPowerFlows.validate(df)
     else:
-        SubstationFlows.validate(df)
+        SubstationPowerFlows.validate(df)
 
 
 def test_process_nwp_data_empty_input():
@@ -136,14 +147,24 @@ def test_process_nwp_data_empty_input():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
     assert res.is_empty()
 
 
-def test_predict_with_empty_features_matrix():
-    """Test predict when the feature matrix is empty."""
+def test_predict_with_missing_feature_column_fails_loudly():
+    """Test that predict fails when a feature column used during training is missing."""
     forecaster = XGBoostForecaster()
-    forecaster.model = MagicMock()
+
+    # Mock model with specific feature names
+    mock_model = MagicMock()
+    mock_model.feature_names_in_ = ["feature_a", "feature_b"]
+    forecaster.model = mock_model
+    forecaster.feature_names = ["feature_a", "feature_b"]
+
+    # Mock target map
+    forecaster.target_map = pl.DataFrame(
+        {"substation_number": [1], "power_col": ["MW"], "peak_capacity_MW_or_MVA": [100.0]}
+    ).with_columns(pl.col("substation_number").cast(pl.Int32))
 
     metadata = pt.DataFrame[SubstationMetadata](
         {
@@ -158,23 +179,64 @@ def test_predict_with_empty_features_matrix():
     )
 
     inference_params = InferenceParams(
-        forecast_time=datetime(2024, 1, 1, tzinfo=timezone.utc), power_fcst_model_name="test"
+        forecast_time=datetime(2024, 1, 1, 4, tzinfo=timezone.utc), power_fcst_model_name="test"
     )
 
-    # Empty NWPs will cause a ValueError as per code
-    with pytest.raises(ValueError, match="XGBoostForecaster requires NWP data for prediction."):
+    # NWP with all critical features
+    nwp = cast(
+        pt.LazyFrame[ProcessedNwp],
+        pl.DataFrame(
+            {
+                "init_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "valid_time": [datetime(2024, 1, 1, 6, tzinfo=timezone.utc)],
+                "h3_index": [1],
+                "ensemble_member": [0],
+                "temperature_2m": [10.0],
+                "dew_point_temperature_2m": [5.0],
+                "wind_speed_10m": [2.0],
+                "wind_direction_10m": [180.0],
+                "wind_speed_100m": [3.0],
+                "wind_direction_100m": [185.0],
+                "pressure_surface": [100.0],
+                "pressure_reduced_to_mean_sea_level": [101.0],
+                "geopotential_height_500hpa": [50.0],
+                "downward_short_wave_radiation_flux_surface": [100.0],
+                "categorical_precipitation_type_surface": [0.0],
+                "precipitation_surface": [0.0],
+                "downward_long_wave_radiation_flux_surface": [0.0],
+            }
+        )
+        .with_columns(
+            [
+                pl.col("h3_index").cast(pl.UInt64),
+                pl.col("ensemble_member").cast(pl.UInt8),
+                pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
+            ]
+        )
+        .lazy(),
+    )
+
+    flows = (
+        pl.DataFrame(
+            {
+                "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+                "substation_number": [1],
+                "MW": [50.0],
+                "MVA": [50.0],
+                "MVAr": [0.0],
+                "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+            }
+        )
+        .with_columns(pl.col("substation_number").cast(pl.Int32))
+        .lazy()
+    )
+    flows_30m = downsample_power_flows(flows, target_map=forecaster.target_map.lazy())
+
+    # This should fail because feature_a and feature_b are missing from the prepared data
+    with pytest.raises(pl_exc.ColumnNotFoundError):
         forecaster.predict(
             substation_metadata=metadata,
             inference_params=inference_params,
-            substation_power_flows=pt.DataFrame[SubstationFlows](
-                {
-                    "timestamp": [],
-                    "substation_number": [],
-                    "MW": [],
-                    "MVA": [],
-                    "MVAr": [],
-                    "ingested_at": [],
-                }
-            ).lazy(),
-            nwps={},
+            flows_30m=cast(pt.LazyFrame, flows_30m),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         )

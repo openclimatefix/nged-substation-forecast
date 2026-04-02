@@ -12,7 +12,7 @@ Key Design Decisions:
    instead of removing rows or imputing. This preserves the strict 30-minute temporal
    grid which is critical for accurate lag and rolling feature generation downstream.
 
-2. **Patito Validation**: The output is validated against the `SubstationFlows` schema
+2. **Patito Validation**: The output is validated against the `SubstationPowerFlows` schema
    which allows null values. This enforces data contracts at the asset boundary.
 
 3. **Metadata Join**: The join with `substation_metadata` is performed here to ensure
@@ -37,15 +37,14 @@ have 48 periods (24 hours) of historical data available, even at the partition b
 import dagster as dg
 import polars as pl
 from typing import cast
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dagster import (
     AssetIn,
     ResourceParam,
-    TimeWindowPartitionMapping,
     DailyPartitionsDefinition,
 )
 
-from contracts.data_schemas import SubstationFlows
+from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
 from nged_data import clean_substation_flows
 
@@ -67,26 +66,20 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
     partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
     auto_materialize_policy=dg.AutoMaterializePolicy.eager(),
     ins={
-        # Use TimeWindowPartitionMapping to include lookback from previous partitions.
-        # This ensures rolling window calculations at the start of each partition
-        # have sufficient history (48 periods = 24 hours) to avoid NaN issues.
-        "live_primary_flows": AssetIn(
-            partition_mapping=TimeWindowPartitionMapping(start_offset=-1, end_offset=0),
-        ),
         "substation_metadata": AssetIn("substation_metadata"),
     },
+    deps=["live_primary_flows"],
 )
 def cleaned_actuals(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
-    live_primary_flows: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
 ) -> pl.DataFrame:
     """Clean raw live primary flows and apply data quality checks.
 
     This asset reads live primary flows, applies data quality cleaning logic (stuck
     sensor detection, insane value detection), and joins with substation metadata.
-    The output is validated against the SubstationFlows schema which allows null values,
+    The output is validated against the SubstationPowerFlows schema which allows null values,
     then saved to a Delta table named "cleaned_actuals".
 
     Cleaning Logic:
@@ -100,14 +93,13 @@ def cleaned_actuals(
         - Rolling operations are strictly backward-looking to prevent data leakage.
         - Null values are preserved from the input; no rows are removed and no
           imputation is performed.
-        - The output is validated against SubstationFlows schema which allows
+        - The output is validated against SubstationPowerFlows schema which allows
           null values for MW, MVA, and MVAr columns.
         - The result is ALWAYS saved to Delta table to ensure persistence.
 
     Args:
         context: Dagster asset execution context.
         settings: Global settings containing data quality thresholds.
-        live_primary_flows: Raw live primary flows with lookback from previous partition.
         substation_metadata: Metadata containing substation locations and config.
 
     Returns:
@@ -117,17 +109,42 @@ def cleaned_actuals(
     partition_key = context.partition_key
     context.log.info(f"Cleaning partition: {partition_key}")
 
+    partition_start = datetime.fromisoformat(partition_key).replace(tzinfo=timezone.utc)
+    partition_end = partition_start + timedelta(days=1)
+    lookback_start = partition_start - timedelta(days=1)
+
+    delta_path = _get_delta_path(settings, "live_primary_flows")
+
+    # Manually load from Delta table and filter to the required date range (including 1 day lookback)
+    # This fix is needed because the InMemoryIOManager in tests doesn't have the "yesterday"
+    # partition data, and live_primary_flows is a side-effect only asset.
+    live_primary_flows = pl.scan_delta(delta_path).filter(
+        pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
+    )
+
     # If the LazyFrame is empty, return empty validated DataFrame
     if live_primary_flows.collect_schema().names() == []:
         context.log.warning("Input LazyFrame is empty, returning empty validated DataFrame.")
-        empty_df = pl.DataFrame(schema=SubstationFlows.dtypes)
-        validated_empty = SubstationFlows.validate(empty_df)
-        validated_empty.write_delta(_get_delta_path(settings, "cleaned_actuals"), mode="overwrite")
+        empty_df = pl.DataFrame(schema=SubstationPowerFlows.dtypes)
+        validated_empty = SubstationPowerFlows.validate(empty_df)
+        # FIX: Do not overwrite the Delta table! Just return the empty DataFrame.
         return validated_empty
 
     # The AssetIn already provides data with proper join from substation_metadata
     # The cleaned data is in the lazy frame
     df_joined_materialized = cast(pl.DataFrame, live_primary_flows.collect())
+
+    # Ensure timestamp has UTC timezone before cleaning/validation.
+    # Delta tables sometimes lose timezone info or Polars scans them as naive.
+    timestamp_dtype = df_joined_materialized.schema["timestamp"]
+    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
+        df_joined_materialized = df_joined_materialized.with_columns(
+            pl.col("timestamp").dt.replace_time_zone("UTC")
+        )
+    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
+        df_joined_materialized = df_joined_materialized.with_columns(
+            pl.col("timestamp").dt.convert_time_zone("UTC")
+        )
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 
@@ -137,7 +154,7 @@ def cleaned_actuals(
     context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
 
     # Validate the output against Patito schema
-    validated_df = SubstationFlows.validate(df_cleaned)
+    validated_df = SubstationPowerFlows.validate(df_cleaned)
 
     context.log.info(f"Validated data shape: {validated_df.shape}")
 
@@ -146,8 +163,6 @@ def cleaned_actuals(
     # but we must only append data for the current partition to avoid data duplication in the
     # Delta table. Example: For partition "2026-03-10", we only include rows with timestamp
     # in [2026-03-10 00:00:00 UTC, 2026-03-11 00:00:00 UTC).
-    partition_start = datetime.fromisoformat(partition_key)
-    partition_end = partition_start + timedelta(days=1)
 
     # Apply filter only for the current partition's time range
     validated_df = validated_df.filter(

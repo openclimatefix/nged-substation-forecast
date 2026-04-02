@@ -43,12 +43,20 @@ class ModelConfig(BaseModel):
         ),
     )
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
-    required_lookback_days: int = Field(default=14)
+    required_lookback_days: int = Field(default=21)
     features: ModelFeaturesConfig
 
     # The latency between the NWP init time and when the NWP is actually downloaded and processed
     # and ready for use.
     nwp_availability_delay_hours: int = Field(default=3)
+
+    # The latency between the telemetry timestamp and when it is actually available for use
+    # in our forecasting pipeline.
+    telemetry_delay_hours: int = Field(default=24)
+
+    # Maximum number of samples to use for training to prevent OOM errors.
+    # If set, the training data will be randomly sampled before collection.
+    max_training_samples: int | None = Field(default=None, gt=0)
 
 
 class TrainingConfig(BaseModel):

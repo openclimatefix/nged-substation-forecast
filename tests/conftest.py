@@ -19,6 +19,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "skip_zarr_refactor: skip test due to Zarr structure limitations"
     )
+    config.addinivalue_line(
+        "markers", "manual: mark test as requiring manual execution (e.g., local data)"
+    )
 
 
 @pytest.fixture

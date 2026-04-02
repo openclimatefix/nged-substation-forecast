@@ -39,6 +39,13 @@ The `ml_core` package provides shared utilities for training and evaluating mode
 - **`train_and_log_model`**: Handles temporal slicing of data based on the `TrainingConfig` and logs the trained model, parameters, and metrics to MLflow.
 - **`evaluate_model`**: Handles temporal slicing of data for inference, generates predictions using the `BaseForecaster.predict` method, and calculates evaluation metrics (e.g., MAE, RMSE) which are logged to MLflow.
 
+
+### Data Engineering & Quality
+
+To ensure robust and reliable machine learning pipelines, we employ several data engineering patterns:
+- **Centralized Data Preparation**: All data entering the ML models goes through a centralized `prepare_data` step (e.g., in `ml_core.data` or model-specific data modules). This ensures consistent handling of missing substations, strict type enforcement, and uniform target filtering across both training and inference.
+- **Strategy Pattern for CSV Parsing**: The ingestion of various NGED datasets (power data, metadata, switching events) uses a Strategy pattern. This allows the pipeline to easily adapt to different CSV formats and schemas without modifying the core ingestion logic, adhering to the Open/Closed Principle.
+
 ### Advanced Forecasting Features
 
 The forecasting models implement several advanced features to ensure robustness and accuracy:
@@ -64,10 +71,10 @@ This partitioning strategy allows for efficient querying of specific model runs 
 To verify the XGBoost forecaster and the ML core utilities without running the full Dagster pipeline, you can run the manual integration test. This script trains and evaluates the model on a small subset of 5 substations:
 
 ```bash
-uv run python tests/manual_xgboost_integration.py
+uv run pytest tests/test_xgboost_dagster_integration.py -v -m manual
 ```
 
-This test demonstrates the usage of the `BaseForecaster` interface, the `train_and_log_model` utility, and the dynamic lag calculation.
+This test executes the actual Dagster assets in-process using an in-memory I/O manager, ensuring the production pipeline logic is fully tested without requiring a heavy infrastructure setup.
 
 ### Downstream Analysis
 
