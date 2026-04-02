@@ -248,7 +248,7 @@ class Nwp(pt.Model):
     # Variables stored as uint8 on disk
     temperature_2m: int = pt.Field(dtype=pl.UInt8)
     dew_point_temperature_2m: int = pt.Field(dtype=pl.UInt8)
-    # WIND VECTOR COMPONENTS (FLAW-003/004):
+    # WIND VECTOR COMPONENTS:
     # We store raw U and V components as Float32 to allow physically realistic
     # linear interpolation in the forecasting pipeline, avoiding the "phantom high wind"
     # artifacts caused by interpolating speed/direction or circular variables.
@@ -385,7 +385,7 @@ class SubstationFeatures(pt.Model):
     # Weather features
     temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     dew_point_temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    # PHYSICAL WIND FEATURES (FLAW-003/004):
+    # PHYSICAL WIND FEATURES:
     # These are calculated from interpolated U/V components in the forecasting
     # pipeline, ensuring physically realistic wind speed and direction.
     wind_speed_10m: float = pt.Field(dtype=pl.Float32)

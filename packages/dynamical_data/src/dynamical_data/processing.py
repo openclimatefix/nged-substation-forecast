@@ -16,7 +16,7 @@ from .scaling import load_scaling_params, scale_to_uint8
 
 _SETTINGS = Settings()
 
-# FLAW-004: Centralized list of required NWP variables to ensure consistency
+# Centralized list of required NWP variables to ensure consistency
 # between validation and download steps, preventing logic drift.
 REQUIRED_NWP_VARS = {
     "temperature_2m",
@@ -171,7 +171,7 @@ def download_ecmwf(
     # can sometimes be misidentified as returning a DataArray.
     ds = cast(xr.Dataset, ds[list(REQUIRED_NWP_VARS)])
 
-    # FLAW-003: Check for empty coordinates before computing bounds to fail gracefully.
+    # Check for empty coordinates before computing bounds to fail gracefully.
     if ds.longitude.size == 0 or ds.latitude.size == 0:
         raise ValueError("Dataset has empty longitude or latitude coordinates.")
 
@@ -199,7 +199,7 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # FLAW-002: Implement wrap-around aware slicing for longitudes.
+    # Implement wrap-around aware slicing for longitudes.
     # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
     lngs = h3_grid.get_column("nwp_lng").unique().sort()
     diffs = lngs.diff().drop_nulls()
@@ -231,7 +231,7 @@ def download_ecmwf(
             latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
         )
 
-    # FLAW-004: Explicitly check for an empty spatial intersection after slicing.
+    # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
     if ds_cropped.longitude.size == 0 or ds_cropped.latitude.size == 0:
         raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
@@ -330,7 +330,7 @@ def process_ecmwf_dataset(
     ]
     processed = df_with_weights.group_by(group_cols).agg(agg_exprs)
 
-    # WEIGHTED CATEGORICAL AGGREGATION (FLAW-002):
+    # WEIGHTED CATEGORICAL AGGREGATION:
     # We use a weighted mode calculation that respects the H3 cell overlap proportions.
     # This ensures categorical weather features (like precipitation type) accurately
     # reflect the area-weighted majority of the H3 cell, rather than treating a 1%
@@ -363,7 +363,7 @@ def process_ecmwf_dataset(
     # 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
     #    in the ML model.
     #
-    # CRITICAL: We do NOT cast back to UInt8 in memory because:
+    # We do NOT cast back to UInt8 in memory because:
     # - It would cause a "staircase" effect by quantizing interpolated values, defeating
     #   the purpose of 30-minute upsampling.
     # - It risks silent underflow during differencing operations (e.g., calculating trends
@@ -373,7 +373,7 @@ def process_ecmwf_dataset(
     scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
     scaling_params = load_scaling_params(scaling_params_path)
 
-    # CIRCULAR VARIABLE SCALING (FLAW-004):
+    # CIRCULAR VARIABLE SCALING:
     # Exclude categorical variables and wind components from empirical min-max scaling.
     # Storing wind components as Float32 avoids destroying circular topology via
     # min-max scaling and simplifies downstream processing.

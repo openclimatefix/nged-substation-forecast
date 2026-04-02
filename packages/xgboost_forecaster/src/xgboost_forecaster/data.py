@@ -175,7 +175,6 @@ def process_nwp_data(
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
 
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # HORIZON LEAKAGE (FLAW-005):
     # We parameterize the lead time filter by the target horizon to eliminate
     # lookahead bias. This ensures the model is trained on forecasts with the
     # exact same accuracy as those available in production.
@@ -208,7 +207,7 @@ def process_nwp_data(
     if df.is_empty():
         return lf.limit(0)
 
-    # FLAW-005: Ensure each group has at least two points for interpolation.
+    # Ensure each group has at least two points for interpolation.
     # Groups with only 1 row cannot be interpolated and would violate the
     # 30-minute temporal resolution contract.
     group_counts = df.group_by(["init_time", "h3_index", "ensemble_member"]).len()
@@ -255,18 +254,18 @@ def process_nwp_data(
         and col not in categorical_cols
     ]
 
-    # TEMPORAL INTERPOLATION & LEAKAGE (FLAW-3):
+    # TEMPORAL INTERPOLATION & LEAKAGE:
     # Interpolating over `valid_time` within a single `init_time` is NOT data leakage.
     # All `valid_time` predictions in a single forecast run are generated simultaneously
     # at `init_time`. We are not looking into the future of when the forecast was made,
     # but merely interpolating the forecast's own future predictions to a higher
     # temporal resolution (30m).
     #
-    # WIND VECTOR INTERPOLATION (FLAW-003):
+    # WIND VECTOR INTERPOLATION:
     # We interpolate Cartesian components (u, v) linearly, which is physically
     # realistic and avoids phantom high winds during direction shifts.
     #
-    # RADIATION INTERPOLATION CAVEAT (FLAW-4):
+    # RADIATION INTERPOLATION CAVEAT:
     # Linear interpolation for solar radiation (`downward_short_wave_radiation_flux_surface`)
     # between 3-hourly NWP points will "cut the corners" of the diurnal solar
     # cycle, potentially underestimating peak solar generation. It is used as a
@@ -278,7 +277,7 @@ def process_nwp_data(
             for c in numeric_cols
         ]
         + [
-            # CATEGORICAL FORWARD-FILL (FLAW-1):
+            # CATEGORICAL FORWARD-FILL:
             # Linear interpolation is physically meaningless for categorical variables.
             # For example, a value of 1.5 between 'rain' (1) and 'snow' (2) has no
             # physical interpretation. We use forward-fill to maintain the discrete
@@ -288,7 +287,7 @@ def process_nwp_data(
         ]
     )
 
-    # PHYSICAL WIND CALCULATION (FLAW-003/004):
+    # PHYSICAL WIND CALCULATION:
     # After interpolating U and V components, we calculate physical wind speed
     # and direction. This ensures the circular topology of wind direction is
     # preserved without needing complex circular interpolation logic.

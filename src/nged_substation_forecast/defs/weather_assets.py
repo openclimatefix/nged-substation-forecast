@@ -71,7 +71,6 @@ class ProcessedNWPConfig(dg.Config):
     substation_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
     )
-    # HORIZON LEAKAGE (FLAW-005):
     # We parameterize the lead time filter by the target horizon to eliminate
     # lookahead bias. This ensures the model is trained on forecasts with the
     # exact same accuracy as those available in production.

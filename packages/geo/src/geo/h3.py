@@ -39,12 +39,12 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
     if df.is_empty():
         raise ValueError("Input DataFrame is empty.")
 
-    # FLAW-001: Ensure grid_size is strictly positive to avoid division by zero
+    # Ensure grid_size is strictly positive to avoid division by zero
     # or nonsensical snapping.
     if grid_size <= 0:
         raise ValueError("grid_size must be strictly positive")
 
-    # FLAW-006: Check resolution of all H3 indices to ensure consistency.
+    # Check resolution of all H3 indices to ensure consistency.
     # Using polars_h3.get_resolution for vectorized check.
     h3_res_unique = df.select(plh3.get_resolution("h3_index")).unique()
     if h3_res_unique.height > 1:
@@ -58,7 +58,7 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_res))
         .explode("child_h3")
         .with_columns(
-            # GRID SNAPPING FORMULA (FLAW-4):
+            # GRID SNAPPING FORMULA:
             # The half-grid offset binning `((lat + grid_size/2) / grid_size).floor() * grid_size`
             # ensures that points are snapped to the *closest* grid center rather than
             # the bottom-left corner of the grid cell. Adding `grid_size/2` before
@@ -66,7 +66,7 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
             # are at the center of each bin.
             nwp_lat=((plh3.cell_to_lat("child_h3") + (grid_size / 2)) / grid_size).floor()
             * grid_size,
-            # LONGITUDE WRAP-AROUND (FLAW-001):
+            # LONGITUDE WRAP-AROUND:
             # Normalizing nwp_lng to the strict [-180, 180) range prevents silent data loss
             # for H3 cells near the anti-meridian, ensuring they correctly join with the
             # NWP dataset.
