@@ -3,7 +3,6 @@
 from typing import cast
 
 import polars as pl
-
 from contracts.data_schemas import SubstationTargetMap
 
 
@@ -55,6 +54,7 @@ def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
     return SubstationTargetMap.validate(target_map_df)
 
 
+# TODO: Use Patito data contracts in function signature.
 def downsample_power_flows(
     flows: pl.LazyFrame | pl.DataFrame, target_map: pl.LazyFrame | pl.DataFrame | None = None
 ) -> pl.LazyFrame:
@@ -62,7 +62,7 @@ def downsample_power_flows(
 
     We assume that NWP data represents the average (or accumulated) value for the
     period *ending* at `valid_time`. For example, a weather forecast for 10:00
-    describes the weather from 09:00 to 10:00 (or 09:30 to 10:00).
+    describes the weather from 09:00 to 10:00.
 
     To align our targets with these features, we downsample power flows using
     `closed="right", label="right"`. This ensures that power readings from
@@ -75,6 +75,14 @@ def downsample_power_flows(
     Returns:
         Downsampled power flows.
     """
+
+    # TODO: The code below is way more complicated (and expensive!) than it needs to be!
+    # - Let's pick MW or MWA as the first step (so we don't downsample both):
+    # - If `target_map` is None then let's pick which column to use using
+    #   `SubstationPowerFlows.to_simplified_power_flow`
+    # - And then downsample the single MW_or_MVA column.
+    # - Done!
+
     downsampled = (
         flows.lazy()
         .sort("timestamp")
