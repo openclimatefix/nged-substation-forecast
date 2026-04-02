@@ -446,6 +446,14 @@ class XGBoostForecaster(BaseForecaster):
         self.config = config
         log.info("Starting XGBoost training...")
 
+        # Log input data info
+        # Note: We don't collect the full LazyFrames here to avoid OOM,
+        # just logging their presence and schema.
+        log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
+        if nwps:
+            for name, lf in nwps.items():
+                log.info(f"Input NWP {name.value} columns: {lf.collect_schema().names()}")
+
         if len(config.features.nwps) > 0 and not nwps:
             raise ValueError("Model config requires NWPs, but none were provided.")
 
@@ -490,6 +498,7 @@ class XGBoostForecaster(BaseForecaster):
                 pl.DataFrame,
                 joined_lf.select(list(set(feature_cols + ["MW_or_MVA"]))).collect(),
             )
+        log.info(f"Collected raw_df shape before dropping nulls: {raw_df.shape}")
         joined_df = raw_df.drop_nulls(subset=critical_cols)
 
         dropped_rows = len(raw_df) - len(joined_df)

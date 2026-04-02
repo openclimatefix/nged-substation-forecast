@@ -38,20 +38,21 @@ def forecast_vs_actual_plot(
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
     # We use get_cleaned_actuals_lazy to ensure we have the full history required for the plot.
     # This function serves as the single source of truth for accessing cleaned actuals.
-    cleaned_actuals = cast(pl.DataFrame, get_cleaned_actuals_lazy(settings, context).collect())
-
-    if predictions.is_empty() or cleaned_actuals.is_empty():
-        context.log.warning("Empty predictions or actuals, skipping plot.")
+    if predictions.is_empty():
+        context.log.warning("Empty predictions, skipping plot.")
         return
 
     # Extract unique substation numbers from predictions
     pred_substations = predictions.get_column("substation_number").unique().to_list()
 
+    # Keep actuals lazy and filter by substation first to avoid eager collection.
+    cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
+
     # Downsample actuals to 30m to match predictions, filtering by substation first.
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations))
+            cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations))
         ).collect(),
     )
 
