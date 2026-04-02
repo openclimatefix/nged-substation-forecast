@@ -54,7 +54,10 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
     ).transform
 
     shape_osgb = transform(project_to_osgb, shape)
-    # Buffer by 25000 meters (25km) to catch islands/coasts without spatial distortion
+    # Buffer by 25,000 meters (25km) to ensure that even the most coastal H3 cells
+    # will have at least one overlapping NWP grid cell (given the 0.25-degree
+    # resolution, which is ~28km at UK latitudes). This prevents coastal
+    # substations from losing coverage from the nearest NWP grid points.
     shape_osgb_buffered = shape_osgb.buffer(25000)
     shape_buffered = transform(project_to_wgs84, shape_osgb_buffered)
 
@@ -79,6 +82,11 @@ def gb_h3_grid_weights(
     """
     h3_res = config.h3_res
     grid_size = config.grid_size
+    # The `+2` heuristic provides ~49 sample points per H3 cell (7^2), which is a
+    # sufficient balance between spatial precision (for area-weighting against a
+    # 0.25-degree grid) and computation time/memory overhead. Increasing it
+    # further could cause an exponential explosion in the number of child cells
+    # and potentially trigger OOM errors.
     child_res = config.child_res if config.child_res is not None else h3_res + 2
 
     if child_res <= h3_res:

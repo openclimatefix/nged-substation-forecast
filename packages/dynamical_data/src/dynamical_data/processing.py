@@ -159,6 +159,11 @@ def download_ecmwf(
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
+        # We set `chunks=None` to disable Dask. This is because we want to
+        # manually control the parallelization of S3 fetches using a
+        # ThreadPoolExecutor below, which avoids Dask's overhead for this
+        # specific I/O-bound task.
+        #
         # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
         # deprecated automatic decoding of time units, ensuring lead_time is
         # correctly parsed as timedelta64[ns].
@@ -231,6 +236,10 @@ def download_ecmwf(
         return {var_name: ds_cropped[var_name].compute()}
 
     data_arrays: dict[str, xr.DataArray] = {}
+    # The download is I/O bound (S3 network requests). We use a
+    # ThreadPoolExecutor to parallelize network latency across multiple
+    # variables. A ProcessPoolExecutor would be less efficient here due to the
+    # high serialization overhead of Xarray objects between processes.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(download_array, str(name)) for name in ds_cropped.data_vars.keys()

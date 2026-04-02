@@ -21,7 +21,12 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
         grid_size: The size of the regular lat/lng grid in degrees (e.g., 0.25).
         child_res: The H3 resolution to use for the underlying points. Must be
             strictly greater than the resolution of the input 'h3_index' column.
-            Defaults to 7.
+            Defaults to 7. The `+2` heuristic (e.g., res 5 -> res 7) provides ~49
+            sample points per H3 cell (7^2), which is a sufficient balance between
+            spatial precision (for area-weighting against a 0.25-degree grid) and
+            computation time/memory overhead. Increasing it further could cause
+            an exponential explosion in the number of child cells and potentially
+            trigger OOM errors.
 
     Returns:
         A Polars DataFrame with columns:

@@ -27,7 +27,9 @@ class DataConfig:
 
     base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
     base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
-    h3_res: int = 5  # TODO: This should probably be stored somewhere like nwp_data_path/ECMWF/ENS/metadata.json?
+    # Resolution 5 is the fixed standard for this model as it balances spatial
+    # precision with feature dimensionality for the XGBoost model.
+    h3_res: int = 5
     resolution: str = "30m"
 
 
@@ -66,10 +68,18 @@ def load_nwp_run(
         FileNotFoundError: If the NWP file for the given init_time does not exist.
     """
     config = config or DataConfig()
+    # The filename format (`YYYY-MM-DDTHHZ.parquet`) is a strict contract with
+    # the upstream data pipeline.
     filename = f"{init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     file_path = config.base_weather_path / filename
 
-    df = pl.read_parquet(file_path)
+    try:
+        df = pl.read_parquet(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"NWP file not found at {file_path}. Expected format: YYYY-MM-DDTHHZ.parquet"
+        )
+
     df = df.filter(pl.col("h3_index").is_in(h3_indices))
 
     if df.is_empty():
@@ -96,6 +106,7 @@ def construct_historical_weather(
         RuntimeError: If no NWP files are found in the date range.
     """
     config = config or DataConfig()
+    # We expect NWP files to follow the `YYYY-MM-DDTHHZ.parquet` naming contract.
     files = sorted(config.base_weather_path.glob("*.parquet"))
     relevant_files = [
         f
@@ -152,6 +163,9 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
             lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
         )
         .with_columns(pl.col("lead_time_hours").cast(pl.Float32))
+        # We cap the lead time at 336 hours (14 days) because ECMWF ENS
+        # reliability drops significantly after day 14, and the model is only
+        # validated for a 14-day horizon.
         .filter((pl.col("lead_time_hours") >= 3) & (pl.col("lead_time_hours") <= 336))
     )
 
@@ -226,6 +240,13 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     # at `init_time`. We are not looking into the future of when the forecast was made,
     # but merely interpolating the forecast's own future predictions to a higher
     # temporal resolution (30m).
+    #
+    # RADIATION INTERPOLATION CAVEAT (FLAW-4):
+    # Linear interpolation for solar radiation (`downward_short_wave_radiation_flux_surface`)
+    # between 3-hourly NWP points will "cut the corners" of the diurnal solar
+    # cycle, potentially underestimating peak solar generation. It is used as a
+    # baseline, and future iterations could use a clear-sky model to better
+    # preserve the diurnal cycle.
     processed = processed.with_columns(
         [
             pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
