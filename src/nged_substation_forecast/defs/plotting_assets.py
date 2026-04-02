@@ -55,11 +55,10 @@ def forecast_vs_actual_plot(
     pred_substations = predictions.get_column("substation_number").unique().to_list()
 
     # Downsample actuals to 30m to match predictions, filtering by substation first.
-    # Note: downsample_power_flows expects LazyFrame, so we convert to lazy, process, then collect
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations)).lazy()
+            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations))
         ).collect(),
     )
 
