@@ -5,11 +5,11 @@ import patito as pt
 import polars as pl
 import pyproj
 import shapely
+from contracts.data_schemas import H3GridWeights
 from dagster import AssetExecutionContext, Config, asset
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
-from contracts.data_schemas import H3GridWeights
 from geo.h3 import compute_h3_grid_weights
 
 
@@ -78,7 +78,7 @@ def gb_h3_grid_weights(
     The mapping is calculated by sampling each H3 cell with finer-resolution child
     cells and determining which regular grid cell each child falls into. The
     `grid_size` parameter is used to snap high-resolution H3 cells to the nearest
-    regular NWP grid points (FLAW-4).
+    regular NWP grid points.
     """
     h3_res = config.h3_res
     grid_size = config.grid_size
