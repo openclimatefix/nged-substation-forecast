@@ -1,11 +1,11 @@
+from datetime import datetime, timedelta
+from typing import cast
+
+import altair as alt
 import dagster as dg
 import polars as pl
-import altair as alt
-from typing import cast
-from datetime import timedelta, datetime
-from dagster import ResourceParam
-
 from contracts.settings import Settings
+from dagster import ResourceParam
 from ml_core.data import downsample_power_flows
 from nged_data import clean_substation_flows
 
@@ -33,7 +33,7 @@ def forecast_vs_actual_plot(
     settings: ResourceParam[Settings],
 ):
     """Generates an Altair plot comparing forecast vs actuals."""
-    # 3.1.B Specific 14-Day Forecast Selection
+
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
     # We read directly from the live_primary_flows Delta table instead of using the
     # cleaned_actuals asset. This is because the cleaned_actuals asset is partitioned
@@ -51,10 +51,10 @@ def forecast_vs_actual_plot(
         context.log.warning("Empty predictions or actuals, skipping plot.")
         return
 
-    # 1. Extract unique substation numbers from predictions
+    # Extract unique substation numbers from predictions
     pred_substations = predictions.get_column("substation_number").unique().to_list()
 
-    # 2. Downsample actuals to 30m to match predictions, filtering by substation first
+    # Downsample actuals to 30m to match predictions, filtering by substation first.
     # Note: downsample_power_flows expects LazyFrame, so we convert to lazy, process, then collect
     actuals_30m = cast(
         pl.DataFrame,
@@ -92,7 +92,7 @@ def forecast_vs_actual_plot(
 
     latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
 
-    # 4. Join predictions with actuals. We use a 'left' join with latest_predictions
+    # Join predictions with actuals. We use a 'left' join with latest_predictions
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
     eval_df = pl.DataFrame(latest_predictions).join(
@@ -108,7 +108,7 @@ def forecast_vs_actual_plot(
         context.log.warning("No overlapping data for plotting, skipping.")
         return
 
-    # 5. Filter plot to 14-day horizon starting from chosen_init_time
+    # Filter plot to 14-day horizon starting from chosen_init_time
     horizon_end = chosen_init_time + timedelta(days=14)
     plot_df = eval_df.filter(
         (pl.col("valid_time") >= chosen_init_time) & (pl.col("valid_time") <= horizon_end)
@@ -121,7 +121,6 @@ def forecast_vs_actual_plot(
         )
         return
 
-    # 3.1.D Substation Names in Titles
     # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
@@ -167,7 +166,7 @@ def forecast_vs_actual_plot(
 
     combined_plot_df = pl.concat([preds_df, actuals_df], how="diagonal").to_pandas()
 
-    # 6. Generate Altair Chart using layers
+    # Generate Altair Chart using layers
     # We use a shared color scale to ensure the legend is consistent
     color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
 
