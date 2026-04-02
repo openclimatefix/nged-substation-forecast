@@ -50,8 +50,8 @@ def test_evaluate_and_save_model_logs_metrics():
         NwpModel.ECMWF_ENS_0_25DEG: pl.DataFrame(
             {
                 "valid_time": [valid_time],
-                "init_time": [valid_time - timedelta(hours=6)],
-                "lead_time_hours": [6.0],
+                "init_time": [valid_time - timedelta(hours=24)],
+                "lead_time_hours": [24.0],
                 "h3_index": [123],
                 "ensemble_member": [0],
                 "temperature_2m": [15.0],
@@ -85,7 +85,7 @@ def test_evaluate_and_save_model_logs_metrics():
                 feature_names=[
                     "substation_number",
                     "lead_time_hours",
-                    "latest_available_weekly_lag",
+                    "latest_available_weekly_power_lag",
                     "temperature_2m",
                     "downward_short_wave_radiation_flux_surface",
                     "wind_speed_10m",
@@ -113,7 +113,7 @@ def test_evaluate_and_save_model_logs_metrics():
             "substation_number": [1],
             "ensemble_member": [0],
             "MW_or_MVA": [11.0],  # Prediction is 11.0, actual is 10.0
-            "nwp_init_time": [valid_time - timedelta(hours=6)],
+            "nwp_init_time": [valid_time - timedelta(hours=24)],
         }
     ).with_columns(
         [
@@ -137,6 +137,7 @@ def test_evaluate_and_save_model_logs_metrics():
         patch("mlflow.start_run") as mock_start_run,
         patch("mlflow.log_metric") as mock_log_metric,
         patch("mlflow.set_experiment") as mock_set_experiment,
+        patch("mlflow.log_artifact") as mock_log_artifact,
     ):
         evaluate_and_save_model(
             context=context,
@@ -158,7 +159,7 @@ def test_evaluate_and_save_model_logs_metrics():
         assert metric_calls["MAE_global"] == pytest.approx(1.0)
         assert metric_calls["RMSE_global"] == pytest.approx(1.0)
         assert metric_calls["nMAE_global"] == pytest.approx(0.01)
-        assert metric_calls["MAE_LT_6.0h"] == pytest.approx(1.0)
+        assert metric_calls["MAE_LT_24.0h"] == pytest.approx(1.0)
 
     # Setup dummy data
     sub_meta = pl.DataFrame(
@@ -226,7 +227,7 @@ def test_evaluate_and_save_model_logs_metrics():
                 feature_names=[
                     "substation_number",
                     "lead_time_hours",
-                    "latest_available_weekly_lag",
+                    "latest_available_weekly_power_lag",
                     "temperature_2m",
                     "downward_short_wave_radiation_flux_surface",
                     "wind_speed_10m",

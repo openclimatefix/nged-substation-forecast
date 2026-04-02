@@ -108,4 +108,4 @@ def test_add_autoregressive_lags_handles_missing_flows():
 
     result = cast(pl.DataFrame, add_autoregressive_lags(df, flows_30m).collect())
 
-    assert result["latest_available_weekly_lag"][0] is None
+    assert result["latest_available_weekly_power_lag"][0] is None

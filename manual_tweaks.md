@@ -14,3 +14,6 @@ call `scale_to_uint8` from `download_and_scale_ecmwf`?
 # In `contracts`
 - Rename `SubstationFlows` to `SubstationPowerFlows`.
 
+# Testing
+- What is `tests/repro_plot.html`? The plot is blank! Where does this plot come from? And why is it
+  blank?

@@ -4,10 +4,10 @@ import polars as pl
 import pytest
 from hypothesis import given, strategies as st
 
-from contracts.data_schemas import Nwp, PowerForecast, SubstationFlows
+from contracts.data_schemas import Nwp, PowerForecast, SubstationPowerFlows
 
 
-def test_substation_flows_validation_mw_or_mva():
+def test_substation_power_flows_validation_mw_or_mva():
     # Valid with MW
     df_mw = pl.DataFrame(
         {
@@ -29,7 +29,7 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     # Should pass
-    SubstationFlows.validate(df_mw)
+    SubstationPowerFlows.validate(df_mw)
 
     # Valid with MVA
     df_mva = pl.DataFrame(
@@ -52,7 +52,7 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     # Should pass
-    SubstationFlows.validate(df_mva)
+    SubstationPowerFlows.validate(df_mva)
 
     # Invalid: neither MW nor MVA has data
     df_none = pl.DataFrame(
@@ -75,10 +75,10 @@ def test_substation_flows_validation_mw_or_mva():
     )
 
     with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-        SubstationFlows.validate(df_none)
+        SubstationPowerFlows.validate(df_none)
 
 
-def test_substation_flows_validation_both():
+def test_substation_power_flows_validation_both():
     # Valid with both
     df_both = pl.DataFrame(
         {
@@ -100,7 +100,7 @@ def test_substation_flows_validation_both():
     )
 
     # Should pass
-    SubstationFlows.validate(df_both)
+    SubstationPowerFlows.validate(df_both)
 
 
 def test_power_forecast_validation():
@@ -210,7 +210,7 @@ def test_nwp_validation():
     mva=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
     | st.none(),
 )
-def test_substation_flows_property_based(mw, mva):
+def test_substation_power_flows_property_based(mw, mva):
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
@@ -232,6 +232,6 @@ def test_substation_flows_property_based(mw, mva):
 
     if mw is None and mva is None:
         with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-            SubstationFlows.validate(df)
+            SubstationPowerFlows.validate(df)
     else:
-        SubstationFlows.validate(df)
+        SubstationPowerFlows.validate(df)

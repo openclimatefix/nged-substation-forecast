@@ -102,7 +102,8 @@ def test_process_ecmwf_dataset_basic():
 
     result = process_ecmwf_dataset(init_time.to_pydatetime(), ds, h3_grid)
     assert len(result) == 1
-    assert result["temperature_2m"].dtype == pl.UInt8
+    assert result["temperature_2m"].dtype == pl.Float32
+    assert result["categorical_precipitation_type_surface"].dtype == pl.UInt8
 
 
 def test_process_ecmwf_dataset_empty_h3_grid():

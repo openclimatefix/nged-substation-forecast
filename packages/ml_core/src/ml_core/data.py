@@ -7,7 +7,7 @@ import polars as pl
 from contracts.data_schemas import SubstationTargetMap
 
 
-def calculate_target_map(flows: pl.LazyFrame) -> pl.DataFrame:
+def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
     """Calculate the target map (power_col and peak_capacity) for each substation.
 
     This function analyzes historical power flows to determine whether MW or MVA
@@ -15,14 +15,15 @@ def calculate_target_map(flows: pl.LazyFrame) -> pl.DataFrame:
     calculates the peak capacity for normalization.
 
     Args:
-        flows: Historical power flow data (LazyFrame).
+        flows: Historical power flow data (LazyFrame or DataFrame).
 
     Returns:
         A Patito DataFrame containing the target map for each substation.
     """
     target_map_df = cast(
         pl.DataFrame,
-        flows.group_by("substation_number")
+        flows.lazy()
+        .group_by("substation_number")
         .agg(
             mw_count=pl.col("MW").is_not_null().sum(),
             mva_count=pl.col("MVA").is_not_null().sum(),
@@ -55,7 +56,7 @@ def calculate_target_map(flows: pl.LazyFrame) -> pl.DataFrame:
 
 
 def downsample_power_flows(
-    flows: pl.LazyFrame, target_map: pl.LazyFrame | None = None
+    flows: pl.LazyFrame | pl.DataFrame, target_map: pl.LazyFrame | pl.DataFrame | None = None
 ) -> pl.LazyFrame:
     """Downsample power flows to 30m using period-ending semantics.
 
@@ -75,7 +76,8 @@ def downsample_power_flows(
         Downsampled power flows.
     """
     downsampled = (
-        flows.sort("timestamp")
+        flows.lazy()
+        .sort("timestamp")
         .group_by_dynamic(
             "timestamp",
             every="30m",
@@ -94,7 +96,7 @@ def downsample_power_flows(
     if target_map is not None:
         # Only join the power_col from target_map to avoid bringing in extra columns like peak_capacity
         downsampled = downsampled.join(
-            target_map.select(["substation_number", "power_col"]),
+            target_map.lazy().select(["substation_number", "power_col"]),
             on="substation_number",
             how="left",
         )

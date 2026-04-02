@@ -10,7 +10,7 @@ features:
     - "substation_number"
     - "lead_time_hours"
     - "nwp_init_hour"
-    - "latest_available_weekly_lag"
+    - "latest_available_weekly_power_lag"
     - "temperature_2m"
     - "dew_point_temperature_2m"
     - "wind_speed_10m"

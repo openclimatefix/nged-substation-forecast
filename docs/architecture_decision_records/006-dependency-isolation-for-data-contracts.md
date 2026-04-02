@@ -9,9 +9,9 @@ tags: ["architecture", "dependencies", "contracts", "mlops"]
 
 ## 1. Context & Problem Statement
 
-We needed a way to define the shape and semantics of our data sources (e.g., `SubstationFlows`, `ProcessedNwp`, `PowerForecast`) so that any component in the system could validate incoming data and understand its structure.
+We needed a way to define the shape and semantics of our data sources (e.g., `SubstationPowerFlows`, `ProcessedNwp`, `PowerForecast`) so that any component in the system could validate incoming data and understand its structure.
 
-Initially, these schemas might have lived alongside the machine learning code that consumes them. However, this creates a tight coupling between data definition and heavy ML dependencies (like MLflow, PyTorch, XGBoost). If a simple data ingestion script or a frontend dashboard needed to know what a `SubstationFlows` dataframe looked like, it would be forced to install the entire ML stack.
+Initially, these schemas might have lived alongside the machine learning code that consumes them. However, this creates a tight coupling between data definition and heavy ML dependencies (like MLflow, PyTorch, XGBoost). If a simple data ingestion script or a frontend dashboard needed to know what a `SubstationPowerFlows` dataframe looked like, it would be forced to install the entire ML stack.
 
 ## 2. Options Considered
 
@@ -24,7 +24,7 @@ Initially, these schemas might have lived alongside the machine learning code th
 
 ## 3. Decision
 
-We chose **Option B: Strict Package Separation**. 
+We chose **Option B: Strict Package Separation**.
 
 We maintain a strict separation between `contracts` and `ml_core` within our `uv` workspace:
 1. **`packages/contracts`**: A lightweight package defining data schemas (using Patito/Polars) and project settings (using Pydantic). This package has minimal dependencies to ensure it can be used by any component.

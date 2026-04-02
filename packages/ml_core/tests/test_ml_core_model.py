@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    SubstationFlows,
+    SubstationPowerFlows,
     SubstationMetadata,
 )
 from contracts.hydra_schemas import (
@@ -80,7 +80,7 @@ def test_local_forecasters():
         }
     )
 
-    sub_flows = pt.DataFrame[SubstationFlows](
+    sub_flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
             "substation_number": [1, 2],

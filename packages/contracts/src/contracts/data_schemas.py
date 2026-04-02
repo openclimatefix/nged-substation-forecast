@@ -24,7 +24,7 @@ class MissingCorePowerVariablesError(ValueError):
     pass
 
 
-class SubstationFlows(pt.Model):
+class SubstationPowerFlows(pt.Model):
     timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     # The unique identifier for the substation.
@@ -57,7 +57,7 @@ class SubstationFlows(pt.Model):
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["SubstationFlows"]:
+    ) -> pt.DataFrame["SubstationPowerFlows"]:
         """Validate the given dataframe, ensuring either MW or MVA is present and has data.
 
         NOTE: Fully null DataFrames are allowed to handle edge cases where:
@@ -77,12 +77,12 @@ class SubstationFlows(pt.Model):
 
             if not mw_has_data and not mva_has_data:
                 raise MissingCorePowerVariablesError(
-                    "SubstationFlows dataframe must have non-null data in either 'MW' or 'MVA' "
+                    "SubstationPowerFlows dataframe must have non-null data in either 'MW' or 'MVA' "
                     "unless the entire DataFrame is empty (which is allowed for edge cases)."
                 )
 
         return cast(
-            pt.DataFrame["SubstationFlows"],
+            pt.DataFrame["SubstationPowerFlows"],
             super().validate(
                 dataframe=dataframe,
                 columns=columns,
@@ -93,25 +93,25 @@ class SubstationFlows(pt.Model):
         )
 
     @staticmethod
-    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> PowerColumn:
+    def choose_power_column(dataframe: pt.DataFrame["SubstationPowerFlows"]) -> PowerColumn:
         mw_valid = dataframe["MW"].is_not_null().sum()
         mva_valid = dataframe["MVA"].is_not_null().sum()
         return "MW" if mw_valid >= mva_valid else "MVA"
 
     @staticmethod
-    def to_simplified_substation_flows(
-        dataframe: pt.DataFrame["SubstationFlows"],
-    ) -> pt.DataFrame[SimplifiedSubstationFlows]:
-        power_col = SubstationFlows.choose_power_column(dataframe)
+    def to_simplified_substation_power_flows(
+        dataframe: pt.DataFrame["SubstationPowerFlows"],
+    ) -> pt.DataFrame[SimplifiedSubstationPowerFlows]:
+        power_col = SubstationPowerFlows.choose_power_column(dataframe)
         simplified_df = (
             dataframe.rename({power_col: "MW_or_MVA"})
             .select(["timestamp", "MW_or_MVA"])
             .drop_nulls()
         )
-        return cast(pt.DataFrame[SimplifiedSubstationFlows], simplified_df)
+        return cast(pt.DataFrame[SimplifiedSubstationPowerFlows], simplified_df)
 
 
-class SimplifiedSubstationFlows(pt.Model):
+class SimplifiedSubstationPowerFlows(pt.Model):
     """Standardized, single-column representation of power flows.
 
     This model is used after the best available power column (MW or MVA) has been
@@ -385,7 +385,7 @@ class SubstationFeatures(pt.Model):
     nwp_init_hour: int = pt.Field(dtype=pl.Int32)
 
     # Power lags
-    latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    latest_available_weekly_power_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
     temperature_2m: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)

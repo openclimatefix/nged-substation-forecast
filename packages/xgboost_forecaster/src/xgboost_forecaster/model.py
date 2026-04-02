@@ -385,7 +385,7 @@ class XGBoostForecaster(BaseForecaster):
             on="substation_number",
             how="inner",  # FIX: Drop substations missing from target_map
         ).with_columns(
-            latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
+            latest_available_weekly_power_lag=pl.col("latest_available_weekly_power_lag")
             / pl.col("peak_capacity_MW_or_MVA")
         )
 

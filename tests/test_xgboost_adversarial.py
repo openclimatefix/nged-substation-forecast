@@ -14,7 +14,7 @@ from contracts.hydra_schemas import (
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
-    SubstationFlows,
+    SubstationPowerFlows,
     SubstationMetadata,
     InferenceParams,
     ProcessedNwp,
@@ -51,7 +51,7 @@ def test_train_handles_missing_init_time():
     )
     forecaster = XGBoostForecaster()
 
-    flows = pt.DataFrame[SubstationFlows](
+    flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
             "substation_number": [1],
@@ -104,8 +104,8 @@ def test_train_handles_missing_init_time():
         (None, None, True),
     ],
 )
-def test_substation_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
-    """Test SubstationFlows validation with various MW/MVA combinations."""
+def test_substation_power_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
+    """Test SubstationPowerFlows validation with various MW/MVA combinations."""
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
@@ -128,9 +128,9 @@ def test_substation_flows_validation_mw_mva_combinations(mw, mva, expected_fail)
 
     if expected_fail:
         with pytest.raises(MissingCorePowerVariablesError):
-            SubstationFlows.validate(df)
+            SubstationPowerFlows.validate(df)
     else:
-        SubstationFlows.validate(df)
+        SubstationPowerFlows.validate(df)
 
 
 def test_process_nwp_data_empty_input():

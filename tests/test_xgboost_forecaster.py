@@ -24,6 +24,7 @@ from contracts.hydra_schemas import (
     NwpModel,
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
+from contracts.settings import Settings
 import dagster as dg
 from src.nged_substation_forecast.defs.xgb_assets import train_xgboost, XGBoostConfig
 
@@ -277,7 +278,7 @@ def test_prepare_training_data_prevents_row_explosion():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",
@@ -315,7 +316,7 @@ def test_prepare_training_data_prevents_row_explosion():
         assert X.shape[0] == 4
 
 
-def test_train_xgboost_asset_filters_to_control_member():
+def test_train_xgboost_asset_filters_to_control_member(tmp_path):
     # Create NWP with members 0, 1, 2
     nwp = pl.DataFrame(
         {
@@ -336,7 +337,16 @@ def test_train_xgboost_asset_filters_to_control_member():
             # Include MW_or_MVA since the train_xgboost asset expects it after merging
             "MW_or_MVA": [1.0],
         }
-    ).lazy()
+    ).with_columns(pl.col("MVA").cast(pl.Float64))
+
+    # Write flows to Delta as the asset now loads from Delta
+    delta_dir = tmp_path / "delta"
+    live_flows_path = delta_dir / "live_primary_flows"
+    live_flows_path.mkdir(parents=True)
+    flows.write_delta(str(live_flows_path))
+
+    settings = Settings(nged_data_path=tmp_path)
+
     metadata = pl.DataFrame(
         {
             "substation_number": [123],
@@ -352,8 +362,8 @@ def test_train_xgboost_asset_filters_to_control_member():
         train_xgboost(
             context=context,
             config=config,
+            settings=settings,
             nwp=nwp,
-            substation_power_flows=flows,
             substation_metadata=metadata,
         )
 
@@ -366,7 +376,7 @@ def test_train_xgboost_asset_filters_to_control_member():
         assert passed_nwp["ensemble_member"][0] == 0
 
 
-def test_latest_available_weekly_lag_prevents_leakage():
+def test_latest_available_weekly_power_lag_prevents_leakage():
     # Test that the dynamic lag logic correctly switches from 7d to 14d
     # when lead_time_hours > 168 (7 days)
 
@@ -445,7 +455,7 @@ def test_latest_available_weekly_lag_prevents_leakage():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",
@@ -479,18 +489,18 @@ def test_latest_available_weekly_lag_prevents_leakage():
         X_arrow = mock_fit.call_args[0][0]
         X = cast(pl.DataFrame, pl.from_arrow(X_arrow))
 
-        # Row 0: lead_time=24 -> should have latest_available_weekly_lag = 77.0 / 1414.0
-        # Row 1: lead_time=240 -> should have latest_available_weekly_lag = 1414.0 / 1414.0 = 1.0
+        # Row 0: lead_time=24 -> should have latest_available_weekly_power_lag = 77.0 / 1414.0
+        # Row 1: lead_time=240 -> should have latest_available_weekly_power_lag = 1414.0 / 1414.0 = 1.0
         # Note: Polars might reorder rows, so we filter
 
         # We need to find which row is which. We can use lead_time_hours if it's in X.
         # It should be there because it's numeric and not in exclude_cols.
 
         row_short = X.filter(pl.col("lead_time_hours") == 24.0)
-        assert row_short["latest_available_weekly_lag"][0] == pytest.approx(77.0 / 1414.0)
+        assert row_short["latest_available_weekly_power_lag"][0] == pytest.approx(77.0 / 1414.0)
 
         row_long = X.filter(pl.col("lead_time_hours") == 240.0)
-        assert row_long["latest_available_weekly_lag"][0] == pytest.approx(1.0)
+        assert row_long["latest_available_weekly_power_lag"][0] == pytest.approx(1.0)
 
 
 def test_xgboost_predict_with_lags():
@@ -554,7 +564,7 @@ def test_xgboost_predict_with_lags():
     mock_model = patch("xgboost.XGBRegressor").start()
     mock_model.feature_names_in_ = [
         "temperature_2m",
-        "latest_available_weekly_lag",
+        "latest_available_weekly_power_lag",
         "hour_sin",
         "hour_cos",
         "day_of_year_sin",

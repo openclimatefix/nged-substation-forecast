@@ -83,7 +83,7 @@ def forecast_vs_actual_plot(
     # 4. Join predictions with actuals. We use a 'left' join with latest_predictions
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
-    eval_df = latest_predictions.join(
+    eval_df = pl.DataFrame(latest_predictions).join(
         actuals_30m.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
         on=["valid_time", "substation_number"],
         how="left",
@@ -113,8 +113,11 @@ def forecast_vs_actual_plot(
     # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
-        plot_df.join(
-            substation_metadata.select(["substation_number", "substation_name_in_location_table"]),
+        pl.DataFrame(plot_df)
+        .join(
+            pl.DataFrame(substation_metadata).select(
+                ["substation_number", "substation_name_in_location_table"]
+            ),
             on="substation_number",
             how="inner",
         )

@@ -96,12 +96,13 @@ def load_nwp_run(
     # Descale data immediately to physical units (Float32)
     params = load_scaling_params()
     scaling_cols = params.select("col_name").to_series().to_list()
-    existing_cols = [c for c in scaling_cols if c in df.columns]
 
-    if existing_cols:
-        descale_exprs = uint8_to_physical_unit(
-            params.filter(pl.col("col_name").is_in(existing_cols))
-        )
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    schema = df.schema
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
         df = df.with_columns(descale_exprs)
 
     return Nwp.validate(df)
@@ -160,12 +161,13 @@ def construct_historical_weather(
     # Descale data immediately to physical units (Float32)
     params = load_scaling_params()
     scaling_cols = params.select("col_name").to_series().to_list()
-    existing_cols = [c for c in scaling_cols if c in combined.columns]
 
-    if existing_cols:
-        descale_exprs = uint8_to_physical_unit(
-            params.filter(pl.col("col_name").is_in(existing_cols))
-        )
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    schema = combined.schema
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
         combined = combined.with_columns(descale_exprs)
 
     return Nwp.validate(combined)
@@ -193,6 +195,22 @@ def process_nwp_data(
     """
     # 1. Filter by H3 indices to reduce data size
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
+
+    # Descale data immediately to physical units (Float32) before any interpolation
+    # or feature engineering. This ensures that interpolation happens in the
+    # physical space and prevents mixing scaled (UInt8) and unscaled variables
+    # in downstream calculations (like windchill or wind speed).
+    params = load_scaling_params()
+    scaling_cols = params.select("col_name").to_series().to_list()
+
+    # Only descale columns that are actually UInt8 to prevent double-descaling
+    # (e.g., if the function is called with already-descaled data in tests).
+    schema = lf.collect_schema()
+    uint8_cols = [col for col, dtype in schema.items() if dtype == pl.UInt8 and col in scaling_cols]
+
+    if uint8_cols:
+        descale_exprs = uint8_to_physical_unit(params.filter(pl.col("col_name").is_in(uint8_cols)))
+        lf = lf.with_columns(descale_exprs)
 
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
     # We cap the lead time at 336 hours (14 days) because ECMWF ENS

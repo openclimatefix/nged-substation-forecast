@@ -48,11 +48,11 @@ def add_autoregressive_lags(
     )
 
     # 2. Join flows_30m on ["substation_number", "target_lag_time"] to extract the exact
-    # latest_available_weekly_lag without needing pre-calculated lag_7d or lag_14d columns.
+    # latest_available_weekly_power_lag without needing pre-calculated lag_7d or lag_14d columns.
     lag_df = flows_30m.select(
         pl.col("substation_number"),
         pl.col("timestamp").alias("target_lag_time"),
-        pl.col("MW_or_MVA").alias("latest_available_weekly_lag"),
+        pl.col("MW_or_MVA").alias("latest_available_weekly_power_lag"),
     )
 
     df = df.join(lag_df, on=["substation_number", "target_lag_time"], how="left")

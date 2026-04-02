@@ -5,7 +5,7 @@ import pytest
 from contracts.data_schemas import (
     InferenceParams,
     ProcessedNwp,
-    SubstationFlows,
+    SubstationPowerFlows,
     SubstationMetadata,
 )
 from contracts.hydra_schemas import (
@@ -39,7 +39,7 @@ def test_xgboost_forecaster_train_and_predict():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[SubstationFlows](
+    sub_flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": timestamps,
             "substation_number": [1] * len(timestamps),
@@ -95,7 +95,7 @@ def test_xgboost_forecaster_train_and_predict():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",
@@ -193,7 +193,7 @@ def test_xgboost_forecaster_predict_empty():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[SubstationFlows](
+    sub_flows = pt.DataFrame[SubstationPowerFlows](
         {
             "timestamp": timestamps,
             "substation_number": [1] * len(timestamps),
@@ -249,7 +249,7 @@ def test_xgboost_forecaster_predict_empty():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",

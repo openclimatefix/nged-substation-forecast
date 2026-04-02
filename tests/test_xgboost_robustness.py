@@ -6,7 +6,7 @@ from typing import Any, cast
 from unittest.mock import MagicMock
 from patito.exceptions import DataFrameValidationError
 from contracts.data_schemas import (
-    SubstationFlows,
+    SubstationPowerFlows,
     Nwp,
     ProcessedNwp,
     SubstationMetadata,
@@ -22,8 +22,8 @@ from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
 
-def test_substation_flows_validation_extreme_values():
-    """Test SubstationFlows validation with values outside the ge/le range."""
+def test_substation_power_flows_validation_extreme_values():
+    """Test SubstationPowerFlows validation with values outside the ge/le range."""
     # MW = 2000 is outside [-1000, 1000]
     df = pl.DataFrame(
         {
@@ -39,7 +39,7 @@ def test_substation_flows_validation_extreme_values():
     )
 
     with pytest.raises(DataFrameValidationError):
-        SubstationFlows.validate(df)
+        SubstationPowerFlows.validate(df)
 
 
 def test_nwp_validation_missing_accumulated_variables_at_step_1():
@@ -100,7 +100,7 @@ def test_xgboost_forecaster_train_with_nans():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",
@@ -172,7 +172,7 @@ def test_xgboost_forecaster_train_with_infs():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",
@@ -251,7 +251,7 @@ def test_xgboost_forecaster_predict_with_nans():
     mock_model = MagicMock()
     mock_model.feature_names_in_ = [
         "temperature_2m",
-        "latest_available_weekly_lag",
+        "latest_available_weekly_power_lag",
         "hour_sin",
         "hour_cos",
         "day_of_year_sin",
@@ -322,7 +322,7 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
             feature_names=[
                 "substation_number",
                 "lead_time_hours",
-                "latest_available_weekly_lag",
+                "latest_available_weekly_power_lag",
                 "temperature_2m",
                 "downward_short_wave_radiation_flux_surface",
                 "wind_speed_10m",

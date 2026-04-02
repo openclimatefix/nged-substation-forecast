@@ -2,6 +2,7 @@ import dagster as dg
 import polars as pl
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
+from pathlib import Path
 
 from src.nged_substation_forecast.defs.xgb_assets import (
     train_xgboost,
@@ -9,9 +10,10 @@ from src.nged_substation_forecast.defs.xgb_assets import (
     XGBoostConfig,
 )
 from xgboost_forecaster.model import XGBoostForecaster
+from contracts.settings import Settings
 
 
-def test_xgboost_dagster_assets_materialize_with_dummy_data():
+def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
     """Test that XGBoost assets can be materialized with dummy data using Dagster's materialize."""
 
     # Setup dummy data
@@ -35,25 +37,33 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data():
         eager=True,
     )
 
-    sub_flows = (
-        pl.DataFrame(
-            {
-                "timestamp": timestamps,
-                "substation_number": [1] * len(timestamps),
-                "MW": [10.0] * len(timestamps),
-                "MVA": [10.0] * len(timestamps),
-                "MVAr": [0.0] * len(timestamps),
-                "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
-                "MW_or_MVA": [10.0] * len(timestamps),
-            }
-        )
-        .with_columns(pl.col("substation_number").cast(pl.Int32))
-        .lazy()
-    )
+    sub_flows = pl.DataFrame(
+        {
+            "timestamp": timestamps,
+            "substation_number": [1] * len(timestamps),
+            "MW": [10.0] * len(timestamps),
+            "MVA": [10.0] * len(timestamps),
+            "MVAr": [0.0] * len(timestamps),
+            "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
+            "MW_or_MVA": [10.0] * len(timestamps),
+        }
+    ).with_columns(pl.col("substation_number").cast(pl.Int32))
 
-    # NWPs only for the training period (Jan 1st to Jan 15th)
+    # Write flows to Delta as the asset now loads from Delta
+    delta_dir = tmp_path / "delta"
+    live_flows_path = delta_dir / "live_primary_flows"
+    cleaned_actuals_path = delta_dir / "cleaned_actuals"
+    live_flows_path.mkdir(parents=True)
+    cleaned_actuals_path.mkdir(parents=True)
+
+    sub_flows.write_delta(str(live_flows_path))
+    sub_flows.write_delta(str(cleaned_actuals_path))
+
+    settings = Settings(nged_data_path=tmp_path)
+
+    # NWPs for the training period AND the required 14-day lag range
     nwp_timestamps = pl.datetime_range(
-        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2025, 12, 15, tzinfo=timezone.utc),
         datetime(2026, 1, 15, tzinfo=timezone.utc),
         "30m",
         eager=True,
@@ -112,8 +122,8 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data():
         model = train_xgboost(
             context=context,
             config=config,
+            settings=settings,
             nwp=nwps,
-            substation_power_flows=sub_flows,
             substation_metadata=sub_meta,
         )
 
@@ -123,9 +133,9 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data():
         forecasts = evaluate_xgboost(
             context=context,
             config=config,
+            settings=settings,
             model=model,
             nwp=nwps,
-            substation_power_flows=sub_flows,
             substation_metadata=sub_meta,
         )
 

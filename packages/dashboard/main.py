@@ -20,7 +20,7 @@ with app.setup:
     import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationFlows, SubstationMetadata
+    from contracts.data_schemas import SubstationMetadata, SubstationPowerFlows
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
@@ -98,7 +98,7 @@ def _(df, layer_widget, map):
 
         try:
             filtered_demand = cast(
-                pt.DataFrame[SubstationFlows],
+                pt.DataFrame[SubstationPowerFlows],
                 delta_df.filter(pl.col("substation_number") == substation_number).collect(),
             )
         except Exception as e:
@@ -107,7 +107,7 @@ def _(df, layer_widget, map):
             if filtered_demand.height == 0:
                 right_pane = mo.md("No data")
             else:
-                power_column = SubstationFlows.choose_power_column(filtered_demand)
+                power_column = SubstationPowerFlows.choose_power_column(filtered_demand)
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()

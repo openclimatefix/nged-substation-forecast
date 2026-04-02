@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 
 from pydantic import Field
 
+from typing import cast
+
 import dagster as dg
 import patito as pt
 import polars as pl
@@ -33,13 +35,15 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 def ecmwf_ens_forecast(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
-    gb_h3_grid_weights: pt.DataFrame[H3GridWeights],
+    gb_h3_grid_weights: pl.DataFrame,
 ) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
     partition_key = context.partition_key
     nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
-    scaled_df = download_and_scale_ecmwf(nwp_init_time, h3_grid=gb_h3_grid_weights)
+    scaled_df = download_and_scale_ecmwf(
+        nwp_init_time, h3_grid=cast(pt.DataFrame[H3GridWeights], gb_h3_grid_weights)
+    )
 
     output_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     output_dir.mkdir(parents=True, exist_ok=True)

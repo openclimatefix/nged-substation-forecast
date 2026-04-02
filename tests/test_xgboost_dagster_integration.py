@@ -106,6 +106,7 @@ def test_xgboost_dagster_integration() -> None:
     resources = defs.resources or {}
     result = job.execute_in_process(
         run_config=run_config,
+        partition_key=test_end.isoformat(),
         resources={
             **resources,
             "io_manager": dg.mem_io_manager,

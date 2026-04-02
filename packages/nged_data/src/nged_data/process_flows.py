@@ -3,7 +3,7 @@ from typing import Protocol
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import UTC_DATETIME_DTYPE, SubstationFlows
+from contracts.data_schemas import UTC_DATETIME_DTYPE, SubstationPowerFlows
 
 
 class ParserStrategy(Protocol):
@@ -93,9 +93,9 @@ def _compute_missing_mva(df: pl.DataFrame) -> pl.DataFrame:
     return df
 
 
-def process_live_primary_substation_flows(
+def process_live_primary_substation_power_flows(
     csv_data: bytes,
-) -> pt.DataFrame[SubstationFlows]:
+) -> pt.DataFrame[SubstationPowerFlows]:
     """Read a primary substation CSV and validate it against the schema."""
     df = pl.read_csv(csv_data)
     first_orig_rows = df.head()
@@ -130,13 +130,13 @@ def process_live_primary_substation_flows(
     if "ingested_at" not in df.columns:
         df = df.with_columns(pl.lit(None).cast(UTC_DATETIME_DTYPE).alias("ingested_at"))
 
-    columns = [col for col in SubstationFlows.columns if col in df.columns]
+    columns = [col for col in SubstationPowerFlows.columns if col in df.columns]
     df = df.select(columns)
-    df = df.cast({col: SubstationFlows.dtypes[col] for col in columns})
+    df = df.cast({col: SubstationPowerFlows.dtypes[col] for col in columns})
     df = df.sort("timestamp")
 
     try:
-        return SubstationFlows.validate(df, allow_missing_columns=True)
+        return SubstationPowerFlows.validate(df, allow_missing_columns=True)
     except Exception as e:
         e.add_note(f"First rows of CSV data, before processing: {first_orig_rows}")
         raise

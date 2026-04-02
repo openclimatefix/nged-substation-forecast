@@ -74,9 +74,6 @@ def clean_substation_flows(
     # Determine grouping columns
     group_by = list(group_by_cols) if group_by_cols is not None else ["substation_number"]
 
-    # Ensure timestamp is datetime for rolling operations
-    df = df.with_columns(pl.col("timestamp").cast(pl.Datetime))
-
     # Sort by timestamp as required by .rolling()
     df_sorted = df.sort("timestamp")
 

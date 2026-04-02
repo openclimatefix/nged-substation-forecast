@@ -44,11 +44,11 @@ We introduced a `collapse_lead_times` parameter in the `predict` method.
 - When `False` (rigorous backtesting), the model evaluates all available lead times up to the cutoff, allowing us to assess performance across different forecast horizons while still respecting the availability delay.
 
 ### 2.5 Strict Data Contracts
-We updated the `SubstationFeatures` and `PowerForecast` data contracts in `packages/contracts` to enforce these new requirements, including validation for the dynamic `latest_available_weekly_lag` and the `ensemble_member` fields.
+We updated the `SubstationFeatures` and `PowerForecast` data contracts in `packages/contracts` to enforce these new requirements, including validation for the dynamic `latest_available_weekly_power_lag` and the `ensemble_member` fields.
 
 
 ### 2.6 Target Normalization by Peak Capacity
-To ensure the model learns generalized patterns across substations of varying sizes, we normalize the target variable (`MW_or_MVA`) and the autoregressive lags (`latest_available_weekly_lag`) by the substation's `peak_capacity`. This allows a single global model to effectively forecast both small and large substations.
+To ensure the model learns generalized patterns across substations of varying sizes, we normalize the target variable (`MW_or_MVA`) and the autoregressive lags (`latest_available_weekly_power_lag`) by the substation's `peak_capacity`. This allows a single global model to effectively forecast both small and large substations.
 
 
 ### 2.7 Unified Training and Evaluation Utilities
