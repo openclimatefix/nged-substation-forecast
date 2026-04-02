@@ -84,6 +84,7 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data():
             [
                 pl.col("h3_index").cast(pl.UInt64),
                 pl.col("ensemble_member").cast(pl.UInt8),
+                pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
             ]
         )
         .lazy()

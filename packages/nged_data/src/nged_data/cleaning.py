@@ -26,9 +26,10 @@ def clean_substation_flows(
     with null to preserve the temporal grid. It performs the following checks:
 
     1. **Stuck sensor detection**: Uses a backward-looking rolling standard deviation
-       (48-period/24-hour window) to detect sensors that haven't changed reading.
+       (24-hour window) to detect sensors that haven't changed reading.
        Values are marked as stuck if the rolling standard deviation falls below
-       `settings.data_quality.stuck_std_threshold`.
+       `settings.data_quality.stuck_std_threshold`. We use time-based rolling
+       to correctly handle different temporal resolutions and missing data.
 
     2. **Insane value detection**: Flags values outside the range
        `[min_mw_threshold, max_mw_threshold]` as insane. This captures physically
@@ -59,51 +60,8 @@ def clean_substation_flows(
           to create the `MW_or_MVA` column.
     """
 
-    def _compute_rolling_std(
-        power_col: str, std_threshold: float, window_size: int = 48
-    ) -> pl.Expr:
-        """Compute a boolean expression for stuck sensor detection.
-
-        A sensor is considered "stuck" if its rolling standard deviation falls below
-        the threshold over a 48-period (24-hour) window. The window is strictly
-        backward-looking to prevent data leakage from future values.
-
-        This must be computed per-substation using `.over("substation_number")`.
-        Without this, the rolling std would be computed for the entire DataFrame,
-        mixing data from all substations and causing incorrect stale detection.
-
-        Args:
-            power_col: Column name to check (e.g., "MW" or "MVA").
-            std_threshold: Threshold below which the sensor is considered stuck.
-            window_size: Number of periods for the rolling window. Defaults to 48
-                        (24 hours at 30-minute resolution).
-
-        Returns:
-            A Polars expression that evaluates to True for stuck values,
-            grouped by substation_number for per-substation rolling calculations.
-        """
-        return (
-            pl.col(power_col)
-            .rolling_std(window_size)
-            .fill_null(float("inf"))
-            .over("substation_number")
-            < std_threshold
-        )
-
     def _compute_insane_mask(power_col: str, min_thresh: float, max_thresh: float) -> pl.Expr:
-        """Compute a boolean expression for insane value detection.
-
-        A value is considered "insane" if it falls outside the physically plausible
-        range [min_thresh, max_thresh].
-
-        Args:
-            power_col: Column name to check (e.g., "MW" or "MVA").
-            min_thresh: Minimum threshold for valid values.
-            max_thresh: Maximum threshold for valid values.
-
-        Returns:
-            A Polars expression that evaluates to True for insane values.
-        """
+        """Compute a boolean expression for insane value detection."""
         return (pl.col(power_col) < min_thresh) | (pl.col(power_col) > max_thresh)
 
     # Determine the power columns to check
@@ -113,31 +71,72 @@ def clean_substation_flows(
         # No power columns to check, return early
         return df
 
-    # Build the mask for stuck sensors
-    stuck_masks = [
-        _compute_rolling_std(col, settings.data_quality.stuck_std_threshold)
-        for col in power_columns
-    ]
-    stuck_mask = pl.any_horizontal(stuck_masks)
+    # Determine grouping columns
+    group_by = list(group_by_cols) if group_by_cols is not None else ["substation_number"]
+
+    # Ensure timestamp is datetime for rolling operations
+    df = df.with_columns(pl.col("timestamp").cast(pl.Datetime))
+
+    # Sort by timestamp as required by .rolling()
+    df_sorted = df.sort("timestamp")
+
+    # Build the mask for stuck sensors using time-based rolling windows.
+    # This is more robust than row-based rolling as it handles missing data
+    # and different temporal resolutions correctly.
+    stuck_mask_expr = pl.lit(False)
+    rolling_std_cols = []
+
+    for col in power_columns:
+        std_col_name = f"{col}_rolling_std"
+        count_col_name = f"{col}_rolling_count"
+        rolling_std_cols.extend([std_col_name, count_col_name])
+
+        rolling_df = df_sorted.rolling(
+            index_column="timestamp",
+            period="24h",
+            group_by=group_by,
+            closed="right",
+        ).agg(
+            [
+                pl.col(col).std().alias(std_col_name),
+                pl.col(col).count().alias(count_col_name),
+            ]
+        )
+
+        df_sorted = df_sorted.join(rolling_df, on=["timestamp", *group_by], how="left")
+
+        # A sensor is stuck if its rolling std is below the threshold.
+        # We require at least 48 periods (24 hours at 30m resolution) to avoid
+        # false positives from short-term constant values.
+        stuck_mask_expr = stuck_mask_expr | (
+            (pl.col(count_col_name) >= 48)
+            & (
+                pl.col(std_col_name).fill_null(float("inf"))
+                < settings.data_quality.stuck_std_threshold
+            )
+        )
 
     # Build the mask for insane values
-    insane_masks = [
-        _compute_insane_mask(
-            col, settings.data_quality.min_mw_threshold, settings.data_quality.max_mw_threshold
-        )
-        for col in power_columns
-    ]
-    insane_mask = pl.any_horizontal(insane_masks)
+    insane_mask_expr = pl.any_horizontal(
+        [
+            _compute_insane_mask(
+                col,
+                settings.data_quality.min_mw_threshold,
+                settings.data_quality.max_mw_threshold,
+            )
+            for col in power_columns
+        ]
+    )
 
     # Combine masks: a value is bad if it's stuck OR insane
-    bad_value_mask = stuck_mask | insane_mask
+    bad_value_mask = stuck_mask_expr | insane_mask_expr
 
-    # Replace bad values with null
-    df_cleaned = df.with_columns(
+    # Replace bad values with null and drop temporary rolling columns
+    df_cleaned = df_sorted.with_columns(
         [
             pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col(col)).alias(col)
             for col in power_columns
         ]
-    )
+    ).drop(rolling_std_cols)
 
     return df_cleaned

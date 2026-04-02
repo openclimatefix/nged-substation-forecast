@@ -2,13 +2,14 @@ import dagster as dg
 import polars as pl
 from typing import cast
 from datetime import date
-from hydra import compose, initialize
+from hydra import compose, initialize_config_dir
 from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 from pydantic import Field, field_validator
 
 from contracts.hydra_schemas import NwpModel, TrainingConfig
 from contracts.data_schemas import PowerForecast
+from contracts.settings import PROJECT_ROOT
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 
 from xgboost_forecaster.model import XGBoostForecaster
@@ -56,11 +57,11 @@ class XGBoostConfig(dg.Config):
 
 def load_hydra_config(model_name: str) -> TrainingConfig:
     """Load the Hydra configuration for a specific model."""
-    if not GlobalHydra.instance().is_initialized():
-        initialize(version_base=None, config_path="../../../conf")
-    cfg = compose(config_name="config", overrides=[f"model={model_name}"])
-    cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
-    return TrainingConfig(**cfg_dict)
+    GlobalHydra.instance().clear()
+    with initialize_config_dir(config_dir=str(PROJECT_ROOT / "conf"), version_base=None):
+        cfg = compose(config_name="config", overrides=[f"model={model_name}"])
+        cfg_dict = cast(dict, OmegaConf.to_container(cfg, resolve=True))
+        return TrainingConfig(**cfg_dict)
 
 
 def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) -> TrainingConfig:

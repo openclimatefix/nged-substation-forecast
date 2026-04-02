@@ -194,7 +194,10 @@ def evaluate_and_save_model(
             target_map_df = forecaster.target_map
             if isinstance(target_map_df, pl.LazyFrame):
                 target_map_df = target_map_df.collect()
-            # Cast to normal Polars DataFrame to avoid Patito type mismatch errors
+
+            # We cast to pl.DataFrame here because eval_df and target_map_df are
+            # different Patito models. Polars' join method on Patito subclasses
+            # enforces that both sides have the same type, which would fail here.
             eval_df = pl.DataFrame(eval_df).join(
                 pl.DataFrame(target_map_df).select(
                     ["substation_number", "peak_capacity_MW_or_MVA"]
