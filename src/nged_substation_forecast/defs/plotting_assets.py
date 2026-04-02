@@ -35,8 +35,16 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
     # 3.1.B Specific 14-Day Forecast Selection
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
+    # We read directly from the live_primary_flows Delta table instead of using the
+    # cleaned_actuals asset. This is because the cleaned_actuals asset is partitioned
+    # and might only provide a single day of data if the job is run for a single partition.
+    # By reading the Delta table directly, we ensure we have the full 14-day history
+    # required for the plot.
     delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
     raw_flows = pl.scan_delta(delta_path)
+
+    # We apply the same cleaning logic as the production pipeline to ensure consistency.
+    # This replaces stuck sensors and insane values with nulls.
     cleaned_actuals = clean_substation_flows(cast(pl.DataFrame, raw_flows.collect()), settings)
 
     if predictions.is_empty() or cleaned_actuals.is_empty():

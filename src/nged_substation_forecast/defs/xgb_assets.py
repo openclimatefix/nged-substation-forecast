@@ -255,11 +255,15 @@ def evaluate_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Manually load from Delta table to ensure we have the full evaluation range.
-    # We use live_primary_flows because cleaned_actuals might not be fully backfilled.
+    # We use live_primary_flows because cleaned_actuals might not be fully backfilled
+    # for the entire evaluation range (e.g., if only a single partition was run).
+    # This ensures that autoregressive lags (which require historical data) are
+    # correctly calculated.
     delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
     raw_flows = pl.scan_delta(delta_path)
 
-    # Clean the data to ensure consistency with the cleaned_actuals asset
+    # Clean the data to ensure consistency with the cleaned_actuals asset.
+    # This replaces stuck sensors and insane values with nulls.
     substation_power_flows = clean_substation_flows(
         cast(pl.DataFrame, raw_flows.collect()), settings
     ).lazy()
