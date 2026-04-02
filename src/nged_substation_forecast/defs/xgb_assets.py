@@ -164,21 +164,19 @@ def train_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Collect to get a DataFrame for metadata operations
+    # Identify healthy substations using lazy evaluation to avoid massive eager collection
     # Note: The actuals may still have nulls; these will be dropped after feature engineering
-    from typing import cast as type_cast
-
-    substation_power_flows_df: pl.DataFrame = type_cast(
-        pl.DataFrame, substation_power_flows.collect()
-    )
-    healthy_substations: list[int] = []
-    if len(substation_power_flows_df) > 0:
-        healthy_substations = (
-            substation_power_flows_df.filter(pl.col("MW_or_MVA").is_not_null())
-            .get_column("substation_number")
+    healthy_substations = (
+        cast(
+            pl.DataFrame,
+            substation_power_flows.filter(pl.col("MW_or_MVA").is_not_null())
+            .select("substation_number")
             .unique()
-            .to_list()
+            .collect(),
         )
+        .get_column("substation_number")
+        .to_list()
+    )
 
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)
@@ -243,18 +241,18 @@ def evaluate_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Collect to determine healthy substations from the actuals data
-    substation_power_flows_df: pl.DataFrame = __import__("typing").cast(
-        pl.DataFrame, substation_power_flows.collect()
-    )
-    healthy_substations: list[int] = []
-    if len(substation_power_flows_df) > 0:
-        healthy_substations = (
-            substation_power_flows_df.filter(pl.col("MW_or_MVA").is_not_null())
-            .get_column("substation_number")
+    # Identify healthy substations using lazy evaluation to avoid massive eager collection
+    healthy_substations = (
+        cast(
+            pl.DataFrame,
+            substation_power_flows.filter(pl.col("MW_or_MVA").is_not_null())
+            .select("substation_number")
             .unique()
-            .to_list()
+            .collect(),
         )
+        .get_column("substation_number")
+        .to_list()
+    )
 
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)

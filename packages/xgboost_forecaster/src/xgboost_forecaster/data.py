@@ -317,4 +317,16 @@ def process_nwp_data(
         ).cast(pl.Float32)
     )
 
+    # Final cast to Float32 for all physical variables to satisfy data contracts.
+    # We exclude H3 index and ensemble member as they are identifiers, and
+    # categorical columns which must remain as integers.
+    physical_cols = [
+        col
+        for col, dtype in processed.schema.items()
+        if dtype.is_numeric()
+        and col not in ["h3_index", "ensemble_member"]
+        and col not in categorical_cols
+    ]
+    processed = processed.with_columns([pl.col(c).cast(pl.Float32) for c in physical_cols])
+
     return processed.lazy()

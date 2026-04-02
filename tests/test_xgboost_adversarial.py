@@ -9,12 +9,14 @@ from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
     ModelFeaturesConfig,
+    NwpModel,
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
     SubstationFlows,
     SubstationMetadata,
     InferenceParams,
+    ProcessedNwp,
 )
 
 
@@ -140,10 +142,19 @@ def test_process_nwp_data_empty_input():
     assert res.is_empty()
 
 
-def test_predict_with_empty_features_matrix():
-    """Test predict when the feature matrix is empty."""
+def test_predict_with_missing_feature_column_fails_loudly():
+    """Test that predict fails when a feature column used during training is missing."""
     forecaster = XGBoostForecaster()
-    forecaster.model = MagicMock()
+
+    # Mock model with specific feature names
+    mock_model = MagicMock()
+    mock_model.feature_names_in_ = ["feature_a", "feature_b"]
+    forecaster.model = mock_model
+
+    # Mock target map
+    forecaster.target_map = pl.DataFrame(
+        {"substation_number": [1], "power_col": ["MW"], "peak_capacity_MW_or_MVA": [100.0]}
+    ).with_columns(pl.col("substation_number").cast(pl.Int32))
 
     metadata = pt.DataFrame[SubstationMetadata](
         {
@@ -158,23 +169,62 @@ def test_predict_with_empty_features_matrix():
     )
 
     inference_params = InferenceParams(
-        forecast_time=datetime(2024, 1, 1, tzinfo=timezone.utc), power_fcst_model_name="test"
+        forecast_time=datetime(2024, 1, 1, 4, tzinfo=timezone.utc), power_fcst_model_name="test"
     )
 
-    # Empty NWPs will cause a ValueError as per code
-    with pytest.raises(ValueError, match="XGBoostForecaster requires NWP data for prediction."):
+    # NWP with all critical features
+    nwp = cast(
+        pt.LazyFrame[ProcessedNwp],
+        pl.DataFrame(
+            {
+                "init_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+                "valid_time": [datetime(2024, 1, 1, 6, tzinfo=timezone.utc)],
+                "h3_index": [1],
+                "ensemble_member": [0],
+                "temperature_2m": [10.0],
+                "dew_point_temperature_2m": [5.0],
+                "wind_speed_10m": [2.0],
+                "wind_direction_10m": [180.0],
+                "wind_speed_100m": [3.0],
+                "wind_direction_100m": [185.0],
+                "pressure_surface": [100.0],
+                "pressure_reduced_to_mean_sea_level": [101.0],
+                "geopotential_height_500hpa": [50.0],
+                "downward_short_wave_radiation_flux_surface": [100.0],
+                "categorical_precipitation_type_surface": [0.0],
+                "precipitation_surface": [0.0],
+                "downward_long_wave_radiation_flux_surface": [0.0],
+            }
+        )
+        .with_columns(
+            [
+                pl.col("h3_index").cast(pl.UInt64),
+                pl.col("ensemble_member").cast(pl.UInt8),
+                pl.col("categorical_precipitation_type_surface").cast(pl.UInt8),
+            ]
+        )
+        .lazy(),
+    )
+
+    # This should fail because feature_a and feature_b are missing from the prepared data
+    with pytest.raises(pl_exc.ColumnNotFoundError):
         forecaster.predict(
             substation_metadata=metadata,
             inference_params=inference_params,
-            substation_power_flows=pt.DataFrame[SubstationFlows](
-                {
-                    "timestamp": [],
-                    "substation_number": [],
-                    "MW": [],
-                    "MVA": [],
-                    "MVAr": [],
-                    "ingested_at": [],
-                }
-            ).lazy(),
-            nwps={},
+            substation_power_flows=cast(
+                pt.LazyFrame[SubstationFlows],
+                pl.DataFrame(
+                    {
+                        "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+                        "substation_number": [1],
+                        "MW": [50.0],
+                        "MVA": [50.0],
+                        "MVAr": [0.0],
+                        "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+                    }
+                )
+                .with_columns(pl.col("substation_number").cast(pl.Int32))
+                .lazy(),
+            ),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         )

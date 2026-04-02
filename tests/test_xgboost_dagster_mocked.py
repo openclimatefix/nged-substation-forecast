@@ -1,0 +1,133 @@
+import dagster as dg
+import polars as pl
+from datetime import datetime, timezone, timedelta
+from unittest.mock import patch
+
+from src.nged_substation_forecast.defs.xgb_assets import (
+    train_xgboost,
+    evaluate_xgboost,
+    XGBoostConfig,
+)
+from xgboost_forecaster.model import XGBoostForecaster
+
+
+def test_xgboost_dagster_assets_materialize_with_dummy_data():
+    """Test that XGBoost assets can be materialized with dummy data using Dagster's materialize."""
+
+    # Setup dummy data
+    sub_meta = pl.DataFrame(
+        {
+            "substation_number": [1],
+            "substation_name": ["Sub1"],
+            "latitude": [51.0],
+            "longitude": [-1.0],
+            "h3_res_5": [123],
+            "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "url": ["https://example.com"],
+        }
+    ).with_columns(pl.col("substation_number").cast(pl.Int32))
+
+    # Create 4 weeks of data to satisfy the dynamic lag
+    timestamps = pl.datetime_range(
+        datetime(2025, 12, 15, tzinfo=timezone.utc),
+        datetime(2026, 1, 15, tzinfo=timezone.utc),
+        "30m",
+        eager=True,
+    )
+
+    sub_flows = (
+        pl.DataFrame(
+            {
+                "timestamp": timestamps,
+                "substation_number": [1] * len(timestamps),
+                "MW": [10.0] * len(timestamps),
+                "MVA": [10.0] * len(timestamps),
+                "MVAr": [0.0] * len(timestamps),
+                "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
+                "MW_or_MVA": [10.0] * len(timestamps),
+            }
+        )
+        .with_columns(pl.col("substation_number").cast(pl.Int32))
+        .lazy()
+    )
+
+    # NWPs only for the training period (Jan 1st to Jan 15th)
+    nwp_timestamps = pl.datetime_range(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 15, tzinfo=timezone.utc),
+        "30m",
+        eager=True,
+    )
+
+    nwps = (
+        pl.DataFrame(
+            {
+                "valid_time": nwp_timestamps,
+                "init_time": nwp_timestamps - timedelta(hours=3),
+                "lead_time_hours": [3.0] * len(nwp_timestamps),
+                "h3_index": [123] * len(nwp_timestamps),
+                "ensemble_member": [0] * len(nwp_timestamps),
+                "temperature_2m": [15.0] * len(nwp_timestamps),
+                "dew_point_temperature_2m": [10.0] * len(nwp_timestamps),
+                "wind_speed_10m": [5.0] * len(nwp_timestamps),
+                "wind_direction_10m": [180.0] * len(nwp_timestamps),
+                "wind_speed_100m": [7.0] * len(nwp_timestamps),
+                "wind_direction_100m": [185.0] * len(nwp_timestamps),
+                "pressure_surface": [100.0] * len(nwp_timestamps),
+                "pressure_reduced_to_mean_sea_level": [101.0] * len(nwp_timestamps),
+                "geopotential_height_500hpa": [50.0] * len(nwp_timestamps),
+                "downward_short_wave_radiation_flux_surface": [100.0] * len(nwp_timestamps),
+                "categorical_precipitation_type_surface": [0.0] * len(nwp_timestamps),
+            }
+        )
+        .with_columns(
+            [
+                pl.col("h3_index").cast(pl.UInt64),
+                pl.col("ensemble_member").cast(pl.UInt8),
+            ]
+        )
+        .lazy()
+    )
+
+    config = XGBoostConfig(
+        train_start="2026-01-01",
+        train_end="2026-01-10",
+        test_start="2026-01-11",
+        test_end="2026-01-15",
+    )
+
+    # Mock MLflow to avoid actual logging
+    with (
+        patch("mlflow.start_run"),
+        patch("mlflow.log_params"),
+        patch("mlflow.log_metric"),
+        patch("mlflow.log_artifact"),
+        patch("mlflow.xgboost.log_model"),
+        patch("mlflow.set_experiment"),
+    ):
+        # Materialize assets
+        context = dg.build_asset_context()
+
+        model = train_xgboost(
+            context=context,
+            config=config,
+            nwp=nwps,
+            substation_power_flows=sub_flows,
+            substation_metadata=sub_meta,
+        )
+
+        assert isinstance(model, XGBoostForecaster)
+        assert model.model is not None
+
+        forecasts = evaluate_xgboost(
+            context=context,
+            config=config,
+            model=model,
+            nwp=nwps,
+            substation_power_flows=sub_flows,
+            substation_metadata=sub_meta,
+        )
+
+        assert isinstance(forecasts, pl.DataFrame)
+        assert not forecasts.is_empty()
+        assert "MW_or_MVA" in forecasts.columns
