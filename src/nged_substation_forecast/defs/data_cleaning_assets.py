@@ -36,6 +36,7 @@ have 48 periods (24 hours) of historical data available, even at the partition b
 
 import dagster as dg
 import polars as pl
+import os
 from typing import cast
 from datetime import datetime, timedelta, timezone
 from dagster import (
@@ -60,6 +61,54 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
         Absolute path as a string.
     """
     return str(settings.nged_data_path / "delta" / table_name)
+
+
+def get_cleaned_actuals_lazy(
+    settings: Settings, context: dg.AssetExecutionContext | None = None
+) -> pl.LazyFrame:
+    """Retrieves the cleaned actuals from the Delta table.
+
+    This function serves as the single source of truth for accessing cleaned actuals
+    data across the pipeline. It reads directly from the `cleaned_actuals` Delta table.
+    If the table does not exist (e.g., before the first run or backfill), it falls back
+    to reading `live_primary_flows` and cleaning it on the fly, logging a warning.
+
+    Args:
+        settings: Global settings object.
+        context: Optional Dagster context for logging.
+
+    Returns:
+        A Polars LazyFrame of the cleaned actuals.
+    """
+    delta_path = _get_delta_path(settings, "cleaned_actuals")
+    try:
+        # In some environments (like integration tests), we may want to force cleaning
+        # on the fly to ensure we have the full history even if backfills haven't run.
+        if os.getenv("NGED_FORCE_CLEAN_ON_THE_FLY") == "1":
+            raise RuntimeError("Forced fallback via NGED_FORCE_CLEAN_ON_THE_FLY")
+
+        # Attempt to scan the Delta table and verify it exists by fetching schema.
+        # We fetch the schema to force an immediate failure if the table is missing,
+        # as pl.scan_delta() is lazy and might not fail until collection.
+        lf = pl.scan_delta(delta_path)
+        lf.collect_schema()
+        if context:
+            context.log.info(f"Reading cleaned actuals from {delta_path}")
+        return lf
+    except Exception as e:
+        if context:
+            context.log.warning(
+                f"Failed to read cleaned_actuals Delta table: {e}. "
+                "Falling back to live_primary_flows. Please backfill the cleaned_actuals asset!"
+            )
+
+        # Fallback to raw data
+        raw_path = _get_delta_path(settings, "live_primary_flows")
+        raw_flows = pl.scan_delta(raw_path)
+
+        # Clean on the fly
+        # Note: clean_substation_flows expects a DataFrame, so we must collect.
+        return clean_substation_flows(cast(pl.DataFrame, raw_flows.collect()), settings).lazy()
 
 
 @dg.asset(

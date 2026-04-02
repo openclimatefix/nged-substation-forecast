@@ -5,6 +5,7 @@ from typing import cast
 import dagster as dg
 import polars as pl
 import pytest
+import os
 from contracts.settings import Settings
 from nged_substation_forecast.definitions import defs
 
@@ -107,14 +108,21 @@ def test_xgboost_dagster_integration() -> None:
     # standard development machine as it executes the full XGBoost pipeline
     # (data loading, cleaning, training, evaluation, and plotting).
     resources = defs.resources or {}
-    result = job.execute_in_process(
-        run_config=run_config,
-        partition_key=test_end.isoformat(),
-        resources={
-            **resources,
-            "io_manager": dg.mem_io_manager,
-        },
-    )
+
+    # Force cleaning on the fly for the integration test to ensure we have the full
+    # history even if backfills haven't run.
+    os.environ["NGED_FORCE_CLEAN_ON_THE_FLY"] = "1"
+    try:
+        result = job.execute_in_process(
+            run_config=run_config,
+            partition_key=test_end.isoformat(),
+            resources={
+                **resources,
+                "io_manager": dg.mem_io_manager,
+            },
+        )
+    finally:
+        del os.environ["NGED_FORCE_CLEAN_ON_THE_FLY"]
 
     # 7. Assertions
     assert result.success, "Dagster job failed"

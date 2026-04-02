@@ -7,7 +7,8 @@ import polars as pl
 from contracts.settings import Settings
 from dagster import ResourceParam
 from ml_core.data import downsample_power_flows
-from nged_data import clean_substation_flows
+
+from .data_cleaning_assets import get_cleaned_actuals_lazy
 
 
 class PlotConfig(dg.Config):
@@ -21,7 +22,7 @@ class PlotConfig(dg.Config):
         "predictions": dg.AssetIn("evaluate_xgboost"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["live_primary_flows"],
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="plots",
 )
@@ -35,17 +36,9 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
 
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
-    # We read directly from the live_primary_flows Delta table instead of using the
-    # cleaned_actuals asset. This is because the cleaned_actuals asset is partitioned
-    # and might only provide a single day of data if the job is run for a single partition.
-    # By reading the Delta table directly, we ensure we have the full 14-day history
-    # required for the plot.
-    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
-    raw_flows = pl.scan_delta(delta_path)
-
-    # We apply the same cleaning logic as the production pipeline to ensure consistency.
-    # This replaces stuck sensors and insane values with nulls.
-    cleaned_actuals = clean_substation_flows(cast(pl.DataFrame, raw_flows.collect()), settings)
+    # We use get_cleaned_actuals_lazy to ensure we have the full history required for the plot.
+    # This function serves as the single source of truth for accessing cleaned actuals.
+    cleaned_actuals = cast(pl.DataFrame, get_cleaned_actuals_lazy(settings, context).collect())
 
     if predictions.is_empty() or cleaned_actuals.is_empty():
         context.log.warning("Empty predictions or actuals, skipping plot.")
