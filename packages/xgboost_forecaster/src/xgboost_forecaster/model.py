@@ -74,7 +74,11 @@ class XGBoostForecaster(BaseForecaster):
             A Polars DataFrame or LazyFrame containing only the feature columns.
         """
         # Extract feature matrix using explicit feature names from config
-        if not hasattr(self, "config") or not self.config.features.feature_names:
+        if hasattr(self, "feature_names") and self.feature_names:
+            res = df.select(self.feature_names)
+        elif hasattr(self, "config") and self.config.features.feature_names:
+            res = df.select(self.config.features.feature_names)
+        else:
             # Fallback: keep only numeric and categorical columns, excluding the target and metadata
             exclude_cols = {
                 "MW",
@@ -96,8 +100,6 @@ class XGBoostForecaster(BaseForecaster):
                 if c not in exclude_cols and (dtype.is_numeric() or dtype == pl.Categorical)
             ]
             res = df.select(feature_cols)
-        else:
-            res = df.select(self.config.features.feature_names)
 
         if isinstance(res, pl.LazyFrame):
             res_schema = res.collect_schema()
@@ -377,7 +379,7 @@ class XGBoostForecaster(BaseForecaster):
         df_lf = df_lf.join(
             target_map_lf.select(["substation_number", "peak_capacity_MW_or_MVA"]),
             on="substation_number",
-            how="left",
+            how="inner",  # FIX: Drop substations missing from target_map
         ).with_columns(
             latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
             / pl.col("peak_capacity_MW_or_MVA")
@@ -596,32 +598,14 @@ class XGBoostForecaster(BaseForecaster):
             NwpColumns.INIT_TIME,
         ]
 
-        critical_cols = []
-        if nwps:
-            critical_cols.extend(
-                [
-                    f"{NwpColumns.TEMPERATURE_2M}_uint8_scaled",
-                    f"{NwpColumns.SW_RADIATION}_uint8_scaled",
-                    NwpColumns.WIND_SPEED_10M,
-                ]
-            )
-
-        raw_df = cast(
+        # FIX: Remove drop_nulls logic during prediction
+        df = cast(
             pl.DataFrame,
             df_lf.select(list(set(feature_cols + output_cols + ["MW_or_MVA"]))).collect(),
         )
-        df = raw_df.drop_nulls(subset=critical_cols)
-
-        dropped_rows = len(raw_df) - len(df)
-        if dropped_rows > 0:
-            log.warning(
-                f"Dropped {dropped_rows} rows during prediction due to nulls in critical columns: {critical_cols}"
-            )
 
         if df.is_empty():
-            raise ValueError(
-                "No inference data remaining after dropping nulls in critical columns."
-            )
+            raise ValueError("No inference data remaining.")
 
         SubstationFeatures.validate(df, allow_missing_columns=True, allow_superfluous_columns=True)
 

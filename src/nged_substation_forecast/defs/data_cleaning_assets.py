@@ -122,7 +122,7 @@ def cleaned_actuals(
         context.log.warning("Input LazyFrame is empty, returning empty validated DataFrame.")
         empty_df = pl.DataFrame(schema=SubstationFlows.dtypes)
         validated_empty = SubstationFlows.validate(empty_df)
-        validated_empty.write_delta(_get_delta_path(settings, "cleaned_actuals"), mode="overwrite")
+        # FIX: Do not overwrite the Delta table! Just return the empty DataFrame.
         return validated_empty
 
     # The AssetIn already provides data with proper join from substation_metadata
