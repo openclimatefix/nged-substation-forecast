@@ -103,6 +103,9 @@ def test_xgboost_dagster_integration() -> None:
     }
 
     # 6. Execute the job in-process
+    # Note: This test takes approximately 3.5 minutes (215 seconds) to run on a
+    # standard development machine as it executes the full XGBoost pipeline
+    # (data loading, cleaning, training, evaluation, and plotting).
     resources = defs.resources or {}
     result = job.execute_in_process(
         run_config=run_config,

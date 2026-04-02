@@ -137,7 +137,7 @@ def _get_target_substations(
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["cleaned_actuals"],
+    deps=["live_primary_flows"],
     compute_kind="python",
     group_name="models",
 )
@@ -230,7 +230,7 @@ def train_xgboost(
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["cleaned_actuals"],
+    deps=["live_primary_flows"],
     compute_kind="python",
     group_name="models",
 )
@@ -255,8 +255,18 @@ def evaluate_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Manually load from Delta table to ensure we have the full evaluation range.
-    delta_path = str(settings.nged_data_path / "delta" / "cleaned_actuals")
-    substation_power_flows = pl.scan_delta(delta_path)
+    # We use live_primary_flows because cleaned_actuals might not be fully backfilled
+    # for the entire evaluation range (e.g., if only a single partition was run).
+    # This ensures that autoregressive lags (which require historical data) are
+    # correctly calculated.
+    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
+    raw_flows = pl.scan_delta(delta_path)
+
+    # Clean the data to ensure consistency with the cleaned_actuals asset.
+    # This replaces stuck sensors and insane values with nulls.
+    substation_power_flows = clean_substation_flows(
+        cast(pl.DataFrame, raw_flows.collect()), settings
+    ).lazy()
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     healthy_substations = (
