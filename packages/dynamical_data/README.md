@@ -1,15 +1,19 @@
+# Dynamical Data Package
+
 Download & process numerical weather predictions from Dynamical.org.
 
 We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
-![Map of Great Britain using H3 resolution 5 hexagons](map-of-Great-Britain-H3-resolution-5.png)
+![Map of Great Britain using H3 resolution 5 hexagons](../geo/assets/map-of-Great-Britain-H3-resolution-5.png)
+
+> **Note:** The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons has been extracted to the `packages/geo` package. This package (`dynamical_data`) focuses specifically on the ingestion, processing, and storage of time-varying NWP datasets like ECMWF. The H3 grid weights are provided as a Dagster asset from the `geo` package, eliminating the need for precomputed static files.
 
 ## Data storage experiments
 
 All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.
 
 The conclusion is to:
-- sort by "init_time", "lead_time", "ensemble_member", "h3_index" 
+- sort by "init_time", "lead_time", "ensemble_member", "h3_index"
 - compression="zstd", compression_level=14 = 51 MB
 
 As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
@@ -58,3 +62,11 @@ Scale to 2⁹  - 1, and save as UInt16 =  62 MB
 Scale to 2⁸  - 1, and save as UInt16 =  51 MB
 Scale to 2⁸  - 1, and save as UInt8  =  51 MB
 ```
+
+## Physical Wind Logic
+
+To ensure physically realistic wind speed and direction, we interpolate the Cartesian `u` and `v` components linearly instead of using circular interpolation on speed and direction. This approach avoids "phantom high wind" artifacts that can occur during rapid direction shifts (e.g., from 359 to 1 degree). Wind speed and direction are reconstructed from the interpolated `u` and `v` components after the interpolation step.
+
+## Anti-Meridian Wrap-Around
+
+The NWP ingestion pipeline correctly handles anti-meridian wrap-around for global datasets. When a dataset spans the 180-degree longitude boundary, the pipeline identifies the gap, slices the dataset into negative and positive longitude blocks, and concatenates them to ensure a continuous spatial representation. This prevents massive unnecessary downloads and ensures physical correctness for global models.

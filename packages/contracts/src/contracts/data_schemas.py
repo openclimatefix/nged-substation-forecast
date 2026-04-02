@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import patito as pt
 import polars as pl
@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
 # Define our standard datetime type for all schemas
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
+
+PowerColumn = Literal["MW", "MVA"]
 
 
 class MissingCorePowerVariablesError(ValueError):
@@ -33,19 +35,19 @@ class SubstationFlows(pt.Model):
     # If we want to reduce storage space we could store kW and kVAr as Int16.
 
     # Active power:
-    MW: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MW: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # Apparent power:
-    MVA: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MVA: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # Reactive power:
-    MVAr: float | None = pt.Field(dtype=pl.Float32, allow_missing=True, ge=-1_000, le=1_000)
+    MVAr: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
     # The datetime this data was ingested into our system. When we update our datasets, we examine
     # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
     # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
     # we didn't record when the data was ingested).
-    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE, allow_missing=True)
+    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
     @classmethod
     def validate(
@@ -67,17 +69,9 @@ class SubstationFlows(pt.Model):
         data scenarios. The downstream model training logic will need to handle fully
         null target variables by either skipping training or using fallback strategies.
         """
-        if "MW" not in dataframe.columns and "MVA" not in dataframe.columns:
-            raise MissingCorePowerVariablesError(
-                "SubstationFlows dataframe must contain at least one of 'MW' or 'MVA' columns."
-                f" {dataframe.columns=}, {len(dataframe)=}"
-            )
-
         # Ensure at least one of MW or MVA has non-null data
-        # NOTE: We skip this check for fully null DataFrames to allow edge cases like
-        # all-cleaned partitions (validated in Flaw-004 fix).
         # Only raise error if there IS data but MW/MVA columns have no non-null values.
-        if isinstance(dataframe, pl.DataFrame) and len(dataframe) > 0:
+        if len(dataframe) > 0:
             mw_has_data = "MW" in dataframe.columns and dataframe["MW"].is_not_null().any()
             mva_has_data = "MVA" in dataframe.columns and dataframe["MVA"].is_not_null().any()
 
@@ -99,9 +93,9 @@ class SubstationFlows(pt.Model):
         )
 
     @staticmethod
-    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> str:
-        mw_valid = dataframe["MW"].is_not_null().sum() if "MW" in dataframe.columns else 0
-        mva_valid = dataframe["MVA"].is_not_null().sum() if "MVA" in dataframe.columns else 0
+    def choose_power_column(dataframe: pt.DataFrame["SubstationFlows"]) -> PowerColumn:
+        mw_valid = dataframe["MW"].is_not_null().sum()
+        mva_valid = dataframe["MVA"].is_not_null().sum()
         return "MW" if mw_valid >= mva_valid else "MVA"
 
     @staticmethod
@@ -118,16 +112,26 @@ class SubstationFlows(pt.Model):
 
 
 class SimplifiedSubstationFlows(pt.Model):
+    """Standardized, single-column representation of power flows.
+
+    This model is used after the best available power column (MW or MVA) has been
+    selected and renamed to 'MW_or_MVA'.
+    """
+
     timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
 class SubstationTargetMap(pt.Model):
-    """Map of substation_number to the target column (MW or MVA) to use."""
+    """Maps substations to their primary power column and stores their peak capacity.
+
+    This model is used to determine whether to use MW or MVA as the target variable
+    for a given substation, and provides the peak capacity for scaling and validation.
+    """
 
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
-    target_col: str = pt.Field(dtype=pl.String)
-    peak_capacity: float = pt.Field(dtype=pl.Float32, gt=0)
+    power_col: PowerColumn = pt.Field(dtype=pl.String)
+    peak_capacity_MW_or_MVA: float = pt.Field(dtype=pl.Float32, gt=0)
 
 
 class SubstationLocations(pt.Model):
@@ -158,6 +162,9 @@ class SubstationMetadata(pt.Model):
     # NGED has 192,000 substations.
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
 
+    # NGED's CKAN portal uses slightly different names for some substations in their location table
+    # versus in their live primary flows data. These names are matched by code in
+    # `packages/nged_data/src/nged_data/substation_names/`
     substation_name_in_location_table: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
 
     # This will be null if the substation doesn't have live telemetry.
@@ -171,7 +178,7 @@ class SubstationMetadata(pt.Model):
     substation_type: str = pt.Field(dtype=pl.Categorical)
     latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
+    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)  # H3 discrete spatial index
 
     # When this metadata record was last updated from the upstream NGED datasets.
     last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -184,19 +191,20 @@ class PowerForecast(pt.Model):
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
+    # The datetime that the underlying weather forecast was initialised.
+    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
     # Identifier for our ML-based power forecasting model.
+    # This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`.
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
 
     # The datetime that the power forecast was initialised.
     power_fcst_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
 
-    # The datetime that the underlying weather forecast was initialised.
-    nwp_init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-
     # Year and month of the power forecast initialisation (for partitioning).
     power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
-    # Active power (megawatts) or apparent power (mega volt amp).
+    # The power forecast itself in units of MW (active power) or MVA (apparent power).
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
 
 
@@ -204,17 +212,28 @@ class ScalingParams(pt.Model):
     """Schema for weather variable scaling parameters.
 
     Used when scaling between physical units (e.g. degrees C) and their unsigned 8-bit integer
-    (uint8) representations (in the range [0, 255])."""
+    (uint8) representations. uint8 represents integers in the range [0, 255]."""
 
     col_name: str = pt.Field(dtype=pl.String)
+
+    # The minimum from the actual values, minus a small buffer.
     buffered_min: float = pt.Field(dtype=pl.Float32)
+
+    # The range from the actual values, plus a small buffer.
     buffered_range: float = pt.Field(dtype=pl.Float32)
+
+    # The maximum from the actual values, plus a small buffer.
+    buffered_max: float = pt.Field(dtype=pl.Float32)
 
 
 class InferenceParams(BaseModel):
     """Parameters for ML model inference."""
 
+    # The time that we create our power forecast. This might be called `t0` in some other OCF
+    # projects. When running backtests, we cannot use any NWPs available after `forecast_time`
+    # (i.e. init_time + delay > forecast_time).
     forecast_time: datetime
+
     power_fcst_model_name: str | None = None
 
 
@@ -229,16 +248,22 @@ class Nwp(pt.Model):
     # Variables stored as uint8 on disk
     temperature_2m: int = pt.Field(dtype=pl.UInt8)
     dew_point_temperature_2m: int = pt.Field(dtype=pl.UInt8)
-    wind_speed_10m: int = pt.Field(dtype=pl.UInt8)
-    wind_direction_10m: int = pt.Field(dtype=pl.UInt8)
-    wind_speed_100m: int = pt.Field(dtype=pl.UInt8)
-    wind_direction_100m: int = pt.Field(dtype=pl.UInt8)
+    # WIND VECTOR COMPONENTS:
+    # We store raw U and V components as Float32 to allow physically realistic
+    # linear interpolation in the forecasting pipeline, avoiding the "phantom high wind"
+    # artifacts caused by interpolating speed/direction or circular variables.
+    wind_u_10m: float = pt.Field(dtype=pl.Float32)
+    wind_v_10m: float = pt.Field(dtype=pl.Float32)
+    wind_u_100m: float = pt.Field(dtype=pl.Float32)
+    wind_v_100m: float = pt.Field(dtype=pl.Float32)
     pressure_surface: int = pt.Field(dtype=pl.UInt8)
     pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
     geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
 
-    # Precipitation and radiation variables are null for the first forecast step (lead time 0)
-    # in ECMWF ENS, as they are accumulated over the previous interval.
+    # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
+    # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
+    # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
+    # values before we receive them. So these are true _rates_.
     downward_long_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
     downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.UInt8)
     precipitation_surface: int | None = pt.Field(dtype=pl.UInt8)
@@ -263,9 +288,6 @@ class Nwp(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        if not isinstance(validated_df, pl.DataFrame):
-            return cast(pt.DataFrame["Nwp"], validated_df)
-
         # Check for nulls from second forecast step onwards
         # (i.e. where valid_time > init_time)
         cols_to_check = [
@@ -289,7 +311,10 @@ class Nwp(pt.Model):
 
 
 class NwpColumns:
-    """Constants for NWP column names."""
+    """Centralized constants for NWP column names.
+
+    Used to prevent typos and ensure consistency across feature engineering and model training.
+    """
 
     VALID_TIME = "valid_time"
     INIT_TIME = "init_time"
@@ -310,7 +335,9 @@ class ProcessedNwp(pt.Model):
 
     Clever Optimization:
     To save memory, weather variables are scaled to a 0-255 range (uint8) before being saved to disk.
-    The scaling formula is: uint8_value = (physical_value - min_bound) / (max_bound - min_bound) * 255.
+    The scaling formula is:
+        uint8_value = round(((physical_value - buffered_min) / buffered_range) * 255).
+
     When loaded, they are cast to Float32 but retain the 0-255 scale.
     """
 
@@ -333,7 +360,7 @@ class ProcessedNwp(pt.Model):
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
-    categorical_precipitation_type_surface: float = pt.Field(dtype=pl.Float32)
+    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
 
 class SubstationFeatures(pt.Model):
@@ -350,6 +377,7 @@ class SubstationFeatures(pt.Model):
     substation_number: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32)
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
 
     # Power lags
     latest_available_weekly_lag: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
@@ -357,10 +385,13 @@ class SubstationFeatures(pt.Model):
     # Weather features
     temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     dew_point_temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    # PHYSICAL WIND FEATURES:
+    # These are calculated from interpolated U/V components in the forecasting
+    # pipeline, ensuring physically realistic wind speed and direction.
+    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
+    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
+    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
+    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
     pressure_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     pressure_reduced_to_mean_sea_level_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     geopotential_height_500hpa_uint8_scaled: float = pt.Field(dtype=pl.Float32)
@@ -373,7 +404,7 @@ class SubstationFeatures(pt.Model):
     precipitation_surface_uint8_scaled: float | None = pt.Field(
         dtype=pl.Float32, allow_missing=True
     )
-    categorical_precipitation_type_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
     # Physical features
     windchill: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
@@ -396,3 +427,19 @@ class SubstationFeatures(pt.Model):
     day_of_year_sin: float = pt.Field(dtype=pl.Float32)
     day_of_year_cos: float = pt.Field(dtype=pl.Float32)
     day_of_week: int = pt.Field(dtype=pl.Int8)
+
+
+class H3GridWeights(pt.Model):
+    """Schema for the pre-computed H3 grid weights.
+
+    This contract defines the mapping between H3 hexagons and a regular latitude/longitude grid.
+    It is used to ensure type safety when passing spatial mapping data from generic geospatial
+    utilities (like `packages/geo`) to dataset-specific ingestion pipelines (like `packages/dynamical_data`).
+    """
+
+    h3_index: int = pt.Field(dtype=pl.UInt64)
+    nwp_lat: float = pt.Field(dtype=pl.Float64, ge=-90, le=90)
+    nwp_lng: float = pt.Field(dtype=pl.Float64, ge=-180, le=180)
+    len: int = pt.Field(dtype=pl.UInt32)
+    total: int = pt.Field(dtype=pl.UInt32)
+    proportion: float = pt.Field(dtype=pl.Float64)

@@ -109,6 +109,14 @@ class XGBoostForecaster(BaseForecaster):
         if "substation_number" in res_schema.names():
             res = res.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
 
+        # Ensure categorical precipitation is treated as a categorical feature
+        if "categorical_precipitation_type_surface" in res_schema.names():
+            res = res.with_columns(
+                pl.col("categorical_precipitation_type_surface")
+                .cast(pl.String)
+                .cast(pl.Categorical)
+            )
+
         return res
 
     def _add_lags(self, df: pl.LazyFrame, flows_30m: pl.LazyFrame) -> pl.LazyFrame:
@@ -224,10 +232,19 @@ class XGBoostForecaster(BaseForecaster):
 
         combined_nwps = nwp_list[0]
         for other_nwp in nwp_list[1:]:
-            combined_nwps = combined_nwps.sort("available_time").join_asof(
-                other_nwp.sort("available_time"),
-                on="available_time",
-                by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, NwpColumns.ENSEMBLE_MEMBER],
+            combined_nwps = (
+                combined_nwps.sort("available_time")
+                .join_asof(
+                    other_nwp.sort("available_time"),
+                    on="available_time",
+                    by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, NwpColumns.ENSEMBLE_MEMBER],
+                )
+                .with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                )
             )
         return combined_nwps
 
@@ -276,25 +293,53 @@ class XGBoostForecaster(BaseForecaster):
                     metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                     on=NwpColumns.H3_INDEX,
                     how="inner",
+                ).with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
                 )
             else:
                 # For training, start with flows and join metadata, then NWPs
-                df_lf = flows_30m.rename({"timestamp": NwpColumns.VALID_TIME}).join(
-                    metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
-                    on="substation_number",
+                df_lf = (
+                    flows_30m.rename({"timestamp": NwpColumns.VALID_TIME})
+                    .join(
+                        metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
+                        on="substation_number",
+                    )
+                    .with_columns(
+                        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                        # critical for downstream H3 operations and memory efficiency.
+                        pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                    )
                 )
                 df_lf = df_lf.join(
                     combined_nwps_lf,
                     on=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX],
                     how="left",
+                ).with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
                 )
         else:
             if not is_training:
                 raise ValueError("XGBoostForecaster requires NWP data for prediction.")
             # For training without NWPs
-            df_lf = flows_30m.rename({"timestamp": NwpColumns.VALID_TIME}).join(
-                metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
-                on="substation_number",
+            df_lf = (
+                flows_30m.rename({"timestamp": NwpColumns.VALID_TIME})
+                .join(
+                    metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
+                    on="substation_number",
+                )
+                .with_columns(
+                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+                    # critical for downstream H3 operations and memory efficiency.
+                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
+                )
             )
 
         # 3. Add lags and features
@@ -306,22 +351,24 @@ class XGBoostForecaster(BaseForecaster):
 
         # Normalize by peak capacity
         df_lf = df_lf.join(
-            target_map_lf.select(["substation_number", "peak_capacity"]),
+            target_map_lf.select(["substation_number", "peak_capacity_MW_or_MVA"]),
             on="substation_number",
             how="left",
         ).with_columns(
             latest_available_weekly_lag=pl.col("latest_available_weekly_lag")
-            / pl.col("peak_capacity")
+            / pl.col("peak_capacity_MW_or_MVA")
         )
 
         if is_training:
             # For training, also normalize target
-            df_lf = df_lf.with_columns(MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity"))
+            df_lf = df_lf.with_columns(
+                MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity_MW_or_MVA")
+            )
         else:
             # For prediction, add dummy target for validation
             df_lf = df_lf.with_columns(MW_or_MVA=pl.lit(0.0, dtype=pl.Float32))
 
-        df_lf = df_lf.drop("peak_capacity")
+        df_lf = df_lf.drop("peak_capacity_MW_or_MVA")
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
 
         # 4. Type casting
@@ -333,6 +380,13 @@ class XGBoostForecaster(BaseForecaster):
         )
         if NwpColumns.ENSEMBLE_MEMBER in df_lf.collect_schema().names():
             df_lf = df_lf.with_columns(pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8))
+
+        # DATA TYPE RATIONALE:
+        # Weather features are kept as Float32 in memory rather than UInt8 to:
+        # 1. Preserve precision from 30-minute interpolation (avoiding "staircase" effects).
+        # 2. Prevent silent underflow during feature engineering (e.g., calculating trends
+        #    via subtraction).
+        # 3. Align with XGBoost's native internal data type (Float32).
 
         # Cast all floats to Float32 for Patito
         df_lf = df_lf.with_columns(pl.col(pl.Float64).cast(pl.Float32))
@@ -370,7 +424,7 @@ class XGBoostForecaster(BaseForecaster):
             .agg(
                 mw_count=pl.col("MW").is_not_null().sum(),
                 mva_count=pl.col("MVA").is_not_null().sum(),
-                peak_capacity=pl.max_horizontal(
+                peak_capacity_MW_or_MVA=pl.max_horizontal(
                     pl.col("MW").abs().max(), pl.col("MVA").abs().max()
                 ).fill_null(1.0),
             )
@@ -378,13 +432,13 @@ class XGBoostForecaster(BaseForecaster):
                 pl.when(pl.col("mw_count") >= pl.col("mva_count"))
                 .then(pl.lit("MW"))
                 .otherwise(pl.lit("MVA"))
-                .alias("target_col"),
-                pl.when(pl.col("peak_capacity") == 0.0)
+                .alias("power_col"),
+                pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
                 .then(pl.lit(1.0))
-                .otherwise(pl.col("peak_capacity"))
-                .alias("peak_capacity"),
+                .otherwise(pl.col("peak_capacity_MW_or_MVA"))
+                .alias("peak_capacity_MW_or_MVA"),
             )
-            .select(["substation_number", "target_col", "peak_capacity"])
+            .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
             .collect(),
         )
 
@@ -392,7 +446,7 @@ class XGBoostForecaster(BaseForecaster):
             target_map_df.with_columns(
                 [
                     pl.col("substation_number").cast(pl.Int32),
-                    pl.col("peak_capacity").cast(pl.Float32),
+                    pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
                 ]
             )
         )
@@ -581,13 +635,15 @@ class XGBoostForecaster(BaseForecaster):
             .join(
                 cast(
                     pl.DataFrame,
-                    target_map_lf.select(["substation_number", "peak_capacity"]).collect(),
+                    target_map_lf.select(
+                        ["substation_number", "peak_capacity_MW_or_MVA"]
+                    ).collect(),
                 ),
                 on="substation_number",
                 how="left",
             )
             .with_columns(
-                MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity"),
+                MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity_MW_or_MVA"),
                 power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
                 power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
                 nwp_init_time=pl.col(NwpColumns.INIT_TIME).cast(pl.Datetime("us", "UTC")),

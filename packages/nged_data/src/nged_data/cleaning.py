@@ -68,7 +68,7 @@ def clean_substation_flows(
         the threshold over a 48-period (24-hour) window. The window is strictly
         backward-looking to prevent data leakage from future values.
 
-        CRITICAL: This must be computed per-substation using `.over("substation_number")`.
+        This must be computed per-substation using `.over("substation_number")`.
         Without this, the rolling std would be computed for the entire DataFrame,
         mixing data from all substations and causing incorrect stale detection.
 

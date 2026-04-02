@@ -41,33 +41,33 @@ def downsample_power_flows(
     )
 
     if target_map is not None:
-        # Only join the target_col from target_map to avoid bringing in extra columns like peak_capacity
+        # Only join the power_col from target_map to avoid bringing in extra columns like peak_capacity
         downsampled = downsampled.join(
-            target_map.select(["substation_number", "target_col"]),
+            target_map.select(["substation_number", "power_col"]),
             on="substation_number",
             how="left",
         )
 
         return (
             downsampled.with_columns(
-                mw_count=pl.when(pl.col("target_col").is_null())
+                mw_count=pl.when(pl.col("power_col").is_null())
                 .then(pl.col("MW").is_not_null().sum().over("substation_number"))
                 .otherwise(0),
-                mva_count=pl.when(pl.col("target_col").is_null())
+                mva_count=pl.when(pl.col("power_col").is_null())
                 .then(pl.col("MVA").is_not_null().sum().over("substation_number"))
                 .otherwise(0),
             )
             .with_columns(
-                pl.when(pl.col("target_col") == "MW")
+                pl.when(pl.col("power_col") == "MW")
                 .then(pl.col("MW"))
-                .when(pl.col("target_col") == "MVA")
+                .when(pl.col("power_col") == "MVA")
                 .then(pl.col("MVA"))
                 .when(pl.col("mw_count") >= pl.col("mva_count"))
                 .then(pl.col("MW"))
                 .otherwise(pl.col("MVA"))
                 .alias("MW_or_MVA")
             )
-            .drop(["target_col", "mw_count", "mva_count"])
+            .drop(["power_col", "mw_count", "mva_count"])
         )
     else:
         return (

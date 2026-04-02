@@ -3,7 +3,9 @@ from datetime import datetime, timezone
 from pydantic import Field
 
 import dagster as dg
+import patito as pt
 import polars as pl
+from contracts.data_schemas import H3GridWeights
 from contracts.settings import Settings
 from dagster import (
     AssetCheckExecutionContext,
@@ -28,19 +30,23 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 # The ECMWF download script uses a lot of RAM, so it's best to run it one-by-one.
 # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
 @asset(partitions_def=weather_partitions, pool="ECMWF")
-def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[Settings]) -> None:
+def ecmwf_ens_forecast(
+    context: AssetExecutionContext,
+    settings: ResourceParam[Settings],
+    gb_h3_grid_weights: pt.DataFrame[H3GridWeights],
+) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
     partition_key = context.partition_key
     nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
-    scaled_df = download_and_scale_ecmwf(nwp_init_time)
+    scaled_df = download_and_scale_ecmwf(nwp_init_time, h3_grid=gb_h3_grid_weights)
 
     output_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     output_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename
 
-    scaled_df.write_parquet(output_path, compression="zstd", compression_level=14)
+    scaled_df.write_parquet(output_path, compression="zstd", compression_level=3)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
 
@@ -48,7 +54,15 @@ def ecmwf_ens_forecast(context: AssetExecutionContext, settings: ResourceParam[S
 @asset(deps=[ecmwf_ens_forecast])
 def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
     """Provides a LazyFrame scanning all downloaded NWP data."""
-    return pl.scan_parquet(settings.nwp_data_path / "ECMWF" / "ENS" / "*.parquet")
+    nwp_dir = settings.nwp_data_path / "ECMWF" / "ENS"
+    if not nwp_dir.exists():
+        # Return an empty LazyFrame with the expected schema if the directory doesn't exist.
+        # This prevents the pipeline from crashing before any data has been downloaded.
+        from contracts.data_schemas import Nwp
+
+        return pl.LazyFrame(schema=Nwp.dtypes)
+
+    return pl.scan_parquet(nwp_dir / "*.parquet")
 
 
 class ProcessedNWPConfig(dg.Config):
@@ -56,6 +70,15 @@ class ProcessedNWPConfig(dg.Config):
 
     substation_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
+    )
+    # We parameterize the lead time filter by the target horizon to eliminate
+    # lookahead bias. This ensures the model is trained on forecasts with the
+    # exact same accuracy as those available in production.
+    target_horizon_hours: int = Field(
+        default=24, description="The forecast horizon we are targeting (e.g., 24)."
+    )
+    publication_delay_hours: int = Field(
+        default=3, description="The delay between NWP initialization and availability."
     )
 
 
@@ -78,7 +101,12 @@ def processed_nwp_data(
             pl.col("substation_number").is_in(config.substation_ids)
         )
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
-    return process_nwp_data(all_nwp_data, h3_indices)
+    return process_nwp_data(
+        all_nwp_data,
+        h3_indices,
+        target_horizon_hours=config.target_horizon_hours,
+        publication_delay_hours=config.publication_delay_hours,
+    )
 
 
 @asset_check(asset=ecmwf_ens_forecast)
@@ -99,11 +127,13 @@ def check_ecmwf_historical_bounds(
     # Lazily scan the parquet file
     lf = pl.scan_parquet(filepath)
 
-    # Find all UInt8 columns
+    # Find all UInt8 columns, excluding categorical variables which are
+    # expected to hit 0 (e.g., "no precipitation").
+    categorical_vars = ["categorical_precipitation_type_surface"]
     uint8_cols = [
         name
         for name, dtype in zip(lf.collect_schema().names(), lf.collect_schema().dtypes())
-        if dtype == pl.UInt8
+        if dtype == pl.UInt8 and name not in categorical_vars
     ]
 
     # Count how many values hit 0 or 255 in a single optimized pass
@@ -125,6 +155,54 @@ def check_ecmwf_historical_bounds(
         )
 
     return AssetCheckResult(passed=True, description="All values within historical bounds.")
+
+
+@asset_check(asset=ecmwf_ens_forecast)
+def check_ecmwf_categorical_bounds(
+    context: AssetCheckExecutionContext, settings: ResourceParam[Settings]
+) -> AssetCheckResult:
+    """Check if categorical precipitation type falls within the expected range (0-8)."""
+    partition_key = context.partition_key
+    nwp_init_time = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    # Locate the parquet file for this partition
+    filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
+    filepath = settings.nwp_data_path / "ECMWF" / "ENS" / filename
+
+    if not filepath.exists():
+        return AssetCheckResult(passed=False, description="Parquet file not found.")
+
+    # Lazily scan the parquet file
+    lf = pl.scan_parquet(filepath)
+
+    # Check if the column exists
+    if "categorical_precipitation_type_surface" not in lf.collect_schema().names():
+        return AssetCheckResult(
+            passed=True, description="Categorical precipitation column not found."
+        )
+
+    # Count values outside [0, 8]
+    import typing
+
+    invalid_count = typing.cast(
+        pl.DataFrame,
+        lf.filter(
+            (pl.col("categorical_precipitation_type_surface") < 0)
+            | (pl.col("categorical_precipitation_type_surface") > 8)
+        )
+        .select(pl.len())
+        .collect(),
+    ).item()
+
+    if invalid_count > 0:
+        return AssetCheckResult(
+            passed=False,
+            severity=AssetCheckSeverity.ERROR,
+            description=f"Found {invalid_count} invalid categorical precipitation values (outside 0-8).",
+            metadata={"invalid_count": invalid_count},
+        )
+
+    return AssetCheckResult(passed=True, description="All categorical values within range (0-8).")
 
 
 update_ecmwf_ens_forecast = define_asset_job(

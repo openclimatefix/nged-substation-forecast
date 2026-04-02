@@ -44,8 +44,11 @@ class ModelConfig(BaseModel):
     )
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
     required_lookback_days: int = Field(default=14)
-    nwp_availability_delay_hours: int = Field(default=3)
     features: ModelFeaturesConfig
+
+    # The latency between the NWP init time and when the NWP is actually downloaded and processed
+    # and ready for use.
+    nwp_availability_delay_hours: int = Field(default=3)
 
 
 class TrainingConfig(BaseModel):

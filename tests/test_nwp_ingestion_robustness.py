@@ -219,7 +219,7 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     """Verify the pipeline can handle single-point forecasts without IndexError.
 
     This test creates a Zarr dataset with only one latitude and longitude value,
-    and passes it through download_ecmwf. It verifies the fix for FLAW-001
+    and passes it through download_ecmwf. It verifies the fix
     where length-1 latitude arrays caused an IndexError during spatial slicing.
     """
 

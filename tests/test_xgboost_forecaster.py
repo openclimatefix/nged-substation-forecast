@@ -59,10 +59,10 @@ def data_config(tmp_path):
             "h3_index": [1],
             "temperature_2m": [200],
             "dew_point_temperature_2m": [190],
-            "wind_speed_10m": [10],
-            "wind_direction_10m": [180],
-            "wind_speed_100m": [15],
-            "wind_direction_100m": [185],
+            "wind_u_10m": [10.0],
+            "wind_v_10m": [0.0],
+            "wind_u_100m": [15.0],
+            "wind_v_100m": [0.0],
             "pressure_surface": [100],
             "pressure_reduced_to_mean_sea_level": [101],
             "geopotential_height_500hpa": [50],
@@ -79,10 +79,10 @@ def data_config(tmp_path):
             pl.col("h3_index").cast(pl.UInt64),
             pl.col("temperature_2m").cast(pl.UInt8),
             pl.col("dew_point_temperature_2m").cast(pl.UInt8),
-            pl.col("wind_speed_10m").cast(pl.UInt8),
-            pl.col("wind_direction_10m").cast(pl.UInt8),
-            pl.col("wind_speed_100m").cast(pl.UInt8),
-            pl.col("wind_direction_100m").cast(pl.UInt8),
+            pl.col("wind_u_10m").cast(pl.Float32),
+            pl.col("wind_v_10m").cast(pl.Float32),
+            pl.col("wind_u_100m").cast(pl.Float32),
+            pl.col("wind_v_100m").cast(pl.Float32),
             pl.col("pressure_surface").cast(pl.UInt8),
             pl.col("pressure_reduced_to_mean_sea_level").cast(pl.UInt8),
             pl.col("geopotential_height_500hpa").cast(pl.UInt8),
@@ -171,7 +171,7 @@ def test_process_nwp_data_removes_zero_lead_time():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
 
     # Remaining valid_times: 03:00, 04:00, 05:00.
     # Upsampling to 30m will create: 03:00, 03:30, 04:00, 04:30, 05:00.
@@ -202,7 +202,7 @@ def test_process_nwp_data_interpolates_safely_within_trajectories():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
 
     # We should have 3 rows for init_time_1 (00:00, 00:30, 01:00)
     # and 3 rows for init_time_2 (00:00, 00:30, 01:00)
@@ -510,8 +510,8 @@ def test_xgboost_predict_with_lags():
         pl.DataFrame(
             {
                 "substation_number": pl.Series([1], dtype=pl.Int32),
-                "target_col": ["MW"],
-                "peak_capacity": pl.Series([100.0], dtype=pl.Float32),
+                "power_col": ["MW"],
+                "peak_capacity_MW_or_MVA": pl.Series([100.0], dtype=pl.Float32),
             }
         )
     )

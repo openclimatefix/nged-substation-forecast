@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, NamedTuple, cast
 
 import dagster as dg
-import h3.api.numpy_int as h3
+import h3.api.basic_int as h3
 import httpx
 import polars as pl
 from contracts.data_schemas import (
@@ -121,13 +121,6 @@ def _download_and_process_substation(
             pl.lit(partition_date).cast(pl.Datetime("us", "UTC")).alias("ingested_at"),
         ]
     )
-
-    # Ensure uniform schema
-    for col in ["MW", "MVA", "MVAr"]:
-        if col not in new_df.columns:
-            new_df = new_df.with_columns(pl.lit(None).cast(pl.Float32).alias(col))
-        else:
-            new_df = new_df.with_columns(pl.col(col).cast(pl.Float32))
 
     new_df = new_df.select(["timestamp", "substation_number", "MW", "MVA", "MVAr", "ingested_at"])
 

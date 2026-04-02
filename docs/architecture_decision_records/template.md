@@ -15,7 +15,7 @@ tags: ["orchestration", "mlops", "polars", "dagster", etc.]
 
 ### Option A: [E.g., Dynamic Partitions based on MLflow Run ID]
 * **Description:** [Briefly explain how it would work.]
-* **Why it was rejected:** [CRITICAL: Be explicit here. E.g., "This causes the 'Small Files Problem' in Delta Lake, resulting in thousands of 50KB Parquet files that crash Polars on read."]
+* **Why it was rejected:** [Be explicit here. E.g., "This causes the 'Small Files Problem' in Delta Lake, resulting in thousands of 50KB Parquet files that crash Polars on read."]
 
 ### Option B: [E.g., Partition by Git Commit Hash]
 * **Description:** [...]

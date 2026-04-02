@@ -1,23 +1,42 @@
 import os
 import concurrent.futures
-import importlib.resources
 from datetime import datetime, timezone
-from typing import Final, cast
+from pathlib import Path
+from typing import cast
 
 import icechunk
 import numpy as np
 import patito as pt
 import polars as pl
-import polars_h3 as plh3
 import xarray as xr
-from contracts.data_schemas import Nwp
+from contracts.data_schemas import H3GridWeights, Nwp
+from contracts.settings import Settings
 
 from .scaling import load_scaling_params, scale_to_uint8
 
-H3_RES: Final[int] = 5
-GRID_SIZE: Final[float] = 0.25
+_SETTINGS = Settings()
+
+# Centralized list of required NWP variables to ensure consistency
+# between validation and download steps, preventing logic drift.
+REQUIRED_NWP_VARS = {
+    "temperature_2m",
+    "dew_point_temperature_2m",
+    "wind_u_10m",
+    "wind_v_10m",
+    "wind_u_100m",
+    "wind_v_100m",
+    "pressure_surface",
+    "pressure_reduced_to_mean_sea_level",
+    "geopotential_height_500hpa",
+    "downward_long_wave_radiation_flux_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "precipitation_surface",
+    "categorical_precipitation_type_surface",
+}
 
 DEFAULT_AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
+ASSETS_PATH = Path(__file__).resolve().parent.parent.parent / "assets"
 
 
 class MalformedZarrError(ValueError):
@@ -43,22 +62,7 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
 
     # Check for a minimal set of required data variables
     # These are the variables required by the Nwp schema in contracts.data_schemas
-    required_vars = {
-        "temperature_2m",
-        "dew_point_temperature_2m",
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_u_100m",
-        "wind_v_100m",
-        "pressure_surface",
-        "pressure_reduced_to_mean_sea_level",
-        "geopotential_height_500hpa",
-        "downward_long_wave_radiation_flux_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "precipitation_surface",
-        "categorical_precipitation_type_surface",
-    }
-    missing_vars = required_vars - set(ds.data_vars)
+    missing_vars = REQUIRED_NWP_VARS - set(ds.data_vars)
     if missing_vars:
         raise MalformedZarrError(f"Dataset is missing required data variables: {missing_vars}")
 
@@ -97,57 +101,17 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         )
 
 
-def get_gb_h3_grid() -> pl.DataFrame:
-    """Load the pre-computed H3 grid for Great Britain.
+def download_and_scale_ecmwf(
+    nwp_init_time: datetime, h3_grid: pt.DataFrame[H3GridWeights]
+) -> pt.DataFrame[Nwp]:
+    """Download and scale ECMWF data for a specific initialization time.
 
-    The grid is pre-computed to avoid a 30-second penalty on every ingestion.
+    Args:
+        nwp_init_time: The initialization time to download.
+        h3_grid: The H3 grid weights to use for spatial aggregation.
+            This is injected via Dagster, allowing dynamic resolution scaling
+            without hardcoding static file paths.
     """
-    grid_path = importlib.resources.files("dynamical_data.assets").joinpath("gb_h3_grid.parquet")
-    with importlib.resources.as_file(grid_path) as path:
-        return pl.read_parquet(path)
-
-
-def compute_h3_grid_weights(df: pl.DataFrame) -> pl.DataFrame:
-    """Computes the proportion mapping for H3 grid cells."""
-    return (
-        df.with_columns(h3_res7=plh3.cell_to_children("h3_index", 7))
-        .explode("h3_res7")
-        .with_columns(
-            nwp_lat=((plh3.cell_to_lat("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
-            * GRID_SIZE,
-            nwp_lng=((plh3.cell_to_lng("h3_res7") + (GRID_SIZE / 2)) / GRID_SIZE).floor()
-            * GRID_SIZE,
-        )
-        .group_by(["h3_index", "nwp_lat", "nwp_lng"])
-        .len()
-        .with_columns(total=pl.col("len").sum().over("h3_index"))
-        .with_columns(proportion=pl.col("len") / pl.col("total"))
-    )
-
-
-def calculate_wind_speed_and_direction(
-    df: pl.DataFrame, u_col: str, v_col: str, speed_name: str, dir_name: str
-) -> pl.DataFrame:
-    """Convert u and v wind components to speed and direction."""
-    u = df[u_col]
-    v = df[v_col]
-
-    speed = (u**2 + v**2) ** 0.5
-    # atan2(u, v) gives angle from north clockwise.
-    # To get "from" direction: (angle + 180) % 360
-    direction = (np.arctan2(u, v) * 180 / np.pi + 180) % 360
-
-    return df.with_columns(
-        [
-            pl.Series(speed_name, speed).cast(pl.Float32),
-            pl.Series(dir_name, direction).cast(pl.Float32),
-        ]
-    )
-
-
-def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
-    h3_grid = get_gb_h3_grid()
-
     # nwp_init_time is aware, we need to make it naive for the selection if it's not already.
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
 
@@ -157,7 +121,7 @@ def download_and_scale_ecmwf(nwp_init_time: datetime) -> pt.DataFrame[Nwp]:
 
 def download_ecmwf(
     nwp_init_time: np.datetime64,
-    h3_grid: pl.DataFrame,
+    h3_grid: pt.DataFrame[H3GridWeights],
     ds: xr.Dataset | None = None,
 ) -> xr.Dataset:
     """Download and process ECMWF data for a specific initialization time.
@@ -168,16 +132,24 @@ def download_ecmwf(
         ds: Optional xarray Dataset. If None, connects to the production icechunk store.
             This allows dependency injection during testing.
     """
+    if h3_grid.is_empty():
+        raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
+
     if ds is None:
         # Connect to the production icechunk store
         storage = icechunk.s3_storage(
-            bucket="dynamical-ecmwf-ifs-ens",
-            prefix="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+            bucket=_SETTINGS.ecmwf_s3_bucket,
+            prefix=_SETTINGS.ecmwf_s3_prefix,
             region=DEFAULT_AWS_REGION,
             anonymous=True,
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
+        # We set `chunks=None` to disable Dask. This is because we want to
+        # manually control the parallelization of S3 fetches using a
+        # ThreadPoolExecutor below, which avoids Dask's overhead for this
+        # specific I/O-bound task.
+        #
         # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
         # deprecated automatic decoding of time units, ensuring lead_time is
         # correctly parsed as timedelta64[ns].
@@ -195,31 +167,26 @@ def download_ecmwf(
     # to save network bandwidth and memory during the download process.
     # We also include the raw wind components (10u, 10v, 100u, 100v) which are
     # needed for calculating wind speed and direction later.
-    required_vars = {
-        "temperature_2m",
-        "dew_point_temperature_2m",
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_u_100m",
-        "wind_v_100m",
-        "pressure_surface",
-        "pressure_reduced_to_mean_sea_level",
-        "geopotential_height_500hpa",
-        "downward_long_wave_radiation_flux_surface",
-        "downward_short_wave_radiation_flux_surface",
-        "precipitation_surface",
-        "categorical_precipitation_type_surface",
-    }
     # Cast to xr.Dataset to satisfy the type checker, as indexing with a list
     # can sometimes be misidentified as returning a DataArray.
-    ds = cast(xr.Dataset, ds[list(required_vars)])
+    ds = cast(xr.Dataset, ds[list(REQUIRED_NWP_VARS)])
+
+    # Check for empty coordinates before computing bounds to fail gracefully.
+    if ds.longitude.size == 0 or ds.latitude.size == 0:
+        raise ValueError("Dataset has empty longitude or latitude coordinates.")
+
+    # Validate longitude range.
+    # NOTE: The ECMWF ENS dataset from Dynamical.org already uses the [-180, 180]
+    # range for longitude. We only validate this here to ensure the upstream
+    # data format hasn't changed unexpectedly, rather than rolling the
+    # coordinates ourselves.
+    if ds.longitude.min() < -180 or ds.longitude.max() > 180:
+        raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
     # Find spatial bounds from grid
-    min_lat, max_lat, min_lng, max_lng = h3_grid.select(
-        min_lat=pl.col("nwp_lat").min(),
-        max_lat=pl.col("nwp_lat").max(),
-        min_lng=pl.col("nwp_lng").min(),
-        max_lng=pl.col("nwp_lng").max(),
+    min_lat, max_lat = h3_grid.select(
+        pl.col("nwp_lat").min().alias("min_lat"),
+        pl.col("nwp_lat").max().alias("max_lat"),
     ).row(0)
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
@@ -232,16 +199,51 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # Xarray datasets from Dynamical are usually tz-naive UTC.
-    # If nwp_init_time is aware, we need to make it naive for the selection.
-    ds_cropped = ds.sel(
-        latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
-    )
+    # Implement wrap-around aware slicing for longitudes.
+    # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
+    lngs = h3_grid.get_column("nwp_lng").unique().sort()
+    diffs = lngs.diff().drop_nulls()
+
+    # We check if the maximum difference between adjacent longitudes is greater than 180.
+    # If it is, we assume the grid crosses the anti-meridian.
+    # We use cast(float, ...) to satisfy the type checker as diffs.max() can return
+    # multiple types, but here we know it's a float.
+    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
+
+    if crosses_antimeridian:
+        gap_idx = diffs.arg_max()
+        if gap_idx is None:
+            # This should be impossible given len(diffs) > 0
+            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
+
+        max_neg_lng = lngs[gap_idx]
+        min_pos_lng = lngs[gap_idx + 1]
+        ds_neg = ds.sel(
+            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
+        )
+        ds_pos = ds.sel(
+            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
+        )
+        ds_cropped = xr.concat([ds_pos, ds_neg], dim="longitude")
+    else:
+        min_lng, max_lng = lngs[0], lngs[-1]
+        ds_cropped = ds.sel(
+            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
+        )
+
+    # Explicitly check for an empty spatial intersection after slicing.
+    # This prevents downstream KeyErrors during DataFrame conversion.
+    if ds_cropped.longitude.size == 0 or ds_cropped.latitude.size == 0:
+        raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
     data_arrays: dict[str, xr.DataArray] = {}
+    # The download is I/O bound (S3 network requests). We use a
+    # ThreadPoolExecutor to parallelize network latency across multiple
+    # variables. A ProcessPoolExecutor would be less efficient here due to the
+    # high serialization overhead of Xarray objects between processes.
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(download_array, str(name)) for name in ds_cropped.data_vars.keys()
@@ -255,13 +257,18 @@ def download_ecmwf(
 def process_ecmwf_dataset(
     nwp_init_time: datetime,
     loaded_ds: xr.Dataset,
-    h3_grid: pl.DataFrame,
+    h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
     # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
     # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
     # available as columns.
+    #
+    # NOTE: This conversion is a known performance and memory bottleneck.
+    # For large datasets, this can cause OOM errors. Future optimizations should
+    # consider using Xarray's native chunking or direct conversion to Arrow/Polars
+    # without Pandas as an intermediary.
     nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
     # Perform a single spatial join with the pre-computed h3_grid.
@@ -278,7 +285,12 @@ def process_ecmwf_dataset(
     )
 
     joined = h3_grid.join(
-        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"]
+        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
+    ).with_columns(
+        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
+        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
+        # critical for downstream H3 operations and memory efficiency.
+        pl.col("h3_index").cast(pl.UInt64)
     )
 
     all_nwp_vars = list(loaded_ds.data_vars.keys())
@@ -291,32 +303,47 @@ def process_ecmwf_dataset(
     # partially overlaps with missing NWP data (e.g., at the edges of the domain),
     # we compute a true weighted average by dividing the weighted sum by the sum
     # of the proportions of the valid (non-NaN) cells.
-    processed = (
-        joined.with_columns(
-            [
-                (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
-                for x in numeric_vars
-            ]
-            + [
-                pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
-                .then(pl.col("proportion"))
-                .otherwise(0.0)
-                .alias(f"{x}_weight_sum")
-                for x in numeric_vars
-            ]
-        )
-        .group_by(["h3_index", "lead_time", "ensemble_member"])
-        .agg(
-            [
-                pl.when(pl.col(f"{x}_weighted").null_count() < pl.len())
-                .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
-                .otherwise(None)
-                .alias(str(x))
-                for x in numeric_vars
-            ]
-            + [pl.col(categorical_vars).mode().first()],
-        )
+    df_with_weights = joined.with_columns(
+        [
+            (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
+            for x in numeric_vars
+        ]
+        + [
+            pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
+            .then(pl.col("proportion"))
+            .otherwise(0.0)
+            .alias(f"{x}_weight_sum")
+            for x in numeric_vars
+        ]
     )
+
+    group_cols = ["h3_index", "lead_time", "ensemble_member"]
+
+    # Aggregate numeric variables
+    agg_exprs = [
+        pl.when(pl.col(f"{x}_weight_sum").sum() > 0)
+        .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
+        .otherwise(None)
+        .cast(pl.Float32)
+        .alias(str(x))
+        for x in numeric_vars
+    ]
+    processed = df_with_weights.group_by(group_cols).agg(agg_exprs)
+
+    # WEIGHTED CATEGORICAL AGGREGATION:
+    # We use a weighted mode calculation that respects the H3 cell overlap proportions.
+    # This ensures categorical weather features (like precipitation type) accurately
+    # reflect the area-weighted majority of the H3 cell, rather than treating a 1%
+    # overlap the same as a 99% overlap.
+    for c in categorical_vars:
+        df_cat = (
+            df_with_weights.group_by(group_cols + [c])
+            .agg(pl.col("proportion").sum().alias("weight"))
+            .sort(group_cols + ["weight"])
+            .group_by(group_cols)
+            .agg(pl.col(c).last().cast(pl.UInt8))
+        )
+        processed = processed.join(df_cat, on=group_cols, how="left")
 
     # Compute valid_time and init_time.
     # lead_time is a timedelta64[ns] in the DataFrame.
@@ -328,31 +355,39 @@ def process_ecmwf_dataset(
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
 
-    # Convert wind
-    processed = calculate_wind_speed_and_direction(
-        processed,
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_speed_10m",
-        "wind_direction_10m",
-    )
-    processed = calculate_wind_speed_and_direction(
-        processed,
-        "wind_u_100m",
-        "wind_v_100m",
-        "wind_speed_100m",
-        "wind_direction_100m",
-    )
+    # DATA TYPE TRANSITION RATIONALE:
+    # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
+    #    space and bandwidth.
+    # 2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
+    #    to maintain precision and avoid rounding errors during aggregation.
+    # 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
+    #    in the ML model.
+    #
+    # We do NOT cast back to UInt8 in memory because:
+    # - It would cause a "staircase" effect by quantizing interpolated values, defeating
+    #   the purpose of 30-minute upsampling.
+    # - It risks silent underflow during differencing operations (e.g., calculating trends
+    #   like temp_trend_6h = current - lagged).
 
-    # Drop raw wind components
-    processed = processed.drop(["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"])
+    # Load scaling parameters
+    scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
+    scaling_params = load_scaling_params(scaling_params_path)
 
-    # Load scaling parameters using importlib.resources
-    scaling_params_path = importlib.resources.files("dynamical_data.assets").joinpath(
-        "ecmwf_scaling_params.csv"
+    # CIRCULAR VARIABLE SCALING:
+    # Exclude categorical variables and wind components from empirical min-max scaling.
+    # Storing wind components as Float32 avoids destroying circular topology via
+    # min-max scaling and simplifies downstream processing.
+    scaling_params = scaling_params.filter(
+        ~pl.col("col_name").is_in(
+            [
+                "categorical_precipitation_type_surface",
+                "wind_u_10m",
+                "wind_v_10m",
+                "wind_u_100m",
+                "wind_v_100m",
+            ]
+        )
     )
-    with importlib.resources.as_file(scaling_params_path) as path:
-        scaling_params = load_scaling_params(path)
 
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])

@@ -136,7 +136,7 @@ def test_process_nwp_data_empty_input():
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1]).collect())
+    res = cast(pl.DataFrame, process_nwp_data(df, h3_indices=[1], target_horizon_hours=0).collect())
     assert res.is_empty()
 
 

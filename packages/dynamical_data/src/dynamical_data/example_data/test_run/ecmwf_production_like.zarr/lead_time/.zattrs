@@ -1,8 +1,0 @@
-{
-  "standard_name": "forecast_period",
-  "long_name": "Lead time",
-  "units": "hours",
-  "_ARRAY_DIMENSIONS": [
-    "lead_time"
-  ]
-}

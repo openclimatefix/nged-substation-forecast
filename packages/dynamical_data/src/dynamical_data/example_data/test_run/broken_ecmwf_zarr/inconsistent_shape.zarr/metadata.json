@@ -1,7 +1,0 @@
-{
-  "broken_test_info": {
-    "type": "inconsistent_shape",
-    "description": "Inconsistent array shapes for variables",
-    "created_at": "2026-04-01T07:45:18.581622+00:00"
-  }
-}

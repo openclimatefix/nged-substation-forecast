@@ -2,7 +2,7 @@ import math
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationFlows
+from contracts.data_schemas import UTC_DATETIME_DTYPE, SubstationFlows
 
 
 def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[SubstationFlows]:
@@ -66,6 +66,15 @@ def process_live_primary_substation_flows(csv_data: bytes) -> pt.DataFrame[Subst
             df = df.with_columns(
                 (math.sqrt(3) * pl.col(volts_col) * pl.col(current_col) / divisor).alias("MVA")
             )
+
+    # Ensure MW, MVA, MVAr, and ingested_at are present before validation.
+    # If they are missing from the source CSV, fill them with null.
+    for col in ["MW", "MVA", "MVAr"]:
+        if col not in df.columns:
+            df = df.with_columns(pl.lit(None).cast(pl.Float32).alias(col))
+
+    if "ingested_at" not in df.columns:
+        df = df.with_columns(pl.lit(None).cast(UTC_DATETIME_DTYPE).alias("ingested_at"))
 
     columns = [col for col in SubstationFlows.columns if col in df.columns]
     df = df.select(columns)

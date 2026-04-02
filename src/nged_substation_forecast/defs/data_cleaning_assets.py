@@ -141,7 +141,7 @@ def cleaned_actuals(
 
     context.log.info(f"Validated data shape: {validated_df.shape}")
 
-    # CRITICAL FIX for Flaw-001: Filter validated_df to current partition's time window.
+    # Filter validated_df to current partition's time window.
     # The TimeWindowPartitionMapping includes historical data for lookback (previous partitions),
     # but we must only append data for the current partition to avoid data duplication in the
     # Delta table. Example: For partition "2026-03-10", we only include rows with timestamp

@@ -51,17 +51,25 @@ class DataQualitySettings(BaseSettings):
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
 
-    # NGED Connected Data
+    # NGED Connected Data CKAN token
     nged_ckan_token: str = Field(...)
 
     # NWP Data Settings
     nwp_ensemble_member: int = Field(
-        default=0, description="Which ensemble member to use (0=control member)."
+        default=0,
+        description=(
+            "Which NWP ensemble member to use for training the ML model (typically 0, the "
+            "control member)."
+        ),
     )
 
     # ML Model Settings
     ml_model_ensemble_size: int = Field(
-        default=10, description="Number of ensemble members for ML model."
+        default=10,
+        description=(
+            "Number of ML models to train in an ensemble (e.g. using different random seeds) "
+            "to improve robustness and provide uncertainty estimates at inference time."
+        ),
     )
 
     # Data Quality Settings
@@ -74,6 +82,16 @@ class Settings(BaseSettings):
     nged_s3_bucket_url: str = Field(...)
     nged_s3_bucket_access_key: str = Field(...)
     nged_s3_bucket_secret: str = Field(...)
+
+    # ECMWF Data Settings
+    ecmwf_s3_bucket: str = Field(
+        default="dynamical-ecmwf-ifs-ens",
+        description="S3 bucket for ECMWF Icechunk store.",
+    )
+    ecmwf_s3_prefix: str = Field(
+        default="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
+        description="S3 prefix for ECMWF Icechunk store.",
+    )
 
     # Paths
     nged_data_path: Path = Path("data/NGED")

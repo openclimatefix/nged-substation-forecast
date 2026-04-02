@@ -11,6 +11,8 @@ This package implements an XGBoost-based model to forecast power flows at NGED p
 - **H3-based Weather Matching**: Automatically matches substation coordinates to H3 resolution 5 cells used in the weather data.
 - **Ensemble Averaging**: Averages weather variables across ensemble members for robust feature engineering.
 - **Temporal Features**: Includes cyclical temporal features (sine/cosine for hour and day of year) and day of week.
+- **Long-Range Horizon Handling**: Supports 14-day (336h) forecasts at 30-minute resolution. The `lead_time_hours` is passed as a feature to the XGBoost model, allowing it to learn the decay in NWP skill over time.
+- **Physical Wind Logic**: Wind speed and direction are interpolated using Cartesian `u` and `v` components instead of circular interpolation. This avoids "phantom high wind" artifacts during rapid direction shifts and ensures physical correctness.
 
 ## Installation
 

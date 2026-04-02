@@ -65,9 +65,15 @@ def add_physical_features(df: pl.LazyFrame) -> pl.LazyFrame:
             ]
         )
 
-    # Rename all scaled columns to *_uint8_scaled
-    rename_mapping = {c: f"{c}_uint8_scaled" for c in existing_cols}
+    # Rename all scaled columns to *_uint8_scaled, except categorical ones
+    categorical_cols = ["categorical_precipitation_type_surface"]
+    rename_mapping = {c: f"{c}_uint8_scaled" for c in existing_cols if c not in categorical_cols}
     df = df.rename(rename_mapping)
+
+    # Ensure categorical columns are UInt8 to match the SubstationFeatures schema
+    df = df.with_columns(
+        [pl.col(c).cast(pl.UInt8) for c in categorical_cols if c in df.collect_schema().names()]
+    )
 
     return df
 
