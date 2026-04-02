@@ -15,17 +15,13 @@ Key Design Decisions:
 2. **Patito Validation**: The output is validated against the `SubstationPowerFlows` schema
    which allows null values. This enforces data contracts at the asset boundary.
 
-3. **Metadata Join**: The join with `substation_metadata` is performed here to ensure
-   metadata is always included with cleaned data, avoiding redundancy and logic drift.
-
-4. **No Imputation**: We explicitly do NOT impute missing values. Models downstream
+3. **No Imputation**: We explicitly do NOT impute missing values. Models downstream
    (like XGBoost) should handle null targets by dropping rows after feature engineering,
    not before.
 
-5. **Partition Mapping with Lookback**: To ensure rolling window calculations have
-   sufficient history at partition boundaries, we use a TimeWindowPartitionMapping that
-   includes previous partitions in the input. This prevents NaN issues at the start
-   of daily partitions.
+4. **Partition Mapping with Lookback**: To ensure rolling window calculations have
+   sufficient history at partition boundaries, we use a 1-day lookback when scanning
+   the Delta table. This prevents NaN issues at the start of daily partitions.
 
 Complex Partitioning Note:
 --------------------------
@@ -40,7 +36,6 @@ import patito as pt
 from typing import cast
 from datetime import datetime, timedelta, timezone
 from dagster import (
-    AssetIn,
     ResourceParam,
     DailyPartitionsDefinition,
 )
@@ -101,20 +96,17 @@ def get_cleaned_actuals_lazy(
 @dg.asset(
     partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
     auto_materialize_policy=dg.AutoMaterializePolicy.eager(),
-    ins={
-        "substation_metadata": AssetIn("substation_metadata"),
-    },
     deps=["live_primary_flows"],
 )
 def cleaned_actuals(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
-    substation_metadata: pl.DataFrame,
-) -> pl.DataFrame:
+) -> dg.MaterializeResult:
     """Clean raw live primary flows and apply data quality checks.
 
-    This asset reads live primary flows, applies data quality cleaning logic (stuck
-    sensor detection, insane value detection), and joins with substation metadata.
+    This asset manually scans the live primary flows Delta table for the current partition
+    plus a 1-day lookback window. It applies data quality cleaning logic (stuck
+    sensor detection, insane value detection).
     The output is validated against the SubstationPowerFlows schema which allows null values,
     then saved to a Delta table named "cleaned_actuals".
 
@@ -127,6 +119,8 @@ def cleaned_actuals(
 
     Notes:
         - Rolling operations are strictly backward-looking to prevent data leakage.
+        - A 1-day lookback is used to ensure rolling windows are fully populated at the
+          start of the partition.
         - Null values are preserved from the input; no rows are removed and no
           imputation is performed.
         - The output is validated against SubstationPowerFlows schema which allows
@@ -136,11 +130,9 @@ def cleaned_actuals(
     Args:
         context: Dagster asset execution context.
         settings: Global settings containing data quality thresholds.
-        substation_metadata: Metadata containing substation locations and config.
 
     Returns:
-        Polars DataFrame of cleaned substation flows, with nulls for problematic values.
-        The DataFrame is validated and saved to the cleaned_actuals Delta table.
+        MaterializeResult containing metadata about the cleaned data.
     """
     partition_key = context.partition_key
     context.log.info(f"Cleaning partition: {partition_key}")
@@ -158,17 +150,13 @@ def cleaned_actuals(
         pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
     )
 
-    # If the LazyFrame is empty, return empty validated DataFrame
-    if cast(pl.DataFrame, live_primary_flows.select(pl.len()).collect()).item() == 0:
-        context.log.warning("Input LazyFrame is empty, returning empty validated DataFrame.")
-        empty_df = pl.DataFrame(schema=SubstationPowerFlows.dtypes)
-        validated_empty = SubstationPowerFlows.validate(empty_df)
-        # FIX: Do not overwrite the Delta table! Just return the empty DataFrame.
-        return validated_empty
-
-    # The AssetIn already provides data with proper join from substation_metadata
-    # The cleaned data is in the lazy frame
+    # Materialize the LazyFrame once
     df_joined_materialized = cast(pl.DataFrame, live_primary_flows.collect())
+
+    # If the DataFrame is empty, return empty MaterializeResult
+    if df_joined_materialized.is_empty():
+        context.log.warning("Input DataFrame is empty, returning empty MaterializeResult.")
+        return dg.MaterializeResult(metadata={"num_rows": 0})
 
     # Ensure timestamp has UTC timezone before cleaning/validation.
     # Delta tables sometimes lose timezone info or Polars scans them as naive.
@@ -232,4 +220,4 @@ def cleaned_actuals(
 
     context.log.info(f"Saved cleaned actuals to Delta table at {delta_path}")
 
-    return validated_df
+    return dg.MaterializeResult(metadata={"num_rows": len(validated_df)})
