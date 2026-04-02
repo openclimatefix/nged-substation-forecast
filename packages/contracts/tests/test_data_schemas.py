@@ -136,10 +136,10 @@ def test_nwp_validation():
         "h3_index": [123, 123],
         "temperature_2m": [10, 11],
         "dew_point_temperature_2m": [5, 6],
-        "wind_speed_10m": [2, 3],
-        "wind_direction_10m": [180, 190],
-        "wind_speed_100m": [4, 5],
-        "wind_direction_100m": [200, 210],
+        "wind_u_10m": [2.0, 3.0],
+        "wind_v_10m": [0.0, 0.0],
+        "wind_u_100m": [4.0, 5.0],
+        "wind_v_100m": [0.0, 0.0],
         "pressure_surface": [100, 101],
         "pressure_reduced_to_mean_sea_level": [102, 103],
         "geopotential_height_500hpa": [50, 51],
@@ -152,10 +152,6 @@ def test_nwp_validation():
             "ensemble_member",
             "temperature_2m",
             "dew_point_temperature_2m",
-            "wind_speed_10m",
-            "wind_direction_10m",
-            "wind_speed_100m",
-            "wind_direction_100m",
             "pressure_surface",
             "pressure_reduced_to_mean_sea_level",
             "geopotential_height_500hpa",
@@ -163,6 +159,15 @@ def test_nwp_validation():
             "precipitation_surface",
             "downward_short_wave_radiation_flux_surface",
             "downward_long_wave_radiation_flux_surface",
+        ]
+    }
+    nwp_vars_to_float32 = {
+        col: pl.Float32
+        for col in [
+            "wind_u_10m",
+            "wind_v_10m",
+            "wind_u_100m",
+            "wind_v_100m",
         ]
     }
 
@@ -175,7 +180,7 @@ def test_nwp_validation():
             "downward_short_wave_radiation_flux_surface": [None, 100],
             "downward_long_wave_radiation_flux_surface": [None, 200],
         }
-    ).cast({**nwp_vars_to_uint8, "h3_index": pl.UInt64})
+    ).cast({**nwp_vars_to_uint8, **nwp_vars_to_float32, "h3_index": pl.UInt64})
 
     # Should pass
     Nwp.validate(df_valid)
@@ -189,7 +194,7 @@ def test_nwp_validation():
             "downward_short_wave_radiation_flux_surface": [None, 100],
             "downward_long_wave_radiation_flux_surface": [None, 200],
         }
-    ).cast({**nwp_vars_to_uint8, "h3_index": pl.UInt64})
+    ).cast({**nwp_vars_to_uint8, **nwp_vars_to_float32, "h3_index": pl.UInt64})
 
     with pytest.raises(ValueError, match="Column 'precipitation_surface' contains 1 null values"):
         Nwp.validate(df_invalid)

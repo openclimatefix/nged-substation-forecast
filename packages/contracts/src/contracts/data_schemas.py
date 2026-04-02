@@ -248,10 +248,14 @@ class Nwp(pt.Model):
     # Variables stored as uint8 on disk
     temperature_2m: int = pt.Field(dtype=pl.UInt8)
     dew_point_temperature_2m: int = pt.Field(dtype=pl.UInt8)
-    wind_speed_10m: int = pt.Field(dtype=pl.UInt8)
-    wind_direction_10m: int = pt.Field(dtype=pl.UInt8)
-    wind_speed_100m: int = pt.Field(dtype=pl.UInt8)
-    wind_direction_100m: int = pt.Field(dtype=pl.UInt8)
+    # WIND VECTOR COMPONENTS (FLAW-003/004):
+    # We store raw U and V components as Float32 to allow physically realistic
+    # linear interpolation in the forecasting pipeline, avoiding the "phantom high wind"
+    # artifacts caused by interpolating speed/direction or circular variables.
+    wind_u_10m: float = pt.Field(dtype=pl.Float32)
+    wind_v_10m: float = pt.Field(dtype=pl.Float32)
+    wind_u_100m: float = pt.Field(dtype=pl.Float32)
+    wind_v_100m: float = pt.Field(dtype=pl.Float32)
     pressure_surface: int = pt.Field(dtype=pl.UInt8)
     pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=pl.UInt8)
     geopotential_height_500hpa: int = pt.Field(dtype=pl.UInt8)
@@ -380,10 +384,13 @@ class SubstationFeatures(pt.Model):
     # Weather features
     temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     dew_point_temperature_2m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m_uint8_scaled: float = pt.Field(dtype=pl.Float32)
+    # PHYSICAL WIND FEATURES (FLAW-003/004):
+    # These are calculated from interpolated U/V components in the forecasting
+    # pipeline, ensuring physically realistic wind speed and direction.
+    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
+    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
+    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
+    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
     pressure_surface_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     pressure_reduced_to_mean_sea_level_uint8_scaled: float = pt.Field(dtype=pl.Float32)
     geopotential_height_500hpa_uint8_scaled: float = pt.Field(dtype=pl.Float32)

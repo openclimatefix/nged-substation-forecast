@@ -71,6 +71,16 @@ class ProcessedNWPConfig(dg.Config):
     substation_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
     )
+    # HORIZON LEAKAGE (FLAW-005):
+    # We parameterize the lead time filter by the target horizon to eliminate
+    # lookahead bias. This ensures the model is trained on forecasts with the
+    # exact same accuracy as those available in production.
+    target_horizon_hours: int = Field(
+        default=24, description="The forecast horizon we are targeting (e.g., 24)."
+    )
+    publication_delay_hours: int = Field(
+        default=3, description="The delay between NWP initialization and availability."
+    )
 
 
 @asset(
@@ -92,7 +102,12 @@ def processed_nwp_data(
             pl.col("substation_number").is_in(config.substation_ids)
         )
     h3_indices = substation_metadata["h3_res_5"].unique().to_list()
-    return process_nwp_data(all_nwp_data, h3_indices)
+    return process_nwp_data(
+        all_nwp_data,
+        h3_indices,
+        target_horizon_hours=config.target_horizon_hours,
+        publication_delay_hours=config.publication_delay_hours,
+    )
 
 
 @asset_check(asset=ecmwf_ens_forecast)

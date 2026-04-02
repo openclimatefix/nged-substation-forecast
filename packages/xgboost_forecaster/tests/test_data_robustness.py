@@ -22,13 +22,16 @@ def test_process_nwp_data_interpolation():
         "h3_index": [h3_index] * 3,
         "ensemble_member": [ensemble_member] * 3,
         "temperature_2m": [10.0, 20.0, 30.0],
-        "wind_direction_10m": [0.0, 63.75, 127.5],  # 0, 90, 180 degrees in 0-255 scale
+        "wind_u_10m": [0.0, 10.0, 0.0],
+        "wind_v_10m": [10.0, 0.0, -10.0],
+        "wind_u_100m": [0.0, 10.0, 0.0],
+        "wind_v_100m": [10.0, 0.0, -10.0],
         "categorical_precipitation_type_surface": [1, 2, 3],
     }
     lf = pl.LazyFrame(data)
 
     # Process data (should interpolate to 30m steps)
-    processed_lf = process_nwp_data(lf, [h3_index])
+    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     # Check number of rows: 3h to 9h is 6 hours. 6 hours / 30m = 12 steps + 1 = 13 rows.
@@ -48,19 +51,17 @@ def test_process_nwp_data_interpolation():
     )["categorical_precipitation_type_surface"][0]
     assert mid_cat == 1
 
-    # Check circular interpolation for wind direction
-    # 0.0 (0 deg) and 63.75 (90 deg)
-    # Midway should be 45 degrees.
-    # In 0-255 scale, 45 deg is 255 * 45 / 360 = 31.875
+    # Check physical wind calculation
+    # At 4.5h, wind_u should be 5.0, wind_v should be 5.0
+    # Speed = sqrt(5^2 + 5^2) = sqrt(50) = 7.071
+    # Direction = (atan2(5, 5) * 180 / pi + 180) % 360 = (45 + 180) % 360 = 225
     mid_row = processed_df.filter(
         pl.col("valid_time") == init_time + timedelta(hours=4, minutes=30)
     )
-    mid_wind = mid_row["wind_direction_10m"][0]
-    assert mid_wind == pytest.approx(31.875)
-
-    # Check 0/360 boundary interpolation
-    # 255.0 (360 deg) and 0.0 (0 deg) - wait, my input doesn't have this.
-    # Let's add another test case for boundary.
+    mid_speed = mid_row["wind_speed_10m"][0]
+    mid_dir = mid_row["wind_direction_10m"][0]
+    assert mid_speed == pytest.approx(7.071, abs=1e-3)
+    assert mid_dir == pytest.approx(225.0)
 
 
 def test_process_nwp_data_circular_boundary():
@@ -68,6 +69,9 @@ def test_process_nwp_data_circular_boundary():
     h3_index = 12345
     ensemble_member = 0
 
+    # Test boundary by interpolating U/V that cross a direction boundary
+    # Point 1: Wind from North (U=0, V=10) -> Direction 180
+    # Point 2: Wind from East (U=-10, V=0) -> Direction 270
     data = {
         "init_time": [init_time] * 2,
         "valid_time": [
@@ -76,27 +80,29 @@ def test_process_nwp_data_circular_boundary():
         ],
         "h3_index": [h3_index] * 2,
         "ensemble_member": [ensemble_member] * 2,
-        "wind_direction_10m": [240.0, 15.0],  # Near 360 and near 0
+        "wind_u_10m": [0.0, -10.0],
+        "wind_v_10m": [10.0, 0.0],
+        "wind_u_100m": [0.0, -10.0],
+        "wind_v_100m": [10.0, 0.0],
     }
     lf = pl.LazyFrame(data)
 
-    processed_lf = process_nwp_data(lf, [h3_index])
+    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
-    # Midway between 240 and 15 (across the boundary)
-    # 240 is ~338 deg, 15 is ~21 deg.
-    # Distance is (255-240) + 15 = 30 units.
-    # Midway is 240 + 15 = 255 (0) or 15 - 15 = 0.
-    # Wait, 240 + 15 = 255.
+    # Midway: U=-5, V=5
+    # Direction = (atan2(-5, 5) * 180 / pi + 180) % 360 = (-45 + 180) % 360 = 135
+    # Wait, atan2(-5, 5) is -45 degrees. -45 + 180 = 135.
+    # Let's re-verify atan2(u, v)
+    # u=0, v=10 -> atan2(0, 10) = 0. (0 + 180) % 360 = 180. Correct (from North).
+    # u=-10, v=0 -> atan2(-10, 0) = -90. (-90 + 180) % 360 = 90. Correct (from East).
+    # Midway: u=-5, v=5 -> atan2(-5, 5) = -45. (-45 + 180) % 360 = 135. Correct (from North-East).
+
     mid_wind = processed_df.filter(
         pl.col("valid_time") == init_time + timedelta(hours=4, minutes=30)
     )["wind_direction_10m"][0]
 
-    # (240/255 * 360) = 338.82
-    # (15/255 * 360) = 21.17
-    # Midpoint across boundary: (338.82 + 21.17 + 360) / 2 % 360 = 359.995 or 0.
-    # In 0-255 scale, this is 0 or 255.
-    assert mid_wind == pytest.approx(0.0, abs=1e-2) or mid_wind == pytest.approx(255.0, abs=1e-2)
+    assert mid_wind == pytest.approx(135.0)
 
 
 def test_process_nwp_data_lead_time_filter():
@@ -118,7 +124,7 @@ def test_process_nwp_data_lead_time_filter():
     }
     lf = pl.LazyFrame(data)
 
-    processed_lf = process_nwp_data(lf, [h3_index])
+    processed_lf = process_nwp_data(lf, [h3_index], target_horizon_hours=0)
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     # Only 3h and 6h should remain, plus interpolated steps between them.
@@ -139,7 +145,7 @@ def test_process_nwp_data_empty_input():
         }
     )
 
-    processed_lf = process_nwp_data(lf, [12345])
+    processed_lf = process_nwp_data(lf, [12345], target_horizon_hours=0)
     processed_df = cast(pl.DataFrame, processed_lf.collect())
 
     assert len(processed_df) == 0

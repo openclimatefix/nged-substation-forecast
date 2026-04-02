@@ -135,7 +135,12 @@ def construct_historical_weather(
     return Nwp.validate(combined)
 
 
-def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
+def process_nwp_data(
+    nwp: pl.LazyFrame,
+    h3_indices: list[int],
+    target_horizon_hours: int,
+    publication_delay_hours: int = 3,
+) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
     Note: Accumulated variables (e.g., precipitation, radiation) are already
@@ -148,6 +153,8 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     Args:
         nwp: Raw NWP data.
         h3_indices: List of H3 indices to filter for.
+        target_horizon_hours: The forecast horizon we are targeting (e.g., 24).
+        publication_delay_hours: The delay between NWP initialization and availability.
 
     Returns:
         Processed NWP data.
@@ -156,8 +163,10 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     lf = nwp.filter(pl.col("h3_index").is_in(h3_indices))
 
     # 2. Calculate Lead Time and Filter (Fixing Leakage)
-    # We strictly exclude lead_time < 3 because NWPs have a 3-hour publication delay.
-    # This prevents the model from learning from weather data that would not be available in real-time.
+    # HORIZON LEAKAGE (FLAW-005):
+    # We parameterize the lead time filter by the target horizon to eliminate
+    # lookahead bias. This ensures the model is trained on forecasts with the
+    # exact same accuracy as those available in production.
     lf = (
         lf.with_columns(
             lead_time_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() / 60.0
@@ -166,7 +175,10 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         # We cap the lead time at 336 hours (14 days) because ECMWF ENS
         # reliability drops significantly after day 14, and the model is only
         # validated for a 14-day horizon.
-        .filter((pl.col("lead_time_hours") >= 3) & (pl.col("lead_time_hours") <= 336))
+        .filter(
+            (pl.col("lead_time_hours") >= (target_horizon_hours + publication_delay_hours))
+            & (pl.col("lead_time_hours") <= 336)
+        )
     )
 
     # 3. Interpolation (Fixing Nulls)
@@ -195,28 +207,9 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     ).sort(["init_time", "h3_index", "ensemble_member", "valid_time"])
 
     # Interpolate all numeric columns, but forward-fill categorical ones.
-    # Circular variables (wind direction) require sine/cosine decomposition
-    # to interpolate correctly across the 0/360 boundary.
     categorical_cols = [
         c for c in ["categorical_precipitation_type_surface"] if c in processed.columns
     ]
-    circular_cols = [
-        c for c in ["wind_direction_10m", "wind_direction_100m"] if c in processed.columns
-    ]
-
-    # Decompose circular variables into sine and cosine components
-    for col in circular_cols:
-        # CIRCULAR INTERPOLATION ASSUMPTION (FLAW-2):
-        # We assume the 0-255 UInt8 scale maps linearly to 0-360 degrees (0-2pi radians).
-        # Note: 255 is treated as 2pi, which is equivalent to 0 degrees. This mapping
-        # allows us to use sine/cosine decomposition to interpolate correctly across
-        # the 0/360 boundary.
-        processed = processed.with_columns(
-            [
-                (pl.col(col).cast(pl.Float32) / 255.0 * 2 * math.pi).sin().alias(f"{col}_sin"),
-                (pl.col(col).cast(pl.Float32) / 255.0 * 2 * math.pi).cos().alias(f"{col}_cos"),
-            ]
-        )
 
     numeric_cols = [
         col
@@ -231,7 +224,6 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
             "lead_time_hours",
         ]
         and col not in categorical_cols
-        and col not in circular_cols
     ]
 
     # TEMPORAL INTERPOLATION & LEAKAGE (FLAW-3):
@@ -240,6 +232,10 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
     # at `init_time`. We are not looking into the future of when the forecast was made,
     # but merely interpolating the forecast's own future predictions to a higher
     # temporal resolution (30m).
+    #
+    # WIND VECTOR INTERPOLATION (FLAW-003):
+    # We interpolate Cartesian components (u, v) linearly, which is physically
+    # realistic and avoids phantom high winds during direction shifts.
     #
     # RADIATION INTERPOLATION CAVEAT (FLAW-4):
     # Linear interpolation for solar radiation (`downward_short_wave_radiation_flux_surface`)
@@ -263,26 +259,28 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         ]
     )
 
-    # Reconstruct circular variables from interpolated sine and cosine components
-    for col in circular_cols:
-        # arctan2 returns values in [-pi, pi].
-        # We add 2pi and take modulo 2pi to get [0, 2pi].
-        # Then map back to the 0-255 scale.
+    # PHYSICAL WIND CALCULATION (FLAW-003/004):
+    # After interpolating U and V components, we calculate physical wind speed
+    # and direction. This ensures the circular topology of wind direction is
+    # preserved without needing complex circular interpolation logic.
+    wind_cols = ["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"]
+    if all(c in processed.columns for c in wind_cols):
         processed = processed.with_columns(
-            (
-                (pl.arctan2(f"{col}_sin", f"{col}_cos") + 2 * math.pi)
-                % (2 * math.pi)
-                / (2 * math.pi)
-                * 255.0
-            )
-            .cast(pl.Float32)
-            .alias(col)
-        )
-
-    # Drop temporary sine and cosine columns
-    processed = processed.drop(
-        [f"{col}_{suffix}" for col in circular_cols for suffix in ["sin", "cos"]]
-    )
+            [
+                (pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2)
+                .sqrt()
+                .alias("wind_speed_10m"),
+                ((pl.arctan2("wind_u_10m", "wind_v_10m") * 180 / math.pi + 180) % 360).alias(
+                    "wind_direction_10m"
+                ),
+                (pl.col("wind_u_100m") ** 2 + pl.col("wind_v_100m") ** 2)
+                .sqrt()
+                .alias("wind_speed_100m"),
+                ((pl.arctan2("wind_u_100m", "wind_v_100m") * 180 / math.pi + 180) % 360).alias(
+                    "wind_direction_100m"
+                ),
+            ]
+        ).drop(wind_cols)
 
     # Recalculate lead_time_hours for the new 30m timestamps
     processed = processed.with_columns(

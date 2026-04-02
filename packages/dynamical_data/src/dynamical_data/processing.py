@@ -95,26 +95,6 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         )
 
 
-def calculate_wind_speed_and_direction(
-    df: pl.DataFrame, u_col: str, v_col: str, speed_name: str, dir_name: str
-) -> pl.DataFrame:
-    """Convert u and v wind components to speed and direction."""
-    u = df[u_col]
-    v = df[v_col]
-
-    speed = (u**2 + v**2) ** 0.5
-    # atan2(u, v) gives angle from north clockwise.
-    # To get "from" direction: (angle + 180) % 360
-    direction = (np.arctan2(u, v) * 180 / np.pi + 180) % 360
-
-    return df.with_columns(
-        [
-            pl.Series(speed_name, speed).cast(pl.Float32),
-            pl.Series(dir_name, direction).cast(pl.Float32),
-        ]
-    )
-
-
 def download_and_scale_ecmwf(
     nwp_init_time: datetime, h3_grid: pt.DataFrame[H3GridWeights]
 ) -> pt.DataFrame[Nwp]:
@@ -299,32 +279,47 @@ def process_ecmwf_dataset(
     # partially overlaps with missing NWP data (e.g., at the edges of the domain),
     # we compute a true weighted average by dividing the weighted sum by the sum
     # of the proportions of the valid (non-NaN) cells.
-    processed = (
-        joined.with_columns(
-            [
-                (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
-                for x in numeric_vars
-            ]
-            + [
-                pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
-                .then(pl.col("proportion"))
-                .otherwise(0.0)
-                .alias(f"{x}_weight_sum")
-                for x in numeric_vars
-            ]
-        )
-        .group_by(["h3_index", "lead_time", "ensemble_member"])
-        .agg(
-            [
-                pl.when(pl.col(f"{x}_weighted").null_count() < pl.len())
-                .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
-                .otherwise(None)
-                .alias(str(x))
-                for x in numeric_vars
-            ]
-            + [pl.col(c).mode().first().cast(pl.UInt8) for c in categorical_vars],
-        )
+    df_with_weights = joined.with_columns(
+        [
+            (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
+            for x in numeric_vars
+        ]
+        + [
+            pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
+            .then(pl.col("proportion"))
+            .otherwise(0.0)
+            .alias(f"{x}_weight_sum")
+            for x in numeric_vars
+        ]
     )
+
+    group_cols = ["h3_index", "lead_time", "ensemble_member"]
+
+    # Aggregate numeric variables
+    agg_exprs = [
+        pl.when(pl.col(f"{x}_weight_sum").sum() > 0)
+        .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
+        .otherwise(None)
+        .cast(pl.Float32)
+        .alias(str(x))
+        for x in numeric_vars
+    ]
+    processed = df_with_weights.group_by(group_cols).agg(agg_exprs)
+
+    # WEIGHTED CATEGORICAL AGGREGATION (FLAW-002):
+    # We use a weighted mode calculation that respects the H3 cell overlap proportions.
+    # This ensures categorical weather features (like precipitation type) accurately
+    # reflect the area-weighted majority of the H3 cell, rather than treating a 1%
+    # overlap the same as a 99% overlap.
+    for c in categorical_vars:
+        df_cat = (
+            df_with_weights.group_by(group_cols + [c])
+            .agg(pl.col("proportion").sum().alias("weight"))
+            .sort(group_cols + ["weight"])
+            .group_by(group_cols)
+            .agg(pl.col(c).last().cast(pl.UInt8))
+        )
+        processed = processed.join(df_cat, on=group_cols, how="left")
 
     # Compute valid_time and init_time.
     # lead_time is a timedelta64[ns] in the DataFrame.
@@ -335,25 +330,6 @@ def process_ecmwf_dataset(
         ).cast(pl.Datetime("us", "UTC")),
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
-
-    # Convert wind
-    processed = calculate_wind_speed_and_direction(
-        processed,
-        "wind_u_10m",
-        "wind_v_10m",
-        "wind_speed_10m",
-        "wind_direction_10m",
-    )
-    processed = calculate_wind_speed_and_direction(
-        processed,
-        "wind_u_100m",
-        "wind_v_100m",
-        "wind_speed_100m",
-        "wind_direction_100m",
-    )
-
-    # Drop raw wind components
-    processed = processed.drop(["wind_u_10m", "wind_v_10m", "wind_u_100m", "wind_v_100m"])
 
     # DATA TYPE TRANSITION RATIONALE:
     # 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
@@ -373,15 +349,22 @@ def process_ecmwf_dataset(
     scaling_params_path = ASSETS_PATH / "ecmwf_scaling_params.csv"
     scaling_params = load_scaling_params(scaling_params_path)
 
-    # Exclude categorical variables from min-max scaling to preserve their discrete state
+    # CIRCULAR VARIABLE SCALING (FLAW-004):
+    # Exclude categorical variables and wind components from empirical min-max scaling.
+    # Storing wind components as Float32 avoids destroying circular topology via
+    # min-max scaling and simplifies downstream processing.
     scaling_params = scaling_params.filter(
-        ~pl.col("col_name").is_in(["categorical_precipitation_type_surface"])
+        ~pl.col("col_name").is_in(
+            [
+                "categorical_precipitation_type_surface",
+                "wind_u_10m",
+                "wind_v_10m",
+                "wind_u_100m",
+                "wind_v_100m",
+            ]
+        )
     )
 
-    # CIRCULAR INTERPOLATION ASSUMPTION (FLAW-2):
-    # Wind direction (0-360 degrees) is scaled to 0-255 UInt8 for storage.
-    # This assumption is relied upon by downstream interpolation logic in the
-    # forecasting module, which expects 255 to map to 2pi (360 degrees).
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
