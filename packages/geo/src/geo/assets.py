@@ -73,7 +73,9 @@ def gb_h3_grid_weights(
     weather variables are correctly area-weighted to the H3 cells.
 
     The mapping is calculated by sampling each H3 cell with finer-resolution child
-    cells and determining which regular grid cell each child falls into.
+    cells and determining which regular grid cell each child falls into. The
+    `grid_size` parameter is used to snap high-resolution H3 cells to the nearest
+    regular NWP grid points (FLAW-4).
     """
     h3_res = config.h3_res
     grid_size = config.grid_size

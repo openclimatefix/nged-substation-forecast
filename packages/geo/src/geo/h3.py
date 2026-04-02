@@ -45,6 +45,12 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_res))
         .explode("child_h3")
         .with_columns(
+            # GRID SNAPPING FORMULA (FLAW-4):
+            # The half-grid offset binning `((lat + grid_size/2) / grid_size).floor() * grid_size`
+            # ensures that points are snapped to the *closest* grid center rather than
+            # the bottom-left corner of the grid cell. Adding `grid_size/2` before
+            # flooring shifts the bin boundaries so that the grid points (0, 0.25, 0.5, etc.)
+            # are at the center of each bin.
             nwp_lat=((plh3.cell_to_lat("child_h3") + (grid_size / 2)) / grid_size).floor()
             * grid_size,
             nwp_lng=((plh3.cell_to_lng("child_h3") + (grid_size / 2)) / grid_size).floor()

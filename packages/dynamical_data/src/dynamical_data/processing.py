@@ -369,6 +369,10 @@ def process_ecmwf_dataset(
         ~pl.col("col_name").is_in(["categorical_precipitation_type_surface"])
     )
 
+    # CIRCULAR INTERPOLATION ASSUMPTION (FLAW-2):
+    # Wind direction (0-360 degrees) is scaled to 0-255 UInt8 for storage.
+    # This assumption is relied upon by downstream interpolation logic in the
+    # forecasting module, which expects 255 to map to 2pi (360 degrees).
     scaled_df = scale_to_uint8(processed, scaling_params)
     scaled_df = scaled_df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 

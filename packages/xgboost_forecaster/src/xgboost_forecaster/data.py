@@ -192,7 +192,11 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
 
     # Decompose circular variables into sine and cosine components
     for col in circular_cols:
-        # Map 0-255 to 0-2pi. Note: 255 is treated as 2pi, which is the same as 0.
+        # CIRCULAR INTERPOLATION ASSUMPTION (FLAW-2):
+        # We assume the 0-255 UInt8 scale maps linearly to 0-360 degrees (0-2pi radians).
+        # Note: 255 is treated as 2pi, which is equivalent to 0 degrees. This mapping
+        # allows us to use sine/cosine decomposition to interpolate correctly across
+        # the 0/360 boundary.
         processed = processed.with_columns(
             [
                 (pl.col(col).cast(pl.Float32) / 255.0 * 2 * math.pi).sin().alias(f"{col}_sin"),
@@ -216,12 +220,23 @@ def process_nwp_data(nwp: pl.LazyFrame, h3_indices: list[int]) -> pl.LazyFrame:
         and col not in circular_cols
     ]
 
+    # TEMPORAL INTERPOLATION & LEAKAGE (FLAW-3):
+    # Interpolating over `valid_time` within a single `init_time` is NOT data leakage.
+    # All `valid_time` predictions in a single forecast run are generated simultaneously
+    # at `init_time`. We are not looking into the future of when the forecast was made,
+    # but merely interpolating the forecast's own future predictions to a higher
+    # temporal resolution (30m).
     processed = processed.with_columns(
         [
             pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
             for c in numeric_cols
         ]
         + [
+            # CATEGORICAL FORWARD-FILL (FLAW-1):
+            # Linear interpolation is physically meaningless for categorical variables.
+            # For example, a value of 1.5 between 'rain' (1) and 'snow' (2) has no
+            # physical interpretation. We use forward-fill to maintain the discrete
+            # state of the weather condition until the next forecast step.
             pl.col(c).forward_fill().over(["init_time", "h3_index", "ensemble_member"])
             for c in categorical_cols
         ]
