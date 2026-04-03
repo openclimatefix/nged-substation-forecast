@@ -43,6 +43,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
                 "substation_number": [110375],
                 "substation_name_in_location_table": ["Test Substation"],
                 "substation_type": ["Primary"],
+                "preferred_power_col": ["MW"],
                 "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
             }
         ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),
@@ -101,6 +102,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
                 "substation_number": [110375],
                 "substation_name_in_location_table": ["Test Substation"],
                 "substation_type": ["Primary"],
+                "preferred_power_col": ["MW"],
                 "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
             }
         ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),

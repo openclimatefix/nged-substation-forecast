@@ -75,25 +75,30 @@ def train_and_log_model(
 
         sliced_data[key] = _slice_temporal_data(val, slice_start, train_end, time_col)
 
-    # 2. Call the Model-Specific Math
-    # The trainer is responsible for joining and feature engineering.
-    # We downsample power flows to 30m and use the provided target map
-    # to ensure consistency across models.
-    if "substation_power_flows" in sliced_data:
-        flows = sliced_data.pop("substation_power_flows")
-        target_map = kwargs.get("target_map")
-        if target_map is None:
-            raise ValueError("target_map must be passed in kwargs to downsample power flows.")
+        # 2. Call the Model-Specific Math
+        # The trainer is responsible for joining and feature engineering.
+        # We downsample power flows to 30m and use the provided target map
+        # to ensure consistency across models.
+        if "substation_power_flows" in sliced_data:
+            flows = sliced_data.pop("substation_power_flows")
+            target_map = kwargs.get("target_map")
+            if target_map is None:
+                raise ValueError("target_map must be passed in kwargs to downsample power flows.")
 
-        flows_30m = downsample_power_flows(
-            flows,
-            target_map=target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map,
-        )
-        sliced_data["flows_30m"] = flows_30m
+            flows_30m = downsample_power_flows(
+                flows,
+                target_map=target_map.lazy()
+                if isinstance(target_map, pl.DataFrame)
+                else target_map,
+            )
+            sliced_data["flows_30m"] = flows_30m
 
-        # Store target_map on the trainer if it supports it
-        if hasattr(trainer, "target_map"):
-            trainer.target_map = target_map
+            # Store target_map on the trainer if it supports it
+            if hasattr(trainer, "target_map"):
+                trainer.target_map = target_map
+
+        # Remove target_map from sliced_data so it's not passed to trainer.train()
+        sliced_data.pop("target_map", None)
 
     model = trainer.train(config=config.model, **sliced_data)
 

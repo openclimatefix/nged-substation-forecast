@@ -157,7 +157,7 @@ def test_mlflow_metric_thinning():
     forecaster.target_map = pl.DataFrame(
         {
             "substation_number": [1],
-            "power_col": ["MW"],
+            "preferred_power_col": ["MW"],
             "peak_capacity_MW_or_MVA": [100.0],
         }
     )

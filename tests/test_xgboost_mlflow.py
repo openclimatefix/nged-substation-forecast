@@ -123,7 +123,11 @@ def test_evaluate_and_save_model_logs_metrics():
         ]
     )
     forecaster.target_map = pl.DataFrame(
-        {"substation_number": [1], "power_col": ["MW"], "peak_capacity_MW_or_MVA": [100.0]}
+        {
+            "substation_number": [1],
+            "preferred_power_col": ["MW"],
+            "peak_capacity_MW_or_MVA": [100.0],
+        }
     ).with_columns(
         [
             pl.col("substation_number").cast(pl.Int32),
@@ -270,6 +274,13 @@ def test_evaluate_and_save_model_logs_metrics():
             substation_power_flows=sub_flows,
             substation_metadata=sub_meta,
             nwps=nwps,
+            target_map=pl.DataFrame(
+                {
+                    "substation_number": [1],
+                    "preferred_power_col": ["MW"],
+                    "peak_capacity_MW_or_MVA": [100.0],
+                }
+            ),
         )
 
         mock_set_experiment.assert_called_once_with("xgboost")

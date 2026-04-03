@@ -167,7 +167,7 @@ def test_predict_with_missing_feature_column_fails_loudly():
     forecaster.target_map = pt.DataFrame[SubstationTargetMap](
         {
             "substation_number": [1],
-            "power_col": [POWER_MW],
+            "preferred_power_col": [POWER_MW],
             "peak_capacity_MW_or_MVA": [100.0],
         }
     ).with_columns(pl.col("substation_number").cast(pl.Int32))

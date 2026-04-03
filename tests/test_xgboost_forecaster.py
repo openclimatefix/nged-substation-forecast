@@ -154,7 +154,7 @@ def test_downsample_power_flows_uses_period_ending_semantics():
             cast(pt.LazyFrame[SubstationPowerFlows], df),
             target_map=cast(
                 pt.DataFrame[SubstationTargetMap],
-                pl.DataFrame({"substation_number": [1], "power_col": [POWER_MW]}),
+                pl.DataFrame({"substation_number": [1], "preferred_power_col": [POWER_MW]}),
             ),
         ).collect(),
     )
