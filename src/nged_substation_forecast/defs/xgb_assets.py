@@ -297,7 +297,6 @@ def evaluate_xgboost(
         forecaster=forecaster,
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
-        substation_power_flows=substation_power_flows_filtered,
         substation_metadata=substation_metadata_filtered,
-        target_map=substation_power_preferences,
+        substation_power_flows=substation_power_flows_filtered,
     )

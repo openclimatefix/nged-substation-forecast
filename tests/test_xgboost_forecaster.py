@@ -374,6 +374,12 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
     config = XGBoostConfig()
 
     context = dg.build_asset_context()
+    sub_power_prefs = pl.DataFrame(
+        {
+            "substation_number": [123],
+            "preferred_power_col": ["MW"],
+        }
+    ).cast({"substation_number": pl.Int32})
 
     with patch("src.nged_substation_forecast.defs.xgb_assets.train_and_log_model") as mock_train:
         train_xgboost(
@@ -382,6 +388,7 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
             settings=settings,
             nwp=nwp,
             substation_metadata=metadata,
+            substation_power_preferences=sub_power_prefs,
         )
 
         # Check the nwp passed to train_and_log_model
