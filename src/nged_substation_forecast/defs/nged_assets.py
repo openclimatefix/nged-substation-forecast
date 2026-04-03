@@ -409,18 +409,16 @@ def substation_metadata(
     )
 
     # 4. Join locations with live primaries
-    # We ensure the result is a materialized DataFrame.
     raw_new_metadata = align.join_location_table_to_live_primaries(
         locations=locations, live_primaries=live_primaries
     )
 
-    if isinstance(raw_new_metadata, pl.LazyFrame):
-        new_metadata = raw_new_metadata.collect()
-    else:
-        new_metadata = cast(pl.DataFrame, raw_new_metadata)
-
-    # Final cast to force the type to DataFrame and stop InProcessQuery warnings
-    new_metadata = cast(pl.DataFrame, new_metadata)
+    new_metadata = cast(
+        pl.DataFrame,
+        raw_new_metadata.collect()
+        if isinstance(raw_new_metadata, pl.LazyFrame)
+        else raw_new_metadata,
+    )
 
     # 5. Add last_updated column
     now = datetime.now(timezone.utc)

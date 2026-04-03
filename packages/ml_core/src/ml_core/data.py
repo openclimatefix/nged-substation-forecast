@@ -40,10 +40,10 @@ def calculate_target_map(
 
     # Calculate valid counts, last seen timestamps, and peak capacity
     stats = flows_lazy.group_by("substation_number").agg(
-        mw_valid_count=pl.col(POWER_MW).is_not_null().sum(),
-        mva_valid_count=pl.col(POWER_MVA).is_not_null().sum(),
-        mw_last_seen=pl.col("timestamp").filter(pl.col(POWER_MW).is_not_null()).max(),
-        mva_last_seen=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
+        valid_count_mw=pl.col(POWER_MW).is_not_null().sum(),
+        valid_count_mva=pl.col(POWER_MVA).is_not_null().sum(),
+        last_seen_mw=pl.col("timestamp").filter(pl.col(POWER_MW).is_not_null()).max(),
+        last_seen_mva=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
         max_timestamp=pl.col("timestamp").max(),
         peak_capacity_MW_or_MVA=pl.max_horizontal(
             pl.col(POWER_MW).cast(pl.Float32).abs().max(),
@@ -53,7 +53,7 @@ def calculate_target_map(
 
     # Determine initial choice based on volume (Priority: MW > MVA if equal counts)
     stats = stats.with_columns(
-        preferred_power_col=pl.when(pl.col("mw_valid_count") >= pl.col("mva_valid_count"))
+        preferred_power_col=pl.when(pl.col("valid_count_mw") >= pl.col("valid_count_mva"))
         .then(pl.lit(POWER_MW))
         .otherwise(pl.lit(POWER_MVA)),
     )
@@ -68,14 +68,14 @@ def calculate_target_map(
     pref_col_expr = (
         pl.when(
             (pl.col("preferred_power_col") == POWER_MW)
-            .and_((pl.col("max_timestamp") - pl.col("mw_last_seen")) > dead_sensor_threshold)
-            .and_(pl.col("mva_valid_count") > 0)
+            .and_((pl.col("max_timestamp") - pl.col("last_seen_mw")) > dead_sensor_threshold)
+            .and_(pl.col("valid_count_mva") > 0)
         )
         .then(pl.lit(POWER_MVA))
         .when(
             (pl.col("preferred_power_col") == POWER_MVA)
-            .and_((pl.col("max_timestamp") - pl.col("mva_last_seen")) > dead_sensor_threshold)
-            .and_(pl.col("mw_valid_count") > 0)
+            .and_((pl.col("max_timestamp") - pl.col("last_seen_mva")) > dead_sensor_threshold)
+            .and_(pl.col("valid_count_mw") > 0)
         )
         .then(pl.lit(POWER_MW))
         .otherwise(pl.col("preferred_power_col"))
@@ -94,16 +94,11 @@ def calculate_target_map(
         peak_capacity_MW_or_MVA=peak_cap_expr,
     ).select(["substation_number", "preferred_power_col", "peak_capacity_MW_or_MVA"])
 
-    target_map_df = target_map_lazy.collect()
-
-    # Explicitly cast to DataFrame to ensure the subsequent .with_columns works on a materialized DF
-    target_map_df = cast(pl.DataFrame, target_map_df)
-
-    target_map_df = target_map_df.with_columns(
-        [
-            pl.col("substation_number").cast(pl.Int32),
-            pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
-        ]
+    target_map_df = cast(pl.DataFrame, target_map_lazy.collect()).cast(
+        {
+            "substation_number": pl.Int32,
+            "peak_capacity_MW_or_MVA": pl.Float32,
+        }
     )
 
     return SubstationTargetMap.validate(target_map_df)
