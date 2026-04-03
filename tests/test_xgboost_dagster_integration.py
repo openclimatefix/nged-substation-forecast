@@ -183,14 +183,20 @@ def test_xgboost_dagster_integration() -> None:
     # (data loading, cleaning, training, evaluation, and plotting).
     resources = defs.resources or {}
 
-    result = job.execute_in_process(
-        run_config=run_config,
-        partition_key=test_end.isoformat(),
-        resources={
-            **resources,
-            "io_manager": dg.mem_io_manager,
-        },
-    )
+    # We use an ephemeral Dagster instance to ensure that all resources,
+    # including SQLite databases and SQLAlchemy connection pools, are
+    # properly cleaned up after the job execution. This prevents
+    # "Cannot operate on a closed database" errors in tests.
+    with dg.DagsterInstance.ephemeral() as instance:
+        result = job.execute_in_process(
+            run_config=run_config,
+            partition_key=test_end.isoformat(),
+            resources={
+                **resources,
+                "io_manager": dg.mem_io_manager,
+            },
+            instance=instance,
+        )
 
     # 7. Assertions
     assert result.success, "Dagster job failed"
