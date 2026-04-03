@@ -209,9 +209,10 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
         # We use .filter() on the collected DataFrame
         init_times = combined_df.filter(pl.col("valid_time") == vt).select("init_time").unique()
         assert len(init_times) == 1
-        # Normalize both timestamps to np.datetime64[us] to prevent flaky tests caused by
-        # precision or timezone representation differences between Polars and Python datetimes.
-        assert np.datetime64(init_times.item(), "us") == np.datetime64(dt2, "us")
+        # We compare the timestamps (seconds since epoch) rather than using np.datetime64.
+        # This avoids Numpy UserWarnings about explicit timezone representation being ignored,
+        # while still maintaining the necessary precision for the comparison.
+        assert init_times.item().timestamp() == dt2.timestamp()
 
 
 def test_single_point_forecast_ingestion(tmp_path, h3_grid):
