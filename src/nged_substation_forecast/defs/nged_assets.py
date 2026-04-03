@@ -605,10 +605,12 @@ def substation_data_quality(
             },
         )
 
-    # Materialize a sample of the data for checking (limit to avoid memory issues)
-    # Note: In production, you might want to check a representative sample
+    # Materialize the data for checking.
+    # Since the data is partitioned by day and filtered to a 2-day window (partition + 1-day lookback),
+    # the maximum number of rows is approximately 384,000 (~4000 substations * 48 half-hours * 2 days).
+    # This easily fits in memory and does not require sampling.
     try:
-        df = cast(pl.DataFrame, live_primary_flows.limit(100_000).collect())
+        df = cast(pl.DataFrame, live_primary_flows.collect())
     except Exception as e:
         return dg.AssetCheckResult(
             passed=True,
