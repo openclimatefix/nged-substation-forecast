@@ -266,6 +266,10 @@ def _merge_to_delta(
                         "target_alias": "t",
                     },
                 )
+                # We must update matched records to support the force_rerun_all configuration,
+                # ensuring that if we re-fetch data for an existing timestamp/substation,
+                # the record in the Delta table is updated with the latest values.
+                .when_matched_update_all()
                 .when_not_matched_insert_all()
                 .execute()
             )
@@ -476,7 +480,9 @@ def substation_data_quality(
         with metadata about affected substations.
     """
     partition_key = context.partition_key
-    partition_date = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    partition_start = datetime.fromisoformat(partition_key).replace(tzinfo=timezone.utc)
+    partition_end = partition_start + timedelta(days=1)
+    lookback_start = partition_start - timedelta(days=1)
     delta_path = str(_get_delta_path(settings))
 
     if not Path(delta_path).exists():
@@ -486,10 +492,25 @@ def substation_data_quality(
             metadata={"warning": dg.MetadataValue.json("Delta table does not exist yet")},
         )
 
-    # Manually load from Delta table and filter to the required ingested_at date.
-    # This fix is needed because live_primary_flows is a side-effect only asset.
-    live_primary_flows = pl.scan_delta(delta_path).filter(
-        pl.col("ingested_at") == pl.lit(partition_date)
+    # Manually load from Delta table and filter to the required date range (including 1 day lookback)
+    # to ensure rolling windows are fully populated at the start of the partition.
+    # We use timestamp instead of ingested_at to match the actual cleaning logic.
+    live_primary_flows = pl.scan_delta(delta_path)
+
+    # Ensure timestamp is UTC-aware before filtering
+    schema = live_primary_flows.collect_schema()
+    ts_dtype = schema["timestamp"]
+    if isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone is None:
+        live_primary_flows = live_primary_flows.with_columns(
+            pl.col("timestamp").dt.replace_time_zone("UTC")
+        )
+    elif isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone != "UTC":
+        live_primary_flows = live_primary_flows.with_columns(
+            pl.col("timestamp").dt.convert_time_zone("UTC")
+        )
+
+    live_primary_flows = live_primary_flows.filter(
+        pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
     )
 
     def _check_for_stuck_and_insane(df: pl.DataFrame) -> tuple[int, list[int], list[int]]:
@@ -504,7 +525,6 @@ def substation_data_quality(
         stuck_std_threshold = settings.data_quality.stuck_std_threshold
         max_mw_threshold = settings.data_quality.max_mw_threshold
         min_mw_threshold = settings.data_quality.min_mw_threshold
-        window_size = 48  # 24 hours at 30-minute resolution
 
         # Get power columns
         power_cols = ["MW", "MVA"]
@@ -513,30 +533,53 @@ def substation_data_quality(
         if not cols_to_check:
             return (0, [], [])
 
+        # Sort by timestamp as required by .rolling()
+        df_sorted = df.sort("timestamp")
+
         # Check for stuck sensors
         stuck_substations = set()
         for col in cols_to_check:
-            # Compute rolling std per substation
-            stuck_mask = (
-                df.sort("timestamp")
-                .group_by("substation_number", maintain_order=True)
-                .agg(
-                    stuck_vals=pl.col(col).rolling_std(window_size).fill_null(float("inf"))
-                    < stuck_std_threshold
-                )
-                .with_columns(num_stuck=pl.col("stuck_vals").list.sum())
+            std_col = f"{col}_std"
+            count_col = f"{col}_count"
+
+            # Use time-based rolling window to correctly handle temporal gaps.
+            # We use a 24h window to detect sensors that haven't changed reading.
+            rolling_df = df_sorted.rolling(
+                index_column="timestamp",
+                period="24h",
+                group_by="substation_number",
+                closed="right",
+            ).agg(
+                [
+                    pl.col(col).std().alias(std_col),
+                    pl.col(col).count().alias(count_col),
+                ]
             )
 
-            # Substations with any stuck values
-            subst_with_stuck = stuck_mask.filter(pl.col("num_stuck") > 0)
-            stuck_substations.update(subst_with_stuck.get_column("substation_number").to_list())
+            # Join rolling results back to the main dataframe
+            df_with_rolling = df_sorted.join(
+                rolling_df, on=["timestamp", "substation_number"], how="left"
+            )
+
+            # Filter to current partition before checking to avoid double-counting
+            # issues from the lookback period.
+            df_partition = df_with_rolling.filter(pl.col("timestamp") >= partition_start)
+
+            # A sensor is stuck if we have enough data (24h at 30m resolution)
+            # and the standard deviation is below the threshold.
+            stuck_mask = (pl.col(count_col) >= 48) & (
+                pl.col(std_col).fill_null(float("inf")) < stuck_std_threshold
+            )
+
+            stuck_substations.update(
+                df_partition.filter(stuck_mask).get_column("substation_number").unique().to_list()
+            )
 
         # Check for insane values (outside physical bounds)
-        # First get non-null values for the power columns
-        power_mask = pl.any_horizontal([pl.col(col).is_not_null() for col in cols_to_check])
-        non_null_df = df.filter(power_mask)
+        # Filter to current partition before checking to avoid double-counting
+        df_partition_for_insane = df_sorted.filter(pl.col("timestamp") >= partition_start)
 
-        insane_mask = non_null_df.filter(
+        insane_mask = df_partition_for_insane.filter(
             pl.any_horizontal(
                 [
                     ((pl.col(col) < min_mw_threshold) | (pl.col(col) > max_mw_threshold))

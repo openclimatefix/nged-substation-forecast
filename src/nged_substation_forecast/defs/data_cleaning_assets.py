@@ -166,11 +166,6 @@ def cleaned_actuals(
     # Materialize the LazyFrame once
     df_joined_materialized = cast(pl.DataFrame, live_primary_flows.collect())
 
-    # If the DataFrame is empty, return empty MaterializeResult
-    if df_joined_materialized.is_empty():
-        context.log.warning("Input DataFrame is empty, returning empty MaterializeResult.")
-        return dg.MaterializeResult(metadata={"num_rows": 0})
-
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 
     # Clean the data using the shared cleaning module
@@ -201,23 +196,20 @@ def cleaned_actuals(
     )
 
     # Save to Delta table using overwrite with replace_where to ensure idempotency
-    # within the partition's time range.
-    min_time = cast(datetime, validated_df.get_column("timestamp").min())
-    max_time = cast(datetime, validated_df.get_column("timestamp").max())
-
+    # within the partition's time range. We use the partition's temporal boundaries
+    # for the predicate instead of the data's min/max time. This ensures that if
+    # the source data is removed, the partition in the Delta table is correctly
+    # cleared out (by writing an empty DataFrame), maintaining idempotency.
     delta_path = _get_delta_path(settings, "cleaned_actuals")
 
-    if validated_df.is_empty():
-        context.log.info("No data to write to Delta table for this partition.")
-    else:
-        validated_df.write_delta(
-            delta_path,
-            mode="overwrite",
-            delta_write_options={
-                "partition_by": ["substation_number"],
-                "predicate": f"timestamp >= '{min_time.isoformat()}' AND timestamp <= '{max_time.isoformat()}'",
-            },
-        )
+    validated_df.write_delta(
+        delta_path,
+        mode="overwrite",
+        delta_write_options={
+            "partition_by": ["substation_number"],
+            "predicate": f"timestamp >= '{partition_start.isoformat()}' AND timestamp < '{partition_end.isoformat()}'",
+        },
+    )
 
     context.log.info(f"Saved cleaned actuals to Delta table at {delta_path}")
 
