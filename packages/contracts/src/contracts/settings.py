@@ -104,7 +104,7 @@ class Settings(BaseSettings):
         description="S3 prefix for ECMWF Icechunk store.",
     )
     h3_grid_weights_path: Path = Field(
-        default=PROJECT_ROOT / "data/H3/h3_grid_weights.parquet",
+        default=PROJECT_ROOT / "data/NWP/reference/gb_h3_grid_weights.parquet",
         description="Path to the H3 grid weights file (Parquet).",
     )
 
