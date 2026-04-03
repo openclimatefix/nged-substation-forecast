@@ -32,12 +32,11 @@ import dagster as dg
 import polars as pl
 import patito as pt
 from typing import cast
-from datetime import datetime, timedelta, timezone
 from dagster import ResourceParam
 
 from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
-from nged_data import clean_substation_flows, ensure_utc_timestamp_lazy
+from nged_data import clean_substation_flows, get_partition_window, scan_delta_table
 from .partitions import DAILY_PARTITIONS
 
 
@@ -71,11 +70,8 @@ def get_cleaned_actuals_lazy(
     """
     delta_path = _get_delta_path(settings, "cleaned_actuals")
 
-    # Attempt to scan the Delta table and verify it exists by fetching schema.
-    # We fetch the schema to force an immediate failure if the table is missing,
-    # as pl.scan_delta() is lazy and might not fail until collection.
-    lf = pl.scan_delta(delta_path)
-    lf = ensure_utc_timestamp_lazy(lf)
+    # Use the new scan_delta_table helper which handles UTC timezone boilerplate.
+    lf = scan_delta_table(delta_path)
 
     if context:
         context.log.info(f"Reading cleaned actuals from {delta_path}")
@@ -123,22 +119,20 @@ def cleaned_actuals(
     Returns:
         MaterializeResult containing metadata about the cleaned data.
     """
-    partition_key = context.partition_key
-    context.log.info(f"Cleaning partition: {partition_key}")
-
-    partition_start = datetime.fromisoformat(partition_key).replace(tzinfo=timezone.utc)
-    partition_end = partition_start + timedelta(days=1)
-    lookback_start = partition_start - timedelta(days=1)
+    # Use the shared helper to get the partition window with a 1-day lookback.
+    partition_start, partition_end, lookback_start = get_partition_window(
+        context.partition_key, lookback_days=1
+    )
+    context.log.info(f"Cleaning partition: {context.partition_key}")
 
     delta_path = _get_delta_path(settings, "live_primary_flows")
 
     # Manually load from Delta table and filter to the required date range (including 1 day lookback)
     # This fix is needed because the InMemoryIOManager in tests doesn't have the "yesterday"
     # partition data, and live_primary_flows is a side-effect only asset.
-    live_primary_flows = (
-        pl.scan_delta(delta_path)
-        .pipe(ensure_utc_timestamp_lazy)
-        .filter(pl.col("timestamp").is_between(lookback_start, partition_end, closed="left"))
+    # We use the new scan_delta_table helper which handles UTC timezone boilerplate.
+    live_primary_flows = scan_delta_table(delta_path).filter(
+        pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
     )
 
     # Materialize the LazyFrame once

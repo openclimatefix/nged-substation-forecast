@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable
 
 import polars as pl
@@ -36,6 +38,11 @@ def ensure_utc_timestamp_lazy(lf: pl.LazyFrame) -> pl.LazyFrame:
         LazyFrame with UTC-aware 'timestamp' column.
     """
     schema = lf.collect_schema()
+    # If the timestamp column is not present, we return early to avoid errors.
+    # This is useful when scanning tables that might not have a timestamp column.
+    if "timestamp" not in schema:
+        return lf
+
     timestamp_dtype = schema["timestamp"]
 
     if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
@@ -43,3 +50,35 @@ def ensure_utc_timestamp_lazy(lf: pl.LazyFrame) -> pl.LazyFrame:
     elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
         return lf.with_columns(pl.col("timestamp").dt.convert_time_zone("UTC"))
     return lf
+
+
+def scan_delta_table(path: str | Path) -> pl.LazyFrame:
+    """Scans a Delta table and ensures the timestamp column is UTC-aware.
+
+    Args:
+        path: Path to the Delta table.
+
+    Returns:
+        Polars LazyFrame with UTC-aware 'timestamp' column (if present).
+    """
+    return ensure_utc_timestamp_lazy(pl.scan_delta(str(path)))
+
+
+def get_partition_window(
+    partition_key: str, lookback_days: int = 0
+) -> tuple[datetime, datetime, datetime]:
+    """Calculates the partition start, end, and lookback start times.
+
+    Args:
+        partition_key: The Dagster partition key (ISO format date string).
+        lookback_days: Number of days to look back from the partition start.
+
+    Returns:
+        A tuple of (partition_start, partition_end, lookback_start).
+    """
+    # We use fromisoformat to handle the partition key, which is expected to be a date string.
+    # We ensure the resulting datetime is UTC-aware.
+    partition_start = datetime.fromisoformat(partition_key).replace(tzinfo=timezone.utc)
+    partition_end = partition_start + timedelta(days=1)
+    lookback_start = partition_start - timedelta(days=lookback_days)
+    return partition_start, partition_end, lookback_start

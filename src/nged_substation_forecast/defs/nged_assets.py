@@ -29,8 +29,10 @@ from dagster import (
 )
 from nged_data import (
     ckan,
-    ensure_utc_timestamp_lazy,
+    clean_substation_flows,
+    get_partition_window,
     process_live_primary_substation_power_flows,
+    scan_delta_table,
 )
 from nged_data.substation_names import align
 from .partitions import DAILY_PARTITIONS
@@ -167,7 +169,7 @@ def _get_processed_substations(
     try:
         processed_df = cast(
             pl.DataFrame,
-            pl.scan_delta(delta_path)
+            scan_delta_table(delta_path)
             .filter(pl.col("ingested_at") == pl.lit(partition_date).cast(pl.Datetime("us", "UTC")))
             .select("substation_number")
             .unique()
@@ -300,13 +302,12 @@ def live_primary_flows(
     settings: ResourceParam[Settings],
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
-    partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d").replace(
-        tzinfo=timezone.utc
-    )
+    # Use the shared helper to get the partition start time.
+    partition_start, _, _ = get_partition_window(context.partition_key)
 
     # Gracefully skip if beyond the 5-day API limit
-    if partition_date < datetime.now(timezone.utc) - timedelta(days=5):
-        context.log.info(f"Partition {partition_date} is older than 5 days. Skipping API call.")
+    if partition_start < datetime.now(timezone.utc) - timedelta(days=5):
+        context.log.info(f"Partition {partition_start} is older than 5 days. Skipping API call.")
         yield dg.AssetCheckResult(passed=True, check_name="all_substations_succeeded")
         yield dg.MaterializeResult(metadata={"skipped": True, "reason": "Beyond 5-day API limit"})
         return
@@ -317,7 +318,7 @@ def live_primary_flows(
     processed_substations = (
         set()
         if config.force_rerun_all
-        else _get_processed_substations(delta_path, partition_date, context.log)
+        else _get_processed_substations(delta_path, partition_start, context.log)
     )
 
     # Fetch resources from metadata
@@ -344,7 +345,7 @@ def live_primary_flows(
     # Download and process
     api_key = settings.nged_ckan_token
     results = _download_and_process_all(
-        resources_to_process, api_key, config, context.log, partition_date
+        resources_to_process, api_key, config, context.log, partition_start
     )
     successes = [r for r in results if r.stage == IngestionStage.SUCCESS and r.df is not None]
     failures = [r for r in results if r.stage != IngestionStage.SUCCESS]
@@ -422,16 +423,11 @@ def substation_metadata(
 
     if out_path.exists():
         existing_metadata = pl.read_parquet(out_path)
-        # Upsert: update existing rows, keep old rows that are not in new_metadata
-        # We use an outer join and then coalesce
-        combined = existing_metadata.join(
-            new_metadata, on="substation_number", how="outer", suffix="_new"
+        # Simplified upsert logic: concat and keep the last occurrence of each substation_number.
+        # This ensures that new metadata overwrites existing metadata for the same substation.
+        final_metadata = pl.concat([existing_metadata, new_metadata]).unique(
+            subset=["substation_number"], keep="last"
         )
-
-        # Coalesce columns
-        cols = [c for c in existing_metadata.columns if c != "substation_number"]
-        coalesce_exprs = [pl.coalesce(f"{c}_new", c).alias(c) for c in cols]
-        final_metadata = combined.select(["substation_number"] + coalesce_exprs)
     else:
         final_metadata = new_metadata
 
@@ -464,16 +460,7 @@ def substation_data_quality(
     - **Insane values**: MW outside [min_mw_threshold, max_mw_threshold] are physically implausible.
 
     The check runs on each daily partition to catch issues early at ingestion time.
-
-    Important Notes:
-    -----------------
-    - **Empty Partition Handling**: If the partition is empty (e.g., ingestion failed),
-      the check gracefully returns passed=True with a warning in metadata. This prevents
-      pipeline crashes when there's total data loss for a day.
-    - **Per-Substation Checks**: All rolling window calculations are performed per-substation
-      to prevent cross-substation data leakage.
-    - **Backward-Looking Windows**: The rolling standard deviation uses a backward-looking
-      window to avoid data leakage from future values.
+    It reuses the production cleaning logic to identify bad substations.
 
     Args:
         context: Asset check execution context.
@@ -483,10 +470,10 @@ def substation_data_quality(
         AssetCheckResult indicating whether the data quality check passed or failed,
         with metadata about affected substations.
     """
-    partition_key = context.partition_key
-    partition_start = datetime.fromisoformat(partition_key).replace(tzinfo=timezone.utc)
-    partition_end = partition_start + timedelta(days=1)
-    lookback_start = partition_start - timedelta(days=1)
+    # Use the shared helper to get the partition window with a 1-day lookback.
+    partition_start, partition_end, lookback_start = get_partition_window(
+        context.partition_key, lookback_days=1
+    )
     delta_path = str(_get_delta_path(settings))
 
     if not Path(delta_path).exists():
@@ -496,99 +483,48 @@ def substation_data_quality(
             metadata={"warning": dg.MetadataValue.json("Delta table does not exist yet")},
         )
 
-    # Manually load from Delta table and filter to the required date range (including 1 day lookback)
-    # to ensure rolling windows are fully populated at the start of the partition.
-    # We use timestamp instead of ingested_at to match the actual cleaning logic.
-    live_primary_flows = pl.scan_delta(delta_path)
-
-    # Ensure timestamp is UTC-aware before filtering
-    live_primary_flows = ensure_utc_timestamp_lazy(live_primary_flows)
+    # Use the new scan_delta_table helper which handles UTC timezone boilerplate.
+    live_primary_flows = scan_delta_table(delta_path)
 
     live_primary_flows = live_primary_flows.filter(
         pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
     )
 
-    def _check_for_stuck_and_insane(df: pl.DataFrame) -> tuple[int, list[int], list[int]]:
-        """Check for stuck sensors and insane values in a DataFrame.
+    def _check_for_bad_substations(df: pl.DataFrame) -> list[int]:
+        """Identify substations with data quality issues by comparing raw and cleaned data.
 
         Args:
-            df: Polars DataFrame with substation flow data.
+            df: Raw substation flows DataFrame.
 
         Returns:
-            Tuple of (affected_count, stuck_substation_ids, insane_substation_ids).
+            List of substation IDs that had values nulled during cleaning.
         """
-        stuck_std_threshold = settings.data_quality.stuck_std_threshold
-        max_mw_threshold = settings.data_quality.max_mw_threshold
-        min_mw_threshold = settings.data_quality.min_mw_threshold
+        # We reuse the production cleaning logic to identify bad substations.
+        # This ensures consistency between the asset check and the actual cleaning process.
+        cleaned_df = clean_substation_flows(df, settings)
 
-        # Get power columns
-        power_cols = ["MW", "MVA"]
-        cols_to_check = [col for col in power_cols if col in df.columns]
+        # Join them to compare original and cleaned values.
+        # We only care about the current partition, not the lookback period.
+        comparison_df = df.join(
+            cleaned_df, on=["timestamp", "substation_number"], how="inner", suffix="_cleaned"
+        ).filter(pl.col("timestamp") >= partition_start)
 
-        if not cols_to_check:
-            return (0, [], [])
+        # A substation is "bad" if any of its MW or MVA values were nulled during cleaning
+        # that were NOT null in the original data.
+        power_cols = [col for col in ["MW", "MVA"] if col in comparison_df.columns]
 
-        # Sort by timestamp as required by .rolling()
-        df_sorted = df.sort("timestamp")
-
-        # Check for stuck sensors
-        stuck_substations = set()
-        for col in cols_to_check:
-            std_col = f"{col}_std"
-            count_col = f"{col}_count"
-
-            # Use time-based rolling window to correctly handle temporal gaps.
-            # We use a 24h window to detect sensors that haven't changed reading.
-            rolling_df = df_sorted.rolling(
-                index_column="timestamp",
-                period="24h",
-                group_by="substation_number",
-                closed="right",
-            ).agg(
-                [
-                    pl.col(col).std().alias(std_col),
-                    pl.col(col).count().alias(count_col),
-                ]
+        bad_substations = set()
+        for col in power_cols:
+            # Find where the original was NOT null but the cleaned IS null.
+            is_newly_null = pl.col(col).is_not_null() & pl.col(f"{col}_cleaned").is_null()
+            bad_substations.update(
+                comparison_df.filter(is_newly_null)
+                .get_column("substation_number")
+                .unique()
+                .to_list()
             )
 
-            # Join rolling results back to the main dataframe
-            df_with_rolling = df_sorted.join(
-                rolling_df, on=["timestamp", "substation_number"], how="left"
-            )
-
-            # Filter to current partition before checking to avoid double-counting
-            # issues from the lookback period.
-            df_partition = df_with_rolling.filter(pl.col("timestamp") >= partition_start)
-
-            # A sensor is stuck if we have enough data (24h at 30m resolution)
-            # and the standard deviation is below the threshold.
-            stuck_mask = (pl.col(count_col) >= settings.data_quality.stuck_window_periods) & (
-                pl.col(std_col).fill_null(float("inf")) < stuck_std_threshold
-            )
-
-            stuck_substations.update(
-                df_partition.filter(stuck_mask).get_column("substation_number").unique().to_list()
-            )
-
-        # Check for insane values (outside physical bounds)
-        # Filter to current partition before checking to avoid double-counting
-        df_partition_for_insane = df_sorted.filter(pl.col("timestamp") >= partition_start)
-
-        insane_mask = df_partition_for_insane.filter(
-            pl.any_horizontal(
-                [
-                    ((pl.col(col) < min_mw_threshold) | (pl.col(col) > max_mw_threshold))
-                    for col in cols_to_check
-                ]
-            )
-        )
-
-        insane_substations = insane_mask.get_column("substation_number").unique().to_list()
-
-        # Calculate affected count (union of stuck and insane)
-        affected_count = len(stuck_substations | set(insane_substations))
-
-        return (affected_count, list(stuck_substations), insane_substations)
+        return sorted(list(bad_substations))
 
     # Handle empty partitions gracefully
     if live_primary_flows.collect_schema().names() == []:
@@ -601,9 +537,6 @@ def substation_data_quality(
         )
 
     # Materialize the data for checking.
-    # Since the data is partitioned by day and filtered to a 2-day window (partition + 1-day lookback),
-    # the maximum number of rows is approximately 384,000 (~4000 substations * 48 half-hours * 2 days).
-    # This easily fits in memory and does not require sampling.
     try:
         df = cast(pl.DataFrame, live_primary_flows.collect())
     except Exception as e:
@@ -621,22 +554,16 @@ def substation_data_quality(
         )
 
     # Run the checks
-    affected_count, stuck_substations, insane_substations = _check_for_stuck_and_insane(df)
+    bad_substations = _check_for_bad_substations(df)
 
     # Report result
-    if affected_count > 0:
+    if bad_substations:
         return dg.AssetCheckResult(
             passed=False,
-            description=(
-                f"Found {len(stuck_substations)} substations with stuck sensors "
-                f"and {len([s for s in insane_substations if s not in stuck_substations])} substations with insane values"
-            ),
+            description=f"Found {len(bad_substations)} substations with data quality issues",
             metadata={
-                "affected_substation_count": dg.MetadataValue.int(affected_count),
-                "stuck_substation_sample": dg.MetadataValue.json(stuck_substations[:100]),
-                "insane_substation_sample": dg.MetadataValue.json(
-                    [s for s in insane_substations if s not in stuck_substations][:100]
-                ),
+                "affected_substation_count": dg.MetadataValue.int(len(bad_substations)),
+                "bad_substation_sample": dg.MetadataValue.json(bad_substations[:100]),
             },
             severity=dg.AssetCheckSeverity.ERROR,
         )
