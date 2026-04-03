@@ -83,6 +83,7 @@ def train_cv_fold(
     nwp: pl.LazyFrame,
     substation_power_flows: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
+    substation_power_preferences: pl.DataFrame,
 ) -> None:
     """Train and evaluate a single cross-validation fold.
 
@@ -108,6 +109,7 @@ def train_cv_fold(
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
+        target_map=substation_power_preferences,
     )
 
     # 2. Evaluate (on all members)
@@ -122,6 +124,7 @@ def train_cv_fold(
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows,
         substation_metadata=substation_metadata,
+        target_map=substation_power_preferences,
     )
 
 
@@ -141,6 +144,7 @@ xgboost_integration_job = dg.define_asset_job(
         "cleaned_actuals",
         "all_nwp_data",
         "processed_nwp_data",
+        "substation_power_preferences",
         "train_xgboost",
         "evaluate_xgboost",
         "forecast_vs_actual_plot",

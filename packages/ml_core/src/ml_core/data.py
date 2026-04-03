@@ -14,6 +14,9 @@ from contracts.data_schemas import (
 )
 
 
+# (Delete previous placeholder)
+
+
 def calculate_target_map(
     flows: pt.LazyFrame[SubstationPowerFlows] | pt.DataFrame[SubstationPowerFlows],
 ) -> pt.DataFrame[SubstationTargetMap]:
@@ -23,42 +26,77 @@ def calculate_target_map(
     is the more reliable target variable (based on data availability) and
     calculates the peak capacity for normalization.
 
+    POTENTIAL DATA LEAKAGE: The 90-day dead sensor rule uses the entire history,
+    introducing temporal leakage, but the user has consciously accepted this to
+    simplify the global decision.
+
     Args:
         flows: Historical power flow data (LazyFrame or DataFrame).
 
     Returns:
         A Patito DataFrame containing the target map for each substation.
     """
-    target_map_df = cast(
-        pl.DataFrame,
-        flows.lazy()
-        .group_by("substation_number")
-        .agg(
-            mw_count=pl.col(POWER_MW).is_not_null().sum(),
-            mva_count=pl.col(POWER_MVA).is_not_null().sum(),
-            peak_capacity_MW_or_MVA=pl.max_horizontal(
-                pl.col(POWER_MW).abs().max(), pl.col(POWER_MVA).abs().max()
-            ).fill_null(1.0),
+    flows_lazy = flows.lazy() if isinstance(flows, pl.DataFrame) else flows
+
+    # Calculate valid counts, last seen timestamps, and peak capacity
+    stats = flows_lazy.group_by("substation_number").agg(
+        valid_count_mw=pl.col(POWER_MW).is_not_null().sum(),
+        valid_count_mva=pl.col(POWER_MVA).is_not_null().sum(),
+        last_seen_mw=pl.col("timestamp").filter(pl.col(POWER_MW).is_not_null()).max(),
+        last_seen_mva=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
+        max_timestamp=pl.col("timestamp").max(),
+        peak_capacity_MW_or_MVA=pl.max_horizontal(
+            pl.col(POWER_MW).cast(pl.Float32).abs().max(),
+            pl.col(POWER_MVA).cast(pl.Float32).abs().max(),
         )
-        .with_columns(
-            pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-            .then(pl.lit(POWER_MW))
-            .otherwise(pl.lit(POWER_MVA))
-            .alias("power_col"),
-            pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
-            .then(pl.lit(1.0))
-            .otherwise(pl.col("peak_capacity_MW_or_MVA"))
-            .alias("peak_capacity_MW_or_MVA"),
-        )
-        .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
-        .collect(),
+        .fill_null(1.0)
+        .clip(lower_bound=1.0),
     )
 
-    target_map_df = target_map_df.with_columns(
-        [
-            pl.col("substation_number").cast(pl.Int32),
-            pl.col("peak_capacity_MW_or_MVA").cast(pl.Float32),
-        ]
+    # Determine initial choice based on volume (Priority: MW > MVA if equal counts)
+    stats = stats.with_columns(
+        preferred_power_col=pl.when(pl.col("valid_count_mw") >= pl.col("valid_count_mva"))
+        .then(pl.lit(POWER_MW))
+        .otherwise(pl.lit(POWER_MVA)),
+    )
+
+    # Apply "Dead Sensor" Exception (90 day rule)
+    # If the preferred column's last seen is > 90 days before the total max_timestamp,
+    # we switch to the alternative.
+    dead_sensor_threshold = pl.duration(days=90)
+
+    # Check if each sensor is dead (no data in the last 90 days)
+    is_mw_dead = (pl.col("max_timestamp") - pl.col("last_seen_mw")) > dead_sensor_threshold
+    is_mva_dead = (pl.col("max_timestamp") - pl.col("last_seen_mva")) > dead_sensor_threshold
+
+    # Determine if we need to switch from the initially preferred column
+    switch_to_mva = (
+        (pl.col("preferred_power_col") == POWER_MW) & is_mw_dead & (pl.col("valid_count_mva") > 0)
+    )
+    switch_to_mw = (
+        (pl.col("preferred_power_col") == POWER_MVA) & is_mva_dead & (pl.col("valid_count_mw") > 0)
+    )
+
+    pref_col_expr = (
+        pl.when(switch_to_mva)
+        .then(pl.lit(POWER_MVA))
+        .when(switch_to_mw)
+        .then(pl.lit(POWER_MW))
+        .otherwise(pl.col("preferred_power_col"))
+    )
+
+    # To avoid type overload issues, we compute the target map entirely lazily
+    # and only collect at the very end.
+    target_map_lazy = stats.with_columns(
+        preferred_power_col=pref_col_expr,
+        peak_capacity_MW_or_MVA=pl.col("peak_capacity_MW_or_MVA"),
+    ).select(["substation_number", "preferred_power_col", "peak_capacity_MW_or_MVA"])
+
+    target_map_df = cast(pl.DataFrame, target_map_lazy.collect()).cast(
+        {
+            "substation_number": pl.Int32,
+            "peak_capacity_MW_or_MVA": pl.Float32,
+        }
     )
 
     return SubstationTargetMap.validate(target_map_df)
@@ -66,7 +104,7 @@ def calculate_target_map(
 
 def downsample_power_flows(
     flows: pt.DataFrame[SubstationPowerFlows] | pt.LazyFrame[SubstationPowerFlows],
-    target_map: pt.DataFrame[SubstationTargetMap] | pt.LazyFrame[SubstationTargetMap] | None = None,
+    target_map: pt.DataFrame[SubstationTargetMap] | pt.LazyFrame[SubstationTargetMap],
 ) -> pt.LazyFrame[SimplifiedSubstationPowerFlows]:
     """Downsample power flows to 30m using period-ending semantics.
 
@@ -80,39 +118,29 @@ def downsample_power_flows(
 
     Args:
         flows: Historical power flow data.
-        target_map: Optional map of substation_number to target_col (MW or MVA).
+        target_map: Map of substation_number to target_col (MW or MVA).
 
     Returns:
         Downsampled power flows.
     """
     flows_lazy = flows.lazy() if isinstance(flows, pl.DataFrame) else flows
+    target_map_lazy = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
 
-    if target_map is not None:
-        target_map_lazy = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
-
-        # Select the correct column before downsampling to avoid expensive operations on both MW and MVA
-        flows_lazy = (
-            flows_lazy.join(
-                target_map_lazy.select(["substation_number", "power_col"]),
-                on="substation_number",
-                how="left",
-            )
-            .with_columns(
-                pl.when(pl.col("power_col") == POWER_MVA)
-                .then(pl.col(POWER_MVA))
-                .otherwise(pl.col(POWER_MW))
-                .alias(POWER_MW_OR_MVA)
-            )
-            .select(["timestamp", "substation_number", POWER_MW_OR_MVA])
+    # Select the correct column before downsampling to avoid expensive operations on both MW and MVA
+    flows_lazy = (
+        flows_lazy.join(
+            target_map_lazy.select(["substation_number", "preferred_power_col"]),
+            on="substation_number",
+            how="left",
         )
-    else:
-        # Use to_simplified_substation_power_flows to pick the column
-        simplified_flows = SubstationPowerFlows.to_simplified_substation_power_flows(flows)
-        flows_lazy = (
-            simplified_flows.lazy()
-            if isinstance(simplified_flows, pl.DataFrame)
-            else simplified_flows
+        .with_columns(
+            pl.when(pl.col("preferred_power_col") == POWER_MVA)
+            .then(pl.col(POWER_MVA))
+            .otherwise(pl.col(POWER_MW))
+            .alias(POWER_MW_OR_MVA)
         )
+        .select(["timestamp", "substation_number", POWER_MW_OR_MVA])
+    )
 
     # Downsample the single MW_or_MVA column
     return cast(

@@ -99,78 +99,6 @@ class SubstationPowerFlows(pt.Model):
             ),
         )
 
-    @staticmethod
-    def choose_power_column(
-        dataframe: pt.DataFrame["SubstationPowerFlows"] | pt.LazyFrame["SubstationPowerFlows"],
-    ) -> PowerColumn:
-        """Choose the power column (MW or MVA) with the most non-null data.
-
-        If the input is a LazyFrame, a minimal collect is performed to count non-nulls.
-        """
-        if isinstance(dataframe, pl.LazyFrame):
-            schema_names = dataframe.collect_schema().names()
-            # Minimal collect to count non-nulls
-            select_exprs = []
-            if POWER_MW in schema_names:
-                select_exprs.append(pl.col(POWER_MW).is_not_null().sum().alias("mw_valid"))
-            else:
-                select_exprs.append(pl.lit(0).alias("mw_valid"))
-
-            if POWER_MVA in schema_names:
-                select_exprs.append(pl.col(POWER_MVA).is_not_null().sum().alias("mva_valid"))
-            else:
-                select_exprs.append(pl.lit(0).alias("mva_valid"))
-
-            counts = cast(
-                pl.DataFrame,
-                dataframe.select(select_exprs).collect(),
-            )
-            mw_valid = counts.get_column("mw_valid").item()
-            mva_valid = counts.get_column("mva_valid").item()
-        else:
-            mw_valid = (
-                dataframe.get_column(POWER_MW).is_not_null().sum()
-                if POWER_MW in dataframe.columns
-                else 0
-            )
-            mva_valid = (
-                dataframe.get_column(POWER_MVA).is_not_null().sum()
-                if POWER_MVA in dataframe.columns
-                else 0
-            )
-
-        return POWER_MW if mw_valid >= mva_valid else POWER_MVA
-
-    @staticmethod
-    def to_simplified_substation_power_flows(
-        dataframe: pt.DataFrame["SubstationPowerFlows"] | pt.LazyFrame["SubstationPowerFlows"],
-    ) -> (
-        pt.DataFrame["SimplifiedSubstationPowerFlows"]
-        | pt.LazyFrame["SimplifiedSubstationPowerFlows"]
-    ):
-        """Convert a SubstationPowerFlows dataframe to a SimplifiedSubstationPowerFlows dataframe.
-
-        This selects the best available power column (MW or MVA) and renames it to 'MW_or_MVA'.
-        """
-        if isinstance(dataframe, pl.LazyFrame):
-            has_mw_or_mva = POWER_MW_OR_MVA in dataframe.collect_schema().names()
-        else:
-            has_mw_or_mva = POWER_MW_OR_MVA in dataframe.columns
-
-        if has_mw_or_mva:
-            simplified_df = dataframe.select(["timestamp", "substation_number", POWER_MW_OR_MVA])
-        else:
-            power_col = SubstationPowerFlows.choose_power_column(dataframe)
-            simplified_df = dataframe.rename({power_col: POWER_MW_OR_MVA}).select(
-                ["timestamp", "substation_number", POWER_MW_OR_MVA]
-            )
-
-        simplified_df = simplified_df.drop_nulls(subset=[POWER_MW_OR_MVA])
-
-        if isinstance(dataframe, pl.LazyFrame):
-            return cast(pt.LazyFrame["SimplifiedSubstationPowerFlows"], simplified_df)
-        return cast(pt.DataFrame["SimplifiedSubstationPowerFlows"], simplified_df)
-
 
 class SimplifiedSubstationPowerFlows(pt.Model):
     """Standardized, single-column representation of power flows.
@@ -192,7 +120,7 @@ class SubstationTargetMap(pt.Model):
     """
 
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
-    power_col: PowerColumn = pt.Field(dtype=pl.String)
+    preferred_power_col: PowerColumn = pt.Field(dtype=pl.String)
     peak_capacity_MW_or_MVA: float = pt.Field(dtype=pl.Float32, gt=0)
 
 
@@ -244,6 +172,10 @@ class SubstationMetadata(pt.Model):
 
     # When this metadata record was last updated from the upstream NGED datasets.
     last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+
+    # A globally computed preference for which power column (MW or MVA) to use, based on full history.
+    # This prioritizes MW but falls back to MVA if MW is unavailable or contains dead sensors.
+    preferred_power_col: str | None = pt.Field(dtype=pl.String, allow_missing=True)
 
 
 class PowerForecast(pt.Model):

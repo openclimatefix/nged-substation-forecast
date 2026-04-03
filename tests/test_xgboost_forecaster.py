@@ -13,6 +13,7 @@ from contracts.data_schemas import (
     ProcessedNwp,
     SubstationMetadata,
     SubstationPowerFlows,
+    SubstationTargetMap,
 )
 from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.data import (
@@ -149,7 +150,13 @@ def test_downsample_power_flows_uses_period_ending_semantics():
 
     res = cast(
         pl.DataFrame,
-        downsample_power_flows(cast(pt.LazyFrame[SubstationPowerFlows], df)).collect(),
+        downsample_power_flows(
+            cast(pt.LazyFrame[SubstationPowerFlows], df),
+            target_map=cast(
+                pt.DataFrame[SubstationTargetMap],
+                pl.DataFrame({"substation_number": [1], "power_col": [POWER_MW]}),
+            ),
+        ).collect(),
     )
 
     # The first three should be aggregated into 10:30

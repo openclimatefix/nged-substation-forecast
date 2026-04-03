@@ -13,9 +13,11 @@ import dagster as dg
 import h3.api.basic_int as h3
 import httpx
 import polars as pl
+import patito as pt
 from contracts.data_schemas import (
     MissingCorePowerVariablesError,
     SubstationMetadata,
+    SubstationPowerFlows,
 )
 from contracts.settings import Settings
 from dagster import (
@@ -27,6 +29,7 @@ from dagster import (
     ResourceParam,
     asset,
 )
+from ml_core.data import calculate_target_map
 from nged_data import (
     ckan,
     clean_substation_flows,
@@ -384,7 +387,7 @@ def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
 ) -> pl.DataFrame:
-    """Download primary substation locations and map them to H3 cells."""
+    """Download primary substation locations, map them to H3 cells."""
     # 1. Download using existing CKAN function
     locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
 
@@ -406,8 +409,15 @@ def substation_metadata(
     )
 
     # 4. Join locations with live primaries
-    new_metadata = align.join_location_table_to_live_primaries(
+    raw_new_metadata = align.join_location_table_to_live_primaries(
         locations=locations, live_primaries=live_primaries
+    )
+
+    new_metadata = cast(
+        pl.DataFrame,
+        raw_new_metadata.collect()
+        if isinstance(raw_new_metadata, pl.LazyFrame)
+        else raw_new_metadata,
     )
 
     # 5. Add last_updated column
@@ -432,7 +442,12 @@ def substation_metadata(
         final_metadata = new_metadata
 
     # 7. Validate against the new schema
-    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore
+    # Ensure we are working with a DataFrame before casting
+    if isinstance(final_metadata, pl.LazyFrame):
+        final_metadata = final_metadata.collect()
+
+    # Cast to ensure the types match the contract's expected dtypes
+    final_metadata = cast(pl.DataFrame, final_metadata).cast(SubstationMetadata.dtypes)  # type: ignore
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk
@@ -446,6 +461,36 @@ def substation_metadata(
     )
 
     return validated_metadata
+
+
+# POTENTIAL DATA LEAKAGE: The user has consciously decided to use the entire history
+# to determine the preferred power column (including the 'Dead Sensor' logic).
+# This introduces temporal leakage, but the user considers it a minor concern
+# that doesn't justify complicating the code.
+@asset
+def substation_power_preferences(
+    context: AssetExecutionContext,
+    settings: ResourceParam[Settings],
+    cleaned_actuals: pl.LazyFrame,
+) -> pl.DataFrame:
+    """Calculate the preferred power column and peak capacity for each substation."""
+    # Cast to Patito LazyFrame to satisfy the type checker
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], cleaned_actuals))
+
+    out_dir = settings.nged_data_path / "parquet"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "substation_power_preferences.parquet"
+
+    target_map.write_parquet(out_path)
+
+    context.add_output_metadata(
+        metadata={
+            "Path": MetadataValue.path(str(out_path)),
+            "Row Count": MetadataValue.int(len(target_map)),
+        }
+    )
+
+    return target_map
 
 
 @dg.asset_check(asset="live_primary_flows")
