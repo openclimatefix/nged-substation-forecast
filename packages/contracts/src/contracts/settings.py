@@ -73,6 +73,16 @@ class Settings(BaseSettings):
         ),
     )
 
+    # MLflow Tracking URI
+    # We centralize the MLflow tracking URI here to allow for environment-specific
+    # configuration (e.g., local SQLite for development, remote server for production).
+    # The application entrypoint should read this setting and set the MLFLOW_TRACKING_URI
+    # environment variable accordingly, which MLflow will automatically pick up.
+    mlflow_tracking_uri: str = Field(
+        default="sqlite:///mlflow.db",
+        description="MLflow tracking URI.",
+    )
+
     # Data Quality Settings
     data_quality: DataQualitySettings = Field(
         default_factory=DataQualitySettings,
