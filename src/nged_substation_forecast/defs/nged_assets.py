@@ -480,7 +480,7 @@ def substation_metadata(
 def substation_power_preferences(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
-    cleaned_actuals: pl.LazyFrame,
+    cleaned_actuals: pl.DataFrame,
 ) -> pl.DataFrame:
     """Calculate the preferred power column and peak capacity for each substation."""
     # Cast to Patito LazyFrame to satisfy the type checker

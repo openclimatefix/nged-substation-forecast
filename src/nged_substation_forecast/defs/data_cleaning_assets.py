@@ -86,7 +86,7 @@ def get_cleaned_actuals_lazy(
 def cleaned_actuals(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
-) -> dg.MaterializeResult:
+) -> pl.DataFrame:
     """Clean raw live primary flows and apply data quality checks.
 
     This asset manually scans the live primary flows Delta table for the current partition
@@ -184,5 +184,4 @@ def cleaned_actuals(
     )
 
     context.log.info(f"Saved cleaned actuals to Delta table at {delta_path}")
-
-    return dg.MaterializeResult(metadata={"num_rows": len(validated_df)})
+    return validated_df
