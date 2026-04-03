@@ -4,10 +4,19 @@ from typing import cast
 
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationPowerFlows, SubstationTargetMap
+from contracts.data_schemas import (
+    POWER_MVA,
+    POWER_MW,
+    POWER_MW_OR_MVA,
+    SimplifiedSubstationPowerFlows,
+    SubstationPowerFlows,
+    SubstationTargetMap,
+)
 
 
-def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
+def calculate_target_map(
+    flows: pt.LazyFrame[SubstationPowerFlows] | pt.DataFrame[SubstationPowerFlows],
+) -> pt.DataFrame[SubstationTargetMap]:
     """Calculate the target map (power_col and peak_capacity) for each substation.
 
     This function analyzes historical power flows to determine whether MW or MVA
@@ -25,16 +34,16 @@ def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
         flows.lazy()
         .group_by("substation_number")
         .agg(
-            mw_count=pl.col("MW").is_not_null().sum(),
-            mva_count=pl.col("MVA").is_not_null().sum(),
+            mw_count=pl.col(POWER_MW).is_not_null().sum(),
+            mva_count=pl.col(POWER_MVA).is_not_null().sum(),
             peak_capacity_MW_or_MVA=pl.max_horizontal(
-                pl.col("MW").abs().max(), pl.col("MVA").abs().max()
+                pl.col(POWER_MW).abs().max(), pl.col(POWER_MVA).abs().max()
             ).fill_null(1.0),
         )
         .with_columns(
             pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-            .then(pl.lit("MW"))
-            .otherwise(pl.lit("MVA"))
+            .then(pl.lit(POWER_MW))
+            .otherwise(pl.lit(POWER_MVA))
             .alias("power_col"),
             pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
             .then(pl.lit(1.0))
@@ -56,9 +65,9 @@ def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
 
 
 def downsample_power_flows(
-    flows: pt.DataFrame[SubstationPowerFlows] | pl.LazyFrame,
-    target_map: pt.DataFrame[SubstationTargetMap] | pl.LazyFrame | None = None,
-) -> pl.LazyFrame:
+    flows: pt.DataFrame[SubstationPowerFlows] | pt.LazyFrame[SubstationPowerFlows],
+    target_map: pt.DataFrame[SubstationTargetMap] | pt.LazyFrame[SubstationTargetMap] | None = None,
+) -> pt.LazyFrame[SimplifiedSubstationPowerFlows]:
     """Downsample power flows to 30m using period-ending semantics.
 
     We assume that NWP data represents the average (or accumulated) value for the
@@ -89,32 +98,34 @@ def downsample_power_flows(
                 how="left",
             )
             .with_columns(
-                pl.when(pl.col("power_col") == "MVA")
-                .then(pl.col("MVA"))
-                .otherwise(pl.col("MW"))
-                .alias("MW_or_MVA")
+                pl.when(pl.col("power_col") == POWER_MVA)
+                .then(pl.col(POWER_MVA))
+                .otherwise(pl.col(POWER_MW))
+                .alias(POWER_MW_OR_MVA)
             )
-            .select(["timestamp", "substation_number", "MW_or_MVA"])
+            .select(["timestamp", "substation_number", POWER_MW_OR_MVA])
         )
     else:
         # Use to_simplified_substation_power_flows to pick the column
-        if isinstance(flows, pl.LazyFrame):
-            flows_df = pt.DataFrame[SubstationPowerFlows](flows.collect())
-        else:
-            flows_df = pt.DataFrame[SubstationPowerFlows](flows)
-
-        simplified_df = SubstationPowerFlows.to_simplified_substation_power_flows(flows_df)
-        flows_lazy = simplified_df.lazy()
+        simplified_flows = SubstationPowerFlows.to_simplified_substation_power_flows(flows)
+        flows_lazy = (
+            simplified_flows.lazy()
+            if isinstance(simplified_flows, pl.DataFrame)
+            else simplified_flows
+        )
 
     # Downsample the single MW_or_MVA column
-    return (
-        flows_lazy.sort("timestamp")
-        .group_by_dynamic(
-            "timestamp",
-            every="30m",
-            group_by="substation_number",
-            closed="right",
-            label="right",
-        )
-        .agg(pl.col("MW_or_MVA").mean())
+    return cast(
+        pt.LazyFrame[SimplifiedSubstationPowerFlows],
+        (
+            flows_lazy.sort("timestamp")
+            .group_by_dynamic(
+                "timestamp",
+                every="30m",
+                group_by="substation_number",
+                closed="right",
+                label="right",
+            )
+            .agg(pl.col(POWER_MW_OR_MVA).mean())
+        ),
     )

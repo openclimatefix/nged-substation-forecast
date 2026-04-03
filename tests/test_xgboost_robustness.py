@@ -148,8 +148,10 @@ def test_xgboost_forecaster_train_with_nans():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+    )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.target_map = target_map
@@ -220,8 +222,10 @@ def test_xgboost_forecaster_train_with_infs():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+    )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.target_map = target_map
@@ -300,7 +304,9 @@ def test_xgboost_forecaster_predict_with_nans():
     )
 
     # Centralized data preparation
-    flows_30m = downsample_power_flows(flows, target_map=forecaster.target_map.lazy())
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=forecaster.target_map.lazy()
+    )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.predict(
@@ -374,8 +380,10 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     )
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+    )
 
     with pytest.raises(ValueError, match="No training data remaining after dropping nulls"):
         forecaster.target_map = target_map

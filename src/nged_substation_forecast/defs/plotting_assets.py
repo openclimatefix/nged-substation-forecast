@@ -3,7 +3,9 @@ from typing import cast
 
 import altair as alt
 import dagster as dg
+import patito as pt
 import polars as pl
+from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
 from dagster import ResourceParam
 from ml_core.data import downsample_power_flows
@@ -55,7 +57,10 @@ def forecast_vs_actual_plot(
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations))
+            cast(
+                pt.LazyFrame[SubstationPowerFlows],
+                cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)),
+            )
         ).collect(),
     )
 

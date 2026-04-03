@@ -6,9 +6,13 @@ from unittest.mock import patch
 from typing import cast
 
 from contracts.data_schemas import (
+    POWER_MW,
+    POWER_MVA,
+    POWER_MW_OR_MVA,
     InferenceParams,
     ProcessedNwp,
     SubstationMetadata,
+    SubstationPowerFlows,
 )
 from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.data import (
@@ -138,21 +142,24 @@ def test_downsample_power_flows_uses_period_ending_semantics():
                 datetime(2024, 1, 1, 10, 31, tzinfo=timezone.utc),  # Next period
             ],
             "substation_number": [1, 1, 1, 1],
-            "MW": [10.0, 20.0, 30.0, 40.0],
-            "MVA": [10.0, 20.0, 30.0, 40.0],
+            POWER_MW: [10.0, 20.0, 30.0, 40.0],
+            POWER_MVA: [10.0, 20.0, 30.0, 40.0],
         }
     ).lazy()
 
-    res = cast(pl.DataFrame, downsample_power_flows(df).collect())
+    res = cast(
+        pl.DataFrame,
+        downsample_power_flows(cast(pt.LazyFrame[SubstationPowerFlows], df)).collect(),
+    )
 
     # The first three should be aggregated into 10:30
     assert len(res) == 2
     assert res["timestamp"][0] == datetime(2024, 1, 1, 10, 30, tzinfo=timezone.utc)
-    assert res["MW_or_MVA"][0] == 20.0  # (10+20+30)/3
+    assert res[POWER_MW_OR_MVA][0] == 20.0  # (10+20+30)/3
 
     # The last one should be aggregated into 11:00
     assert res["timestamp"][1] == datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)
-    assert res["MW_or_MVA"][1] == 40.0
+    assert res[POWER_MW_OR_MVA][1] == 40.0
 
 
 def test_process_nwp_data_removes_zero_lead_time():
@@ -297,8 +304,11 @@ def test_prepare_training_data_prevents_row_explosion():
     from contracts.data_schemas import SubstationMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        target_map=target_map.lazy(),
+    )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.target_map = target_map
@@ -474,8 +484,11 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     from contracts.data_schemas import SubstationMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        target_map=target_map.lazy(),
+    )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.target_map = target_map
@@ -552,8 +565,11 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        target_map=target_map.lazy(),
+    )
 
     forecaster = XGBoostForecaster()
     # Set target_map for normalization/descaling
