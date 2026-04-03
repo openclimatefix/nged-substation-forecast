@@ -275,7 +275,7 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
         dims=["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
     )
 
-    ds.to_zarr(zarr_path)
+    ds.to_zarr(zarr_path, zarr_format=2)
 
     # 2. Process it
     # Explicitly setting decode_timedelta=True avoids reliance on Xarray's

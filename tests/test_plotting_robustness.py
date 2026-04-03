@@ -52,23 +52,22 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
 
     config = PlotConfig(output_path="tests/temp_test_plot.html")
     settings = Settings()
-    context = dg.build_asset_context()
+    with dg.build_asset_context() as context:
+        # We want to verify that forecast_vs_actual_plot doesn't crash
+        try:
+            result = forecast_vs_actual_plot(
+                context=context,
+                predictions=predictions,
+                substation_metadata=substation_metadata,
+                config=config,
+                settings=settings,
+            )
+            assert result is not None
+        finally:
+            import os
 
-    # We want to verify that forecast_vs_actual_plot doesn't crash
-    try:
-        result = forecast_vs_actual_plot(
-            context=context,
-            predictions=predictions,
-            substation_metadata=substation_metadata,
-            config=config,
-            settings=settings,
-        )
-        assert result is not None
-    finally:
-        import os
-
-        if os.path.exists("tests/temp_test_plot.html"):
-            os.remove("tests/temp_test_plot.html")
+            if os.path.exists("tests/temp_test_plot.html"):
+                os.remove("tests/temp_test_plot.html")
 
 
 @patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_actuals_lazy")
@@ -112,14 +111,13 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     config = PlotConfig(output_path="tests/test_plot_no_overlap.html")
 
     # Use dagster's build_asset_context
-    context = dg.build_asset_context()
+    with dg.build_asset_context() as context:
+        result = forecast_vs_actual_plot(
+            context=context,
+            predictions=predictions,
+            substation_metadata=substation_metadata,
+            config=config,
+            settings=Settings(),
+        )
 
-    result = forecast_vs_actual_plot(
-        context=context,
-        predictions=predictions,
-        substation_metadata=substation_metadata,
-        config=config,
-        settings=Settings(),
-    )
-
-    assert result is None
+        assert result is None

@@ -1,4 +1,5 @@
 import dagster as dg
+import mlflow
 import polars as pl
 from typing import cast
 from datetime import date
@@ -164,6 +165,7 @@ def train_xgboost(
       fallback instead of scanning the entire actuals dataset.
     - The `healthy_substations` dependency has been removed as it's no longer needed.
     """
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     model_name = "xgboost"
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
@@ -248,6 +250,7 @@ def evaluate_xgboost(
     - Uses `substation_metadata` for determining active substations instead
       of relying on the removed `healthy_substations` dependency.
     """
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     model_name = "xgboost"
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
