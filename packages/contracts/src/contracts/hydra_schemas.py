@@ -20,6 +20,7 @@ class NwpModel(str, Enum):
     """Available NWP datasets."""
 
     ECMWF_ENS_0_25DEG = "ecmwf_ens_0_25deg"
+    GFS_0_25DEG = "gfs_0_25deg"
 
 
 class ModelFeaturesConfig(BaseModel):

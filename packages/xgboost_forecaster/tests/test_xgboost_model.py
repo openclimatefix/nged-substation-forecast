@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import cast
 import patito as pt
 import polars as pl
 import pytest
@@ -310,3 +311,72 @@ def test_xgboost_forecaster_predict_empty():
             nwps=predict_nwps,
             flows_30m=flows_30m,
         )
+
+
+def test_prepare_and_join_nwps_handles_unsorted_input():
+    """
+    Test that _prepare_and_join_nwps correctly handles unsorted input data.
+
+    The method performs an asof join, which requires sorted data. This test
+    verifies that the internal sorting logic within _prepare_and_join_nwps
+    correctly handles unsorted input, ensuring join semantics are maintained
+    without requiring the caller to pre-sort the data.
+    """
+    # Setup: Create two NWP sources with unsorted data
+    # We use a small number of rows to make the test fast and readable.
+    timestamps = pl.datetime_range(
+        datetime(2026, 1, 1, tzinfo=timezone.utc),
+        datetime(2026, 1, 1, 6, tzinfo=timezone.utc),
+        "1h",
+        eager=True,
+    )
+
+    # Create unsorted data
+    nwp_data = {
+        "valid_time": timestamps,
+        "init_time": timestamps - timedelta(hours=3),
+        "lead_time_hours": [3.0] * len(timestamps),
+        "h3_index": [123] * len(timestamps),
+        "ensemble_member": [0] * len(timestamps),
+        "temperature_2m": [15.0] * len(timestamps),
+        "dew_point_temperature_2m": [10.0] * len(timestamps),
+        "wind_speed_10m": [5.0] * len(timestamps),
+        "wind_direction_10m": [180.0] * len(timestamps),
+        "wind_speed_100m": [7.0] * len(timestamps),
+        "wind_direction_100m": [185.0] * len(timestamps),
+        "pressure_surface": [100.0] * len(timestamps),
+        "pressure_reduced_to_mean_sea_level": [101.0] * len(timestamps),
+        "geopotential_height_500hpa": [50.0] * len(timestamps),
+        "downward_short_wave_radiation_flux_surface": [100.0] * len(timestamps),
+        "categorical_precipitation_type_surface": [0.0] * len(timestamps),
+    }
+
+    # Create two NWP sources, one with unsorted valid_time
+    nwp1 = pt.DataFrame[ProcessedNwp](nwp_data).lazy().sort("valid_time", descending=True)
+    nwp2 = pt.DataFrame[ProcessedNwp](nwp_data).lazy().sort("valid_time", descending=True)
+
+    nwps = {
+        NwpModel.ECMWF_ENS_0_25DEG: nwp1,
+        NwpModel.GFS_0_25DEG: nwp2,
+    }
+
+    # Initialize Forecaster
+    forecaster = XGBoostForecaster()
+    # Set dummy config
+    forecaster.config = ModelConfig(
+        power_fcst_model_name="xgboost",
+        hyperparameters={},
+        features=ModelFeaturesConfig(
+            nwps=[NwpModel.ECMWF_ENS_0_25DEG, NwpModel.GFS_0_25DEG], feature_names=[]
+        ),
+        nwp_availability_delay_hours=3,
+    )
+
+    # Call _prepare_and_join_nwps
+    joined_nwps = forecaster._prepare_and_join_nwps(nwps)
+
+    # Verify the output is not empty and has the expected columns
+    result = cast(pl.DataFrame, joined_nwps.collect())
+    assert not result.is_empty()
+    assert "temperature_2m" in result.columns
+    assert "gfs_0_25deg_temperature_2m" in result.columns
