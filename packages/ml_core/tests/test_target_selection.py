@@ -228,3 +228,28 @@ def test_calculate_target_map_multiple_substations():
 
     assert results_dict[1] == POWER_MW
     assert results_dict[2] == POWER_MVA
+
+
+def test_calculate_target_map_all_null_power():
+    """Test that calculate_target_map does not crash when power columns are entirely null."""
+    data = [
+        {
+            "substation_number": 1,
+            "timestamp": datetime(2024, 1, 1),
+            POWER_MW: None,
+            POWER_MVA: None,
+        },
+        {
+            "substation_number": 1,
+            "timestamp": datetime(2024, 1, 2),
+            POWER_MW: None,
+            POWER_MVA: None,
+        },
+    ]
+    lf = create_test_lazyframe(data)
+    # This should not raise InvalidOperationError
+    result = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], lf))
+
+    # Verify that peak_capacity defaults to 1.0 as per implementation
+    peak_cap = result.get_column("peak_capacity_MW_or_MVA")[0]
+    assert peak_cap == 1.0

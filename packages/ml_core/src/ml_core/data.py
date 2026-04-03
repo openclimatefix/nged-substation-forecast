@@ -46,7 +46,8 @@ def calculate_target_map(
         mva_last_seen=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
         max_timestamp=pl.col("timestamp").max(),
         peak_capacity_MW_or_MVA=pl.max_horizontal(
-            pl.col(POWER_MW).abs().max(), pl.col(POWER_MVA).abs().max()
+            pl.col(POWER_MW).cast(pl.Float32).abs().max(),
+            pl.col(POWER_MVA).cast(pl.Float32).abs().max(),
         ).fill_null(1.0),
     )
 
