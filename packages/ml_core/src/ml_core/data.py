@@ -48,7 +48,9 @@ def calculate_target_map(
         peak_capacity_MW_or_MVA=pl.max_horizontal(
             pl.col(POWER_MW).cast(pl.Float32).abs().max(),
             pl.col(POWER_MVA).cast(pl.Float32).abs().max(),
-        ).fill_null(1.0),
+        )
+        .fill_null(1.0)
+        .clip(lower_bound=1.0),
     )
 
     # Determine initial choice based on volume (Priority: MW > MVA if equal counts)
@@ -81,17 +83,11 @@ def calculate_target_map(
         .otherwise(pl.col("preferred_power_col"))
     )
 
-    peak_cap_expr = (
-        pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
-        .then(pl.lit(1.0))
-        .otherwise(pl.col("peak_capacity_MW_or_MVA"))
-    )
-
     # To avoid type overload issues, we compute the target map entirely lazily
     # and only collect at the very end.
     target_map_lazy = stats.with_columns(
         preferred_power_col=pref_col_expr,
-        peak_capacity_MW_or_MVA=peak_cap_expr,
+        peak_capacity_MW_or_MVA=pl.col("peak_capacity_MW_or_MVA"),
     ).select(["substation_number", "preferred_power_col", "peak_capacity_MW_or_MVA"])
 
     target_map_df = cast(pl.DataFrame, target_map_lazy.collect()).cast(
