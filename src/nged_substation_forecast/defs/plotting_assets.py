@@ -3,17 +3,21 @@ from typing import cast
 
 import altair as alt
 import dagster as dg
+import patito as pt
 import polars as pl
+from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
 from dagster import ResourceParam
 from ml_core.data import downsample_power_flows
-from nged_data import clean_substation_flows
+
+from .data_cleaning_assets import get_cleaned_actuals_lazy
 
 
 class PlotConfig(dg.Config):
     """Configuration for the forecast vs actual plot asset."""
 
     output_path: str = "tests/xgboost_integration_plot.html"
+    max_substations: int = 6
 
 
 @dg.asset(
@@ -21,7 +25,7 @@ class PlotConfig(dg.Config):
         "predictions": dg.AssetIn("evaluate_xgboost"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["live_primary_flows"],
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="plots",
 )
@@ -35,31 +39,28 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
 
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
-    # We read directly from the live_primary_flows Delta table instead of using the
-    # cleaned_actuals asset. This is because the cleaned_actuals asset is partitioned
-    # and might only provide a single day of data if the job is run for a single partition.
-    # By reading the Delta table directly, we ensure we have the full 14-day history
-    # required for the plot.
-    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
-    raw_flows = pl.scan_delta(delta_path)
-
-    # We apply the same cleaning logic as the production pipeline to ensure consistency.
-    # This replaces stuck sensors and insane values with nulls.
-    cleaned_actuals = clean_substation_flows(cast(pl.DataFrame, raw_flows.collect()), settings)
-
-    if predictions.is_empty() or cleaned_actuals.is_empty():
-        context.log.warning("Empty predictions or actuals, skipping plot.")
+    # We use get_cleaned_actuals_lazy to ensure we have the full history required for the plot.
+    # This function serves as the single source of truth for accessing cleaned actuals.
+    if predictions.is_empty():
+        context.log.warning("Empty predictions, skipping plot.")
         return
 
-    # Extract unique substation numbers from predictions
-    pred_substations = predictions.get_column("substation_number").unique().to_list()
+    # Extract unique substation numbers from predictions and limit for plotting.
+    pred_substations = (
+        predictions.get_column("substation_number").unique().to_list()[: config.max_substations]
+    )
+
+    # Keep actuals lazy and filter by substation first to avoid eager collection.
+    cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
 
     # Downsample actuals to 30m to match predictions, filtering by substation first.
-    # Note: downsample_power_flows expects LazyFrame, so we convert to lazy, process, then collect
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
-            cleaned_actuals.filter(pl.col("substation_number").is_in(pred_substations)).lazy()
+            cast(
+                pt.LazyFrame[SubstationPowerFlows],
+                cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)),
+            )
         ).collect(),
     )
 

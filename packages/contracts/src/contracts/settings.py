@@ -44,6 +44,7 @@ class DataQualitySettings(BaseSettings):
     """
 
     stuck_std_threshold: float = 0.01
+    stuck_window_periods: int = 48
     max_mw_threshold: float = 100.0
     min_mw_threshold: float = -20.0
 

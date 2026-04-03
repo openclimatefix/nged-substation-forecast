@@ -398,7 +398,6 @@ class XGBoostForecaster(BaseForecaster):
             # For prediction, add dummy target for validation
             df_lf = df_lf.with_columns(MW_or_MVA=pl.lit(0.0, dtype=pl.Float32))
 
-        df_lf = df_lf.drop("peak_capacity_MW_or_MVA")
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
 
         # 4. Type casting
@@ -446,6 +445,14 @@ class XGBoostForecaster(BaseForecaster):
         self.config = config
         log.info("Starting XGBoost training...")
 
+        # Log input data info
+        # Note: We don't collect the full LazyFrames here to avoid OOM,
+        # just logging their presence and schema.
+        log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
+        if nwps:
+            for name, lf in nwps.items():
+                log.info(f"Input NWP {name.value} columns: {lf.collect_schema().names()}")
+
         if len(config.features.nwps) > 0 and not nwps:
             raise ValueError("Model config requires NWPs, but none were provided.")
 
@@ -490,6 +497,7 @@ class XGBoostForecaster(BaseForecaster):
                 pl.DataFrame,
                 joined_lf.select(list(set(feature_cols + ["MW_or_MVA"]))).collect(),
             )
+        log.info(f"Collected raw_df shape before dropping nulls: {raw_df.shape}")
         joined_df = raw_df.drop_nulls(subset=critical_cols)
 
         dropped_rows = len(raw_df) - len(joined_df)
@@ -589,7 +597,9 @@ class XGBoostForecaster(BaseForecaster):
         # FIX: Remove drop_nulls logic during prediction
         df = cast(
             pl.DataFrame,
-            df_lf.select(list(set(feature_cols + output_cols + ["MW_or_MVA"]))).collect(),
+            df_lf.select(
+                list(set(feature_cols + output_cols + ["MW_or_MVA", "peak_capacity_MW_or_MVA"]))
+            ).collect(),
         )
 
         if df.is_empty():
@@ -627,11 +637,6 @@ class XGBoostForecaster(BaseForecaster):
         res = (
             df.with_columns(
                 MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
-            )
-            .join(
-                self._get_target_map_df().select(["substation_number", "peak_capacity_MW_or_MVA"]),
-                on="substation_number",
-                how="inner",
             )
             .with_columns(
                 MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity_MW_or_MVA"),

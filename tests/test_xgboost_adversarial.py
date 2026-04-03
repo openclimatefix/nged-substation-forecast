@@ -14,10 +14,12 @@ from contracts.hydra_schemas import (
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
-    SubstationPowerFlows,
-    SubstationMetadata,
+    POWER_MW,
     InferenceParams,
     ProcessedNwp,
+    SubstationMetadata,
+    SubstationPowerFlows,
+    SubstationTargetMap,
 )
 
 
@@ -162,8 +164,12 @@ def test_predict_with_missing_feature_column_fails_loudly():
     forecaster.feature_names = ["feature_a", "feature_b"]
 
     # Mock target map
-    forecaster.target_map = pl.DataFrame(
-        {"substation_number": [1], "power_col": ["MW"], "peak_capacity_MW_or_MVA": [100.0]}
+    forecaster.target_map = pt.DataFrame[SubstationTargetMap](
+        {
+            "substation_number": [1],
+            "power_col": [POWER_MW],
+            "peak_capacity_MW_or_MVA": [100.0],
+        }
     ).with_columns(pl.col("substation_number").cast(pl.Int32))
 
     metadata = pt.DataFrame[SubstationMetadata](
@@ -230,7 +236,10 @@ def test_predict_with_missing_feature_column_fails_loudly():
         .with_columns(pl.col("substation_number").cast(pl.Int32))
         .lazy()
     )
-    flows_30m = downsample_power_flows(flows, target_map=forecaster.target_map.lazy())
+    flows_30m = downsample_power_flows(
+        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        target_map=forecaster.target_map.lazy(),
+    )
 
     # This should fail because feature_a and feature_b are missing from the prepared data
     with pytest.raises(pl_exc.ColumnNotFoundError):

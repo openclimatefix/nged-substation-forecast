@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 # Define our standard datetime type for all schemas
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
+POWER_MW = "MW"
+POWER_MVA = "MVA"
+POWER_MW_OR_MVA = "MW_or_MVA"
+
 PowerColumn = Literal["MW", "MVA"]
 
 
@@ -72,13 +76,16 @@ class SubstationPowerFlows(pt.Model):
         # Ensure at least one of MW or MVA has non-null data
         # Only raise error if there IS data but MW/MVA columns have no non-null values.
         if len(dataframe) > 0:
-            mw_has_data = "MW" in dataframe.columns and dataframe["MW"].is_not_null().any()
-            mva_has_data = "MVA" in dataframe.columns and dataframe["MVA"].is_not_null().any()
+            mw_has_data = POWER_MW in dataframe.columns and dataframe[POWER_MW].is_not_null().any()
+            mva_has_data = (
+                POWER_MVA in dataframe.columns and dataframe[POWER_MVA].is_not_null().any()
+            )
 
             if not mw_has_data and not mva_has_data:
                 raise MissingCorePowerVariablesError(
-                    "SubstationPowerFlows dataframe must have non-null data in either 'MW' or 'MVA' "
-                    "unless the entire DataFrame is empty (which is allowed for edge cases)."
+                    f"SubstationPowerFlows dataframe must have non-null data in either '{POWER_MW}' "
+                    f"or '{POWER_MVA}' unless the entire DataFrame is empty (which is allowed for "
+                    "edge cases)."
                 )
 
         return cast(
@@ -93,22 +100,76 @@ class SubstationPowerFlows(pt.Model):
         )
 
     @staticmethod
-    def choose_power_column(dataframe: pt.DataFrame["SubstationPowerFlows"]) -> PowerColumn:
-        mw_valid = dataframe["MW"].is_not_null().sum()
-        mva_valid = dataframe["MVA"].is_not_null().sum()
-        return "MW" if mw_valid >= mva_valid else "MVA"
+    def choose_power_column(
+        dataframe: pt.DataFrame["SubstationPowerFlows"] | pt.LazyFrame["SubstationPowerFlows"],
+    ) -> PowerColumn:
+        """Choose the power column (MW or MVA) with the most non-null data.
+
+        If the input is a LazyFrame, a minimal collect is performed to count non-nulls.
+        """
+        if isinstance(dataframe, pl.LazyFrame):
+            schema_names = dataframe.collect_schema().names()
+            # Minimal collect to count non-nulls
+            select_exprs = []
+            if POWER_MW in schema_names:
+                select_exprs.append(pl.col(POWER_MW).is_not_null().sum().alias("mw_valid"))
+            else:
+                select_exprs.append(pl.lit(0).alias("mw_valid"))
+
+            if POWER_MVA in schema_names:
+                select_exprs.append(pl.col(POWER_MVA).is_not_null().sum().alias("mva_valid"))
+            else:
+                select_exprs.append(pl.lit(0).alias("mva_valid"))
+
+            counts = cast(
+                pl.DataFrame,
+                dataframe.select(select_exprs).collect(),
+            )
+            mw_valid = counts.get_column("mw_valid").item()
+            mva_valid = counts.get_column("mva_valid").item()
+        else:
+            mw_valid = (
+                dataframe.get_column(POWER_MW).is_not_null().sum()
+                if POWER_MW in dataframe.columns
+                else 0
+            )
+            mva_valid = (
+                dataframe.get_column(POWER_MVA).is_not_null().sum()
+                if POWER_MVA in dataframe.columns
+                else 0
+            )
+
+        return POWER_MW if mw_valid >= mva_valid else POWER_MVA
 
     @staticmethod
     def to_simplified_substation_power_flows(
-        dataframe: pt.DataFrame["SubstationPowerFlows"],
-    ) -> pt.DataFrame[SimplifiedSubstationPowerFlows]:
-        power_col = SubstationPowerFlows.choose_power_column(dataframe)
-        simplified_df = (
-            dataframe.rename({power_col: "MW_or_MVA"})
-            .select(["timestamp", "MW_or_MVA"])
-            .drop_nulls()
-        )
-        return cast(pt.DataFrame[SimplifiedSubstationPowerFlows], simplified_df)
+        dataframe: pt.DataFrame["SubstationPowerFlows"] | pt.LazyFrame["SubstationPowerFlows"],
+    ) -> (
+        pt.DataFrame["SimplifiedSubstationPowerFlows"]
+        | pt.LazyFrame["SimplifiedSubstationPowerFlows"]
+    ):
+        """Convert a SubstationPowerFlows dataframe to a SimplifiedSubstationPowerFlows dataframe.
+
+        This selects the best available power column (MW or MVA) and renames it to 'MW_or_MVA'.
+        """
+        if isinstance(dataframe, pl.LazyFrame):
+            has_mw_or_mva = POWER_MW_OR_MVA in dataframe.collect_schema().names()
+        else:
+            has_mw_or_mva = POWER_MW_OR_MVA in dataframe.columns
+
+        if has_mw_or_mva:
+            simplified_df = dataframe.select(["timestamp", "substation_number", POWER_MW_OR_MVA])
+        else:
+            power_col = SubstationPowerFlows.choose_power_column(dataframe)
+            simplified_df = dataframe.rename({power_col: POWER_MW_OR_MVA}).select(
+                ["timestamp", "substation_number", POWER_MW_OR_MVA]
+            )
+
+        simplified_df = simplified_df.drop_nulls(subset=[POWER_MW_OR_MVA])
+
+        if isinstance(dataframe, pl.LazyFrame):
+            return cast(pt.LazyFrame["SimplifiedSubstationPowerFlows"], simplified_df)
+        return cast(pt.DataFrame["SimplifiedSubstationPowerFlows"], simplified_df)
 
 
 class SimplifiedSubstationPowerFlows(pt.Model):
@@ -119,6 +180,7 @@ class SimplifiedSubstationPowerFlows(pt.Model):
     """
 
     timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    substation_number: int = pt.Field(dtype=pl.Int32)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 

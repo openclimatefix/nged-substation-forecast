@@ -66,7 +66,8 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
     if missing_vars:
         raise MalformedZarrError(f"Dataset is missing required data variables: {missing_vars}")
 
-    # Check that all data variables have the expected dimensions and order
+    # Check that all data variables have the expected dimensions and order.
+    # The canonical order is (latitude, longitude, init_time, lead_time, ensemble_member).
     # Note: init_time might be a scalar coordinate after selection, so we allow it to be missing
     # from dimensions of the DataArray if it's present in the Dataset coordinates.
     expected_dims = ("latitude", "longitude", "init_time", "lead_time", "ensemble_member")
@@ -78,13 +79,14 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
                 f"Variable '{var_name}' is missing required dimensions: {missing_dims}"
             )
 
-        # Check dimension order for variables that have all dimensions
-        if set(da.dims) == set(expected_dims):
-            if da.dims != expected_dims:
-                raise MalformedZarrError(
-                    f"Variable '{var_name}' has wrong dimension order: {da.dims}, "
-                    f"expected {expected_dims}"
-                )
+        # Check dimension order (ignoring init_time if it's a scalar coordinate)
+        actual_dims = [d for d in da.dims if d in expected_dims]
+        expected_dims_filtered = [d for d in expected_dims if d in da.dims]
+        if actual_dims != expected_dims_filtered:
+            raise MalformedZarrError(
+                f"Variable '{var_name}' has wrong dimension order: {da.dims}, "
+                f"expected {expected_dims}"
+            )
 
     # Check coordinate dtypes
     if not np.issubdtype(ds.latitude.dtype, np.floating):

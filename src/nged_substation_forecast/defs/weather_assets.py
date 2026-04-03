@@ -75,6 +75,12 @@ class ProcessedNWPConfig(dg.Config):
     substation_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
     )
+    start_date: str | None = Field(
+        default=None, description="Optional start date for filtering NWP data (YYYY-MM-DD)."
+    )
+    end_date: str | None = Field(
+        default=None, description="Optional end date for filtering NWP data (YYYY-MM-DD)."
+    )
 
 
 @asset(
@@ -91,6 +97,19 @@ def processed_nwp_data(
     WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
     if the input NWP data or the number of substations is very large.
     """
+    if config.start_date:
+        all_nwp_data = all_nwp_data.filter(
+            pl.col("init_time")
+            >= datetime.fromisoformat(config.start_date).replace(tzinfo=timezone.utc)
+        )
+    if config.end_date:
+        all_nwp_data = all_nwp_data.filter(
+            pl.col("init_time")
+            <= datetime.fromisoformat(config.end_date).replace(
+                tzinfo=timezone.utc, hour=23, minute=59, second=59
+            )
+        )
+
     if config.substation_ids:
         substation_metadata = substation_metadata.filter(
             pl.col("substation_number").is_in(config.substation_ids)

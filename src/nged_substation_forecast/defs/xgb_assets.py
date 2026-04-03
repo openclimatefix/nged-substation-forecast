@@ -11,9 +11,9 @@ from contracts.hydra_schemas import NwpModel, TrainingConfig
 from contracts.data_schemas import PowerForecast
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
-
-from nged_data import clean_substation_flows
 from xgboost_forecaster.model import XGBoostForecaster
+
+from .data_cleaning_assets import get_cleaned_actuals_lazy
 
 
 class XGBoostConfig(dg.Config):
@@ -137,7 +137,7 @@ def _get_target_substations(
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["live_primary_flows"],
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="models",
 )
@@ -166,16 +166,9 @@ def train_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Manually load from Delta table to ensure we have the full training range.
-    # We use live_primary_flows as the source because cleaned_actuals is partitioned
-    # and might not have been backfilled for the entire range.
-    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
-    raw_flows = pl.scan_delta(delta_path)
-
-    # Clean the data to ensure consistency with the cleaned_actuals asset
-    substation_power_flows = clean_substation_flows(
-        cast(pl.DataFrame, raw_flows.collect()), settings
-    ).lazy()
+    # Use get_cleaned_actuals_lazy to ensure we have the full training range.
+    # This function serves as the single source of truth for accessing cleaned actuals.
+    substation_power_flows = get_cleaned_actuals_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     # Note: The actuals may still have nulls; these will be dropped after feature engineering
@@ -230,7 +223,7 @@ def train_xgboost(
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
     },
-    deps=["live_primary_flows"],
+    deps=["cleaned_actuals"],
     compute_kind="python",
     group_name="models",
 )
@@ -254,19 +247,9 @@ def evaluate_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Manually load from Delta table to ensure we have the full evaluation range.
-    # We use live_primary_flows because cleaned_actuals might not be fully backfilled
-    # for the entire evaluation range (e.g., if only a single partition was run).
-    # This ensures that autoregressive lags (which require historical data) are
-    # correctly calculated.
-    delta_path = str(settings.nged_data_path / "delta" / "live_primary_flows")
-    raw_flows = pl.scan_delta(delta_path)
-
-    # Clean the data to ensure consistency with the cleaned_actuals asset.
-    # This replaces stuck sensors and insane values with nulls.
-    substation_power_flows = clean_substation_flows(
-        cast(pl.DataFrame, raw_flows.collect()), settings
-    ).lazy()
+    # Use get_cleaned_actuals_lazy to ensure we have the full evaluation range.
+    # This function serves as the single source of truth for accessing cleaned actuals.
+    substation_power_flows = get_cleaned_actuals_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     healthy_substations = (
