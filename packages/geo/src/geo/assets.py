@@ -1,11 +1,13 @@
 import importlib.resources
+from pathlib import Path
 
 import h3.api.basic_int as h3
 import polars as pl
 import pyproj
 import shapely
 from contracts.data_schemas import H3GridWeights
-from dagster import AssetExecutionContext, Config, asset
+from contracts.settings import Settings
+from dagster import AssetExecutionContext, Config, ResourceParam, asset
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform
 
@@ -65,8 +67,11 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
 
 @asset(group_name="reference_data")
 def gb_h3_grid_weights(
-    context: AssetExecutionContext, config: H3GridConfig, uk_boundary: BaseGeometry
-) -> pl.DataFrame:
+    context: AssetExecutionContext,
+    config: H3GridConfig,
+    uk_boundary: BaseGeometry,
+    settings: ResourceParam[Settings],
+) -> Path:
     """Computes the H3 grid weights for Great Britain based on the UK boundary.
 
     This asset dynamically generates the spatial mapping between the hexagonal H3 grid
@@ -78,6 +83,9 @@ def gb_h3_grid_weights(
     cells and determining which regular grid cell each child falls into. The
     `grid_size` parameter is used to snap high-resolution H3 cells to the nearest
     regular NWP grid points.
+
+    Returns:
+        Path: The path to the computed H3 grid weights Parquet file.
     """
     h3_res = config.h3_res
     grid_size = config.grid_size
@@ -111,4 +119,10 @@ def gb_h3_grid_weights(
     )
     df_with_counts = compute_h3_grid_weights(df, grid_size=grid_size, child_res=child_res)
 
-    return pl.DataFrame(H3GridWeights.validate(df_with_counts))
+    # Save to Parquet and return the path to avoid loading the full DataFrame into memory
+    # for every downstream asset partition.
+    output_path = settings.nwp_data_path / "reference" / "gb_h3_grid_weights.parquet"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(H3GridWeights.validate(df_with_counts)).write_parquet(output_path)
+
+    return output_path

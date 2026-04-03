@@ -78,7 +78,9 @@ def test_xgboost_dagster_integration() -> None:
             context = dg.build_asset_context(resources={"settings": settings}, instance=instance)
             sub_meta_df = substation_metadata(context)
             uk_bound = uk_boundary(context)
-            grid_weights = gb_h3_grid_weights(context, config=H3GridConfig(), uk_boundary=uk_bound)
+            grid_weights = gb_h3_grid_weights(
+                context, config=H3GridConfig(), uk_boundary=uk_bound, settings=settings
+            )
 
             # Materialize live_primary_flows for the latest partition to get the full history
             # (The asset downloads the full history for the requested substations)
