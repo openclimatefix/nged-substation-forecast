@@ -1,9 +1,10 @@
 from typing import cast
+import patito as pt
 import polars as pl
 import pytest
 from datetime import datetime
-from ml_core.data import calculate_preferred_power_col
-from contracts.data_schemas import POWER_MW, POWER_MVA
+from ml_core.data import calculate_target_map
+from contracts.data_schemas import POWER_MW, POWER_MVA, SubstationPowerFlows
 
 
 def create_test_lazyframe(data: list[dict]) -> pl.LazyFrame:
@@ -174,7 +175,7 @@ def create_test_lazyframe(data: list[dict]) -> pl.LazyFrame:
         ),
     ],
 )
-def test_calculate_preferred_power_col(scenario, data, expected_col):
+def test_calculate_target_map(scenario, data, expected_col):
     """
     Test the global power column selection logic across various data availability scenarios.
 
@@ -182,9 +183,7 @@ def test_calculate_preferred_power_col(scenario, data, expected_col):
     is correctly implemented.
     """
     lf = create_test_lazyframe(data)
-    result = calculate_preferred_power_col(lf).collect()
-    result = cast(pl.DataFrame, result)
-
+    result = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], lf))
     actual_col = result.get_column("preferred_power_col")[0]
 
     if expected_col is None:
@@ -202,7 +201,7 @@ def test_calculate_preferred_power_col(scenario, data, expected_col):
         )
 
 
-def test_calculate_preferred_power_col_multiple_substations():
+def test_calculate_target_map_multiple_substations():
     """Test that the function correctly handles multiple substations independently."""
     data = [
         # Substation 1: MW Only
@@ -221,8 +220,7 @@ def test_calculate_preferred_power_col_multiple_substations():
         },
     ]
     lf = create_test_lazyframe(data)
-    result = calculate_preferred_power_col(lf).collect()
-    result = cast(pl.DataFrame, result)
+    result = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], lf))
 
     results_dict = {
         row["substation_number"]: row["preferred_power_col"] for row in result.to_dicts()

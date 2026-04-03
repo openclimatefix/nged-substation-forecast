@@ -13,9 +13,11 @@ import dagster as dg
 import h3.api.basic_int as h3
 import httpx
 import polars as pl
+import patito as pt
 from contracts.data_schemas import (
     MissingCorePowerVariablesError,
     SubstationMetadata,
+    SubstationPowerFlows,
 )
 from contracts.settings import Settings
 from dagster import (
@@ -27,7 +29,7 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from ml_core.data import calculate_preferred_power_col
+from ml_core.data import calculate_target_map
 from nged_data import (
     ckan,
     clean_substation_flows,
@@ -384,9 +386,8 @@ def live_primary_flows(
 def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
-    cleaned_actuals: pl.LazyFrame,
 ) -> pl.DataFrame:
-    """Download primary substation locations, map them to H3 cells, and compute preferred power column."""
+    """Download primary substation locations, map them to H3 cells."""
     # 1. Download using existing CKAN function
     locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
 
@@ -421,14 +422,7 @@ def substation_metadata(
     # Final cast to force the type to DataFrame and stop InProcessQuery warnings
     new_metadata = cast(pl.DataFrame, new_metadata)
 
-    # 5. Compute and join the preferred power column
-    # We use the full history from cleaned_actuals to make a global decision.
-    preferred_cols_lf = calculate_preferred_power_col(cleaned_actuals)
-    preferred_cols_df = cast(pl.DataFrame, preferred_cols_lf.collect())
-
-    new_metadata = new_metadata.join(preferred_cols_df, on="substation_number", how="left")
-
-    # 6. Add last_updated column
+    # 5. Add last_updated column
     now = datetime.now(timezone.utc)
     new_metadata = new_metadata.with_columns(
         last_updated=pl.lit(now).cast(pl.Datetime("us", "UTC"))
@@ -443,14 +437,11 @@ def substation_metadata(
         existing_metadata = pl.read_parquet(out_path)
         # Simplified upsert logic: concat and keep the last occurrence of each substation_number.
         # This ensures that new metadata overwrites existing metadata for the same substation.
-        final_metadata = cast(
-            pl.DataFrame,
-            pl.concat([existing_metadata, new_metadata]).unique(
-                subset=["substation_number"], keep="last"
-            ),
+        final_metadata = pl.concat([existing_metadata, new_metadata]).unique(
+            subset=["substation_number"], keep="last"
         )
     else:
-        final_metadata = cast(pl.DataFrame, new_metadata)
+        final_metadata = new_metadata
 
     # 7. Validate against the new schema
     # Ensure we are working with a DataFrame before casting
@@ -472,6 +463,36 @@ def substation_metadata(
     )
 
     return validated_metadata
+
+
+# POTENTIAL DATA LEAKAGE: The user has consciously decided to use the entire history
+# to determine the preferred power column (including the 'Dead Sensor' logic).
+# This introduces temporal leakage, but the user considers it a minor concern
+# that doesn't justify complicating the code.
+@asset
+def substation_power_preferences(
+    context: AssetExecutionContext,
+    settings: ResourceParam[Settings],
+    cleaned_actuals: pl.LazyFrame,
+) -> pl.DataFrame:
+    """Calculate the preferred power column and peak capacity for each substation."""
+    # Cast to Patito LazyFrame to satisfy the type checker
+    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], cleaned_actuals))
+
+    out_dir = settings.nged_data_path / "parquet"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "substation_power_preferences.parquet"
+
+    target_map.write_parquet(out_path)
+
+    context.add_output_metadata(
+        metadata={
+            "Path": MetadataValue.path(str(out_path)),
+            "Row Count": MetadataValue.int(len(target_map)),
+        }
+    )
+
+    return target_map
 
 
 @dg.asset_check(asset="live_primary_flows")

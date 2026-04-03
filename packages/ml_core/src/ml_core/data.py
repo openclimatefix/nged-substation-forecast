@@ -14,74 +14,7 @@ from contracts.data_schemas import (
 )
 
 
-def calculate_preferred_power_col(cleaned_actuals: pl.LazyFrame) -> pl.LazyFrame:
-    """
-    Determine the preferred power column (MW vs MVA) for each substation based on
-    data availability and sensor health.
-
-    User decided to ignore temporal leakage in favor of a global decision.
-    The 3-month rule ensures we don't train on a dead sensor that was once prolific.
-
-    Logic:
-    1. Count valid (non-null) timesteps for both MW and MVA.
-    2. Track the last time each sensor was seen (max timestamp of non-null).
-    3. Compare valid counts:
-       - If only one is valid, pick that one.
-       - If counts are equal, prefer MW.
-       - Otherwise, pick the one with more valid timesteps.
-    4. Dead Sensor Exception: If the chosen sensor stopped reporting > 90 days
-       before the end of the series, switch to the other sensor.
-
-    Args:
-        cleaned_actuals: LazyFrame containing cleaned power flow data.
-            Must contain "substation_number", "timestamp", and the power columns.
-
-    Returns:
-        A LazyFrame containing "substation_number" and "preferred_power_col".
-    """
-    # Calculate valid counts and last seen timestamps per substation
-    # We assume 'timestamp' exists and is a date/datetime type.
-    stats = cleaned_actuals.group_by("substation_number").agg(
-        mw_valid_count=pl.col(POWER_MW).is_not_null().sum(),
-        mva_valid_count=pl.col(POWER_MVA).is_not_null().sum(),
-        mw_last_seen=pl.col("timestamp").filter(pl.col(POWER_MW).is_not_null()).max(),
-        mva_last_seen=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
-        max_timestamp=pl.col("timestamp").max(),
-    )
-
-    # Determine initial choice based on volume
-    # Priority: MW > MVA if equal counts
-    initial_choice = stats.with_columns(
-        preferred_power_col=pl.when(pl.col("mw_valid_count") >= pl.col("mva_valid_count"))
-        .then(pl.lit(POWER_MW))
-        .otherwise(pl.lit(POWER_MVA)),
-    )
-
-    # Apply "Dead Sensor" Exception (90 day rule)
-    # If the preferred column's last seen is > 90 days before the total max_timestamp,
-    # we switch to the alternative.
-    # We use pl.duration to handle the 90-day offset.
-    dead_sensor_threshold = pl.duration(days=90)
-
-    return initial_choice.with_columns(
-        preferred_power_col=pl.when(
-            (pl.col("preferred_power_col") == POWER_MW)
-            # If MW is preferred, check if it is dead
-            .and_((pl.col("max_timestamp") - pl.col("mw_last_seen")) > dead_sensor_threshold)
-            # And ensure MVA actually exists as a fallback
-            .and_(pl.col("mva_valid_count") > 0)
-        )
-        .then(pl.lit(POWER_MVA))
-        .when(
-            (pl.col("preferred_power_col") == POWER_MVA)
-            # If MVA is preferred, check if it is dead
-            .and_((pl.col("max_timestamp") - pl.col("mva_last_seen")) > dead_sensor_threshold)
-            # And ensure MW actually exists as a fallback
-            .and_(pl.col("mw_valid_count") > 0)
-        )
-        .then(pl.lit(POWER_MW))
-        .otherwise(pl.col("preferred_power_col")),
-    ).select(["substation_number", "preferred_power_col"])
+# (Delete previous placeholder)
 
 
 def calculate_target_map(
@@ -93,36 +26,77 @@ def calculate_target_map(
     is the more reliable target variable (based on data availability) and
     calculates the peak capacity for normalization.
 
+    POTENTIAL DATA LEAKAGE: The 90-day dead sensor rule uses the entire history,
+    introducing temporal leakage, but the user has consciously accepted this to
+    simplify the global decision.
+
     Args:
         flows: Historical power flow data (LazyFrame or DataFrame).
 
     Returns:
         A Patito DataFrame containing the target map for each substation.
     """
-    target_map_df = cast(
-        pl.DataFrame,
-        flows.lazy()
-        .group_by("substation_number")
-        .agg(
-            mw_count=pl.col(POWER_MW).is_not_null().sum(),
-            mva_count=pl.col(POWER_MVA).is_not_null().sum(),
-            peak_capacity_MW_or_MVA=pl.max_horizontal(
-                pl.col(POWER_MW).abs().max(), pl.col(POWER_MVA).abs().max()
-            ).fill_null(1.0),
-        )
-        .with_columns(
-            pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-            .then(pl.lit(POWER_MW))
-            .otherwise(pl.lit(POWER_MVA))
-            .alias("power_col"),
-            pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
-            .then(pl.lit(1.0))
-            .otherwise(pl.col("peak_capacity_MW_or_MVA"))
-            .alias("peak_capacity_MW_or_MVA"),
-        )
-        .select(["substation_number", "power_col", "peak_capacity_MW_or_MVA"])
-        .collect(),
+    flows_lazy = flows.lazy() if isinstance(flows, pl.DataFrame) else flows
+
+    # Calculate valid counts, last seen timestamps, and peak capacity
+    stats = flows_lazy.group_by("substation_number").agg(
+        mw_valid_count=pl.col(POWER_MW).is_not_null().sum(),
+        mva_valid_count=pl.col(POWER_MVA).is_not_null().sum(),
+        mw_last_seen=pl.col("timestamp").filter(pl.col(POWER_MW).is_not_null()).max(),
+        mva_last_seen=pl.col("timestamp").filter(pl.col(POWER_MVA).is_not_null()).max(),
+        max_timestamp=pl.col("timestamp").max(),
+        peak_capacity_MW_or_MVA=pl.max_horizontal(
+            pl.col(POWER_MW).abs().max(), pl.col(POWER_MVA).abs().max()
+        ).fill_null(1.0),
     )
+
+    # Determine initial choice based on volume (Priority: MW > MVA if equal counts)
+    stats = stats.with_columns(
+        preferred_power_col=pl.when(pl.col("mw_valid_count") >= pl.col("mva_valid_count"))
+        .then(pl.lit(POWER_MW))
+        .otherwise(pl.lit(POWER_MVA)),
+    )
+
+    # Apply "Dead Sensor" Exception (90 day rule)
+    # If the preferred column's last seen is > 90 days before the total max_timestamp,
+    # we switch to the alternative.
+    dead_sensor_threshold = pl.duration(days=90)
+
+    # Use with_columns with expressions to avoid overload issues.
+    # We compute the expressions first to keep the with_columns call clean.
+    pref_col_expr = (
+        pl.when(
+            (pl.col("preferred_power_col") == POWER_MW)
+            .and_((pl.col("max_timestamp") - pl.col("mw_last_seen")) > dead_sensor_threshold)
+            .and_(pl.col("mva_valid_count") > 0)
+        )
+        .then(pl.lit(POWER_MVA))
+        .when(
+            (pl.col("preferred_power_col") == POWER_MVA)
+            .and_((pl.col("max_timestamp") - pl.col("mva_last_seen")) > dead_sensor_threshold)
+            .and_(pl.col("mw_valid_count") > 0)
+        )
+        .then(pl.lit(POWER_MW))
+        .otherwise(pl.col("preferred_power_col"))
+    )
+
+    peak_cap_expr = (
+        pl.when(pl.col("peak_capacity_MW_or_MVA") == 0.0)
+        .then(pl.lit(1.0))
+        .otherwise(pl.col("peak_capacity_MW_or_MVA"))
+    )
+
+    # To avoid type overload issues, we compute the target map entirely lazily
+    # and only collect at the very end.
+    target_map_lazy = stats.with_columns(
+        preferred_power_col=pref_col_expr,
+        peak_capacity_MW_or_MVA=peak_cap_expr,
+    ).select(["substation_number", "preferred_power_col", "peak_capacity_MW_or_MVA"])
+
+    target_map_df = target_map_lazy.collect()
+
+    # Explicitly cast to DataFrame to ensure the subsequent .with_columns works on a materialized DF
+    target_map_df = cast(pl.DataFrame, target_map_df)
 
     target_map_df = target_map_df.with_columns(
         [
