@@ -434,8 +434,8 @@ def substation_metadata(
     if out_path.exists():
         existing_metadata = pl.read_parquet(out_path)
         # Simplified upsert logic: concat and keep the last occurrence of each substation_number.
-        # This ensures that new metadata overwrites existing metadata for the same substation.
-        final_metadata = pl.concat([existing_metadata, new_metadata]).unique(
+        # Use diagonal concat to handle cases where the schema evolved (e.g., adding preferred_power_col).
+        final_metadata = pl.concat([existing_metadata, new_metadata], how="diagonal").unique(
             subset=["substation_number"], keep="last"
         )
     else:
@@ -446,8 +446,17 @@ def substation_metadata(
     if isinstance(final_metadata, pl.LazyFrame):
         final_metadata = final_metadata.collect()
 
+    # final_metadata can be DataFrame | InProcessQuery; cast to DataFrame for column operations
+    final_metadata = cast(pl.DataFrame, final_metadata)
+
+    # Add preferred_power_col if missing to avoid casting errors
+    if "preferred_power_col" not in final_metadata.columns:
+        final_metadata = final_metadata.with_columns(
+            preferred_power_col=pl.lit(None).cast(pl.String)
+        )
+
     # Cast to ensure the types match the contract's expected dtypes
-    final_metadata = cast(pl.DataFrame, final_metadata).cast(SubstationMetadata.dtypes)  # type: ignore
+    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk
