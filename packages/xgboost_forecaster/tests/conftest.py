@@ -7,7 +7,7 @@ import shutil
 @pytest.fixture(scope="session", autouse=True)
 def mlflow_test_setup():
     tmp_dir = tempfile.mkdtemp()
-    tracking_uri = f"file://{tmp_dir}"
+    tracking_uri = f"sqlite:///{tmp_dir}/mlflow.db"
     mlflow.set_tracking_uri(tracking_uri)
     yield
     shutil.rmtree(tmp_dir)
