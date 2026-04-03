@@ -80,7 +80,11 @@ def get_cleaned_actuals_lazy(
 
 @dg.asset(
     partitions_def=DAILY_PARTITIONS,
-    auto_materialize_policy=dg.AutoMaterializePolicy.eager(),
+    # We use automation_condition instead of auto_materialize_policy because
+    # AutoMaterializePolicy is deprecated in newer versions of Dagster.
+    # AutomationCondition provides a more flexible and modern way to define
+    # when assets should be automatically materialized.
+    automation_condition=dg.AutomationCondition.eager(),
     deps=["live_primary_flows"],
 )
 def cleaned_actuals(
