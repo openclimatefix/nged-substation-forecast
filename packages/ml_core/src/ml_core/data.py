@@ -135,12 +135,12 @@ def downsample_power_flows(
     # Select the correct column before downsampling to avoid expensive operations on both MW and MVA
     flows_lazy = (
         flows_lazy.join(
-            target_map_lazy.select(["substation_number", "power_col"]),
+            target_map_lazy.select(["substation_number", "preferred_power_col"]),
             on="substation_number",
             how="left",
         )
         .with_columns(
-            pl.when(pl.col("power_col") == POWER_MVA)
+            pl.when(pl.col("preferred_power_col") == POWER_MVA)
             .then(pl.col(POWER_MVA))
             .otherwise(pl.col(POWER_MW))
             .alias(POWER_MW_OR_MVA)

@@ -120,7 +120,7 @@ class SubstationTargetMap(pt.Model):
     """
 
     substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
-    power_col: PowerColumn = pt.Field(dtype=pl.String)
+    preferred_power_col: PowerColumn = pt.Field(dtype=pl.String)
     peak_capacity_MW_or_MVA: float = pt.Field(dtype=pl.Float32, gt=0)
 
 
