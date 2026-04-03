@@ -111,4 +111,4 @@ def gb_h3_grid_weights(
     )
     df_with_counts = compute_h3_grid_weights(df, grid_size=grid_size, child_res=child_res)
 
-    return H3GridWeights.validate(df_with_counts)
+    return pl.DataFrame(H3GridWeights.validate(df_with_counts))
