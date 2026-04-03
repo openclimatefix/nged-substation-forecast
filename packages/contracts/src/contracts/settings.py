@@ -103,6 +103,10 @@ class Settings(BaseSettings):
         default="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
         description="S3 prefix for ECMWF Icechunk store.",
     )
+    h3_grid_weights_path: Path = Field(
+        default=Path("data/H3/h3_grid_weights.parquet"),
+        description="Path to the H3 grid weights file (Parquet).",
+    )
 
     # Paths
     nged_data_path: Path = Path("data/NGED")

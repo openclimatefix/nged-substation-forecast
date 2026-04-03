@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from pathlib import Path
 
 from pydantic import Field
 
@@ -10,6 +9,7 @@ import patito as pt
 import polars as pl
 from contracts.data_schemas import H3GridWeights
 from contracts.settings import Settings
+from nged_substation_forecast.resources.h3_grid import H3GridResource
 from dagster import (
     AssetCheckExecutionContext,
     AssetCheckResult,
@@ -36,7 +36,7 @@ weather_partitions = DailyPartitionsDefinition(start_date="2024-04-01", end_offs
 def ecmwf_ens_forecast(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
-    gb_h3_grid_weights: Path,
+    h3_grid: ResourceParam[H3GridResource],
 ) -> None:
     """Download and process ECMWF ENS forecast for Great Britain."""
     partition_key = context.partition_key
@@ -44,10 +44,10 @@ def ecmwf_ens_forecast(
     context.log.info(f"Downloading ECMWF ENS for {partition_key}")
 
     # Load H3 grid weights just-in-time to avoid loading into memory for every partition
-    h3_grid = pl.read_parquet(gb_h3_grid_weights)
+    h3_grid_df = h3_grid.get_weights()
 
     scaled_df = download_and_scale_ecmwf(
-        nwp_init_time, h3_grid=cast(pt.DataFrame[H3GridWeights], h3_grid)
+        nwp_init_time, h3_grid=cast(pt.DataFrame[H3GridWeights], h3_grid_df)
     )
 
     output_dir = settings.nwp_data_path / "ECMWF" / "ENS"

@@ -1,0 +1,28 @@
+import icechunk
+import psutil
+import os
+import xarray as xr
+from contracts.settings import Settings
+
+
+def print_mem(label):
+    process = psutil.Process(os.getpid())
+    print(f"{label}: {process.memory_info().rss / 1024 / 1024:.2f} MB")
+
+
+print_mem("Start")
+_SETTINGS = Settings()
+storage = icechunk.s3_storage(
+    bucket=_SETTINGS.ecmwf_s3_bucket,
+    prefix=_SETTINGS.ecmwf_s3_prefix,
+    region="us-west-2",
+    anonymous=True,
+)
+print_mem("After storage")
+repo = icechunk.Repository.open(storage)
+print_mem("After repo")
+session = repo.readonly_session("main")
+print_mem("After session")
+
+ds = xr.open_zarr(session.store, chunks=None, decode_timedelta=True)
+print_mem("After open_zarr")

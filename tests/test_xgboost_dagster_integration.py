@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import cast
+from unittest.mock import MagicMock
 
 import dagster as dg
 import polars as pl
@@ -15,6 +16,7 @@ from nged_substation_forecast.defs.nged_assets import (
 from nged_substation_forecast.defs.reference_data import gb_h3_grid_weights, uk_boundary
 from nged_substation_forecast.defs.weather_assets import ecmwf_ens_forecast
 from nged_substation_forecast.defs.data_cleaning_assets import cleaned_actuals
+from nged_substation_forecast.resources.h3_grid import H3GridResource
 from geo.assets import H3GridConfig
 
 
@@ -108,7 +110,9 @@ def test_xgboost_dagster_integration() -> None:
                     nwp_filename = f"{date_str}T00Z.parquet"
                     nwp_path = settings.nwp_data_path / "ECMWF" / "ENS" / nwp_filename
                     if not nwp_path.exists():
-                        ecmwf_ens_forecast(ctx, gb_h3_grid_weights=grid_weights)
+                        mock_h3_grid = MagicMock(spec=H3GridResource)
+                        mock_h3_grid.get_weights.return_value = grid_weights
+                        ecmwf_ens_forecast(ctx, h3_grid=mock_h3_grid)
 
                     cleaned_actuals(ctx, substation_metadata=sub_meta_df)
                 except Exception as e:
