@@ -102,12 +102,15 @@ class SubstationPowerFlows(pt.Model):
     def to_simplified_substation_power_flows(
         dataframe: pt.DataFrame["SubstationPowerFlows"],
     ) -> pt.DataFrame[SimplifiedSubstationPowerFlows]:
-        power_col = SubstationPowerFlows.choose_power_column(dataframe)
-        simplified_df = (
-            dataframe.rename({power_col: "MW_or_MVA"})
-            .select(["timestamp", "MW_or_MVA"])
-            .drop_nulls()
-        )
+        if "MW_or_MVA" in dataframe.columns:
+            simplified_df = dataframe.select(["timestamp", "substation_number", "MW_or_MVA"])
+        else:
+            power_col = SubstationPowerFlows.choose_power_column(dataframe)
+            simplified_df = dataframe.rename({power_col: "MW_or_MVA"}).select(
+                ["timestamp", "substation_number", "MW_or_MVA"]
+            )
+
+        simplified_df = simplified_df.drop_nulls(subset=["MW_or_MVA"])
         return cast(pt.DataFrame[SimplifiedSubstationPowerFlows], simplified_df)
 
 
@@ -119,6 +122,7 @@ class SimplifiedSubstationPowerFlows(pt.Model):
     """
 
     timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    substation_number: int = pt.Field(dtype=pl.Int32)
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 

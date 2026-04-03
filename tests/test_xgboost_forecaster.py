@@ -148,11 +148,11 @@ def test_downsample_power_flows_uses_period_ending_semantics():
     # The first three should be aggregated into 10:30
     assert len(res) == 2
     assert res["timestamp"][0] == datetime(2024, 1, 1, 10, 30, tzinfo=timezone.utc)
-    assert res["MW"][0] == 20.0  # (10+20+30)/3
+    assert res["MW_or_MVA"][0] == 20.0  # (10+20+30)/3
 
     # The last one should be aggregated into 11:00
     assert res["timestamp"][1] == datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)
-    assert res["MW"][1] == 40.0
+    assert res["MW_or_MVA"][1] == 40.0
 
 
 def test_process_nwp_data_removes_zero_lead_time():
@@ -341,9 +341,9 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
 
     # Write flows to Delta as the asset now loads from Delta
     delta_dir = tmp_path / "delta"
-    live_flows_path = delta_dir / "live_primary_flows"
-    live_flows_path.mkdir(parents=True)
-    flows.write_delta(str(live_flows_path))
+    cleaned_actuals_path = delta_dir / "cleaned_actuals"
+    cleaned_actuals_path.mkdir(parents=True)
+    flows.write_delta(str(cleaned_actuals_path))
 
     settings = Settings(nged_data_path=tmp_path)
 

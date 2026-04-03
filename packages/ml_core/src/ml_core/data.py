@@ -2,8 +2,9 @@
 
 from typing import cast
 
+import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationTargetMap
+from contracts.data_schemas import SubstationPowerFlows, SubstationTargetMap
 
 
 def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
@@ -54,9 +55,9 @@ def calculate_target_map(flows: pl.LazyFrame | pl.DataFrame) -> pl.DataFrame:
     return SubstationTargetMap.validate(target_map_df)
 
 
-# TODO: Use Patito data contracts in function signature.
 def downsample_power_flows(
-    flows: pl.LazyFrame | pl.DataFrame, target_map: pl.LazyFrame | pl.DataFrame | None = None
+    flows: pt.DataFrame[SubstationPowerFlows] | pl.LazyFrame,
+    target_map: pt.DataFrame[SubstationTargetMap] | pl.LazyFrame | None = None,
 ) -> pl.LazyFrame:
     """Downsample power flows to 30m using period-ending semantics.
 
@@ -75,17 +76,39 @@ def downsample_power_flows(
     Returns:
         Downsampled power flows.
     """
+    flows_lazy = flows.lazy() if isinstance(flows, pl.DataFrame) else flows
 
-    # TODO: The code below is way more complicated (and expensive!) than it needs to be!
-    # - Let's pick MW or MWA as the first step (so we don't downsample both):
-    # - If `target_map` is None then let's pick which column to use using
-    #   `SubstationPowerFlows.to_simplified_power_flow`
-    # - And then downsample the single MW_or_MVA column.
-    # - Done!
+    if target_map is not None:
+        target_map_lazy = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
 
-    downsampled = (
-        flows.lazy()
-        .sort("timestamp")
+        # Select the correct column before downsampling to avoid expensive operations on both MW and MVA
+        flows_lazy = (
+            flows_lazy.join(
+                target_map_lazy.select(["substation_number", "power_col"]),
+                on="substation_number",
+                how="left",
+            )
+            .with_columns(
+                pl.when(pl.col("power_col") == "MVA")
+                .then(pl.col("MVA"))
+                .otherwise(pl.col("MW"))
+                .alias("MW_or_MVA")
+            )
+            .select(["timestamp", "substation_number", "MW_or_MVA"])
+        )
+    else:
+        # Use to_simplified_substation_power_flows to pick the column
+        if isinstance(flows, pl.LazyFrame):
+            flows_df = pt.DataFrame[SubstationPowerFlows](flows.collect())
+        else:
+            flows_df = pt.DataFrame[SubstationPowerFlows](flows)
+
+        simplified_df = SubstationPowerFlows.to_simplified_substation_power_flows(flows_df)
+        flows_lazy = simplified_df.lazy()
+
+    # Downsample the single MW_or_MVA column
+    return (
+        flows_lazy.sort("timestamp")
         .group_by_dynamic(
             "timestamp",
             every="30m",
@@ -93,54 +116,5 @@ def downsample_power_flows(
             closed="right",
             label="right",
         )
-        .agg(
-            [
-                pl.col("MW").mean(),
-                pl.col("MVA").mean(),
-            ]
-        )
+        .agg(pl.col("MW_or_MVA").mean())
     )
-
-    if target_map is not None:
-        # Only join the power_col from target_map to avoid bringing in extra columns like peak_capacity
-        downsampled = downsampled.join(
-            target_map.lazy().select(["substation_number", "power_col"]),
-            on="substation_number",
-            how="left",
-        )
-
-        return (
-            downsampled.with_columns(
-                mw_count=pl.when(pl.col("power_col").is_null())
-                .then(pl.col("MW").is_not_null().sum().over("substation_number"))
-                .otherwise(0),
-                mva_count=pl.when(pl.col("power_col").is_null())
-                .then(pl.col("MVA").is_not_null().sum().over("substation_number"))
-                .otherwise(0),
-            )
-            .with_columns(
-                pl.when(pl.col("power_col") == "MW")
-                .then(pl.col("MW"))
-                .when(pl.col("power_col") == "MVA")
-                .then(pl.col("MVA"))
-                .when(pl.col("mw_count") >= pl.col("mva_count"))
-                .then(pl.col("MW"))
-                .otherwise(pl.col("MVA"))
-                .alias("MW_or_MVA")
-            )
-            .drop(["power_col", "mw_count", "mva_count"])
-        )
-    else:
-        return (
-            downsampled.with_columns(
-                mw_count=pl.col("MW").is_not_null().sum().over("substation_number"),
-                mva_count=pl.col("MVA").is_not_null().sum().over("substation_number"),
-            )
-            .with_columns(
-                pl.when(pl.col("mw_count") >= pl.col("mva_count"))
-                .then(pl.col("MW"))
-                .otherwise(pl.col("MVA"))
-                .alias("MW_or_MVA")
-            )
-            .drop(["mw_count", "mva_count"])
-        )
