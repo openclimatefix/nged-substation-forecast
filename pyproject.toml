@@ -95,3 +95,8 @@ indent-style = "space"
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 100
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
+]
