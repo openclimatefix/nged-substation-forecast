@@ -136,6 +136,7 @@ def _get_target_substations(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
+        "substation_power_preferences": dg.AssetIn("substation_power_preferences"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -147,6 +148,7 @@ def train_xgboost(
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
+    substation_power_preferences: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -214,6 +216,7 @@ def train_xgboost(
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows_filtered,
         substation_metadata=substation_metadata_filtered,
+        target_map=substation_power_preferences,
     )
 
 
@@ -222,6 +225,7 @@ def train_xgboost(
         "model": dg.AssetIn("train_xgboost"),
         "nwp": dg.AssetIn("processed_nwp_data"),
         "substation_metadata": dg.AssetIn("substation_metadata"),
+        "substation_power_preferences": dg.AssetIn("substation_power_preferences"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -234,6 +238,7 @@ def evaluate_xgboost(
     model: XGBoostForecaster,
     nwp: pl.LazyFrame,
     substation_metadata: pl.DataFrame,
+    substation_power_preferences: pl.DataFrame,
 ):
     """Evaluate the XGBoost model and generate forecasts.
 
@@ -294,4 +299,5 @@ def evaluate_xgboost(
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows_filtered,
         substation_metadata=substation_metadata_filtered,
+        target_map=substation_power_preferences,
     )

@@ -9,7 +9,7 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
-from ml_core.data import calculate_target_map, downsample_power_flows
+from ml_core.data import downsample_power_flows
 
 log = logging.getLogger(__name__)
 
@@ -77,12 +77,18 @@ def train_and_log_model(
 
     # 2. Call the Model-Specific Math
     # The trainer is responsible for joining and feature engineering.
-    # We downsample power flows to 30m and calculate the target map here to centralize
-    # data preparation and ensure consistency across models.
+    # We downsample power flows to 30m and use the provided target map
+    # to ensure consistency across models.
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
-        target_map = calculate_target_map(flows)
-        flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+        target_map = kwargs.get("target_map")
+        if target_map is None:
+            raise ValueError("target_map must be passed in kwargs to downsample power flows.")
+
+        flows_30m = downsample_power_flows(
+            flows,
+            target_map=target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map,
+        )
         sliced_data["flows_30m"] = flows_30m
 
         # Store target_map on the trainer if it supports it
@@ -168,16 +174,19 @@ def evaluate_and_save_model(
     # Downsample power flows to 30m for inference (lags)
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
-        # Use the forecaster's existing target_map for consistency
-        target_map_lf = (
-            forecaster.target_map.lazy()
-            if hasattr(forecaster, "target_map") and forecaster.target_map is not None
-            else None
-        )
-        if target_map_lf is None:
+        # Use the provided target_map for consistency
+        target_map = kwargs.get("target_map")
+        if target_map is None:
             # Fallback if no target_map is available on the forecaster
             # In production, the forecaster should always have one.
-            raise ValueError("Forecaster must have a target_map to downsample power flows.")
+            if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
+                target_map = forecaster.target_map
+            else:
+                raise ValueError(
+                    "target_map must be provided in kwargs or present on the forecaster to downsample power flows."
+                )
+
+        target_map_lf = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
         flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
         sliced_data["flows_30m"] = flows_30m
 
