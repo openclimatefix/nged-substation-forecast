@@ -117,37 +117,37 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
         patch("mlflow.set_experiment"),
     ):
         # Materialize assets
-        context = dg.build_asset_context()
-        sub_power_prefs = pl.DataFrame(
-            {
-                "substation_number": [1],
-                "preferred_power_col": ["MW"],
-                "peak_capacity_MW_or_MVA": [100.0],
-            }
-        ).cast({"substation_number": pl.Int32})
+        with dg.build_asset_context() as context:
+            sub_power_prefs = pl.DataFrame(
+                {
+                    "substation_number": [1],
+                    "preferred_power_col": ["MW"],
+                    "peak_capacity_MW_or_MVA": [100.0],
+                }
+            ).cast({"substation_number": pl.Int32})
 
-        model = train_xgboost(
-            context=context,
-            config=config,
-            settings=settings,
-            nwp=nwps,
-            substation_metadata=sub_meta,
-            substation_power_preferences=sub_power_prefs,
-        )
+            model = train_xgboost(
+                context=context,
+                config=config,
+                settings=settings,
+                nwp=nwps,
+                substation_metadata=sub_meta,
+                substation_power_preferences=sub_power_prefs,
+            )
 
-        assert isinstance(model, XGBoostForecaster)
-        assert model.model is not None
+            assert isinstance(model, XGBoostForecaster)
+            assert model.model is not None
 
-        forecasts = evaluate_xgboost(
-            context=context,
-            config=config,
-            settings=settings,
-            model=model,
-            nwp=nwps,
-            substation_metadata=sub_meta,
-            substation_power_preferences=sub_power_prefs,
-        )
+            forecasts = evaluate_xgboost(
+                context=context,
+                config=config,
+                settings=settings,
+                model=model,
+                nwp=nwps,
+                substation_metadata=sub_meta,
+                substation_power_preferences=sub_power_prefs,
+            )
 
-        assert isinstance(forecasts, pl.DataFrame)
-        assert not forecasts.is_empty()
-        assert "MW_or_MVA" in forecasts.columns
+            assert isinstance(forecasts, pl.DataFrame)
+            assert not forecasts.is_empty()
+            assert "MW_or_MVA" in forecasts.columns
