@@ -65,20 +65,22 @@ def calculate_target_map(
     # we switch to the alternative.
     dead_sensor_threshold = pl.duration(days=90)
 
-    # Use with_columns with expressions to avoid overload issues.
-    # We compute the expressions first to keep the with_columns call clean.
+    # Check if each sensor is dead (no data in the last 90 days)
+    is_mw_dead = (pl.col("max_timestamp") - pl.col("last_seen_mw")) > dead_sensor_threshold
+    is_mva_dead = (pl.col("max_timestamp") - pl.col("last_seen_mva")) > dead_sensor_threshold
+
+    # Determine if we need to switch from the initially preferred column
+    switch_to_mva = (
+        (pl.col("preferred_power_col") == POWER_MW) & is_mw_dead & (pl.col("valid_count_mva") > 0)
+    )
+    switch_to_mw = (
+        (pl.col("preferred_power_col") == POWER_MVA) & is_mva_dead & (pl.col("valid_count_mw") > 0)
+    )
+
     pref_col_expr = (
-        pl.when(
-            (pl.col("preferred_power_col") == POWER_MW)
-            .and_((pl.col("max_timestamp") - pl.col("last_seen_mw")) > dead_sensor_threshold)
-            .and_(pl.col("valid_count_mva") > 0)
-        )
+        pl.when(switch_to_mva)
         .then(pl.lit(POWER_MVA))
-        .when(
-            (pl.col("preferred_power_col") == POWER_MVA)
-            .and_((pl.col("max_timestamp") - pl.col("last_seen_mva")) > dead_sensor_threshold)
-            .and_(pl.col("valid_count_mw") > 0)
-        )
+        .when(switch_to_mw)
         .then(pl.lit(POWER_MW))
         .otherwise(pl.col("preferred_power_col"))
     )
