@@ -169,7 +169,15 @@ def evaluate_and_save_model(
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
         # Use the forecaster's existing target_map for consistency
-        target_map_lf = forecaster.target_map.lazy() if hasattr(forecaster, "target_map") else None
+        target_map_lf = (
+            forecaster.target_map.lazy()
+            if hasattr(forecaster, "target_map") and forecaster.target_map is not None
+            else None
+        )
+        if target_map_lf is None:
+            # Fallback if no target_map is available on the forecaster
+            # In production, the forecaster should always have one.
+            raise ValueError("Forecaster must have a target_map to downsample power flows.")
         flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
         sliced_data["flows_30m"] = flows_30m
 

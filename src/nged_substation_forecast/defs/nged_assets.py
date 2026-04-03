@@ -27,6 +27,7 @@ from dagster import (
     ResourceParam,
     asset,
 )
+from ml_core.data import calculate_preferred_power_col
 from nged_data import (
     ckan,
     clean_substation_flows,
@@ -383,8 +384,9 @@ def live_primary_flows(
 def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
+    cleaned_actuals: pl.LazyFrame,
 ) -> pl.DataFrame:
-    """Download primary substation locations and map them to H3 cells."""
+    """Download primary substation locations, map them to H3 cells, and compute preferred power column."""
     # 1. Download using existing CKAN function
     locations = ckan.get_primary_substation_locations(api_key=settings.nged_ckan_token)
 
@@ -406,11 +408,27 @@ def substation_metadata(
     )
 
     # 4. Join locations with live primaries
-    new_metadata = align.join_location_table_to_live_primaries(
+    # We ensure the result is a materialized DataFrame.
+    raw_new_metadata = align.join_location_table_to_live_primaries(
         locations=locations, live_primaries=live_primaries
     )
 
-    # 5. Add last_updated column
+    if isinstance(raw_new_metadata, pl.LazyFrame):
+        new_metadata = raw_new_metadata.collect()
+    else:
+        new_metadata = cast(pl.DataFrame, raw_new_metadata)
+
+    # Final cast to force the type to DataFrame and stop InProcessQuery warnings
+    new_metadata = cast(pl.DataFrame, new_metadata)
+
+    # 5. Compute and join the preferred power column
+    # We use the full history from cleaned_actuals to make a global decision.
+    preferred_cols_lf = calculate_preferred_power_col(cleaned_actuals)
+    preferred_cols_df = cast(pl.DataFrame, preferred_cols_lf.collect())
+
+    new_metadata = new_metadata.join(preferred_cols_df, on="substation_number", how="left")
+
+    # 6. Add last_updated column
     now = datetime.now(timezone.utc)
     new_metadata = new_metadata.with_columns(
         last_updated=pl.lit(now).cast(pl.Datetime("us", "UTC"))
@@ -425,14 +443,22 @@ def substation_metadata(
         existing_metadata = pl.read_parquet(out_path)
         # Simplified upsert logic: concat and keep the last occurrence of each substation_number.
         # This ensures that new metadata overwrites existing metadata for the same substation.
-        final_metadata = pl.concat([existing_metadata, new_metadata]).unique(
-            subset=["substation_number"], keep="last"
+        final_metadata = cast(
+            pl.DataFrame,
+            pl.concat([existing_metadata, new_metadata]).unique(
+                subset=["substation_number"], keep="last"
+            ),
         )
     else:
-        final_metadata = new_metadata
+        final_metadata = cast(pl.DataFrame, new_metadata)
 
     # 7. Validate against the new schema
-    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore
+    # Ensure we are working with a DataFrame before casting
+    if isinstance(final_metadata, pl.LazyFrame):
+        final_metadata = final_metadata.collect()
+
+    # Cast to ensure the types match the contract's expected dtypes
+    final_metadata = cast(pl.DataFrame, final_metadata).cast(SubstationMetadata.dtypes)  # type: ignore
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk

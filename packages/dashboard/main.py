@@ -107,7 +107,9 @@ def _(df, layer_widget, map):
             if filtered_demand.height == 0:
                 right_pane = mo.md("No data")
             else:
-                power_column = SubstationPowerFlows.choose_power_column(filtered_demand)
+                # Use metadata to get the preferred power column, falling back to POWER_MW
+                power_column = selected_df["preferred_power_col"].item() or "POWER_MW"
+
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()

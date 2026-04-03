@@ -5,7 +5,7 @@ import altair as alt
 import dagster as dg
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationPowerFlows
+from contracts.data_schemas import SubstationPowerFlows, SubstationTargetMap
 from contracts.settings import Settings
 from dagster import ResourceParam
 from ml_core.data import downsample_power_flows
@@ -54,13 +54,15 @@ def forecast_vs_actual_plot(
     cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
 
     # Downsample actuals to 30m to match predictions, filtering by substation first.
+    # We use the substation_metadata to provide the necessary target_map.
     actuals_30m = cast(
         pl.DataFrame,
         downsample_power_flows(
             cast(
                 pt.LazyFrame[SubstationPowerFlows],
                 cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)),
-            )
+            ),
+            target_map=cast(pt.DataFrame[SubstationTargetMap], substation_metadata),
         ).collect(),
     )
 
