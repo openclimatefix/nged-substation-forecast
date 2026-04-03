@@ -31,8 +31,10 @@ def test_xgboost_dagster_integration() -> None:
     The generated plot is saved to `tests/xgboost_dagster_integration_plot.html`
     for manual inspection.
     """
-    # 1. Get the job from definitions
-    job = defs.get_job_def("xgboost_integration_job")
+    # We use resolve_job_def instead of get_job_def to avoid the UnresolvedAssetJobDefinition
+    # deprecation warning in newer Dagster versions. This ensures we correctly retrieve
+    # the job definition.
+    job = defs.resolve_job_def("xgboost_integration_job")
 
     # 2. Ensure data is available by materializing if necessary
     settings = Settings()
