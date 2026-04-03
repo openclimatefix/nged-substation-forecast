@@ -80,20 +80,44 @@ This test executes the actual Dagster assets in-process using an in-memory I/O m
 
 The `metrics` and `plot` assets are model-agnostic and partitioned by `model_partitions`. They use an `AutoMaterializePolicy.eager()` to automatically run whenever a new model partition is added to the system (e.g., when an `evaluate_*` asset finishes and calls `context.instance.add_dynamic_partitions`).
 
+## 🛠 Build, Lint, and Test Commands
+
+This project uses `uv` for dependency management and task execution.
+
+### Modernization & Testing Practices
+
+Recent improvements to the pipeline have modernized our dependencies and testing practices:
+- **Python 3.14+**: Leveraging the latest Python features.
+- **Polars & Patito**: Using Polars for fast, memory-efficient data processing and Patito for strict data contracts and schema validation.
+- **Testing with Pytest & Hypothesis**: Comprehensive testing using `pytest` (v9+) and property-based testing with `hypothesis`.
+- **Linting & Formatting**: Enforcing code quality with `ruff` and strict type checking with `ty`.
+- **Dagster Orchestration**: Managing the ML pipeline and data ingestion with Dagster.
+
+### Setup
+
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
-1. `uv sync --all-packages` (The `--all-packages` flag ensures that dependencies for all workspace members, like the dashboard and notebooks, are installed into the shared virtual environment, which is necessary for IDE support and type checking).
-1. `uv run pre-commit install`
+2. **Install dependencies**: `uv sync`
+3. **Install pre-commit hooks**: `uv run pre-commit install`
 
-To run linting and type checking:
-1. `uv run ruff check .`
-2. `uv run --all-packages ty check`
+### Linting & Formatting
 
-To run tests:
-1. `uv run --all-packages pytest`
+- **Check linting**: `uv run ruff check .`
+- **Fix linting**: `uv run ruff check . --fix`
+- **Format code**: `uv run ruff format .`
+- **Type checking**: `uv run ty check`
 
-To run Dagster:
-1. `uv run dg dev`
-1. Open http://localhost:3000 in your browser to see the project.
+### Testing
+
+- **Run all tests**: `uv run pytest`
+- **Run a single test file**: `uv run pytest tests/test_placeholder.py`
+- **Run a single test function**: `uv run pytest tests/test_placeholder.py::test_placeholder`
+- **Run tests with coverage**: `uv run pytest --cov`
+
+### Development
+
+- **Run Dagster UI**: `uv run dagster dev`
+- Open http://localhost:3000 in your browser to see the project.
+- **Run Marimo notebooks**: `uv run marimo edit packages/notebooks/some_notebook.py`
 
 Optional: To allow Dagster to remember its state after you shut it down:
 1. `mkdir ~/dagster_home/`
