@@ -234,12 +234,17 @@ class XGBoostForecaster(BaseForecaster):
 
         combined_nwps = nwp_list[0]
         for other_nwp in nwp_list[1:]:
+            # We explicitly sort by the group keys (valid_time, h3_index) and the join key (available_time)
+            # to ensure the data is correctly ordered for the asof join.
+            # We pass check_sortedness=False to suppress a false-positive warning from Polars
+            # that can occur even when the data is correctly sorted.
             combined_nwps = (
-                combined_nwps.sort("available_time")
+                combined_nwps.sort([NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, "available_time"])
                 .join_asof(
-                    other_nwp.sort("available_time"),
+                    other_nwp.sort([NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, "available_time"]),
                     on="available_time",
                     by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX],
+                    check_sortedness=False,
                 )
                 .with_columns(
                     # Explicitly cast h3_index to UInt64 after the join to prevent silent type

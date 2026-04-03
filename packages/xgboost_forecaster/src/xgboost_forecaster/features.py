@@ -161,8 +161,20 @@ def add_weather_features(
 
         left = df.with_columns(target_valid_time=pl.col(NwpColumns.VALID_TIME) - offset)
 
-        return left.join_asof(right, on=NwpColumns.INIT_TIME, by=by_cols, strategy="backward").drop(
-            "target_valid_time"
+        # We explicitly sort by the group keys (by_cols) and the join key (init_time)
+        # to ensure the data is correctly ordered for the asof join.
+        # We pass check_sortedness=False to suppress a false-positive warning from Polars
+        # that can occur even when the data is correctly sorted.
+        return (
+            left.sort(by_cols + [NwpColumns.INIT_TIME])
+            .join_asof(
+                right.sort(by_cols + [NwpColumns.INIT_TIME]),
+                on=NwpColumns.INIT_TIME,
+                by=by_cols,
+                strategy="backward",
+                check_sortedness=False,
+            )
+            .drop("target_valid_time")
         )
 
     weather = _add_lag_asof(weather, full_weather, timedelta(days=7), "lag_7d")
