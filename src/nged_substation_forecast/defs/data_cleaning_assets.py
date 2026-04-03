@@ -25,9 +25,7 @@ Key Design Decisions:
 
 Complex Partitioning Note:
 --------------------------
-The implementation uses TimeWindowPartitionMapping with a 2-day lookback window. This
-ensures that when computing rolling std for the first timestamp in a partition, we
-have 48 periods (24 hours) of historical data available, even at the partition boundary.
+The implementation uses a manual 1-day lookback window when scanning the Delta table. This ensures that when computing rolling std for the first timestamp in a partition, we have 48 periods (24 hours) of historical data available, even at the partition boundary.
 """
 
 import dagster as dg
@@ -35,14 +33,12 @@ import polars as pl
 import patito as pt
 from typing import cast
 from datetime import datetime, timedelta, timezone
-from dagster import (
-    ResourceParam,
-    DailyPartitionsDefinition,
-)
+from dagster import ResourceParam
 
 from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
 from nged_data import clean_substation_flows
+from .partitions import DAILY_PARTITIONS
 
 
 def _get_delta_path(settings: Settings, table_name: str) -> str:
@@ -56,6 +52,28 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
         Absolute path as a string.
     """
     return str(settings.nged_data_path / "delta" / table_name)
+
+
+def _ensure_utc_lazy(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Ensures the timestamp column is UTC timezone-aware lazily.
+
+    This handles cases where Delta tables lose timezone metadata or Polars scans
+    them as naive. It also handles non-UTC timezones by converting them.
+
+    Args:
+        lf: Polars LazyFrame with a 'timestamp' column.
+
+    Returns:
+        LazyFrame with UTC-aware 'timestamp' column.
+    """
+    schema = lf.collect_schema()
+    timestamp_dtype = schema["timestamp"]
+
+    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
+        return lf.with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))
+    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
+        return lf.with_columns(pl.col("timestamp").dt.convert_time_zone("UTC"))
+    return lf
 
 
 def get_cleaned_actuals_lazy(
@@ -79,14 +97,7 @@ def get_cleaned_actuals_lazy(
     # We fetch the schema to force an immediate failure if the table is missing,
     # as pl.scan_delta() is lazy and might not fail until collection.
     lf = pl.scan_delta(delta_path)
-    schema = lf.collect_schema()
-
-    # Ensure timestamp has UTC timezone. Delta tables sometimes lose timezone info.
-    timestamp_dtype = schema["timestamp"]
-    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
-        lf = lf.with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))
-    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
-        lf = lf.with_columns(pl.col("timestamp").dt.convert_time_zone("UTC"))
+    lf = _ensure_utc_lazy(lf)
 
     if context:
         context.log.info(f"Reading cleaned actuals from {delta_path}")
@@ -94,7 +105,7 @@ def get_cleaned_actuals_lazy(
 
 
 @dg.asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
+    partitions_def=DAILY_PARTITIONS,
     auto_materialize_policy=dg.AutoMaterializePolicy.eager(),
     deps=["live_primary_flows"],
 )
@@ -146,8 +157,10 @@ def cleaned_actuals(
     # Manually load from Delta table and filter to the required date range (including 1 day lookback)
     # This fix is needed because the InMemoryIOManager in tests doesn't have the "yesterday"
     # partition data, and live_primary_flows is a side-effect only asset.
-    live_primary_flows = pl.scan_delta(delta_path).filter(
-        pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
+    live_primary_flows = (
+        pl.scan_delta(delta_path)
+        .pipe(_ensure_utc_lazy)
+        .filter(pl.col("timestamp").is_between(lookback_start, partition_end, closed="left"))
     )
 
     # Materialize the LazyFrame once
@@ -157,18 +170,6 @@ def cleaned_actuals(
     if df_joined_materialized.is_empty():
         context.log.warning("Input DataFrame is empty, returning empty MaterializeResult.")
         return dg.MaterializeResult(metadata={"num_rows": 0})
-
-    # Ensure timestamp has UTC timezone before cleaning/validation.
-    # Delta tables sometimes lose timezone info or Polars scans them as naive.
-    timestamp_dtype = df_joined_materialized.schema["timestamp"]
-    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
-        df_joined_materialized = df_joined_materialized.with_columns(
-            pl.col("timestamp").dt.replace_time_zone("UTC")
-        )
-    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
-        df_joined_materialized = df_joined_materialized.with_columns(
-            pl.col("timestamp").dt.convert_time_zone("UTC")
-        )
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 

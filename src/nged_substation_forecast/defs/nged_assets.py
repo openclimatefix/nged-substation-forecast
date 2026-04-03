@@ -4,7 +4,7 @@ import random
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, NamedTuple, cast
@@ -22,7 +22,6 @@ from dagster import (
     AssetCheckResult,
     AssetCheckSpec,
     AssetExecutionContext,
-    DailyPartitionsDefinition,
     MaterializeResult,
     MetadataValue,
     ResourceParam,
@@ -30,6 +29,7 @@ from dagster import (
 )
 from nged_data import ckan, process_live_primary_substation_power_flows
 from nged_data.substation_names import align
+from .partitions import DAILY_PARTITIONS
 
 
 class IngestionStage(str, Enum):
@@ -280,7 +280,7 @@ def _merge_to_delta(
 
 
 @asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2026-03-10", end_offset=1),
+    partitions_def=DAILY_PARTITIONS,
     check_specs=[
         AssetCheckSpec(name="all_substations_succeeded", asset="live_primary_flows"),
     ],
@@ -292,7 +292,17 @@ def live_primary_flows(
     settings: ResourceParam[Settings],
 ) -> Iterable[dg.AssetCheckResult | dg.MaterializeResult]:
     """Download and process live primary substation flows from NGED CKAN."""
-    partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d")
+    partition_date = datetime.strptime(context.partition_key, "%Y-%m-%d").replace(
+        tzinfo=timezone.utc
+    )
+
+    # Gracefully skip if beyond the 5-day API limit
+    if partition_date < datetime.now(timezone.utc) - timedelta(days=5):
+        context.log.info(f"Partition {partition_date} is older than 5 days. Skipping API call.")
+        yield dg.AssetCheckResult(passed=True, check_name="all_substations_succeeded")
+        yield dg.MaterializeResult(metadata={"skipped": True, "reason": "Beyond 5-day API limit"})
+        return
+
     delta_path = str(_get_delta_path(settings))
 
     # Identify what's already processed
