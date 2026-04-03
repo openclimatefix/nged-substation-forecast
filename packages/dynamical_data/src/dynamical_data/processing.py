@@ -83,10 +83,8 @@ def validate_dataset_schema(ds: xr.Dataset) -> None:
         actual_dims = [d for d in da.dims if d in expected_dims]
         expected_dims_filtered = [d for d in expected_dims if d in da.dims]
         if actual_dims != expected_dims_filtered:
-            raise MalformedZarrError(
-                f"Variable '{var_name}' has wrong dimension order: {da.dims}, "
-                f"expected {expected_dims}"
-            )
+            # Transpose the data to the expected order
+            ds[var_name] = da.transpose(*expected_dims_filtered)
 
     # Check coordinate dtypes
     if not np.issubdtype(ds.latitude.dtype, np.floating):
