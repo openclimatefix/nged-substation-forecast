@@ -3,10 +3,12 @@
 from .cleaning import clean_substation_flows
 from .process_flows import process_live_primary_substation_power_flows
 from .schemas import CkanResource
+from .utils import ensure_utc_timestamp_lazy
 
 __all__ = [
     "clean_substation_flows",
     "process_live_primary_substation_power_flows",
     "CkanResource",
     "ckan",
+    "ensure_utc_timestamp_lazy",
 ]

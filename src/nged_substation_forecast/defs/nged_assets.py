@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import NamedTuple, cast
 
 import dagster as dg
 import h3.api.basic_int as h3
@@ -27,7 +27,11 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from nged_data import ckan, process_live_primary_substation_power_flows
+from nged_data import (
+    ckan,
+    ensure_utc_timestamp_lazy,
+    process_live_primary_substation_power_flows,
+)
 from nged_data.substation_names import align
 from .partitions import DAILY_PARTITIONS
 
@@ -238,7 +242,7 @@ def _download_and_process_all(
 
 def _merge_to_delta(
     delta_path: str, successes: list[SubstationIngestionResult], log: dg.DagsterLogManager
-):
+) -> None:
     """Merge successful ingestion results into the Delta Lake table."""
     if not successes:
         return
@@ -406,7 +410,7 @@ def substation_metadata(
     )
 
     # 5. Add last_updated column
-    now = datetime.now().astimezone(datetime.now().astimezone().tzinfo)
+    now = datetime.now(timezone.utc)
     new_metadata = new_metadata.with_columns(
         last_updated=pl.lit(now).cast(pl.Datetime("us", "UTC"))
     )
@@ -432,7 +436,7 @@ def substation_metadata(
         final_metadata = new_metadata
 
     # 7. Validate against the new schema
-    final_metadata = final_metadata.cast(cast(Any, SubstationMetadata.dtypes))
+    final_metadata = final_metadata.cast(SubstationMetadata.dtypes)  # type: ignore
     validated_metadata = SubstationMetadata.validate(final_metadata)
 
     # 8. Save to disk
@@ -498,16 +502,7 @@ def substation_data_quality(
     live_primary_flows = pl.scan_delta(delta_path)
 
     # Ensure timestamp is UTC-aware before filtering
-    schema = live_primary_flows.collect_schema()
-    ts_dtype = schema["timestamp"]
-    if isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone is None:
-        live_primary_flows = live_primary_flows.with_columns(
-            pl.col("timestamp").dt.replace_time_zone("UTC")
-        )
-    elif isinstance(ts_dtype, pl.Datetime) and ts_dtype.time_zone != "UTC":
-        live_primary_flows = live_primary_flows.with_columns(
-            pl.col("timestamp").dt.convert_time_zone("UTC")
-        )
+    live_primary_flows = ensure_utc_timestamp_lazy(live_primary_flows)
 
     live_primary_flows = live_primary_flows.filter(
         pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
@@ -567,7 +562,7 @@ def substation_data_quality(
 
             # A sensor is stuck if we have enough data (24h at 30m resolution)
             # and the standard deviation is below the threshold.
-            stuck_mask = (pl.col(count_col) >= 48) & (
+            stuck_mask = (pl.col(count_col) >= settings.data_quality.stuck_window_periods) & (
                 pl.col(std_col).fill_null(float("inf")) < stuck_std_threshold
             )
 

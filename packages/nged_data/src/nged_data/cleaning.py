@@ -80,60 +80,58 @@ def clean_substation_flows(
     # Build the mask for stuck sensors using time-based rolling windows.
     # This is more robust than row-based rolling as it handles missing data
     # and different temporal resolutions correctly.
-    stuck_mask_expr = pl.lit(False)
-    rolling_std_cols = []
-
+    agg_exprs = []
+    rolling_cols = []
     for col in power_columns:
         std_col_name = f"{col}_rolling_std"
         count_col_name = f"{col}_rolling_count"
-        rolling_std_cols.extend([std_col_name, count_col_name])
-
-        rolling_df = df_sorted.rolling(
-            index_column="timestamp",
-            period="24h",
-            group_by=group_by,
-            closed="right",
-        ).agg(
+        rolling_cols.extend([std_col_name, count_col_name])
+        agg_exprs.extend(
             [
                 pl.col(col).std().alias(std_col_name),
                 pl.col(col).count().alias(count_col_name),
             ]
         )
 
-        df_sorted = df_sorted.join(rolling_df, on=["timestamp", *group_by], how="left")
+    rolling_df = df_sorted.rolling(
+        index_column="timestamp",
+        period="24h",
+        group_by=group_by,
+        closed="right",
+    ).agg(agg_exprs)
+
+    df_with_rolling = df_sorted.join(rolling_df, on=["timestamp", *group_by], how="left")
+
+    # Replace bad values with null and drop temporary rolling columns.
+    # We evaluate stuck and insane masks independently for each power column.
+    # This prevents a stuck MW sensor from unnecessarily nulling out a healthy MVA sensor.
+    stuck_window_periods = settings.data_quality.stuck_window_periods
+    stuck_std_threshold = settings.data_quality.stuck_std_threshold
+    min_mw_threshold = settings.data_quality.min_mw_threshold
+    max_mw_threshold = settings.data_quality.max_mw_threshold
+
+    with_columns_exprs = []
+    for col in power_columns:
+        std_col_name = f"{col}_rolling_std"
+        count_col_name = f"{col}_rolling_count"
 
         # A sensor is stuck if its rolling std is below the threshold.
-        # We require at least 48 periods (24 hours at 30m resolution) to avoid
-        # false positives from short-term constant values.
-        stuck_mask_expr = stuck_mask_expr | (
-            (pl.col(count_col_name) >= 48)
-            & (
-                pl.col(std_col_name).fill_null(float("inf"))
-                < settings.data_quality.stuck_std_threshold
-            )
+        # We require a minimum number of periods (e.g. 48 for 24 hours at 30m resolution)
+        # to avoid false positives from short-term constant values.
+        stuck_mask = (pl.col(count_col_name) >= stuck_window_periods) & (
+            pl.col(std_col_name).fill_null(float("inf")) < stuck_std_threshold
         )
 
-    # Build the mask for insane values
-    insane_mask_expr = pl.any_horizontal(
-        [
-            _compute_insane_mask(
-                col,
-                settings.data_quality.min_mw_threshold,
-                settings.data_quality.max_mw_threshold,
-            )
-            for col in power_columns
-        ]
-    )
+        # A value is insane if it falls outside physically plausible bounds.
+        insane_mask = _compute_insane_mask(col, min_mw_threshold, max_mw_threshold)
 
-    # Combine masks: a value is bad if it's stuck OR insane
-    bad_value_mask = stuck_mask_expr | insane_mask_expr
+        # Combine masks: a value is bad if it's stuck OR insane
+        bad_mask = stuck_mask | insane_mask
 
-    # Replace bad values with null and drop temporary rolling columns
-    df_cleaned = df_sorted.with_columns(
-        [
-            pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col(col)).alias(col)
-            for col in power_columns
-        ]
-    ).drop(rolling_std_cols)
+        with_columns_exprs.append(
+            pl.when(bad_mask).then(pl.lit(None)).otherwise(pl.col(col)).alias(col)
+        )
+
+    df_cleaned = df_with_rolling.with_columns(with_columns_exprs).drop(rolling_cols)
 
     return df_cleaned

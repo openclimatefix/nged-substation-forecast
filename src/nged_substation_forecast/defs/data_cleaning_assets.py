@@ -37,7 +37,7 @@ from dagster import ResourceParam
 
 from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
-from nged_data import clean_substation_flows
+from nged_data import clean_substation_flows, ensure_utc_timestamp_lazy
 from .partitions import DAILY_PARTITIONS
 
 
@@ -52,28 +52,6 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
         Absolute path as a string.
     """
     return str(settings.nged_data_path / "delta" / table_name)
-
-
-def _ensure_utc_lazy(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Ensures the timestamp column is UTC timezone-aware lazily.
-
-    This handles cases where Delta tables lose timezone metadata or Polars scans
-    them as naive. It also handles non-UTC timezones by converting them.
-
-    Args:
-        lf: Polars LazyFrame with a 'timestamp' column.
-
-    Returns:
-        LazyFrame with UTC-aware 'timestamp' column.
-    """
-    schema = lf.collect_schema()
-    timestamp_dtype = schema["timestamp"]
-
-    if isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone is None:
-        return lf.with_columns(pl.col("timestamp").dt.replace_time_zone("UTC"))
-    elif isinstance(timestamp_dtype, pl.Datetime) and timestamp_dtype.time_zone != "UTC":
-        return lf.with_columns(pl.col("timestamp").dt.convert_time_zone("UTC"))
-    return lf
 
 
 def get_cleaned_actuals_lazy(
@@ -97,7 +75,7 @@ def get_cleaned_actuals_lazy(
     # We fetch the schema to force an immediate failure if the table is missing,
     # as pl.scan_delta() is lazy and might not fail until collection.
     lf = pl.scan_delta(delta_path)
-    lf = _ensure_utc_lazy(lf)
+    lf = ensure_utc_timestamp_lazy(lf)
 
     if context:
         context.log.info(f"Reading cleaned actuals from {delta_path}")
@@ -159,7 +137,7 @@ def cleaned_actuals(
     # partition data, and live_primary_flows is a side-effect only asset.
     live_primary_flows = (
         pl.scan_delta(delta_path)
-        .pipe(_ensure_utc_lazy)
+        .pipe(ensure_utc_timestamp_lazy)
         .filter(pl.col("timestamp").is_between(lookback_start, partition_end, closed="left"))
     )
 
