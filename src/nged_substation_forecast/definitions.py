@@ -5,7 +5,6 @@ from pathlib import Path
 from dagster import Definitions, ResourceDefinition, load_from_defs_folder
 
 from contracts.settings import Settings
-from nged_substation_forecast.resources.h3_grid import H3GridResource
 
 
 def create_defs() -> Definitions:
@@ -21,7 +20,6 @@ def create_defs() -> Definitions:
         sensors=loaded_defs.sensors,
         resources={
             "settings": ResourceDefinition.hardcoded_resource(settings),
-            "h3_grid": H3GridResource(h3_grid_weights_path=str(settings.h3_grid_weights_path)),
         },
     )
 
