@@ -270,22 +270,17 @@ def download_ecmwf(
     return xr.Dataset(data_arrays)
 
 
-def _process_chunk(ds_chunk: xr.Dataset, h3_grid: pt.DataFrame[H3GridWeights]) -> pl.DataFrame:
+def _process_chunk(
+    ds_chunk: xr.Dataset,
+    h3_grid: pt.DataFrame[H3GridWeights],
+    lat_grid_raveled: np.ndarray,
+    lon_grid_raveled: np.ndarray,
+) -> pl.DataFrame:
     """Processes a single chunk of the ECMWF dataset."""
-    # Extract coordinates
-    lat = ds_chunk.latitude.values
-    lon = ds_chunk.longitude.values
-
-    # Create meshgrid
-    # Note: np.meshgrid(lon, lat) returns (lon_grid, lat_grid)
-    # The order of dimensions in the data variables is (latitude, longitude)
-    # So we use indexing='ij' to match the (latitude, longitude) order.
-    lon_grid, lat_grid = np.meshgrid(lon, lat, indexing="ij")
-
     # Prepare data dictionary
     data_dict: dict[str, Any] = {
-        "latitude": lat_grid.ravel(),
-        "longitude": lon_grid.ravel(),
+        "latitude": lat_grid_raveled,
+        "longitude": lon_grid_raveled,
     }
 
     # Add data variables
@@ -300,7 +295,7 @@ def _process_chunk(ds_chunk: xr.Dataset, h3_grid: pt.DataFrame[H3GridWeights]) -
             # It's a scalar coordinate
             val = ds_chunk[coord_name].values
             # Broadcast to the same length as the flattened arrays
-            data_dict[coord_name] = np.full(lat.size * lon.size, val)
+            data_dict[coord_name] = np.full(lat_grid_raveled.size, val)
 
     nwp_df = pl.DataFrame(data_dict)
 
@@ -378,12 +373,26 @@ def process_ecmwf_dataset(
         [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
     )
 
+    # Precompute latitude and longitude grids
+    lat_grid, lon_grid = np.meshgrid(
+        loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
+    )
+    lat_grid_raveled = lat_grid.ravel()
+    lon_grid_raveled = lon_grid.ravel()
+
     # Iterate over lead_time and ensemble_member to process in chunks.
     processed_chunks = []
     for lead_time in loaded_ds.lead_time.values:
         for ensemble_member in loaded_ds.ensemble_member.values:
             ds_chunk = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
-            processed_chunks.append(_process_chunk(ds_chunk, h3_grid))
+            processed_chunks.append(
+                _process_chunk(
+                    ds_chunk,
+                    h3_grid,
+                    lat_grid_raveled=lat_grid_raveled,
+                    lon_grid_raveled=lon_grid_raveled,
+                )
+            )
 
     processed = pl.concat(processed_chunks)
 
