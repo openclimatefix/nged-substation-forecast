@@ -305,6 +305,7 @@ def _process_chunk(ds_chunk: xr.Dataset, h3_grid: pt.DataFrame[H3GridWeights]) -
     nwp_df = pl.DataFrame(data_dict)
 
     # Check for missing spatial data.
+    # TODO: Is this definitely necessary? If it's super-cheap then maybe it's fine to keep.
     if (
         nwp_df.drop(["init_time", "lead_time", "ensemble_member", "latitude", "longitude"])
         .null_count()
