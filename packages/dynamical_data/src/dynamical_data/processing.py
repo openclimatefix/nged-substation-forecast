@@ -239,7 +239,7 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # NOTE: This will fail if the region crosses the anti-Meridian. But we do not anticipate
+    # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
     # forecasting near the anti-meridian.
     ds_cropped = ds.sel(
         latitude=lat_slice,
