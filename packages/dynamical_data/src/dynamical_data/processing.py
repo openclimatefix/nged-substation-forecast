@@ -270,21 +270,11 @@ def download_ecmwf(
     return xr.Dataset(data_arrays)
 
 
-def process_ecmwf_dataset(
-    nwp_init_time: datetime,
-    loaded_ds: xr.Dataset,
-    h3_grid: pt.DataFrame[H3GridWeights],
-) -> pt.DataFrame[Nwp]:
-    """Vectorized processing of ECMWF dataset to H3 grid."""
-    # Convert the entire Xarray Dataset to a Polars DataFrame directly.
-    # We use to_dataframe() which returns a pandas DataFrame, then convert to Polars.
-    # While this uses pandas, it is the most direct way to convert Xarray to Polars
-    # without manual iteration.
-    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
+def _process_chunk(ds_chunk: xr.Dataset, h3_grid: pt.DataFrame[H3GridWeights]) -> pl.DataFrame:
+    """Processes a single chunk of the ECMWF dataset."""
+    nwp_df = pl.from_pandas(ds_chunk.to_dataframe().reset_index())
 
     # Check for missing spatial data.
-    # NWPs should never have "random" missing data. If data is missing then there's a bug
-    # and I want the code to fail loudly!
     if (
         nwp_df.drop(["init_time", "lead_time", "ensemble_member", "latitude", "longitude"])
         .null_count()
@@ -297,36 +287,20 @@ def process_ecmwf_dataset(
         )
 
     # Define variables for aggregation
-    all_nwp_vars = [str(v) for v in loaded_ds.data_vars.keys()]
+    all_nwp_vars = [str(v) for v in ds_chunk.data_vars.keys()]
     categorical_vars = ["categorical_precipitation_type_surface"]
     numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
+
     # The join is on latitude and longitude.
-    # We cast coordinates to Float32 before the join to ensure exact bit-level matching.
-    # Polars performs exact equality checks for joins, and floating-point precision
-    # differences between Float32 (often used in Zarr) and Float64 (used in the H3 grid)
-    # can cause the join to fail silently.
     nwp_df = nwp_df.with_columns(
         [pl.col("longitude").cast(pl.Float32), pl.col("latitude").cast(pl.Float32)]
-    )
-    h3_grid = h3_grid.with_columns(
-        [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
     )
 
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
-    ).with_columns(
-        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
-        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
-        # critical for downstream H3 operations and memory efficiency.
-        pl.col("h3_index").cast(pl.UInt64)
-    )
+    ).with_columns(pl.col("h3_index").cast(pl.UInt64))
 
     # Aggregate to H3 resolution 5.
-    # We group by h3_index, lead_time, and ensemble_member.
-    # To avoid biasing the aggregated weather variables towards zero when an H3 cell
-    # partially overlaps with missing NWP data (e.g., at the edges of the domain),
-    # we compute a true weighted average by dividing the weighted sum by the sum
-    # of the proportions of the valid (non-NaN) cells.
     group_cols = ["h3_index", "lead_time", "ensemble_member"]
 
     def weight_sum_expr(x: str) -> pl.Expr:
@@ -349,10 +323,6 @@ def process_ecmwf_dataset(
     processed = joined.group_by(group_cols).agg(agg_exprs)
 
     # WEIGHTED CATEGORICAL AGGREGATION:
-    # We use a weighted mode calculation that respects the H3 cell overlap proportions.
-    # This ensures categorical weather features (like precipitation type) accurately
-    # reflect the area-weighted majority of the H3 cell, rather than treating a 1%
-    # overlap the same as a 99% overlap.
     for c in categorical_vars:
         df_cat = (
             joined.group_by(group_cols + [c])
@@ -363,8 +333,30 @@ def process_ecmwf_dataset(
         )
         processed = processed.join(df_cat, on=group_cols, how="left")
 
+    return processed
+
+
+def process_ecmwf_dataset(
+    nwp_init_time: datetime,
+    loaded_ds: xr.Dataset,
+    h3_grid: pt.DataFrame[H3GridWeights],
+) -> pt.DataFrame[Nwp]:
+    """Vectorized processing of ECMWF dataset to H3 grid."""
+    # Cast coordinates to Float32 before the join to ensure exact bit-level matching.
+    h3_grid = h3_grid.with_columns(
+        [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
+    )
+
+    # Iterate over lead_time and ensemble_member to process in chunks.
+    processed_chunks = []
+    for lead_time in loaded_ds.lead_time.values:
+        for ensemble_member in loaded_ds.ensemble_member.values:
+            ds_chunk = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
+            processed_chunks.append(_process_chunk(ds_chunk, h3_grid))
+
+    processed = pl.concat(processed_chunks)
+
     # Compute valid_time and init_time.
-    # lead_time is a timedelta64[ns] in the DataFrame.
     processed = processed.with_columns(
         init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
         valid_time=(
@@ -378,5 +370,4 @@ def process_ecmwf_dataset(
     processed = processed.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     # Validate to ensure the interpolated data matches the expected schema
-    # (The Nwp schema expects Float32 for weather variables)
     return Nwp.validate(processed, drop_superfluous_columns=True)
