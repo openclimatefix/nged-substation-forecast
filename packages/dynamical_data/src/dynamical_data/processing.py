@@ -215,15 +215,15 @@ def download_ecmwf(
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
-        # We set `chunks=None` to disable Dask. This is because we want to
-        # manually control the parallelization of S3 fetches using a
-        # ThreadPoolExecutor below, which avoids Dask's overhead for this
-        # specific I/O-bound task.
+        # We set `chunks` to enable Dask, which allows for lazy loading and
+        # avoids OOM errors on large datasets.
         #
         # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
         # deprecated automatic decoding of time units, ensuring lead_time is
         # correctly parsed as timedelta64[ns].
-        ds = xr.open_zarr(session.store, chunks=None, decode_timedelta=True)
+        ds = xr.open_zarr(
+            session.store, chunks={"latitude": 100, "longitude": 100}, decode_timedelta=True
+        )
 
     if ds is None:
         raise MalformedZarrError("Dataset could not be loaded")
@@ -308,6 +308,20 @@ def process_ecmwf_dataset(
     # available as columns.
     nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
+    # FLAW-002: Handle missing spatial data.
+    # Fill nulls with the mean of the variable for that init_time, lead_time, ensemble_member.
+    # This is a simple fallback strategy to avoid producing null values.
+    all_nwp_vars = [str(v) for v in loaded_ds.data_vars.keys()]
+    categorical_vars = ["categorical_precipitation_type_surface"]
+    numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
+
+    for x in numeric_vars:
+        nwp_df = nwp_df.with_columns(
+            pl.col(x).fill_null(
+                pl.col(x).mean().over(["init_time", "lead_time", "ensemble_member"])
+            )
+        )
+
     # Perform a single spatial join with the pre-computed h3_grid.
     # The join is on latitude and longitude.
     # We cast coordinates to Float32 before the join to ensure exact bit-level matching.
@@ -329,10 +343,6 @@ def process_ecmwf_dataset(
         # critical for downstream H3 operations and memory efficiency.
         pl.col("h3_index").cast(pl.UInt64)
     )
-
-    all_nwp_vars = [str(v) for v in loaded_ds.data_vars.keys()]
-    categorical_vars = ["categorical_precipitation_type_surface"]
-    numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
 
     # Aggregate to H3 resolution 5.
     # We group by h3_index, lead_time, and ensemble_member.
