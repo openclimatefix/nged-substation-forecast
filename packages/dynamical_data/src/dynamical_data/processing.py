@@ -324,8 +324,8 @@ def process_ecmwf_dataset(
             # Add lead_time and ensemble_member columns back
             nwp_df = nwp_df.with_columns(
                 [
-                    pl.lit(lead_time).alias("lead_time"),
-                    pl.lit(ensemble_member).alias("ensemble_member"),
+                    pl.lit(lead_time).cast(pl.Duration("ns")).alias("lead_time"),
+                    pl.lit(ensemble_member).cast(pl.UInt8).alias("ensemble_member"),
                 ]
             )
 
