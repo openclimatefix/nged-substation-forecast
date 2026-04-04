@@ -2,7 +2,7 @@ import concurrent.futures
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import icechunk
 import numpy as np
@@ -272,7 +272,37 @@ def download_ecmwf(
 
 def _process_chunk(ds_chunk: xr.Dataset, h3_grid: pt.DataFrame[H3GridWeights]) -> pl.DataFrame:
     """Processes a single chunk of the ECMWF dataset."""
-    nwp_df = pl.from_pandas(ds_chunk.to_dataframe().reset_index())
+    # Extract coordinates
+    lat = ds_chunk.latitude.values
+    lon = ds_chunk.longitude.values
+
+    # Create meshgrid
+    # Note: np.meshgrid(lon, lat) returns (lon_grid, lat_grid)
+    # The order of dimensions in the data variables is (latitude, longitude)
+    # So we use indexing='ij' to match the (latitude, longitude) order.
+    lon_grid, lat_grid = np.meshgrid(lon, lat, indexing="ij")
+
+    # Prepare data dictionary
+    data_dict: dict[str, Any] = {
+        "latitude": lat_grid.ravel(),
+        "longitude": lon_grid.ravel(),
+    }
+
+    # Add data variables
+    for var_name in ds_chunk.data_vars:
+        # Ensure the variable has the correct dimension order (latitude, longitude)
+        # The validation function already ensures this.
+        data_dict[str(var_name)] = ds_chunk[var_name].values.ravel()
+
+    # Add scalar coordinates
+    for coord_name in ["init_time", "lead_time", "ensemble_member"]:
+        if coord_name in ds_chunk.coords:
+            # It's a scalar coordinate
+            val = ds_chunk[coord_name].values
+            # Broadcast to the same length as the flattened arrays
+            data_dict[coord_name] = np.full(lat.size * lon.size, val)
+
+    nwp_df = pl.DataFrame(data_dict)
 
     # Check for missing spatial data.
     if (
