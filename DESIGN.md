@@ -161,6 +161,13 @@ like ML training or back-tests.
 * **Substation NRA (normal running arrangement) Forecast (Universal Model):** Train one universal demand forecast XGBoost model across all substations and horizons. Use the switching labels to estimate the transfer magnitude ($\\Delta P$) and mathematically "correct" the historical SCADA data. Feed these *Virtual Normal Running Arrangement (NRA)* lags into the model. Also give the XGBoost model the estimated transfer magnitude. Only use "true" NRA data as the training target.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type. Discard exact point-lags (which cause "phantom echoes" of random machine outages). Replace with **State-Lags**: 2-hour rolling max/min, 3-hour windowed mean, and weekly rolling medians.
 
+**Model Architecture & Orchestration (Dagster + MLflow)**
+* **Global Asset Models:** We will train three separate global models: Demand, Solar, and Wind. Substation ID will be passed as a categorical feature to handle spatial variations and solve the cold-start problem for new substations.
+* **Phase 1 (MVP):** A single model per asset type. The forecast horizon (0 to 14 days) and historical power lags will be passed as standard features.
+* **Phase 2 (Horizon Bucketing):** To prevent the model from struggling to balance autoregressive short-term signals (lags) against long-term meteorological signals (weather), the pipeline will transition to **Horizon Bucketing**. We will train 3-4 separate models per asset type spanning logical timeframes (e.g., Nowcast, Short-Term, Medium-Range, Long-Range).
+* **Ensemble & Uncertainty:** The 50+ ECMWF NWP ensemble members will be passed through the ML models individually. The models will utilize quantile regression to generate probabilistic forecasts.
+* **MLOps:** Dagster will orchestrate the entire DAG (data extraction, 12-bit quantization, chunked training, inference, and plotting). MLflow will be integrated within Dagster to track model artifacts, scaling parameters (`min`/`max` bounds per variable), and the performance of the various horizon buckets.
+
 **Target completion date**: End of July 2026.
 
 **Stretch goal:** For each ML experiment, calculate £ saved for NGED's flexibility spend.
