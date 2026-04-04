@@ -157,38 +157,6 @@ def download_and_scale_ecmwf(
     return scale_to_uint8(processed, scaling_params)
 
 
-def _get_longitude_slice(
-    ds: xr.Dataset,
-    h3_grid: pt.DataFrame[H3GridWeights],
-    lat_slice: slice,
-    nwp_init_time: np.datetime64,
-) -> xr.Dataset:
-    """Helper to slice longitude, handling anti-meridian wrap-around."""
-    lngs = h3_grid.get_column("nwp_lng").unique().sort()
-    diffs = lngs.diff().drop_nulls()
-    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
-
-    if crosses_antimeridian:
-        gap_idx = diffs.arg_max()
-        if gap_idx is None:
-            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
-
-        max_neg_lng = lngs[gap_idx]
-        min_pos_lng = lngs[gap_idx + 1]
-        ds_neg = ds.sel(
-            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
-        )
-        ds_pos = ds.sel(
-            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
-        )
-        return xr.concat([ds_pos, ds_neg], dim="longitude")
-    else:
-        min_lng, max_lng = lngs[0], lngs[-1]
-        return ds.sel(
-            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
-        )
-
-
 def download_ecmwf(
     nwp_init_time: np.datetime64,
     h3_grid: pt.DataFrame[H3GridWeights],
