@@ -1,5 +1,5 @@
-import os
 import concurrent.futures
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
@@ -183,7 +183,12 @@ def download_ecmwf(
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
+
         # chunks=None is a deliberate design choice to disable Dask and avoid memory overhead.
+        # We set `chunks=None` to disable Dask. This is because we want to
+        # manually control the parallelization of S3 fetches using a
+        # ThreadPoolExecutor below, which avoids Dask's overhead for this
+        # specific I/O-bound task.
         #
         # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
         # deprecated automatic decoding of time units, ensuring lead_time is
