@@ -239,7 +239,7 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # NOTE: Anti-meridian logic has been removed as we do not anticipate
+    # NOTE: This will fail if the region crosses the anti-Meridian. But we do not anticipate
     # forecasting near the anti-meridian.
     ds_cropped = ds.sel(
         latitude=lat_slice,
@@ -255,11 +255,11 @@ def download_ecmwf(
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
-    data_arrays: dict[str, xr.DataArray] = {}
     # The download is I/O bound (S3 network requests). We use a
     # ThreadPoolExecutor to parallelize network latency across multiple
     # variables. A ProcessPoolExecutor would be less efficient here due to the
     # high serialization overhead of Xarray objects between processes.
+    data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(download_array, str(name)) for name in ds_cropped.data_vars.keys()
