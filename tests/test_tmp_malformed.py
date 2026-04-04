@@ -19,8 +19,8 @@ def test_malformed_data_fails(broken_zarr_factory):
         pl.DataFrame(
             {
                 "h3_index": [123456789],
-                "nwp_lat": [56.0],
-                "nwp_lng": [-3.25],
+                "nwp_lat": [55.75],
+                "nwp_lng": [-3.5],
                 "len": [1],
                 "total": [1],
                 "proportion": [1.0],

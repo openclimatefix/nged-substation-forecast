@@ -215,15 +215,12 @@ def download_ecmwf(
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
-        # We set `chunks` to enable Dask, which allows for lazy loading and
-        # avoids OOM errors on large datasets.
+        # chunks=None is a deliberate design choice to disable Dask and avoid memory overhead.
         #
         # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
         # deprecated automatic decoding of time units, ensuring lead_time is
         # correctly parsed as timedelta64[ns].
-        ds = xr.open_zarr(
-            session.store, chunks={"latitude": 100, "longitude": 100}, decode_timedelta=True
-        )
+        ds = xr.open_zarr(session.store, chunks=None, decode_timedelta=True)
 
     if ds is None:
         raise MalformedZarrError("Dataset could not be loaded")
@@ -269,9 +266,13 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # Implement wrap-around aware slicing for longitudes.
-    # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
-    ds_cropped = _get_longitude_slice(ds, h3_grid, lat_slice, nwp_init_time)
+    # NOTE: Anti-meridian logic has been removed as we do not anticipate
+    # forecasting near the anti-meridian.
+    ds_cropped = ds.sel(
+        latitude=lat_slice,
+        longitude=slice(h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()),
+        init_time=nwp_init_time,
+    )
 
     # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
@@ -302,45 +303,30 @@ def process_ecmwf_dataset(
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
-    # Convert the Xarray Dataset to a Polars DataFrame in chunks to avoid
-    # loading the entire dataset into memory at once.
-    # We iterate over latitude and longitude chunks.
-    lat_size = loaded_ds.latitude.size
-    lon_size = loaded_ds.longitude.size
-    chunk_size = 100
+    # Convert the entire Xarray Dataset to a Polars DataFrame directly.
+    # We use to_dataframe() which returns a pandas DataFrame, then convert to Polars.
+    # While this uses pandas, it is the most direct way to convert Xarray to Polars
+    # without manual iteration.
+    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
-    dfs = []
-    for lat_start in range(0, lat_size, chunk_size):
-        for lon_start in range(0, lon_size, chunk_size):
-            lat_end = min(lat_start + chunk_size, lat_size)
-            lon_end = min(lon_start + chunk_size, lon_size)
+    # Check for missing spatial data.
+    # NWPs should never have "random" missing data. If data is missing then there's a bug
+    # and I want the code to fail loudly!
+    if (
+        nwp_df.drop(["init_time", "lead_time", "ensemble_member", "latitude", "longitude"])
+        .null_count()
+        .sum()
+        .item(0, 0)
+        > 0
+    ):
+        raise MalformedZarrError(
+            "Missing spatial data detected in NWP dataset. This indicates a bug."
+        )
 
-            chunk = loaded_ds.isel(
-                latitude=slice(lat_start, lat_end), longitude=slice(lon_start, lon_end)
-            )
-
-            # Convert chunk to Polars
-            chunk_df = pl.from_pandas(chunk.to_dataframe().reset_index())
-            dfs.append(chunk_df)
-
-    # Combine chunks
-    nwp_df = pl.concat(dfs)
-
-    # FLAW-002: Handle missing spatial data.
-    # Fill nulls with the mean of the variable for that init_time, lead_time, ensemble_member.
-    # This is a simple fallback strategy to avoid producing null values.
+    # Define variables for aggregation
     all_nwp_vars = [str(v) for v in loaded_ds.data_vars.keys()]
     categorical_vars = ["categorical_precipitation_type_surface"]
     numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
-
-    for x in numeric_vars:
-        nwp_df = nwp_df.with_columns(
-            pl.col(x).fill_null(
-                pl.col(x).mean().over(["init_time", "lead_time", "ensemble_member"])
-            )
-        )
-
-    # Perform a single spatial join with the pre-computed h3_grid.
     # The join is on latitude and longitude.
     # We cast coordinates to Float32 before the join to ensure exact bit-level matching.
     # Polars performs exact equality checks for joins, and floating-point precision
@@ -409,7 +395,8 @@ def process_ecmwf_dataset(
     processed = processed.with_columns(
         init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
         valid_time=(
-            pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")) + pl.col("lead_time")
+            pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC"))
+            + pl.col("lead_time").cast(pl.Duration("us"))
         ).cast(pl.Datetime("us", "UTC")),
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
