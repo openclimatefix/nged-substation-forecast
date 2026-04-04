@@ -157,6 +157,38 @@ def download_and_scale_ecmwf(
     return scale_to_uint8(processed, scaling_params)
 
 
+def _get_longitude_slice(
+    ds: xr.Dataset,
+    h3_grid: pt.DataFrame[H3GridWeights],
+    lat_slice: slice,
+    nwp_init_time: np.datetime64,
+) -> xr.Dataset:
+    """Helper to slice longitude, handling anti-meridian wrap-around."""
+    lngs = h3_grid.get_column("nwp_lng").unique().sort()
+    diffs = lngs.diff().drop_nulls()
+    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
+
+    if crosses_antimeridian:
+        gap_idx = diffs.arg_max()
+        if gap_idx is None:
+            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
+
+        max_neg_lng = lngs[gap_idx]
+        min_pos_lng = lngs[gap_idx + 1]
+        ds_neg = ds.sel(
+            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
+        )
+        ds_pos = ds.sel(
+            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
+        )
+        return xr.concat([ds_pos, ds_neg], dim="longitude")
+    else:
+        min_lng, max_lng = lngs[0], lngs[-1]
+        return ds.sel(
+            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
+        )
+
+
 def download_ecmwf(
     nwp_init_time: np.datetime64,
     h3_grid: pt.DataFrame[H3GridWeights],
@@ -239,35 +271,7 @@ def download_ecmwf(
 
     # Implement wrap-around aware slicing for longitudes.
     # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
-    lngs = h3_grid.get_column("nwp_lng").unique().sort()
-    diffs = lngs.diff().drop_nulls()
-
-    # We check if the maximum difference between adjacent longitudes is greater than 180.
-    # If it is, we assume the grid crosses the anti-meridian.
-    # We use cast(float, ...) to satisfy the type checker as diffs.max() can return
-    # multiple types, but here we know it's a float.
-    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
-
-    if crosses_antimeridian:
-        gap_idx = diffs.arg_max()
-        if gap_idx is None:
-            # This should be impossible given len(diffs) > 0
-            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
-
-        max_neg_lng = lngs[gap_idx]
-        min_pos_lng = lngs[gap_idx + 1]
-        ds_neg = ds.sel(
-            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
-        )
-        ds_pos = ds.sel(
-            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
-        )
-        ds_cropped = xr.concat([ds_pos, ds_neg], dim="longitude")
-    else:
-        min_lng, max_lng = lngs[0], lngs[-1]
-        ds_cropped = ds.sel(
-            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
-        )
+    ds_cropped = _get_longitude_slice(ds, h3_grid, lat_slice, nwp_init_time)
 
     # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
@@ -302,36 +306,7 @@ def process_ecmwf_dataset(
     # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
     # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
     # available as columns.
-    #
-    # NOTE: This conversion is a known performance and memory bottleneck.
-    # For large datasets, this can cause OOM errors. Future optimizations should
-    # consider using Xarray's native chunking or direct conversion to Arrow/Polars
-    # without Pandas as an intermediary.
-
-    # Optimized approach: Iterate over chunks to minimize peak memory usage.
-    # We iterate over lead_time and ensemble_member to process smaller slices.
-
-    dfs = []
-    for lead_time in loaded_ds.lead_time.values:
-        for ensemble_member in loaded_ds.ensemble_member.values:
-            # Extract slice
-            member_ds = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
-
-            # Convert slice to Polars DataFrame directly
-            # We use to_dataframe() on the slice, which is much smaller than the full dataset.
-            nwp_df = pl.from_pandas(member_ds.to_dataframe().reset_index())
-
-            # Add lead_time and ensemble_member columns back
-            nwp_df = nwp_df.with_columns(
-                [
-                    pl.lit(lead_time).cast(pl.Duration("ns")).alias("lead_time"),
-                    pl.lit(ensemble_member).cast(pl.UInt8).alias("ensemble_member"),
-                ]
-            )
-
-            dfs.append(nwp_df)
-
-    nwp_df = pl.concat(dfs)
+    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
 
     # Perform a single spatial join with the pre-computed h3_grid.
     # The join is on latitude and longitude.
@@ -355,7 +330,7 @@ def process_ecmwf_dataset(
         pl.col("h3_index").cast(pl.UInt64)
     )
 
-    all_nwp_vars = list(loaded_ds.data_vars.keys())
+    all_nwp_vars = [str(v) for v in loaded_ds.data_vars.keys()]
     categorical_vars = ["categorical_precipitation_type_surface"]
     numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
 
@@ -365,32 +340,26 @@ def process_ecmwf_dataset(
     # partially overlaps with missing NWP data (e.g., at the edges of the domain),
     # we compute a true weighted average by dividing the weighted sum by the sum
     # of the proportions of the valid (non-NaN) cells.
-    df_with_weights = joined.with_columns(
-        [
-            (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
-            for x in numeric_vars
-        ]
-        + [
-            pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
+    group_cols = ["h3_index", "lead_time", "ensemble_member"]
+
+    def weight_sum_expr(x: str) -> pl.Expr:
+        return (
+            pl.when(pl.col(x).fill_nan(None).is_not_null())
             .then(pl.col("proportion"))
             .otherwise(0.0)
-            .alias(f"{x}_weight_sum")
-            for x in numeric_vars
-        ]
-    )
-
-    group_cols = ["h3_index", "lead_time", "ensemble_member"]
+            .sum()
+        )
 
     # Aggregate numeric variables
     agg_exprs = [
-        pl.when(pl.col(f"{x}_weight_sum").sum() > 0)
-        .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
+        pl.when(weight_sum_expr(x) > 0)
+        .then((pl.col(x).fill_nan(None) * pl.col("proportion")).sum() / weight_sum_expr(x))
         .otherwise(None)
         .cast(pl.Float32)
-        .alias(str(x))
+        .alias(x)
         for x in numeric_vars
     ]
-    processed = df_with_weights.group_by(group_cols).agg(agg_exprs)
+    processed = joined.group_by(group_cols).agg(agg_exprs)
 
     # WEIGHTED CATEGORICAL AGGREGATION:
     # We use a weighted mode calculation that respects the H3 cell overlap proportions.
@@ -399,7 +368,7 @@ def process_ecmwf_dataset(
     # overlap the same as a 99% overlap.
     for c in categorical_vars:
         df_cat = (
-            df_with_weights.group_by(group_cols + [c])
+            joined.group_by(group_cols + [c])
             .agg(pl.col("proportion").sum().alias("weight"))
             .sort(group_cols + ["weight"])
             .group_by(group_cols)
