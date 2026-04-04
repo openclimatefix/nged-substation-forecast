@@ -302,11 +302,29 @@ def process_ecmwf_dataset(
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
-    # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
-    # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
-    # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
-    # available as columns.
-    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
+    # Convert the Xarray Dataset to a Polars DataFrame in chunks to avoid
+    # loading the entire dataset into memory at once.
+    # We iterate over latitude and longitude chunks.
+    lat_size = loaded_ds.latitude.size
+    lon_size = loaded_ds.longitude.size
+    chunk_size = 100
+
+    dfs = []
+    for lat_start in range(0, lat_size, chunk_size):
+        for lon_start in range(0, lon_size, chunk_size):
+            lat_end = min(lat_start + chunk_size, lat_size)
+            lon_end = min(lon_start + chunk_size, lon_size)
+
+            chunk = loaded_ds.isel(
+                latitude=slice(lat_start, lat_end), longitude=slice(lon_start, lon_end)
+            )
+
+            # Convert chunk to Polars
+            chunk_df = pl.from_pandas(chunk.to_dataframe().reset_index())
+            dfs.append(chunk_df)
+
+    # Combine chunks
+    nwp_df = pl.concat(dfs)
 
     # FLAW-002: Handle missing spatial data.
     # Fill nulls with the mean of the variable for that init_time, lead_time, ensemble_member.
