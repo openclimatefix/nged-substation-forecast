@@ -307,7 +307,31 @@ def process_ecmwf_dataset(
     # For large datasets, this can cause OOM errors. Future optimizations should
     # consider using Xarray's native chunking or direct conversion to Arrow/Polars
     # without Pandas as an intermediary.
-    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
+
+    # Optimized approach: Iterate over chunks to minimize peak memory usage.
+    # We iterate over lead_time and ensemble_member to process smaller slices.
+
+    dfs = []
+    for lead_time in loaded_ds.lead_time.values:
+        for ensemble_member in loaded_ds.ensemble_member.values:
+            # Extract slice
+            member_ds = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
+
+            # Convert slice to Polars DataFrame directly
+            # We use to_dataframe() on the slice, which is much smaller than the full dataset.
+            nwp_df = pl.from_pandas(member_ds.to_dataframe().reset_index())
+
+            # Add lead_time and ensemble_member columns back
+            nwp_df = nwp_df.with_columns(
+                [
+                    pl.lit(lead_time).alias("lead_time"),
+                    pl.lit(ensemble_member).alias("ensemble_member"),
+                ]
+            )
+
+            dfs.append(nwp_df)
+
+    nwp_df = pl.concat(dfs)
 
     # Perform a single spatial join with the pre-computed h3_grid.
     # The join is on latitude and longitude.
