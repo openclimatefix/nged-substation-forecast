@@ -55,7 +55,7 @@ are 100% certain they are wrong! This is the law!
     - Constants: `UPPER_SNAKE_CASE`
 
 ### Data Handling
-- **Tabular Data**: Use **Polars** (`import polars as pl`) for dataframes. Avoid Pandas unless strictly necessary for library compatibility.
+- **Tabular Data**: Use **Polars** (`import polars as pl`) for dataframes. Pandas is strictly forbidden. Use Polars for all tabular data.
 - **Gridded/NWP Data**: Use **Xarray** and **Zarr**.
 - **Data Contracts**: Use **Patito** for defining and validating data schemas.
 - **Persistence**: Prefer partitioned Parquet files for tabular data.

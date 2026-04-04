@@ -24,7 +24,7 @@ Historically, many Python ML pipelines default to using Pandas DataFrames. Howev
 * **Description:** Strictly enforce that the `BaseForecaster` interface (`fit` and `predict` methods) accepts and returns *only* `polars.DataFrame`. Leverage the fact that modern ML libraries like XGBoost (and LightGBM) natively support Arrow/Polars data structures, allowing for zero-copy memory transfers.
 
 ## 3. Decision
-We chose **Option C: Pure Polars pipeline via Arrow integration**. We are eliminating Pandas dependencies in the ML training and inference code. All data passed through the `BaseForecaster` and `LocalForecasters` boundaries must be `polars.DataFrame` objects.
+We chose **Option C: Pure Polars pipeline via Arrow integration**. We have completely eliminated all Pandas dependencies from the project. All data passed through the `BaseForecaster` and `LocalForecasters` boundaries must be `polars.DataFrame` objects.
 
 ## 4. Consequences
 * **Positive:** Significant reduction in memory usage and execution time due to zero-copy memory transfers between Polars and XGBoost via Apache Arrow.

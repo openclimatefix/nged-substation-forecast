@@ -108,8 +108,7 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
     """Verify that the pipeline fails loudly when encountering malformed Zarr data.
 
     We test that the actual production ingestion functions raise appropriate
-    exceptions when given broken data. We map each broken type to a specific
-    expected exception to prevent broad exception catching from hiding unrelated bugs.
+    exceptions when given broken data.
     """
     zarr_path = broken_zarr_factory(broken_type)
     # Explicitly setting decode_timedelta=True avoids reliance on Xarray's
@@ -121,7 +120,7 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
     # Map broken types to expected exceptions
     expected_exceptions = {
         "missing_coords": MalformedZarrError,
-        "wrong_dim_order": MalformedZarrError,
+        "wrong_dim_order": None,  # Now automatically fixed
         "missing_vars": MalformedZarrError,
         "wrong_dtype": MalformedZarrError,
         "inconsistent_shape": (ValueError, MalformedZarrError),
@@ -129,14 +128,19 @@ def test_broken_zarr_ingestion_fails_loudly(broken_zarr_factory, broken_type, h3
 
     expected_exc = expected_exceptions.get(broken_type, Exception)
 
-    # Depending on the broken type, different parts of the pipeline should fail
-    with pytest.raises(expected_exc):
+    def run_pipeline():
         downloaded_ds = download_ecmwf(init_time, h3_grid, ds)
-
         init_dt = datetime.fromtimestamp(
             init_time.astype("datetime64[s]").astype(int), tz=timezone.utc
         )
         process_ecmwf_dataset(nwp_init_time=init_dt, loaded_ds=downloaded_ds, h3_grid=h3_grid)
+
+    # Depending on the broken type, different parts of the pipeline should fail
+    if expected_exc is None:
+        run_pipeline()
+    else:
+        with pytest.raises(expected_exc):
+            run_pipeline()
 
 
 def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):

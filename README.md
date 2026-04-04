@@ -55,7 +55,6 @@ The forecasting models implement several advanced features to ensure robustness 
 3. **Rigorous Backtesting**: The `predict` method includes a `collapse_lead_times` parameter. When simulating real-time inference, it filters NWP data to keep only the latest available forecast for each valid time, enforcing the 3-hour availability delay. For rigorous backtesting, it evaluates all available lead times up to the cutoff.
 4. **Physical Wind Logic**: Wind speed and direction are interpolated using Cartesian `u` and `v` components instead of circular interpolation. This avoids "phantom high wind" artifacts during rapid direction shifts and ensures physical correctness.
 5. **Long-Range Horizon Handling**: The model supports 14-day (336h) forecasts at 30-minute resolution. The `lead_time_hours` is passed as a feature to the XGBoost model, allowing it to learn the decay in NWP skill over time.
-6. **Anti-Meridian Wrap-Around**: The NWP ingestion pipeline correctly handles anti-meridian wrap-around for global datasets, ensuring that data is correctly sliced and concatenated across the 180-degree longitude boundary.
 
 ### Power Forecast Storage
 
