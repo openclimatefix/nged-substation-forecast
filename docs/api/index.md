@@ -8,13 +8,18 @@ This section contains the auto-generated API documentation for the project.
 ## Packages
 
 ### Contracts
-::: contracts
+::: contracts.data_schemas
+::: contracts.hydra_schemas
+::: contracts.settings
 
 ### Dynamical Data
-::: dynamical_data
+::: dynamical_data.processing
+::: dynamical_data.scaling
 
 ### Geo
-::: geo
+::: geo.assets
+::: geo.h3
+::: geo.io_managers
 
 ### ML Core
 ::: ml_core.model
@@ -24,7 +29,17 @@ This section contains the auto-generated API documentation for the project.
 ::: ml_core.scaling
 
 ### NGED Data
-::: nged_data
+::: nged_data.ckan
+::: nged_data.cleaning
+::: nged_data.process_flows
+::: nged_data.schemas
+::: nged_data.substation_names.align
+::: nged_data.utils
 
 ### XGBoost Forecaster
-::: xgboost_forecaster
+::: xgboost_forecaster.config
+::: xgboost_forecaster.data
+::: xgboost_forecaster.features
+::: xgboost_forecaster.model
+::: xgboost_forecaster.scaling
+::: xgboost_forecaster.types
