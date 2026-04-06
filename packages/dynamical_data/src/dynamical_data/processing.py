@@ -348,6 +348,9 @@ def _process_chunk(
     ]
     processed = joined.group_by(group_cols).agg(agg_exprs)
 
+    # Fill missing values for numeric variables
+    processed = processed.with_columns([pl.col(x).fill_null(0.0) for x in numeric_vars])
+
     # WEIGHTED CATEGORICAL AGGREGATION:
     for c in categorical_vars:
         df_cat = (
@@ -358,6 +361,8 @@ def _process_chunk(
             .agg(pl.col(c).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
         )
         processed = processed.join(df_cat, on=group_cols, how="left")
+        # Fill missing values for categorical variables
+        processed = processed.with_columns(pl.col(c).fill_null(0))
 
     return processed
 
