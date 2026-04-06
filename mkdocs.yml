@@ -28,5 +28,12 @@ nav:
       - Add a Dataset: guides/add-dataset.md
       - Add a Model: guides/add-model.md
       - Run a Backtest: guides/run-backtest.md
-  - API Reference: api/index.md
+  - API Reference:
+      - Overview: api/index.md
+      - Contracts: api/contracts/index.md
+      - Dynamical Data: api/dynamical_data/index.md
+      - Geo: api/geo/index.md
+      - ML Core: api/ml_core/index.md
+      - NGED Data: api/nged_data/index.md
+      - XGBoost Forecaster: api/xgboost_forecaster/index.md
   - Roadmap: roadmap.md
