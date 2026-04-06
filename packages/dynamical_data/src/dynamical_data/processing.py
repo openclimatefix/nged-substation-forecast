@@ -1,8 +1,8 @@
-import os
 import concurrent.futures
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import icechunk
 import numpy as np
@@ -183,6 +183,8 @@ def download_ecmwf(
         )
         repo = icechunk.Repository.open(storage)
         session = repo.readonly_session("main")
+
+        # chunks=None is a deliberate design choice to disable Dask and avoid memory overhead.
         # We set `chunks=None` to disable Dask. This is because we want to
         # manually control the parallelization of S3 fetches using a
         # ThreadPoolExecutor below, which avoids Dask's overhead for this
@@ -228,7 +230,7 @@ def download_ecmwf(
     ).row(0)
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
-    # We check the first two elements to determine if latitude is ascending or descending.
+    # We check the first two elements to determine if latitude/longitude are ascending or descending.
     # Single-point forecasts (length 1) do not have a direction, so we bypass the
     # ascending/descending check to avoid an IndexError.
     if len(ds.latitude.values) > 1:
@@ -237,37 +239,20 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
-    # Implement wrap-around aware slicing for longitudes.
-    # This prevents massive unnecessary downloads when the H3 grid crosses the anti-meridian.
-    lngs = h3_grid.get_column("nwp_lng").unique().sort()
-    diffs = lngs.diff().drop_nulls()
-
-    # We check if the maximum difference between adjacent longitudes is greater than 180.
-    # If it is, we assume the grid crosses the anti-meridian.
-    # We use cast(float, ...) to satisfy the type checker as diffs.max() can return
-    # multiple types, but here we know it's a float.
-    crosses_antimeridian = len(diffs) > 0 and cast(float, diffs.max()) > 180
-
-    if crosses_antimeridian:
-        gap_idx = diffs.arg_max()
-        if gap_idx is None:
-            # This should be impossible given len(diffs) > 0
-            raise RuntimeError("Failed to find gap index for anti-meridian crossing.")
-
-        max_neg_lng = lngs[gap_idx]
-        min_pos_lng = lngs[gap_idx + 1]
-        ds_neg = ds.sel(
-            latitude=lat_slice, longitude=slice(-180, max_neg_lng), init_time=nwp_init_time
-        )
-        ds_pos = ds.sel(
-            latitude=lat_slice, longitude=slice(min_pos_lng, 180), init_time=nwp_init_time
-        )
-        ds_cropped = xr.concat([ds_pos, ds_neg], dim="longitude")
+    min_lng, max_lng = h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()
+    if len(ds.longitude.values) > 1:
+        lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
+        lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
     else:
-        min_lng, max_lng = lngs[0], lngs[-1]
-        ds_cropped = ds.sel(
-            latitude=lat_slice, longitude=slice(min_lng, max_lng), init_time=nwp_init_time
-        )
+        lng_slice = slice(min_lng, max_lng)
+
+    # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
+    # forecasting near the anti-meridian.
+    ds_cropped = ds.sel(
+        latitude=lat_slice,
+        longitude=lng_slice,
+        init_time=nwp_init_time,
+    )
 
     # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
@@ -277,11 +262,11 @@ def download_ecmwf(
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
-    data_arrays: dict[str, xr.DataArray] = {}
     # The download is I/O bound (S3 network requests). We use a
     # ThreadPoolExecutor to parallelize network latency across multiple
     # variables. A ProcessPoolExecutor would be less efficient here due to the
     # high serialization overhead of Xarray objects between processes.
+    data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(download_array, str(name)) for name in ds_cropped.data_vars.keys()
@@ -292,103 +277,143 @@ def download_ecmwf(
     return xr.Dataset(data_arrays)
 
 
+def _process_chunk(
+    ds_chunk: xr.Dataset,
+    h3_grid: pt.DataFrame[H3GridWeights],
+    lat_grid_raveled: np.ndarray,
+    lon_grid_raveled: np.ndarray,
+) -> pl.DataFrame:
+    """Processes a single chunk of the ECMWF dataset."""
+    # Prepare data dictionary
+    data_dict: dict[str, Any] = {
+        "latitude": lat_grid_raveled,
+        "longitude": lon_grid_raveled,
+    }
+
+    # Add data variables
+    for var_name in ds_chunk.data_vars:
+        # Ensure the variable has the correct dimension order (latitude, longitude)
+        # The validation function already ensures this.
+        data_dict[str(var_name)] = ds_chunk[var_name].values.ravel()
+
+    # Add scalar coordinates
+    for coord_name in ["init_time", "lead_time", "ensemble_member"]:
+        if coord_name in ds_chunk.coords:
+            # It's a scalar coordinate
+            val = ds_chunk[coord_name].values
+            # Broadcast to the same length as the flattened arrays
+            data_dict[coord_name] = np.full(lat_grid_raveled.size, val)
+
+    nwp_df = pl.DataFrame(data_dict)
+
+    # Check for missing spatial data.
+    # TODO: Is this definitely necessary? If it's super-cheap then maybe it's fine to keep.
+    if (
+        nwp_df.drop(["init_time", "lead_time", "ensemble_member", "latitude", "longitude"])
+        .null_count()
+        .sum()
+        .item(0, 0)
+        > 0
+    ):
+        raise MalformedZarrError(
+            "Missing spatial data detected in NWP dataset. This indicates a bug."
+        )
+
+    # Define variables for aggregation
+    all_nwp_vars = [str(v) for v in ds_chunk.data_vars.keys()]
+    categorical_vars = ["categorical_precipitation_type_surface"]
+    numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
+
+    # The join is on latitude and longitude.
+    nwp_df = nwp_df.with_columns(
+        [pl.col("longitude").cast(pl.Float32), pl.col("latitude").cast(pl.Float32)]
+    )
+
+    joined = h3_grid.join(
+        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
+    ).with_columns(pl.col("h3_index").cast(pl.UInt64))
+
+    # Aggregate to H3 resolution 5.
+    group_cols = ["h3_index", "lead_time", "ensemble_member"]
+
+    def weight_sum_expr(x: str) -> pl.Expr:
+        return (
+            pl.when(pl.col(x).fill_nan(None).is_not_null())
+            .then(pl.col("proportion"))
+            .otherwise(0.0)
+            .sum()
+        )
+
+    # Aggregate numeric variables
+    agg_exprs = [
+        pl.when(weight_sum_expr(x) > 0)
+        .then((pl.col(x).fill_nan(None) * pl.col("proportion")).sum() / weight_sum_expr(x))
+        .otherwise(None)
+        .cast(pl.Float32)
+        .alias(x)
+        for x in numeric_vars
+    ]
+    processed = joined.group_by(group_cols).agg(agg_exprs)
+
+    # Fill missing values for numeric variables
+    processed = processed.with_columns([pl.col(x).fill_null(0.0) for x in numeric_vars])
+
+    # WEIGHTED CATEGORICAL AGGREGATION:
+    for c in categorical_vars:
+        df_cat = (
+            joined.group_by(group_cols + [c])
+            .agg(pl.col("proportion").sum().alias("weight"))
+            .sort(group_cols + ["weight"])
+            .group_by(group_cols)
+            .agg(pl.col(c).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
+        )
+        processed = processed.join(df_cat, on=group_cols, how="left")
+        # Fill missing values for categorical variables
+        processed = processed.with_columns(pl.col(c).fill_null(0))
+
+    return processed
+
+
 def process_ecmwf_dataset(
     nwp_init_time: datetime,
     loaded_ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
-    # Convert the entire Xarray Dataset to a Polars DataFrame in a single operation.
-    # This avoids thousands of slow loop iterations over lead_time and ensemble_member.
-    # We reset the index to make coordinates (lead_time, ensemble_member, latitude, longitude)
-    # available as columns.
-    #
-    # NOTE: This conversion is a known performance and memory bottleneck.
-    # For large datasets, this can cause OOM errors. Future optimizations should
-    # consider using Xarray's native chunking or direct conversion to Arrow/Polars
-    # without Pandas as an intermediary.
-    nwp_df = pl.from_pandas(loaded_ds.to_dataframe().reset_index())
-
-    # Perform a single spatial join with the pre-computed h3_grid.
-    # The join is on latitude and longitude.
-    # We cast coordinates to Float32 before the join to ensure exact bit-level matching.
-    # Polars performs exact equality checks for joins, and floating-point precision
-    # differences between Float32 (often used in Zarr) and Float64 (used in the H3 grid)
-    # can cause the join to fail silently.
-    nwp_df = nwp_df.with_columns(
-        [pl.col("longitude").cast(pl.Float32), pl.col("latitude").cast(pl.Float32)]
-    )
+    # Cast coordinates to Float32 before the join to ensure exact bit-level matching.
     h3_grid = h3_grid.with_columns(
         [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
     )
 
-    joined = h3_grid.join(
-        nwp_df, left_on=["nwp_lng", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
-    ).with_columns(
-        # Explicitly cast h3_index to UInt64 after the join to prevent silent type
-        # coercion (e.g., to Float64 or Int64) during Polars joins, which is
-        # critical for downstream H3 operations and memory efficiency.
-        pl.col("h3_index").cast(pl.UInt64)
+    # Precompute latitude and longitude grids
+    lat_grid, lon_grid = np.meshgrid(
+        loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
     )
+    lat_grid_raveled = lat_grid.ravel()
+    lon_grid_raveled = lon_grid.ravel()
 
-    all_nwp_vars = list(loaded_ds.data_vars.keys())
-    categorical_vars = ["categorical_precipitation_type_surface"]
-    numeric_vars = [v for v in all_nwp_vars if v not in categorical_vars]
+    # Iterate over lead_time and ensemble_member to process in chunks.
+    processed_chunks = []
+    for lead_time in loaded_ds.lead_time.values:
+        for ensemble_member in loaded_ds.ensemble_member.values:
+            ds_chunk = loaded_ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
+            processed_chunks.append(
+                _process_chunk(
+                    ds_chunk,
+                    h3_grid,
+                    lat_grid_raveled=lat_grid_raveled,
+                    lon_grid_raveled=lon_grid_raveled,
+                )
+            )
 
-    # Aggregate to H3 resolution 5.
-    # We group by h3_index, lead_time, and ensemble_member.
-    # To avoid biasing the aggregated weather variables towards zero when an H3 cell
-    # partially overlaps with missing NWP data (e.g., at the edges of the domain),
-    # we compute a true weighted average by dividing the weighted sum by the sum
-    # of the proportions of the valid (non-NaN) cells.
-    df_with_weights = joined.with_columns(
-        [
-            (pl.col(str(x)).fill_nan(None) * pl.col("proportion")).alias(f"{x}_weighted")
-            for x in numeric_vars
-        ]
-        + [
-            pl.when(pl.col(str(x)).fill_nan(None).is_not_null())
-            .then(pl.col("proportion"))
-            .otherwise(0.0)
-            .alias(f"{x}_weight_sum")
-            for x in numeric_vars
-        ]
-    )
-
-    group_cols = ["h3_index", "lead_time", "ensemble_member"]
-
-    # Aggregate numeric variables
-    agg_exprs = [
-        pl.when(pl.col(f"{x}_weight_sum").sum() > 0)
-        .then(pl.col(f"{x}_weighted").sum() / pl.col(f"{x}_weight_sum").sum())
-        .otherwise(None)
-        .cast(pl.Float32)
-        .alias(str(x))
-        for x in numeric_vars
-    ]
-    processed = df_with_weights.group_by(group_cols).agg(agg_exprs)
-
-    # WEIGHTED CATEGORICAL AGGREGATION:
-    # We use a weighted mode calculation that respects the H3 cell overlap proportions.
-    # This ensures categorical weather features (like precipitation type) accurately
-    # reflect the area-weighted majority of the H3 cell, rather than treating a 1%
-    # overlap the same as a 99% overlap.
-    for c in categorical_vars:
-        df_cat = (
-            df_with_weights.group_by(group_cols + [c])
-            .agg(pl.col("proportion").sum().alias("weight"))
-            .sort(group_cols + ["weight"])
-            .group_by(group_cols)
-            .agg(pl.col(c).last().cast(pl.UInt8))
-        )
-        processed = processed.join(df_cat, on=group_cols, how="left")
+    processed = pl.concat(processed_chunks)
 
     # Compute valid_time and init_time.
-    # lead_time is a timedelta64[ns] in the DataFrame.
     processed = processed.with_columns(
         init_time=pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")),
         valid_time=(
-            pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC")) + pl.col("lead_time")
+            pl.lit(nwp_init_time).cast(pl.Datetime("us", "UTC"))
+            + pl.col("lead_time").cast(pl.Duration("us"))
         ).cast(pl.Datetime("us", "UTC")),
         ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
     ).drop("lead_time")
@@ -397,5 +422,4 @@ def process_ecmwf_dataset(
     processed = processed.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     # Validate to ensure the interpolated data matches the expected schema
-    # (The Nwp schema expects Float32 for weather variables)
     return Nwp.validate(processed, drop_superfluous_columns=True)

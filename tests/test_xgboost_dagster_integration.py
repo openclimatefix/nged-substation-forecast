@@ -1,10 +1,10 @@
+import pytest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import cast
 
 import dagster as dg
 import polars as pl
-import pytest
 from contracts.settings import Settings
 from nged_substation_forecast.definitions import defs
 from nged_substation_forecast.defs.nged_assets import (
@@ -18,6 +18,7 @@ from nged_substation_forecast.defs.data_cleaning_assets import cleaned_actuals
 from geo.assets import H3GridConfig
 
 
+@pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.manual
 def test_xgboost_dagster_integration() -> None:

@@ -56,6 +56,20 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
 def recover_physical_units(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFrame:
     """Convert uint8 columns back to physical units.
 
+    DATA TYPE TRANSITION RATIONALE:
+    1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
+       space and bandwidth.
+    2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
+       to maintain precision and avoid rounding errors during aggregation.
+    3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
+       in the ML model.
+
+    We do NOT cast back to UInt8 in memory because:
+    - It would cause a "staircase" effect by quantizing interpolated values, defeating
+      the purpose of 30-minute upsampling.
+    - It risks silent underflow during differencing operations (e.g., calculating trends
+      like temp_trend_6h = current - lagged).
+
     Args:
         df: Polars DataFrame with uint8 columns.
         scaling_params: DataFrame with col_name, buffered_min, buffered_range.

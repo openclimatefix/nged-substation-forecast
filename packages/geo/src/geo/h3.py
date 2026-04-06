@@ -66,19 +66,8 @@ def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int =
             # are at the center of each bin.
             nwp_lat=((plh3.cell_to_lat("child_h3") + (grid_size / 2)) / grid_size).floor()
             * grid_size,
-            # LONGITUDE WRAP-AROUND:
-            # Normalizing nwp_lng to the strict [-180, 180) range prevents silent data loss
-            # for H3 cells near the anti-meridian, ensuring they correctly join with the
-            # NWP dataset.
-            nwp_lng=(
-                (
-                    ((plh3.cell_to_lng("child_h3") + (grid_size / 2)) / grid_size).floor()
-                    * grid_size
-                    + 180
-                )
-                % 360
-            )
-            - 180,
+            nwp_lng=((plh3.cell_to_lng("child_h3") + (grid_size / 2)) / grid_size).floor()
+            * grid_size,
         )
         .group_by(["h3_index", "nwp_lat", "nwp_lng"])
         .len()

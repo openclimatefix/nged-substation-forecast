@@ -1,13 +1,19 @@
 import numpy as np
-import pandas as pd
 import polars as pl
 import pytest
 import xarray as xr
-from dynamical_data.processing import process_ecmwf_dataset, download_ecmwf
+from datetime import datetime, timezone
 from contracts.data_schemas import H3GridWeights
+from dynamical_data.processing import download_ecmwf, process_ecmwf_dataset
 
 
-def create_mock_ds(lats, lons, init_time, lead_times, ensembles):
+def create_mock_ds(
+    lats: list[float],
+    lons: list[float],
+    init_time: np.datetime64,
+    lead_times: list[np.timedelta64],
+    ensembles: list[int],
+) -> xr.Dataset:
     shape = (len(lats), len(lons), 1, len(lead_times), len(ensembles))
     return xr.Dataset(
         data_vars={
@@ -67,7 +73,7 @@ def create_mock_ds(lats, lons, init_time, lead_times, ensembles):
         coords={
             "latitude": lats,
             "longitude": lons,
-            "init_time": [init_time.to_datetime64()],
+            "init_time": [init_time],
             "lead_time": lead_times,
             "ensemble_member": ensembles,
         },
@@ -97,10 +103,16 @@ def test_process_ecmwf_dataset_basic():
         )
     )
 
-    init_time = pd.Timestamp("2024-04-01", tz="UTC")
-    ds = create_mock_ds([51.5], [0.0], init_time, [pd.Timedelta(hours=0)], [0])
+    init_time = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    ds = create_mock_ds(
+        [51.5],
+        [0.0],
+        np.datetime64(init_time.replace(tzinfo=None)),
+        [np.timedelta64(0, "ns")],
+        [0],
+    )
 
-    result = process_ecmwf_dataset(init_time.to_pydatetime(), ds, h3_grid)
+    result = process_ecmwf_dataset(init_time, ds, h3_grid)
     assert len(result) == 1
     assert result["temperature_2m"].dtype == pl.Float32
     assert result["categorical_precipitation_type_surface"].dtype == pl.UInt8
@@ -119,10 +131,16 @@ def test_process_ecmwf_dataset_empty_h3_grid():
             }
         )
     )
-    init_time = pd.Timestamp("2024-04-01", tz="UTC")
-    ds = create_mock_ds([51.5], [0.0], init_time, [pd.Timedelta(hours=0)], [0])
+    init_time = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    ds = create_mock_ds(
+        [51.5],
+        [0.0],
+        np.datetime64(init_time.replace(tzinfo=None)),
+        [np.timedelta64(0, "ns")],
+        [0],
+    )
 
-    result = process_ecmwf_dataset(init_time.to_pydatetime(), ds, h3_grid)
+    result = process_ecmwf_dataset(init_time, ds, h3_grid)
     assert len(result) == 0
 
 
@@ -167,9 +185,15 @@ def test_download_ecmwf_longitude_validation():
         )
     )
 
-    init_time = pd.Timestamp("2024-04-01", tz="UTC")
+    init_time = datetime(2024, 4, 1, tzinfo=timezone.utc)
     # Provide longitude 359.0 in the source dataset, which is out of the [-180, 180] range
-    ds = create_mock_ds([51.5], [359.0], init_time, [pd.Timedelta(hours=0)], [0])
+    ds = create_mock_ds(
+        [51.5],
+        [359.0],
+        np.datetime64(init_time.replace(tzinfo=None)),
+        [np.timedelta64(0, "ns")],
+        [0],
+    )
 
     with pytest.raises(ValueError, match=r"Dataset longitude must be in the range \[-180, 180\]"):
-        download_ecmwf(init_time.to_datetime64(), h3_grid, ds=ds)
+        download_ecmwf(np.datetime64(init_time.replace(tzinfo=None)), h3_grid, ds=ds)
