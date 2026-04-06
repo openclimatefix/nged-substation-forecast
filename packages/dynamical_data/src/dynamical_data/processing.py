@@ -230,7 +230,7 @@ def download_ecmwf(
     ).row(0)
 
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
-    # We check the first two elements to determine if latitude is ascending or descending.
+    # We check the first two elements to determine if latitude/longitude are ascending or descending.
     # Single-point forecasts (length 1) do not have a direction, so we bypass the
     # ascending/descending check to avoid an IndexError.
     if len(ds.latitude.values) > 1:
@@ -239,11 +239,18 @@ def download_ecmwf(
     else:
         lat_slice = slice(min_lat, max_lat)
 
+    min_lng, max_lng = h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()
+    if len(ds.longitude.values) > 1:
+        lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
+        lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
+    else:
+        lng_slice = slice(min_lng, max_lng)
+
     # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
     # forecasting near the anti-meridian.
     ds_cropped = ds.sel(
         latitude=lat_slice,
-        longitude=slice(h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()),
+        longitude=lng_slice,
         init_time=nwp_init_time,
     )
 
