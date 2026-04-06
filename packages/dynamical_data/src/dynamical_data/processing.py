@@ -355,7 +355,7 @@ def _process_chunk(
             .agg(pl.col("proportion").sum().alias("weight"))
             .sort(group_cols + ["weight"])
             .group_by(group_cols)
-            .agg(pl.col(c).last().cast(pl.Float32).cast(pl.UInt8))
+            .agg(pl.col(c).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
         )
         processed = processed.join(df_cat, on=group_cols, how="left")
 
