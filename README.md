@@ -67,6 +67,9 @@ This partitioning strategy allows for efficient querying of specific model runs 
 
 ### Manual Integration Test
 
+In normal development, run tests with `uv run pytest -n "not slow"`. This will run the tests that
+are not marked `slow`.
+
 To verify the XGBoost forecaster and the ML core utilities without running the full Dagster pipeline, you can run the manual integration test. This script trains and evaluates the model on a small subset of 5 substations:
 
 ```bash
