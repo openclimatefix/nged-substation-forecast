@@ -1,6 +1,6 @@
 # ML Core API
 
-<!-- include "../../packages/ml_core/README.md" -->
+{% include "../../../packages/ml_core/README.md" %}
 
 ::: ml_core.model
 ::: ml_core.utils

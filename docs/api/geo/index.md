@@ -1,6 +1,6 @@
 # Geo API
 
-<!-- include "../../packages/geo/README.md" -->
+{% include "../../../packages/geo/README.md" %}
 
 ::: geo.assets
 ::: geo.h3

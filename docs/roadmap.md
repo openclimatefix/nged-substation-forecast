@@ -6,7 +6,7 @@ This roadmap outlines the long-term architectural vision and planned research ph
 *Before attempting to detect complex switching events, we must prove the data engineering, MLflow tracking, and Dagster orchestration work end-to-end in a production environment.*
 
 * **Ingestion:** Download NGED data and ECMWF ensemble NWP. Convert NGED data to Delta Lake and index via H3. Convert ECMWF to Parquet and index via H3.
-* **The "Universal" Model:** Build a single XGBoost forecast for the ~50 trial sites. This model is "universal" in two ways: it is trained globally across all substations and across all forecast horizons (0-14 days) using `lead_time_hours` as a feature. Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc`.
+* **The "Universal" Model:** Build a single XGBoost forecast for the ~50 trial sites. This model is "universal" in two ways: it is trained globally across all substations and across all forecast horizons (0-14 days) using `lead_time_hours` as a feature. Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one.
 * **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure.
 
 **Target completion date**: End of May 2026.

@@ -17,10 +17,7 @@ plugins:
             show_source: true
             show_root_heading: true
             show_category_heading: true
-  - include-markdown:
-      opening_tag: '<!-- include'
-      closing_tag: '-->'
-      enabled: true
+  - include-markdown
 
 nav:
   - Home: index.md
