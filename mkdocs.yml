@@ -24,6 +24,7 @@ nav:
   - Architecture:
       - Philosophy: architecture/philosophy.md
       - Overview: architecture/overview.md
+  - Roadmap: roadmap.md
   - Guides:
       - Create a Forecast: guides/create-forecast.md
       - Add a Dataset: guides/add-dataset.md
@@ -37,4 +38,3 @@ nav:
       - ML Core: api/ml_core/index.md
       - NGED Data: api/nged_data/index.md
       - XGBoost Forecaster: api/xgboost_forecaster/index.md
-  - Roadmap: roadmap.md
