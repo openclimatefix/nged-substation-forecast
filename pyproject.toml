@@ -46,6 +46,9 @@ dev = [
     "ty>=0.0.16",
     "unittest-xml-reporting>=4.0.0",
     "hypothesis>=6.0.0",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3",
+    "mkdocs-include-markdown-plugin>=7.2.2",
 ]
 
 [project.urls]
