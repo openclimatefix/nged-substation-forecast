@@ -9,6 +9,8 @@ This roadmap outlines the long-term architectural vision and planned research ph
 * **The "Universal" Model:** Build a single XGBoost forecast for the ~50 trial sites. This model is "universal" in two ways: it is trained globally across all substations and across all forecast horizons (0-14 days) using `lead_time_hours` as a feature. Output an ensemble of power forecasts by passing each NWP ensemble member through the XGBoost model one-by-one. Wrap this model in an MLflow custom `pyfunc`.
 * **Purpose:** This model will intentionally ignore switching events. The forecast will be flawed, but it serves as an integration test for our infrastructure.
 
+**Target completion date**: End of May 2026.
+
 ## Phase 2: Topology Switching Detection
 *Isolate and label historical switching events to significantly improve the demand forecasts.*
 
@@ -16,11 +18,15 @@ This roadmap outlines the long-term architectural vision and planned research ph
 * **Residual Detection:** Apply CUSUM or Rolling Difference filters to the baseline residuals to flag topological step-changes.
 * **Spatial Verification (Super-Node Test):** Validate switches by applying Kirchhoff's laws to neighbours.
 
+**Target completion date**: End of June 2026.
+
 ## Phase 3: Upgrade forecast to handle switching events, and output NRA forecasts
 *With clean switching labels, build the robust statistical baseline.*
 
 * **Substation NRA (normal running arrangement) Forecast (Universal Model):** Train one universal demand forecast XGBoost model across all substations and horizons. Use the switching labels to estimate the transfer magnitude and mathematically "correct" the historical SCADA data.
 * **Customer Meter Forecasts (Clustered/Local Models):** Train models clustered by asset type.
+
+**Target completion date**: End of July 2026.
 
 ## Phase 4: Grey-Box Physics-Informed Neural Network (PyTorch)
 *Transitioning from black-box trees to explainable physics to explicitly model Behind-The-Meter (BTM) assets.*
@@ -29,11 +35,15 @@ This roadmap outlines the long-term architectural vision and planned research ph
 * **Asset Discovery:** By feeding CM-SAF irradiance to a differentiable solar-torch module, physical parameters (installed capacity, tilt, azimuth, DC:AC capacity, shading) become learnable via gradient descent.
 * **Natively Handling MVA Telemetry:** Older substations report absolute apparent power (MVA), hiding reverse power flows.
 
+**Target completion date**: End of November 2026.
+
 ## Phase 5: Spatial Graph Neural Network
 *Capturing highly non-linear, cross-network interactions during extreme events.*
 
 * **Dynamic Adjacency Matrix:** The live Switching Detector acts as a permanent interceptor, continuously updating the adjacency matrix before inference.
 * This ensures the GNN's message-passing layers route data along the actual physical paths of the switched grid.
+
+**Target completion date**: End of Feb 2027.
 
 ## Phase 6: Further research
 * Continually improve the current best model.
