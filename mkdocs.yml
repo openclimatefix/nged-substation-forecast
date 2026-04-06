@@ -24,7 +24,7 @@ nav:
   - Architecture:
       - Philosophy: architecture/philosophy.md
       - Overview: architecture/overview.md
-  - Roadmap: roadmap.md
+      - Roadmap: roadmap.md
   - Guides:
       - Create a Forecast: guides/create-forecast.md
       - Add a Dataset: guides/add-dataset.md
