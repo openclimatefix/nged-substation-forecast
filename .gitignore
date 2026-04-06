@@ -66,3 +66,4 @@ test.parquet
 *.zarr/
 example_data/
 packages/dynamical_data/example_data
+site/

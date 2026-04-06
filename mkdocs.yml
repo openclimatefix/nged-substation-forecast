@@ -1,0 +1,32 @@
+site_name: NGED Substation Forecast
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Philosophy: architecture/philosophy.md
+      - Overview: architecture/overview.md
+  - Guides:
+      - Create a Forecast: guides/create-forecast.md
+      - Add a Dataset: guides/add-dataset.md
+      - Add a Model: guides/add-model.md
+      - Run a Backtest: guides/run-backtest.md
+  - API Reference: api/index.md
+  - Roadmap: roadmap.md
