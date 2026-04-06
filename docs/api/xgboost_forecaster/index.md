@@ -1,6 +1,6 @@
 # XGBoost Forecaster API
 
---8<-- "packages/xgboost_forecaster/README.md"
+<!-- include "packages/xgboost_forecaster/README.md" -->
 
 ::: xgboost_forecaster.config
 ::: xgboost_forecaster.data
