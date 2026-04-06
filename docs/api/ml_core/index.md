@@ -1,5 +1,7 @@
 # ML Core API
 
+--8<-- "packages/ml_core/README.md"
+
 ::: ml_core.model
 ::: ml_core.utils
 ::: ml_core.data
