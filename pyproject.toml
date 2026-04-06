@@ -103,4 +103,4 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
-norecursedirs = [".venv", "venv", ".git", "__pycache__"]
+norecursedirs = [".venv", "venv", ".git", "__pycache__", ".hypothesis"]
