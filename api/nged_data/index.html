@@ -1,0 +1,3518 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../ml_core/">
+      
+      
+        <link rel="next" href="../xgboost_forecaster/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>NGED Data - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nged-data-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              NGED Data
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/create-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create a Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/run-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.ckan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ckan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ckan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan.get_primary_substation_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_primary_substation_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.cleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cleaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="cleaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning.clean_substation_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clean_substation_flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.process_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        process_flows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="process_flows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.MilfordHavenParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MilfordHavenParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParserStrategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ParserStrategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy.can_parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        can_parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy.parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.RegentStreetParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegentStreetParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.StandardFormatParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StandardFormatParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.process_live_primary_substation_power_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        process_live_primary_substation_power_flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        align
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="align">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align.join_location_table_to_live_primaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        join_location_table_to_live_primaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.utils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        utils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="utils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.ensure_utc_timestamp_lazy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensure_utc_timestamp_lazy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.find_one_match" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        find_one_match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.get_partition_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_partition_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.scan_delta_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scan_delta_table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.ckan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ckan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ckan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.ckan.get_primary_substation_locations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_primary_substation_locations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.cleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cleaning
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="cleaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.cleaning.clean_substation_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clean_substation_flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.process_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        process_flows
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="process_flows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Classes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.MilfordHavenParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MilfordHavenParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ParserStrategy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ParserStrategy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy.can_parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        can_parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.ParserStrategy.parse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parse
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.RegentStreetParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegentStreetParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.StandardFormatParser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StandardFormatParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.process_flows.process_live_primary_substation_power_flows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        process_live_primary_substation_power_flows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.schemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schemas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        align
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="align">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align-classes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.substation_names.align.join_location_table_to_live_primaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        join_location_table_to_live_primaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nged_data.utils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        utils
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="utils">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.ensure_utc_timestamp_lazy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ensure_utc_timestamp_lazy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.find_one_match" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        find_one_match
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.get_partition_window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_partition_window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nged_data.utils.scan_delta_table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scan_delta_table
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="nged-data-api">NGED Data API</h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.ckan" class="doc doc-heading">
+            <code>nged_data.ckan</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Generic CKAN client for interacting with NGED's Connected Data portal.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="nged_data.ckan-classes">Classes</h3>
+<h3 id="nged_data.ckan-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.ckan.get_primary_substation_locations" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_primary_substation_locations</span><span class="p">(</span><span class="n">api_key</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Note that 'Park Lane' appears twice (with different substation numbers).</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/ckan.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_primary_substation_locations</span><span class="p">(</span><span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationLocations</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Note that &#39;Park Lane&#39; appears twice (with different substation numbers).&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">api_key</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Fetching substation locations with API key (length: </span><span class="si">%d</span><span class="s2">, prefix: </span><span class="si">%s</span><span class="s2">...)&quot;</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">api_key</span><span class="p">),</span>
+            <span class="n">api_key</span><span class="p">[:</span><span class="mi">4</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Fetching substation locations WITHOUT API key&quot;</span><span class="p">)</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">BASE_CKAN_URL</span><span class="si">}</span><span class="s2">/api/3/action/resource_search&quot;</span>
+    <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="n">api_key</span><span class="p">}</span> <span class="k">if</span> <span class="n">api_key</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;query&quot;</span><span class="p">:</span> <span class="s2">&quot;name:Primary Substation Location&quot;</span><span class="p">}</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">resp</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">,</span> <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+        <span class="n">resp</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">resp</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;CKAN resource_search failed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">raise</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;success&quot;</span><span class="p">):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;CKAN resource_search returned success=False: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CKAN search failed: </span><span class="si">{</span><span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">ckan_results</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;results&quot;</span><span class="p">]</span>
+    <span class="n">ckan_result</span> <span class="o">=</span> <span class="n">find_one_match</span><span class="p">(</span><span class="k">lambda</span> <span class="n">result</span><span class="p">:</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;format&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;CSV&quot;</span><span class="p">,</span> <span class="n">ckan_results</span><span class="p">)</span>
+    <span class="n">url</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">ckan_result</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">])</span>
+    <span class="n">http_response</span> <span class="o">=</span> <span class="n">httpx_get_with_auth</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">api_key</span><span class="o">=</span><span class="n">api_key</span><span class="p">)</span>
+    <span class="n">locations</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">http_response</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+    <span class="n">locations</span> <span class="o">=</span> <span class="n">change_dataframe_column_names_to_snake_case</span><span class="p">(</span><span class="n">locations</span><span class="p">)</span>
+    <span class="n">locations</span> <span class="o">=</span> <span class="n">locations</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;substation_type&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">to_lowercase</span><span class="p">()</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;primary&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">dtypes</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">SubstationLocations</span><span class="o">.</span><span class="n">dtypes</span><span class="p">)</span>
+    <span class="n">locations</span> <span class="o">=</span> <span class="n">locations</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">dtypes</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">SubstationLocations</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">drop_superfluous_columns</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.cleaning" class="doc doc-heading">
+            <code>nged_data.cleaning</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Data cleaning logic for substation flows.</p>
+<p>This module provides functions to identify and handle problematic telemetry data:
+- "Stuck" values: Values where the rolling standard deviation is below a threshold,
+  indicating a sensor that hasn't changed reading.
+- "Insane" values: Values that fall outside physically plausible min/max bounds.</p>
+<p>All operations use backward-looking rolling windows and group by substation to prevent
+data leakage. Bad values are replaced with null to preserve the temporal grid rather
+than being removed or imputed.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="nged_data.cleaning-classes">Classes</h3>
+<h3 id="nged_data.cleaning-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.cleaning.clean_substation_flows" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">clean_substation_flows</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">settings</span><span class="p">,</span> <span class="n">group_by_cols</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Clean substation flows by replacing stuck and insane values with null.</p>
+<p>This function identifies problematic telemetry data and replaces these values
+with null to preserve the temporal grid. It performs the following checks:</p>
+<ol>
+<li>
+<p><strong>Stuck sensor detection</strong>: Uses a backward-looking rolling standard deviation
+   (24-hour window) to detect sensors that haven't changed reading.
+   Values are marked as stuck if the rolling standard deviation falls below
+   <code>settings.data_quality.stuck_std_threshold</code>. We use time-based rolling
+   to correctly handle different temporal resolutions and missing data.</p>
+</li>
+<li>
+<p><strong>Insane value detection</strong>: Flags values outside the range
+   <code>[min_mw_threshold, max_mw_threshold]</code> as insane. This captures physically
+   implausible readings (e.g., MW &gt; 100 for primary substations, or extreme
+   negative values).</p>
+</li>
+</ol>
+<p>Both checks are performed per-substation to prevent cross-substation data leakage.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raw substation flows DataFrame with 'MW' and 'MVA' columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>settings</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Settings (contracts.settings.Settings)" href="../contracts/#contracts.settings.Settings">Settings</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Configuration containing data quality thresholds.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>group_by_cols</code>
+            </td>
+            <td>
+                  <code><span title="collections.abc.Sequence">Sequence</span>[<span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Columns to group by for per-substation operations.
+         Defaults to ["substation_number"].</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with stuck and insane values replaced with null. The temporal grid</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>is preserved (no rows removed, no imputation).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="example" open>
+  <summary>Example</summary>
+  <blockquote>
+<blockquote>
+<blockquote>
+<p>from contracts.settings import Settings
+df = clean_substation_flows(raw_df, Settings(...))</p>
+</blockquote>
+</blockquote>
+</blockquote>
+</details>
+
+<details class="notes" open>
+  <summary>Notes</summary>
+  <ul>
+<li>All rolling window operations are backward-looking to prevent data leakage.</li>
+<li>Null values from the original data are preserved as-is.</li>
+<li>Both 'MW' and 'MVA' columns are checked independently.</li>
+<li>After cleaning, downstream logic should use <code>pl.coalesce(['MW', 'MVA'])</code>
+  to create the <code>MW_or_MVA</code> column.</li>
+</ul>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/cleaning.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
+<span class="normal"> 21</span>
+<span class="normal"> 22</span>
+<span class="normal"> 23</span>
+<span class="normal"> 24</span>
+<span class="normal"> 25</span>
+<span class="normal"> 26</span>
+<span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">clean_substation_flows</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">settings</span><span class="p">:</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">group_by_cols</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Clean substation flows by replacing stuck and insane values with null.</span>
+
+<span class="sd">    This function identifies problematic telemetry data and replaces these values</span>
+<span class="sd">    with null to preserve the temporal grid. It performs the following checks:</span>
+
+<span class="sd">    1. **Stuck sensor detection**: Uses a backward-looking rolling standard deviation</span>
+<span class="sd">       (24-hour window) to detect sensors that haven&#39;t changed reading.</span>
+<span class="sd">       Values are marked as stuck if the rolling standard deviation falls below</span>
+<span class="sd">       `settings.data_quality.stuck_std_threshold`. We use time-based rolling</span>
+<span class="sd">       to correctly handle different temporal resolutions and missing data.</span>
+
+<span class="sd">    2. **Insane value detection**: Flags values outside the range</span>
+<span class="sd">       `[min_mw_threshold, max_mw_threshold]` as insane. This captures physically</span>
+<span class="sd">       implausible readings (e.g., MW &gt; 100 for primary substations, or extreme</span>
+<span class="sd">       negative values).</span>
+
+<span class="sd">    Both checks are performed per-substation to prevent cross-substation data leakage.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df: Raw substation flows DataFrame with &#39;MW&#39; and &#39;MVA&#39; columns.</span>
+<span class="sd">        settings: Configuration containing data quality thresholds.</span>
+<span class="sd">        group_by_cols: Columns to group by for per-substation operations.</span>
+<span class="sd">                     Defaults to [&quot;substation_number&quot;].</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with stuck and insane values replaced with null. The temporal grid</span>
+<span class="sd">        is preserved (no rows removed, no imputation).</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from contracts.settings import Settings</span>
+<span class="sd">        &gt;&gt;&gt; df = clean_substation_flows(raw_df, Settings(...))</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        - All rolling window operations are backward-looking to prevent data leakage.</span>
+<span class="sd">        - Null values from the original data are preserved as-is.</span>
+<span class="sd">        - Both &#39;MW&#39; and &#39;MVA&#39; columns are checked independently.</span>
+<span class="sd">        - After cleaning, downstream logic should use `pl.coalesce([&#39;MW&#39;, &#39;MVA&#39;])`</span>
+<span class="sd">          to create the `MW_or_MVA` column.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_insane_mask</span><span class="p">(</span><span class="n">power_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">min_thresh</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">max_thresh</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a boolean expression for insane value detection.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">power_col</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">min_thresh</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">power_col</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_thresh</span><span class="p">)</span>
+
+    <span class="c1"># Determine the power columns to check</span>
+    <span class="n">power_columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;MW&quot;</span><span class="p">,</span> <span class="s2">&quot;MVA&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">power_columns</span><span class="p">:</span>
+        <span class="c1"># No power columns to check, return early</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="c1"># Determine grouping columns</span>
+    <span class="n">group_by</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">group_by_cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">group_by_cols</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[</span><span class="s2">&quot;substation_number&quot;</span><span class="p">]</span>
+
+    <span class="c1"># Sort by timestamp as required by .rolling()</span>
+    <span class="n">df_sorted</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Build the mask for stuck sensors using time-based rolling windows.</span>
+    <span class="c1"># This is more robust than row-based rolling as it handles missing data</span>
+    <span class="c1"># and different temporal resolutions correctly.</span>
+    <span class="n">agg_exprs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">rolling_cols</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">power_columns</span><span class="p">:</span>
+        <span class="n">std_col_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">_rolling_std&quot;</span>
+        <span class="n">count_col_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">_rolling_count&quot;</span>
+        <span class="n">rolling_cols</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="n">std_col_name</span><span class="p">,</span> <span class="n">count_col_name</span><span class="p">])</span>
+        <span class="n">agg_exprs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">std</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">std_col_name</span><span class="p">),</span>
+                <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">count_col_name</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+
+    <span class="n">rolling_df</span> <span class="o">=</span> <span class="n">df_sorted</span><span class="o">.</span><span class="n">rolling</span><span class="p">(</span>
+        <span class="n">index_column</span><span class="o">=</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+        <span class="n">period</span><span class="o">=</span><span class="s2">&quot;24h&quot;</span><span class="p">,</span>
+        <span class="n">group_by</span><span class="o">=</span><span class="n">group_by</span><span class="p">,</span>
+        <span class="n">closed</span><span class="o">=</span><span class="s2">&quot;right&quot;</span><span class="p">,</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">agg_exprs</span><span class="p">)</span>
+
+    <span class="n">df_with_rolling</span> <span class="o">=</span> <span class="n">df_sorted</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">rolling_df</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">group_by</span><span class="p">],</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Replace bad values with null and drop temporary rolling columns.</span>
+    <span class="c1"># We evaluate stuck and insane masks independently for each power column.</span>
+    <span class="c1"># This prevents a stuck MW sensor from unnecessarily nulling out a healthy MVA sensor.</span>
+    <span class="n">stuck_window_periods</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">data_quality</span><span class="o">.</span><span class="n">stuck_window_periods</span>
+    <span class="n">stuck_std_threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">data_quality</span><span class="o">.</span><span class="n">stuck_std_threshold</span>
+    <span class="n">min_mw_threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">data_quality</span><span class="o">.</span><span class="n">min_mw_threshold</span>
+    <span class="n">max_mw_threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">data_quality</span><span class="o">.</span><span class="n">max_mw_threshold</span>
+
+    <span class="n">with_columns_exprs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">power_columns</span><span class="p">:</span>
+        <span class="n">std_col_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">_rolling_std&quot;</span>
+        <span class="n">count_col_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">_rolling_count&quot;</span>
+
+        <span class="c1"># A sensor is stuck if its rolling std is below the threshold.</span>
+        <span class="c1"># We require a minimum number of periods (e.g. 48 for 24 hours at 30m resolution)</span>
+        <span class="c1"># to avoid false positives from short-term constant values.</span>
+        <span class="n">stuck_mask</span> <span class="o">=</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">count_col_name</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">stuck_window_periods</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">std_col_name</span><span class="p">)</span><span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span> <span class="o">&lt;</span> <span class="n">stuck_std_threshold</span>
+        <span class="p">)</span>
+
+        <span class="c1"># A value is insane if it falls outside physically plausible bounds.</span>
+        <span class="n">insane_mask</span> <span class="o">=</span> <span class="n">_compute_insane_mask</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">min_mw_threshold</span><span class="p">,</span> <span class="n">max_mw_threshold</span><span class="p">)</span>
+
+        <span class="c1"># Combine masks: a value is bad if it&#39;s stuck OR insane</span>
+        <span class="n">bad_mask</span> <span class="o">=</span> <span class="n">stuck_mask</span> <span class="o">|</span> <span class="n">insane_mask</span>
+
+        <span class="n">with_columns_exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">bad_mask</span><span class="p">)</span><span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span><span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">))</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="n">df_cleaned</span> <span class="o">=</span> <span class="n">df_with_rolling</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">with_columns_exprs</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">rolling_cols</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df_cleaned</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.process_flows" class="doc doc-heading">
+            <code>nged_data.process_flows</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="nged_data.process_flows-classes">Classes</h3>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.process_flows.MilfordHavenParser" class="doc doc-heading">
+            <code>MilfordHavenParser</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Parser for Milford Haven format (unit=MW).</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MilfordHavenParser</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parser for Milford Haven format (unit=MW).&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">can_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;unit&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="s2">&quot;value&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;unit&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;MW&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">({</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;MW&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">},</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.process_flows.ParserStrategy" class="doc doc-heading">
+            <code>ParserStrategy</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.Protocol">Protocol</span></code></p>
+
+
+
+        <p>Protocol for CSV parsing strategies.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ParserStrategy</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Protocol for CSV parsing strategies.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">can_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return True if this strategy can parse the given DataFrame.&quot;&quot;&quot;</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parse the DataFrame and return it with standardized column names.&quot;&quot;&quot;</span>
+        <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+<h5 id="nged_data.process_flows.ParserStrategy-functions">Functions</h5>
+
+<div class="doc doc-object doc-function">
+
+
+<h6 id="nged_data.process_flows.ParserStrategy.can_parse" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">can_parse</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></code>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return True if this strategy can parse the given DataFrame.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">can_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if this strategy can parse the given DataFrame.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h6 id="nged_data.process_flows.ParserStrategy.parse" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">parse</span><span class="p">(</span><span class="n">df</span><span class="p">)</span></code>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parse the DataFrame and return it with standardized column names.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse the DataFrame and return it with standardized column names.&quot;&quot;&quot;</span>
+    <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.process_flows.RegentStreetParser" class="doc doc-heading">
+            <code>RegentStreetParser</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Parser for Regent Street format (unit=MVA).</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RegentStreetParser</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parser for Regent Street format (unit=MVA).&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">can_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;unit&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="s2">&quot;value&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;unit&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;MVA&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">({</span><span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;MVA&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">},</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.process_flows.StandardFormatParser" class="doc doc-heading">
+            <code>StandardFormatParser</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+
+
+        <p>Parser for standard NGED formats with various column names.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StandardFormatParser</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parser for standard NGED formats with various column names.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">can_parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">standard_cols</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;ValueDate&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Timestamp&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;MW Inst&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;MVA Inst&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Derived MVA&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Amps&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Volts&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">standard_cols</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;ValueDate&quot;</span><span class="p">:</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Timestamp&quot;</span><span class="p">:</span> <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;MW Inst&quot;</span><span class="p">:</span> <span class="s2">&quot;MW&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;MVAr Inst&quot;</span><span class="p">:</span> <span class="s2">&quot;MVAr&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;MVA Inst&quot;</span><span class="p">:</span> <span class="s2">&quot;MVA&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;Derived MVA&quot;</span><span class="p">:</span> <span class="s2">&quot;MVA&quot;</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+<h3 id="nged_data.process_flows-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.process_flows.process_live_primary_substation_power_flows" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">process_live_primary_substation_power_flows</span><span class="p">(</span><span class="n">csv_data</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Read a primary substation CSV and validate it against the schema.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/process_flows.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_live_primary_substation_power_flows</span><span class="p">(</span>
+    <span class="n">csv_data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationPowerFlows</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a primary substation CSV and validate it against the schema.&quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">csv_data</span><span class="p">)</span>
+    <span class="n">first_orig_rows</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+
+    <span class="c1"># Define available parsing strategies</span>
+    <span class="n">parsers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ParserStrategy</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">RegentStreetParser</span><span class="p">(),</span>
+        <span class="n">MilfordHavenParser</span><span class="p">(),</span>
+        <span class="n">StandardFormatParser</span><span class="p">(),</span>
+    <span class="p">]</span>
+
+    <span class="c1"># Try each parser until one succeeds</span>
+    <span class="n">parsed</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">parser</span> <span class="ow">in</span> <span class="n">parsers</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">parser</span><span class="o">.</span><span class="n">can_parse</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">break</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed</span> <span class="ow">and</span> <span class="p">(</span><span class="s2">&quot;unit&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="s2">&quot;value&quot;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected unit in CSV: </span><span class="si">{</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;unit&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Compute MVA if missing</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">_compute_missing_mva</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+
+    <span class="c1"># Ensure MW, MVA, MVAr, and ingested_at are present before validation.</span>
+    <span class="c1"># If they are missing from the source CSV, fill them with null.</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;MW&quot;</span><span class="p">,</span> <span class="s2">&quot;MVA&quot;</span><span class="p">,</span> <span class="s2">&quot;MVAr&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="s2">&quot;ingested_at&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">UTC_DATETIME_DTYPE</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;ingested_at&quot;</span><span class="p">))</span>
+
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">SubstationPowerFlows</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">cast</span><span class="p">({</span><span class="n">col</span><span class="p">:</span> <span class="n">SubstationPowerFlows</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">})</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">SubstationPowerFlows</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">allow_missing_columns</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">e</span><span class="o">.</span><span class="n">add_note</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First rows of CSV data, before processing: </span><span class="si">{</span><span class="n">first_orig_rows</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.schemas" class="doc doc-heading">
+            <code>nged_data.schemas</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.substation_names.align" class="doc doc-heading">
+            <code>nged_data.substation_names.align</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="nged_data.substation_names.align-classes">Classes</h3>
+<h3 id="nged_data.substation_names.align-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.substation_names.align.join_location_table_to_live_primaries" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">join_location_table_to_live_primaries</span><span class="p">(</span><span class="n">locations</span><span class="p">,</span> <span class="n">live_primaries</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Joins the substation locations dataset to the list of live primary flow resources.</p>
+<p>This function performs a "dance" of normalization because NGED uses slightly different
+naming conventions in different datasets. For example:
+- The locations dataset might use "Abington 33/11kv".
+- The live flows dataset might use "Abington Primary Transformer Flows".</p>
+<p>We normalize these by stripping out common suffixes and voltage information to create
+a "simple_name" that can be used for joining. We also use a manual mapping file for
+cases where the automated normalization isn't enough.</p>
+<p>Returns a DataFrame that can be validated against SubstationMetadata.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/substation_names/align.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">join_location_table_to_live_primaries</span><span class="p">(</span>
+    <span class="n">locations</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationLocations</span><span class="p">],</span>
+    <span class="n">live_primaries</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CkanResource</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationMetadata</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Joins the substation locations dataset to the list of live primary flow resources.</span>
+
+<span class="sd">    This function performs a &quot;dance&quot; of normalization because NGED uses slightly different</span>
+<span class="sd">    naming conventions in different datasets. For example:</span>
+<span class="sd">    - The locations dataset might use &quot;Abington 33/11kv&quot;.</span>
+<span class="sd">    - The live flows dataset might use &quot;Abington Primary Transformer Flows&quot;.</span>
+
+<span class="sd">    We normalize these by stripping out common suffixes and voltage information to create</span>
+<span class="sd">    a &quot;simple_name&quot; that can be used for joining. We also use a manual mapping file for</span>
+<span class="sd">    cases where the automated normalization isn&#39;t enough.</span>
+
+<span class="sd">    Returns a DataFrame that can be validated against SubstationMetadata.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">live_primaries_df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">r</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">live_primaries</span><span class="p">])</span>
+
+    <span class="c1"># Append a &quot;simple_name&quot; column to each dataframe:</span>
+    <span class="n">live_primaries_df</span> <span class="o">=</span> <span class="n">live_primaries_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">simple_name</span><span class="o">=</span><span class="n">simplify_substation_name</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">))</span>
+    <span class="n">locations</span> <span class="o">=</span> <span class="n">locations</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">simple_name</span><span class="o">=</span><span class="n">simplify_substation_name</span><span class="p">(</span><span class="s2">&quot;substation_name&quot;</span><span class="p">))</span>
+
+    <span class="c1"># Load manual mapping</span>
+    <span class="n">csv_filename</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span>
+        <span class="o">/</span> <span class="s2">&quot;map_substation_names_in_live_primary_flows_to_substation_names_in_location_table.csv&quot;</span>
+    <span class="p">)</span>
+    <span class="n">name_mapping</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">csv_filename</span><span class="p">)</span>
+
+    <span class="c1"># Replace any simple names in the live primaries dataframe with the name from the manual</span>
+    <span class="c1"># mapping, if such a mapping exists.</span>
+    <span class="n">live_primaries_df</span> <span class="o">=</span> <span class="n">live_primaries_df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">name_mapping</span><span class="p">,</span>
+        <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span>
+        <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;simple_name&quot;</span><span class="p">,</span>
+        <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;simplified_substation_name_in_live_flows&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">live_primaries_df</span> <span class="o">=</span> <span class="n">live_primaries_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="n">simple_name</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">coalesce</span><span class="p">(</span><span class="s2">&quot;simplified_substation_name_in_location_table&quot;</span><span class="p">,</span> <span class="s2">&quot;simple_name&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Rename the name columns to match SubstationMetadata</span>
+    <span class="n">live_primaries_df</span> <span class="o">=</span> <span class="n">live_primaries_df</span><span class="o">.</span><span class="n">rename</span><span class="p">({</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;substation_name_in_live_primaries&quot;</span><span class="p">})</span>
+    <span class="n">locations_renamed_col</span> <span class="o">=</span> <span class="n">locations</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span>
+        <span class="p">{</span><span class="s2">&quot;substation_name&quot;</span><span class="p">:</span> <span class="s2">&quot;substation_name_in_location_table&quot;</span><span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Join and select relevant columns for SubstationMetadata</span>
+    <span class="n">joined</span> <span class="o">=</span> <span class="n">live_primaries_df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">locations_renamed_col</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;simple_name&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Ensure the URL is a string</span>
+    <span class="n">joined</span> <span class="o">=</span> <span class="n">joined</span><span class="o">.</span><span class="n">cast</span><span class="p">({</span><span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">String</span><span class="p">})</span>
+
+    <span class="c1"># Select only the columns defined in the SubstationMetadata schema</span>
+    <span class="n">columns_to_select</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">SubstationMetadata</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">joined</span><span class="o">.</span><span class="n">columns</span><span class="p">]</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">joined</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">columns_to_select</span><span class="p">)</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="s2">&quot;substation_number&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">SubstationMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">allow_missing_columns</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.utils" class="doc doc-heading">
+            <code>nged_data.utils</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+<h3 id="nged_data.utils-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.utils.ensure_utc_timestamp_lazy" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ensure_utc_timestamp_lazy</span><span class="p">(</span><span class="n">lf</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Ensures the timestamp column is UTC timezone-aware lazily.</p>
+<p>This handles cases where Delta tables lose timezone metadata or Polars scans
+them as naive. It also handles non-UTC timezones by converting them.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>lf</code>
+            </td>
+            <td>
+                  <code><span title="polars.LazyFrame">LazyFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Polars LazyFrame with a 'timestamp' column.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.LazyFrame">LazyFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>LazyFrame with UTC-aware 'timestamp' column.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ensure_utc_timestamp_lazy</span><span class="p">(</span><span class="n">lf</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensures the timestamp column is UTC timezone-aware lazily.</span>
+
+<span class="sd">    This handles cases where Delta tables lose timezone metadata or Polars scans</span>
+<span class="sd">    them as naive. It also handles non-UTC timezones by converting them.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        lf: Polars LazyFrame with a &#39;timestamp&#39; column.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        LazyFrame with UTC-aware &#39;timestamp&#39; column.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">schema</span> <span class="o">=</span> <span class="n">lf</span><span class="o">.</span><span class="n">collect_schema</span><span class="p">()</span>
+    <span class="c1"># If the timestamp column is not present, we return early to avoid errors.</span>
+    <span class="c1"># This is useful when scanning tables that might not have a timestamp column.</span>
+    <span class="k">if</span> <span class="s2">&quot;timestamp&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">schema</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">lf</span>
+
+    <span class="n">timestamp_dtype</span> <span class="o">=</span> <span class="n">schema</span><span class="p">[</span><span class="s2">&quot;timestamp&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">timestamp_dtype</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="n">timestamp_dtype</span><span class="o">.</span><span class="n">time_zone</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">lf</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">replace_time_zone</span><span class="p">(</span><span class="s2">&quot;UTC&quot;</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">timestamp_dtype</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">Datetime</span><span class="p">)</span> <span class="ow">and</span> <span class="n">timestamp_dtype</span><span class="o">.</span><span class="n">time_zone</span> <span class="o">!=</span> <span class="s2">&quot;UTC&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">lf</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">convert_time_zone</span><span class="p">(</span><span class="s2">&quot;UTC&quot;</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">lf</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.utils.find_one_match" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">find_one_match</span><span class="p">(</span><span class="n">predicate</span><span class="p">,</span> <span class="n">haystack</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Find exactly one match in haystack. Raise a ValueError if haystack is empty, or if there is
+more than 1 match.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">find_one_match</span><span class="p">[</span><span class="n">T</span><span class="p">](</span><span class="n">predicate</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="nb">bool</span><span class="p">],</span> <span class="n">haystack</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">T</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find exactly one match in haystack. Raise a ValueError if haystack is empty, or if there is</span>
+<span class="sd">    more than 1 match.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">haystack</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;haystack is empty!&quot;</span><span class="p">)</span>
+    <span class="n">filtered</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="n">predicate</span><span class="p">,</span> <span class="n">haystack</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">filtered</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filtered</span><span class="p">)</span><span class="si">}</span><span class="s2"> matches when we were expecting exactly 1!&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">filtered</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.utils.get_partition_window" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_partition_window</span><span class="p">(</span><span class="n">partition_key</span><span class="p">,</span> <span class="n">lookback_days</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Calculates the partition start, end, and lookback start times.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>partition_key</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The Dagster partition key (ISO format date string).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>lookback_days</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Number of days to look back from the partition start.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="datetime.datetime">datetime</span>, <span title="datetime.datetime">datetime</span>, <span title="datetime.datetime">datetime</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A tuple of (partition_start, partition_end, lookback_start).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_partition_window</span><span class="p">(</span>
+    <span class="n">partition_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">lookback_days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">datetime</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculates the partition start, end, and lookback start times.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        partition_key: The Dagster partition key (ISO format date string).</span>
+<span class="sd">        lookback_days: Number of days to look back from the partition start.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple of (partition_start, partition_end, lookback_start).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># We use fromisoformat to handle the partition key, which is expected to be a date string.</span>
+    <span class="c1"># We ensure the resulting datetime is UTC-aware.</span>
+    <span class="n">partition_start</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromisoformat</span><span class="p">(</span><span class="n">partition_key</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+    <span class="n">partition_end</span> <span class="o">=</span> <span class="n">partition_start</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">lookback_start</span> <span class="o">=</span> <span class="n">partition_start</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">lookback_days</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">partition_start</span><span class="p">,</span> <span class="n">partition_end</span><span class="p">,</span> <span class="n">lookback_start</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.utils.scan_delta_table" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">scan_delta_table</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Scans a Delta table and ensures the timestamp column is UTC-aware.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path to the Delta table.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.LazyFrame">LazyFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Polars LazyFrame with UTC-aware 'timestamp' column (if present).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scan_delta_table</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scans a Delta table and ensures the timestamp column is UTC-aware.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        path: Path to the Delta table.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Polars LazyFrame with UTC-aware &#39;timestamp&#39; column (if present).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">ensure_utc_timestamp_lazy</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">scan_delta</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

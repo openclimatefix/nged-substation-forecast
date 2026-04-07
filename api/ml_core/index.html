@@ -1,0 +1,3378 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../geo/">
+      
+      
+        <link rel="next" href="../nged_data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>ML Core - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ml-core-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ML Core
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/create-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create a Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/run-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="ml-core-api">ML Core API</h1>
+<h1 id="ml_core"><code>ml_core</code></h1>
+<p>Unified ML model interface and shared utilities for substation forecasting.</p>
+<h2 id="purpose">Purpose</h2>
+<p>This package provides the abstract base classes and shared logic required to implement the "Tiny Wrapper" ML pipeline. It prioritizes readability, explicit dependencies, and native framework integrations.</p>
+<h2 id="why-this-package-exists">Why this package exists</h2>
+<p>To enable rapid experimentation with different model architectures (XGBoost, GNNs, etc.), we need a common interface that shields the model developer from the underlying data engineering.</p>
+<h2 id="key-components">Key Components</h2>
+<ul>
+<li><strong><code>model.py</code></strong>: Base classes for forecasters (<code>BaseForecaster</code>). The <code>BaseForecaster</code> protocol defines a standard interface for all forecasting models, requiring them to implement <code>train()</code> and <code>predict()</code> methods. This allows Dagster to orchestrate any model uniformly.</li>
+<li><strong><code>utils.py</code></strong>: Shared MLOps utilities for training (<code>train_and_log_model</code>) and evaluation (<code>evaluate_and_save_model</code>).</li>
+<li><strong><code>features.py</code></strong>: Shared feature engineering logic (e.g., cyclical time features).</li>
+<li><strong><code>data.py</code></strong>: Shared data splitting and loading logic.</li>
+<li><strong><code>scaling.py</code></strong>: Shared normalization and scaling utilities.</li>
+</ul>
+<h2 id="advanced-forecasting-features">Advanced Forecasting Features</h2>
+<p>The <code>BaseForecaster</code> protocol supports several advanced forecasting features:</p>
+<ol>
+<li><strong>Multi-NWP Support</strong>: Models can ingest forecasts from multiple Numerical Weather Prediction (NWP) providers simultaneously. Secondary NWP features are prefixed with their model name (e.g., <code>gfs_temperature_2m</code>), and all NWPs are joined using a 3-hour availability delay.</li>
+<li><strong>Dynamic Seasonal Lags</strong>: Prevents lookahead bias by calculating autoregressive lags dynamically based on the forecast lead time. The model always uses the most recent <em>available</em> historical data for a given lead time (e.g., <code>lag_days = max(1, ceil(lead_time_days / 7)) * 7</code>).</li>
+<li><strong>Rigorous Backtesting</strong>: Supports simulating real-time inference via the <code>collapse_lead_times</code> parameter. When enabled, it filters NWP data to keep only the latest available forecast for each valid time, enforcing the 3-hour availability delay.</li>
+</ol>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ml_core.model" class="doc doc-heading">
+            <code>ml_core.model</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Base classes for ML model inference.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="ml_core.model-classes">Classes</h3>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="ml_core.model.BaseForecaster" class="doc doc-heading">
+            <code>BaseForecaster</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="abc.ABC">ABC</span></code></p>
+
+
+
+        <p>Abstract base class for all ML model forecasters.</p>
+<p>A Forecaster handles the full lifecycle of an ML model: training and
+production inference. It handles eager <code>DataFrames</code> and is designed to
+be used within Dagster assets or standalone scripts.</p>
+<p>Subclasses should override the <code>train</code> and <code>predict</code> methods with explicit,
+strictly-typed keyword arguments for the specific data they require.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/ml_core/src/ml_core/model.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseForecaster</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for all ML model forecasters.</span>
+
+<span class="sd">    A Forecaster handles the full lifecycle of an ML model: training and</span>
+<span class="sd">    production inference. It handles eager `DataFrames` and is designed to</span>
+<span class="sd">    be used within Dagster assets or standalone scripts.</span>
+
+<span class="sd">    Subclasses should override the `train` and `predict` methods with explicit,</span>
+<span class="sd">    strictly-typed keyword arguments for the specific data they require.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="n">ModelConfig</span><span class="p">,</span>
+        <span class="n">flows_30m</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">,</span>
+        <span class="n">substation_metadata</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationMetadata</span><span class="p">],</span>
+        <span class="n">nwps</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">NwpModel</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Train the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            config: Model configuration object.</span>
+<span class="sd">            flows_30m: Historical power flow data downsampled to 30m.</span>
+<span class="sd">            substation_metadata: The substation metadata.</span>
+<span class="sd">            nwps: A dictionary of weather forecast dataframes.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The trained native model object (e.g., XGBRegressor).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">substation_metadata</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationMetadata</span><span class="p">],</span>
+        <span class="n">inference_params</span><span class="p">:</span> <span class="n">InferenceParams</span><span class="p">,</span>
+        <span class="n">flows_30m</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">,</span>
+        <span class="n">nwps</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">NwpModel</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">collapse_lead_times</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerForecast</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate power forecasts.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            substation_metadata: The substation metadata.</span>
+<span class="sd">            inference_params: Parameters for inference.</span>
+<span class="sd">            flows_30m: Historical power flow data downsampled to 30m (for lags).</span>
+<span class="sd">            nwps: A dictionary of weather forecast dataframes.</span>
+<span class="sd">            collapse_lead_times: Whether to collapse lead times (used in backtesting).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Patito DataFrame containing the model&#39;s predictions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Log the model to MLflow.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model_name: The name to register the model under.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+<h5 id="ml_core.model.BaseForecaster-functions">Functions</h5>
+
+<div class="doc doc-object doc-function">
+
+
+<h6 id="ml_core.model.BaseForecaster.log_model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Log the model to MLflow.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>model_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The name to register the model under.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/model.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Log the model to MLflow.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model_name: The name to register the model under.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h6 id="ml_core.model.BaseForecaster.predict" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">predict</span><span class="p">(</span><span class="n">substation_metadata</span><span class="p">,</span> <span class="n">inference_params</span><span class="p">,</span> <span class="n">flows_30m</span><span class="p">,</span> <span class="n">nwps</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">collapse_lead_times</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Generate power forecasts.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>substation_metadata</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationMetadata (contracts.data_schemas.SubstationMetadata)" href="../contracts/#contracts.data_schemas.SubstationMetadata">SubstationMetadata</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The substation metadata.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>inference_params</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="InferenceParams (contracts.data_schemas.InferenceParams)" href="../contracts/#contracts.data_schemas.InferenceParams">InferenceParams</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Parameters for inference.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>flows_30m</code>
+            </td>
+            <td>
+                  <code><span title="polars.LazyFrame">LazyFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Historical power flow data downsampled to 30m (for lags).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nwps</code>
+            </td>
+            <td>
+                  <code><span title="collections.abc.Mapping">Mapping</span>[<a class="autorefs autorefs-internal" title="NwpModel (contracts.hydra_schemas.NwpModel)" href="../contracts/#contracts.hydra_schemas.NwpModel">NwpModel</a>, <span title="polars.LazyFrame">LazyFrame</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dictionary of weather forecast dataframes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>collapse_lead_times</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether to collapse lead times (used in backtesting).</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="PowerForecast (contracts.data_schemas.PowerForecast)" href="../contracts/#contracts.data_schemas.PowerForecast">PowerForecast</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Patito DataFrame containing the model's predictions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/model.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">substation_metadata</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationMetadata</span><span class="p">],</span>
+    <span class="n">inference_params</span><span class="p">:</span> <span class="n">InferenceParams</span><span class="p">,</span>
+    <span class="n">flows_30m</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">,</span>
+    <span class="n">nwps</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">NwpModel</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">collapse_lead_times</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerForecast</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate power forecasts.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        substation_metadata: The substation metadata.</span>
+<span class="sd">        inference_params: Parameters for inference.</span>
+<span class="sd">        flows_30m: Historical power flow data downsampled to 30m (for lags).</span>
+<span class="sd">        nwps: A dictionary of weather forecast dataframes.</span>
+<span class="sd">        collapse_lead_times: Whether to collapse lead times (used in backtesting).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A Patito DataFrame containing the model&#39;s predictions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h6 id="ml_core.model.BaseForecaster.train" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">train</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">flows_30m</span><span class="p">,</span> <span class="n">substation_metadata</span><span class="p">,</span> <span class="n">nwps</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Train the model.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ModelConfig (contracts.hydra_schemas.ModelConfig)" href="../contracts/#contracts.hydra_schemas.ModelConfig">ModelConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Model configuration object.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>flows_30m</code>
+            </td>
+            <td>
+                  <code><span title="polars.LazyFrame">LazyFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Historical power flow data downsampled to 30m.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>substation_metadata</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationMetadata (contracts.data_schemas.SubstationMetadata)" href="../contracts/#contracts.data_schemas.SubstationMetadata">SubstationMetadata</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The substation metadata.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>nwps</code>
+            </td>
+            <td>
+                  <code><span title="collections.abc.Mapping">Mapping</span>[<a class="autorefs autorefs-internal" title="NwpModel (contracts.hydra_schemas.NwpModel)" href="../contracts/#contracts.hydra_schemas.NwpModel">NwpModel</a>, <span title="polars.LazyFrame">LazyFrame</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A dictionary of weather forecast dataframes.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The trained native model object (e.g., XGBRegressor).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/model.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">train</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">ModelConfig</span><span class="p">,</span>
+    <span class="n">flows_30m</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">,</span>
+    <span class="n">substation_metadata</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationMetadata</span><span class="p">],</span>
+    <span class="n">nwps</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">NwpModel</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Train the model.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        config: Model configuration object.</span>
+<span class="sd">        flows_30m: Historical power flow data downsampled to 30m.</span>
+<span class="sd">        substation_metadata: The substation metadata.</span>
+<span class="sd">        nwps: A dictionary of weather forecast dataframes.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The trained native model object (e.g., XGBRegressor).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ml_core.utils" class="doc doc-heading">
+            <code>ml_core.utils</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="ml_core.utils-classes">Classes</h3>
+<h3 id="ml_core.utils-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.utils.evaluate_and_save_model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">evaluate_and_save_model</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">forecaster</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Universal utility to handle temporal slicing, inference, and storage.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="dagster.AssetExecutionContext">AssetExecutionContext</span>, <span title="dagster.OpExecutionContext">OpExecutionContext</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dagster execution context (Asset or Op).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the model.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>forecaster</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An object with a <code>predict(**kwargs)</code> method.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TrainingConfig (contracts.hydra_schemas.TrainingConfig)" href="../contracts/#contracts.hydra_schemas.TrainingConfig">TrainingConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Training configuration object.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input LazyFrames to be temporally sliced and collected.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Polars DataFrame containing the predictions.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate_and_save_model</span><span class="p">(</span>
+    <span class="n">context</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">dg</span><span class="o">.</span><span class="n">AssetExecutionContext</span><span class="p">,</span> <span class="n">dg</span><span class="o">.</span><span class="n">OpExecutionContext</span><span class="p">],</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">forecaster</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">TrainingConfig</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Universal utility to handle temporal slicing, inference, and storage.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        context: Dagster execution context (Asset or Op).</span>
+<span class="sd">        model_name: Name of the model.</span>
+<span class="sd">        forecaster: An object with a `predict(**kwargs)` method.</span>
+<span class="sd">        config: Training configuration object.</span>
+<span class="sd">        **kwargs: Input LazyFrames to be temporally sliced and collected.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A Polars DataFrame containing the predictions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Universal Temporal Slicing for Test Set</span>
+    <span class="n">test_start</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">data_split</span><span class="o">.</span><span class="n">test_start</span>
+    <span class="n">test_end</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">data_split</span><span class="o">.</span><span class="n">test_end</span>
+
+    <span class="n">sliced_data</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;substation_metadata&quot;</span><span class="p">:</span>
+            <span class="n">sliced_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+            <span class="k">continue</span>
+
+        <span class="n">time_col</span> <span class="o">=</span> <span class="s2">&quot;timestamp&quot;</span> <span class="k">if</span> <span class="s2">&quot;power_flows&quot;</span> <span class="ow">in</span> <span class="n">key</span> <span class="k">else</span> <span class="s2">&quot;valid_time&quot;</span>
+
+        <span class="c1"># Add a configurable lookback for autoregressive features</span>
+        <span class="n">slice_start</span> <span class="o">=</span> <span class="n">test_start</span>
+        <span class="k">if</span> <span class="s2">&quot;power_flows&quot;</span> <span class="ow">in</span> <span class="n">key</span> <span class="ow">or</span> <span class="s2">&quot;nwps&quot;</span> <span class="ow">in</span> <span class="n">key</span><span class="p">:</span>
+            <span class="n">lookback</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;required_lookback_days&quot;</span><span class="p">,</span> <span class="mi">14</span><span class="p">)</span>
+            <span class="n">slice_start</span> <span class="o">=</span> <span class="n">test_start</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">lookback</span><span class="p">)</span>
+
+        <span class="n">sliced_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">_slice_temporal_data</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">slice_start</span><span class="p">,</span> <span class="n">test_end</span><span class="p">,</span> <span class="n">time_col</span><span class="p">)</span>
+
+    <span class="c1"># 2. Call the Model-Specific Inference</span>
+    <span class="c1"># Extract the actual init_time from the provided nwps data</span>
+    <span class="n">forecast_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">&quot;nwps&quot;</span> <span class="ow">in</span> <span class="n">sliced_data</span><span class="p">:</span>
+        <span class="n">nwps_data</span> <span class="o">=</span> <span class="n">sliced_data</span><span class="p">[</span><span class="s2">&quot;nwps&quot;</span><span class="p">]</span>
+        <span class="n">first_nwp</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nwps_data</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="n">nwps_data</span><span class="p">:</span>
+            <span class="n">first_nwp</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">nwps_data</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nwps_data</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">and</span> <span class="n">nwps_data</span><span class="p">:</span>
+            <span class="n">first_nwp</span> <span class="o">=</span> <span class="n">nwps_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nwps_data</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">):</span>
+            <span class="n">first_nwp</span> <span class="o">=</span> <span class="n">nwps_data</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">first_nwp</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">):</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">first_nwp</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;init_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">())</span><span class="o">.</span><span class="n">collect</span><span class="p">())</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span> <span class="ow">and</span> <span class="n">df</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">delay_hours</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;nwp_availability_delay_hours&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+                <span class="n">forecast_time</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="n">delay_hours</span><span class="p">)</span>
+
+    <span class="n">inference_params</span> <span class="o">=</span> <span class="n">InferenceParams</span><span class="p">(</span>
+        <span class="n">forecast_time</span><span class="o">=</span><span class="n">forecast_time</span><span class="p">,</span>
+        <span class="n">power_fcst_model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Downsample power flows to 30m for inference (lags)</span>
+    <span class="k">if</span> <span class="s2">&quot;substation_power_flows&quot;</span> <span class="ow">in</span> <span class="n">sliced_data</span><span class="p">:</span>
+        <span class="n">flows</span> <span class="o">=</span> <span class="n">sliced_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;substation_power_flows&quot;</span><span class="p">)</span>
+        <span class="c1"># Use the provided target_map for consistency</span>
+        <span class="n">target_map</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_map&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Fallback if no target_map is available on the forecaster</span>
+            <span class="c1"># In production, the forecaster should always have one.</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">forecaster</span><span class="p">,</span> <span class="s2">&quot;target_map&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">forecaster</span><span class="o">.</span><span class="n">target_map</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">target_map</span> <span class="o">=</span> <span class="n">forecaster</span><span class="o">.</span><span class="n">target_map</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;target_map must be provided in kwargs or present on the forecaster to downsample power flows.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">target_map_lf</span> <span class="o">=</span> <span class="n">target_map</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_map</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="k">else</span> <span class="n">target_map</span>
+        <span class="n">flows_30m</span> <span class="o">=</span> <span class="n">downsample_power_flows</span><span class="p">(</span><span class="n">flows</span><span class="p">,</span> <span class="n">target_map</span><span class="o">=</span><span class="n">target_map_lf</span><span class="p">)</span>
+        <span class="n">sliced_data</span><span class="p">[</span><span class="s2">&quot;flows_30m&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flows_30m</span>
+
+    <span class="n">results_df</span> <span class="o">=</span> <span class="n">forecaster</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
+        <span class="n">inference_params</span><span class="o">=</span><span class="n">inference_params</span><span class="p">,</span> <span class="n">collapse_lead_times</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">sliced_data</span>
+    <span class="p">)</span>
+
+    <span class="c1"># 3. Calculate Metrics per lead_time</span>
+    <span class="k">if</span> <span class="s2">&quot;flows_30m&quot;</span> <span class="ow">in</span> <span class="n">sliced_data</span><span class="p">:</span>
+        <span class="n">actuals</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+            <span class="n">sliced_data</span><span class="p">[</span><span class="s2">&quot;flows_30m&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">collect</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Join predictions with actuals</span>
+        <span class="n">eval_df</span> <span class="o">=</span> <span class="n">results_df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">actuals</span><span class="o">.</span><span class="n">rename</span><span class="p">({</span><span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="s2">&quot;valid_time&quot;</span><span class="p">,</span> <span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">:</span> <span class="s2">&quot;actual&quot;</span><span class="p">}),</span>
+            <span class="n">on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;valid_time&quot;</span><span class="p">,</span> <span class="s2">&quot;substation_number&quot;</span><span class="p">],</span>
+            <span class="n">how</span><span class="o">=</span><span class="s2">&quot;inner&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Join the peak_capacity_MW_or_MVA from the forecaster&#39;s target_map</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">forecaster</span><span class="p">,</span> <span class="s2">&quot;target_map&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">forecaster</span><span class="o">.</span><span class="n">target_map</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">target_map_df</span> <span class="o">=</span> <span class="n">forecaster</span><span class="o">.</span><span class="n">target_map</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_map_df</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">):</span>
+                <span class="n">target_map_df</span> <span class="o">=</span> <span class="n">target_map_df</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+            <span class="c1"># We cast to pl.DataFrame here because eval_df and target_map_df are</span>
+            <span class="c1"># different Patito models. Polars&#39; join method on Patito subclasses</span>
+            <span class="c1"># enforces that both sides have the same type, which would fail here.</span>
+            <span class="n">eval_df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">eval_df</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">target_map_df</span><span class="p">)</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+                    <span class="p">[</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span> <span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">]</span>
+                <span class="p">),</span>
+                <span class="n">on</span><span class="o">=</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span>
+                <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># Fill missing peak_capacity_MW_or_MVA with 1.0 to avoid division by zero</span>
+            <span class="n">eval_df</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="mf">1.0</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Fallback if no target_map is available</span>
+            <span class="n">eval_df</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">peak_capacity_MW_or_MVA</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="mf">1.0</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+            <span class="c1"># Filter out the lookback period to avoid data leakage in evaluation</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">test_start</span><span class="p">,</span> <span class="n">date</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">test_start</span><span class="p">,</span> <span class="n">datetime</span><span class="p">):</span>
+                <span class="n">test_start_dt</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">combine</span><span class="p">(</span><span class="n">test_start</span><span class="p">,</span> <span class="n">datetime</span><span class="o">.</span><span class="n">min</span><span class="o">.</span><span class="n">time</span><span class="p">())</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+                    <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">test_start_dt</span> <span class="o">=</span> <span class="n">test_start</span>
+
+            <span class="n">eval_df</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_time&quot;</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">test_start_dt</span><span class="p">)</span>
+
+            <span class="c1"># Calculate lead_time_hours</span>
+            <span class="k">if</span> <span class="s2">&quot;nwp_init_time&quot;</span> <span class="ow">in</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">eval_df</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                    <span class="n">lead_time_hours</span><span class="o">=</span><span class="p">(</span>
+                        <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_time&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;nwp_init_time&quot;</span><span class="p">)</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">total_minutes</span><span class="p">()</span>
+                    <span class="o">/</span> <span class="mf">60.0</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Fallback if nwp_init_time is not available</span>
+                <span class="n">eval_df</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+                    <span class="n">lead_time_hours</span><span class="o">=</span><span class="p">(</span>
+                        <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_time&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">forecast_time</span><span class="p">)</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">total_minutes</span><span class="p">()</span>
+                    <span class="o">/</span> <span class="mf">60.0</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Group by lead_time_hours and calculate metrics</span>
+            <span class="n">metrics</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">eval_df</span><span class="o">.</span><span class="n">group_by</span><span class="p">(</span><span class="s2">&quot;lead_time_hours&quot;</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">agg</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;MAE&quot;</span><span class="p">),</span>
+                        <span class="p">((</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;RMSE&quot;</span><span class="p">),</span>
+                        <span class="p">(</span>
+                            <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span>
+                            <span class="o">/</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">)</span>
+                        <span class="p">)</span>
+                        <span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                        <span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;nMAE&quot;</span><span class="p">),</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+                <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;lead_time_hours&quot;</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Log metrics to MLflow</span>
+            <span class="n">mlflow</span><span class="o">.</span><span class="n">set_experiment</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">start_run</span><span class="p">(</span><span class="n">run_name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_eval&quot;</span><span class="p">):</span>
+                <span class="c1"># 1. Metric Thinning: Log only key operational horizons</span>
+                <span class="n">key_horizons</span> <span class="o">=</span> <span class="p">{</span><span class="mf">24.0</span><span class="p">,</span> <span class="mf">48.0</span><span class="p">,</span> <span class="mf">72.0</span><span class="p">,</span> <span class="mf">168.0</span><span class="p">,</span> <span class="mf">336.0</span><span class="p">}</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">metrics</span><span class="o">.</span><span class="n">iter_rows</span><span class="p">(</span><span class="n">named</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                    <span class="n">lt</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;lead_time_hours&quot;</span><span class="p">]),</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">lt</span> <span class="ow">in</span> <span class="n">key_horizons</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;MAE&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MAE_LT_</span><span class="si">{</span><span class="n">lt</span><span class="si">}</span><span class="s2">h&quot;</span><span class="p">,</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;MAE&quot;</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;RMSE&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;RMSE_LT_</span><span class="si">{</span><span class="n">lt</span><span class="si">}</span><span class="s2">h&quot;</span><span class="p">,</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;RMSE&quot;</span><span class="p">])</span>
+                        <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;nMAE&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;nMAE_LT_</span><span class="si">{</span><span class="n">lt</span><span class="si">}</span><span class="s2">h&quot;</span><span class="p">,</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;nMAE&quot;</span><span class="p">])</span>
+
+                <span class="c1"># 2. Log global aggregate metrics</span>
+                <span class="n">mae_global</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">mae_global</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="s2">&quot;mean_mae_all_horizons&quot;</span><span class="p">,</span> <span class="n">mae_global</span><span class="p">)</span>
+                    <span class="c1"># Keep MAE_global for backward compatibility</span>
+                    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="s2">&quot;MAE_global&quot;</span><span class="p">,</span> <span class="n">mae_global</span><span class="p">)</span>
+
+                <span class="n">rmse_global</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+                    <span class="p">((</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">rmse_global</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="s2">&quot;RMSE_global&quot;</span><span class="p">,</span> <span class="n">rmse_global</span><span class="p">)</span>
+
+                <span class="n">nmae_global</span> <span class="o">=</span> <span class="n">eval_df</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+                    <span class="p">(</span>
+                        <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;MW_or_MVA&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;actual&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span>
+                        <span class="o">/</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">)</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">nmae_global</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_metric</span><span class="p">(</span><span class="s2">&quot;nMAE_global&quot;</span><span class="p">,</span> <span class="n">nmae_global</span><span class="p">)</span>
+
+                <span class="c1"># 3. Save full granular evaluation dataframe as Parquet artifact</span>
+                <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
+                    <span class="n">eval_df_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;evaluation_granular.parquet&quot;</span><span class="p">)</span>
+                    <span class="n">eval_df</span><span class="o">.</span><span class="n">write_parquet</span><span class="p">(</span><span class="n">eval_df_path</span><span class="p">)</span>
+                    <span class="n">mlflow</span><span class="o">.</span><span class="n">log_artifact</span><span class="p">(</span><span class="n">eval_df_path</span><span class="p">)</span>
+
+    <span class="c1"># 4. Trigger Dynamic Partition</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s2">&quot;instance&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">context</span><span class="o">.</span><span class="n">instance</span><span class="p">:</span>
+        <span class="n">context</span><span class="o">.</span><span class="n">instance</span><span class="o">.</span><span class="n">add_dynamic_partitions</span><span class="p">(</span><span class="s2">&quot;model_partitions&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">model_name</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s2">&quot;add_output_metadata&quot;</span><span class="p">):</span>
+        <span class="n">context</span><span class="o">.</span><span class="n">add_output_metadata</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;num_rows&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">results_df</span><span class="p">),</span>
+                <span class="s2">&quot;power_fcst_model_name&quot;</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results_df</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.utils.train_and_log_model" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">train_and_log_model</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">trainer</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Universal utility to handle temporal slicing and MLflow logging for training.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>context</code>
+            </td>
+            <td>
+                  <code><span title="typing.Union">Union</span>[<span title="dagster.AssetExecutionContext">AssetExecutionContext</span>, <span title="dagster.OpExecutionContext">OpExecutionContext</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Dagster execution context (Asset or Op).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>model_name</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the model (for MLflow run name).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>trainer</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An object with a <code>train(config, **kwargs)</code> method.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>config</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="TrainingConfig (contracts.hydra_schemas.TrainingConfig)" href="../contracts/#contracts.hydra_schemas.TrainingConfig">TrainingConfig</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Training configuration object.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>**kwargs</code>
+            </td>
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Input LazyFrames to be temporally sliced.</p>
+              </div>
+            </td>
+            <td>
+                  <code>{}</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The trained model object.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/utils.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">train_and_log_model</span><span class="p">(</span>
+    <span class="n">context</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">dg</span><span class="o">.</span><span class="n">AssetExecutionContext</span><span class="p">,</span> <span class="n">dg</span><span class="o">.</span><span class="n">OpExecutionContext</span><span class="p">],</span>
+    <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">trainer</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="n">TrainingConfig</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Universal utility to handle temporal slicing and MLflow logging for training.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        context: Dagster execution context (Asset or Op).</span>
+<span class="sd">        model_name: Name of the model (for MLflow run name).</span>
+<span class="sd">        trainer: An object with a `train(config, **kwargs)` method.</span>
+<span class="sd">        config: Training configuration object.</span>
+<span class="sd">        **kwargs: Input LazyFrames to be temporally sliced.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The trained model object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Universal Temporal Slicing</span>
+    <span class="n">train_start</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">data_split</span><span class="o">.</span><span class="n">train_start</span>
+    <span class="n">train_end</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">data_split</span><span class="o">.</span><span class="n">train_end</span>
+
+    <span class="n">sliced_data</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;substation_metadata&quot;</span><span class="p">:</span>
+            <span class="n">sliced_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+            <span class="k">continue</span>
+
+        <span class="n">time_col</span> <span class="o">=</span> <span class="s2">&quot;timestamp&quot;</span> <span class="k">if</span> <span class="s2">&quot;power_flows&quot;</span> <span class="ow">in</span> <span class="n">key</span> <span class="k">else</span> <span class="s2">&quot;valid_time&quot;</span>
+
+        <span class="c1"># Add a configurable lookback for autoregressive features</span>
+        <span class="n">slice_start</span> <span class="o">=</span> <span class="n">train_start</span>
+        <span class="k">if</span> <span class="s2">&quot;power_flows&quot;</span> <span class="ow">in</span> <span class="n">key</span> <span class="ow">or</span> <span class="s2">&quot;nwps&quot;</span> <span class="ow">in</span> <span class="n">key</span><span class="p">:</span>
+            <span class="n">lookback</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;required_lookback_days&quot;</span><span class="p">,</span> <span class="mi">14</span><span class="p">)</span>
+            <span class="n">slice_start</span> <span class="o">=</span> <span class="n">train_start</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">lookback</span><span class="p">)</span>
+
+        <span class="n">sliced_data</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">_slice_temporal_data</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">slice_start</span><span class="p">,</span> <span class="n">train_end</span><span class="p">,</span> <span class="n">time_col</span><span class="p">)</span>
+
+        <span class="c1"># 2. Call the Model-Specific Math</span>
+        <span class="c1"># The trainer is responsible for joining and feature engineering.</span>
+        <span class="c1"># We downsample power flows to 30m and use the provided target map</span>
+        <span class="c1"># to ensure consistency across models.</span>
+        <span class="k">if</span> <span class="s2">&quot;substation_power_flows&quot;</span> <span class="ow">in</span> <span class="n">sliced_data</span><span class="p">:</span>
+            <span class="n">flows</span> <span class="o">=</span> <span class="n">sliced_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;substation_power_flows&quot;</span><span class="p">)</span>
+            <span class="n">target_map</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_map&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">target_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_map must be passed in kwargs to downsample power flows.&quot;</span><span class="p">)</span>
+
+            <span class="n">flows_30m</span> <span class="o">=</span> <span class="n">downsample_power_flows</span><span class="p">(</span>
+                <span class="n">flows</span><span class="p">,</span>
+                <span class="n">target_map</span><span class="o">=</span><span class="n">target_map</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_map</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
+                <span class="k">else</span> <span class="n">target_map</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">sliced_data</span><span class="p">[</span><span class="s2">&quot;flows_30m&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">flows_30m</span>
+
+            <span class="c1"># Store target_map on the trainer if it supports it</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">trainer</span><span class="p">,</span> <span class="s2">&quot;target_map&quot;</span><span class="p">):</span>
+                <span class="n">trainer</span><span class="o">.</span><span class="n">target_map</span> <span class="o">=</span> <span class="n">target_map</span>
+
+        <span class="c1"># Remove target_map from sliced_data so it&#39;s not passed to trainer.train()</span>
+        <span class="n">sliced_data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;target_map&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">model</span> <span class="o">=</span> <span class="n">trainer</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">sliced_data</span><span class="p">)</span>
+
+    <span class="c1"># 3. Universal MLflow Logging</span>
+    <span class="n">mlflow</span><span class="o">.</span><span class="n">set_experiment</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">mlflow</span><span class="o">.</span><span class="n">start_run</span><span class="p">(</span><span class="n">run_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">)</span> <span class="k">as</span> <span class="n">run</span><span class="p">:</span>
+        <span class="n">mlflow</span><span class="o">.</span><span class="n">log_params</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">model_dump</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">))</span>
+        <span class="n">trainer</span><span class="o">.</span><span class="n">log_model</span><span class="p">(</span><span class="n">model_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="s2">&quot;add_output_metadata&quot;</span><span class="p">):</span>
+            <span class="n">context</span><span class="o">.</span><span class="n">add_output_metadata</span><span class="p">({</span><span class="s2">&quot;mlflow_run_id&quot;</span><span class="p">:</span> <span class="n">run</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">run_id</span><span class="p">})</span>
+
+    <span class="k">return</span> <span class="n">model</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ml_core.data" class="doc doc-heading">
+            <code>ml_core.data</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Shared data processing logic for ML models.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="ml_core.data-classes">Classes</h3>
+<h3 id="ml_core.data-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.data.calculate_target_map" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">calculate_target_map</span><span class="p">(</span><span class="n">flows</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Calculate the target map (power_col and peak_capacity) for each substation.</p>
+<p>This function analyzes historical power flows to determine whether MW or MVA
+is the more reliable target variable (based on data availability) and
+calculates the peak capacity for normalization.</p>
+<p>POTENTIAL DATA LEAKAGE: The 90-day dead sensor rule uses the entire history,
+introducing temporal leakage, but the user has consciously accepted this to
+simplify the global decision.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>flows</code>
+            </td>
+            <td>
+                  <code><span title="patito.LazyFrame">LazyFrame</span>[<a class="autorefs autorefs-internal" title="SubstationPowerFlows (contracts.data_schemas.SubstationPowerFlows)" href="../contracts/#contracts.data_schemas.SubstationPowerFlows">SubstationPowerFlows</a>] | <span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationPowerFlows (contracts.data_schemas.SubstationPowerFlows)" href="../contracts/#contracts.data_schemas.SubstationPowerFlows">SubstationPowerFlows</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Historical power flow data (LazyFrame or DataFrame).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationTargetMap (contracts.data_schemas.SubstationTargetMap)" href="../contracts/#contracts.data_schemas.SubstationTargetMap">SubstationTargetMap</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A Patito DataFrame containing the target map for each substation.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/data.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
+<span class="normal"> 21</span>
+<span class="normal"> 22</span>
+<span class="normal"> 23</span>
+<span class="normal"> 24</span>
+<span class="normal"> 25</span>
+<span class="normal"> 26</span>
+<span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">calculate_target_map</span><span class="p">(</span>
+    <span class="n">flows</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">[</span><span class="n">SubstationPowerFlows</span><span class="p">]</span> <span class="o">|</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationPowerFlows</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationTargetMap</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate the target map (power_col and peak_capacity) for each substation.</span>
+
+<span class="sd">    This function analyzes historical power flows to determine whether MW or MVA</span>
+<span class="sd">    is the more reliable target variable (based on data availability) and</span>
+<span class="sd">    calculates the peak capacity for normalization.</span>
+
+<span class="sd">    POTENTIAL DATA LEAKAGE: The 90-day dead sensor rule uses the entire history,</span>
+<span class="sd">    introducing temporal leakage, but the user has consciously accepted this to</span>
+<span class="sd">    simplify the global decision.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        flows: Historical power flow data (LazyFrame or DataFrame).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A Patito DataFrame containing the target map for each substation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">flows_lazy</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">flows</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="k">else</span> <span class="n">flows</span>
+
+    <span class="c1"># Calculate valid counts, last seen timestamps, and peak capacity</span>
+    <span class="n">stats</span> <span class="o">=</span> <span class="n">flows_lazy</span><span class="o">.</span><span class="n">group_by</span><span class="p">(</span><span class="s2">&quot;substation_number&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span>
+        <span class="n">valid_count_mw</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">)</span><span class="o">.</span><span class="n">is_not_null</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+        <span class="n">valid_count_mva</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">)</span><span class="o">.</span><span class="n">is_not_null</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span>
+        <span class="n">last_seen_mw</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">)</span><span class="o">.</span><span class="n">is_not_null</span><span class="p">())</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+        <span class="n">last_seen_mva</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">)</span><span class="o">.</span><span class="n">is_not_null</span><span class="p">())</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+        <span class="n">max_timestamp</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+        <span class="n">peak_capacity_MW_or_MVA</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">max_horizontal</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower_bound</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Determine initial choice based on volume (Priority: MW &gt; MVA if equal counts)</span>
+    <span class="n">stats</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="n">preferred_power_col</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_count_mw&quot;</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_count_mva&quot;</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">)),</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Apply &quot;Dead Sensor&quot; Exception (90 day rule)</span>
+    <span class="c1"># If the preferred column&#39;s last seen is &gt; 90 days before the total max_timestamp,</span>
+    <span class="c1"># we switch to the alternative.</span>
+    <span class="n">dead_sensor_threshold</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">duration</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">90</span><span class="p">)</span>
+
+    <span class="c1"># Check if each sensor is dead (no data in the last 90 days)</span>
+    <span class="n">is_mw_dead</span> <span class="o">=</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;max_timestamp&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;last_seen_mw&quot;</span><span class="p">))</span> <span class="o">&gt;</span> <span class="n">dead_sensor_threshold</span>
+    <span class="n">is_mva_dead</span> <span class="o">=</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;max_timestamp&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;last_seen_mva&quot;</span><span class="p">))</span> <span class="o">&gt;</span> <span class="n">dead_sensor_threshold</span>
+
+    <span class="c1"># Determine if we need to switch from the initially preferred column</span>
+    <span class="n">switch_to_mva</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;preferred_power_col&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">POWER_MW</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">is_mw_dead</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_count_mva&quot;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">switch_to_mw</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;preferred_power_col&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">POWER_MVA</span><span class="p">)</span> <span class="o">&amp;</span> <span class="n">is_mva_dead</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;valid_count_mw&quot;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">pref_col_expr</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">switch_to_mva</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">switch_to_mw</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;preferred_power_col&quot;</span><span class="p">))</span>
+    <span class="p">)</span>
+
+    <span class="c1"># To avoid type overload issues, we compute the target map entirely lazily</span>
+    <span class="c1"># and only collect at the very end.</span>
+    <span class="n">target_map_lazy</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="n">preferred_power_col</span><span class="o">=</span><span class="n">pref_col_expr</span><span class="p">,</span>
+        <span class="n">peak_capacity_MW_or_MVA</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span> <span class="s2">&quot;preferred_power_col&quot;</span><span class="p">,</span> <span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">])</span>
+
+    <span class="n">target_map_df</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">target_map_lazy</span><span class="o">.</span><span class="n">collect</span><span class="p">())</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;substation_number&quot;</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Int32</span><span class="p">,</span>
+            <span class="s2">&quot;peak_capacity_MW_or_MVA&quot;</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">SubstationTargetMap</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">target_map_df</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.data.downsample_power_flows" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">downsample_power_flows</span><span class="p">(</span><span class="n">flows</span><span class="p">,</span> <span class="n">target_map</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Downsample power flows to 30m using period-ending semantics.</p>
+<p>We assume that NWP data represents the average (or accumulated) value for the
+period <em>ending</em> at <code>valid_time</code>. For example, a weather forecast for 10:00
+describes the weather from 09:00 to 10:00.</p>
+<p>To align our targets with these features, we downsample power flows using
+<code>closed="right", label="right"</code>. This ensures that power readings from
+09:30 to 10:00 are aggregated and labeled as <code>10:00</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>flows</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationPowerFlows (contracts.data_schemas.SubstationPowerFlows)" href="../contracts/#contracts.data_schemas.SubstationPowerFlows">SubstationPowerFlows</a>] | <span title="patito.LazyFrame">LazyFrame</span>[<a class="autorefs autorefs-internal" title="SubstationPowerFlows (contracts.data_schemas.SubstationPowerFlows)" href="../contracts/#contracts.data_schemas.SubstationPowerFlows">SubstationPowerFlows</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Historical power flow data.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>target_map</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="SubstationTargetMap (contracts.data_schemas.SubstationTargetMap)" href="../contracts/#contracts.data_schemas.SubstationTargetMap">SubstationTargetMap</a>] | <span title="patito.LazyFrame">LazyFrame</span>[<a class="autorefs autorefs-internal" title="SubstationTargetMap (contracts.data_schemas.SubstationTargetMap)" href="../contracts/#contracts.data_schemas.SubstationTargetMap">SubstationTargetMap</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Map of substation_number to target_col (MW or MVA).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="patito.LazyFrame">LazyFrame</span>[<a class="autorefs autorefs-internal" title="SimplifiedSubstationPowerFlows (contracts.data_schemas.SimplifiedSubstationPowerFlows)" href="../contracts/#contracts.data_schemas.SimplifiedSubstationPowerFlows">SimplifiedSubstationPowerFlows</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Downsampled power flows.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/data.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">downsample_power_flows</span><span class="p">(</span>
+    <span class="n">flows</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationPowerFlows</span><span class="p">]</span> <span class="o">|</span> <span class="n">pt</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">[</span><span class="n">SubstationPowerFlows</span><span class="p">],</span>
+    <span class="n">target_map</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">SubstationTargetMap</span><span class="p">]</span> <span class="o">|</span> <span class="n">pt</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">[</span><span class="n">SubstationTargetMap</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">[</span><span class="n">SimplifiedSubstationPowerFlows</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Downsample power flows to 30m using period-ending semantics.</span>
+
+<span class="sd">    We assume that NWP data represents the average (or accumulated) value for the</span>
+<span class="sd">    period *ending* at `valid_time`. For example, a weather forecast for 10:00</span>
+<span class="sd">    describes the weather from 09:00 to 10:00.</span>
+
+<span class="sd">    To align our targets with these features, we downsample power flows using</span>
+<span class="sd">    `closed=&quot;right&quot;, label=&quot;right&quot;`. This ensures that power readings from</span>
+<span class="sd">    09:30 to 10:00 are aggregated and labeled as `10:00`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        flows: Historical power flow data.</span>
+<span class="sd">        target_map: Map of substation_number to target_col (MW or MVA).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Downsampled power flows.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">flows_lazy</span> <span class="o">=</span> <span class="n">flows</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">flows</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="k">else</span> <span class="n">flows</span>
+    <span class="n">target_map_lazy</span> <span class="o">=</span> <span class="n">target_map</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">target_map</span><span class="p">,</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="k">else</span> <span class="n">target_map</span>
+
+    <span class="c1"># Select the correct column before downsampling to avoid expensive operations on both MW and MVA</span>
+    <span class="n">flows_lazy</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">flows_lazy</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="n">target_map_lazy</span><span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span> <span class="s2">&quot;preferred_power_col&quot;</span><span class="p">]),</span>
+            <span class="n">on</span><span class="o">=</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span>
+            <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;preferred_power_col&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">POWER_MVA</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MVA</span><span class="p">))</span>
+            <span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MW</span><span class="p">))</span>
+            <span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">POWER_MW_OR_MVA</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">select</span><span class="p">([</span><span class="s2">&quot;timestamp&quot;</span><span class="p">,</span> <span class="s2">&quot;substation_number&quot;</span><span class="p">,</span> <span class="n">POWER_MW_OR_MVA</span><span class="p">])</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Downsample the single MW_or_MVA column</span>
+    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+        <span class="n">pt</span><span class="o">.</span><span class="n">LazyFrame</span><span class="p">[</span><span class="n">SimplifiedSubstationPowerFlows</span><span class="p">],</span>
+        <span class="p">(</span>
+            <span class="n">flows_lazy</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;timestamp&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">group_by_dynamic</span><span class="p">(</span>
+                <span class="s2">&quot;timestamp&quot;</span><span class="p">,</span>
+                <span class="n">every</span><span class="o">=</span><span class="s2">&quot;30m&quot;</span><span class="p">,</span>
+                <span class="n">group_by</span><span class="o">=</span><span class="s2">&quot;substation_number&quot;</span><span class="p">,</span>
+                <span class="n">closed</span><span class="o">=</span><span class="s2">&quot;right&quot;</span><span class="p">,</span>
+                <span class="n">label</span><span class="o">=</span><span class="s2">&quot;right&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">POWER_MW_OR_MVA</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ml_core.features" class="doc doc-heading">
+            <code>ml_core.features</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Shared feature engineering logic for ML models.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+<h3 id="ml_core.features-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.features.add_cyclical_temporal_features" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">add_cyclical_temporal_features</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">time_col</span><span class="o">=</span><span class="s1">&#39;valid_time&#39;</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Add cyclical and standard temporal features.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="ml_core.features.T">T</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame or LazyFrame with a time column.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>time_col</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Name of the time column.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;valid_time&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ml_core.features.T">T</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame or LazyFrame with added temporal features (hour_sin, hour_cos,</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ml_core.features.T">T</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>day_of_year_sin, day_of_year_cos, day_of_week).</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/features.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add_cyclical_temporal_features</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">T</span><span class="p">,</span> <span class="n">time_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;valid_time&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add cyclical and standard temporal features.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df: DataFrame or LazyFrame with a time column.</span>
+<span class="sd">        time_col: Name of the time column.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame or LazyFrame with added temporal features (hour_sin, hour_cos,</span>
+<span class="sd">        day_of_year_sin, day_of_year_cos, day_of_week).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+        <span class="n">T</span><span class="p">,</span>
+        <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+            <span class="c1"># Convert to local time (Europe/London) before extracting temporal features</span>
+            <span class="c1"># to ensure diurnal patterns align with human activity and DST shifts.</span>
+            <span class="n">local_time</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">time_col</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">convert_time_zone</span><span class="p">(</span><span class="s2">&quot;Europe/London&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+            <span class="c1"># Cyclical Hour (24h)</span>
+            <span class="n">hour_sin</span><span class="o">=</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span><span class="p">()</span> <span class="o">+</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">minute</span><span class="p">()</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">)</span>
+                <span class="o">*</span> <span class="mi">2</span>
+                <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+                <span class="o">/</span> <span class="mi">24</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">sin</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">),</span>
+            <span class="n">hour_cos</span><span class="o">=</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span><span class="p">()</span> <span class="o">+</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">minute</span><span class="p">()</span> <span class="o">/</span> <span class="mf">60.0</span><span class="p">)</span>
+                <span class="o">*</span> <span class="mi">2</span>
+                <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span>
+                <span class="o">/</span> <span class="mi">24</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">cos</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">),</span>
+            <span class="c1"># Cyclical Day of Year (365.25d)</span>
+            <span class="n">day_of_year_sin</span><span class="o">=</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">ordinal_day</span><span class="p">()</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">365.25</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">sin</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">),</span>
+            <span class="n">day_of_year_cos</span><span class="o">=</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">ordinal_day</span><span class="p">()</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">365.25</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">cos</span><span class="p">()</span>
+            <span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">),</span>
+            <span class="c1"># Day of week (1-7)</span>
+            <span class="n">day_of_week</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">weekday</span><span class="p">()</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Int8</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;local_time&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="ml_core.scaling" class="doc doc-heading">
+            <code>ml_core.scaling</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Shared scaling and normalization utilities for ML models.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="ml_core.scaling-classes">Classes</h3>
+<h3 id="ml_core.scaling-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ml_core.scaling.uint8_to_physical_unit" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">uint8_to_physical_unit</span><span class="p">(</span><span class="n">params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Convert uint8 columns back to physical units (Float32).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>params</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="ScalingParams (contracts.data_schemas.ScalingParams)" href="../contracts/#contracts.data_schemas.ScalingParams">ScalingParams</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Patito DataFrame with scaling parameters.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="polars.Expr">Expr</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>List of Polars expressions for the conversion.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/ml_core/src/ml_core/scaling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">uint8_to_physical_unit</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">ScalingParams</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert uint8 columns back to physical units (Float32).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        params: Patito DataFrame with scaling parameters.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of Polars expressions for the conversion.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">iter_rows</span><span class="p">(</span><span class="n">named</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">col</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;col_name&quot;</span><span class="p">]</span>
+        <span class="n">b_min</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_min&quot;</span><span class="p">]</span>
+        <span class="n">b_range</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_range&quot;</span><span class="p">]</span>
+
+        <span class="c1"># UInt8 -&gt; Raw (Float32)</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="p">((</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span> <span class="o">/</span> <span class="mi">255</span> <span class="o">*</span> <span class="n">b_range</span><span class="p">)</span> <span class="o">+</span> <span class="n">b_min</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+        <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">exprs</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

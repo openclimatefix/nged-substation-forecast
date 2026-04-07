@@ -1,0 +1,2268 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../contracts/">
+      
+      
+        <link rel="next" href="../geo/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Dynamical Data - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dynamical-data-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dynamical Data
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/create-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Create a Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-dataset/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Dataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/add-model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Add a Model
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guides/run-backtest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Backtest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dynamical-data-api">Dynamical Data API</h1>
+<h1 id="dynamical-data-package">Dynamical Data Package</h1>
+<p>Download &amp; process numerical weather predictions from Dynamical.org.</p>
+<p>We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:</p>
+<p><img alt="Map of Great Britain using H3 resolution 5 hexagons" src="../geo/assets/map-of-Great-Britain-H3-resolution-5.png" /></p>
+<blockquote>
+<p><strong>Note:</strong> The generic geospatial logic for mapping latitude/longitude grids to H3 hexagons has been extracted to the <code>packages/geo</code> package. This package (<code>dynamical_data</code>) focuses specifically on the ingestion, processing, and storage of time-varying NWP datasets like ECMWF. The H3 grid weights are provided as a Dagster asset from the <code>geo</code> package, eliminating the need for precomputed static files.</p>
+</blockquote>
+<h2 id="data-storage-experiments">Data storage experiments</h2>
+<p>All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.</p>
+<p>The conclusion is to:
+- sort by "init_time", "lead_time", "ensemble_member", "h3_index"
+- compression="zstd", compression_level=14 = 51 MB</p>
+<p>As a comparison: Saving a single ECMWF ENS run using <code>float32</code>, and <code>zstd</code> compression (with default compression
+level) results in Parquet files ranging between about 205 MB to 220 MB.</p>
+<h3 id="test-different-sort-orders">Test different sort orders:</h3>
+<p>(After scaling to <code>[0, 255]</code> and saving as <code>UInt8</code>, and compressing using zstd with the default level)</p>
+<pre><code>&quot;init_time&quot;, &quot;lead_time&quot;, &quot;ensemble_member&quot;, &quot;h3_index&quot; = 54 MB (BEST YET)
+&quot;init_time&quot;, &quot;ensemble_member&quot;, &quot;lead_time&quot;, &quot;h3_index&quot; = 56 MB
+&quot;init_time&quot;, &quot;lead_time&quot;, &quot;h3_index&quot;, &quot;ensemble_member&quot; = 59 MB
+&quot;init_time&quot;, &quot;h3_index&quot;, &quot;lead_time&quot;, &quot;ensemble_member&quot; = 60 MB
+&quot;init_time&quot;, &quot;ensemble_member&quot;, &quot;h3_index&quot;, &quot;lead_time&quot; = 62 MB
+</code></pre>
+<h3 id="test-compression-algorithm">Test compression algorithm</h3>
+<p>(after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and scaling to <code>[0, 255]</code>
+and saving as <code>UInt8</code>)</p>
+<pre><code>compression=&quot;zstd&quot;, compression_level=12 = 54 MB
+compression=&quot;zstd&quot;, compression_level=13 = 53 MB
+compression=&quot;zstd&quot;, compression_level=14 = 51 MB, 2.26s (BEST MIX OF SPEED &amp; COMPRESSION RATIO)
+compression=&quot;zstd&quot;, compression_level=15 = 51 MB
+compression=&quot;zstd&quot;, compression_level=20 = 51 MB
+compression=&quot;zstd&quot;, compression_level=22 = 51 MB
+compression=&quot;lz4&quot; = 68 MB
+compression=&quot;snappy&quot; = 78 MB
+compression=&quot;gzip&quot; = 56 MB
+compression=&quot;gzip&quot;, compression_level=9 = 53 MB, 1.49s
+compression=&quot;brotli&quot;, compression_level=6  = 54 MB, 1.88s
+compression=&quot;brotli&quot;, compression_level=8  = 54 MB, 2.75s
+compression=&quot;brotli&quot;, compression_level=9  = 53 MB, 3.9s
+compression=&quot;brotli&quot;, compression_level=10 = 48 MB, 12.59s
+compression=&quot;brotli&quot;, compression_level=11 = 48 MB, 17.75s!
+</code></pre>
+<h3 id="testing-different-dtypes">Testing different dtypes</h3>
+<p>(after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and compressing using zstd level 14)</p>
+<pre><code>Scale to 2¹⁶ - 1, and save as UInt16 = 145 MB
+Scale to 2¹⁰ - 1, and save as UInt16 =  79 MB
+Scale to 2⁹  - 1, and save as UInt16 =  62 MB
+Scale to 2⁸  - 1, and save as UInt16 =  51 MB
+Scale to 2⁸  - 1, and save as UInt8  =  51 MB
+</code></pre>
+<h2 id="physical-wind-logic">Physical Wind Logic</h2>
+<p>To ensure physically realistic wind speed and direction, we interpolate the Cartesian <code>u</code> and <code>v</code> components linearly instead of using circular interpolation on speed and direction. This approach avoids "phantom high wind" artifacts that can occur during rapid direction shifts (e.g., from 359 to 1 degree). Wind speed and direction are reconstructed from the interpolated <code>u</code> and <code>v</code> components after the interpolation step.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="dynamical_data.processing" class="doc doc-heading">
+            <code>dynamical_data.processing</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="dynamical_data.processing-classes">Classes</h3>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="dynamical_data.processing.MalformedZarrError" class="doc doc-heading">
+            <code>MalformedZarrError</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="ValueError">ValueError</span></code></p>
+
+
+
+        <p>Raised when an ECMWF Zarr store does not match the expected schema.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/processing.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MalformedZarrError</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when an ECMWF Zarr store does not match the expected schema.&quot;&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+    </div>
+
+</div>
+<h3 id="dynamical_data.processing-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.processing.download_and_scale_ecmwf" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">download_and_scale_ecmwf</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="p">,</span> <span class="n">h3_grid</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Download and scale ECMWF data for a specific initialization time.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>nwp_init_time</code>
+            </td>
+            <td>
+                  <code><span title="datetime.datetime">datetime</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The initialization time to download.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>h3_grid</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="H3GridWeights (contracts.data_schemas.H3GridWeights)" href="../contracts/#contracts.data_schemas.H3GridWeights">H3GridWeights</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The H3 grid weights to use for spatial aggregation.
+This is injected via Dagster, allowing dynamic resolution scaling
+without hardcoding static file paths.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/processing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_and_scale_ecmwf</span><span class="p">(</span>
+    <span class="n">nwp_init_time</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">h3_grid</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">H3GridWeights</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Download and scale ECMWF data for a specific initialization time.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        nwp_init_time: The initialization time to download.</span>
+<span class="sd">        h3_grid: The H3 grid weights to use for spatial aggregation.</span>
+<span class="sd">            This is injected via Dagster, allowing dynamic resolution scaling</span>
+<span class="sd">            without hardcoding static file paths.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># nwp_init_time is aware, we need to make it naive for the selection if it&#39;s not already.</span>
+    <span class="n">utc_nwp_init_time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="o">.</span><span class="n">astimezone</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="kc">None</span><span class="p">))</span>
+
+    <span class="n">loaded_ds</span> <span class="o">=</span> <span class="n">download_ecmwf</span><span class="p">(</span><span class="n">utc_nwp_init_time</span><span class="p">,</span> <span class="n">h3_grid</span><span class="o">=</span><span class="n">h3_grid</span><span class="p">)</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">process_ecmwf_dataset</span><span class="p">(</span>
+        <span class="n">nwp_init_time</span><span class="o">=</span><span class="n">nwp_init_time</span><span class="p">,</span> <span class="n">loaded_ds</span><span class="o">=</span><span class="n">loaded_ds</span><span class="p">,</span> <span class="n">h3_grid</span><span class="o">=</span><span class="n">h3_grid</span>
+    <span class="p">)</span>
+
+    <span class="c1"># DATA TYPE TRANSITION RATIONALE:</span>
+    <span class="c1"># 1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save</span>
+    <span class="c1">#    space and bandwidth.</span>
+    <span class="c1"># 2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64</span>
+    <span class="c1">#    to maintain precision and avoid rounding errors during aggregation.</span>
+    <span class="c1"># 3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency</span>
+    <span class="c1">#    in the ML model.</span>
+    <span class="c1">#</span>
+    <span class="c1"># We do NOT cast back to UInt8 in memory because:</span>
+    <span class="c1"># - It would cause a &quot;staircase&quot; effect by quantizing interpolated values, defeating</span>
+    <span class="c1">#   the purpose of 30-minute upsampling.</span>
+    <span class="c1"># - It risks silent underflow during differencing operations (e.g., calculating trends</span>
+    <span class="c1">#   like temp_trend_6h = current - lagged).</span>
+
+    <span class="c1"># Load scaling parameters</span>
+    <span class="n">scaling_params_path</span> <span class="o">=</span> <span class="n">ASSETS_PATH</span> <span class="o">/</span> <span class="s2">&quot;ecmwf_scaling_params.csv&quot;</span>
+    <span class="n">scaling_params</span> <span class="o">=</span> <span class="n">load_scaling_params</span><span class="p">(</span><span class="n">scaling_params_path</span><span class="p">)</span>
+
+    <span class="c1"># CIRCULAR VARIABLE SCALING:</span>
+    <span class="c1"># Exclude categorical variables and wind components from empirical min-max scaling.</span>
+    <span class="c1"># Storing wind components as Float32 avoids destroying circular topology via</span>
+    <span class="c1"># min-max scaling and simplifies downstream processing.</span>
+    <span class="n">scaling_params</span> <span class="o">=</span> <span class="n">scaling_params</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="o">~</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;col_name&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_in</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="s2">&quot;categorical_precipitation_type_surface&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;wind_u_10m&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;wind_v_10m&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;wind_u_100m&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;wind_v_100m&quot;</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">scale_to_uint8</span><span class="p">(</span><span class="n">processed</span><span class="p">,</span> <span class="n">scaling_params</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.processing.download_ecmwf" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">download_ecmwf</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="p">,</span> <span class="n">h3_grid</span><span class="p">,</span> <span class="n">ds</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Download and process ECMWF data for a specific initialization time.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>nwp_init_time</code>
+            </td>
+            <td>
+                  <code><span title="numpy.datetime64">datetime64</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The initialization time to download.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>h3_grid</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="H3GridWeights (contracts.data_schemas.H3GridWeights)" href="../contracts/#contracts.data_schemas.H3GridWeights">H3GridWeights</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The H3 grid to use for spatial bounds.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>ds</code>
+            </td>
+            <td>
+                  <code><span title="xarray.Dataset">Dataset</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional xarray Dataset. If None, connects to the production icechunk store.
+This allows dependency injection during testing.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/processing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_ecmwf</span><span class="p">(</span>
+    <span class="n">nwp_init_time</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">,</span>
+    <span class="n">h3_grid</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">H3GridWeights</span><span class="p">],</span>
+    <span class="n">ds</span><span class="p">:</span> <span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Download and process ECMWF data for a specific initialization time.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        nwp_init_time: The initialization time to download.</span>
+<span class="sd">        h3_grid: The H3 grid to use for spatial bounds.</span>
+<span class="sd">        ds: Optional xarray Dataset. If None, connects to the production icechunk store.</span>
+<span class="sd">            This allows dependency injection during testing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">h3_grid</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;h3_grid is empty. Cannot download ECMWF data for an empty grid.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Connect to the production icechunk store</span>
+        <span class="n">storage</span> <span class="o">=</span> <span class="n">icechunk</span><span class="o">.</span><span class="n">s3_storage</span><span class="p">(</span>
+            <span class="n">bucket</span><span class="o">=</span><span class="n">_SETTINGS</span><span class="o">.</span><span class="n">ecmwf_s3_bucket</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">_SETTINGS</span><span class="o">.</span><span class="n">ecmwf_s3_prefix</span><span class="p">,</span>
+            <span class="n">region</span><span class="o">=</span><span class="n">DEFAULT_AWS_REGION</span><span class="p">,</span>
+            <span class="n">anonymous</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">repo</span> <span class="o">=</span> <span class="n">icechunk</span><span class="o">.</span><span class="n">Repository</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">storage</span><span class="p">)</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="n">repo</span><span class="o">.</span><span class="n">readonly_session</span><span class="p">(</span><span class="s2">&quot;main&quot;</span><span class="p">)</span>
+
+        <span class="c1"># chunks=None is a deliberate design choice to disable Dask and avoid memory overhead.</span>
+        <span class="c1"># We set `chunks=None` to disable Dask. This is because we want to</span>
+        <span class="c1"># manually control the parallelization of S3 fetches using a</span>
+        <span class="c1"># ThreadPoolExecutor below, which avoids Dask&#39;s overhead for this</span>
+        <span class="c1"># specific I/O-bound task.</span>
+        <span class="c1">#</span>
+        <span class="c1"># Explicitly setting decode_timedelta=True avoids reliance on Xarray&#39;s</span>
+        <span class="c1"># deprecated automatic decoding of time units, ensuring lead_time is</span>
+        <span class="c1"># correctly parsed as timedelta64[ns].</span>
+        <span class="n">ds</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">open_zarr</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">store</span><span class="p">,</span> <span class="n">chunks</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">decode_timedelta</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ds</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span><span class="s2">&quot;Dataset could not be loaded&quot;</span><span class="p">)</span>
+
+    <span class="n">validate_dataset_schema</span><span class="p">(</span><span class="n">ds</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">nwp_init_time</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">init_time</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">nwp_init_time</span><span class="si">}</span><span class="s2"> is not in ds.init_time.values&quot;</span><span class="p">)</span>
+
+    <span class="c1"># We subset the dataset to only the required variables defined in the Nwp schema</span>
+    <span class="c1"># to save network bandwidth and memory during the download process.</span>
+    <span class="c1"># We also include the raw wind components (10u, 10v, 100u, 100v) which are</span>
+    <span class="c1"># needed for calculating wind speed and direction later.</span>
+    <span class="c1"># Cast to xr.Dataset to satisfy the type checker, as indexing with a list</span>
+    <span class="c1"># can sometimes be misidentified as returning a DataArray.</span>
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">,</span> <span class="n">ds</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">REQUIRED_NWP_VARS</span><span class="p">)])</span>
+
+    <span class="c1"># Check for empty coordinates before computing bounds to fail gracefully.</span>
+    <span class="k">if</span> <span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dataset has empty longitude or latitude coordinates.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Validate longitude range.</span>
+    <span class="c1"># NOTE: The ECMWF ENS dataset from Dynamical.org already uses the [-180, 180]</span>
+    <span class="c1"># range for longitude. We only validate this here to ensure the upstream</span>
+    <span class="c1"># data format hasn&#39;t changed unexpectedly, rather than rolling the</span>
+    <span class="c1"># coordinates ourselves.</span>
+    <span class="k">if</span> <span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mi">180</span> <span class="ow">or</span> <span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">180</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dataset longitude must be in the range [-180, 180]&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Find spatial bounds from grid</span>
+    <span class="n">min_lat</span><span class="p">,</span> <span class="n">max_lat</span> <span class="o">=</span> <span class="n">h3_grid</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;nwp_lat&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;min_lat&quot;</span><span class="p">),</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;nwp_lat&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="s2">&quot;max_lat&quot;</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">row</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.</span>
+    <span class="c1"># We check the first two elements to determine if latitude/longitude are ascending or descending.</span>
+    <span class="c1"># Single-point forecasts (length 1) do not have a direction, so we bypass the</span>
+    <span class="c1"># ascending/descending check to avoid an IndexError.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">values</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">lat_is_descending</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">lat_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">max_lat</span><span class="p">,</span> <span class="n">min_lat</span><span class="p">)</span> <span class="k">if</span> <span class="n">lat_is_descending</span> <span class="k">else</span> <span class="nb">slice</span><span class="p">(</span><span class="n">min_lat</span><span class="p">,</span> <span class="n">max_lat</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">lat_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">min_lat</span><span class="p">,</span> <span class="n">max_lat</span><span class="p">)</span>
+
+    <span class="n">min_lng</span><span class="p">,</span> <span class="n">max_lng</span> <span class="o">=</span> <span class="n">h3_grid</span><span class="o">.</span><span class="n">get_column</span><span class="p">(</span><span class="s2">&quot;nwp_lng&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">h3_grid</span><span class="o">.</span><span class="n">get_column</span><span class="p">(</span><span class="s2">&quot;nwp_lng&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">values</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">lng_is_descending</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">lng_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">max_lng</span><span class="p">,</span> <span class="n">min_lng</span><span class="p">)</span> <span class="k">if</span> <span class="n">lng_is_descending</span> <span class="k">else</span> <span class="nb">slice</span><span class="p">(</span><span class="n">min_lng</span><span class="p">,</span> <span class="n">max_lng</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">lng_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">min_lng</span><span class="p">,</span> <span class="n">max_lng</span><span class="p">)</span>
+
+    <span class="c1"># NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate</span>
+    <span class="c1"># forecasting near the anti-meridian.</span>
+    <span class="n">ds_cropped</span> <span class="o">=</span> <span class="n">ds</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span>
+        <span class="n">latitude</span><span class="o">=</span><span class="n">lat_slice</span><span class="p">,</span>
+        <span class="n">longitude</span><span class="o">=</span><span class="n">lng_slice</span><span class="p">,</span>
+        <span class="n">init_time</span><span class="o">=</span><span class="n">nwp_init_time</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Explicitly check for an empty spatial intersection after slicing.</span>
+    <span class="c1"># This prevents downstream KeyErrors during DataFrame conversion.</span>
+    <span class="k">if</span> <span class="n">ds_cropped</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">ds_cropped</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No spatial overlap found between H3 grid and NWP dataset.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">download_array</span><span class="p">(</span><span class="n">var_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">var_name</span><span class="p">:</span> <span class="n">ds_cropped</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">compute</span><span class="p">()}</span>
+
+    <span class="c1"># The download is I/O bound (S3 network requests). We use a</span>
+    <span class="c1"># ThreadPoolExecutor to parallelize network latency across multiple</span>
+    <span class="c1"># variables. A ProcessPoolExecutor would be less efficient here due to the</span>
+    <span class="c1"># high serialization overhead of Xarray objects between processes.</span>
+    <span class="n">data_arrays</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">xr</span><span class="o">.</span><span class="n">DataArray</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">with</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">ThreadPoolExecutor</span><span class="p">()</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+        <span class="n">futures</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">download_array</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">ds_cropped</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="p">]</span>
+        <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+            <span class="n">data_arrays</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">(</span><span class="n">data_arrays</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.processing.process_ecmwf_dataset" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">process_ecmwf_dataset</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="p">,</span> <span class="n">loaded_ds</span><span class="p">,</span> <span class="n">h3_grid</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Vectorized processing of ECMWF dataset to H3 grid.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/processing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process_ecmwf_dataset</span><span class="p">(</span>
+    <span class="n">nwp_init_time</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span>
+    <span class="n">loaded_ds</span><span class="p">:</span> <span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">,</span>
+    <span class="n">h3_grid</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">H3GridWeights</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">Nwp</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Vectorized processing of ECMWF dataset to H3 grid.&quot;&quot;&quot;</span>
+    <span class="c1"># Cast coordinates to Float32 before the join to ensure exact bit-level matching.</span>
+    <span class="n">h3_grid</span> <span class="o">=</span> <span class="n">h3_grid</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;nwp_lng&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">),</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;nwp_lat&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)]</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Precompute latitude and longitude grids</span>
+    <span class="n">lat_grid</span><span class="p">,</span> <span class="n">lon_grid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span>
+        <span class="n">loaded_ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">loaded_ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="n">indexing</span><span class="o">=</span><span class="s2">&quot;ij&quot;</span>
+    <span class="p">)</span>
+    <span class="n">lat_grid_raveled</span> <span class="o">=</span> <span class="n">lat_grid</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="n">lon_grid_raveled</span> <span class="o">=</span> <span class="n">lon_grid</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+
+    <span class="c1"># Iterate over lead_time and ensemble_member to process in chunks.</span>
+    <span class="n">processed_chunks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">lead_time</span> <span class="ow">in</span> <span class="n">loaded_ds</span><span class="o">.</span><span class="n">lead_time</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ensemble_member</span> <span class="ow">in</span> <span class="n">loaded_ds</span><span class="o">.</span><span class="n">ensemble_member</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="n">ds_chunk</span> <span class="o">=</span> <span class="n">loaded_ds</span><span class="o">.</span><span class="n">sel</span><span class="p">(</span><span class="n">lead_time</span><span class="o">=</span><span class="n">lead_time</span><span class="p">,</span> <span class="n">ensemble_member</span><span class="o">=</span><span class="n">ensemble_member</span><span class="p">)</span>
+            <span class="n">processed_chunks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">_process_chunk</span><span class="p">(</span>
+                    <span class="n">ds_chunk</span><span class="p">,</span>
+                    <span class="n">h3_grid</span><span class="p">,</span>
+                    <span class="n">lat_grid_raveled</span><span class="o">=</span><span class="n">lat_grid_raveled</span><span class="p">,</span>
+                    <span class="n">lon_grid_raveled</span><span class="o">=</span><span class="n">lon_grid_raveled</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">processed_chunks</span><span class="p">)</span>
+
+    <span class="c1"># Compute valid_time and init_time.</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="n">init_time</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Datetime</span><span class="p">(</span><span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="s2">&quot;UTC&quot;</span><span class="p">)),</span>
+        <span class="n">valid_time</span><span class="o">=</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">nwp_init_time</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Datetime</span><span class="p">(</span><span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="s2">&quot;UTC&quot;</span><span class="p">))</span>
+            <span class="o">+</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;lead_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Duration</span><span class="p">(</span><span class="s2">&quot;us&quot;</span><span class="p">))</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Datetime</span><span class="p">(</span><span class="s2">&quot;us&quot;</span><span class="p">,</span> <span class="s2">&quot;UTC&quot;</span><span class="p">)),</span>
+        <span class="n">ensemble_member</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;ensemble_member&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">UInt8</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;lead_time&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Sort before validation to ensure consistent output order</span>
+    <span class="n">processed</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;init_time&quot;</span><span class="p">,</span> <span class="s2">&quot;valid_time&quot;</span><span class="p">,</span> <span class="s2">&quot;ensemble_member&quot;</span><span class="p">,</span> <span class="s2">&quot;h3_index&quot;</span><span class="p">])</span>
+
+    <span class="c1"># Validate to ensure the interpolated data matches the expected schema</span>
+    <span class="k">return</span> <span class="n">Nwp</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">processed</span><span class="p">,</span> <span class="n">drop_superfluous_columns</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.processing.validate_dataset_schema" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">validate_dataset_schema</span><span class="p">(</span><span class="n">ds</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Enforces the data contract for incoming ECMWF Zarr stores.</p>
+<p>Ensures all required spatial and temporal dimensions and coordinates exist
+before processing begins.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>ds</code>
+            </td>
+            <td>
+                  <code><span title="xarray.Dataset">Dataset</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The xarray Dataset to validate.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="MalformedZarrError (dynamical_data.processing.MalformedZarrError)" href="#dynamical_data.processing.MalformedZarrError">MalformedZarrError</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>If any required coordinates or variables are missing.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/processing.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">validate_dataset_schema</span><span class="p">(</span><span class="n">ds</span><span class="p">:</span> <span class="n">xr</span><span class="o">.</span><span class="n">Dataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enforces the data contract for incoming ECMWF Zarr stores.</span>
+
+<span class="sd">    Ensures all required spatial and temporal dimensions and coordinates exist</span>
+<span class="sd">    before processing begins.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ds: The xarray Dataset to validate.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        MalformedZarrError: If any required coordinates or variables are missing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">required_coords</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;latitude&quot;</span><span class="p">,</span> <span class="s2">&quot;longitude&quot;</span><span class="p">,</span> <span class="s2">&quot;init_time&quot;</span><span class="p">,</span> <span class="s2">&quot;lead_time&quot;</span><span class="p">,</span> <span class="s2">&quot;ensemble_member&quot;</span><span class="p">}</span>
+    <span class="n">missing_coords</span> <span class="o">=</span> <span class="n">required_coords</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">coords</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing_coords</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset is missing required coordinates: </span><span class="si">{</span><span class="n">missing_coords</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check for a minimal set of required data variables</span>
+    <span class="c1"># These are the variables required by the Nwp schema in contracts.data_schemas</span>
+    <span class="n">missing_vars</span> <span class="o">=</span> <span class="n">REQUIRED_NWP_VARS</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">data_vars</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing_vars</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dataset is missing required data variables: </span><span class="si">{</span><span class="n">missing_vars</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check that all data variables have the expected dimensions and order.</span>
+    <span class="c1"># The canonical order is (latitude, longitude, init_time, lead_time, ensemble_member).</span>
+    <span class="c1"># Note: init_time might be a scalar coordinate after selection, so we allow it to be missing</span>
+    <span class="c1"># from dimensions of the DataArray if it&#39;s present in the Dataset coordinates.</span>
+    <span class="n">expected_dims</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;latitude&quot;</span><span class="p">,</span> <span class="s2">&quot;longitude&quot;</span><span class="p">,</span> <span class="s2">&quot;init_time&quot;</span><span class="p">,</span> <span class="s2">&quot;lead_time&quot;</span><span class="p">,</span> <span class="s2">&quot;ensemble_member&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">var_name</span><span class="p">,</span> <span class="n">da</span> <span class="ow">in</span> <span class="n">ds</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="c1"># Check for missing dimensions (excluding init_time)</span>
+        <span class="n">missing_dims</span> <span class="o">=</span> <span class="n">required_coords</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">da</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">-</span> <span class="p">{</span><span class="s2">&quot;init_time&quot;</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">missing_dims</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_name</span><span class="si">}</span><span class="s2">&#39; is missing required dimensions: </span><span class="si">{</span><span class="n">missing_dims</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Check dimension order (ignoring init_time if it&#39;s a scalar coordinate)</span>
+        <span class="n">actual_dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">d</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">da</span><span class="o">.</span><span class="n">dims</span> <span class="k">if</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">expected_dims</span><span class="p">]</span>
+        <span class="n">expected_dims_filtered</span> <span class="o">=</span> <span class="p">[</span><span class="n">d</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">expected_dims</span> <span class="k">if</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">da</span><span class="o">.</span><span class="n">dims</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">actual_dims</span> <span class="o">!=</span> <span class="n">expected_dims_filtered</span><span class="p">:</span>
+            <span class="c1"># Transpose the data to the expected order</span>
+            <span class="n">ds</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">da</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="o">*</span><span class="n">expected_dims_filtered</span><span class="p">)</span>
+
+    <span class="c1"># Check coordinate dtypes</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">floating</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;latitude has wrong dtype: </span><span class="si">{</span><span class="n">ds</span><span class="o">.</span><span class="n">latitude</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">, expected floating&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">floating</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;longitude has wrong dtype: </span><span class="si">{</span><span class="n">ds</span><span class="o">.</span><span class="n">longitude</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">, expected floating&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">ds</span><span class="o">.</span><span class="n">init_time</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">MalformedZarrError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;init_time has wrong dtype: </span><span class="si">{</span><span class="n">ds</span><span class="o">.</span><span class="n">init_time</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">, expected datetime64&quot;</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="dynamical_data.scaling" class="doc doc-heading">
+            <code>dynamical_data.scaling</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+<h3 id="dynamical_data.scaling-functions">Functions</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.scaling.load_scaling_params" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">load_scaling_params</span><span class="p">(</span><span class="n">csv_path</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load scaling parameters from a CSV file.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/scaling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">6</span>
+<span class="normal">7</span>
+<span class="normal">8</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_scaling_params</span><span class="p">(</span><span class="n">csv_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load scaling parameters from a CSV file.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">csv_path</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.scaling.recover_physical_units" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">recover_physical_units</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">scaling_params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Convert uint8 columns back to physical units.</p>
+<p>DATA TYPE TRANSITION RATIONALE:
+1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save
+   space and bandwidth.
+2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64
+   to maintain precision and avoid rounding errors during aggregation.
+3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency
+   in the ML model.</p>
+<p>We do NOT cast back to UInt8 in memory because:
+- It would cause a "staircase" effect by quantizing interpolated values, defeating
+  the purpose of 30-minute upsampling.
+- It risks silent underflow during differencing operations (e.g., calculating trends
+  like temp_trend_6h = current - lagged).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Polars DataFrame with uint8 columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scaling_params</code>
+            </td>
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with col_name, buffered_min, buffered_range.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with recovered float32 columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/scaling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span>
+<span class="normal">97</span>
+<span class="normal">98</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">recover_physical_units</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">scaling_params</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert uint8 columns back to physical units.</span>
+
+<span class="sd">    DATA TYPE TRANSITION RATIONALE:</span>
+<span class="sd">    1. Disk (UInt8): Weather variables are stored as scaled 8-bit unsigned integers to save</span>
+<span class="sd">       space and bandwidth.</span>
+<span class="sd">    2. Interpolation (Float64): During spatial weighting and H3 grid joins, we use Float64</span>
+<span class="sd">       to maintain precision and avoid rounding errors during aggregation.</span>
+<span class="sd">    3. Memory/Model (Float32): After processing, we cast to Float32 for memory efficiency</span>
+<span class="sd">       in the ML model.</span>
+
+<span class="sd">    We do NOT cast back to UInt8 in memory because:</span>
+<span class="sd">    - It would cause a &quot;staircase&quot; effect by quantizing interpolated values, defeating</span>
+<span class="sd">      the purpose of 30-minute upsampling.</span>
+<span class="sd">    - It risks silent underflow during differencing operations (e.g., calculating trends</span>
+<span class="sd">      like temp_trend_6h = current - lagged).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df: Polars DataFrame with uint8 columns.</span>
+<span class="sd">        scaling_params: DataFrame with col_name, buffered_min, buffered_range.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with recovered float32 columns.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">scaling_params</span><span class="o">.</span><span class="n">to_dicts</span><span class="p">():</span>
+        <span class="n">col_name</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;col_name&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">col_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">buffered_min</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_min&quot;</span><span class="p">]</span>
+        <span class="n">buffered_range</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_range&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">buffered_range</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">buffered_min</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span> <span class="o">/</span> <span class="mf">255.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">buffered_range</span> <span class="o">+</span> <span class="n">buffered_min</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span>
+
+        <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="dynamical_data.scaling.scale_to_uint8" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">scale_to_uint8</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">scaling_params</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Scale numeric columns to uint8 [0, 255] based on scaling parameters.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>df</code>
+            </td>
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Polars DataFrame with float32 columns.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>scaling_params</code>
+            </td>
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with col_name, buffered_min, buffered_range.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.DataFrame">DataFrame</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>DataFrame with rescaled uint8 columns.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/dynamical_data/src/dynamical_data/scaling.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scale_to_uint8</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">scaling_params</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scale numeric columns to uint8 [0, 255] based on scaling parameters.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        df: Polars DataFrame with float32 columns.</span>
+<span class="sd">        scaling_params: DataFrame with col_name, buffered_min, buffered_range.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with rescaled uint8 columns.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">scaling_params</span><span class="o">.</span><span class="n">to_dicts</span><span class="p">():</span>
+        <span class="n">col_name</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;col_name&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">col_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">buffered_min</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_min&quot;</span><span class="p">]</span>
+        <span class="n">buffered_max</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_max&quot;</span><span class="p">]</span>
+        <span class="n">buffered_range</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;buffered_range&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Handle NaNs first (Polars treats NaN as &gt; any finite number)</span>
+        <span class="n">base_col</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span><span class="o">.</span><span class="n">fill_nan</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">clipped_col</span> <span class="o">=</span> <span class="n">base_col</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower_bound</span><span class="o">=</span><span class="n">buffered_min</span><span class="p">,</span> <span class="n">upper_bound</span><span class="o">=</span><span class="n">buffered_max</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">buffered_range</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">UInt8</span><span class="p">)</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Categorical variables like precipitation type are handled natively by this loop</span>
+            <span class="c1"># because their `buffered_min` is 0.0 and `buffered_range` is 255.0 in the</span>
+            <span class="c1"># scaling parameters, which naturally simplifies to a direct cast to UInt8</span>
+            <span class="c1"># without scaling artifacts.</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(((</span><span class="n">clipped_col</span> <span class="o">-</span> <span class="n">buffered_min</span><span class="p">)</span> <span class="o">/</span> <span class="n">buffered_range</span><span class="p">)</span> <span class="o">*</span> <span class="mi">255</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">round</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">UInt8</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col_name</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
