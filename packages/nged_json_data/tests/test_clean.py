@@ -23,7 +23,7 @@ def test_clean_power_data():
     with pytest.raises(
         ValueError, match="All rows were removed after filtering by variance threshold."
     ):
-        clean_power_data(df, variance_threshold=0.1)
+        clean_power_data(df, default_threshold=0.1)
 
     # Test with data that should be kept
     data_keep = {
@@ -35,7 +35,7 @@ def test_clean_power_data():
         pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         pl.col("value").cast(pl.Float32),
     )
-    cleaned_df = clean_power_data(df_keep, variance_threshold=0.1)
+    cleaned_df = clean_power_data(df_keep, default_threshold=0.1)
     assert len(cleaned_df) == 48
 
     # Test with null values
@@ -48,5 +48,5 @@ def test_clean_power_data():
         pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
         pl.col("value").cast(pl.Float32),
     )
-    cleaned_df_null = clean_power_data(df_null, variance_threshold=0.1)
+    cleaned_df_null = clean_power_data(df_null, default_threshold=0.1)
     assert len(cleaned_df_null) == 46

@@ -115,7 +115,7 @@ class SimplifiedSubstationPowerFlows(pt.Model):
 class NgedJsonPowerFlows(pt.Model):
     time_series_id: str = pt.Field(dtype=pl.String)
     end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    value: float = pt.Field(dtype=pl.Float32)
+    value: float | None = pt.Field(dtype=pl.Float32)
 
 
 class SubstationTargetMap(pt.Model):

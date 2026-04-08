@@ -41,7 +41,6 @@ from nged_json_data import (
     append_to_delta,
     clean_power_data,
     load_nged_json,
-    upsert_metadata,
 )
 from nged_data.substation_names import align
 from .partitions import DAILY_PARTITIONS
@@ -518,10 +517,12 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
         metadata_df, time_series_df = load_nged_json(json_file)
 
         # Clean power data
-        cleaned_df = clean_power_data(time_series_df)
-
-        # Update metadata
-        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "substations.parquet")
+        substation_number = metadata_df.get_column("substation_number").item()
+        cleaned_df = clean_power_data(
+            time_series_df,
+            substation_number=substation_number,
+            variance_thresholds=settings.data_quality.variance_thresholds,
+        )
 
         # Append to delta
         append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
@@ -537,6 +538,7 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
         timezone="UTC",
     ),
     group_name="NGED_JSON",
+    op_tags={"dagster/concurrency_key": "nged_json_ingestion"},
 )
 def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
     """Live updates of NGED JSON data."""
@@ -548,7 +550,12 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
         metadata_df, time_series_df = load_nged_json(json_file)
 
         # Clean power data
-        cleaned_df = clean_power_data(time_series_df)
+        substation_number = metadata_df.get_column("substation_number").item()
+        cleaned_df = clean_power_data(
+            time_series_df,
+            substation_number=substation_number,
+            variance_thresholds=settings.data_quality.variance_thresholds,
+        )
 
         # Append to delta
         append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")

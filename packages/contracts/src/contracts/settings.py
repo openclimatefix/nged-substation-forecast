@@ -47,6 +47,7 @@ class DataQualitySettings(BaseSettings):
     stuck_window_periods: int = 48
     max_mw_threshold: float = 100.0
     min_mw_threshold: float = -20.0
+    variance_thresholds: dict[int, float] = Field(default_factory=dict)
 
 
 class Settings(BaseSettings):
