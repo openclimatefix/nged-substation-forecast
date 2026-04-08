@@ -37,6 +37,12 @@ from nged_data import (
     process_live_primary_substation_power_flows,
     scan_delta_table,
 )
+from nged_json_data import (
+    append_to_delta,
+    clean_power_data,
+    load_nged_json,
+    upsert_metadata,
+)
 from nged_data.substation_names import align
 from .partitions import DAILY_PARTITIONS
 
@@ -501,6 +507,53 @@ def substation_power_preferences(
     )
 
     return target_map
+
+
+@asset(group_name="NGED JSON")
+def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
+    """One-off historical backfill of NGED JSON data."""
+    json_dir = settings.nged_data_path / "json" / "archive"
+
+    for json_file in json_dir.glob("*.json"):
+        metadata_df, time_series_df = load_nged_json(json_file)
+
+        # Clean power data
+        cleaned_df = clean_power_data(time_series_df)
+
+        # Update metadata
+        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "substations.parquet")
+
+        # Append to delta
+        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+
+    context.log.info("Finished processing archive JSON data.")
+
+
+@asset(
+    partitions_def=dg.TimeWindowPartitionsDefinition(
+        cron_schedule="0 */6 * * *",
+        start="2026-01-26",
+        fmt="%Y-%m-%d-%H:%M",
+        timezone="UTC",
+    ),
+    group_name="NGED JSON",
+)
+def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
+    """Live updates of NGED JSON data."""
+    # Assuming there's a directory with JSON files for the current partition
+    partition_date = context.partition_time_window.start
+    json_dir = settings.nged_data_path / "json" / "live" / partition_date.strftime("%Y-%m-%d-%H")
+
+    for json_file in json_dir.glob("*.json"):
+        metadata_df, time_series_df = load_nged_json(json_file)
+
+        # Clean power data
+        cleaned_df = clean_power_data(time_series_df)
+
+        # Append to delta
+        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+
+    context.log.info(f"Finished processing live JSON data for {partition_date}.")
 
 
 @dg.asset_check(asset="live_primary_flows")
