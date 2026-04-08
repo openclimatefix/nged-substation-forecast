@@ -45,6 +45,7 @@ mlruns/
 # searching/filtering than the file backend), this database file stores the run metadata. Like any
 # database file, it shouldn't be versioned.
 mlflow.db
+mlflow.db.bak
 
 
 #######################
