@@ -171,98 +171,50 @@ class XGBoostForecaster(BaseForecaster):
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_and_join_nwps(
         self,
-        nwps: Mapping[NwpModel, pl.LazyFrame],
+        nwp_lf: pl.LazyFrame,
         nwp_cutoff: datetime | None = None,
         collapse_lead_times: bool = False,
+        is_training: bool = False,
     ) -> pl.LazyFrame:
-        """Prepare and join multiple NWP sources."""
+        """Prepare NWP data."""
         # Get delay from config, default to 3 hours if not set
         delay_hours = self.config.nwp_availability_delay_hours if hasattr(self, "config") else 3
 
-        nwp_list = []
-        for i, (name, lf) in enumerate(nwps.items()):
-            # Add weather features (lags, trends, etc.)
-            lf = add_weather_features(lf)
-            # Add time features (lead_time_hours, nwp_init_hour)
-            lf = add_time_features(lf)
+        # Add weather features (lags, trends, etc.)
+        lf = add_weather_features(nwp_lf)
+        # Add time features (lead_time_hours, nwp_init_hour)
+        lf = add_time_features(lf)
 
-            # CRITICAL: This filter is the sole mechanism preventing future data leakage.
-            # It ensures that we only use NWP forecasts that would have been available
-            # at the valid time, accounting for the data ingestion delay.
-            # init_time + delay_hours <= valid_time
-            available_nwp = lf.filter(
-                pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
-                <= pl.col(NwpColumns.VALID_TIME)
-            )
+        # CRITICAL: This filter is the sole mechanism preventing future data leakage.
+        # It ensures that we only use NWP forecasts that would have been available
+        # at the valid time, accounting for the data ingestion delay.
+        # init_time + delay_hours <= valid_time
+        available_nwp = lf.filter(
+            pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
+            <= pl.col(NwpColumns.VALID_TIME)
+        )
 
-            if nwp_cutoff is None:
-                # During training, we use all available lead times.
-                # The target_horizon_hours filter is removed to maximize training data.
+        if nwp_cutoff is None:
+            # During training, we use all available lead times.
+            # The target_horizon_hours filter is removed to maximize training data.
 
-                # For the primary NWP model (i == 0), we only use the control member (0)
-                # to avoid inflating the training set with highly correlated ensemble members.
-                if i == 0:
-                    available_nwp = available_nwp.filter(pl.col(NwpColumns.ENSEMBLE_MEMBER) == 0)
+            # For training, we only use the control member (0)
+            # to avoid inflating the training set with highly correlated ensemble members.
+            if is_training:
+                available_nwp = available_nwp.filter(pl.col(NwpColumns.ENSEMBLE_MEMBER) == 0)
 
-                latest_nwp = available_nwp
+            latest_nwp = available_nwp
+        else:
+            if collapse_lead_times:
+                latest_nwp = self._collapse_lead_times(available_nwp, nwp_cutoff, delay_hours)
             else:
-                if collapse_lead_times:
-                    latest_nwp = self._collapse_lead_times(available_nwp, nwp_cutoff, delay_hours)
-                else:
-                    latest_nwp = available_nwp.filter(
-                        pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours) <= nwp_cutoff
-                    )
-
-            if i == 0:
-                prefixed_nwp = latest_nwp.with_columns(
-                    available_time=pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
-                )
-            else:
-                prefix = f"{name.value}_"
-                # For secondary NWP models, filter to ensemble_member == 0 (control member)
-                # and drop the column to avoid arbitrary pairing with primary NWP members.
-                latest_nwp = latest_nwp.filter(pl.col(NwpColumns.ENSEMBLE_MEMBER) == 0).drop(
-                    NwpColumns.ENSEMBLE_MEMBER
+                latest_nwp = available_nwp.filter(
+                    pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours) <= nwp_cutoff
                 )
 
-                nwp_schema_names = latest_nwp.collect_schema().names()
-                rename_mapping = {
-                    col: f"{prefix}{col}"
-                    for col in nwp_schema_names
-                    if col
-                    not in [
-                        NwpColumns.VALID_TIME,
-                        NwpColumns.H3_INDEX,
-                    ]
-                }
-                prefixed_nwp = latest_nwp.rename(rename_mapping).with_columns(
-                    available_time=pl.col(f"{prefix}{NwpColumns.INIT_TIME}")
-                    + pl.duration(hours=delay_hours)
-                )
-            nwp_list.append(prefixed_nwp)
-
-        combined_nwps = nwp_list[0]
-        for other_nwp in nwp_list[1:]:
-            # We explicitly sort by the group keys (valid_time, h3_index) and the join key (available_time)
-            # to ensure the data is correctly ordered for the asof join.
-            # We pass check_sortedness=False to suppress a false-positive warning from Polars
-            # that can occur even when the data is correctly sorted.
-            combined_nwps = (
-                combined_nwps.sort([NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, "available_time"])
-                .join_asof(
-                    other_nwp.sort([NwpColumns.VALID_TIME, NwpColumns.H3_INDEX, "available_time"]),
-                    on="available_time",
-                    by=[NwpColumns.VALID_TIME, NwpColumns.H3_INDEX],
-                    check_sortedness=False,
-                )
-                .with_columns(
-                    # Explicitly cast h3_index to UInt64 after the join to prevent silent type
-                    # coercion (e.g., to Float64 or Int64) during Polars joins, which is
-                    # critical for downstream H3 operations and memory efficiency.
-                    pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
-                )
-            )
-        return combined_nwps
+        return latest_nwp.with_columns(
+            available_time=pl.col(NwpColumns.INIT_TIME) + pl.duration(hours=delay_hours)
+        )
 
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_training_data(
@@ -371,11 +323,14 @@ class XGBoostForecaster(BaseForecaster):
 
         combined_nwps_lf = None
         if nwps:
+            # We only support a single NWP source now.
+            nwp_lf = list(nwps.values())[0]
             nwp_cutoff = inference_params.forecast_time if inference_params is not None else None
             combined_nwps_lf = self._prepare_and_join_nwps(
-                nwps,
+                nwp_lf,
                 nwp_cutoff=nwp_cutoff,
                 collapse_lead_times=collapse_lead_times,
+                is_training=is_training,
             )
 
         if is_training:

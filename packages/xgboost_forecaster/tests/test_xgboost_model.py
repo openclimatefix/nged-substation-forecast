@@ -373,7 +373,7 @@ def test_prepare_and_join_nwps_handles_unsorted_input():
     )
 
     # Call _prepare_and_join_nwps
-    joined_nwps = forecaster._prepare_and_join_nwps(nwps)
+    joined_nwps = forecaster._prepare_and_join_nwps(list(nwps.values())[0])
 
     # Verify the output is not empty and has the expected columns
     result = cast(pl.DataFrame, joined_nwps.collect())
