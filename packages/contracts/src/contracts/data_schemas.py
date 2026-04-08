@@ -112,6 +112,12 @@ class SimplifiedSubstationPowerFlows(pt.Model):
     MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
 
 
+class NgedJsonPowerFlows(pt.Model):
+    time_series_id: str = pt.Field(dtype=pl.String)
+    end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    value: float = pt.Field(dtype=pl.Float32)
+
+
 class SubstationTargetMap(pt.Model):
     """Maps substations to their primary power column and stores their peak capacity.
 
@@ -155,7 +161,9 @@ class SubstationMetadata(pt.Model):
     # NGED's CKAN portal uses slightly different names for some substations in their location table
     # versus in their live primary flows data. These names are matched by code in
     # `packages/nged_data/src/nged_data/substation_names/`
-    substation_name_in_location_table: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
+    substation_name_in_location_table: str | None = pt.Field(
+        dtype=pl.String, min_length=2, max_length=64, allow_missing=True
+    )
 
     # This will be null if the substation doesn't have live telemetry.
     substation_name_in_live_primaries: str | None = pt.Field(
@@ -176,6 +184,17 @@ class SubstationMetadata(pt.Model):
     # A globally computed preference for which power column (MW or MVA) to use, based on full history.
     # This prioritizes MW but falls back to MVA if MW is unavailable or contains dead sensors.
     preferred_power_col: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+
+    # New fields
+    time_series_name: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    time_series_id: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    time_series_type: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    units: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    licence_area: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    information: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    area_wkt: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    area_center_lat: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    area_center_lon: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
 
 class PowerForecast(pt.Model):

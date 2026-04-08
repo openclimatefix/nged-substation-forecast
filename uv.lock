@@ -15,6 +15,7 @@ members = [
     "geo",
     "ml-core",
     "nged-data",
+    "nged-json-data",
     "nged-substation-forecast",
     "notebooks",
     "xgboost-forecaster",
@@ -2039,6 +2040,17 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "requests", specifier = ">=2.31.0" },
 ]
+
+[[package]]
+name = "nged-json-data"
+version = "0.0.1"
+source = { editable = "packages/nged_json_data" }
+dependencies = [
+    { name = "polars" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "polars", specifier = ">=1.0.0" }]
 
 [[package]]
 name = "nged-substation-forecast"
