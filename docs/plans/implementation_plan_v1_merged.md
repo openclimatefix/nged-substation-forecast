@@ -38,7 +38,7 @@ We will create a new package to handle the JSON data ingestion.
         4.  **Crucial:** Heavily document the rationale for this variance threshold in the code comments. Ensure the function fails loudly (raises an exception) if *all* rows are removed by this filter.
 *   **Metadata Handling (`packages/nged_json_data/src/nged_json_data/metadata.py`):**
     *   Implement `upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path)`.
-    *   **Concurrency Control:** Use a file lock (e.g., via the `filelock` library) to ensure atomic reads and writes to the metadata Parquet file, preventing race conditions.
+    *   **Concurrency Control:** To avoid race conditions and complex conflict resolution, we will designate a single Dagster asset (the `nged_json_archive_asset`) as the *exclusive* owner of metadata updates. The `nged_json_live_asset` will be restricted from updating metadata. Dagster's concurrency limits will be configured to ensure only one instance of the metadata-updating asset can run at a time.
     *   If the local Parquet file doesn't exist, save `new_metadata`.
     *   If it exists, read it, compare with `new_metadata`. If there are differences, update the Parquet file and log a prominent warning message (e.g., using Dagster's `get_dagster_logger().warning`).
 *   **Delta Table Storage (`packages/nged_json_data/src/nged_json_data/storage.py`):**
@@ -68,6 +68,6 @@ The implementation must include rigorous tests covering the following scenarios:
 ## Review Responses & Rejections
 
 *   **FLAW-001 (Reviewer):** ACCEPTED. The hardcoded 0.1 MW variance threshold in `clean_power_data` has been made a configurable parameter (`variance_threshold`).
-*   **FLAW-002 (Reviewer):** ACCEPTED. Potential race conditions in `upsert_metadata` will be mitigated by implementing file-level locking (e.g., using `filelock`).
+*   **FLAW-002 (Reviewer):** ACCEPTED. Potential race conditions in `upsert_metadata` will be mitigated by designating a single asset as the exclusive owner of metadata updates and configuring Dagster to prevent concurrent runs of this asset.
 *   **FLAW-001 (Simplicity):** ACCEPTED. The unnecessary and high-churn renaming of `packages/nged_data` to `packages/nged_ckan_data` has been rejected. We will keep the original name and use deprecation warnings instead.
 *   **FLAW-002 (Simplicity):** ACCEPTED. The complex data cleaning logic will be retained but made configurable and heavily documented to explain the rationale. We will also ensure it fails loudly if it removes all data.
