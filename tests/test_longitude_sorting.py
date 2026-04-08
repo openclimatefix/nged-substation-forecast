@@ -2,7 +2,6 @@ import pytest
 import xarray as xr
 import numpy as np
 import polars as pl
-from datetime import datetime, timezone
 from dynamical_data.processing import download_ecmwf
 
 
@@ -10,10 +9,10 @@ from dynamical_data.processing import download_ecmwf
 def h3_grid() -> pl.DataFrame:
     return pl.DataFrame(
         {
-            "h3_index": [123456789],
-            "nwp_lat": [56.0],
-            "nwp_lng": [-3.25],
-            "proportion": [1.0],
+            "h3_index": [123456789, 123456790],
+            "nwp_lat": [56.0, 57.0],
+            "nwp_lng": [0.0, -5.0],
+            "proportion": [0.5, 0.5],
         },
         schema={
             "h3_index": pl.UInt64,
@@ -33,9 +32,9 @@ def test_longitude_descending_slicing(tmp_path, h3_grid):
         {
             "temperature_2m": (
                 ["latitude", "longitude", "init_time", "lead_time", "ensemble_member"],
-                np.random.rand(1, 2, 1, 1, 1),
+                np.random.rand(2, 2, 1, 1, 1),
             ),
-            "latitude": (["latitude"], [56.0]),
+            "latitude": (["latitude"], [56.0, 57.0]),
             "longitude": (["longitude"], [0.0, -5.0]),
             "init_time": (["init_time"], [init_time]),
             "lead_time": (["lead_time"], [0.0]),

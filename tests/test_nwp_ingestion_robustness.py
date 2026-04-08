@@ -47,10 +47,10 @@ def h3_grid() -> pl.DataFrame:
     """
     return pl.DataFrame(
         {
-            "h3_index": [123456789],  # Dummy index
-            "nwp_lat": [56.0],
-            "nwp_lng": [-3.25],
-            "proportion": [1.0],
+            "h3_index": [123456789, 987654321],
+            "nwp_lat": [56.0, 56.25],
+            "nwp_lng": [-3.25, -3.0],
+            "proportion": [0.5, 0.5],
         },
         schema={
             "h3_index": pl.UInt64,
@@ -219,10 +219,10 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
         assert init_times.item().timestamp() == dt2.timestamp()
 
 
-def test_single_point_forecast_ingestion(tmp_path, h3_grid):
-    """Verify the pipeline can handle single-point forecasts without IndexError.
+def test_small_grid_forecast_ingestion(tmp_path, h3_grid):
+    """Verify the pipeline can handle small-grid forecasts without IndexError.
 
-    This test creates a Zarr dataset with only one latitude and longitude value,
+    This test creates a Zarr dataset with a 2x2 latitude and longitude grid,
     and passes it through download_ecmwf. It verifies the fix
     where length-1 latitude arrays caused an IndexError during spatial slicing.
     """
@@ -233,17 +233,17 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     init_time = np.datetime64("2026-03-01T00:00:00")
     zarr_path = tmp_path / "single_point.zarr"
 
-    # Create a minimal dataset with only one lat/lon
+    # Create a minimal dataset with 2x2 lat/lon
     ds = xr.Dataset(
         {
             "latitude": (
                 ["latitude"],
-                np.array([56.0], dtype=np.float32),
+                np.array([56.0, 56.25], dtype=np.float32),
                 {"units": "degrees_north"},
             ),
             "longitude": (
                 ["longitude"],
-                np.array([-3.25], dtype=np.float32),
+                np.array([-3.25, -3.0], dtype=np.float32),
                 {"units": "degrees_east"},
             ),
             "init_time": (["init_time"], [init_time]),
@@ -253,7 +253,7 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     )
 
     # Add dummy variables
-    shape = (1, 1, 1, 2, 1)
+    shape = (2, 2, 1, 2, 1)
     required_vars = [
         "temperature_2m",
         "dew_point_temperature_2m",
@@ -290,6 +290,6 @@ def test_single_point_forecast_ingestion(tmp_path, h3_grid):
     # This should NOT raise an IndexError
     downloaded_ds = download_ecmwf(init_time, h3_grid, ds_loaded)
 
-    assert downloaded_ds.latitude.size == 1
-    assert downloaded_ds.longitude.size == 1
+    assert downloaded_ds.latitude.size == 2
+    assert downloaded_ds.longitude.size == 2
     assert "temperature_2m" in downloaded_ds.data_vars

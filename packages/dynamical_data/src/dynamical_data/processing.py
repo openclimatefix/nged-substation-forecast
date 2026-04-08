@@ -2,7 +2,7 @@ import concurrent.futures
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import icechunk
 import numpy as np
@@ -223,36 +223,19 @@ def download_ecmwf(
     if ds.longitude.min() < -180 or ds.longitude.max() > 180:
         raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
-    # Find spatial bounds from grid
-    min_lat, max_lat = h3_grid.select(
-        pl.col("nwp_lat").min().alias("min_lat"),
-        pl.col("nwp_lat").max().alias("max_lat"),
+    min_lat, max_lat, min_lng, max_lng = h3_grid.select(
+        min_lat=pl.col("nwp_lat").min(),
+        max_lat=pl.col("nwp_lat").max(),
+        min_lng=pl.col("nwp_lng").min(),
+        max_lng=pl.col("nwp_lng").max(),
     ).row(0)
 
-    # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
-    # We check the first two elements to determine if latitude/longitude are ascending or descending.
-    # Single-point forecasts (length 1) do not have a direction, so we bypass the
-    # ascending/descending check to avoid an IndexError.
-    if len(ds.latitude.values) > 1:
-        lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
-        lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
-    else:
-        lat_slice = slice(min_lat, max_lat)
-
-    min_lng, max_lng = h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()
-    if len(ds.longitude.values) > 1:
-        lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
-        lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
-    else:
-        lng_slice = slice(min_lng, max_lng)
+    lat_slice = _calc_slice_for_lat_or_lng("latitude", ds, min_lat, max_lat)
+    lng_slice = _calc_slice_for_lat_or_lng("longitude", ds, min_lng, max_lng)
 
     # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
     # forecasting near the anti-meridian.
-    ds_cropped = ds.sel(
-        latitude=lat_slice,
-        longitude=lng_slice,
-        init_time=nwp_init_time,
-    )
+    ds_cropped = ds.sel(latitude=lat_slice, longitude=lng_slice, init_time=nwp_init_time)
 
     # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
@@ -262,10 +245,9 @@ def download_ecmwf(
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
-    # The download is I/O bound (S3 network requests). We use a
-    # ThreadPoolExecutor to parallelize network latency across multiple
-    # variables. A ProcessPoolExecutor would be less efficient here due to the
-    # high serialization overhead of Xarray objects between processes.
+    # The download is I/O bound (S3 network requests). We use a ThreadPoolExecutor to parallelize
+    # network latency across multiple variables. A ProcessPoolExecutor would be less efficient here
+    # due to the high serialization overhead of Xarray objects between processes.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
@@ -275,6 +257,29 @@ def download_ecmwf(
             data_arrays.update(future.result())
 
     return xr.Dataset(data_arrays)
+
+
+def _calc_slice_for_lat_or_lng(
+    coord_name: Literal["latitude", "longitude"],
+    ds: xr.Dataset,
+    min_coord: float,
+    max_coord: float,
+) -> slice:
+    """Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
+
+    We check the first two elements to determine if latitude/longitude are ascending or descending.
+    """
+    if min_coord == max_coord:
+        raise ValueError(f"{min_coord=} cannot be equal to {max_coord=} for {coord_name}")
+
+    coord_array = ds[coord_name].values
+    if len(coord_array) <= 1:
+        raise ValueError(
+            f"ds.{coord_name}.values must have multiple values. Found {len(coord_array)} values"
+        )
+
+    is_descending = coord_array[0] > coord_array[-1]
+    return slice(max_coord, min_coord) if is_descending else slice(min_coord, max_coord)
 
 
 def _process_chunk(
@@ -384,6 +389,11 @@ def process_ecmwf_dataset(
     h3_grid = h3_grid.with_columns(
         [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
     )
+
+    # Check for NaNs in the input dataset
+    for var_name in loaded_ds.data_vars:
+        if loaded_ds[var_name].isnull().any():
+            raise MalformedZarrError(f"Variable '{var_name}' contains NaNs.")
 
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
