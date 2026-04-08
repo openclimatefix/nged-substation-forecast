@@ -2,7 +2,7 @@ import concurrent.futures
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import icechunk
 import numpy as np
@@ -223,7 +223,6 @@ def download_ecmwf(
     if ds.longitude.min() < -180 or ds.longitude.max() > 180:
         raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
-    # TODO: Reduce duplication in the handling of latitude and longitude coords
     min_lat, max_lat, min_lng, max_lng = h3_grid.select(
         min_lat=pl.col("nwp_lat").min(),
         max_lat=pl.col("nwp_lat").max(),
@@ -231,31 +230,8 @@ def download_ecmwf(
         max_lng=pl.col("nwp_lng").max(),
     ).row(0)
 
-    # Latitude coordinates
-    if min_lat == max_lat:
-        raise ValueError("min_lat cannot be equal to max_lat")
-
-    if len(ds.latitude.values) <= 1:
-        raise ValueError(
-            f"ds.latitude.values must have multiple values. Found {len(ds.latitude.values)} values"
-        )
-
-    # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
-    # We check the first two elements to determine if latitude/longitude are ascending or descending.
-    lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
-    lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
-
-    # Longitude coordinates.
-    if min_lng == max_lng:
-        raise ValueError("min_lng cannot be equal to max_lng")
-
-    if len(ds.longitude.values) <= 1:
-        raise ValueError(
-            f"ds.longitude.values must have multiple values. Found {len(ds.longitude.values)} values"
-        )
-
-    lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
-    lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
+    lat_slice = _calc_slice_for_lat_or_lng("latitude", ds, min_lat, max_lat)
+    lng_slice = _calc_slice_for_lat_or_lng("longitude", ds, min_lng, max_lng)
 
     # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
     # forecasting near the anti-meridian.
@@ -281,6 +257,29 @@ def download_ecmwf(
             data_arrays.update(future.result())
 
     return xr.Dataset(data_arrays)
+
+
+def _calc_slice_for_lat_or_lng(
+    coord_name: Literal["latitude", "longitude"],
+    ds: xr.Dataset,
+    min_coord: float,
+    max_coord: float,
+) -> slice:
+    """Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
+
+    We check the first two elements to determine if latitude/longitude are ascending or descending.
+    """
+    if min_coord == max_coord:
+        raise ValueError(f"{min_coord=} cannot be equal to {max_coord=} for {coord_name}")
+
+    coord_array = ds[coord_name].values
+    if len(coord_array) <= 1:
+        raise ValueError(
+            f"ds.{coord_name}.values must have multiple values. Found {len(coord_array)} values"
+        )
+
+    is_descending = coord_array[0] > coord_array[-1]
+    return slice(max_coord, min_coord) if is_descending else slice(min_coord, max_coord)
 
 
 def _process_chunk(
