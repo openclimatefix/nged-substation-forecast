@@ -1,5 +1,6 @@
 import polars as pl
 import patito as pt
+import dagster
 from contracts.data_schemas import NgedJsonPowerFlows
 
 
@@ -18,7 +19,7 @@ def calculate_rolling_variance(df: pl.DataFrame) -> pl.DataFrame:
 
 def apply_variance_threshold(df: pl.DataFrame, threshold: float) -> pl.DataFrame:
     """Nullifies values where rolling variance is below the threshold."""
-    print(f"DF before threshold: {df}")
+    dagster.get_dagster_logger().info(f"DF before threshold: {df}")
     df = df.with_columns(
         value=pl.when(
             (pl.col("rolling_variance").is_null()) | (pl.col("rolling_variance") <= threshold)
@@ -26,7 +27,7 @@ def apply_variance_threshold(df: pl.DataFrame, threshold: float) -> pl.DataFrame
         .then(None)
         .otherwise(pl.col("value"))
     )
-    print(f"DF after threshold: {df}")
+    dagster.get_dagster_logger().info(f"DF after threshold: {df}")
     return df.drop("rolling_variance")
 
 
@@ -66,7 +67,7 @@ def clean_power_data(
 
     # Drop nulls again
     df = df.with_columns(value=pl.col("value").fill_nan(None)).drop_nulls(subset=["value"])
-    print(f"DF after dropping nulls: {df}")
+    dagster.get_dagster_logger().info(f"DF after dropping nulls: {df}")
 
     # 4. Validate
     return validate_data(df)

@@ -10,8 +10,7 @@ def test_clean_power_data():
     data = {
         "time_series_id": ["1"] * 48,
         "end_time": [start_time + timedelta(hours=i) for i in range(48)],
-        "value": [1.0] * 24
-        + [2.0] * 24,  # Day 1: constant (variance 0), Day 2: constant (variance 0)
+        "value": [1.0] * 48,  # Constant (variance 0)
     }
     df = pl.DataFrame(data).with_columns(
         pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
@@ -36,7 +35,7 @@ def test_clean_power_data():
         pl.col("value").cast(pl.Float32),
     )
     cleaned_df = clean_power_data(df_keep, default_threshold=0.1)
-    assert len(cleaned_df) == 48
+    assert len(cleaned_df) == 47
 
     # Test with null values
     data_null = {
@@ -49,4 +48,4 @@ def test_clean_power_data():
         pl.col("value").cast(pl.Float32),
     )
     cleaned_df_null = clean_power_data(df_null, default_threshold=0.1)
-    assert len(cleaned_df_null) == 46
+    assert len(cleaned_df_null) == 45

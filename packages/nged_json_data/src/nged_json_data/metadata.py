@@ -1,6 +1,14 @@
 import polars as pl
 from pathlib import Path
 from dagster import get_dagster_logger
+import io
+
+
+def get_df_hash(df: pl.DataFrame) -> int:
+    """Calculates a hash of the DataFrame."""
+    buffer = io.BytesIO()
+    df.write_parquet(buffer)
+    return hash(buffer.getvalue())
 
 
 def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
@@ -29,8 +37,8 @@ def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
     existing_metadata = pl.read_parquet(metadata_path)
 
     # Compare metadata
-    # We use `equals` to check if the DataFrames are identical.
-    if not existing_metadata.equals(new_metadata):
+    # We use `hash_rows().sum()` to check if the DataFrames are identical.
+    if get_df_hash(existing_metadata) != get_df_hash(new_metadata):
         logger.warning(f"Metadata mismatch detected at {metadata_path}. Updating metadata file.")
         new_metadata.write_parquet(metadata_path)
     else:

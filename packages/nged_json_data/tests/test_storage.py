@@ -50,12 +50,12 @@ def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_w
 
     # Mock existing keys
     mock_dt = mock_delta_table.return_value
-    mock_dt.to_pyarrow_table.return_value.to_pandas.return_value = pl.DataFrame(
+    mock_dt.to_pyarrow_table.return_value = pl.DataFrame(
         {
             "time_series_id": ["1"],
             "end_time": [datetime(2026, 1, 1)],
         }
-    ).to_pandas()
+    ).to_arrow()
 
     # Create a dummy Patito DataFrame with new data
     df = pt.DataFrame[NgedJsonPowerFlows](
