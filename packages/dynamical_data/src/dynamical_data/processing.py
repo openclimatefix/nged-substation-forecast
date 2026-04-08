@@ -223,45 +223,43 @@ def download_ecmwf(
     if ds.longitude.min() < -180 or ds.longitude.max() > 180:
         raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
-    # Find spatial bounds from grid
-    min_lat, max_lat = h3_grid.select(
-        pl.col("nwp_lat").min().alias("min_lat"),
-        pl.col("nwp_lat").max().alias("max_lat"),
+    # TODO: Reduce duplication in the handling of latitude and longitude coords
+    min_lat, max_lat, min_lng, max_lng = h3_grid.select(
+        min_lat=pl.col("nwp_lat").min(),
+        max_lat=pl.col("nwp_lat").max(),
+        min_lng=pl.col("nwp_lng").min(),
+        max_lng=pl.col("nwp_lng").max(),
     ).row(0)
 
+    # Latitude coordinates
     if min_lat == max_lat:
         raise ValueError("min_lat cannot be equal to max_lat")
 
+    if len(ds.latitude.values) <= 1:
+        raise ValueError(
+            f"ds.latitude.values must have multiple values. Found {len(ds.latitude.values)} values"
+        )
+
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
     # We check the first two elements to determine if latitude/longitude are ascending or descending.
-    # Single-point forecasts (length 1) do not have a direction, so we bypass the
-    # ascending/descending check to avoid an IndexError.
-    #
-    # If the slice is too narrow (e.g., a single point), we expand it to the nearest
-    # grid points to ensure we capture the data.
-    if len(ds.latitude.values) > 1:
-        lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
-        lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
-    else:
-        lat_slice = slice(min_lat, max_lat)
+    lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
+    lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
 
-    min_lng, max_lng = h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()
+    # Longitude coordinates.
     if min_lng == max_lng:
         raise ValueError("min_lng cannot be equal to max_lng")
 
-    if len(ds.longitude.values) > 1:
-        lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
-        lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
-    else:
-        lng_slice = slice(min_lng, max_lng)
+    if len(ds.longitude.values) <= 1:
+        raise ValueError(
+            f"ds.longitude.values must have multiple values. Found {len(ds.longitude.values)} values"
+        )
+
+    lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
+    lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
 
     # NOTE: This will fail if the region crosses the anti-meridian. But we do not anticipate
     # forecasting near the anti-meridian.
-    ds_cropped = ds.sel(
-        latitude=lat_slice,
-        longitude=lng_slice,
-        init_time=nwp_init_time,
-    )
+    ds_cropped = ds.sel(latitude=lat_slice, longitude=lng_slice, init_time=nwp_init_time)
 
     # Explicitly check for an empty spatial intersection after slicing.
     # This prevents downstream KeyErrors during DataFrame conversion.
@@ -271,10 +269,9 @@ def download_ecmwf(
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_cropped[var_name].compute()}
 
-    # The download is I/O bound (S3 network requests). We use a
-    # ThreadPoolExecutor to parallelize network latency across multiple
-    # variables. A ProcessPoolExecutor would be less efficient here due to the
-    # high serialization overhead of Xarray objects between processes.
+    # The download is I/O bound (S3 network requests). We use a ThreadPoolExecutor to parallelize
+    # network latency across multiple variables. A ProcessPoolExecutor would be less efficient here
+    # due to the high serialization overhead of Xarray objects between processes.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
