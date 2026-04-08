@@ -304,7 +304,7 @@ def _merge_to_delta(
         AssetCheckSpec(name="all_substations_succeeded", asset="live_primary_flows"),
     ],
     deps=["substation_metadata"],
-    group_name="NGED CKAN (Deprecated)",
+    group_name="NGED_CKAN_Deprecated",
 )
 def live_primary_flows(
     context: AssetExecutionContext,
@@ -389,7 +389,7 @@ def live_primary_flows(
     yield MaterializeResult(metadata=metadata)
 
 
-@asset(group_name="NGED CKAN (Deprecated)")
+@asset(group_name="NGED_CKAN_Deprecated")
 def substation_metadata(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
@@ -483,7 +483,7 @@ def substation_metadata(
 # to determine the preferred power column (including the 'Dead Sensor' logic).
 # This introduces temporal leakage, but the user considers it a minor concern
 # that doesn't justify complicating the code.
-@asset(group_name="NGED CKAN (Deprecated)")
+@asset(group_name="NGED_CKAN_Deprecated")
 def substation_power_preferences(
     context: AssetExecutionContext,
     settings: ResourceParam[Settings],
@@ -509,7 +509,7 @@ def substation_power_preferences(
     return target_map
 
 
-@asset(group_name="NGED JSON")
+@asset(group_name="NGED_JSON")
 def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
     """One-off historical backfill of NGED JSON data."""
     json_dir = settings.nged_data_path / "json" / "archive"
@@ -532,11 +532,11 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
 @asset(
     partitions_def=dg.TimeWindowPartitionsDefinition(
         cron_schedule="0 */6 * * *",
-        start="2026-01-26",
+        start="2026-01-26-00:00",
         fmt="%Y-%m-%d-%H:%M",
         timezone="UTC",
     ),
-    group_name="NGED JSON",
+    group_name="NGED_JSON",
 )
 def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
     """Live updates of NGED JSON data."""

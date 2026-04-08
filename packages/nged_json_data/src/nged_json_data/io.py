@@ -28,6 +28,10 @@ def load_nged_json(file_path: Path) -> tuple[pl.DataFrame, pl.DataFrame]:
     # Extract time series data: explode the 'data' column and unnest the struct.
     # 'explode' expands the list of structs into individual rows.
     # 'unnest' expands the struct fields into individual columns.
-    time_series_df = df.select("data").explode("data").unnest("data")
+    time_series_df = df.select("data").explode("data")
+    if time_series_df["data"].dtype == pl.Null:
+        return metadata_df, pl.DataFrame()
+
+    time_series_df = time_series_df.unnest("data")
 
     return metadata_df, time_series_df
