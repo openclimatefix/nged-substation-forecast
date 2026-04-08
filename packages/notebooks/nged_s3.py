@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.22.5"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -29,10 +29,8 @@ def _():
 
 @app.cell
 def _(store):
-    files = list(store.list())
-    for file in files:
-        print(file.path)
-    return (files,)
+    list(store.list())
+    return
 
 
 @app.cell
@@ -79,11 +77,11 @@ def _(files):
     print(f"Found {len(json_files)} JSON files.")
     for json_file in json_files[:5]:
         print(json_file)
-    return (json_files,)
+    return
 
 
-@app.cell
-def _(store, json_files):
+app._unparsable_cell(
+    r"""
     if json_files:
         # Read the first JSON file
         _result = store.get(json_files[0])
@@ -92,7 +90,9 @@ def _(store, json_files):
         print(f"Successfully read {json_files[0]}")
         print(json_df.head())
         return (json_df,)
-    return
+    """,
+    name="_",
+)
 
 
 if __name__ == "__main__":
