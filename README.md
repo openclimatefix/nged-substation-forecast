@@ -29,6 +29,8 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 
 ### Testing
 
+- **Run only the fast tests**: `uv run pytest -m "not slow"`
+- **Run only the slow tests**: `uv run pytest -m "slow"`
 - **Run all tests**: `uv run pytest`
 - **Run tests with coverage**: `uv run pytest --cov`
 
