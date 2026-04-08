@@ -316,14 +316,8 @@ def test_xgboost_forecaster_predict_empty():
 def test_prepare_and_join_nwps_handles_unsorted_input():
     """
     Test that _prepare_and_join_nwps correctly handles unsorted input data.
-
-    The method performs an asof join, which requires sorted data. This test
-    verifies that the internal sorting logic within _prepare_and_join_nwps
-    correctly handles unsorted input, ensuring join semantics are maintained
-    without requiring the caller to pre-sort the data.
     """
-    # Setup: Create two NWP sources with unsorted data
-    # We use a small number of rows to make the test fast and readable.
+    # Setup: Create NWP source with unsorted data
     timestamps = pl.datetime_range(
         datetime(2026, 1, 1, tzinfo=timezone.utc),
         datetime(2026, 1, 1, 6, tzinfo=timezone.utc),
@@ -351,14 +345,8 @@ def test_prepare_and_join_nwps_handles_unsorted_input():
         "categorical_precipitation_type_surface": [0.0] * len(timestamps),
     }
 
-    # Create two NWP sources, one with unsorted valid_time
+    # Create NWP source with unsorted valid_time
     nwp1 = pt.DataFrame[ProcessedNwp](nwp_data).lazy().sort("valid_time", descending=True)
-    nwp2 = pt.DataFrame[ProcessedNwp](nwp_data).lazy().sort("valid_time", descending=True)
-
-    nwps = {
-        NwpModel.ECMWF_ENS_0_25DEG: nwp1,
-        NwpModel.GFS_0_25DEG: nwp2,
-    }
 
     # Initialize Forecaster
     forecaster = XGBoostForecaster()
@@ -366,17 +354,14 @@ def test_prepare_and_join_nwps_handles_unsorted_input():
     forecaster.config = ModelConfig(
         power_fcst_model_name="xgboost",
         hyperparameters={},
-        features=ModelFeaturesConfig(
-            nwps=[NwpModel.ECMWF_ENS_0_25DEG, NwpModel.GFS_0_25DEG], feature_names=[]
-        ),
+        features=ModelFeaturesConfig(nwps=[NwpModel.ECMWF_ENS_0_25DEG], feature_names=[]),
         nwp_availability_delay_hours=3,
     )
 
     # Call _prepare_and_join_nwps
-    joined_nwps = forecaster._prepare_and_join_nwps(list(nwps.values())[0])
+    joined_nwps = forecaster._prepare_and_join_nwps(nwp1)
 
     # Verify the output is not empty and has the expected columns
     result = cast(pl.DataFrame, joined_nwps.collect())
     assert not result.is_empty()
     assert "temperature_2m" in result.columns
-    assert "gfs_0_25deg_temperature_2m" in result.columns
