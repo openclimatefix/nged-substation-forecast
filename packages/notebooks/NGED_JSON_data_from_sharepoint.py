@@ -3,30 +3,26 @@ import marimo
 __generated_with = "0.22.5"
 app = marimo.App(width="full")
 
+with app.setup:
+    import polars as pl
+    from pathlib import Path
+    from datetime import datetime, timezone
+
 
 @app.cell
 def _():
-    from pathlib import Path
-
-    return (Path,)
-
-
-@app.cell
-def _(Path):
     archive_path = Path(
         "/home/jack/dev/python/nged-substation-forecast/data/from_NGED_sharepoint/OneDrive_1_4-8-2026/1451606400000_1774512000000/"
     )
     file_listing = list(archive_path.glob("*.json"))
     file_listing
-    return
+    return (file_listing,)
 
 
-app._unparsable_cell(
-    r"""
-    df = pl.read_json(file_listing[0])s
-    """,
-    name="_",
-)
+@app.cell
+def _(file_listing):
+    df = pl.read_json(file_listing[0])
+    return (df,)
 
 
 @app.cell
@@ -57,7 +53,27 @@ def _(df):
 
 @app.cell
 def _(df):
-    df["data"].explode().struct.unnest()
+    timeseries = (
+        df["data"]
+        .explode()
+        .struct.unnest()
+        .select(["value", "endTime"])
+        .with_columns(endTime=pl.col("endTime").str.to_datetime(time_zone="UTC"))
+    )
+    timeseries
+    return (timeseries,)
+
+
+@app.cell
+def _(timeseries):
+    filtered = timeseries.filter(pl.col("endTime") > datetime(2026, 3, 20, tzinfo=timezone.utc))
+    filtered
+    return (filtered,)
+
+
+@app.cell
+def _(filtered):
+    filtered.plot.line(x="endTime", y="value")
     return
 
 
