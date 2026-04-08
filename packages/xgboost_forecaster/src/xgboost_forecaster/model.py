@@ -10,7 +10,6 @@ from typing import cast
 import mlflow
 import patito as pt
 import polars as pl
-
 from contracts.data_schemas import (
     InferenceParams,
     NwpColumns,
@@ -22,6 +21,7 @@ from contracts.hydra_schemas import ModelConfig, NwpModel
 from ml_core.features import add_cyclical_temporal_features
 from ml_core.model import BaseForecaster
 from xgboost import XGBRegressor
+
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.features import (
     add_autoregressive_lags,
@@ -54,6 +54,7 @@ class XGBoostForecaster(BaseForecaster):
         self.target_map = None
         self.feature_names = []
 
+    # TODO: Use Patito data contracts for output of this function.
     def _get_target_map_df(self) -> pl.DataFrame:
         """Get the target map as a Polars DataFrame.
 
@@ -83,6 +84,7 @@ class XGBoostForecaster(BaseForecaster):
                 target_map_df.write_json(path)
                 mlflow.log_artifact(path, artifact_path="metadata")
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_features(self, df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame | pl.LazyFrame:
         """Extract the feature matrix.
 
@@ -132,6 +134,7 @@ class XGBoostForecaster(BaseForecaster):
 
         return res
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _collapse_lead_times(
         self,
         df: pl.LazyFrame,
@@ -165,6 +168,7 @@ class XGBoostForecaster(BaseForecaster):
             .last()
         )
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_and_join_nwps(
         self,
         nwps: Mapping[NwpModel, pl.LazyFrame],
@@ -260,6 +264,7 @@ class XGBoostForecaster(BaseForecaster):
             )
         return combined_nwps
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_training_data(
         self,
         flows_30m: pl.LazyFrame,
@@ -306,6 +311,7 @@ class XGBoostForecaster(BaseForecaster):
             )
         return df_lf
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_inference_data(
         self,
         metadata_lf: pl.LazyFrame,
@@ -334,6 +340,7 @@ class XGBoostForecaster(BaseForecaster):
             pl.col(NwpColumns.H3_INDEX).cast(pl.UInt64)
         )
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_data_for_model(
         self,
         flows_30m: pl.LazyFrame,
@@ -434,6 +441,7 @@ class XGBoostForecaster(BaseForecaster):
 
         return df_lf
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def train(
         self,
         config: ModelConfig,
@@ -553,6 +561,7 @@ class XGBoostForecaster(BaseForecaster):
 
         return self
 
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
     def predict(
         self,
         substation_metadata: pt.DataFrame[SubstationMetadata],
