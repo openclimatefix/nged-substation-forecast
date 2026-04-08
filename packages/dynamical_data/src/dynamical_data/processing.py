@@ -229,6 +229,9 @@ def download_ecmwf(
         pl.col("nwp_lat").max().alias("max_lat"),
     ).row(0)
 
+    if min_lat == max_lat:
+        raise ValueError("min_lat cannot be equal to max_lat")
+
     # Robust slicing: xarray slice(a, b) is sensitive to coordinate direction.
     # We check the first two elements to determine if latitude/longitude are ascending or descending.
     # Single-point forecasts (length 1) do not have a direction, so we bypass the
@@ -238,44 +241,17 @@ def download_ecmwf(
     # grid points to ensure we capture the data.
     if len(ds.latitude.values) > 1:
         lat_is_descending = ds.latitude.values[0] > ds.latitude.values[1]
-        if min_lat == max_lat:
-            # Find the nearest grid points
-            lat_values = ds.latitude.values
-            # Find the index of the nearest value
-            idx = (np.abs(lat_values - min_lat)).argmin()
-            # Expand to include the nearest neighbor
-            if idx == 0:
-                lat_slice = slice(
-                    lat_values[0], lat_values[1] if len(lat_values) > 1 else lat_values[0]
-                )
-            elif idx == len(lat_values) - 1:
-                lat_slice = slice(lat_values[-2], lat_values[-1])
-            else:
-                lat_slice = slice(lat_values[idx - 1], lat_values[idx + 1])
-        else:
-            lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
+        lat_slice = slice(max_lat, min_lat) if lat_is_descending else slice(min_lat, max_lat)
     else:
         lat_slice = slice(min_lat, max_lat)
 
     min_lng, max_lng = h3_grid.get_column("nwp_lng").min(), h3_grid.get_column("nwp_lng").max()
+    if min_lng == max_lng:
+        raise ValueError("min_lng cannot be equal to max_lng")
+
     if len(ds.longitude.values) > 1:
         lng_is_descending = ds.longitude.values[0] > ds.longitude.values[1]
-        if min_lng == max_lng:
-            # Find the nearest grid points
-            lng_values = ds.longitude.values
-            # Find the index of the nearest value
-            idx = (np.abs(lng_values - min_lng)).argmin()
-            # Expand to include the nearest neighbor
-            if idx == 0:
-                lng_slice = slice(
-                    lng_values[0], lng_values[1] if len(lng_values) > 1 else lng_values[0]
-                )
-            elif idx == len(lng_values) - 1:
-                lng_slice = slice(lng_values[-2], lng_values[-1])
-            else:
-                lng_slice = slice(lng_values[idx - 1], lng_values[idx + 1])
-        else:
-            lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
+        lng_slice = slice(max_lng, min_lng) if lng_is_descending else slice(min_lng, max_lng)
     else:
         lng_slice = slice(min_lng, max_lng)
 

@@ -18,12 +18,12 @@ def test_malformed_data_fails(broken_zarr_factory):
     h3_grid = H3GridWeights.validate(
         pl.DataFrame(
             {
-                "h3_index": [123456789],
-                "nwp_lat": [55.75],
-                "nwp_lng": [-3.5],
-                "len": [1],
-                "total": [1],
-                "proportion": [1.0],
+                "h3_index": [123456789, 123456790],
+                "nwp_lat": [55.75, 56.75],
+                "nwp_lng": [-3.5, -4.5],
+                "len": [1, 1],
+                "total": [2, 2],
+                "proportion": [0.5, 0.5],
             },
             schema={
                 "h3_index": pl.UInt64,
