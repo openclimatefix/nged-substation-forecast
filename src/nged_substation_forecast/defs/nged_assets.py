@@ -16,6 +16,7 @@ import polars as pl
 import patito as pt
 from contracts.data_schemas import (
     MissingCorePowerVariablesError,
+    NgedJsonPowerFlows,
     SubstationMetadata,
     SubstationPowerFlows,
 )
@@ -546,6 +547,7 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
     partition_date = context.partition_time_window.start
     json_dir = settings.nged_data_path / "json" / "live" / partition_date.strftime("%Y-%m-%d-%H")
 
+    cleaned_dfs = []
     for json_file in json_dir.glob("*.json"):
         metadata_df, time_series_df = load_nged_json(json_file)
 
@@ -556,9 +558,15 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
             substation_number=substation_number,
             variance_thresholds=settings.data_quality.variance_thresholds,
         )
+        cleaned_dfs.append(cleaned_df)
 
-        # Append to delta
-        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+    if cleaned_dfs:
+        # Combine all cleaned dataframes and append in a single operation
+        combined_df = pl.concat(cleaned_dfs)
+        append_to_delta(
+            pt.DataFrame[NgedJsonPowerFlows](combined_df),
+            settings.nged_data_path / "delta" / "json_data",
+        )
 
     context.log.info(f"Finished processing live JSON data for {partition_date}.")
 

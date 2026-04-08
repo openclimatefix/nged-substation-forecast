@@ -2,25 +2,25 @@
 review_iteration: 1
 reviewer: "scientist"
 total_flaws: 3
-critical_flaws: 1
+critical_flaws: 1 # Conductor will halt and escalate to Architect if > 0
 ---
 
-# ML Rigor Review: NGED JSON Ingestion Pipeline
+# ML Rigor Review
 
-## FLAW-001: Aggressive Data Cleaning (Critical)
-* **File & Line Number:** `packages/nged_json_data/src/nged_json_data/clean.py`, lines 48-55
-* **The Theoretical Issue:** The `clean_power_data` function calculates variance per day and drops the *entire day* if the variance is below a threshold. This is scientifically unsound as it removes valid low-load periods (e.g., overnight) and fails to handle sensors that are only stuck for a few hours.
-* **Concrete Failure Mode:** The model will lose significant amounts of valid, low-load training data, leading to biased forecasts that overestimate load during quiet periods.
-* **Required Architectural Fix:** Redesign the cleaning logic to use a rolling window for variance calculation instead of a daily aggregate, and only nullify the specific time slices that are identified as "stuck" rather than dropping the entire day.
+## FLAW-001: Potential Race Condition in `append_to_delta`
+* **File & Line Number:** `packages/nged_json_data/src/nged_json_data/storage.py`, lines 30-43 and 64-76
+* **The Theoretical Issue:** The `append_to_delta` function reads existing keys, filters new data, and then appends. This is not an atomic operation. If another process appends data between reading existing keys and appending new data, duplicates could be introduced.
+* **Concrete Failure Mode:** The Delta table could contain duplicate records for the same `(time_series_id, end_time)`, leading to incorrect data in the downstream models.
+* **Required Architectural Fix:** The Architect must redesign the `append_to_delta` function to use an atomic `merge` operation provided by Delta Lake, rather than a read-filter-append pattern.
 
-## FLAW-002: Hardcoded Variance Threshold
-* **File & Line Number:** `packages/nged_json_data/src/nged_json_data/clean.py`, line 7
-* **The Theoretical Issue:** The `variance_threshold` is hardcoded as a default (0.1). This threshold is unlikely to be appropriate for all substations, which have different load profiles and noise characteristics.
-* **Concrete Failure Mode:** The model will either fail to filter out genuinely stuck sensors (if the threshold is too low) or incorrectly filter out valid data (if the threshold is too high), leading to inconsistent data quality across the grid.
-* **Required Architectural Fix:** Make the `variance_threshold` a configurable parameter, ideally per substation, and document the rationale for its selection.
+## FLAW-002: Inefficient Delta Lake Appends
+* **File & Line Number:** `src/nged_substation_forecast/defs/nged_assets.py`, lines 549-561
+* **The Theoretical Issue:** The `nged_json_live_asset` calls `append_to_delta` inside a loop for each JSON file. This results in multiple small transactions, which is inefficient for Delta Lake and can lead to performance issues.
+* **Concrete Failure Mode:** The ingestion pipeline will be slow and create many small files in the Delta table, which can degrade query performance.
+* **Required Architectural Fix:** The Architect must modify the `nged_json_live_asset` to collect all cleaned dataframes and append them in a single operation to reduce the number of Delta Lake transactions.
 
-## FLAW-003: Lack of Concurrency Control in Delta Appends
-* **File & Line Number:** `packages/nged_json_data/src/nged_json_data/storage.py`, lines 40-43, 73-76
-* **The Theoretical Issue:** The `append_to_delta` function lacks the robust retry logic for concurrent writes that is present in `src/nged_substation_forecast/defs/nged_assets.py`.
-* **Concrete Failure Mode:** In a distributed or parallel ingestion environment, multiple processes attempting to append to the same Delta table will likely cause race conditions and write failures.
-* **Required Architectural Fix:** Implement a retry mechanism for concurrent writes in `append_to_delta`, similar to the one used in `_merge_to_delta` in `nged_assets.py`.
+## FLAW-003: Redundant Code in `append_to_delta`
+* **File & Line Number:** `packages/nged_json_data/src/nged_json_data/storage.py`, lines 30-43 and 64-76
+* **The Theoretical Issue:** The `append_to_delta` function contains redundant code blocks that perform the same logic.
+* **Concrete Failure Mode:** This increases the maintenance burden and the risk of bugs if one block is updated but the other is not.
+* **Required Architectural Fix:** The Architect must refactor the `append_to_delta` function to remove the redundant code.
