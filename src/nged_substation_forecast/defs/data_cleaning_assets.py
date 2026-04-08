@@ -36,8 +36,9 @@ from dagster import ResourceParam
 
 from contracts.data_schemas import SubstationPowerFlows
 from contracts.settings import Settings
-from nged_data import clean_substation_flows, get_partition_window, scan_delta_table
 from .partitions import DAILY_PARTITIONS
+from ..utils import scan_delta_table, get_partition_window
+from ..cleaning import clean_substation_flows
 
 
 def _get_delta_path(settings: Settings, table_name: str) -> str:

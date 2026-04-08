@@ -1,23 +1,14 @@
 import random
 import time
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple, cast, TYPE_CHECKING
+from typing import NamedTuple, cast
 
 import dagster as dg
-import httpx
 import polars as pl
 from contracts.settings import Settings
-from nged_data import (
-    ckan,
-    process_live_primary_substation_power_flows,
-    scan_delta_table,
-)
-
-if TYPE_CHECKING:
-    from ..defs.nged_assets import LivePrimaryFlowsConfig
+from ..utils import scan_delta_table
 
 
 class IngestionStage(str, Enum):
@@ -48,63 +39,6 @@ class SubstationResource(NamedTuple):
 
 def get_delta_path(settings: Settings) -> Path:
     return settings.nged_data_path / "delta" / "live_primary_flows"
-
-
-def download_and_process_substation(
-    substation_number: int,
-    url: str,
-    api_key: str,
-    max_retries: int,
-    log: dg.DagsterLogManager,
-    client: httpx.Client,
-    partition_date: datetime,
-) -> SubstationIngestionResult:
-    log.info(f"Processing substation {substation_number}...")
-
-    # Download
-    try:
-        response = ckan.httpx_get_with_auth(
-            url, api_key=api_key, max_retries=max_retries, client=client
-        )
-        csv_data = response.content
-    except Exception as e:
-        return SubstationIngestionResult(
-            substation_number=substation_number, stage=IngestionStage.DOWNLOAD, error_message=str(e)
-        )
-
-    # Process
-    try:
-        new_df = process_live_primary_substation_power_flows(csv_data)
-    except Exception as e:
-        # The exception might have a note with the CSV snippet from process_flows.py
-        error_message = str(e)
-        if hasattr(e, "__notes__") and e.__notes__:
-            error_message += "\n" + "\n".join(e.__notes__)
-
-        try:
-            csv_snippet = "\n".join(csv_data.decode("utf-8", errors="replace").splitlines()[:3])
-        except Exception:
-            csv_snippet = "Could not decode CSV snippet"
-        return SubstationIngestionResult(
-            substation_number=substation_number,
-            stage=IngestionStage.PROCESSING,
-            error_message=error_message,
-            csv_snippet=csv_snippet,
-        )
-
-    # Add required columns for Delta Lake
-    new_df = new_df.with_columns(
-        [
-            pl.lit(substation_number).cast(pl.Int32).alias("substation_number"),
-            pl.lit(partition_date).cast(pl.Datetime("us", "UTC")).alias("ingested_at"),
-        ]
-    )
-
-    new_df = new_df.select(["timestamp", "substation_number", "MW", "MVA", "MVAr", "ingested_at"])
-
-    return SubstationIngestionResult(
-        substation_number=substation_number, stage=IngestionStage.SUCCESS, df=new_df
-    )
 
 
 def format_failure_metadata(
@@ -155,56 +89,6 @@ def get_processed_substations(
         f"{len(processed_substations)} substations have already been processed for {partition_date}"
     )
     return processed_substations
-
-
-def filter_resources(
-    all_resources: list[SubstationResource],
-    processed_substations: set[int],
-    config: "LivePrimaryFlowsConfig",
-    log: dg.DagsterLogManager,
-) -> list[SubstationResource]:
-    """Filter resources based on processing state and configuration."""
-    # Filter out already processed
-    unprocessed = [r for r in all_resources if r.substation_number not in processed_substations]
-
-    # Apply manual filters
-    if config.substation_numbers:
-        filtered = [r for r in unprocessed if r.substation_number in config.substation_numbers]
-        log.info("Filtered to %d substations by number", len(filtered))
-        return filtered
-
-    if config.limit:
-        limited = unprocessed[: config.limit]
-        log.info("Limited to %d substations", config.limit)
-        return limited
-
-    return unprocessed
-
-
-def download_and_process_all(
-    resources: list[SubstationResource],
-    api_key: str,
-    config: "LivePrimaryFlowsConfig",
-    log: dg.DagsterLogManager,
-    partition_date: datetime,
-) -> list[SubstationIngestionResult]:
-    """Download and process multiple substations concurrently."""
-    with httpx.Client() as client:
-        with ThreadPoolExecutor(max_workers=config.max_concurrent_connections) as executor:
-            return list(
-                executor.map(
-                    lambda r: download_and_process_substation(
-                        r.substation_number,
-                        r.url,
-                        api_key,
-                        config.max_retries,
-                        log,
-                        client,
-                        partition_date,
-                    ),
-                    resources,
-                )
-            )
 
 
 def merge_to_delta(

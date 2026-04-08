@@ -14,4 +14,4 @@
 - **Test Suite Audit & Update:** Audit all tests, implement property-based tests (`hypothesis`), add unit tests for transformations, and remove unnecessary/redundant tests.
 
 ## Next Steps
-- Resume the workflow by starting the code review loop using the finalized plan `docs/temp/implementation_plan_v1_final.md`.
+- Use you `implement` skill to implement the finalized plan `docs/temp/implementation_plan_v1_final.md`.

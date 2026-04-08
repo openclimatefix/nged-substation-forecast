@@ -14,7 +14,6 @@ dependencies = [
     "contracts",
     "ml_core",
     "patito",
-    "nged-data",
     "pyarrow>=23.0.1",
     "mlflow-skinny",
     "altair>=6.0.0",
