@@ -198,7 +198,7 @@ def test_temporal_deduplication_last_update_wins(tmp_path, h3_grid):
     nwp_cutoff = datetime.fromisoformat("2026-03-01T12:00:00").replace(tzinfo=timezone.utc)
 
     combined_lf = forecaster._prepare_and_join_nwps(
-        nwps, nwp_cutoff=nwp_cutoff, collapse_lead_times=True
+        list(nwps.values())[0], nwp_cutoff=nwp_cutoff, collapse_lead_times=True
     )
 
     combined_df = cast(pl.DataFrame, combined_lf.collect())
