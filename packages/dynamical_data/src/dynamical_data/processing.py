@@ -418,6 +418,11 @@ def process_ecmwf_dataset(
         [pl.col("nwp_lng").cast(pl.Float32), pl.col("nwp_lat").cast(pl.Float32)]
     )
 
+    # Check for NaNs in the input dataset
+    for var_name in loaded_ds.data_vars:
+        if loaded_ds[var_name].isnull().any():
+            raise MalformedZarrError(f"Variable '{var_name}' contains NaNs.")
+
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
         loaded_ds.latitude.values, loaded_ds.longitude.values, indexing="ij"
