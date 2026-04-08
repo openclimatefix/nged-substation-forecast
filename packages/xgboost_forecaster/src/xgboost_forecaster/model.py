@@ -422,9 +422,17 @@ class XGBoostForecaster(BaseForecaster):
         # Note: We don't collect the full LazyFrames here to avoid OOM,
         # just logging their presence and schema.
         log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
+        # Log the range of timestamps in flows_30m
+        log.info(
+            f"flows_30m range: {flows_30m.select(pl.col('timestamp').min().alias('min'), pl.col('timestamp').max().alias('max')).collect()}"
+        )
         if nwps:
             for name, lf in nwps.items():
                 log.info(f"Input NWP {name.value} columns: {lf.collect_schema().names()}")
+                # Log the range of valid_time in NWP
+                log.info(
+                    f"NWP range: {lf.select(pl.col(NwpColumns.VALID_TIME).min().alias('min'), pl.col(NwpColumns.VALID_TIME).max().alias('max')).collect()}"
+                )
 
         if len(config.features.nwps) > 0 and not nwps:
             raise ValueError("Model config requires NWPs, but none were provided.")
