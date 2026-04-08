@@ -115,14 +115,19 @@ class XGBoostForecaster(BaseForecaster):
 
         # Ensure substation_number is treated as a categorical feature by XGBoost
         if "substation_number" in res_schema.names():
-            res = res.with_columns(pl.col("substation_number").cast(pl.String).cast(pl.Categorical))
+            substations = [
+                str(s) for s in self._get_target_map_df()["substation_number"].unique().to_list()
+            ]
+            res = res.with_columns(
+                pl.col("substation_number").cast(pl.String).cast(pl.Enum(substations))
+            )
 
         # Ensure categorical precipitation is treated as a categorical feature
         if "categorical_precipitation_type_surface" in res_schema.names():
             res = res.with_columns(
                 pl.col("categorical_precipitation_type_surface")
                 .cast(pl.String)
-                .cast(pl.Categorical)
+                .cast(pl.Enum(["0", "1", "2", "3", "4", "5", "6", "7", "8"]))
             )
 
         return res
