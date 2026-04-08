@@ -4,6 +4,9 @@ from .cleaning import clean_substation_flows
 from .process_flows import process_live_primary_substation_power_flows
 from .schemas import CkanResource
 from .utils import ensure_utc_timestamp_lazy, get_partition_window, scan_delta_table
+from .deprecation import warn_deprecated
+
+warn_deprecated()
 
 __all__ = [
     "clean_substation_flows",

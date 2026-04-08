@@ -4,6 +4,7 @@ from typing import Protocol
 import patito as pt
 import polars as pl
 from contracts.data_schemas import UTC_DATETIME_DTYPE, SubstationPowerFlows
+from .deprecation import warn_deprecated
 
 
 class ParserStrategy(Protocol):
@@ -96,7 +97,12 @@ def _compute_missing_mva(df: pl.DataFrame) -> pl.DataFrame:
 def process_live_primary_substation_power_flows(
     csv_data: bytes,
 ) -> pt.DataFrame[SubstationPowerFlows]:
-    """Read a primary substation CSV and validate it against the schema."""
+    """Read a primary substation CSV and validate it against the schema.
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
+    """
+    warn_deprecated()
     df = pl.read_csv(csv_data)
     first_orig_rows = df.head()
 

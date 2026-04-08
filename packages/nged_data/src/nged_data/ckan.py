@@ -13,6 +13,7 @@ from contracts.data_schemas import SubstationLocations
 from nged_data.schemas import CkanResource, PackageSearchResult
 
 from .utils import change_dataframe_column_names_to_snake_case, find_one_match
+from .deprecation import warn_deprecated
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +21,12 @@ BASE_CKAN_URL: Final[str] = "https://connecteddata.nationalgrid.co.uk"
 
 
 def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLocations]:
-    """Note that 'Park Lane' appears twice (with different substation numbers)."""
+    """Note that 'Park Lane' appears twice (with different substation numbers).
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
+    """
+    warn_deprecated()
     if api_key:
         log.info(
             "Fetching substation locations with API key (length: %d, prefix: %s...)",
@@ -61,17 +67,35 @@ def get_primary_substation_locations(api_key: str) -> pt.DataFrame[SubstationLoc
 
 
 def download_resource(resource: CkanResource, api_key: str) -> bytes:
+    """Download a resource from CKAN.
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
+    """
+    warn_deprecated()
     http_response = httpx_get_with_auth(str(resource.url), api_key=api_key)
     return http_response.content
 
 
 def get_csv_resources_for_historical_primary_substation_flows(api_key: str) -> list[CkanResource]:
+    """Get CSV resources for historical primary substation flows.
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
+    """
+    warn_deprecated()
     return get_csv_resources_for_package(
         'title:"primary transformer flows"', api_key=api_key, max_age=timedelta(days=2)
     )
 
 
 def get_csv_resources_for_live_primary_substation_flows(api_key: str) -> list[CkanResource]:
+    """Get CSV resources for live primary substation flows.
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
+    """
+    warn_deprecated()
     return get_csv_resources_for_package(
         'title:"live primary"', api_key=api_key, max_age=timedelta(days=2)
     )

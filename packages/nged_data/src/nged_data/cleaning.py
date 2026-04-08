@@ -15,12 +15,16 @@ from collections.abc import Sequence
 import polars as pl
 
 from contracts.settings import Settings
+from .deprecation import warn_deprecated
 
 
 def clean_substation_flows(
     df: pl.DataFrame, settings: Settings, group_by_cols: Sequence[str] | None = None
 ) -> pl.DataFrame:
     """Clean substation flows by replacing stuck and insane values with null.
+
+    .. deprecated:: 0.1.0
+       Use 'nged_json_data' instead.
 
     This function identifies problematic telemetry data and replaces these values
     with null to preserve the temporal grid. It performs the following checks:
@@ -59,6 +63,7 @@ def clean_substation_flows(
         - After cleaning, downstream logic should use `pl.coalesce(['MW', 'MVA'])`
           to create the `MW_or_MVA` column.
     """
+    warn_deprecated()
 
     def _compute_insane_mask(power_col: str, min_thresh: float, max_thresh: float) -> pl.Expr:
         """Compute a boolean expression for insane value detection."""
