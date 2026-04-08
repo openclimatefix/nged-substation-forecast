@@ -29,8 +29,10 @@ def _():
 
 @app.cell
 def _(store):
-    list(store.list())
-    return
+    files = list(store.list())
+    for file in files:
+        print(file.path)
+    return (files,)
 
 
 @app.cell
@@ -72,7 +74,24 @@ def _(timeseries_df):
 
 
 @app.cell
-def _():
+def _(files):
+    json_files = [f.path for f in files if f.path.endswith(".json")]
+    print(f"Found {len(json_files)} JSON files.")
+    for json_file in json_files[:5]:
+        print(json_file)
+    return (json_files,)
+
+
+@app.cell
+def _(store, json_files):
+    if json_files:
+        # Read the first JSON file
+        _result = store.get(json_files[0])
+        # Assuming it's a standard JSON file
+        json_df = pl.read_json(BytesIO(_result.bytes()))
+        print(f"Successfully read {json_files[0]}")
+        print(json_df.head())
+        return (json_df,)
     return
 
 
