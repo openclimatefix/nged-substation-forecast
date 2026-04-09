@@ -1,20 +1,19 @@
-# Session Handoff: NGED Substation Forecast Pipeline Refactoring
+# Session Handoff: NGED Substation Forecast Pipeline Refactoring (Paused)
 
-## Current State
-- The planning phase for removing deprecated NGED CKAN data ingestion and updating data contracts is complete.
-- The final implementation plan is documented in `docs/temp/implementation_plan_v1_final.md`.
-- **Completed:**
-    - Removed `packages/nged_data` and updated `pyproject.toml` files.
-    - Removed NGED CKAN Dagster assets and fixed imports.
-    - Updated Data Contracts in `packages/contracts/src/contracts/data_schemas.py`.
-    - Updated `packages/ml_core` to use new data contracts.
-- **In Progress:**
-    - Updating downstream code (`packages/xgboost_forecaster`, `packages/dashboard`, `packages/nged_json_data`).
-    - Fixing broken imports and type errors in tests (identified by `ty` tool).
-- **Pending:**
-    - Update and Audit Tests.
+## Current Status
+The refactoring to remove `target_map` and `substation_metadata` is in progress but currently in an inconsistent state. 
 
-## Next Steps
-- Systematically fix the remaining broken imports and type errors in the test suite, specifically focusing on the `ty` errors identified in the last run.
-- Run `pytest` to verify the fixes.
-- Finalize the downstream code updates.
+- **What has been done:**
+    - `target_map` has been removed from `XGBoostForecaster`.
+    - `ml_core/utils.py` has been updated to remove `target_map` dependency.
+    - Several test files have been updated to remove `target_map` and `substation_metadata` references.
+    - `TimeSeriesMetadata` schema has been updated.
+
+- **What is broken (Current Issues):**
+    - `pytest tests/` is failing with multiple errors related to schema mismatches and Dagster asset resolution.
+    - The codebase is currently not in a runnable state.
+
+## Next Steps for the Next Session
+1. **Re-evaluate the design:** The current approach of removing `substation_metadata` and updating `TimeSeriesMetadata` is causing significant test failures. A new design is needed.
+2. **Do not continue with the current implementation:** The current changes are likely going in the wrong direction.
+3. **Review the current state:** The codebase has many modified files. It is recommended to either revert to the last known good state or carefully review the changes before proceeding.
