@@ -10,7 +10,7 @@ import patito as pt
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    SubstationMetadata,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
 
@@ -33,7 +33,7 @@ class BaseForecaster(ABC):
         self,
         config: ModelConfig,
         flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> Any:
         """Train the model.
@@ -41,7 +41,7 @@ class BaseForecaster(ABC):
         Args:
             config: Model configuration object.
             flows_30m: Historical power flow data downsampled to 30m.
-            substation_metadata: The substation metadata.
+            time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
         Returns:
@@ -52,7 +52,7 @@ class BaseForecaster(ABC):
     @abstractmethod
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
         flows_30m: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
@@ -61,7 +61,7 @@ class BaseForecaster(ABC):
         """Generate power forecasts.
 
         Args:
-            substation_metadata: The substation metadata.
+            time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
             flows_30m: Historical power flow data downsampled to 30m (for lags).
             nwps: A dictionary of weather forecast dataframes.

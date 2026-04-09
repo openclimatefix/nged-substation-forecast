@@ -20,7 +20,7 @@ with app.setup:
     import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationMetadata, SubstationPowerFlows
+    from contracts.data_schemas import TimeSeriesMetadata, PowerTimeSeries
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
@@ -30,7 +30,7 @@ with app.setup:
 @app.cell
 def _():
     metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "substation_metadata.parquet"
-    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
+    df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
 
     # Filter for substations with live telemetry
     df = df.filter(pl.col("url").is_not_null())
@@ -98,7 +98,7 @@ def _(df, layer_widget, map):
 
         try:
             filtered_demand = cast(
-                pt.DataFrame[SubstationPowerFlows],
+                pt.DataFrame[PowerTimeSeries],
                 delta_df.filter(pl.col("substation_number") == substation_number).collect(),
             )
         except Exception as e:

@@ -85,12 +85,7 @@ def train_and_log_model(
             if target_map is None:
                 raise ValueError("target_map must be passed in kwargs to downsample power flows.")
 
-            flows_30m = downsample_power_flows(
-                flows,
-                target_map=target_map.lazy()
-                if isinstance(target_map, pl.DataFrame)
-                else target_map,
-            )
+            flows_30m = downsample_power_flows(flows)
             sliced_data["flows_30m"] = flows_30m
 
             # Store target_map on the trainer if it supports it
@@ -138,7 +133,7 @@ def evaluate_and_save_model(
 
     sliced_data = {}
     for key, val in kwargs.items():
-        if key == "substation_metadata":
+        if key == "time_series_metadata":
             sliced_data[key] = val
             continue
 
@@ -191,8 +186,7 @@ def evaluate_and_save_model(
                     "target_map must be provided in kwargs or present on the forecaster to downsample power flows."
                 )
 
-        target_map_lf = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
-        flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
+        flows_30m = downsample_power_flows(flows)
         sliced_data["flows_30m"] = flows_30m
 
     results_df = forecaster.predict(
@@ -208,8 +202,8 @@ def evaluate_and_save_model(
 
         # Join predictions with actuals
         eval_df = results_df.join(
-            actuals.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
-            on=["valid_time", "substation_number"],
+            actuals.rename({"end_time": "valid_time", "value": "actual"}),
+            on=["valid_time", "time_series_id"],
             how="inner",
         )
 
@@ -223,10 +217,8 @@ def evaluate_and_save_model(
             # different Patito models. Polars' join method on Patito subclasses
             # enforces that both sides have the same type, which would fail here.
             eval_df = pl.DataFrame(eval_df).join(
-                pl.DataFrame(target_map_df).select(
-                    ["substation_number", "peak_capacity_MW_or_MVA"]
-                ),
-                on="substation_number",
+                pl.DataFrame(target_map_df).select(["time_series_id", "peak_capacity_MW_or_MVA"]),
+                on="time_series_id",
                 how="left",
             )
             # Fill missing peak_capacity_MW_or_MVA with 1.0 to avoid division by zero
@@ -268,10 +260,10 @@ def evaluate_and_save_model(
                 eval_df.group_by("lead_time_hours")
                 .agg(
                     [
-                        (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean().alias("MAE"),
-                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
+                        (pl.col("value") - pl.col("actual")).abs().mean().alias("MAE"),
+                        ((pl.col("value") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
                         (
-                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
+                            (pl.col("value") - pl.col("actual")).abs()
                             / pl.col("peak_capacity_MW_or_MVA")
                         )
                         .mean()
@@ -298,7 +290,7 @@ def evaluate_and_save_model(
 
                 # 2. Log global aggregate metrics
                 mae_global = eval_df.select(
-                    (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()
+                    (pl.col("value") - pl.col("actual")).abs().mean()
                 ).item()
                 if mae_global is not None:
                     mlflow.log_metric("mean_mae_all_horizons", mae_global)
@@ -306,14 +298,14 @@ def evaluate_and_save_model(
                     mlflow.log_metric("MAE_global", mae_global)
 
                 rmse_global = eval_df.select(
-                    ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
+                    ((pl.col("value") - pl.col("actual")) ** 2).mean().sqrt()
                 ).item()
                 if rmse_global is not None:
                     mlflow.log_metric("RMSE_global", rmse_global)
 
                 nmae_global = eval_df.select(
                     (
-                        (pl.col("MW_or_MVA") - pl.col("actual")).abs()
+                        (pl.col("value") - pl.col("actual")).abs()
                         / pl.col("peak_capacity_MW_or_MVA")
                     ).mean()
                 ).item()

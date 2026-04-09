@@ -2,7 +2,7 @@ from unittest.mock import patch
 import polars as pl
 from src.nged_substation_forecast.defs.plotting_assets import forecast_vs_actual_plot, PlotConfig
 from contracts.settings import Settings
-from contracts.data_schemas import SubstationMetadata
+from contracts.data_schemas import TimeSeriesMetadata
 from datetime import datetime, timezone
 import dagster as dg
 
@@ -37,7 +37,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
     mock_get_lazy.return_value = actuals.lazy()
 
     # Mock substation_metadata using Patito
-    substation_metadata = SubstationMetadata.validate(
+    substation_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
                 "substation_number": [110375],
@@ -95,7 +95,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     mock_get_lazy.return_value = actuals.lazy()
 
     # Mock substation_metadata using Patito
-    substation_metadata = SubstationMetadata.validate(
+    substation_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
                 "substation_number": [110375],

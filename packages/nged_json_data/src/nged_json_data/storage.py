@@ -2,10 +2,10 @@ import polars as pl
 import patito as pt
 from deltalake import write_deltalake, DeltaTable
 from pathlib import Path
-from contracts.data_schemas import NgedJsonPowerFlows
+from contracts.data_schemas import PowerTimeSeries
 
 
-def append_to_delta(df: pt.DataFrame[NgedJsonPowerFlows], delta_path: Path):
+def append_to_delta(df: pt.DataFrame[PowerTimeSeries], delta_path: Path):
     """
     Appends data to a Delta table, ensuring no duplicates based on (time_series_id, end_time).
 

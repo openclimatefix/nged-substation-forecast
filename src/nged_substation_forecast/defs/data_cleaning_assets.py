@@ -12,7 +12,7 @@ Key Design Decisions:
    instead of removing rows or imputing. This preserves the strict 30-minute temporal
    grid which is critical for accurate lag and rolling feature generation downstream.
 
-2. **Patito Validation**: The output is validated against the `SubstationPowerFlows` schema
+2. **Patito Validation**: The output is validated against the `PowerTimeSeries` schema
    which allows null values. This enforces data contracts at the asset boundary.
 
 3. **No Imputation**: We explicitly do NOT impute missing values. Models downstream
@@ -34,7 +34,7 @@ import patito as pt
 from typing import cast
 from dagster import ResourceParam
 
-from contracts.data_schemas import SubstationPowerFlows
+from contracts.data_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from .partitions import DAILY_PARTITIONS
 from ..utils import scan_delta_table, get_partition_window
@@ -56,7 +56,7 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
 
 def get_cleaned_actuals_lazy(
     settings: Settings, context: dg.AssetExecutionContext | None = None
-) -> pt.LazyFrame[SubstationPowerFlows]:
+) -> pt.LazyFrame[PowerTimeSeries]:
     """Retrieves the cleaned actuals from the Delta table.
 
     This function serves as the single source of truth for accessing cleaned actuals
@@ -76,7 +76,7 @@ def get_cleaned_actuals_lazy(
 
     if context:
         context.log.info(f"Reading cleaned actuals from {delta_path}")
-    return cast(pt.LazyFrame[SubstationPowerFlows], lf)
+    return cast(pt.LazyFrame[PowerTimeSeries], lf)
 
 
 @dg.asset(
@@ -97,7 +97,7 @@ def cleaned_actuals(
     This asset manually scans the live primary flows Delta table for the current partition
     plus a 1-day lookback window. It applies data quality cleaning logic (stuck
     sensor detection, insane value detection).
-    The output is validated against the SubstationPowerFlows schema which allows null values,
+    The output is validated against the PowerTimeSeries schema which allows null values,
     then saved to a Delta table named "cleaned_actuals".
 
     Cleaning Logic:
@@ -113,7 +113,7 @@ def cleaned_actuals(
           start of the partition.
         - Null values are preserved from the input; no rows are removed and no
           imputation is performed.
-        - The output is validated against SubstationPowerFlows schema which allows
+        - The output is validated against PowerTimeSeries schema which allows
           null values for MW, MVA, and MVAr columns.
         - The result is ALWAYS saved to Delta table to ensure persistence.
 
@@ -151,7 +151,7 @@ def cleaned_actuals(
     context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
 
     # Validate the output against Patito schema
-    validated_df = SubstationPowerFlows.validate(df_cleaned)
+    validated_df = PowerTimeSeries.validate(df_cleaned)
 
     context.log.info(f"Validated data shape: {validated_df.shape}")
 

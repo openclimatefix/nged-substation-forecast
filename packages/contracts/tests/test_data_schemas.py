@@ -4,103 +4,91 @@ import polars as pl
 import pytest
 from hypothesis import given, strategies as st
 
-from contracts.data_schemas import Nwp, PowerForecast, SubstationPowerFlows
+from contracts.data_schemas import Nwp, PowerForecast, PowerTimeSeries
 
 
-def test_substation_power_flows_validation_mw_or_mva():
+def test_power_time_series_validation_mw_or_mva():
     # Valid with MW
     df_mw = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
-            "MW": [10.0],
-            "MVA": [None],
-            "MVAr": [None],
-            "ingested_at": [None],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "value": [10.0],
         }
     ).cast(
         {
-            "substation_number": pl.Int32,
-            "MW": pl.Float32,
-            "MVA": pl.Float32,
-            "MVAr": pl.Float32,
-            "ingested_at": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "time_series_id": pl.String,
+            "start_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "value": pl.Float32,
         }
     )
 
     # Should pass
-    SubstationPowerFlows.validate(df_mw)
+    PowerTimeSeries.validate(df_mw)
 
     # Valid with MVA
     df_mva = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
-            "MW": [None],
-            "MVA": [10.0],
-            "MVAr": [None],
-            "ingested_at": [None],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "value": [10.0],
         }
     ).cast(
         {
-            "substation_number": pl.Int32,
-            "MW": pl.Float32,
-            "MVA": pl.Float32,
-            "MVAr": pl.Float32,
-            "ingested_at": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "time_series_id": pl.String,
+            "start_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "value": pl.Float32,
         }
     )
 
     # Should pass
-    SubstationPowerFlows.validate(df_mva)
+    PowerTimeSeries.validate(df_mva)
 
-    # Invalid: neither MW nor MVA has data
+    # Invalid: null value
     df_none = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
-            "MW": [None],
-            "MVA": [None],
-            "MVAr": [5.0],
-            "ingested_at": [None],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "value": [None],
         }
     ).cast(
         {
-            "substation_number": pl.Int32,
-            "MW": pl.Float32,
-            "MVA": pl.Float32,
-            "MVAr": pl.Float32,
-            "ingested_at": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "time_series_id": pl.String,
+            "start_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "value": pl.Float32,
         }
     )
 
-    with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-        SubstationPowerFlows.validate(df_none)
+    with pytest.raises(ValueError, match="must have non-null data"):
+        PowerTimeSeries.validate(df_none)
 
 
-def test_substation_power_flows_validation_both():
-    # Valid with both
+def test_power_time_series_validation_both():
+    # Valid
     df_both = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
-            "MW": [10.0],
-            "MVA": [12.0],
-            "MVAr": [5.0],
-            "ingested_at": [datetime(2026, 3, 20, tzinfo=timezone.utc)],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "value": [10.0],
         }
     ).cast(
         {
-            "substation_number": pl.Int32,
-            "MW": pl.Float32,
-            "MVA": pl.Float32,
-            "MVAr": pl.Float32,
-            "ingested_at": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "time_series_id": pl.String,
+            "start_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "value": pl.Float32,
         }
     )
 
     # Should pass
-    SubstationPowerFlows.validate(df_both)
+    PowerTimeSeries.validate(df_both)
 
 
 def test_power_forecast_validation():
@@ -205,33 +193,28 @@ def test_nwp_validation():
 
 
 @given(
-    mw=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
-    | st.none(),
-    mva=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
+    value=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
     | st.none(),
 )
-def test_substation_power_flows_property_based(mw, mva):
+def test_power_time_series_property_based(value):
     df = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
-            "MW": [mw],
-            "MVA": [mva],
-            "MVAr": [None],
-            "ingested_at": [None],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "value": [value],
         }
     ).cast(
         {
-            "substation_number": pl.Int32,
-            "MW": pl.Float32,
-            "MVA": pl.Float32,
-            "MVAr": pl.Float32,
-            "ingested_at": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "time_series_id": pl.String,
+            "start_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "value": pl.Float32,
         }
     )
 
-    if mw is None and mva is None:
-        with pytest.raises(ValueError, match="must have non-null data in either 'MW' or 'MVA'"):
-            SubstationPowerFlows.validate(df)
+    if value is None:
+        with pytest.raises(ValueError, match="must have non-null data"):
+            PowerTimeSeries.validate(df)
     else:
-        SubstationPowerFlows.validate(df)
+        PowerTimeSeries.validate(df)

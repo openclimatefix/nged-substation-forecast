@@ -14,8 +14,8 @@ from contracts.data_schemas import (
     InferenceParams,
     NwpColumns,
     PowerForecast,
-    SubstationFeatures,
-    SubstationMetadata,
+    TimeSeriesMetadata,
+    XGBoostInputFeatures,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
 from ml_core.features import add_cyclical_temporal_features
@@ -55,11 +55,11 @@ class XGBoostForecaster(BaseForecaster):
         self.feature_names = []
 
     # TODO: Use Patito data contracts for output of this function.
-    def _get_target_map_df(self) -> pl.DataFrame:
-        """Get the target map as a Polars DataFrame.
+    def _get_capacity_map_df(self) -> pl.DataFrame:
+        """Get the capacity map as a Polars DataFrame.
 
         Returns:
-            The target map collected into a DataFrame.
+            The capacity map collected into a DataFrame.
 
         Raises:
             ValueError: If target_map is not set.
@@ -78,7 +78,7 @@ class XGBoostForecaster(BaseForecaster):
 
         if self.target_map is not None:
             # Ensure target_map is a DataFrame before writing to JSON
-            target_map_df = self._get_target_map_df()
+            target_map_df = self._get_capacity_map_df()
             with tempfile.TemporaryDirectory() as tmpdir:
                 path = os.path.join(tmpdir, "target_map.json")
                 target_map_df.write_json(path)
@@ -115,13 +115,13 @@ class XGBoostForecaster(BaseForecaster):
         else:
             res_schema = res.schema  # Fail loudly if columns are missing
 
-        # Ensure substation_number is treated as a categorical feature by XGBoost
-        if "substation_number" in res_schema.names():
-            substations = [
-                str(s) for s in self._get_target_map_df()["substation_number"].unique().to_list()
+        # Ensure time_series_id is treated as a categorical feature by XGBoost
+        if "time_series_id" in res_schema.names():
+            time_series_ids = [
+                str(s) for s in self._get_capacity_map_df()["time_series_id"].unique().to_list()
             ]
             res = res.with_columns(
-                pl.col("substation_number").cast(pl.String).cast(pl.Enum(substations))
+                pl.col("time_series_id").cast(pl.String).cast(pl.Enum(time_series_ids))
             )
 
         # Ensure categorical precipitation is treated as a categorical feature
@@ -237,10 +237,10 @@ class XGBoostForecaster(BaseForecaster):
             A LazyFrame containing the joined training data.
         """
         df_lf = (
-            flows_30m.rename({"timestamp": NwpColumns.VALID_TIME})
+            flows_30m.rename({"end_time": NwpColumns.VALID_TIME})
             .join(
                 metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
-                on="substation_number",
+                on="time_series_id",
             )
             .with_columns(
                 # Explicitly cast h3_index to UInt64 after the join to prevent silent type
@@ -296,7 +296,7 @@ class XGBoostForecaster(BaseForecaster):
     def _prepare_data_for_model(
         self,
         flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        substation_metadata: pt.DataFrame[TimeSeriesMetadata],
         target_map_df: pl.DataFrame | pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         inference_params: InferenceParams | None = None,
@@ -315,7 +315,7 @@ class XGBoostForecaster(BaseForecaster):
         Returns:
             Prepared LazyFrame ready for feature extraction.
         """
-        metadata_lf = substation_metadata.select(["substation_number", "h3_res_5"]).lazy()
+        metadata_lf = substation_metadata.select(["time_series_id", "h3_res_5"]).lazy()
         target_map_lf = target_map_df.lazy()
 
         # 1. Prepare NWPs and join
@@ -353,19 +353,34 @@ class XGBoostForecaster(BaseForecaster):
 
         # Normalize by peak capacity
         df_lf = df_lf.join(
-            target_map_lf.select(["substation_number", "peak_capacity_MW_or_MVA"]),
-            on="substation_number",
+            target_map_lf.select(["time_series_id", "peak_capacity"]),
+            on="time_series_id",
             how="inner",  # FIX: Drop substations missing from target_map
         ).with_columns(
             latest_available_weekly_power_lag=pl.col("latest_available_weekly_power_lag")
-            / pl.col("peak_capacity_MW_or_MVA")
+            / pl.col("peak_capacity")
         )
 
         if is_training:
             # For training, also normalize target
-            df_lf = df_lf.with_columns(
-                MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity_MW_or_MVA")
-            )
+            df_lf = df_lf.with_columns(value=pl.col("value") / pl.col("peak_capacity"))
+        else:
+            # For prediction, add dummy target for validation
+            df_lf = df_lf.with_columns(value=pl.lit(0.0, dtype=pl.Float32))
+
+        df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
+
+        # 4. Type casting
+        df_lf = df_lf.with_columns(
+            [
+                pl.col("time_series_id").cast(pl.String),
+                pl.col("value").cast(pl.Float32),
+            ]
+        )
+
+        if is_training:
+            # For training, also normalize target
+            df_lf = df_lf.with_columns(MW_or_MVA=pl.col("MW_or_MVA") / pl.col("peak_capacity"))
         else:
             # For prediction, add dummy target for validation
             df_lf = df_lf.with_columns(MW_or_MVA=pl.lit(0.0, dtype=pl.Float32))
@@ -375,7 +390,7 @@ class XGBoostForecaster(BaseForecaster):
         # 4. Type casting
         df_lf = df_lf.with_columns(
             [
-                pl.col("substation_number").cast(pl.Int32),
+                pl.col("time_series_id").cast(pl.String),
                 pl.col("MW_or_MVA").cast(pl.Float32),
             ]
         )
@@ -401,7 +416,7 @@ class XGBoostForecaster(BaseForecaster):
         self,
         config: ModelConfig,
         flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> "XGBoostForecaster":
         """Train the XGBoost model.
@@ -409,7 +424,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             config: The model configuration object.
             flows_30m: Historical power flow data downsampled to 30m.
-            substation_metadata: The substation metadata containing h3 mapping.
+            time_series_metadata: The time series metadata containing h3 mapping.
             nwps: A dictionary of weather forecast dataframes.
 
         Returns:
@@ -424,7 +439,7 @@ class XGBoostForecaster(BaseForecaster):
         log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
         # Log the range of timestamps in flows_30m
         log.info(
-            f"flows_30m range: {flows_30m.select(pl.col('timestamp').min().alias('min'), pl.col('timestamp').max().alias('max')).collect()}"
+            f"flows_30m range: {flows_30m.select(pl.col('end_time').min().alias('min'), pl.col('end_time').max().alias('max')).collect()}"
         )
         if nwps:
             for name, lf in nwps.items():
@@ -442,7 +457,7 @@ class XGBoostForecaster(BaseForecaster):
 
         joined_lf = self._prepare_data_for_model(
             flows_30m=flows_30m,
-            substation_metadata=substation_metadata,
+            substation_metadata=time_series_metadata,
             target_map_df=self.target_map,
             nwps=nwps,
         )
@@ -452,7 +467,7 @@ class XGBoostForecaster(BaseForecaster):
         feature_cols = feature_lf.collect_schema().names()
 
         # Collect only necessary columns and drop nulls
-        critical_cols = ["MW_or_MVA"]
+        critical_cols = ["value"]
         if nwps:
             critical_cols.extend(
                 [
@@ -461,6 +476,189 @@ class XGBoostForecaster(BaseForecaster):
                     NwpColumns.WIND_SPEED_10M,
                 ]
             )
+
+        # Apply random sampling if max_training_samples is set to prevent OOM errors
+        # during collection.
+        if config.max_training_samples is not None:
+            log.info(f"Sampling training data to {config.max_training_samples} samples.")
+            # LazyFrame doesn't have a direct sample(n=...) method, so we collect and then sample.
+            # This still helps prevent OOM in XGBoost training itself, even if the collection
+            # is the bottleneck.
+            raw_df = cast(
+                pl.DataFrame,
+                joined_lf.select(list(set(feature_cols + ["value"]))).collect(),
+            ).sample(n=config.max_training_samples, seed=42)
+        else:
+            raw_df = cast(
+                pl.DataFrame,
+                joined_lf.select(list(set(feature_cols + ["value"]))).collect(),
+            )
+        log.info(f"Collected raw_df shape before dropping nulls: {raw_df.shape}")
+        joined_df = raw_df.drop_nulls(subset=critical_cols)
+
+        dropped_rows = len(raw_df) - len(joined_df)
+        if dropped_rows > 0:
+            log.warning(
+                f"Dropped {dropped_rows} rows during training due to nulls in critical columns: {critical_cols}"
+            )
+
+        if joined_df.is_empty():
+            raise ValueError("No training data remaining after dropping nulls in critical columns.")
+
+        XGBoostInputFeatures.validate(
+            joined_df, allow_missing_columns=True, allow_superfluous_columns=True
+        )
+
+        X = cast(pl.DataFrame, self._prepare_features(joined_df))
+        y = joined_df.select("value").to_series()
+
+        # NaN/Inf checks
+        if (
+            X.select(
+                pl.any_horizontal(
+                    pl.col(pl.Float32, pl.Float64).is_nan()
+                    | pl.col(pl.Float32, pl.Float64).is_infinite()
+                )
+            )
+            .sum()
+            .item()
+            > 0
+        ):
+            raise ValueError("Input features X contain NaN or Inf values")
+
+        if y.is_nan().any() or y.is_infinite().any():
+            raise ValueError("Target y contains NaN or Inf values")
+
+        # Save feature names
+        self.feature_names = X.columns
+
+        hyperparams = XGBoostHyperparameters(**config.hyperparameters)
+        model = XGBRegressor(**hyperparams.model_dump())
+        model.fit(X.to_arrow(), y.to_arrow())
+        self.model = model
+
+        return self
+
+    # TODO: Use Patito data contracts for inputs and outputs of this function.
+    def predict(
+        self,
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
+        inference_params: InferenceParams,
+        flows_30m: pl.LazyFrame,
+        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        collapse_lead_times: bool = False,
+    ) -> pt.DataFrame[PowerForecast]:
+        """Execute the inference logic.
+
+        Args:
+            time_series_metadata: The time series metadata containing h3 mapping.
+            inference_params: Parameters for inference.
+            flows_30m: Historical power flow data downsampled to 30m (for lags).
+            nwps: A dictionary of weather forecast lazyframes.
+            collapse_lead_times: Whether to collapse lead times to simulate real-time inference by keeping only the latest available NWP forecast for each valid time.
+
+        Returns:
+            A Patito DataFrame containing the predictions.
+        """
+        if self.model is None:
+            raise ValueError("Model must be trained before calling predict.")
+
+        if not nwps:
+            raise ValueError("XGBoostForecaster requires NWP data for prediction.")
+
+        if self.target_map is None:
+            raise ValueError("target_map must be set before calling predict.")
+
+        df_lf = self._prepare_data_for_model(
+            flows_30m=flows_30m,
+            substation_metadata=time_series_metadata,
+            target_map_df=self.target_map,
+            nwps=nwps,
+            inference_params=inference_params,
+            collapse_lead_times=collapse_lead_times,
+        )
+
+        feature_lf = self._prepare_features(df_lf)
+        feature_cols = feature_lf.collect_schema().names()
+
+        # Output columns needed for the final result
+        output_cols = [
+            NwpColumns.VALID_TIME,
+            "time_series_id",
+            NwpColumns.ENSEMBLE_MEMBER,
+            NwpColumns.INIT_TIME,
+            "nwp_init_hour",
+            "lead_time_hours",
+        ]
+
+        # FIX: Remove drop_nulls logic during prediction
+        df = cast(
+            pl.DataFrame,
+            df_lf.select(
+                list(set(feature_cols + output_cols + ["value", "peak_capacity"]))
+            ).collect(),
+        )
+
+        if df.is_empty():
+            raise ValueError("No inference data remaining.")
+
+        XGBoostInputFeatures.validate(
+            df, allow_missing_columns=True, allow_superfluous_columns=True
+        )
+
+        X = cast(pl.DataFrame, self._prepare_features(df))
+
+        if (
+            X.select(
+                pl.any_horizontal(
+                    pl.col(pl.Float32, pl.Float64).is_nan()
+                    | pl.col(pl.Float32, pl.Float64).is_infinite()
+                )
+            )
+            .sum()
+            .item()
+            > 0
+        ):
+            raise ValueError("Input features X contain NaN or Inf values")
+
+        # Enforce exact column order from training
+        if hasattr(self.model, "feature_names_in_"):
+            X = X.select(self.model.feature_names_in_)
+        elif hasattr(self, "feature_names") and self.feature_names:
+            X = X.select(self.feature_names)
+
+        preds = self.model.predict(X.to_arrow())
+
+        # Descale predictions and return with correct schema
+        fcst_init_time = inference_params.forecast_time
+        model_name = inference_params.power_fcst_model_name or "xgboost_global"
+
+        res = (
+            df.with_columns(
+                value=pl.Series(values=preds, dtype=pl.Float32),
+            )
+            .with_columns(
+                value=pl.col("value") * pl.col("peak_capacity"),
+                power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
+                power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
+                nwp_init_time=pl.col(NwpColumns.INIT_TIME).cast(pl.Datetime("us", "UTC")),
+                power_fcst_init_year_month=pl.lit(fcst_init_time.strftime("%Y-%m")).cast(pl.String),
+            )
+            .select(
+                [
+                    NwpColumns.VALID_TIME,
+                    "time_series_id",
+                    NwpColumns.ENSEMBLE_MEMBER,
+                    "power_fcst_model_name",
+                    "power_fcst_init_time",
+                    "nwp_init_time",
+                    "power_fcst_init_year_month",
+                    "nwp_init_hour",
+                    "lead_time_hours",
+                    "value",
+                ]
+            )
+        )
 
         # Apply random sampling if max_training_samples is set to prevent OOM errors
         # during collection.
@@ -490,7 +688,7 @@ class XGBoostForecaster(BaseForecaster):
         if joined_df.is_empty():
             raise ValueError("No training data remaining after dropping nulls in critical columns.")
 
-        SubstationFeatures.validate(
+        XGBoostInputFeatures.validate(
             joined_df, allow_missing_columns=True, allow_superfluous_columns=True
         )
 
@@ -527,7 +725,7 @@ class XGBoostForecaster(BaseForecaster):
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
         flows_30m: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
@@ -536,7 +734,7 @@ class XGBoostForecaster(BaseForecaster):
         """Execute the inference logic.
 
         Args:
-            substation_metadata: The substation metadata containing h3 mapping.
+            time_series_metadata: The time series metadata containing h3 mapping.
             inference_params: Parameters for inference.
             flows_30m: Historical power flow data downsampled to 30m (for lags).
             nwps: A dictionary of weather forecast lazyframes.
@@ -556,7 +754,7 @@ class XGBoostForecaster(BaseForecaster):
 
         df_lf = self._prepare_data_for_model(
             flows_30m=flows_30m,
-            substation_metadata=substation_metadata,
+            substation_metadata=time_series_metadata,
             target_map_df=self.target_map,
             nwps=nwps,
             inference_params=inference_params,
@@ -569,7 +767,7 @@ class XGBoostForecaster(BaseForecaster):
         # Output columns needed for the final result
         output_cols = [
             NwpColumns.VALID_TIME,
-            "substation_number",
+            "time_series_id",
             NwpColumns.ENSEMBLE_MEMBER,
             NwpColumns.INIT_TIME,
             "nwp_init_hour",
@@ -580,14 +778,77 @@ class XGBoostForecaster(BaseForecaster):
         df = cast(
             pl.DataFrame,
             df_lf.select(
-                list(set(feature_cols + output_cols + ["MW_or_MVA", "peak_capacity_MW_or_MVA"]))
+                list(set(feature_cols + output_cols + ["MW_or_MVA", "peak_capacity"]))
             ).collect(),
         )
 
         if df.is_empty():
             raise ValueError("No inference data remaining.")
 
-        SubstationFeatures.validate(df, allow_missing_columns=True, allow_superfluous_columns=True)
+        XGBoostInputFeatures.validate(
+            df, allow_missing_columns=True, allow_superfluous_columns=True
+        )
+
+        X = cast(pl.DataFrame, self._prepare_features(df))
+
+        if (
+            X.select(
+                pl.any_horizontal(
+                    pl.col(pl.Float32, pl.Float64).is_nan()
+                    | pl.col(pl.Float32, pl.Float64).is_infinite()
+                )
+            )
+            .sum()
+            .item()
+            > 0
+        ):
+            raise ValueError("Input features X contain NaN or Inf values")
+
+        # Enforce exact column order from training
+        if hasattr(self.model, "feature_names_in_"):
+            X = X.select(self.model.feature_names_in_)
+        elif hasattr(self, "feature_names") and self.feature_names:
+            X = X.select(self.feature_names)
+
+        preds = self.model.predict(X.to_arrow())
+
+        # Descale predictions and return with correct schema
+        fcst_init_time = inference_params.forecast_time
+        model_name = inference_params.power_fcst_model_name or "xgboost_global"
+
+        res = (
+            df.with_columns(
+                MW_or_MVA=pl.Series(values=preds, dtype=pl.Float32),
+            )
+            .with_columns(
+                MW_or_MVA=pl.col("MW_or_MVA") * pl.col("peak_capacity"),
+                power_fcst_model_name=pl.lit(model_name).cast(pl.Categorical),
+                power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
+                nwp_init_time=pl.col(NwpColumns.INIT_TIME).cast(pl.Datetime("us", "UTC")),
+                power_fcst_init_year_month=pl.lit(fcst_init_time.strftime("%Y-%m")).cast(pl.String),
+            )
+            .select(
+                [
+                    NwpColumns.VALID_TIME,
+                    "time_series_id",
+                    NwpColumns.ENSEMBLE_MEMBER,
+                    "power_fcst_model_name",
+                    "power_fcst_init_time",
+                    "nwp_init_time",
+                    "power_fcst_init_year_month",
+                    "nwp_init_hour",
+                    "lead_time_hours",
+                    "MW_or_MVA",
+                ]
+            )
+        )
+
+        if df.is_empty():
+            raise ValueError("No inference data remaining.")
+
+        XGBoostInputFeatures.validate(
+            df, allow_missing_columns=True, allow_superfluous_columns=True
+        )
 
         X = cast(pl.DataFrame, self._prepare_features(df))
 
@@ -630,7 +891,7 @@ class XGBoostForecaster(BaseForecaster):
             .select(
                 [
                     NwpColumns.VALID_TIME,
-                    "substation_number",
+                    "time_series_id",
                     NwpColumns.ENSEMBLE_MEMBER,
                     "power_fcst_model_name",
                     "power_fcst_init_time",
@@ -645,13 +906,13 @@ class XGBoostForecaster(BaseForecaster):
 
         # Ensure all substations in the inference set are present in the target_map
         # to prevent silent dropping of forecasts.
-        if res.select("substation_number").n_unique() < df.select("substation_number").n_unique():
-            missing_substations = set(df.select("substation_number").to_series()) - set(
-                res.select("substation_number").to_series()
+        if res.select("time_series_id").n_unique() < df.select("time_series_id").n_unique():
+            missing_substations = set(df.select("time_series_id").to_series()) - set(
+                res.select("time_series_id").to_series()
             )
             raise ValueError(
-                f"The following substations are missing from the target_map: {missing_substations}. "
-                "All substations in the inference set must have a corresponding entry in the "
+                f"The following time_series_ids are missing from the target_map: {missing_substations}. "
+                "All time_series_ids in the inference set must have a corresponding entry in the "
                 "target_map to prevent null forecasts."
             )
 

@@ -4,7 +4,7 @@ import dagster as dg
 import polars as pl
 import patito as pt
 from contracts.data_schemas import (
-    NgedJsonPowerFlows,
+    PowerTimeSeries,
 )
 from contracts.settings import Settings
 from dagster import (
@@ -74,7 +74,7 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
         # Combine all cleaned dataframes and append in a single operation
         combined_df = pl.concat(cleaned_dfs)
         append_to_delta(
-            pt.DataFrame[NgedJsonPowerFlows](combined_df),
+            pt.DataFrame[PowerTimeSeries](combined_df),
             settings.nged_data_path / "delta" / "json_data",
         )
 

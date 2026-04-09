@@ -6,7 +6,7 @@ import numpy as np
 import patito as pt
 import polars as pl
 import pytest
-from contracts.data_schemas import NwpColumns, PowerForecast, SubstationMetadata
+from contracts.data_schemas import NwpColumns, PowerForecast, TimeSeriesMetadata
 from contracts.hydra_schemas import (
     DataSplitConfig,
     ModelConfig,
@@ -66,7 +66,7 @@ def test_universal_training_data_integrity():
     flows_lf = pl.LazyFrame(flows_data)
 
     # Metadata
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         pl.DataFrame(
             {
                 "substation_number": [substation_number],
@@ -386,7 +386,7 @@ def test_lookahead_audit():
     flows_lf = pl.LazyFrame(flows_data)
 
     # Metadata
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         pl.DataFrame(
             {
                 "substation_number": [substation_number],

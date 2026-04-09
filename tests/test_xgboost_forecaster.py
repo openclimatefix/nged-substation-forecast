@@ -11,8 +11,8 @@ from contracts.data_schemas import (
     POWER_MW_OR_MVA,
     InferenceParams,
     ProcessedNwp,
-    SubstationMetadata,
-    SubstationPowerFlows,
+    TimeSeriesMetadata,
+    PowerTimeSeries,
     SubstationTargetMap,
 )
 from ml_core.data import calculate_target_map, downsample_power_flows
@@ -151,7 +151,7 @@ def test_downsample_power_flows_uses_period_ending_semantics():
     res = cast(
         pl.DataFrame,
         downsample_power_flows(
-            cast(pt.LazyFrame[SubstationPowerFlows], df),
+            cast(pt.LazyFrame[PowerTimeSeries], df),
             target_map=cast(
                 pt.DataFrame[SubstationTargetMap],
                 pl.DataFrame({"substation_number": [1], "preferred_power_col": [POWER_MW]}),
@@ -308,12 +308,12 @@ def test_prepare_training_data_prevents_row_explosion():
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        cast(pt.LazyFrame[PowerTimeSeries], flows),
         target_map=target_map.lazy(),
     )
 
@@ -322,7 +322,7 @@ def test_prepare_training_data_prevents_row_explosion():
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -497,12 +497,12 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import SubstationMetadata, ProcessedNwp
+    from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        cast(pt.LazyFrame[PowerTimeSeries], flows),
         target_map=target_map.lazy(),
     )
 
@@ -511,7 +511,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -581,9 +581,9 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        cast(pt.LazyFrame[PowerTimeSeries], flows),
         target_map=target_map.lazy(),
     )
 
@@ -613,7 +613,7 @@ def test_xgboost_predict_with_lags():
     )
 
     preds = forecaster.predict(
-        substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+        substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
         inference_params=inference_params,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         flows_30m=cast(pt.LazyFrame, flows_30m),

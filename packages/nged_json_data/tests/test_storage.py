@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
 from nged_json_data.storage import append_to_delta
-from contracts.data_schemas import NgedJsonPowerFlows
+from contracts.data_schemas import PowerTimeSeries
 
 
 @pytest.fixture
@@ -24,7 +24,7 @@ def test_append_to_delta_new_table(tmp_path: Path, mock_write_deltalake):
     delta_path = tmp_path / "delta"
 
     # Create a dummy Patito DataFrame
-    df = pt.DataFrame[NgedJsonPowerFlows](
+    df = pt.DataFrame[PowerTimeSeries](
         pl.DataFrame(
             {
                 "time_series_id": ["1"],
@@ -58,7 +58,7 @@ def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_w
     ).to_arrow()
 
     # Create a dummy Patito DataFrame with new data
-    df = pt.DataFrame[NgedJsonPowerFlows](
+    df = pt.DataFrame[PowerTimeSeries](
         pl.DataFrame(
             {
                 "time_series_id": ["1", "2"],

@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from contracts.data_schemas import (
     InferenceParams,
     PowerForecast,
-    SubstationPowerFlows,
-    SubstationMetadata,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import (
     ModelConfig,
@@ -26,7 +26,7 @@ class MockForecaster(BaseForecaster):
         self,
         config: ModelConfig,
         flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ):
         self.trained = True
@@ -34,14 +34,14 @@ class MockForecaster(BaseForecaster):
 
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
         flows_30m: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
-        sub_num = substation_metadata["substation_number"][0]
+        sub_num = time_series_metadata["substation_number"][0]
         df = pl.DataFrame(
             {
                 "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
@@ -69,7 +69,7 @@ class MockForecaster(BaseForecaster):
 
 def test_local_forecasters():
     # Setup dummy data
-    sub_meta = pt.DataFrame[SubstationMetadata](
+    sub_meta = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1, 2],
             "substation_name": ["Sub1", "Sub2"],
@@ -77,17 +77,16 @@ def test_local_forecasters():
             "longitude": [-1.0, -2.0],
             "h3_res_5": [123, 456],
             "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "time_series_id": ["1", "2"],
         }
     )
 
-    sub_flows = pt.DataFrame[SubstationPowerFlows](
+    sub_flows = pt.DataFrame[PowerTimeSeries](
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
-            "substation_number": [1, 2],
-            "MW": [10.0, 20.0],
-            "MVA": [10.0, 20.0],
-            "MVAr": [0.0, 0.0],
-            "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "time_series_id": ["1", "2"],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)] * 2,
+            "value": [10.0, 20.0],
         }
     ).lazy()
 
@@ -104,15 +103,15 @@ def test_local_forecasters():
     local_forecasters.train(
         config=config,
         flows_30m=sub_flows,
-        substation_metadata=sub_meta,
+        time_series_metadata=sub_meta,
     )
 
     assert len(local_forecasters.models) == 2
-    assert isinstance(local_forecasters.models[1], MockForecaster)
-    assert isinstance(local_forecasters.models[2], MockForecaster)
-    assert local_forecasters.models[1].trained
-    assert local_forecasters.models[2].trained
-    assert local_forecasters.models[1].kwargs == {"some_arg": "value"}
+    assert isinstance(local_forecasters.models["1"], MockForecaster)
+    assert isinstance(local_forecasters.models["2"], MockForecaster)
+    assert local_forecasters.models["1"].trained
+    assert local_forecasters.models["2"].trained
+    assert local_forecasters.models["1"].kwargs == {"some_arg": "value"}
 
     # Predict
     inference_params = InferenceParams(
@@ -121,11 +120,11 @@ def test_local_forecasters():
     )
 
     preds = local_forecasters.predict(
-        substation_metadata=sub_meta,
+        time_series_metadata=sub_meta,
         inference_params=inference_params,
         flows_30m=sub_flows,
     )
 
     assert len(preds) == 2
-    assert preds.filter(pl.col("substation_number") == 1)["MW_or_MVA"][0] == 10.0
-    assert preds.filter(pl.col("substation_number") == 2)["MW_or_MVA"][0] == 20.0
+    assert preds.filter(pl.col("time_series_id") == "1")["MW_or_MVA"][0] == 10.0
+    assert preds.filter(pl.col("time_series_id") == "2")["MW_or_MVA"][0] == 20.0

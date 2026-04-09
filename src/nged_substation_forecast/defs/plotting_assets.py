@@ -5,10 +5,8 @@ import altair as alt
 import dagster as dg
 import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationPowerFlows, SubstationTargetMap
 from contracts.settings import Settings
 from dagster import ResourceParam
-from ml_core.data import downsample_power_flows
 
 from .data_cleaning_assets import get_cleaned_actuals_lazy
 
@@ -47,23 +45,25 @@ def forecast_vs_actual_plot(
 
     # Extract unique substation numbers from predictions and limit for plotting.
     pred_substations = (
-        predictions.get_column("substation_number").unique().to_list()[: config.max_substations]
+        predictions.get_column("time_series_id").unique().to_list()[: config.max_substations]
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
     cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
 
-    # Downsample actuals to 30m to match predictions, filtering by substation first.
-    # We use the substation_metadata to provide the necessary target_map.
+    # Filter actuals by substation.
     actuals_30m = cast(
         pl.DataFrame,
-        downsample_power_flows(
-            cast(
-                pt.LazyFrame[SubstationPowerFlows],
-                cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)),
-            ),
-            target_map=cast(pt.DataFrame[SubstationTargetMap], substation_metadata),
-        ).collect(),
+        cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_substations)).collect(),
+    )
+
+    # Keep actuals lazy and filter by substation first to avoid eager collection.
+    cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
+
+    # Filter actuals by substation.
+    actuals_30m = cast(
+        pl.DataFrame,
+        cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)).collect(),
     )
 
     if actuals_30m.is_empty():
@@ -99,8 +99,8 @@ def forecast_vs_actual_plot(
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
     eval_df = pl.DataFrame(latest_predictions).join(
-        actuals_30m.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
-        on=["valid_time", "substation_number"],
+        actuals_30m.rename({"end_time": "valid_time", "value": "actual"}),
+        on=["valid_time", "time_series_id"],
         how="left",
     )
 
@@ -129,17 +129,15 @@ def forecast_vs_actual_plot(
     plot_df = (
         pl.DataFrame(plot_df)
         .join(
-            pl.DataFrame(substation_metadata).select(
-                ["substation_number", "substation_name_in_location_table"]
-            ),
-            on="substation_number",
+            pl.DataFrame(substation_metadata).select(["time_series_id", "time_series_name"]),
+            on="time_series_id",
             how="inner",
         )
         .with_columns(
             substation_name_with_id=pl.format(
                 "{} ({})",
-                pl.col("substation_name_in_location_table"),
-                pl.col("substation_number"),
+                pl.col("time_series_name"),
+                pl.col("time_series_id"),
             )
         )
         .sort("valid_time")

@@ -11,7 +11,7 @@ import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     Nwp,
-    SubstationMetadata,
+    TimeSeriesMetadata,
 )
 from contracts.settings import Settings
 from ml_core.scaling import uint8_to_physical_unit
@@ -35,11 +35,11 @@ class DataConfig:
     resolution: str = "30m"
 
 
-def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[SubstationMetadata]:
+def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[TimeSeriesMetadata]:
     """Load substation metadata and filter for those with available power data."""
     config = config or DataConfig()
     metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
-    metadata_df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
+    metadata_df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
 
     # Only return substations we have local power data for in Delta Lake.
     # We use `pl.scan_delta` to perform a lazy, optimized scan of the Delta Lake

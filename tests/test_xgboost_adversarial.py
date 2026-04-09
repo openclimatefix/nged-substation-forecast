@@ -17,8 +17,8 @@ from contracts.data_schemas import (
     POWER_MW,
     InferenceParams,
     ProcessedNwp,
-    SubstationMetadata,
-    SubstationPowerFlows,
+    TimeSeriesMetadata,
+    PowerTimeSeries,
     SubstationTargetMap,
 )
 
@@ -53,7 +53,7 @@ def test_train_handles_missing_init_time():
     )
     forecaster = XGBoostForecaster()
 
-    flows = pt.DataFrame[SubstationPowerFlows](
+    flows = pt.DataFrame[PowerTimeSeries](
         {
             "timestamp": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
             "substation_number": [1],
@@ -64,7 +64,7 @@ def test_train_handles_missing_init_time():
         }
     ).lazy()
 
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1],
             "substation_name_in_location_table": ["Sub1"],
@@ -107,7 +107,7 @@ def test_train_handles_missing_init_time():
     ],
 )
 def test_substation_power_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
-    """Test SubstationPowerFlows validation with various MW/MVA combinations."""
+    """Test PowerTimeSeries validation with various MW/MVA combinations."""
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
@@ -130,9 +130,9 @@ def test_substation_power_flows_validation_mw_mva_combinations(mw, mva, expected
 
     if expected_fail:
         with pytest.raises(MissingCorePowerVariablesError):
-            SubstationPowerFlows.validate(df)
+            PowerTimeSeries.validate(df)
     else:
-        SubstationPowerFlows.validate(df)
+        PowerTimeSeries.validate(df)
 
 
 def test_process_nwp_data_empty_input():
@@ -172,7 +172,7 @@ def test_predict_with_missing_feature_column_fails_loudly():
         }
     ).with_columns(pl.col("substation_number").cast(pl.Int32))
 
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1],
             "substation_name_in_location_table": ["Sub1"],
@@ -237,7 +237,7 @@ def test_predict_with_missing_feature_column_fails_loudly():
         .lazy()
     )
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows),
+        cast(pt.LazyFrame[PowerTimeSeries], flows),
         target_map=forecaster.target_map.lazy(),
     )
 

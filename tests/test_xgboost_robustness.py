@@ -6,10 +6,10 @@ from typing import Any, cast
 from unittest.mock import MagicMock
 from patito.exceptions import DataFrameValidationError
 from contracts.data_schemas import (
-    SubstationPowerFlows,
+    PowerTimeSeries,
     Nwp,
     ProcessedNwp,
-    SubstationMetadata,
+    TimeSeriesMetadata,
     InferenceParams,
 )
 from contracts.hydra_schemas import (
@@ -17,13 +17,13 @@ from contracts.hydra_schemas import (
     ModelFeaturesConfig,
     NwpModel,
 )
-from ml_core.data import calculate_target_map, downsample_power_flows
+from ml_core.data import downsample_power_flows
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
 
 def test_substation_power_flows_validation_extreme_values():
-    """Test SubstationPowerFlows validation with values outside the ge/le range."""
+    """Test PowerTimeSeries validation with values outside the ge/le range."""
     # MW = 2000 is outside [-1000, 1000]
     df = pl.DataFrame(
         {
@@ -39,7 +39,7 @@ def test_substation_power_flows_validation_extreme_values():
     )
 
     with pytest.raises(DataFrameValidationError):
-        SubstationPowerFlows.validate(df)
+        PowerTimeSeries.validate(df)
 
 
 def test_nwp_validation_missing_accumulated_variables_at_step_1():
@@ -148,9 +148,9 @@ def test_xgboost_forecaster_train_with_nans():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
     )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
@@ -158,7 +158,7 @@ def test_xgboost_forecaster_train_with_nans():
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -222,9 +222,9 @@ def test_xgboost_forecaster_train_with_infs():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
     )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
@@ -232,7 +232,7 @@ def test_xgboost_forecaster_train_with_infs():
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -305,12 +305,12 @@ def test_xgboost_forecaster_predict_with_nans():
 
     # Centralized data preparation
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=forecaster.target_map.lazy()
+        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=forecaster.target_map.lazy()
     )
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.predict(
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             inference_params=inference_params,
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
             flows_30m=cast(pt.LazyFrame, flows_30m),
@@ -380,9 +380,9 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     )
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[SubstationPowerFlows], flows))
+    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
     flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows), target_map=target_map.lazy()
+        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
     )
 
     with pytest.raises(ValueError, match="No training data remaining after dropping nulls"):
@@ -390,6 +390,6 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[SubstationMetadata], metadata),
+            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )

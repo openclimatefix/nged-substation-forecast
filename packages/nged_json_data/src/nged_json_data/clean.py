@@ -1,7 +1,7 @@
 import polars as pl
 import patito as pt
 import dagster
-from contracts.data_schemas import NgedJsonPowerFlows
+from contracts.data_schemas import PowerTimeSeries
 
 
 def sort_data(df: pl.DataFrame) -> pl.DataFrame:
@@ -31,11 +31,11 @@ def apply_variance_threshold(df: pl.DataFrame, threshold: float) -> pl.DataFrame
     return df.drop("rolling_variance")
 
 
-def validate_data(df: pl.DataFrame) -> pt.DataFrame[NgedJsonPowerFlows]:
+def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
     """Validates the cleaned DataFrame."""
     if df.is_empty():
         raise ValueError("All rows were removed after filtering by variance threshold.")
-    return NgedJsonPowerFlows.validate(df)
+    return PowerTimeSeries.validate(df)
 
 
 def clean_power_data(
@@ -43,7 +43,7 @@ def clean_power_data(
     substation_number: int | None = None,
     variance_thresholds: dict[int, float] | None = None,
     default_threshold: float = 0.1,
-) -> pt.DataFrame[NgedJsonPowerFlows]:
+) -> pt.DataFrame[PowerTimeSeries]:
     # 1. Sort
     df = sort_data(df)
 

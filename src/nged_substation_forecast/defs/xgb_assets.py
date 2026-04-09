@@ -98,7 +98,7 @@ def _get_target_substations(
         config: XGBoost configuration with optional substation_ids override.
         healthy_substations: List of substations with healthy telemetry.
         context: Asset execution context for logging.
-        substation_metadata: Optional SubstationMetadata DataFrame. If provided and
+        substation_metadata: Optional TimeSeriesMetadata DataFrame. If provided and
                              no config.substation_ids given, this is used as a fallback
                              to identify active substations (url is not null).
 
