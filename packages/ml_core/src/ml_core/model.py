@@ -40,7 +40,7 @@ class BaseForecaster(ABC):
 
         Args:
             config: Model configuration object.
-            power_time_series: Historical power flow data at 30m resolution.
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements).
             time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -63,7 +63,7 @@ class BaseForecaster(ABC):
         Args:
             time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
-            power_time_series: Historical power flow data at 30m resolution (for lags).
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements, used for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 
