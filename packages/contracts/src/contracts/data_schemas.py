@@ -17,9 +17,11 @@ UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
 
 class PowerTimeSeries(pt.Model):
-    time_series_id: str = pt.Field(dtype=pl.String)
-    end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    value: float | None = pt.Field(dtype=pl.Float32)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32)
+    # period_end_time represents the end of the 30-minute settlement period.
+    period_end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    power: float | None = pt.Field(dtype=pl.Float32)
 
     @classmethod
     def validate(
@@ -30,7 +32,7 @@ class PowerTimeSeries(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["PowerTimeSeries"]:
-        """Validate the given dataframe, ensuring end_time is at :00 or :30."""
+        """Validate the given dataframe, ensuring period_end_time is at :00 or :30."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -39,10 +41,12 @@ class PowerTimeSeries(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        # Validate end_time is at :00 or :30
-        minutes = validated_df["end_time"].dt.minute()
+        # Validate period_end_time is at :00 or :30
+        minutes = validated_df["period_end_time"].dt.minute()
         if not minutes.is_in([0, 30]).all():
-            raise ValueError("end_time must be at the top or bottom of the hour (minute 00 or 30).")
+            raise ValueError(
+                "period_end_time must be at the top or bottom of the hour (minute 00 or 30)."
+            )
 
         return cast(pt.DataFrame["PowerTimeSeries"], validated_df)
 
@@ -50,7 +54,8 @@ class PowerTimeSeries(pt.Model):
 class TimeSeriesMetadata(pt.Model):
     """Metadata for a time series, joining location data with live telemetry info."""
 
-    time_series_id: str = pt.Field(dtype=pl.String, unique=True)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32, unique=True)
     time_series_name: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     time_series_type: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     units: str | None = pt.Field(dtype=pl.String, allow_missing=True)
@@ -69,7 +74,8 @@ class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts."""
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    time_series_id: str = pt.Field(dtype=pl.String)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
     # The datetime that the underlying weather forecast was initialised.
@@ -259,7 +265,8 @@ class XGBoostInputFeatures(pt.Model):
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    time_series_id: str = pt.Field(dtype=pl.String)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32)
     time_series_type: str = pt.Field(dtype=pl.Categorical)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
     power: float = pt.Field(dtype=pl.Float32)
