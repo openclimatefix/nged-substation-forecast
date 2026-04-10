@@ -18,6 +18,6 @@ def calculate_peak_capacity(flows: pt.LazyFrame[PowerTimeSeries]) -> pt.DataFram
     """
     return pt.DataFrame(
         flows.group_by("time_series_id")
-        .agg(peak_capacity=pl.col("value").abs().max().fill_null(1.0).clip(lower_bound=1.0))
+        .agg(peak_capacity=pl.col("power").abs().max().fill_null(1.0).clip(lower_bound=1.0))
         .collect()
     )

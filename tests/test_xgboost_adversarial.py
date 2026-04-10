@@ -54,8 +54,8 @@ def test_train_handles_missing_init_time():
         {
             "time_series_id": ["1"],
             "start_time": [datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)],
-            "end_time": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
-            "value": [10.0],
+            "period_end_time": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
+            "power": [10.0],
         }
     )
 

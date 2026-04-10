@@ -30,16 +30,16 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
         {
             "time_series_id": ["1"] * len(timestamps),
             "start_time": timestamps,
-            "end_time": timestamps + timedelta(minutes=30),
-            "value": [10.0] * len(timestamps),
+            "period_end_time": timestamps + timedelta(minutes=30),
+            "power": [10.0] * len(timestamps),
             "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.String),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("value").cast(pl.Float32),
+            pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("power").cast(pl.Float32),
         ]
     )
 

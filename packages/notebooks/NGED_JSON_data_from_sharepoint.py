@@ -57,8 +57,8 @@ def _(df):
         df["data"]
         .explode()
         .struct.unnest()
-        .select(["value", "endTime"])
-        .with_columns(endTime=pl.col("endTime").str.to_datetime(time_zone="UTC"))
+        .select(["power", "period_end_time"])
+        .with_columns(period_end_time=pl.col("period_end_time").str.to_datetime(time_zone="UTC"))
     )
     timeseries
     return (timeseries,)
@@ -66,14 +66,16 @@ def _(df):
 
 @app.cell
 def _(timeseries):
-    filtered = timeseries.filter(pl.col("endTime") > datetime(2026, 3, 20, tzinfo=timezone.utc))
+    filtered = timeseries.filter(
+        pl.col("period_end_time") > datetime(2026, 3, 20, tzinfo=timezone.utc)
+    )
     filtered
     return (filtered,)
 
 
 @app.cell
 def _(filtered):
-    filtered.plot.line(x="endTime", y="value")
+    filtered.plot.line(x="period_end_time", y="power")
     return
 
 

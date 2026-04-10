@@ -269,7 +269,7 @@ def test_prepare_training_data_prevents_row_explosion():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
         pl.col("time_series_id").cast(pl.String)
     )
 
@@ -304,8 +304,8 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
         {
             "time_series_id": ["123"],
             "start_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
-            "end_time": [datetime(2024, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=30)],
-            "value": [1.0],
+            "period_end_time": [datetime(2024, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=30)],
+            "power": [1.0],
             "MVA": [None],
         }
     ).with_columns(pl.col("MVA").cast(pl.Float64))
@@ -438,7 +438,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
         pl.col("time_series_id").cast(pl.String)
     )
 
@@ -516,7 +516,7 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
         pl.col("time_series_id").cast(pl.String)
     )
 

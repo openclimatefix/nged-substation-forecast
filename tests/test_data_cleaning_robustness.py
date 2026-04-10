@@ -28,15 +28,15 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
         {
             "time_series_id": ["1", "1"],
             "start_time": [t1, t2],
-            "end_time": [t1 + timedelta(minutes=30), t2 + timedelta(minutes=30)],
-            "value": [10.0, 10.0],
+            "period_end_time": [t1 + timedelta(minutes=30), t2 + timedelta(minutes=30)],
+            "power": [10.0, 10.0],
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.String),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("value").cast(pl.Float32),
+            pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("power").cast(pl.Float32),
         ]
     )
 
@@ -85,15 +85,15 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         {
             "time_series_id": ["1"],
             "start_time": [t1],
-            "end_time": [t1 + timedelta(minutes=30)],
-            "value": [10.0],
+            "period_end_time": [t1 + timedelta(minutes=30)],
+            "power": [10.0],
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.String),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
-            pl.col("value").cast(pl.Float32),
+            pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("power").cast(pl.Float32),
         ]
     )
 
@@ -110,22 +110,22 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         # Verify data exists
         df_result = pl.read_delta(str(cleaned_actuals_path))
         assert len(df_result) == 1
-        assert df_result["value"][0] == 10.0
+        assert df_result["power"][0] == 10.0
 
         # Run again with different data in source for same partition
         df_new = pl.DataFrame(
             {
                 "time_series_id": ["1"],
                 "start_time": [t1],
-                "end_time": [t1 + timedelta(minutes=30)],
-                "value": [20.0],
+                "period_end_time": [t1 + timedelta(minutes=30)],
+                "power": [20.0],
             }
         ).with_columns(
             [
                 pl.col("time_series_id").cast(pl.String),
                 pl.col("start_time").cast(UTC_DATETIME_DTYPE),
-                pl.col("end_time").cast(UTC_DATETIME_DTYPE),
-                pl.col("value").cast(pl.Float32),
+                pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
+                pl.col("power").cast(pl.Float32),
             ]
         )
 
@@ -140,4 +140,4 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         # Verify data was overwritten
         df_result = pl.read_delta(str(cleaned_actuals_path))
         assert len(df_result) == 1
-        assert df_result["value"][0] == 20.0
+        assert df_result["power"][0] == 20.0

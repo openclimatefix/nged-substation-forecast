@@ -151,20 +151,23 @@ def cleaned_actuals(
     context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
 
     # Validate the output against Patito schema
-    validated_df = PowerTimeSeries.validate(df_cleaned)
+    validated_df = PowerTimeSeries.validate(df_cleaned, allow_superfluous_columns=True)
 
     context.log.info(f"Validated data shape: {validated_df.shape}")
 
     # Filter validated_df to current partition's time window.
     # The TimeWindowPartitionMapping includes historical data for lookback (previous partitions),
     # but we must only append data for the current partition to avoid data duplication in the
-    # Delta table. Example: For partition "2026-03-10", we only include rows with start_time
+    # Delta table. Example: For partition "2026-03-10", we only include rows with period_end_time
     # in [2026-03-10 00:00:00 UTC, 2026-03-11 00:00:00 UTC).
 
     # Apply filter only for the current partition's time range
     validated_df = validated_df.filter(
-        pl.col("start_time").is_between(partition_start, partition_end, closed="left")
+        pl.col("period_end_time").is_between(partition_start, partition_end, closed="left")
     )
+
+    # Drop superfluous columns after validation and filtering
+    validated_df = validated_df.drop("start_time")
 
     context.log.info(
         f"Filtered cleaned actuals to current partition. "
@@ -184,7 +187,7 @@ def cleaned_actuals(
         mode="overwrite",
         delta_write_options={
             "partition_by": ["time_series_id"],
-            "predicate": f"start_time >= '{partition_start.isoformat()}' AND start_time < '{partition_end.isoformat()}'",
+            "predicate": f"period_end_time >= '{partition_start.isoformat()}' AND period_end_time < '{partition_end.isoformat()}'",
         },
     )
 
