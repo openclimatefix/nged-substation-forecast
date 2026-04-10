@@ -56,27 +56,24 @@ class TimeSeriesMetadata(pt.Model):
 
     # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
     time_series_id: int = pt.Field(dtype=pl.Int32, unique=True)
-    time_series_name: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    time_series_type: (
-        Literal[
-            "BESS",
-            "Biofuel",
-            "Disaggregated Demand",
-            "Other (Generation)",
-            "PV",
-            "Raw Flow",
-            "Wind",
-        ]
-        | None
-    ) = pt.Field(dtype=pl.String, allow_missing=True)
-    units: Literal["MVA", "MW"] | None = pt.Field(dtype=pl.String, allow_missing=True)
-    licence_area: Literal["EMids"] | None = pt.Field(dtype=pl.String, allow_missing=True)
+    time_series_name: str = pt.Field(dtype=pl.String)
+    time_series_type: Literal[
+        "BESS",
+        "Biofuel",
+        "Disaggregated Demand",
+        "Other (Generation)",
+        "PV",
+        "Raw Flow",
+        "Wind",
+    ] = pt.Field(dtype=pl.String)
+    units: Literal["MVA", "MW"] = pt.Field(dtype=pl.String)
+    licence_area: Literal["EMids"] = pt.Field(dtype=pl.String)
     substation_number: int = pt.Field(dtype=pl.Int32, gt=0, lt=1_000_000)
     substation_type: Literal["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"] = pt.Field(
         dtype=pl.Categorical
     )
-    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
-    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
+    latitude: float = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
+    longitude: float = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
     information: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     area_wkt: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     area_center_lat: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
