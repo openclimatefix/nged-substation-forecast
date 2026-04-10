@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import patito as pt
 import polars as pl
@@ -57,11 +57,24 @@ class TimeSeriesMetadata(pt.Model):
     # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
     time_series_id: int = pt.Field(dtype=pl.Int32, unique=True)
     time_series_name: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    time_series_type: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    units: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    licence_area: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    time_series_type: (
+        Literal[
+            "BESS",
+            "Biofuel",
+            "Disaggregated Demand",
+            "Other (Generation)",
+            "PV",
+            "Raw Flow",
+            "Wind",
+        ]
+        | None
+    ) = pt.Field(dtype=pl.String, allow_missing=True)
+    units: Literal["MVA", "MW"] | None = pt.Field(dtype=pl.String, allow_missing=True)
+    licence_area: Literal["EMids"] | None = pt.Field(dtype=pl.String, allow_missing=True)
     substation_number: int = pt.Field(dtype=pl.Int32, gt=0, lt=1_000_000)
-    substation_type: str = pt.Field(dtype=pl.Categorical)
+    substation_type: Literal["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"] = pt.Field(
+        dtype=pl.Categorical
+    )
     latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
     longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
     information: str | None = pt.Field(dtype=pl.String, allow_missing=True)
