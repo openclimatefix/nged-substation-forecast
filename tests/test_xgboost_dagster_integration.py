@@ -35,7 +35,7 @@ def test_xgboost_dagster_integration() -> None:
     with dg.DagsterInstance.ephemeral() as instance:
         settings = Settings()
         actuals_path = settings.nged_data_path / "delta" / "raw_power_time_series"
-        cleaned_path = settings.nged_data_path / "delta" / "cleaned_actuals"
+        cleaned_path = settings.nged_data_path / "delta" / "cleaned_power_time_series"
 
         if not actuals_path.exists() or not cleaned_path.exists():
             pytest.skip("Required Delta tables missing. Please download data.")
@@ -45,14 +45,29 @@ def test_xgboost_dagster_integration() -> None:
 
         # 3. Dynamically calculate dates from local data
         df = pl.scan_delta(str(actuals_path))
-        max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
-        max_dt = max_dt_df.get_column("timestamp").max()
+        # Verify schema
+        assert "period_end_time" in df.collect_schema().names(), (
+            "Missing 'period_end_time' in raw_power_time_series"
+        )
+        assert "power" in df.collect_schema().names(), "Missing 'power' in raw_power_time_series"
+
+        max_dt_df = cast(pl.DataFrame, df.select(pl.col("period_end_time").max()).collect())
+        max_dt = max_dt_df.get_column("period_end_time").max()
 
         if max_dt is None:
             pytest.skip("No maximum timestamp found in data.")
 
-        min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
-        min_dt = min_dt_df.get_column("timestamp").min()
+        min_dt_df = cast(pl.DataFrame, df.select(pl.col("period_end_time").min()).collect())
+        min_dt = min_dt_df.get_column("period_end_time").min()
+
+        # Verify cleaned_power_time_series schema
+        df_cleaned = pl.scan_delta(str(cleaned_path))
+        assert "period_end_time" in df_cleaned.collect_schema().names(), (
+            "Missing 'period_end_time' in cleaned_power_time_series"
+        )
+        assert "power" in df_cleaned.collect_schema().names(), (
+            "Missing 'power' in cleaned_power_time_series"
+        )
 
         if min_dt is None:
             pytest.skip("No minimum timestamp found in data.")
