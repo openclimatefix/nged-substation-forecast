@@ -34,7 +34,7 @@ def test_xgboost_dagster_integration() -> None:
     # "Cannot operate on a closed database" errors in tests.
     with dg.DagsterInstance.ephemeral() as instance:
         settings = Settings()
-        actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
+        actuals_path = settings.nged_data_path / "delta" / "raw_power_time_series"
         cleaned_path = settings.nged_data_path / "delta" / "cleaned_actuals"
 
         if not actuals_path.exists() or not cleaned_path.exists():
@@ -102,7 +102,7 @@ def test_xgboost_dagster_integration() -> None:
         # 5. Provide run configuration
         run_config = {
             "ops": {
-                "live_primary_flows": {
+                "raw_power_time_series": {
                     "config": {
                         "substation_numbers": substations,
                         "limit": 5,

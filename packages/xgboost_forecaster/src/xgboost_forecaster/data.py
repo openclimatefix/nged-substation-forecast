@@ -27,7 +27,7 @@ _SETTINGS = Settings()
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
+    base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "cleaned_power_time_series"
     base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
     # Resolution 5 is the fixed standard for this model as it balances spatial
     # precision with feature dimensionality for the XGBoost model.

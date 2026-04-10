@@ -46,7 +46,7 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
 
     Args:
         settings: Global settings object.
-        table_name: Name of the Delta table (e.g., "live_primary_flows").
+        table_name: Name of the Delta table (e.g., "raw_power_time_series").
 
     Returns:
         Absolute path as a string.
@@ -86,7 +86,7 @@ def get_cleaned_actuals_lazy(
     # AutomationCondition provides a more flexible and modern way to define
     # when assets should be automatically materialized.
     automation_condition=dg.AutomationCondition.eager(),
-    deps=["live_primary_flows"],
+    deps=["raw_power_time_series"],
 )
 def cleaned_actuals(
     context: dg.AssetExecutionContext,
@@ -94,7 +94,7 @@ def cleaned_actuals(
 ) -> pl.DataFrame:
     """Clean raw live primary flows and apply data quality checks.
 
-    This asset manually scans the live primary flows Delta table for the current partition
+    This asset manually scans the raw power time series Delta table for the current partition
     plus a 1-day lookback window. It applies data quality cleaning logic (stuck
     sensor detection, insane power detection).
     The output is validated against the PowerTimeSeries schema which allows null values,
@@ -130,18 +130,18 @@ def cleaned_actuals(
     )
     context.log.info(f"Cleaning partition: {context.partition_key}")
 
-    delta_path = _get_delta_path(settings, "live_primary_flows")
+    delta_path = _get_delta_path(settings, "raw_power_time_series")
 
     # Manually load from Delta table and filter to the required date range (including 1 day lookback)
     # This fix is needed because the InMemoryIOManager in tests doesn't have the "yesterday"
-    # partition data, and live_primary_flows is a side-effect only asset.
+    # partition data, and raw_power_time_series is a side-effect only asset.
     # We use the new scan_delta_table helper which handles UTC timezone boilerplate.
-    live_primary_flows = scan_delta_table(delta_path).filter(
+    raw_flows = scan_delta_table(delta_path).filter(
         pl.col("start_time").is_between(lookback_start, partition_end, closed="left")
     )
 
     # Materialize the LazyFrame once
-    df_joined_materialized = cast(pl.DataFrame, live_primary_flows.collect())
+    df_joined_materialized = cast(pl.DataFrame, raw_flows.collect())
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 

@@ -14,8 +14,8 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
 
     # 1. Setup paths
     delta_dir = tmp_path / "delta"
-    live_flows_path = delta_dir / "live_primary_flows"
-    live_flows_path.mkdir(parents=True)
+    raw_flows_path = delta_dir / "raw_power_time_series"
+    raw_flows_path.mkdir(parents=True)
 
     # 2. Create dummy data for two days
     # Day 1: 2026-03-09
@@ -40,7 +40,7 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
         ]
     )
 
-    df.write_delta(str(live_flows_path))
+    df.write_delta(str(raw_flows_path))
 
     # 3. Setup settings
     settings = Settings(
@@ -75,9 +75,9 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
     """Test that cleaned_actuals correctly overwrites only its partition."""
 
     delta_dir = tmp_path / "delta"
-    live_flows_path = delta_dir / "live_primary_flows"
+    raw_flows_path = delta_dir / "raw_power_time_series"
     cleaned_actuals_path = delta_dir / "cleaned_actuals"
-    live_flows_path.mkdir(parents=True)
+    raw_flows_path.mkdir(parents=True)
 
     t1 = datetime(2026, 3, 10, 12, tzinfo=timezone.utc)
 
@@ -97,7 +97,7 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         ]
     )
 
-    df.write_delta(str(live_flows_path))
+    df.write_delta(str(raw_flows_path))
 
     settings = Settings(nged_data_path=tmp_path)
 
@@ -130,7 +130,7 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         )
 
         df_new.write_delta(
-            str(live_flows_path),
+            str(raw_flows_path),
             mode="overwrite",
             delta_write_options={"predicate": f"start_time >= '{t1.isoformat()}'"},
         )

@@ -38,7 +38,7 @@ class SubstationResource(NamedTuple):
 
 
 def get_delta_path(settings: Settings) -> Path:
-    return settings.nged_data_path / "delta" / "live_primary_flows"
+    return settings.nged_data_path / "delta" / "raw_power_time_series"
 
 
 def format_failure_metadata(

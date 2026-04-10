@@ -55,12 +55,12 @@ def cleaned_power_time_series(
     delta_path = _get_delta_path(settings, "raw_power_time_series")
 
     # Manually load from Delta table and filter to the required date range (including 1 day lookback)
-    live_primary_flows = scan_delta_table(delta_path).filter(
+    raw_flows = scan_delta_table(delta_path).filter(
         pl.col("period_end_time").is_between(lookback_start, partition_end, closed="left")
     )
 
     # Materialize the LazyFrame once
-    df_joined_materialized = cast(pl.DataFrame, live_primary_flows.collect())
+    df_joined_materialized = cast(pl.DataFrame, raw_flows.collect())
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 
