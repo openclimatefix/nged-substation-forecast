@@ -23,7 +23,7 @@ def test_xgboost_forecaster_train_and_predict():
     time_series_id = 1
     time_series_metadata = pt.DataFrame[TimeSeriesMetadata](
         {
-            "time_series_id": ["1"],
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
             "substation_number": [time_series_id],
             "substation_name": ["Sub1"],
             "latitude": [51.0],
@@ -41,14 +41,18 @@ def test_xgboost_forecaster_train_and_predict():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[PowerTimeSeries](
-        {
-            "start_time": timestamps - timedelta(minutes=30),
-            "end_time": timestamps,
-            "time_series_id": ["1"] * len(timestamps),
-            "value": [10.0] * len(timestamps),
-        }
-    ).lazy()
+    sub_flows = (
+        pt.DataFrame[PowerTimeSeries](
+            {
+                "start_time": timestamps - timedelta(minutes=30),
+                "period_end_time": timestamps,
+                "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
+                "value": [10.0] * len(timestamps),
+            }
+        )
+        .lazy()
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
+    )
 
     # Centralized data preparation
     flows_30m = sub_flows
@@ -126,14 +130,18 @@ def test_xgboost_forecaster_train_and_predict():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[PowerTimeSeries](
-        {
-            "start_time": timestamps - timedelta(minutes=30),
-            "end_time": timestamps,
-            "time_series_id": ["1"] * len(timestamps),
-            "value": [10.0] * len(timestamps),
-        }
-    ).lazy()
+    sub_flows = (
+        pt.DataFrame[PowerTimeSeries](
+            {
+                "start_time": timestamps - timedelta(minutes=30),
+                "period_end_time": timestamps,
+                "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
+                "value": [10.0] * len(timestamps),
+            }
+        )
+        .lazy()
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
+    )
 
     # Centralized data preparation
     flows_30m = sub_flows
@@ -259,7 +267,7 @@ def test_xgboost_forecaster_predict_empty():
     time_series_id = 1
     time_series_metadata = pt.DataFrame[TimeSeriesMetadata](
         {
-            "time_series_id": ["1"],
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
             "substation_number": [time_series_id],
             "substation_name": ["Sub1"],
             "latitude": [51.0],
@@ -277,14 +285,18 @@ def test_xgboost_forecaster_predict_empty():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[PowerTimeSeries](
-        {
-            "start_time": timestamps - timedelta(minutes=30),
-            "end_time": timestamps,
-            "time_series_id": ["1"] * len(timestamps),
-            "value": [10.0] * len(timestamps),
-        }
-    ).lazy()
+    sub_flows = (
+        pt.DataFrame[PowerTimeSeries](
+            {
+                "start_time": timestamps - timedelta(minutes=30),
+                "period_end_time": timestamps,
+                "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
+                "value": [10.0] * len(timestamps),
+            }
+        )
+        .lazy()
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
+    )
 
     # Centralized data preparation
     flows_30m = sub_flows
@@ -362,14 +374,18 @@ def test_xgboost_forecaster_predict_empty():
         eager=True,
     )
 
-    sub_flows = pt.DataFrame[PowerTimeSeries](
-        {
-            "start_time": timestamps - timedelta(minutes=30),
-            "end_time": timestamps,
-            "time_series_id": ["1"] * len(timestamps),
-            "value": [10.0] * len(timestamps),
-        }
-    ).lazy()
+    sub_flows = (
+        pt.DataFrame[PowerTimeSeries](
+            {
+                "start_time": timestamps - timedelta(minutes=30),
+                "period_end_time": timestamps,
+                "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
+                "value": [10.0] * len(timestamps),
+            }
+        )
+        .lazy()
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
+    )
 
     # Centralized data preparation
     flows_30m = sub_flows

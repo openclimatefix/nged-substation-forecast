@@ -22,7 +22,7 @@ from ml_core.utils import evaluate_and_save_model
 def test_universal_training_data_integrity():
     """Verify training data integrity: delay filter and lead_time_hours calculation."""
     # Setup
-    time_series_id = "1"
+    time_series_id = 1
     h3_index = 12345
 
     # Create a range of init times and valid times
@@ -60,11 +60,11 @@ def test_universal_training_data_integrity():
             {
                 "time_series_id": time_series_id,
                 "start_time": valid_time - timedelta(minutes=30),
-                "end_time": valid_time,
+                "period_end_time": valid_time,
                 "value": 10.0,
             }
         )
-    flows_lf = pl.LazyFrame(flows_data)
+    flows_lf = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Metadata
     metadata = pt.DataFrame[TimeSeriesMetadata](
@@ -78,7 +78,7 @@ def test_universal_training_data_integrity():
                 "latitude": [51.5],
                 "longitude": [-0.1],
             }
-        )
+        ).with_columns(pl.col("time_series_id").cast(pl.Int32))
     )
 
     # Forecaster
@@ -157,7 +157,7 @@ def test_mlflow_metric_thinning():
         results_data.append(
             {
                 NwpColumns.VALID_TIME: init_time + timedelta(hours=lt),
-                "time_series_id": "1",
+                "time_series_id": 1,
                 NwpColumns.ENSEMBLE_MEMBER: 0,
                 "power_fcst_model_name": "test_model",
                 "power_fcst_init_time": init_time,
@@ -172,7 +172,7 @@ def test_mlflow_metric_thinning():
     results_df = PowerForecast.validate(
         pl.DataFrame(results_data).with_columns(
             [
-                pl.col("time_series_id").cast(pl.String),
+                pl.col("time_series_id").cast(pl.Int32),
                 pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8),
                 pl.col("nwp_init_hour").cast(pl.Int32),
                 pl.col("lead_time_hours").cast(pl.Float32),
@@ -188,13 +188,17 @@ def test_mlflow_metric_thinning():
     for lt in lead_times:
         flows_data.append(
             {
-                "time_series_id": "1",
+                "time_series_id": 1,
                 "start_time": init_time + timedelta(hours=lt) - timedelta(minutes=30),
-                "end_time": init_time + timedelta(hours=lt),
-                "value": 11.0,  # Constant error of 1.0
+                "period_end_time": init_time + timedelta(hours=lt),
+                "power": 11.0,  # Constant error of 1.0
             }
         )
-    flows_30m = pl.LazyFrame(flows_data)
+    flows_30m = (
+        pl.LazyFrame(flows_data)
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
+        .rename({"power": "value"})
+    )
 
     config = TrainingConfig(
         data_split=DataSplitConfig(
@@ -262,18 +266,18 @@ def test_autoregressive_lag_consistency():
 
     df = pl.LazyFrame(
         {
-            "time_series_id": ["1", "1"],
+            "time_series_id": [1, 1],
             "valid_time": [valid_time, valid_time],
             "init_time": [init_time_1, init_time_2],
         }
-    )
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Empty flows for lag calculation (we only care about target_lag_time)
     flows_30m = pl.LazyFrame(
         {
-            "time_series_id": pl.Series([], dtype=pl.String),
+            "time_series_id": pl.Series([], dtype=pl.Int32),
             "start_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
-            "end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
+            "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
             "value": pl.Series([], dtype=pl.Float32),
         }
     )
@@ -310,7 +314,7 @@ def test_lookahead_audit():
     # Create a synthetic dataset where the target is a function of a FUTURE weather variable
     # and verify the model's feature importance for that variable is zero.
 
-    time_series_id = "1"
+    time_series_id = 1
     h3_index = 12345
 
     # Create training data
@@ -365,14 +369,14 @@ def test_lookahead_audit():
             target = 0.5 * temp_now + 2.0 * temp_future
             flows_data.append(
                 {
-                    "time_series_id": "1",
+                    "time_series_id": 1,
                     "start_time": valid_time - timedelta(minutes=30),
-                    "end_time": valid_time,
+                    "period_end_time": valid_time,
                     "value": target,
                 }
             )
 
-    flows_lf = pl.LazyFrame(flows_data)
+    flows_lf = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Metadata
     metadata = pt.DataFrame[TimeSeriesMetadata](
@@ -386,7 +390,7 @@ def test_lookahead_audit():
                 "latitude": [51.5],
                 "longitude": [-0.1],
             }
-        )
+        ).with_columns(pl.col("time_series_id").cast(pl.Int32))
     )
 
     # Forecaster

@@ -51,7 +51,7 @@ def add_autoregressive_lags(
     # latest_available_weekly_power_lag without needing pre-calculated lag_7d or lag_14d columns.
     lag_df = flows_30m.select(
         pl.col("time_series_id"),
-        pl.col("end_time").alias("target_lag_time"),
+        pl.col("period_end_time").alias("target_lag_time"),
         pl.col("value").alias("latest_available_weekly_power_lag"),
     )
 

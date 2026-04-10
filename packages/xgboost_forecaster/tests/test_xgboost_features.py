@@ -37,7 +37,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
     flows_30m = pl.LazyFrame(
         {
             "time_series_id": [time_series_id] * len(flow_timestamps),
-            "end_time": flow_timestamps,
+            "period_end_time": flow_timestamps,
             "value": [float(i) for i in range(len(flow_timestamps))],
         }
     )
@@ -107,7 +107,7 @@ def test_add_autoregressive_lags_handles_missing_flows():
     flows_30m = pl.LazyFrame(
         {
             "time_series_id": pl.Series([], dtype=pl.String),
-            "end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
+            "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
             "value": pl.Series([], dtype=pl.Float32),
         }
     )

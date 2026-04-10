@@ -217,7 +217,7 @@ class XGBoostForecaster(BaseForecaster):
             A LazyFrame containing the joined training data.
         """
         df_lf = (
-            flows_30m.rename({"end_time": NwpColumns.VALID_TIME})
+            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME})
             .join(
                 metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                 on="time_series_id",
@@ -401,7 +401,7 @@ class XGBoostForecaster(BaseForecaster):
         log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
         # Log the range of timestamps in flows_30m
         log.info(
-            f"flows_30m range: {cast(pl.DataFrame, flows_30m.select(pl.col('end_time').min().alias('min'), pl.col('end_time').max().alias('max')).collect())}"
+            f"flows_30m range: {cast(pl.DataFrame, flows_30m.select(pl.col('period_end_time').min().alias('min'), pl.col('period_end_time').max().alias('max')).collect())}"
         )
         if nwps:
             for name, lf in nwps.items():
