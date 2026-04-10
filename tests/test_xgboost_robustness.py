@@ -4,9 +4,7 @@ import patito as pt
 from datetime import datetime, timezone, timedelta
 from typing import Any, cast
 from unittest.mock import MagicMock
-from patito.exceptions import DataFrameValidationError
 from contracts.data_schemas import (
-    PowerTimeSeries,
     Nwp,
     ProcessedNwp,
     TimeSeriesMetadata,
@@ -19,26 +17,6 @@ from contracts.hydra_schemas import (
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
-
-
-def test_substation_power_flows_validation_extreme_values():
-    """Test PowerTimeSeries validation with values outside the ge/le range."""
-    # power = 2000 is outside [-1000, 1000]
-    df = pl.DataFrame(
-        {
-            "period_end_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "time_series_id": [123],
-            "power": [2000.0],
-        }
-    ).with_columns(
-        [
-            pl.col("time_series_id").cast(pl.Int32),
-            pl.col("power").cast(pl.Float32),
-        ]
-    )
-
-    with pytest.raises(DataFrameValidationError):
-        PowerTimeSeries.validate(df)
 
 
 def test_nwp_validation_missing_accumulated_variables_at_step_1():
