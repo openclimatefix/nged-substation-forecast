@@ -52,7 +52,7 @@ def add_autoregressive_lags(
     lag_df = flows_30m.select(
         pl.col("time_series_id"),
         pl.col("period_end_time").alias("target_lag_time"),
-        pl.col("value").alias("latest_available_weekly_power_lag"),
+        pl.col("power").alias("latest_available_weekly_power_lag"),
     )
 
     df = df.join(lag_df, on=["time_series_id", "target_lag_time"], how="left")

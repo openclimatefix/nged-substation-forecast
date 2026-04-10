@@ -73,6 +73,7 @@ def test_universal_training_data_integrity():
                 "h3_res_5": [h3_index],
                 "substation_name": ["Test Substation"],
                 "substation_type": ["primary"],
+                "substation_number": [123],
                 "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
                 "latitude": [51.5],
                 "longitude": [-0.1],
@@ -180,7 +181,7 @@ def test_mlflow_metric_thinning():
             ]
         )
     )
-    forecaster.predict.return_value = results_df.rename({"power_fcst": "value"})
+    forecaster.predict.return_value = results_df
 
     # Mock flows_30m
     flows_data = []
@@ -193,11 +194,7 @@ def test_mlflow_metric_thinning():
                 "power": 11.0,  # Constant error of 1.0
             }
         )
-    flows_30m = (
-        pl.LazyFrame(flows_data)
-        .with_columns(pl.col("time_series_id").cast(pl.Int32))
-        .rename({"power": "value"})
-    )
+    flows_30m = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     config = TrainingConfig(
         data_split=DataSplitConfig(
@@ -277,7 +274,7 @@ def test_autoregressive_lag_consistency():
             "time_series_id": pl.Series([], dtype=pl.Int32),
             "start_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
             "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
-            "value": pl.Series([], dtype=pl.Float32),
+            "power": pl.Series([], dtype=pl.Float32),
         }
     )
 
@@ -384,6 +381,7 @@ def test_lookahead_audit():
                 "h3_res_5": [h3_index],
                 "substation_name": ["Test Substation"],
                 "substation_type": ["primary"],
+                "substation_number": [123],
                 "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
                 "latitude": [51.5],
                 "longitude": [-0.1],

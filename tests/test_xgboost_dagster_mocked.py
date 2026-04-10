@@ -109,6 +109,9 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
         patch("mlflow.log_artifact"),
         patch("mlflow.xgboost.log_model"),
         patch("mlflow.set_experiment"),
+        patch(
+            "src.nged_substation_forecast.defs.xgb_assets.get_substation_metadata"
+        ) as mock_get_substation_metadata,
     ):
         # Materialize assets
         with dg.build_asset_context() as context:
@@ -124,6 +127,7 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
                     pl.col("substation_number").cast(pl.Int32),
                 ]
             )
+            mock_get_substation_metadata.return_value = metadata
 
             model = train_xgboost(
                 context=context,

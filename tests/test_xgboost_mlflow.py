@@ -21,28 +21,29 @@ def test_evaluate_and_save_model_logs_metrics():
     # Setup dummy data
     sub_meta = pl.DataFrame(
         {
-            "time_series_id": ["1"],
+            "time_series_id": [1],
             "substation_name": ["Sub1"],
             "latitude": [51.0],
             "longitude": [-1.0],
             "h3_res_5": [123],
+            "substation_number": [1],
             "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
         }
-    ).with_columns(pl.col("time_series_id").cast(pl.String))
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     valid_time = datetime(2026, 1, 2, 12, tzinfo=timezone.utc)
     sub_flows = (
         pl.DataFrame(
             {
-                "end_time": [valid_time],
-                "time_series_id": ["1"],
-                "value": [10.0],
+                "period_end_time": [valid_time],
+                "time_series_id": [1],
+                "power": [10.0],
                 "MVA": [10.0],
                 "MVAr": [0.0],
                 "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             }
         )
-        .with_columns(pl.col("time_series_id").cast(pl.String))
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
         .lazy()
     )
 
@@ -169,14 +170,14 @@ def test_evaluate_and_save_model_logs_metrics():
     forecaster.predict.return_value = pl.DataFrame(
         {
             "valid_time": [valid_time],
-            "time_series_id": ["1"],
+            "time_series_id": [1],
             "ensemble_member": [0],
             "value": [11.0],  # Prediction is 11.0, actual is 10.0
             "nwp_init_time": [valid_time - timedelta(hours=24)],
         }
     ).with_columns(
         [
-            pl.col("time_series_id").cast(pl.String),
+            pl.col("time_series_id").cast(pl.Int32),
             pl.col("ensemble_member").cast(pl.UInt8),
             pl.col("value").cast(pl.Float32),
         ]
@@ -196,7 +197,7 @@ def test_evaluate_and_save_model_logs_metrics():
             config=config,
             nwps=nwps,
             substation_power_flows=sub_flows,
-            substation_metadata=sub_meta,
+            time_series_metadata=sub_meta,
         )
 
         mock_set_experiment.assert_called_with("xgboost")
@@ -214,27 +215,28 @@ def test_evaluate_and_save_model_logs_metrics():
     # Setup dummy data
     sub_meta = pl.DataFrame(
         {
-            "time_series_id": ["1"],
+            "time_series_id": [1],
             "substation_name": ["Sub1"],
             "latitude": [51.0],
             "longitude": [-1.0],
             "h3_res_5": [123],
+            "substation_number": [1],
             "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
         }
-    ).with_columns(pl.col("time_series_id").cast(pl.String))
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     sub_flows = (
         pl.DataFrame(
             {
-                "end_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-                "time_series_id": ["1"],
-                "value": [10.0],
+                "period_end_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+                "time_series_id": [1],
+                "power": [10.0],
                 "MVA": [10.0],
                 "MVAr": [0.0],
                 "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             }
         )
-        .with_columns(pl.col("time_series_id").cast(pl.String))
+        .with_columns(pl.col("time_series_id").cast(pl.Int32))
         .lazy()
     )
 

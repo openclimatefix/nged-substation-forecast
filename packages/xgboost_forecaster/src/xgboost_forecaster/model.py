@@ -217,7 +217,7 @@ class XGBoostForecaster(BaseForecaster):
             A LazyFrame containing the joined training data.
         """
         df_lf = (
-            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME, "power": "value"})
+            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME})
             .join(
                 metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                 on="time_series_id",
@@ -336,7 +336,7 @@ class XGBoostForecaster(BaseForecaster):
         telemetry_delay_hours = self.config.telemetry_delay_hours if hasattr(self, "config") else 24
         df_lf = add_autoregressive_lags(
             df_lf,
-            cast(pt.LazyFrame[PowerTimeSeries], flows_30m.rename({"power": "value"})),
+            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
             telemetry_delay_hours=telemetry_delay_hours,
         )
 
@@ -352,10 +352,10 @@ class XGBoostForecaster(BaseForecaster):
 
         if is_training:
             # For training, also normalize target
-            df_lf = df_lf.with_columns(value=pl.col("value") / pl.col("peak_capacity"))
+            df_lf = df_lf.with_columns(power=pl.col("power") / pl.col("peak_capacity"))
         else:
             # For prediction, add dummy target for validation
-            df_lf = df_lf.with_columns(value=pl.lit(0.0, dtype=pl.Float32))
+            df_lf = df_lf.with_columns(power=pl.lit(0.0, dtype=pl.Float32))
 
         df_lf = add_cyclical_temporal_features(df_lf, time_col=NwpColumns.VALID_TIME)
 
@@ -429,7 +429,7 @@ class XGBoostForecaster(BaseForecaster):
         feature_cols = feature_lf.collect_schema().names()
 
         # Collect only necessary columns and drop nulls
-        critical_cols = ["value"]
+        critical_cols = ["power"]
         if nwps:
             critical_cols.extend(
                 [
@@ -448,12 +448,12 @@ class XGBoostForecaster(BaseForecaster):
             # is the bottleneck.
             raw_df = cast(
                 pl.DataFrame,
-                joined_lf.select(list(set(feature_cols + ["value"]))).collect(),
+                joined_lf.select(list(set(feature_cols + ["power"]))).collect(),
             ).sample(n=config.max_training_samples, seed=42)
         else:
             raw_df = cast(
                 pl.DataFrame,
-                joined_lf.select(list(set(feature_cols + ["value"]))).collect(),
+                joined_lf.select(list(set(feature_cols + ["power"]))).collect(),
             )
         log.info(f"Collected raw_df shape before dropping nulls: {raw_df.shape}")
         joined_df = raw_df.drop_nulls(subset=critical_cols)
@@ -472,7 +472,7 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         X = cast(pl.DataFrame, self._prepare_features(joined_df))
-        y = joined_df.get_column("value")
+        y = joined_df.get_column("power")
 
         # NaN/Inf checks
         if (
@@ -553,7 +553,7 @@ class XGBoostForecaster(BaseForecaster):
         df = cast(
             pl.DataFrame,
             df_lf.select(
-                list(set(feature_cols + output_cols + ["value", "peak_capacity"]))
+                list(set(feature_cols + output_cols + ["power", "peak_capacity"]))
             ).collect(),
         )
 

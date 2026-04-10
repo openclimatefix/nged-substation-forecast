@@ -38,7 +38,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
         {
             "time_series_id": [time_series_id] * len(flow_timestamps),
             "period_end_time": flow_timestamps,
-            "value": [float(i) for i in range(len(flow_timestamps))],
+            "power": [float(i) for i in range(len(flow_timestamps))],
         }
     )
 
@@ -108,7 +108,7 @@ def test_add_autoregressive_lags_handles_missing_flows():
         {
             "time_series_id": pl.Series([], dtype=pl.String),
             "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
-            "value": pl.Series([], dtype=pl.Float32),
+            "power": pl.Series([], dtype=pl.Float32),
         }
     )
 

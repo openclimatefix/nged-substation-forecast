@@ -484,9 +484,9 @@ def test_xgboost_predict_with_lags():
     nwp_init_time = valid_time - timedelta(days=1)
     inference_nwp_init_time = nwp_init_time + timedelta(hours=4)
 
-    metadata = pl.DataFrame({"time_series_id": [1], "h3_res_5": [1]}).with_columns(
-        pl.col("time_series_id").cast(pl.Int32)
-    )
+    metadata = pl.DataFrame(
+        {"time_series_id": [1], "h3_res_5": [1], "substation_number": [1]}
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
     nwp = pl.DataFrame(
         [
             {

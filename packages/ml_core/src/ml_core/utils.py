@@ -231,9 +231,12 @@ def evaluate_and_save_model(
                 eval_df.group_by("lead_time_hours")
                 .agg(
                     [
-                        (pl.col("value") - pl.col("actual")).abs().mean().alias("MAE"),
-                        ((pl.col("value") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
-                        ((pl.col("value") - pl.col("actual")).abs() / pl.col("peak_capacity"))
+                        (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
+                        ((pl.col("power_fcst") - pl.col("actual")) ** 2)
+                        .mean()
+                        .sqrt()
+                        .alias("RMSE"),
+                        ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
                         .mean()
                         .alias("nMAE"),
                     ]
@@ -258,7 +261,7 @@ def evaluate_and_save_model(
 
                 # 2. Log global aggregate metrics
                 mae_global = eval_df.select(
-                    (pl.col("value") - pl.col("actual")).abs().mean()
+                    (pl.col("power_fcst") - pl.col("actual")).abs().mean()
                 ).item()
                 if mae_global is not None:
                     mlflow.log_metric("mean_mae_all_horizons", mae_global)
@@ -266,13 +269,15 @@ def evaluate_and_save_model(
                     mlflow.log_metric("MAE_global", mae_global)
 
                 rmse_global = eval_df.select(
-                    ((pl.col("value") - pl.col("actual")) ** 2).mean().sqrt()
+                    ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt()
                 ).item()
                 if rmse_global is not None:
                     mlflow.log_metric("RMSE_global", rmse_global)
 
                 nmae_global = eval_df.select(
-                    ((pl.col("value") - pl.col("actual")).abs() / pl.col("peak_capacity")).mean()
+                    (
+                        (pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity")
+                    ).mean()
                 ).item()
                 if nmae_global is not None:
                     mlflow.log_metric("nMAE_global", nmae_global)

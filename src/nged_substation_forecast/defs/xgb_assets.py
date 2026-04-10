@@ -13,6 +13,7 @@ from contracts.data_schemas import PowerForecast
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster
+from xgboost_forecaster.data import get_substation_metadata
 
 from .data_cleaning_assets import get_cleaned_actuals_lazy
 
@@ -244,6 +245,9 @@ def evaluate_xgboost(
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context)
 
+    # Load substation metadata
+    substation_metadata = get_substation_metadata()
+
     # If no substations are available, return an empty forecast gracefully
     if not sub_ids:
         context.log.warning(
@@ -253,6 +257,11 @@ def evaluate_xgboost(
 
     # Filter the actuals data to target substations
     substation_power_flows_filtered = substation_power_flows.filter(
+        pl.col("time_series_id").is_in(sub_ids)
+    )
+
+    # Filter metadata to target substations
+    substation_metadata_filtered = substation_metadata.filter(
         pl.col("time_series_id").is_in(sub_ids)
     )
 
@@ -267,4 +276,5 @@ def evaluate_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows_filtered,
+        time_series_metadata=substation_metadata_filtered,
     )
