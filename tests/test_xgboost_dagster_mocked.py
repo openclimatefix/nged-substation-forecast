@@ -124,13 +124,15 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
                     pl.col("substation_number").cast(pl.Int32),
                 ]
             )
+            metadata_dir = tmp_path / "parquet"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            metadata.write_parquet(metadata_dir / "time_series_metadata.parquet")
 
             model = train_xgboost(
                 context=context,
                 config=config,
                 settings=settings,
                 nwp=nwps,
-                time_series_metadata=metadata,
             )
 
             assert isinstance(model, XGBoostForecaster)
@@ -142,7 +144,6 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
                 settings=settings,
                 model=model,
                 nwp=nwps,
-                time_series_metadata=metadata,
             )
 
             assert isinstance(forecasts, pl.DataFrame)

@@ -127,7 +127,6 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
-    time_series_metadata: pl.DataFrame | None = None,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -149,10 +148,9 @@ def train_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Load time series metadata
-    if time_series_metadata is None:
-        time_series_metadata = pl.read_parquet(
-            settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-        )
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
 
     # Use get_cleaned_actuals_lazy to ensure we have the full training range.
     # This function serves as the single source of truth for accessing cleaned actuals.
@@ -186,6 +184,14 @@ def train_xgboost(
     substation_power_flows_filtered = substation_power_flows.filter(
         pl.col("time_series_id").is_in(sub_ids)
     )
+    # context.log.info(f"substation_power_flows_filtered: {substation_power_flows_filtered}")
+
+    # Filter metadata to target substations
+    time_series_metadata_filtered = time_series_metadata.filter(
+        pl.col("time_series_id").is_in(sub_ids)
+    )
+    context.log.info(f"time_series_metadata_filtered shape: {time_series_metadata_filtered.shape}")
+    context.log.info(f"sub_ids: {sub_ids}")
 
     # Option A: Train on the control member (ensemble_member == 0)
     # This avoids non-linearity issues and distribution shift.
@@ -198,7 +204,7 @@ def train_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows_filtered,
-        time_series_metadata=time_series_metadata,
+        time_series_metadata=time_series_metadata_filtered,
     )
 
 
@@ -217,7 +223,6 @@ def evaluate_xgboost(
     settings: dg.ResourceParam[Settings],
     model: XGBoostForecaster,
     nwp: pl.LazyFrame,
-    time_series_metadata: pl.DataFrame | None = None,
 ):
     """Evaluate the XGBoost model and generate forecasts.
 
@@ -251,10 +256,9 @@ def evaluate_xgboost(
     sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # Load time series metadata
-    if time_series_metadata is None:
-        time_series_metadata = pl.read_parquet(
-            settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-        )
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
 
     # If no substations are available, return an empty forecast gracefully
     if not sub_ids:
