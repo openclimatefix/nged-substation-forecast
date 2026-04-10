@@ -5,6 +5,7 @@ description = "Package for handling NGED JSON data"
 requires-python = ">=3.14"
 dependencies = [
     "polars>=1.0.0",
+    "polars-h3",
 ]
 
 [build-system]

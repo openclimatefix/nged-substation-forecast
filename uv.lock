@@ -1974,10 +1974,14 @@ version = "0.0.1"
 source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "polars" },
+    { name = "polars-h3" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "polars", specifier = ">=1.0.0" }]
+requires-dist = [
+    { name = "polars", specifier = ">=1.0.0" },
+    { name = "polars-h3" },
+]
 
 [[package]]
 name = "nged-substation-forecast"

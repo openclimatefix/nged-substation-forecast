@@ -89,23 +89,20 @@ class ProcessedNWPConfig(dg.Config):
     }
 )
 def processed_nwp_data(
-    config: ProcessedNWPConfig, all_nwp_data: pl.LazyFrame, settings: ResourceParam[Settings]
+    context: AssetExecutionContext,
+    config: ProcessedNWPConfig,
+    all_nwp_data: pl.LazyFrame,
+    settings: ResourceParam[Settings],
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
     WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
     if the input NWP data or the number of substations is very large.
     """
+    context.log.info(f"processed_nwp_data config: {config}")
+    context.log.info(f"all_nwp_data schema: {all_nwp_data.collect_schema().names()}")
     time_series_metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
     metadata = pl.read_parquet(time_series_metadata_path)
-
-    # If h3_res_5 is not populated, populate it
-    if metadata["h3_res_5"].sum() == 0:
-        import polars_h3 as plh3
-
-        metadata = metadata.with_columns(
-            h3_res_5=plh3.latlng_to_cell(pl.col("latitude"), pl.col("longitude"), 5)
-        )
 
     if config.start_date:
         all_nwp_data = all_nwp_data.filter(

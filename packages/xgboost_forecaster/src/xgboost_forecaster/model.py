@@ -456,6 +456,7 @@ class XGBoostForecaster(BaseForecaster):
                 joined_lf.select(list(set(feature_cols + ["power"]))).collect(),
             )
         log.info(f"Collected raw_df shape before dropping nulls: {raw_df.shape}")
+        log.info(f"Null counts: {raw_df.null_count()}")
         joined_df = raw_df.drop_nulls(subset=critical_cols)
 
         dropped_rows = len(raw_df) - len(joined_df)

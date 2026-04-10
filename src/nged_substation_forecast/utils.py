@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta, timezone
 import polars as pl
+from datetime import datetime, timedelta, timezone
 
 
 def scan_delta_table(delta_path: str) -> pl.LazyFrame:

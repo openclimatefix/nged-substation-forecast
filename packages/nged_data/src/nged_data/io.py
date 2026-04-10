@@ -1,5 +1,6 @@
 import polars as pl
 import patito as pt
+import polars_h3
 from pathlib import Path
 import re
 from contracts.data_schemas import TimeSeriesMetadata, PowerTimeSeries, UTC_DATETIME_DTYPE
@@ -83,6 +84,11 @@ def load_nged_json(
         metadata_df = metadata_df.with_columns(pl.col("information").cast(pl.String))
     if "area_wkt" in metadata_df.columns:
         metadata_df = metadata_df.with_columns(pl.col("area_wkt").cast(pl.String))
+
+    # Compute H3 index at resolution 5
+    metadata_df = metadata_df.with_columns(
+        polars_h3.latlng_to_cell(pl.col("latitude"), pl.col("longitude"), 5).alias("h3_res_5")
+    )
 
     # Validate the metadata DataFrame against the new TimeSeriesMetadata contract.
     metadata_df = TimeSeriesMetadata.validate(metadata_df)

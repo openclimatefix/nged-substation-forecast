@@ -159,6 +159,10 @@ class TimeSeriesMetadata(pt.Model):
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
         ),
     )
+    h3_res_5: int = pt.Field(
+        dtype=pl.UInt64,
+        description="H3 spatial index at resolution 5.",
+    )
 
 
 class PowerForecast(pt.Model):

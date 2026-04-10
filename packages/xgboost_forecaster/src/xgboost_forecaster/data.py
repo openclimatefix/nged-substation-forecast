@@ -237,7 +237,11 @@ def process_nwp_data(
     # temporal resolution (30m).
     lf = lf.with_columns(
         [
-            pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
+            pl.col(c)
+            .interpolate()
+            .forward_fill()
+            .backward_fill()
+            .over(["init_time", "h3_index", "ensemble_member"])
             for c in numeric_cols
         ]
         + [

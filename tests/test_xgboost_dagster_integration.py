@@ -104,6 +104,7 @@ def test_xgboost_dagster_integration() -> None:
         if train_start > train_end:
             pytest.skip("Calculated train_start is after train_end. Insufficient data.")
 
+        print(f"min_dt: {min_dt}, max_dt: {max_dt}")
         print(f"train_start: {train_start}, train_end: {train_end}")
         print(f"nwp_init_time: {nwp_init_time}")
         print(f"test_start: {test_start}, test_end: {test_end}")
@@ -117,7 +118,7 @@ def test_xgboost_dagster_integration() -> None:
                 "processed_nwp_data": {
                     "config": {
                         "substation_ids": time_series_ids,
-                        "start_date": str(nwp_init_time),
+                        "start_date": "2026-02-16",
                         "end_date": str(test_end),
                     }
                 },
@@ -148,6 +149,23 @@ def test_xgboost_dagster_integration() -> None:
         # standard development machine as it executes the full XGBoost pipeline
         # (data loading, cleaning, training, evaluation, and plotting).
         resources = defs.resources or {}
+
+        # Run for training partitions
+        training_partitions = []
+        for i in range((train_end - train_start).days + 1):
+            date = train_start + timedelta(days=i)
+            training_partitions.append(date.isoformat())
+
+        for partition_key in training_partitions:
+            job.execute_in_process(
+                run_config=run_config,
+                partition_key=partition_key,
+                resources={
+                    **resources,
+                    "io_manager": dg.mem_io_manager,
+                },
+                instance=instance,
+            )
 
         result = job.execute_in_process(
             run_config=run_config,

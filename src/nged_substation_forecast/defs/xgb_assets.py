@@ -153,6 +153,7 @@ def train_xgboost(
     )
 
     # Use get_cleaned_actuals_lazy to ensure we have the full training range.
+
     # This function serves as the single source of truth for accessing cleaned actuals.
     substation_power_flows = get_cleaned_actuals_lazy(settings, context)
 
