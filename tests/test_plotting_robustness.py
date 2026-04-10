@@ -14,7 +14,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
     predictions = pl.DataFrame(
         {
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
-            "substation_number": [110375],
+            "time_series_id": [110375],
             "ensemble_member": [0],
             "MW_or_MVA": [10.0],
             "nwp_init_time": [datetime(2026, 3, 1, 0, tzinfo=timezone.utc)],
@@ -27,11 +27,9 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
     # Mock cleaned_actuals with many substations
     actuals = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)] * 11,
-            "substation_number": list(range(10)) + [110375],
-            "MW": [1.0] * 11,
-            "MVA": [1.0] * 11,
-            "MW_or_MVA": [1.0] * 11,
+            "period_end_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)] * 11,
+            "time_series_id": list(range(10)) + [110375],
+            "power": [1.0] * 11,
         }
     )
     mock_get_lazy.return_value = actuals.lazy()
@@ -40,14 +38,28 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
     substation_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
+                "time_series_id": [110375],
+                "time_series_name": ["Test Substation"],
+                "time_series_type": ["Disaggregated Demand"],
+                "units": ["MW"],
+                "licence_area": ["EMids"],
                 "substation_number": [110375],
-                "substation_name_in_location_table": ["Test Substation"],
                 "substation_type": ["Primary"],
-                "preferred_power_col": ["MW"],
-                "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
+                "latitude": [52.0],
+                "longitude": [0.0],
             }
-        ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),
+        ).cast(
+            {
+                "time_series_id": pl.Int32,
+                "substation_number": pl.Int32,
+                "substation_type": pl.Categorical,
+                "time_series_type": pl.String,
+                "latitude": pl.Float32,
+                "longitude": pl.Float32,
+            }
+        ),
         allow_missing_columns=True,
+        allow_superfluous_columns=True,
     )
 
     config = PlotConfig(output_path="tests/temp_test_plot.html")
@@ -75,7 +87,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     predictions = pl.DataFrame(
         {
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
-            "substation_number": [110375],
+            "time_series_id": [110375],
             "ensemble_member": [0],
             "MW_or_MVA": [10.0],
             "nwp_init_time": [datetime(2026, 3, 1, 0, tzinfo=timezone.utc)],
@@ -85,11 +97,9 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     # Actuals at a different time
     actuals = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, 12, tzinfo=timezone.utc)],
-            "substation_number": [110375],
-            "MW": [1.0],
-            "MVA": [1.0],
-            "MW_or_MVA": [1.0],
+            "period_end_time": [datetime(2026, 1, 1, 12, tzinfo=timezone.utc)],
+            "time_series_id": [110375],
+            "power": [1.0],
         }
     )
     mock_get_lazy.return_value = actuals.lazy()
@@ -98,14 +108,28 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     substation_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
+                "time_series_id": [110375],
+                "time_series_name": ["Test Substation"],
+                "time_series_type": ["Disaggregated Demand"],
+                "units": ["MW"],
+                "licence_area": ["EMids"],
                 "substation_number": [110375],
-                "substation_name_in_location_table": ["Test Substation"],
                 "substation_type": ["Primary"],
-                "preferred_power_col": ["MW"],
-                "last_updated": [datetime(2026, 3, 1, tzinfo=timezone.utc)],
+                "latitude": [52.0],
+                "longitude": [0.0],
             }
-        ).cast({"substation_number": pl.Int32, "substation_type": pl.Categorical}),
+        ).cast(
+            {
+                "time_series_id": pl.Int32,
+                "substation_number": pl.Int32,
+                "substation_type": pl.Categorical,
+                "time_series_type": pl.String,
+                "latitude": pl.Float32,
+                "longitude": pl.Float32,
+            }
+        ),
         allow_missing_columns=True,
+        allow_superfluous_columns=True,
     )
 
     config = PlotConfig(output_path="tests/test_plot_no_overlap.html")

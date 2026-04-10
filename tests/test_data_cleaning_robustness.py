@@ -26,14 +26,14 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
 
     df = pl.DataFrame(
         {
-            "time_series_id": ["1", "1"],
+            "time_series_id": [1, 1],
             "start_time": [t1, t2],
             "period_end_time": [t1 + timedelta(minutes=30), t2 + timedelta(minutes=30)],
             "power": [10.0, 10.0],
         }
     ).with_columns(
         [
-            pl.col("time_series_id").cast(pl.String),
+            pl.col("time_series_id").cast(pl.Int32),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
             pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
             pl.col("power").cast(pl.Float32),
@@ -83,14 +83,14 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
 
     df = pl.DataFrame(
         {
-            "time_series_id": ["1"],
+            "time_series_id": [1],
             "start_time": [t1],
             "period_end_time": [t1 + timedelta(minutes=30)],
             "power": [10.0],
         }
     ).with_columns(
         [
-            pl.col("time_series_id").cast(pl.String),
+            pl.col("time_series_id").cast(pl.Int32),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
             pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
             pl.col("power").cast(pl.Float32),
@@ -115,14 +115,14 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         # Run again with different data in source for same partition
         df_new = pl.DataFrame(
             {
-                "time_series_id": ["1"],
+                "time_series_id": [1],
                 "start_time": [t1],
                 "period_end_time": [t1 + timedelta(minutes=30)],
                 "power": [20.0],
             }
         ).with_columns(
             [
-                pl.col("time_series_id").cast(pl.String),
+                pl.col("time_series_id").cast(pl.Int32),
                 pl.col("start_time").cast(UTC_DATETIME_DTYPE),
                 pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
                 pl.col("power").cast(pl.Float32),

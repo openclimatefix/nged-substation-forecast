@@ -56,15 +56,6 @@ def forecast_vs_actual_plot(
         cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_substations)).collect(),
     )
 
-    # Keep actuals lazy and filter by substation first to avoid eager collection.
-    cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
-
-    # Filter actuals by substation.
-    actuals_30m = cast(
-        pl.DataFrame,
-        cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)).collect(),
-    )
-
     if actuals_30m.is_empty():
         context.log.warning("No actuals found for the predicted substations, skipping plot.")
         return
@@ -72,7 +63,7 @@ def forecast_vs_actual_plot(
     # Calculate target_init_time = max_actual_time - 14 days.
     # We select the latest nwp_init_time that is <= max_actual_time - 14 days to guarantee
     # that the entire 14-day forecast horizon has corresponding actuals for comparison.
-    max_actual_time = cast(datetime, actuals_30m.get_column("timestamp").max())
+    max_actual_time = cast(datetime, actuals_30m.get_column("period_end_time").max())
     target_init_time = max_actual_time - timedelta(days=14)
 
     # Select chosen_init_time: max nwp_init_time <= target_init_time
@@ -92,12 +83,14 @@ def forecast_vs_actual_plot(
             f"Falling back to earliest available: {chosen_init_time}"
         )
 
-    latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
+    latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time).rename(
+        {"valid_time": "period_end_time"}
+    )
 
     # Join predictions with actuals. We use a 'left' join with latest_predictions
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
-    eval_df = pl.DataFrame(latest_predictions).join(
+    eval_df = latest_predictions.join(
         actuals_30m.rename({"power": "actual"}),
         on=["period_end_time", "time_series_id"],
         how="left",
