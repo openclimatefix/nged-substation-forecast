@@ -40,6 +40,8 @@ def load_nged_json(
     metadata_df = metadata_df.rename({col: camel_to_snake(col) for col in metadata_df.columns})
 
     # Cast columns to match TimeSeriesMetadata contract
+    if "time_series_id" in metadata_df.columns:
+        metadata_df = metadata_df.with_columns(pl.col("time_series_id").cast(pl.Int32))
     if "substation_number" in metadata_df.columns:
         metadata_df = metadata_df.with_columns(pl.col("substation_number").cast(pl.Int32))
     if "substation_type" in metadata_df.columns:
@@ -59,31 +61,38 @@ def load_nged_json(
     if time_series_df["data"].dtype == pl.Null:
         empty_df = pl.DataFrame(
             schema={
-                "time_series_id": pl.String,
-                "end_time": UTC_DATETIME_DTYPE,
-                "value": pl.Float32,
+                "time_series_id": pl.Int32,
+                "period_end_time": UTC_DATETIME_DTYPE,
+                "power": pl.Float32,
             }
         )
         return metadata_df, pt.DataFrame[PowerTimeSeries](empty_df)
 
     time_series_df = time_series_df.unnest("data")
 
-    # Rename endTime to end_time and parse it as a UTC datetime.
-    time_series_df = time_series_df.rename({"endTime": "end_time"})
+    # Rename endTime to period_end_time and parse it as a UTC datetime.
+    time_series_df = time_series_df.rename({"endTime": "period_end_time"})
     time_series_df = time_series_df.with_columns(
-        pl.col("end_time").str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ").dt.replace_time_zone("UTC")
+        pl.col("period_end_time")
+        .str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ")
+        .dt.replace_time_zone("UTC")
     )
 
     # Add the time_series_id from the metadata to the time_series_df.
     # Assuming metadata_df has only one row, which is the time_series_id.
     time_series_id = metadata_df["time_series_id"].item()
-    time_series_df = time_series_df.with_columns(pl.lit(time_series_id).alias("time_series_id"))
+    time_series_df = time_series_df.with_columns(
+        pl.lit(time_series_id).cast(pl.Int32).alias("time_series_id")
+    )
 
-    # Select only the required columns: ["time_series_id", "end_time", "value"].
-    time_series_df = time_series_df.select(["time_series_id", "end_time", "value"])
+    # Rename value to power
+    time_series_df = time_series_df.rename({"value": "power"})
 
-    # Cast value to Float32
-    time_series_df = time_series_df.with_columns(pl.col("value").cast(pl.Float32))
+    # Select only the required columns: ["time_series_id", "period_end_time", "power"].
+    time_series_df = time_series_df.select(["time_series_id", "period_end_time", "power"])
+
+    # Cast power to Float32
+    time_series_df = time_series_df.with_columns(pl.col("power").cast(pl.Float32))
 
     # Validate the time series against the PowerTimeSeries data contract.
     time_series_df = PowerTimeSeries.validate(time_series_df)

@@ -8,13 +8,14 @@ def test_clean_power_data():
     # Create dummy data
     start_time = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
     data = {
-        "time_series_id": ["1"] * 48,
-        "end_time": [start_time + timedelta(hours=i) for i in range(48)],
-        "value": [1.0] * 48,  # Constant (variance 0)
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0] * 48,  # Constant (variance 0)
     }
     df = pl.DataFrame(data).with_columns(
-        pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
-        pl.col("value").cast(pl.Float32),
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
     )
 
     # Test with variance threshold 0.1
@@ -26,26 +27,28 @@ def test_clean_power_data():
 
     # Test with data that should be kept
     data_keep = {
-        "time_series_id": ["1"] * 48,
-        "end_time": [start_time + timedelta(hours=i) for i in range(48)],
-        "value": [1.0, 2.0] * 24,  # Day 1: variance > 0, Day 2: variance > 0
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0, 2.0] * 24,  # Day 1: variance > 0, Day 2: variance > 0
     }
     df_keep = pl.DataFrame(data_keep).with_columns(
-        pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
-        pl.col("value").cast(pl.Float32),
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
     )
     cleaned_df = clean_power_data(df_keep, default_threshold=0.1)
     assert len(cleaned_df) == 47
 
     # Test with null values
     data_null = {
-        "time_series_id": ["1"] * 48,
-        "end_time": [start_time + timedelta(hours=i) for i in range(48)],
-        "value": [1.0, 2.0] * 23 + [None, None],
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0, 2.0] * 23 + [None, None],
     }
     df_null = pl.DataFrame(data_null).with_columns(
-        pl.col("end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
-        pl.col("value").cast(pl.Float32),
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
     )
     cleaned_df_null = clean_power_data(df_null, default_threshold=0.1)
     assert len(cleaned_df_null) == 45

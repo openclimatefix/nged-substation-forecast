@@ -5,16 +5,16 @@ from contracts.data_schemas import PowerTimeSeries
 
 
 def sort_data(df: pl.DataFrame) -> pl.DataFrame:
-    """Sorts the DataFrame by 'end_time'."""
-    return df.sort("end_time")
+    """Sorts the DataFrame by 'period_end_time'."""
+    return df.sort("period_end_time")
 
 
 def calculate_rolling_variance(df: pl.DataFrame) -> pl.DataFrame:
     """Calculates rolling variance over a 6-hour window."""
-    rolling_df = df.rolling(index_column="end_time", period="6h").agg(
-        rolling_variance=pl.col("value").var()
+    rolling_df = df.rolling(index_column="period_end_time", period="6h").agg(
+        rolling_variance=pl.col("power").var()
     )
-    return df.join(rolling_df, on="end_time")
+    return df.join(rolling_df, on="period_end_time")
 
 
 def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
@@ -34,7 +34,7 @@ def clean_power_data(
     df = sort_data(df)
 
     # 2. Drop initial nulls
-    df = df.drop_nulls(subset=["value"])
+    df = df.drop_nulls(subset=["power"])
     if df.is_empty():
         raise ValueError("All rows were removed after dropping nulls.")
 
@@ -52,16 +52,16 @@ def clean_power_data(
     if valid_rows.is_empty():
         raise ValueError("All rows were removed after filtering by variance threshold.")
 
-    first_valid_time = valid_rows.select("end_time").min().item()
+    first_valid_time = valid_rows.select("period_end_time").min().item()
 
     # Slice the DataFrame from that index onwards.
-    df = df.filter(pl.col("end_time") >= first_valid_time)
+    df = df.filter(pl.col("period_end_time") >= first_valid_time)
 
     # Drop the rolling_variance column
     df = df.drop("rolling_variance")
 
     # Drop nulls again
-    df = df.with_columns(value=pl.col("value").fill_nan(None)).drop_nulls(subset=["value"])
+    df = df.with_columns(power=pl.col("power").fill_nan(None)).drop_nulls(subset=["power"])
     dagster.get_dagster_logger().info(f"DF after dropping nulls: {df}")
 
     # 4. Validate

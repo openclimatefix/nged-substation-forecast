@@ -27,11 +27,9 @@ def test_append_to_delta_new_table(tmp_path: Path, mock_write_deltalake):
     df = pt.DataFrame[PowerTimeSeries](
         pl.DataFrame(
             {
-                "time_series_id": ["1"],
-                "end_time": [datetime(2026, 1, 1)],
-                "MW": [10.0],
-                "MVA": [12.0],
-                "MVAr": [1.0],
+                "time_series_id": [1],
+                "period_end_time": [datetime(2026, 1, 1)],
+                "power": [10.0],
             }
         )
     )
@@ -52,8 +50,8 @@ def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_w
     mock_dt = mock_delta_table.return_value
     mock_dt.to_pyarrow_table.return_value = pl.DataFrame(
         {
-            "time_series_id": ["1"],
-            "end_time": [datetime(2026, 1, 1)],
+            "time_series_id": [1],
+            "period_end_time": [datetime(2026, 1, 1)],
         }
     ).to_arrow()
 
@@ -61,18 +59,16 @@ def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_w
     df = pt.DataFrame[PowerTimeSeries](
         pl.DataFrame(
             {
-                "time_series_id": ["1", "2"],
-                "end_time": [datetime(2026, 1, 1), datetime(2026, 1, 2)],
-                "MW": [10.0, 20.0],
-                "MVA": [12.0, 22.0],
-                "MVAr": [1.0, 2.0],
+                "time_series_id": [1, 2],
+                "period_end_time": [datetime(2026, 1, 1), datetime(2026, 1, 2)],
+                "power": [10.0, 20.0],
             }
         )
     )
 
     append_to_delta(df, delta_path)
 
-    # Should have called write_deltalake with only the new data (time_series_id="2")
+    # Should have called write_deltalake with only the new data (time_series_id=2)
     mock_write_deltalake.assert_called_once()
     args, kwargs = mock_write_deltalake.call_args
     assert args[0] == delta_path
@@ -83,4 +79,4 @@ def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_w
     assert len(written_df) == 1
     from typing import cast
 
-    assert cast(pl.DataFrame, written_df).item(0, "time_series_id") == "2"
+    assert cast(pl.DataFrame, written_df).item(0, "time_series_id") == 2

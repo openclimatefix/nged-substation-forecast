@@ -7,7 +7,7 @@ from contracts.data_schemas import PowerTimeSeries
 
 def append_to_delta(df: pt.DataFrame[PowerTimeSeries], delta_path: Path):
     """
-    Appends data to a Delta table, ensuring no duplicates based on (time_series_id, end_time).
+    Appends data to a Delta table, ensuring no duplicates based on (time_series_id, period_end_time).
 
     Args:
         df: The Patito DataFrame to append.
@@ -25,20 +25,22 @@ def append_to_delta(df: pt.DataFrame[PowerTimeSeries], delta_path: Path):
         return
 
     # If it exists, we need to merge.
-    # To avoid duplicates, we filter out existing (time_series_id, end_time) pairs.
+    # To avoid duplicates, we filter out existing (time_series_id, period_end_time) pairs.
 
     # Load the existing Delta table
     dt = DeltaTable(str(delta_path))
 
     # Read existing keys to identify duplicates
-    existing_keys = pl.from_arrow(dt.to_pyarrow_table(columns=["time_series_id", "end_time"]))
+    existing_keys = pl.from_arrow(
+        dt.to_pyarrow_table(columns=["time_series_id", "period_end_time"])
+    )
 
     # Ensure existing_keys is a DataFrame
     if isinstance(existing_keys, pl.Series):
         existing_keys = existing_keys.to_frame()
 
     # Filter new data to only include rows not already in the Delta table
-    new_data = df.join(existing_keys, on=["time_series_id", "end_time"], how="anti")
+    new_data = df.join(existing_keys, on=["time_series_id", "period_end_time"], how="anti")
 
     if len(new_data) > 0:
         write_deltalake(

@@ -7,7 +7,7 @@ from nged_json_data.io import load_nged_json
 def test_load_nged_json_valid(tmp_path: Path):
     # Create a dummy JSON file
     data = {
-        "TimeSeriesID": "test_id",
+        "TimeSeriesID": 123,
         "SubstationNumber": 123,
         "SubstationType": "primary",
         "Latitude": 51.0,
@@ -24,20 +24,20 @@ def test_load_nged_json_valid(tmp_path: Path):
     metadata_df, time_series_df = load_nged_json(file_path)
 
     assert "time_series_id" in metadata_df.columns
-    assert metadata_df["time_series_id"][0] == "test_id"
+    assert metadata_df["time_series_id"][0] == 123
     assert len(metadata_df) == 1
 
     assert "time_series_id" in time_series_df.columns
-    assert "end_time" in time_series_df.columns
-    assert "value" in time_series_df.columns
+    assert "period_end_time" in time_series_df.columns
+    assert "power" in time_series_df.columns
     assert len(time_series_df) == 2
-    assert time_series_df["value"][0] == 10.0
+    assert time_series_df["power"][0] == 10.0
 
 
 def test_load_nged_json_empty_data(tmp_path: Path):
     # Create a dummy JSON file with empty data
     data = {
-        "TimeSeriesID": "test_id",
+        "TimeSeriesID": 123,
         "SubstationNumber": 123,
         "SubstationType": "primary",
         "Latitude": 51.0,
@@ -52,7 +52,7 @@ def test_load_nged_json_empty_data(tmp_path: Path):
 
     assert len(metadata_df) == 1
     assert len(time_series_df) == 0
-    assert set(time_series_df.columns) == {"time_series_id", "end_time", "value"}
+    assert set(time_series_df.columns) == {"time_series_id", "period_end_time", "power"}
 
 
 def test_load_nged_json_missing_file():
