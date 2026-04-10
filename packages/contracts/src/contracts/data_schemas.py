@@ -17,10 +17,12 @@ UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
 
 class PowerTimeSeries(pt.Model):
-    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
     time_series_id: int = pt.Field(dtype=pl.Int32)
     # period_end_time represents the end of the 30-minute settlement period.
-    period_end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    period_end_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description="The end time of the 30-minute period. Note that all the JSON time series data is already 30-minutely.",
+    )
     power: float | None = pt.Field(dtype=pl.Float32)
 
     @classmethod
@@ -133,22 +135,25 @@ class TimeSeriesMetadata(pt.Model):
         allow_missing=True,
         description="Always None in the trial area",
     )
-    area_wkt: str = pt.Field(
+    area_wkt: str | None = pt.Field(
         dtype=pl.String,
+        allow_missing=True,
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
             " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
         ),
     )
-    area_center_lat: float = pt.Field(
+    area_center_lat: float | None = pt.Field(
         dtype=pl.Float32,
+        allow_missing=True,
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
         ),
     )
-    area_center_lon: float = pt.Field(
+    area_center_lon: float | None = pt.Field(
         dtype=pl.Float32,
+        allow_missing=True,
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
         ),

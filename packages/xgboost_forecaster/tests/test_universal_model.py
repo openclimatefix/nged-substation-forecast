@@ -59,9 +59,8 @@ def test_universal_training_data_integrity():
         flows_data.append(
             {
                 "time_series_id": time_series_id,
-                "start_time": valid_time - timedelta(minutes=30),
                 "period_end_time": valid_time,
-                "value": 10.0,
+                "power": 10.0,
             }
         )
     flows_lf = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
@@ -370,9 +369,8 @@ def test_lookahead_audit():
             flows_data.append(
                 {
                     "time_series_id": 1,
-                    "start_time": valid_time - timedelta(minutes=30),
                     "period_end_time": valid_time,
-                    "value": target,
+                    "power": target,
                 }
             )
 

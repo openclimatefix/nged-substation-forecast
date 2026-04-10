@@ -44,10 +44,9 @@ def test_xgboost_forecaster_train_and_predict():
     sub_flows = (
         pt.DataFrame[PowerTimeSeries](
             {
-                "start_time": timestamps - timedelta(minutes=30),
                 "period_end_time": timestamps,
                 "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
-                "value": [10.0] * len(timestamps),
+                "power": [10.0] * len(timestamps),
             }
         )
         .lazy()
@@ -133,10 +132,9 @@ def test_xgboost_forecaster_train_and_predict():
     sub_flows = (
         pt.DataFrame[PowerTimeSeries](
             {
-                "start_time": timestamps - timedelta(minutes=30),
                 "period_end_time": timestamps,
                 "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
-                "value": [10.0] * len(timestamps),
+                "power": [10.0] * len(timestamps),
             }
         )
         .lazy()
@@ -288,10 +286,9 @@ def test_xgboost_forecaster_predict_empty():
     sub_flows = (
         pt.DataFrame[PowerTimeSeries](
             {
-                "start_time": timestamps - timedelta(minutes=30),
                 "period_end_time": timestamps,
                 "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
-                "value": [10.0] * len(timestamps),
+                "power": [10.0] * len(timestamps),
             }
         )
         .lazy()
@@ -377,10 +374,9 @@ def test_xgboost_forecaster_predict_empty():
     sub_flows = (
         pt.DataFrame[PowerTimeSeries](
             {
-                "start_time": timestamps - timedelta(minutes=30),
                 "period_end_time": timestamps,
                 "time_series_id": pl.Series([1] * len(timestamps), dtype=pl.Int32),
-                "value": [10.0] * len(timestamps),
+                "power": [10.0] * len(timestamps),
             }
         )
         .lazy()

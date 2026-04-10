@@ -36,8 +36,24 @@ def load_nged_json(
     # This assumes that all columns other than 'data' are metadata.
     metadata_df = df.drop("data")
 
+    # If 'Area' struct exists, unnest it
+    if "Area" in metadata_df.columns:
+        metadata_df = metadata_df.unnest("Area")
+
     # Convert metadata keys from CamelCase to snake_case
     metadata_df = metadata_df.rename({col: camel_to_snake(col) for col in metadata_df.columns})
+
+    # Rename area fields if they exist
+    rename_map = {}
+    if "wkt" in metadata_df.columns:
+        rename_map["wkt"] = "area_wkt"
+    if "center_lat" in metadata_df.columns:
+        rename_map["center_lat"] = "area_center_lat"
+    if "center_lon" in metadata_df.columns:
+        rename_map["center_lon"] = "area_center_lon"
+
+    if rename_map:
+        metadata_df = metadata_df.rename(rename_map)
 
     # Cast columns to match TimeSeriesMetadata contract
     if "time_series_id" in metadata_df.columns:
@@ -50,6 +66,10 @@ def load_nged_json(
         metadata_df = metadata_df.with_columns(pl.col("latitude").cast(pl.Float32))
     if "longitude" in metadata_df.columns:
         metadata_df = metadata_df.with_columns(pl.col("longitude").cast(pl.Float32))
+    if "area_center_lat" in metadata_df.columns:
+        metadata_df = metadata_df.with_columns(pl.col("area_center_lat").cast(pl.Float32))
+    if "area_center_lon" in metadata_df.columns:
+        metadata_df = metadata_df.with_columns(pl.col("area_center_lon").cast(pl.Float32))
 
     # Validate the metadata DataFrame against the new TimeSeriesMetadata contract.
     metadata_df = TimeSeriesMetadata.validate(metadata_df)
