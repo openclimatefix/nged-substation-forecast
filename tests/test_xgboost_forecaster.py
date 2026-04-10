@@ -322,18 +322,17 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
         with patch(
             "src.nged_substation_forecast.defs.xgb_assets.train_and_log_model"
         ) as mock_train:
-            metadata = pl.DataFrame(
-                {
-                    "time_series_id": ["123"],
-                    "h3_res_5": [1],
-                }
+            train_xgboost(
+                context=context,
+                config=config,
+                settings=settings,
+                nwp=nwp,
             )
             train_xgboost(
                 context=context,
                 config=config,
                 settings=settings,
                 nwp=nwp,
-                time_series_metadata=metadata,
             )
 
             # Check the nwp passed to train_and_log_model
