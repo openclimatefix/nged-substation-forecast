@@ -82,8 +82,8 @@ def train_and_log_model(
         if "substation_power_flows" in sliced_data:
             flows = sliced_data.pop("substation_power_flows")
 
-            flows_30m = flows
-            sliced_data["flows_30m"] = flows_30m
+            power_time_series = flows
+            sliced_data["power_time_series"] = power_time_series
 
     model = trainer.train(config=config.model, **sliced_data)
 
@@ -165,18 +165,18 @@ def evaluate_and_save_model(
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
 
-        flows_30m = flows
-        sliced_data["flows_30m"] = flows_30m
+        power_time_series = flows
+        sliced_data["power_time_series"] = power_time_series
 
     results_df = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     )
 
     # 3. Calculate Metrics per lead_time
-    if "flows_30m" in sliced_data:
+    if "power_time_series" in sliced_data:
         actuals = cast(
             pl.DataFrame,
-            sliced_data["flows_30m"].collect(),
+            sliced_data["power_time_series"].collect(),
         )
 
         # Join predictions with actuals

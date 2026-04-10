@@ -54,7 +54,7 @@ def test_xgboost_forecaster_train_and_predict():
     )
 
     # Centralized data preparation
-    flows_30m = sub_flows
+    power_time_series = sub_flows
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -116,7 +116,7 @@ def test_xgboost_forecaster_train_and_predict():
     # Train
     forecaster.train(
         config=config,
-        flows_30m=flows_30m,
+        power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
         nwps=nwps,
     )
@@ -142,7 +142,7 @@ def test_xgboost_forecaster_train_and_predict():
     )
 
     # Centralized data preparation
-    flows_30m = sub_flows
+    power_time_series = sub_flows
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -204,7 +204,7 @@ def test_xgboost_forecaster_train_and_predict():
     # Train
     forecaster.train(
         config=config,
-        flows_30m=flows_30m,
+        power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
         nwps=nwps,
     )
@@ -252,7 +252,7 @@ def test_xgboost_forecaster_train_and_predict():
         time_series_metadata=time_series_metadata,
         inference_params=inference_params,
         nwps=predict_nwps,
-        flows_30m=flows_30m,
+        power_time_series=power_time_series,
     )
 
     assert len(preds) == len(predict_timestamps)
@@ -296,7 +296,7 @@ def test_xgboost_forecaster_predict_empty():
     )
 
     # Centralized data preparation
-    flows_30m = sub_flows
+    power_time_series = sub_flows
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -358,7 +358,7 @@ def test_xgboost_forecaster_predict_empty():
     # Train
     forecaster.train(
         config=config,
-        flows_30m=flows_30m,
+        power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
         nwps=nwps,
     )
@@ -384,7 +384,7 @@ def test_xgboost_forecaster_predict_empty():
     )
 
     # Centralized data preparation
-    flows_30m = sub_flows
+    power_time_series = sub_flows
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -446,7 +446,7 @@ def test_xgboost_forecaster_predict_empty():
     # Train
     forecaster.train(
         config=config,
-        flows_30m=flows_30m,
+        power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
         nwps=nwps,
     )
@@ -485,7 +485,7 @@ def test_xgboost_forecaster_predict_empty():
             time_series_metadata=time_series_metadata,
             inference_params=inference_params,
             nwps=predict_nwps,
-            flows_30m=flows_30m,
+            power_time_series=power_time_series,
         )
 
 

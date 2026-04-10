@@ -11,7 +11,9 @@ log = logging.getLogger(__name__)
 
 
 def add_autoregressive_lags(
-    df: pl.LazyFrame, flows_30m: pt.LazyFrame[PowerTimeSeries], telemetry_delay_hours: int = 24
+    df: pl.LazyFrame,
+    power_time_series: pt.LazyFrame[PowerTimeSeries],
+    telemetry_delay_hours: int = 24,
 ) -> pl.LazyFrame:
     """Add autoregressive lags to the feature matrix.
 
@@ -21,7 +23,7 @@ def add_autoregressive_lags(
 
     Args:
         df: The input LazyFrame (schema: XGBoostInputFeatures).
-        flows_30m: Historical power flows at 30m resolution.
+        power_time_series: Historical power flows at 30m resolution.
         telemetry_delay_hours: Delay in hours for telemetry availability.
 
     Returns:
@@ -47,9 +49,9 @@ def add_autoregressive_lags(
         )
     )
 
-    # 2. Join flows_30m on ["time_series_id", "target_lag_time"] to extract the exact
+    # 2. Join power_time_series on ["time_series_id", "target_lag_time"] to extract the exact
     # latest_available_weekly_power_lag without needing pre-calculated lag_7d or lag_14d columns.
-    lag_df = flows_30m.select(
+    lag_df = power_time_series.select(
         pl.col("time_series_id"),
         pl.col("period_end_time").alias("target_lag_time"),
         pl.col("power").alias("latest_available_weekly_power_lag"),

@@ -37,7 +37,7 @@ class LocalForecasters(BaseForecaster):
     def train(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> "LocalForecasters":
@@ -45,7 +45,7 @@ class LocalForecasters(BaseForecaster):
 
         Args:
             config: Model configuration object.
-            flows_30m: Historical power flow data at 30m resolution.
+            power_time_series: Historical power flow data at 30m resolution.
             time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -59,13 +59,13 @@ class LocalForecasters(BaseForecaster):
         for ts_id in time_series_ids:
             log.debug(f"Training model for time series {ts_id}")
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
-            ts_flows = flows_30m.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = power_time_series.filter(pl.col("time_series_id") == ts_id)
 
             # Instantiate and train
             model = self.forecaster_cls(**self.forecaster_kwargs)
             model.train(
                 config=config,
-                flows_30m=ts_flows,
+                power_time_series=ts_flows,
                 time_series_metadata=ts_meta,
                 nwps=nwps,
             )
@@ -77,7 +77,7 @@ class LocalForecasters(BaseForecaster):
         self,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
@@ -86,7 +86,7 @@ class LocalForecasters(BaseForecaster):
         Args:
             time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
-            flows_30m: Historical power flow data at 30m resolution (for lags).
+            power_time_series: Historical power flow data at 30m resolution (for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 
@@ -104,12 +104,12 @@ class LocalForecasters(BaseForecaster):
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
 
             # Filter inputs
-            ts_flows = flows_30m.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = power_time_series.filter(pl.col("time_series_id") == ts_id)
 
             preds = self.models[ts_id].predict(
                 time_series_metadata=ts_meta,
                 inference_params=inference_params,
-                flows_30m=ts_flows,
+                power_time_series=ts_flows,
                 nwps=nwps,
                 collapse_lead_times=collapse_lead_times,
             )

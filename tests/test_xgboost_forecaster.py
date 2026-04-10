@@ -269,12 +269,12 @@ def test_prepare_training_data_prevents_row_explosion():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
+    power_time_series = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -445,12 +445,12 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
+    power_time_series = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
@@ -523,7 +523,7 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     # Centralized data preparation
-    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
+    power_time_series = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     forecaster = XGBoostForecaster()
 
@@ -551,7 +551,7 @@ def test_xgboost_predict_with_lags():
         time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
         inference_params=inference_params,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-        flows_30m=cast(pt.LazyFrame, flows_30m),
+        power_time_series=cast(pt.LazyFrame, power_time_series),
     )
 
     assert len(preds) == 1

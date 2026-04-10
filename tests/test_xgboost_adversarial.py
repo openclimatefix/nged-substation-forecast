@@ -73,14 +73,14 @@ def test_train_handles_missing_init_time():
     )
 
     # Centralized data preparation
-    flows_30m = flows.lazy()
+    power_time_series = flows.lazy()
 
     # This should no longer raise ColumnNotFoundError for init_time
     # It might fail later due to missing features in the mock setup, but not on init_time
     try:
         forecaster.train(
             config=config,
-            flows_30m=flows_30m,
+            power_time_series=power_time_series,
             time_series_metadata=metadata,
             nwps={},
         )
@@ -181,13 +181,13 @@ def test_predict_with_missing_feature_column_fails_loudly():
             "time_series_id": ["1"],
         }
     ).lazy()
-    flows_30m = flows
+    power_time_series = flows
 
     # This should fail because feature_a and feature_b are missing from the prepared data
     with pytest.raises(pl_exc.ColumnNotFoundError):
         forecaster.predict(
             time_series_metadata=metadata,
             inference_params=inference_params,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         )

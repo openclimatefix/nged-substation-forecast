@@ -199,7 +199,7 @@ class XGBoostForecaster(BaseForecaster):
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_training_data(
         self,
-        flows_30m: pt.LazyFrame[PowerTimeSeries],
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         metadata_lf: pl.LazyFrame,
         combined_nwps_lf: pl.LazyFrame | None = None,
     ) -> pl.LazyFrame:
@@ -209,7 +209,7 @@ class XGBoostForecaster(BaseForecaster):
         substation metadata and NWP forecasts.
 
         Args:
-            flows_30m: Historical power flows at 30m resolution.
+            power_time_series: Historical power flows at 30m resolution.
             metadata_lf: Substation metadata.
             combined_nwps_lf: Combined NWP forecasts.
 
@@ -217,7 +217,7 @@ class XGBoostForecaster(BaseForecaster):
             A LazyFrame containing the joined training data.
         """
         df_lf = (
-            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME})
+            power_time_series.rename({"period_end_time": NwpColumns.VALID_TIME})
             .join(
                 metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                 on="time_series_id",
@@ -275,7 +275,7 @@ class XGBoostForecaster(BaseForecaster):
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _prepare_data_for_model(
         self,
-        flows_30m: pt.LazyFrame[PowerTimeSeries],
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         inference_params: InferenceParams | None = None,
@@ -284,7 +284,7 @@ class XGBoostForecaster(BaseForecaster):
         """Prepares data for training or prediction.
 
         Args:
-            flows_30m: Historical power flows at 30m resolution.
+            power_time_series: Historical power flows at 30m resolution.
             time_series_metadata: Time series metadata.
             nwps: Dictionary of NWP data.
             inference_params: Inference parameters (only for prediction).
@@ -298,7 +298,7 @@ class XGBoostForecaster(BaseForecaster):
         ).lazy()
 
         # Calculate peak capacity
-        peak_capacity_df = calculate_peak_capacity(flows_30m)
+        peak_capacity_df = calculate_peak_capacity(power_time_series)
         peak_capacity_lf = peak_capacity_df.lazy()
 
         # 1. Prepare NWPs and join
@@ -318,7 +318,7 @@ class XGBoostForecaster(BaseForecaster):
 
         if is_training:
             df_lf = self._prepare_training_data(
-                flows_30m,
+                power_time_series,
                 metadata_lf,
                 combined_nwps_lf,
             )
@@ -336,7 +336,7 @@ class XGBoostForecaster(BaseForecaster):
         telemetry_delay_hours = self.config.telemetry_delay_hours if hasattr(self, "config") else 24
         df_lf = add_autoregressive_lags(
             df_lf,
-            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             telemetry_delay_hours=telemetry_delay_hours,
         )
 
@@ -381,7 +381,7 @@ class XGBoostForecaster(BaseForecaster):
     def train(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ) -> "XGBoostForecaster":
@@ -389,7 +389,7 @@ class XGBoostForecaster(BaseForecaster):
 
         Args:
             config: The model configuration object.
-            flows_30m: Historical power flow data downsampled to 30m.
+            power_time_series: Historical power flow data downsampled to 30m.
             time_series_metadata: The time series metadata containing h3 mapping.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -402,10 +402,10 @@ class XGBoostForecaster(BaseForecaster):
         # Log input data info
         # Note: We don't collect the full LazyFrames here to avoid OOM,
         # just logging their presence and schema.
-        log.info(f"Input flows_30m columns: {flows_30m.collect_schema().names()}")
-        # Log the range of timestamps in flows_30m
+        log.info(f"Input power_time_series columns: {power_time_series.collect_schema().names()}")
+        # Log the range of timestamps in power_time_series
         log.info(
-            f"flows_30m range: {cast(pl.DataFrame, flows_30m.select(pl.col('period_end_time').min().alias('min'), pl.col('period_end_time').max().alias('max')).collect())}"
+            f"power_time_series range: {cast(pl.DataFrame, power_time_series.select(pl.col('period_end_time').min().alias('min'), pl.col('period_end_time').max().alias('max')).collect())}"
         )
         if nwps:
             for name, lf in nwps.items():
@@ -419,7 +419,7 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("Model config requires NWPs, but none were provided.")
 
         joined_lf = self._prepare_data_for_model(
-            flows_30m=cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=time_series_metadata,
             nwps=nwps,
         )
@@ -506,7 +506,7 @@ class XGBoostForecaster(BaseForecaster):
         self,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
@@ -515,7 +515,7 @@ class XGBoostForecaster(BaseForecaster):
         Args:
             time_series_metadata: The time series metadata containing h3 mapping.
             inference_params: Parameters for inference.
-            flows_30m: Historical power flow data downsampled to 30m (for lags).
+            power_time_series: Historical power flow data downsampled to 30m (for lags).
             nwps: A dictionary of weather forecast lazyframes.
             collapse_lead_times: Whether to collapse lead times to simulate real-time inference by keeping only the latest available NWP forecast for each valid time.
 
@@ -529,7 +529,7 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
         df_lf = self._prepare_data_for_model(
-            flows_30m=cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=time_series_metadata,
             nwps=nwps,
             inference_params=inference_params,

@@ -159,12 +159,12 @@ def test_xgboost_forecaster_train_with_nans():
 
     # Centralized data preparation
 
-    flows_30m = flows
+    power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
@@ -244,12 +244,12 @@ def test_xgboost_forecaster_train_with_infs():
 
     # Centralized data preparation
 
-    flows_30m = flows
+    power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
@@ -324,7 +324,7 @@ def test_xgboost_forecaster_predict_with_nans():
     )
     # Centralized data preparation
 
-    flows_30m = flows
+    power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.predict(
@@ -334,7 +334,7 @@ def test_xgboost_forecaster_predict_with_nans():
             ),
             inference_params=inference_params,
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
         )
 
 
@@ -413,14 +413,14 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
 
     # Centralized data preparation
 
-    flows_30m = flows
+    power_time_series = flows
 
     with pytest.raises(
         ValueError, match="No training data remaining after dropping nulls in critical columns."
     ):
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
@@ -468,12 +468,12 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
 
     # Centralized data preparation
 
-    flows_30m = flows
+    power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.train(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
+            power_time_series=cast(pt.LazyFrame, power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,

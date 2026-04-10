@@ -98,7 +98,7 @@ def test_universal_training_data_integrity():
     nwps = {NwpModel.ECMWF_ENS_0_25DEG: nwps_lf}
 
     prepared_lf = forecaster._prepare_data_for_model(
-        flows_30m=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
         time_series_metadata=metadata,
         nwps=nwps,
     )
@@ -183,7 +183,7 @@ def test_mlflow_metric_thinning():
     )
     forecaster.predict.return_value = results_df
 
-    # Mock flows_30m
+    # Mock power_time_series
     flows_data = []
     for lt in lead_times:
         flows_data.append(
@@ -194,7 +194,9 @@ def test_mlflow_metric_thinning():
                 "power": 11.0,  # Constant error of 1.0
             }
         )
-    flows_30m = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
+    power_time_series = pl.LazyFrame(flows_data).with_columns(
+        pl.col("time_series_id").cast(pl.Int32)
+    )
 
     config = TrainingConfig(
         data_split=DataSplitConfig(
@@ -223,7 +225,7 @@ def test_mlflow_metric_thinning():
             model_name="test_model",
             forecaster=forecaster,
             config=config,
-            substation_power_flows=flows_30m,
+            substation_power_flows=power_time_series,
         )
 
         # Check logged metrics
@@ -269,7 +271,7 @@ def test_autoregressive_lag_consistency():
     ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Empty flows for lag calculation (we only care about target_lag_time)
-    flows_30m = pl.LazyFrame(
+    power_time_series = pl.LazyFrame(
         {
             "time_series_id": pl.Series([], dtype=pl.Int32),
             "start_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
@@ -283,7 +285,7 @@ def test_autoregressive_lag_consistency():
         pl.DataFrame,
         add_autoregressive_lags(
             df,
-            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
@@ -416,7 +418,7 @@ def test_lookahead_audit():
     # Train the model
     forecaster.train(
         config=config,
-        flows_30m=flows_lf,
+        power_time_series=flows_lf,
         time_series_metadata=metadata,
         nwps=nwps,
     )
@@ -439,7 +441,7 @@ def test_lookahead_audit():
     # Add a feature that IS future data, and verify it's NOT in the final feature matrix.
 
     prepared_lf = forecaster._prepare_data_for_model(
-        flows_30m=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
         time_series_metadata=metadata,
         nwps=nwps,
     )

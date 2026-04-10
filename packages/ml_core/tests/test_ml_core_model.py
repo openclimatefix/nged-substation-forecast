@@ -25,7 +25,7 @@ class MockForecaster(BaseForecaster):
     def train(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
     ):
@@ -36,7 +36,7 @@ class MockForecaster(BaseForecaster):
         self,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
@@ -102,7 +102,7 @@ def test_local_forecasters():
     # Train
     local_forecasters.train(
         config=config,
-        flows_30m=sub_flows,
+        power_time_series=sub_flows,
         time_series_metadata=sub_meta,
     )
 
@@ -122,7 +122,7 @@ def test_local_forecasters():
     preds = local_forecasters.predict(
         time_series_metadata=sub_meta,
         inference_params=inference_params,
-        flows_30m=sub_flows,
+        power_time_series=sub_flows,
     )
 
     assert len(preds) == 2

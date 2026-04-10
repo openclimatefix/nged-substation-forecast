@@ -34,7 +34,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
         t - timedelta(days=14) for t in valid_times
     ]
 
-    flows_30m = pl.LazyFrame(
+    power_time_series = pl.LazyFrame(
         {
             "time_series_id": [time_series_id] * len(flow_timestamps),
             "period_end_time": flow_timestamps,
@@ -48,7 +48,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
         pl.DataFrame,
         add_autoregressive_lags(
             df,
-            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
@@ -81,7 +81,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
         pl.DataFrame,
         add_autoregressive_lags(
             df_long,
-            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
@@ -104,7 +104,7 @@ def test_add_autoregressive_lags_handles_missing_flows():
     )
 
     # Empty flows
-    flows_30m = pl.LazyFrame(
+    power_time_series = pl.LazyFrame(
         {
             "time_series_id": pl.Series([], dtype=pl.String),
             "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
@@ -114,7 +114,9 @@ def test_add_autoregressive_lags_handles_missing_flows():
 
     result = cast(
         pl.DataFrame,
-        add_autoregressive_lags(df, cast(pt.LazyFrame[PowerTimeSeries], flows_30m)).collect(),
+        add_autoregressive_lags(
+            df, cast(pt.LazyFrame[PowerTimeSeries], power_time_series)
+        ).collect(),
     )
 
     assert result["latest_available_weekly_power_lag"][0] is None
