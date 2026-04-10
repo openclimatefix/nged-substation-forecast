@@ -1,11 +1,12 @@
 import polars as pl
 import dagster as dg
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from src.nged_substation_forecast.defs.data_cleaning_assets import cleaned_actuals
 from contracts.settings import Settings, DataQualitySettings
+from contracts.data_schemas import UTC_DATETIME_DTYPE
 
 
 def test_cleaned_actuals_lookback_logic(tmp_path: Path):
@@ -25,19 +26,17 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
 
     df = pl.DataFrame(
         {
-            "timestamp": [t1, t2],
-            "substation_number": [1, 1],
-            "MW": [10.0, 10.0],
-            "MVA": [10.0, 10.0],
-            "MVAr": [0.0, 0.0],
-            "ingested_at": [t1, t2],
+            "time_series_id": ["1", "1"],
+            "start_time": [t1, t2],
+            "end_time": [t1 + timedelta(minutes=30), t2 + timedelta(minutes=30)],
+            "value": [10.0, 10.0],
         }
     ).with_columns(
         [
-            pl.col("substation_number").cast(pl.Int32),
-            pl.col("MW").cast(pl.Float32),
-            pl.col("MVA").cast(pl.Float32),
-            pl.col("MVAr").cast(pl.Float32),
+            pl.col("time_series_id").cast(pl.String),
+            pl.col("start_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("value").cast(pl.Float32),
         ]
     )
 
@@ -60,7 +59,7 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
             "src.nged_substation_forecast.defs.data_cleaning_assets.clean_substation_flows"
         ) as mock_clean:
             # Mock return value to be a valid DataFrame
-            mock_clean.return_value = df.filter(pl.col("timestamp") == t2)
+            mock_clean.return_value = df.filter(pl.col("start_time") == t2)
 
             cleaned_actuals(context, settings)
 
@@ -68,8 +67,8 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
             # because of the 1-day lookback.
             called_df = mock_clean.call_args[0][0]
             assert len(called_df) == 2
-            assert t1 in called_df["timestamp"].to_list()
-            assert t2 in called_df["timestamp"].to_list()
+            assert t1 in called_df["start_time"].to_list()
+            assert t2 in called_df["start_time"].to_list()
 
 
 def test_cleaned_actuals_idempotency(tmp_path: Path):
@@ -84,19 +83,17 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
 
     df = pl.DataFrame(
         {
-            "timestamp": [t1],
-            "substation_number": [1],
-            "MW": [10.0],
-            "MVA": [10.0],
-            "MVAr": [0.0],
-            "ingested_at": [t1],
+            "time_series_id": ["1"],
+            "start_time": [t1],
+            "end_time": [t1 + timedelta(minutes=30)],
+            "value": [10.0],
         }
     ).with_columns(
         [
-            pl.col("substation_number").cast(pl.Int32),
-            pl.col("MW").cast(pl.Float32),
-            pl.col("MVA").cast(pl.Float32),
-            pl.col("MVAr").cast(pl.Float32),
+            pl.col("time_series_id").cast(pl.String),
+            pl.col("start_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("value").cast(pl.Float32),
         ]
     )
 
@@ -113,31 +110,29 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         # Verify data exists
         df_result = pl.read_delta(str(cleaned_actuals_path))
         assert len(df_result) == 1
-        assert df_result["MW"][0] == 10.0
+        assert df_result["value"][0] == 10.0
 
         # Run again with different data in source for same partition
         df_new = pl.DataFrame(
             {
-                "timestamp": [t1],
-                "substation_number": [1],
-                "MW": [20.0],
-                "MVA": [20.0],
-                "MVAr": [0.0],
-                "ingested_at": [t1],
+                "time_series_id": ["1"],
+                "start_time": [t1],
+                "end_time": [t1 + timedelta(minutes=30)],
+                "value": [20.0],
             }
         ).with_columns(
             [
-                pl.col("substation_number").cast(pl.Int32),
-                pl.col("MW").cast(pl.Float32),
-                pl.col("MVA").cast(pl.Float32),
-                pl.col("MVAr").cast(pl.Float32),
+                pl.col("time_series_id").cast(pl.String),
+                pl.col("start_time").cast(UTC_DATETIME_DTYPE),
+                pl.col("end_time").cast(UTC_DATETIME_DTYPE),
+                pl.col("value").cast(pl.Float32),
             ]
         )
 
         df_new.write_delta(
             str(live_flows_path),
             mode="overwrite",
-            delta_write_options={"predicate": "timestamp >= '2026-03-10'"},
+            delta_write_options={"predicate": f"start_time >= '{t1.isoformat()}'"},
         )
 
         cleaned_actuals(context, settings)
@@ -145,4 +140,4 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         # Verify data was overwritten
         df_result = pl.read_delta(str(cleaned_actuals_path))
         assert len(df_result) == 1
-        assert df_result["MW"][0] == 20.0
+        assert df_result["value"][0] == 20.0

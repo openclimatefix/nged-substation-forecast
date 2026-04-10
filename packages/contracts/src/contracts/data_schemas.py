@@ -18,7 +18,6 @@ UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
 class PowerTimeSeries(pt.Model):
     time_series_id: str = pt.Field(dtype=pl.String)
-    start_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     end_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     value: float | None = pt.Field(dtype=pl.Float32)
 
@@ -31,7 +30,7 @@ class PowerTimeSeries(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["PowerTimeSeries"]:
-        """Validate the given dataframe, ensuring time span is 30 minutes and end_time is at :00 or :30."""
+        """Validate the given dataframe, ensuring end_time is at :00 or :30."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -39,13 +38,6 @@ class PowerTimeSeries(pt.Model):
             allow_superfluous_columns=allow_superfluous_columns,
             drop_superfluous_columns=drop_superfluous_columns,
         )
-
-        # Validate time span is exactly 30 minutes
-        time_diff = (validated_df["end_time"] - validated_df["start_time"]).dt.total_minutes()
-        if not (time_diff == 30).all():
-            raise ValueError(
-                "Time span between start_time and end_time must be exactly 30 minutes."
-            )
 
         # Validate end_time is at :00 or :30
         minutes = validated_df["end_time"].dt.minute()
@@ -58,23 +50,15 @@ class PowerTimeSeries(pt.Model):
 class TimeSeriesMetadata(pt.Model):
     """Metadata for a time series, joining location data with live telemetry info."""
 
-    # NGED has 192,000 substations.
-    substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
-
-    substation_type: str = pt.Field(dtype=pl.Categorical)
-    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
-    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)  # H3 discrete spatial index
-
-    # When this metadata record was last updated from the upstream NGED datasets.
-    last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-
-    # New fields
+    time_series_id: str = pt.Field(dtype=pl.String, unique=True)
     time_series_name: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    time_series_id: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     time_series_type: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     units: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     licence_area: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    substation_number: int = pt.Field(dtype=pl.Int32, gt=0, lt=1_000_000)
+    substation_type: str = pt.Field(dtype=pl.Categorical)
+    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
+    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
     information: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     area_wkt: str | None = pt.Field(dtype=pl.String, allow_missing=True)
     area_center_lat: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
@@ -108,6 +92,7 @@ class PowerForecast(pt.Model):
     power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
     # The power forecast itself in units of MW (active power) or MVA (apparent power).
+    # The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`.
     power_fcst: float = pt.Field(dtype=pl.Float32)
 
 

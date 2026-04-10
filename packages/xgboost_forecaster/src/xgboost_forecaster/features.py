@@ -4,14 +4,14 @@ import logging
 from datetime import timedelta
 
 import polars as pl
-
-from contracts.data_schemas import NwpColumns
+import patito as pt
+from contracts.data_schemas import NwpColumns, PowerTimeSeries
 
 log = logging.getLogger(__name__)
 
 
 def add_autoregressive_lags(
-    df: pl.LazyFrame, flows_30m: pl.LazyFrame, telemetry_delay_hours: int = 24
+    df: pl.LazyFrame, flows_30m: pt.LazyFrame[PowerTimeSeries], telemetry_delay_hours: int = 24
 ) -> pl.LazyFrame:
     """Add autoregressive lags to the feature matrix.
 

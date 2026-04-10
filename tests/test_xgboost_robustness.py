@@ -17,7 +17,6 @@ from contracts.hydra_schemas import (
     ModelFeaturesConfig,
     NwpModel,
 )
-from ml_core.data import downsample_power_flows
 from xgboost_forecaster.config import XGBoostHyperparameters
 from xgboost_forecaster.model import XGBoostForecaster
 
@@ -28,12 +27,12 @@ def test_substation_power_flows_validation_extreme_values():
     df = pl.DataFrame(
         {
             "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [123],
+            "time_series_id": [123],
             "MW": [2000.0],
         }
     ).with_columns(
         [
-            pl.col("substation_number").cast(pl.Int32),
+            pl.col("time_series_id").cast(pl.Int32),
             pl.col("MW").cast(pl.Float32),
         ]
     )
@@ -98,7 +97,7 @@ def test_xgboost_forecaster_train_with_nans():
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
-                "substation_number",
+                "time_series_id",
                 "lead_time_hours",
                 "latest_available_weekly_power_lag",
                 "temperature_2m",
@@ -118,13 +117,13 @@ def test_xgboost_forecaster_train_with_nans():
     flows = pl.DataFrame(
         {
             "timestamp": [valid_time, valid_time - timedelta(days=7)],
-            "substation_number": [1, 1],
+            "time_series_id": ["1", "1"],
             "MW": [50.0, 50.0],
             "MVA": [50.0, 50.0],
         }
     ).lazy()
 
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": ["1"], "substation_number": [1], "h3_res_5": [1]})
 
     nwp = pl.DataFrame(
         {
@@ -148,17 +147,17 @@ def test_xgboost_forecaster_train_with_nans():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
-    )
+
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"})
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
-        forecaster.target_map = target_map
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(
+                pt.DataFrame[TimeSeriesMetadata],
+                metadata,
+            ),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -172,7 +171,7 @@ def test_xgboost_forecaster_train_with_infs():
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
-                "substation_number",
+                "time_series_id",
                 "lead_time_hours",
                 "latest_available_weekly_power_lag",
                 "temperature_2m",
@@ -192,13 +191,13 @@ def test_xgboost_forecaster_train_with_infs():
     flows = pl.DataFrame(
         {
             "timestamp": [valid_time, valid_time - timedelta(days=7)],
-            "substation_number": [1, 1],
+            "time_series_id": ["1", "1"],
             "MW": [50.0, 50.0],
             "MVA": [50.0, 50.0],
         }
     ).lazy()
 
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": ["1"], "substation_number": [1], "h3_res_5": [1]})
 
     nwp = pl.DataFrame(
         {
@@ -222,17 +221,17 @@ def test_xgboost_forecaster_train_with_infs():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
-    )
+
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"})
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
-        forecaster.target_map = target_map
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(
+                pt.DataFrame[TimeSeriesMetadata],
+                metadata,
+            ),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -240,18 +239,6 @@ def test_xgboost_forecaster_train_with_infs():
 def test_xgboost_forecaster_predict_with_nans():
     """Test that predict raises ValueError if input features contain NaNs."""
     forecaster = XGBoostForecaster()
-    # Set target_map for normalization/descaling
-    from contracts.data_schemas import SubstationTargetMap
-
-    forecaster.target_map = SubstationTargetMap.validate(
-        pl.DataFrame(
-            {
-                "substation_number": pl.Series([1], dtype=pl.Int32),
-                "preferred_power_col": ["MW"],
-                "peak_capacity_MW_or_MVA": pl.Series([100.0], dtype=pl.Float32),
-            }
-        )
-    )
     mock_model = MagicMock()
     mock_model.feature_names_in_ = [
         "temperature_2m",
@@ -266,7 +253,7 @@ def test_xgboost_forecaster_predict_with_nans():
     forecaster.feature_names = mock_model.feature_names_in_
 
     valid_time = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": ["1"], "substation_number": [1], "h3_res_5": [1]})
 
     # NWP with NaN
     nwp = pl.DataFrame(
@@ -292,7 +279,7 @@ def test_xgboost_forecaster_predict_with_nans():
     flows = pl.DataFrame(
         {
             "timestamp": [valid_time - timedelta(days=7)],
-            "substation_number": [1],
+            "time_series_id": ["1"],
             "MW": [50.0],
             "MVA": [50.0],
         }
@@ -304,13 +291,14 @@ def test_xgboost_forecaster_predict_with_nans():
     )
 
     # Centralized data preparation
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=forecaster.target_map.lazy()
-    )
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"})
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.predict(
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(
+                pt.DataFrame[TimeSeriesMetadata],
+                metadata,
+            ),
             inference_params=inference_params,
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
             flows_30m=cast(pt.LazyFrame, flows_30m),
@@ -326,7 +314,7 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
-                "substation_number",
+                "time_series_id",
                 "lead_time_hours",
                 "latest_available_weekly_power_lag",
                 "temperature_2m",
@@ -346,13 +334,13 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     flows = pl.DataFrame(
         {
             "timestamp": [valid_time],
-            "substation_number": [1],
+            "time_series_id": [1],
             "MW": [50.0],
             "MVA": [50.0],
         }
     ).lazy()
 
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": [1], "substation_number": [1], "h3_res_5": [1]})
 
     nwp = (
         pl.DataFrame(
@@ -380,16 +368,16 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     )
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows), target_map=target_map.lazy()
-    )
+
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"})
 
     with pytest.raises(ValueError, match="No training data remaining after dropping nulls"):
-        forecaster.target_map = target_map
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(
+                pt.DataFrame[TimeSeriesMetadata],
+                metadata,
+            ),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )

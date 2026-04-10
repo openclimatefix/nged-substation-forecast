@@ -16,6 +16,7 @@ from nged_json_data import (
     append_to_delta,
     clean_power_data,
     load_nged_json,
+    upsert_metadata,
 )
 
 
@@ -27,11 +28,14 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
     for json_file in json_dir.glob("*.json"):
         metadata_df, time_series_df = load_nged_json(json_file)
 
+        # Upsert metadata
+        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
+
         # Clean power data
-        substation_number = metadata_df.get_column("substation_number").item()
+        time_series_id = int(metadata_df.get_column("time_series_id").item())
         cleaned_df = clean_power_data(
             time_series_df,
-            substation_number=substation_number,
+            time_series_id=time_series_id,
             variance_thresholds=settings.data_quality.variance_thresholds,
         )
 
@@ -61,11 +65,14 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
     for json_file in json_dir.glob("*.json"):
         metadata_df, time_series_df = load_nged_json(json_file)
 
+        # Upsert metadata
+        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
+
         # Clean power data
-        substation_number = metadata_df.get_column("substation_number").item()
+        time_series_id = int(metadata_df.get_column("time_series_id").item())
         cleaned_df = clean_power_data(
             time_series_df,
-            substation_number=substation_number,
+            time_series_id=time_series_id,
             variance_thresholds=settings.data_quality.variance_thresholds,
         )
         cleaned_dfs.append(cleaned_df)

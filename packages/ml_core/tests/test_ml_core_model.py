@@ -41,24 +41,24 @@ class MockForecaster(BaseForecaster):
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
-        sub_num = time_series_metadata["substation_number"][0]
+        sub_id = time_series_metadata["time_series_id"][0]
         df = pl.DataFrame(
             {
                 "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
-                "substation_number": [sub_num],
+                "time_series_id": [sub_id],
                 "ensemble_member": [0],
                 "power_fcst_model_name": ["mock"],
                 "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
                 "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
                 "power_fcst_init_year_month": ["2026-01"],
-                "MW_or_MVA": [10.0 * sub_num],
+                "power_fcst": [10.0 * float(sub_id)],
             }
         ).with_columns(
             [
-                pl.col("substation_number").cast(pl.Int32),
+                pl.col("time_series_id").cast(pl.String),
                 pl.col("ensemble_member").cast(pl.UInt8),
                 pl.col("power_fcst_model_name").cast(pl.Categorical),
-                pl.col("MW_or_MVA").cast(pl.Float32),
+                pl.col("power_fcst").cast(pl.Float32),
             ]
         )
         return pt.DataFrame[PowerForecast](df)
@@ -126,5 +126,5 @@ def test_local_forecasters():
     )
 
     assert len(preds) == 2
-    assert preds.filter(pl.col("time_series_id") == "1")["MW_or_MVA"][0] == 10.0
-    assert preds.filter(pl.col("time_series_id") == "2")["MW_or_MVA"][0] == 20.0
+    assert preds.filter(pl.col("time_series_id") == "1")["power_fcst"][0] == 10.0
+    assert preds.filter(pl.col("time_series_id") == "2")["power_fcst"][0] == 20.0

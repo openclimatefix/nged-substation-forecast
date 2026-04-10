@@ -17,20 +17,6 @@ def calculate_rolling_variance(df: pl.DataFrame) -> pl.DataFrame:
     return df.join(rolling_df, on="end_time")
 
 
-def apply_variance_threshold(df: pl.DataFrame, threshold: float) -> pl.DataFrame:
-    """Nullifies values where rolling variance is below the threshold."""
-    dagster.get_dagster_logger().info(f"DF before threshold: {df}")
-    df = df.with_columns(
-        value=pl.when(
-            (pl.col("rolling_variance").is_null()) | (pl.col("rolling_variance") <= threshold)
-        )
-        .then(None)
-        .otherwise(pl.col("value"))
-    )
-    dagster.get_dagster_logger().info(f"DF after threshold: {df}")
-    return df.drop("rolling_variance")
-
-
 def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
     """Validates the cleaned DataFrame."""
     if df.is_empty():
@@ -40,7 +26,7 @@ def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
 
 def clean_power_data(
     df: pl.DataFrame,
-    substation_number: int | None = None,
+    time_series_id: int | None = None,
     variance_thresholds: dict[int, float] | None = None,
     default_threshold: float = 0.1,
 ) -> pt.DataFrame[PowerTimeSeries]:
@@ -54,16 +40,25 @@ def clean_power_data(
 
     # Determine threshold
     threshold = default_threshold
-    if (
-        variance_thresholds
-        and substation_number is not None
-        and substation_number in variance_thresholds
-    ):
-        threshold = variance_thresholds[substation_number]
+    if variance_thresholds and time_series_id is not None and time_series_id in variance_thresholds:
+        threshold = variance_thresholds[time_series_id]
 
     # 3. Identify 'bad pre-amble data'
     df = calculate_rolling_variance(df)
-    df = apply_variance_threshold(df, threshold)
+
+    # Find the first index where rolling variance exceeds the threshold
+    valid_rows = df.filter(pl.col("rolling_variance") > threshold)
+
+    if valid_rows.is_empty():
+        raise ValueError("All rows were removed after filtering by variance threshold.")
+
+    first_valid_time = valid_rows.select("end_time").min().item()
+
+    # Slice the DataFrame from that index onwards.
+    df = df.filter(pl.col("end_time") >= first_valid_time)
+
+    # Drop the rolling_variance column
+    df = df.drop("rolling_variance")
 
     # Drop nulls again
     df = df.with_columns(value=pl.col("value").fill_nan(None)).drop_nulls(subset=["value"])

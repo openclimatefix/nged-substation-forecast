@@ -80,7 +80,6 @@ def _get_target_substations(
     config: XGBoostConfig,
     healthy_substations: list[int],
     context: dg.AssetExecutionContext,
-    substation_metadata: pl.DataFrame | None = None,
 ) -> list[int]:
     """Intersects requested substation IDs with healthy/active ones and logs the result.
 
@@ -90,17 +89,12 @@ def _get_target_substations(
     Strategy:
     ---------
     1. If `config.substation_ids` is provided, filter to only healthy substations.
-    2. Otherwise, use `substation_metadata` as a fallback to identify active substations.
-       This is more efficient than scanning the actuals data and uses the authoritative
-       metadata source that reflects current network configuration.
+    2. Otherwise, use all healthy substations.
 
     Args:
         config: XGBoost configuration with optional substation_ids override.
         healthy_substations: List of substations with healthy telemetry.
         context: Asset execution context for logging.
-        substation_metadata: Optional TimeSeriesMetadata DataFrame. If provided and
-                             no config.substation_ids given, this is used as a fallback
-                             to identify active substations (url is not null).
 
     Returns:
         List of substation IDs to use for training/evaluation.
@@ -110,22 +104,9 @@ def _get_target_substations(
         sub_ids = [s for s in config.substation_ids if s in healthy_substations]
         context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
     else:
-        # Fallback: use metadata to determine active substations
-        # This is more efficient than scanning actuals data for healthy substations
-        if substation_metadata is not None and len(substation_metadata) > 0:
-            # Get substations with live telemetry (url is not null) from metadata
-            valid_substation_ids = (
-                substation_metadata.filter(pl.col("url").is_not_null())
-                .get_column("substation_number")
-                .unique()
-            )
-            # Intersect with healthy substations
-            sub_ids = [s for s in valid_substation_ids if s in healthy_substations]
-        else:
-            # Last resort: use all healthy substations
-            sub_ids = healthy_substations
-
-        context.log.info(f"Using {len(sub_ids)} substations from metadata/healthy fallback.")
+        # Fallback: use all healthy substations
+        sub_ids = healthy_substations
+        context.log.info(f"Using {len(sub_ids)} healthy substations.")
 
     if not sub_ids and not config.allow_empty_substations:
         raise ValueError("No healthy substations available for training/evaluation.")
@@ -136,8 +117,6 @@ def _get_target_substations(
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "substation_metadata": dg.AssetIn("substation_metadata"),
-        "substation_power_preferences": dg.AssetIn("substation_power_preferences"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -148,8 +127,6 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
-    substation_metadata: pl.DataFrame,
-    substation_power_preferences: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -179,17 +156,17 @@ def train_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
-            .select("substation_number")
+            substation_power_flows.filter(pl.col("value").is_not_null())
+            .select("time_series_id")
             .unique()
             .collect(),
         )
-        .get_column("substation_number")
+        .get_column("time_series_id")
         .to_list()
     )
 
     # Filter to target substations using metadata as efficient fallback
-    sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)
+    sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # If no substations are available, return an empty model gracefully
     if not sub_ids:
@@ -200,10 +177,7 @@ def train_xgboost(
 
     # Filter the actuals data to target substations
     substation_power_flows_filtered = substation_power_flows.filter(
-        pl.col("substation_number").is_in(sub_ids)
-    )
-    substation_metadata_filtered = substation_metadata.filter(
-        pl.col("substation_number").is_in(sub_ids)
+        pl.col("time_series_id").is_in(sub_ids)
     )
 
     # Option A: Train on the control member (ensemble_member == 0)
@@ -217,8 +191,6 @@ def train_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows_filtered,
-        substation_metadata=substation_metadata_filtered,
-        target_map=substation_power_preferences,
     )
 
 
@@ -226,8 +198,6 @@ def train_xgboost(
     ins={
         "model": dg.AssetIn("train_xgboost"),
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "substation_metadata": dg.AssetIn("substation_metadata"),
-        "substation_power_preferences": dg.AssetIn("substation_power_preferences"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -239,16 +209,12 @@ def evaluate_xgboost(
     settings: dg.ResourceParam[Settings],
     model: XGBoostForecaster,
     nwp: pl.LazyFrame,
-    substation_metadata: pl.DataFrame,
-    substation_power_preferences: pl.DataFrame,
 ):
     """Evaluate the XGBoost model and generate forecasts.
 
     This asset evaluates the trained model on cleaned actuals data. The evaluation:
     - Uses `cleaned_actuals` instead of `combined_actuals` to ensure evaluation
       on physically plausible data only.
-    - Uses `substation_metadata` for determining active substations instead
-      of relying on the removed `healthy_substations` dependency.
     """
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     model_name = "xgboost"
@@ -263,17 +229,17 @@ def evaluate_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("MW").is_not_null() | pl.col("MVA").is_not_null())
-            .select("substation_number")
+            substation_power_flows.filter(pl.col("value").is_not_null())
+            .select("time_series_id")
             .unique()
             .collect(),
         )
-        .get_column("substation_number")
+        .get_column("time_series_id")
         .to_list()
     )
 
     # Filter to target substations using metadata as efficient fallback
-    sub_ids = _get_target_substations(config, healthy_substations, context, substation_metadata)
+    sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # If no substations are available, return an empty forecast gracefully
     if not sub_ids:
@@ -284,10 +250,7 @@ def evaluate_xgboost(
 
     # Filter the actuals data to target substations
     substation_power_flows_filtered = substation_power_flows.filter(
-        pl.col("substation_number").is_in(sub_ids)
-    )
-    substation_metadata_filtered = substation_metadata.filter(
-        pl.col("substation_number").is_in(sub_ids)
+        pl.col("time_series_id").is_in(sub_ids)
     )
 
     # The Dagster asset now returns the full XGBoostForecaster instance
@@ -300,6 +263,5 @@ def evaluate_xgboost(
         forecaster=forecaster,
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
-        substation_metadata=substation_metadata_filtered,
         substation_power_flows=substation_power_flows_filtered,
     )

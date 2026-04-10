@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 from pathlib import Path
 
+from contracts.data_schemas import UTC_DATETIME_DTYPE
 from src.nged_substation_forecast.defs.xgb_assets import (
     train_xgboost,
     evaluate_xgboost,
@@ -17,18 +18,6 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
     """Test that XGBoost assets can be materialized with dummy data using Dagster's materialize."""
 
     # Setup dummy data
-    sub_meta = pl.DataFrame(
-        {
-            "substation_number": [1],
-            "substation_name": ["Sub1"],
-            "latitude": [51.0],
-            "longitude": [-1.0],
-            "h3_res_5": [123],
-            "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "url": ["https://example.com"],
-        }
-    ).with_columns(pl.col("substation_number").cast(pl.Int32))
-
     # Create 4 weeks of data to satisfy the dynamic lag
     timestamps = pl.datetime_range(
         datetime(2025, 12, 15, tzinfo=timezone.utc),
@@ -39,15 +28,20 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
 
     sub_flows = pl.DataFrame(
         {
-            "timestamp": timestamps,
-            "substation_number": [1] * len(timestamps),
-            "MW": [10.0] * len(timestamps),
-            "MVA": [10.0] * len(timestamps),
-            "MVAr": [0.0] * len(timestamps),
+            "time_series_id": ["1"] * len(timestamps),
+            "start_time": timestamps,
+            "end_time": timestamps + timedelta(minutes=30),
+            "value": [10.0] * len(timestamps),
             "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * len(timestamps),
-            "MW_or_MVA": [10.0] * len(timestamps),
         }
-    ).with_columns(pl.col("substation_number").cast(pl.Int32))
+    ).with_columns(
+        [
+            pl.col("time_series_id").cast(pl.String),
+            pl.col("start_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("end_time").cast(UTC_DATETIME_DTYPE),
+            pl.col("value").cast(pl.Float32),
+        ]
+    )
 
     # Write flows to Delta as the asset now loads from Delta
     delta_dir = tmp_path / "delta"
@@ -118,21 +112,11 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
     ):
         # Materialize assets
         with dg.build_asset_context() as context:
-            sub_power_prefs = pl.DataFrame(
-                {
-                    "substation_number": [1],
-                    "preferred_power_col": ["MW"],
-                    "peak_capacity_MW_or_MVA": [100.0],
-                }
-            ).cast({"substation_number": pl.Int32})
-
             model = train_xgboost(
                 context=context,
                 config=config,
                 settings=settings,
                 nwp=nwps,
-                substation_metadata=sub_meta,
-                substation_power_preferences=sub_power_prefs,
             )
 
             assert isinstance(model, XGBoostForecaster)
@@ -144,8 +128,6 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
                 settings=settings,
                 model=model,
                 nwp=nwps,
-                substation_metadata=sub_meta,
-                substation_power_preferences=sub_power_prefs,
             )
 
             assert isinstance(forecasts, pl.DataFrame)

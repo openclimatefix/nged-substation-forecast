@@ -2,14 +2,16 @@ from datetime import datetime, timedelta, timezone
 
 from typing import cast
 
+import patito as pt
 import polars as pl
+from contracts.data_schemas import PowerTimeSeries
 from xgboost_forecaster.features import add_autoregressive_lags
 
 
 def test_add_autoregressive_lags_prevents_lookahead():
     """Test that add_autoregressive_lags correctly calculates lags to prevent lookahead bias."""
     # Setup: 30-minute timestamps for a single substation
-    substation_number = 1
+    time_series_id = "1"
     init_time = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
 
     # Create a range of valid times (lead times)
@@ -17,7 +19,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
 
     df = pl.LazyFrame(
         {
-            "substation_number": [substation_number] * len(valid_times),
+            "time_series_id": [time_series_id] * len(valid_times),
             "valid_time": valid_times,
             "init_time": [init_time] * len(valid_times),
         }
@@ -34,9 +36,9 @@ def test_add_autoregressive_lags_prevents_lookahead():
 
     flows_30m = pl.LazyFrame(
         {
-            "substation_number": [substation_number] * len(flow_timestamps),
-            "timestamp": flow_timestamps,
-            "MW_or_MVA": [float(i) for i in range(len(flow_timestamps))],
+            "time_series_id": [time_series_id] * len(flow_timestamps),
+            "end_time": flow_timestamps,
+            "value": [float(i) for i in range(len(flow_timestamps))],
         }
     )
 
@@ -45,7 +47,9 @@ def test_add_autoregressive_lags_prevents_lookahead():
     result = cast(
         pl.DataFrame,
         add_autoregressive_lags(
-            df, flows_30m, telemetry_delay_hours=telemetry_delay_hours
+            df,
+            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
 
@@ -67,7 +71,7 @@ def test_add_autoregressive_lags_prevents_lookahead():
     # We need to add this to our valid_times if it's not there
     df_long = pl.LazyFrame(
         {
-            "substation_number": [substation_number],
+            "time_series_id": [time_series_id],
             "valid_time": [valid_time_6_5d],
             "init_time": [init_time],
         }
@@ -76,7 +80,9 @@ def test_add_autoregressive_lags_prevents_lookahead():
     result_long = cast(
         pl.DataFrame,
         add_autoregressive_lags(
-            df_long, flows_30m, telemetry_delay_hours=telemetry_delay_hours
+            df_long,
+            cast(pt.LazyFrame[PowerTimeSeries], flows_30m),
+            telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
     assert result_long["lag_days"][0] == 14
@@ -85,13 +91,13 @@ def test_add_autoregressive_lags_prevents_lookahead():
 
 def test_add_autoregressive_lags_handles_missing_flows():
     """Test that add_autoregressive_lags handles cases where historical flows are missing."""
-    substation_number = 1
+    time_series_id = "1"
     init_time = datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc)
     valid_time = init_time + timedelta(hours=1)
 
     df = pl.LazyFrame(
         {
-            "substation_number": [substation_number],
+            "time_series_id": [time_series_id],
             "valid_time": [valid_time],
             "init_time": [init_time],
         }
@@ -100,12 +106,15 @@ def test_add_autoregressive_lags_handles_missing_flows():
     # Empty flows
     flows_30m = pl.LazyFrame(
         {
-            "substation_number": pl.Series([], dtype=pl.Int32),
-            "timestamp": pl.Series([], dtype=pl.Datetime("us", "UTC")),
-            "MW_or_MVA": pl.Series([], dtype=pl.Float32),
+            "time_series_id": pl.Series([], dtype=pl.String),
+            "end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
+            "value": pl.Series([], dtype=pl.Float32),
         }
     )
 
-    result = cast(pl.DataFrame, add_autoregressive_lags(df, flows_30m).collect())
+    result = cast(
+        pl.DataFrame,
+        add_autoregressive_lags(df, cast(pt.LazyFrame[PowerTimeSeries], flows_30m)).collect(),
+    )
 
     assert result["latest_available_weekly_power_lag"][0] is None

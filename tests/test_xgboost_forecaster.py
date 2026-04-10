@@ -6,16 +6,10 @@ from unittest.mock import patch
 from typing import cast
 
 from contracts.data_schemas import (
-    POWER_MW,
-    POWER_MVA,
-    POWER_MW_OR_MVA,
     InferenceParams,
     ProcessedNwp,
     TimeSeriesMetadata,
-    PowerTimeSeries,
-    SubstationTargetMap,
 )
-from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.data import (
     DataConfig,
     load_nwp_run,
@@ -46,13 +40,13 @@ def data_config(tmp_path):
 
     # Create dummy power data
     df_power = pl.DataFrame(
-        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "substation_number": [123]}
+        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "time_series_id": ["123"]}
     )
     df_power = df_power.with_columns(
         pl.col("timestamp").str.to_datetime().dt.replace_time_zone("UTC"),
-        pl.col("substation_number").cast(pl.Int32),
+        pl.col("time_series_id").cast(pl.String),
     )
-    df_power.write_delta(power_path, delta_write_options={"partition_by": ["substation_number"]})
+    df_power.write_delta(power_path, delta_write_options={"partition_by": ["time_series_id"]})
 
     # Create dummy weather data (Nwp schema)
     init_time = datetime(2026, 3, 7, 0, tzinfo=timezone.utc)
@@ -132,43 +126,6 @@ def test_load_scaling_params_with_config(tmp_path):
         assert False, f"Failed to load scaling params: {e}"
 
 
-def test_downsample_power_flows_uses_period_ending_semantics():
-    # Create power flows at 10:01, 10:15, 10:29
-    df = pl.DataFrame(
-        {
-            "timestamp": [
-                datetime(2024, 1, 1, 10, 1, tzinfo=timezone.utc),
-                datetime(2024, 1, 1, 10, 15, tzinfo=timezone.utc),
-                datetime(2024, 1, 1, 10, 29, tzinfo=timezone.utc),
-                datetime(2024, 1, 1, 10, 31, tzinfo=timezone.utc),  # Next period
-            ],
-            "substation_number": [1, 1, 1, 1],
-            POWER_MW: [10.0, 20.0, 30.0, 40.0],
-            POWER_MVA: [10.0, 20.0, 30.0, 40.0],
-        }
-    ).lazy()
-
-    res = cast(
-        pl.DataFrame,
-        downsample_power_flows(
-            cast(pt.LazyFrame[PowerTimeSeries], df),
-            target_map=cast(
-                pt.DataFrame[SubstationTargetMap],
-                pl.DataFrame({"substation_number": [1], "preferred_power_col": [POWER_MW]}),
-            ),
-        ).collect(),
-    )
-
-    # The first three should be aggregated into 10:30
-    assert len(res) == 2
-    assert res["timestamp"][0] == datetime(2024, 1, 1, 10, 30, tzinfo=timezone.utc)
-    assert res[POWER_MW_OR_MVA][0] == 20.0  # (10+20+30)/3
-
-    # The last one should be aggregated into 11:00
-    assert res["timestamp"][1] == datetime(2024, 1, 1, 11, 0, tzinfo=timezone.utc)
-    assert res[POWER_MW_OR_MVA][1] == 40.0
-
-
 def test_process_nwp_data_removes_zero_lead_time():
     init_time = datetime(2024, 1, 1, 0, tzinfo=timezone.utc)
     df = pl.DataFrame(
@@ -243,7 +200,7 @@ def test_prepare_training_data_prevents_row_explosion():
                 valid_time - timedelta(days=21),
                 valid_time - timedelta(days=28),
             ],
-            "substation_number": [1] * 5,
+            "time_series_id": ["1"] * 5,
             "MW": [50.0] * 5,
             "MVA": [50.0] * 5,
         }
@@ -252,6 +209,7 @@ def test_prepare_training_data_prevents_row_explosion():
     # Metadata
     metadata = pl.DataFrame(
         {
+            "time_series_id": ["1"],
             "substation_number": [1],
             "h3_res_5": [1],
         }
@@ -290,7 +248,7 @@ def test_prepare_training_data_prevents_row_explosion():
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
-                "substation_number",
+                "time_series_id",
                 "lead_time_hours",
                 "latest_available_weekly_power_lag",
                 "temperature_2m",
@@ -311,18 +269,15 @@ def test_prepare_training_data_prevents_row_explosion():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows),
-        target_map=target_map.lazy(),
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+        pl.col("time_series_id").cast(pl.String)
     )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
-        forecaster.target_map = target_map
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -347,12 +302,11 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
 
     flows = pl.DataFrame(
         {
-            "substation_number": [123],
-            "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
-            "MW": [1.0],
+            "time_series_id": ["123"],
+            "start_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "end_time": [datetime(2024, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=30)],
+            "value": [1.0],
             "MVA": [None],
-            # Include MW_or_MVA since the train_xgboost asset expects it after merging
-            "MW_or_MVA": [1.0],
         }
     ).with_columns(pl.col("MVA").cast(pl.Float64))
 
@@ -364,23 +318,9 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
 
     settings = Settings(nged_data_path=tmp_path)
 
-    metadata = pl.DataFrame(
-        {
-            "substation_number": [123],
-            "h3_res_5": [1],
-            "url": ["https://example.com"],  # Required by _get_target_substations
-        }
-    )
     config = XGBoostConfig()
 
     with dg.build_asset_context() as context:
-        sub_power_prefs = pl.DataFrame(
-            {
-                "substation_number": [123],
-                "preferred_power_col": ["MW"],
-            }
-        ).cast({"substation_number": pl.Int32})
-
         with patch(
             "src.nged_substation_forecast.defs.xgb_assets.train_and_log_model"
         ) as mock_train:
@@ -389,8 +329,6 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
                 config=config,
                 settings=settings,
                 nwp=nwp,
-                substation_metadata=metadata,
-                substation_power_preferences=sub_power_prefs,
             )
 
             # Check the nwp passed to train_and_log_model
@@ -424,13 +362,13 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
                 valid_time - timedelta(days=21),
                 valid_time - timedelta(days=28),
             ],
-            "substation_number": [1] * 5,
+            "time_series_id": ["1"] * 5,
             "MW": [100.0, 77.0, 1414.0, 0.0, 0.0],  # Distinct values for 7d and 14d lags
             "MVA": [100.0, 77.0, 1414.0, 0.0, 0.0],
         }
     ).lazy()
 
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": ["1"], "substation_number": [1], "h3_res_5": [1]})
 
     nwp = pl.DataFrame(
         [
@@ -479,7 +417,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
         features=ModelFeaturesConfig(
             nwps=[NwpModel.ECMWF_ENS_0_25DEG],
             feature_names=[
-                "substation_number",
+                "time_series_id",
                 "lead_time_hours",
                 "latest_available_weekly_power_lag",
                 "temperature_2m",
@@ -500,18 +438,15 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows),
-        target_map=target_map.lazy(),
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+        pl.col("time_series_id").cast(pl.String)
     )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
-        forecaster.target_map = target_map
         forecaster.train(
             config=config,
             flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+            time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
             nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         )
 
@@ -540,7 +475,7 @@ def test_xgboost_predict_with_lags():
     nwp_init_time = valid_time - timedelta(days=1)
     inference_nwp_init_time = nwp_init_time + timedelta(hours=4)
 
-    metadata = pl.DataFrame({"substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": ["1"], "h3_res_5": [1]})
     nwp = pl.DataFrame(
         [
             {
@@ -567,13 +502,13 @@ def test_xgboost_predict_with_lags():
         [
             {
                 "timestamp": valid_time - timedelta(days=7),
-                "substation_number": 1,
+                "time_series_id": "1",
                 "MW": 77.0,
                 "MVA": 77.0,
             },
             {
                 "timestamp": valid_time - timedelta(days=14),
-                "substation_number": 1,
+                "time_series_id": "1",
                 "MW": 1414.0,
                 "MVA": 1414.0,
             },
@@ -581,16 +516,11 @@ def test_xgboost_predict_with_lags():
     ).lazy()
 
     # Centralized data preparation
-    target_map = calculate_target_map(cast(pt.LazyFrame[PowerTimeSeries], flows))
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[PowerTimeSeries], flows),
-        target_map=target_map.lazy(),
+    flows_30m = flows.rename({"timestamp": "end_time", "MW": "value"}).with_columns(
+        pl.col("time_series_id").cast(pl.String)
     )
 
     forecaster = XGBoostForecaster()
-    # Set target_map for normalization/descaling
-
-    forecaster.target_map = target_map
 
     # Mock the model and its feature_names_in_
     mock_model = patch("xgboost.XGBRegressor").start()
@@ -613,14 +543,14 @@ def test_xgboost_predict_with_lags():
     )
 
     preds = forecaster.predict(
-        substation_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
+        time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
         inference_params=inference_params,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
         flows_30m=cast(pt.LazyFrame, flows_30m),
     )
 
     assert len(preds) == 1
-    assert preds["MW_or_MVA"][0] == 1414.0
+    assert preds["power_fcst"][0] == 1414.0
     # Check that the lag was correctly picked up (77.0 for 1-day lead time)
     # We can't easily check the internal X dataframe without more patching,
     # but the fact that it didn't crash is a good sign.

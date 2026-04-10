@@ -6,10 +6,11 @@ from typing import Any, Union, cast
 
 import dagster as dg
 import mlflow
+import patito as pt
 import polars as pl
-from contracts.data_schemas import InferenceParams
+from contracts.data_schemas import InferenceParams, PowerTimeSeries
 from contracts.hydra_schemas import TrainingConfig
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_peak_capacity
 
 log = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def train_and_log_model(
             sliced_data[key] = val
             continue
 
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        time_col = "end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = train_start
@@ -77,23 +78,12 @@ def train_and_log_model(
 
         # 2. Call the Model-Specific Math
         # The trainer is responsible for joining and feature engineering.
-        # We downsample power flows to 30m and use the provided target map
-        # to ensure consistency across models.
+        # We downsample power flows to 30m to ensure consistency across models.
         if "substation_power_flows" in sliced_data:
             flows = sliced_data.pop("substation_power_flows")
-            target_map = kwargs.get("target_map")
-            if target_map is None:
-                raise ValueError("target_map must be passed in kwargs to downsample power flows.")
 
-            flows_30m = downsample_power_flows(flows)
+            flows_30m = flows
             sliced_data["flows_30m"] = flows_30m
-
-            # Store target_map on the trainer if it supports it
-            if hasattr(trainer, "target_map"):
-                trainer.target_map = target_map
-
-        # Remove target_map from sliced_data so it's not passed to trainer.train()
-        sliced_data.pop("target_map", None)
 
     model = trainer.train(config=config.model, **sliced_data)
 
@@ -137,7 +127,7 @@ def evaluate_and_save_model(
             sliced_data[key] = val
             continue
 
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        time_col = "end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = test_start
@@ -174,19 +164,8 @@ def evaluate_and_save_model(
     # Downsample power flows to 30m for inference (lags)
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
-        # Use the provided target_map for consistency
-        target_map = kwargs.get("target_map")
-        if target_map is None:
-            # Fallback if no target_map is available on the forecaster
-            # In production, the forecaster should always have one.
-            if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
-                target_map = forecaster.target_map
-            else:
-                raise ValueError(
-                    "target_map must be provided in kwargs or present on the forecaster to downsample power flows."
-                )
 
-        flows_30m = downsample_power_flows(flows)
+        flows_30m = flows
         sliced_data["flows_30m"] = flows_30m
 
     results_df = forecaster.predict(
@@ -207,25 +186,17 @@ def evaluate_and_save_model(
             how="inner",
         )
 
-        # Join the peak_capacity_MW_or_MVA from the forecaster's target_map
-        if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
-            target_map_df = forecaster.target_map
-            if isinstance(target_map_df, pl.LazyFrame):
-                target_map_df = target_map_df.collect()
-
-            # We cast to pl.DataFrame here because eval_df and target_map_df are
-            # different Patito models. Polars' join method on Patito subclasses
-            # enforces that both sides have the same type, which would fail here.
-            eval_df = pl.DataFrame(eval_df).join(
-                pl.DataFrame(target_map_df).select(["time_series_id", "peak_capacity_MW_or_MVA"]),
-                on="time_series_id",
-                how="left",
-            )
-            # Fill missing peak_capacity_MW_or_MVA with 1.0 to avoid division by zero
-            eval_df = eval_df.with_columns(pl.col("peak_capacity_MW_or_MVA").fill_null(1.0))
-        else:
-            # Fallback if no target_map is available
-            eval_df = eval_df.with_columns(peak_capacity_MW_or_MVA=pl.lit(1.0))
+        # Join the peak_capacity from the actuals
+        peak_capacity_df = calculate_peak_capacity(
+            cast(pt.LazyFrame[PowerTimeSeries], actuals.lazy())
+        )
+        eval_df = pl.DataFrame(eval_df).join(
+            peak_capacity_df.select(["time_series_id", "peak_capacity"]),
+            on="time_series_id",
+            how="left",
+        )
+        # Fill missing peak_capacity with 1.0 to avoid division by zero
+        eval_df = eval_df.with_columns(pl.col("peak_capacity").fill_null(1.0))
 
         if not eval_df.is_empty():
             # Filter out the lookback period to avoid data leakage in evaluation
@@ -262,10 +233,7 @@ def evaluate_and_save_model(
                     [
                         (pl.col("value") - pl.col("actual")).abs().mean().alias("MAE"),
                         ((pl.col("value") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
-                        (
-                            (pl.col("value") - pl.col("actual")).abs()
-                            / pl.col("peak_capacity_MW_or_MVA")
-                        )
+                        ((pl.col("value") - pl.col("actual")).abs() / pl.col("peak_capacity"))
                         .mean()
                         .alias("nMAE"),
                     ]
@@ -304,10 +272,7 @@ def evaluate_and_save_model(
                     mlflow.log_metric("RMSE_global", rmse_global)
 
                 nmae_global = eval_df.select(
-                    (
-                        (pl.col("value") - pl.col("actual")).abs()
-                        / pl.col("peak_capacity_MW_or_MVA")
-                    ).mean()
+                    ((pl.col("value") - pl.col("actual")).abs() / pl.col("peak_capacity")).mean()
                 ).item()
                 if nmae_global is not None:
                     mlflow.log_metric("nMAE_global", nmae_global)

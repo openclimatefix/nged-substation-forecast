@@ -137,7 +137,7 @@ def cleaned_actuals(
     # partition data, and live_primary_flows is a side-effect only asset.
     # We use the new scan_delta_table helper which handles UTC timezone boilerplate.
     live_primary_flows = scan_delta_table(delta_path).filter(
-        pl.col("timestamp").is_between(lookback_start, partition_end, closed="left")
+        pl.col("start_time").is_between(lookback_start, partition_end, closed="left")
     )
 
     # Materialize the LazyFrame once
@@ -158,12 +158,12 @@ def cleaned_actuals(
     # Filter validated_df to current partition's time window.
     # The TimeWindowPartitionMapping includes historical data for lookback (previous partitions),
     # but we must only append data for the current partition to avoid data duplication in the
-    # Delta table. Example: For partition "2026-03-10", we only include rows with timestamp
+    # Delta table. Example: For partition "2026-03-10", we only include rows with start_time
     # in [2026-03-10 00:00:00 UTC, 2026-03-11 00:00:00 UTC).
 
     # Apply filter only for the current partition's time range
     validated_df = validated_df.filter(
-        pl.col("timestamp").is_between(partition_start, partition_end, closed="left")
+        pl.col("start_time").is_between(partition_start, partition_end, closed="left")
     )
 
     context.log.info(
@@ -183,8 +183,8 @@ def cleaned_actuals(
         delta_path,
         mode="overwrite",
         delta_write_options={
-            "partition_by": ["substation_number"],
-            "predicate": f"timestamp >= '{partition_start.isoformat()}' AND timestamp < '{partition_end.isoformat()}'",
+            "partition_by": ["time_series_id"],
+            "predicate": f"start_time >= '{partition_start.isoformat()}' AND start_time < '{partition_end.isoformat()}'",
         },
     )
 

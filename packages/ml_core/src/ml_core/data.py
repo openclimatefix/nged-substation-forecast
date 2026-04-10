@@ -1,7 +1,5 @@
 """Shared data processing logic for ML models."""
 
-from typing import cast
-
 import patito as pt
 import polars as pl
 from contracts.data_schemas import (
