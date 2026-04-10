@@ -333,7 +333,7 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
                 config=config,
                 settings=settings,
                 nwp=nwp,
-                substation_metadata=metadata,
+                time_series_metadata=metadata,
             )
 
             # Check the nwp passed to train_and_log_model
