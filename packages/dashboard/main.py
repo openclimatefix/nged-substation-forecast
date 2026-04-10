@@ -31,9 +31,13 @@ with app.setup:
 def _():
     metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
     df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
-
-    # Filter for substations with live telemetry
     return (df,)
+
+
+@app.cell
+def _(df):
+    df
+    return
 
 
 @app.cell

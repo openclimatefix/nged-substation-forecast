@@ -19,8 +19,9 @@ def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
     explicit locking is required.
 
     If the local Parquet file does not exist, it saves the new_metadata.
-    If it exists, it reads it, compares it with new_metadata, and updates
-    the Parquet file if there are differences, logging a warning.
+    If it exists, it merges the new_metadata with the existing metadata,
+    keeping the latest version for each time_series_id, and updates the
+    Parquet file if there are differences.
 
     Args:
         new_metadata: The new metadata DataFrame.
@@ -36,10 +37,14 @@ def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
     # Read existing metadata
     existing_metadata = pl.read_parquet(metadata_path)
 
+    # Merge metadata
+    # Put new_metadata first so that unique() keeps the new version
+    merged_metadata = pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id")
+
     # Compare metadata
     # We use `hash_rows().sum()` to check if the DataFrames are identical.
-    if get_df_hash(existing_metadata) != get_df_hash(new_metadata):
-        logger.warning(f"Metadata mismatch detected at {metadata_path}. Updating metadata file.")
-        new_metadata.write_parquet(metadata_path)
+    if get_df_hash(existing_metadata) != get_df_hash(merged_metadata):
+        logger.info(f"Metadata update detected at {metadata_path}. Updating metadata file.")
+        merged_metadata.write_parquet(metadata_path)
     else:
         logger.info("Metadata is up to date.")
