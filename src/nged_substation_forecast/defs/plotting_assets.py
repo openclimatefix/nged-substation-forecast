@@ -20,7 +20,7 @@ class PlotConfig(dg.Config):
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "substation_metadata": dg.AssetIn("substation_metadata"),
+        "time_series_metadata": dg.AssetIn("time_series_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -29,7 +29,7 @@ class PlotConfig(dg.Config):
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    substation_metadata: pl.DataFrame,
+    time_series_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
 ):
@@ -116,12 +116,12 @@ def forecast_vs_actual_plot(
         )
         return
 
-    # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
+    # Join with time_series_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
         pl.DataFrame(plot_df)
         .join(
-            pl.DataFrame(substation_metadata).select(["time_series_id", "time_series_name"]),
+            pl.DataFrame(time_series_metadata).select(["time_series_id", "time_series_name"]),
             on="time_series_id",
             how="inner",
         )
