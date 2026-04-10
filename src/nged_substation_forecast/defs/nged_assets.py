@@ -3,6 +3,7 @@
 import dagster as dg
 import polars as pl
 import patito as pt
+from pathlib import Path
 from contracts.data_schemas import (
     PowerTimeSeries,
 )
@@ -86,3 +87,34 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
         )
 
     context.log.info(f"Finished processing live JSON data for {partition_date}.")
+
+
+@asset(group_name="NGED_JSON")
+def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
+    """Ingest the 33 NGED JSON files provided via SharePoint."""
+    # Hardcoded path for the specific SharePoint drop
+    json_dir = Path("data/NGED/from_sharepoint/OneDrive_1_4-8-2026/1451606400000_1774512000000/")
+
+    if not json_dir.exists():
+        context.log.warning(f"Directory {json_dir} does not exist. Skipping ingestion.")
+        return
+
+    for json_file in json_dir.glob("*.json"):
+        context.log.info(f"Processing {json_file.name}")
+        metadata_df, time_series_df = load_nged_json(json_file)
+
+        # Upsert metadata to Parquet
+        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
+
+        # Clean power data
+        time_series_id = int(metadata_df.get_column("time_series_id").item())
+        cleaned_df = clean_power_data(
+            time_series_df,
+            time_series_id=time_series_id,
+            variance_thresholds=settings.data_quality.variance_thresholds,
+        )
+
+        # Append to Delta table
+        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+
+    context.log.info("Finished processing SharePoint JSON data.")
