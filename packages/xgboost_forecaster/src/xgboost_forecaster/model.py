@@ -293,7 +293,9 @@ class XGBoostForecaster(BaseForecaster):
         Returns:
             Prepared LazyFrame ready for feature extraction.
         """
-        metadata_lf = time_series_metadata.select(["time_series_id", "h3_res_5"]).lazy()
+        metadata_lf = time_series_metadata.select(
+            ["time_series_id", "h3_res_5", "substation_number"]
+        ).lazy()
 
         # Calculate peak capacity
         peak_capacity_df = calculate_peak_capacity(flows_30m)

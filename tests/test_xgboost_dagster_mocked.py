@@ -115,9 +115,15 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
             metadata = pl.DataFrame(
                 {
                     "time_series_id": [1],
-                    "h3_res_5": [1],
+                    "substation_number": [1],
+                    "h3_res_5": [123],
                 }
-            ).with_columns(pl.col("time_series_id").cast(pl.Int32))
+            ).with_columns(
+                [
+                    pl.col("time_series_id").cast(pl.Int32),
+                    pl.col("substation_number").cast(pl.Int32),
+                ]
+            )
 
             model = train_xgboost(
                 context=context,
