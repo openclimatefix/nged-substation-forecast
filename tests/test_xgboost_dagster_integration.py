@@ -150,13 +150,16 @@ def test_xgboost_dagster_integration() -> None:
         # (data loading, cleaning, training, evaluation, and plotting).
         resources = defs.resources or {}
 
-        # Run for training partitions
-        training_partitions = []
+        # Run for training and test partitions
+        all_partitions = []
         for i in range((train_end - train_start).days + 1):
             date = train_start + timedelta(days=i)
-            training_partitions.append(date.isoformat())
+            all_partitions.append(date.isoformat())
+        for i in range((test_end - test_start).days + 1):
+            date = test_start + timedelta(days=i)
+            all_partitions.append(date.isoformat())
 
-        for partition_key in training_partitions:
+        for partition_key in all_partitions:
             job.execute_in_process(
                 run_config=run_config,
                 partition_key=partition_key,
