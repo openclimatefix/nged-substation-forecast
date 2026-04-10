@@ -37,6 +37,10 @@ def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
     # Read existing metadata
     existing_metadata = pl.read_parquet(metadata_path)
 
+    # Ensure h3_res_5 is UInt64 in existing metadata if it exists
+    if "h3_res_5" in existing_metadata.columns:
+        existing_metadata = existing_metadata.with_columns(pl.col("h3_res_5").cast(pl.UInt64))
+
     # Merge metadata
     # Put new_metadata first so that unique() keeps the new version
     merged_metadata = pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id")
