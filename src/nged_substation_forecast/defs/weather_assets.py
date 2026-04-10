@@ -96,10 +96,16 @@ def processed_nwp_data(
     WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
     if the input NWP data or the number of substations is very large.
     """
-    substation_metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
-    substation_metadata = pl.read_parquet(substation_metadata_path)
     time_series_metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-    time_series_metadata = pl.read_parquet(time_series_metadata_path)
+    metadata = pl.read_parquet(time_series_metadata_path)
+
+    # If h3_res_5 is not populated, populate it
+    if metadata["h3_res_5"].sum() == 0:
+        import polars_h3 as plh3
+
+        metadata = metadata.with_columns(
+            h3_res_5=plh3.latlng_to_cell(pl.col("latitude"), pl.col("longitude"), 5)
+        )
 
     if config.start_date:
         all_nwp_data = all_nwp_data.filter(
@@ -113,8 +119,6 @@ def processed_nwp_data(
                 tzinfo=timezone.utc, hour=23, minute=59, second=59
             )
         )
-
-    metadata = time_series_metadata.join(substation_metadata, on="substation_number")
 
     if config.substation_ids:
         metadata = metadata.filter(pl.col("time_series_id").is_in(config.substation_ids))
