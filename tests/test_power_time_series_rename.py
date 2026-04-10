@@ -5,7 +5,7 @@ from contracts.data_schemas import PowerTimeSeries
 
 def test_power_time_series_schema_matches_expected():
     # This test verifies that the PowerTimeSeries schema has the expected columns
-    # and types, which should be identical to the old flows_30m schema.
+    # and types, which should be identical to the previous schema.
 
     # Define a valid DataFrame
     df = pl.DataFrame(
