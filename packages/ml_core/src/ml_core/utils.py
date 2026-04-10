@@ -66,7 +66,7 @@ def train_and_log_model(
             sliced_data[key] = val
             continue
 
-        time_col = "end_time" if "power_flows" in key else "valid_time"
+        time_col = "period_end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = train_start
@@ -127,7 +127,7 @@ def evaluate_and_save_model(
             sliced_data[key] = val
             continue
 
-        time_col = "end_time" if "power_flows" in key else "valid_time"
+        time_col = "period_end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = test_start
@@ -181,7 +181,7 @@ def evaluate_and_save_model(
 
         # Join predictions with actuals
         eval_df = results_df.join(
-            actuals.rename({"end_time": "valid_time", "value": "actual"}),
+            actuals.rename({"period_end_time": "valid_time", "power": "actual"}),
             on=["valid_time", "time_series_id"],
             how="inner",
         )

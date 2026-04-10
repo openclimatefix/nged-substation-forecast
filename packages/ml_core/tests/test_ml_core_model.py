@@ -55,7 +55,7 @@ class MockForecaster(BaseForecaster):
             }
         ).with_columns(
             [
-                pl.col("time_series_id").cast(pl.String),
+                pl.col("time_series_id").cast(pl.Int64),
                 pl.col("ensemble_member").cast(pl.UInt8),
                 pl.col("power_fcst_model_name").cast(pl.Categorical),
                 pl.col("power_fcst").cast(pl.Float32),
@@ -77,16 +77,16 @@ def test_local_forecasters():
             "longitude": [-1.0, -2.0],
             "h3_res_5": [123, 456],
             "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
-            "time_series_id": ["1", "2"],
+            "time_series_id": [1, 2],
         }
     )
 
     sub_flows = pt.DataFrame[PowerTimeSeries](
         {
-            "time_series_id": ["1", "2"],
+            "time_series_id": [1, 2],
             "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
-            "end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)] * 2,
-            "value": [10.0, 20.0],
+            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)] * 2,
+            "power": [10.0, 20.0],
         }
     ).lazy()
 
@@ -107,11 +107,11 @@ def test_local_forecasters():
     )
 
     assert len(local_forecasters.models) == 2
-    assert isinstance(local_forecasters.models["1"], MockForecaster)
-    assert isinstance(local_forecasters.models["2"], MockForecaster)
-    assert local_forecasters.models["1"].trained
-    assert local_forecasters.models["2"].trained
-    assert local_forecasters.models["1"].kwargs == {"some_arg": "value"}
+    assert isinstance(local_forecasters.models[1], MockForecaster)
+    assert isinstance(local_forecasters.models[2], MockForecaster)
+    assert local_forecasters.models[1].trained
+    assert local_forecasters.models[2].trained
+    assert local_forecasters.models[1].kwargs == {"some_arg": "value"}
 
     # Predict
     inference_params = InferenceParams(
@@ -126,5 +126,5 @@ def test_local_forecasters():
     )
 
     assert len(preds) == 2
-    assert preds.filter(pl.col("time_series_id") == "1")["power_fcst"][0] == 10.0
-    assert preds.filter(pl.col("time_series_id") == "2")["power_fcst"][0] == 20.0
+    assert preds.filter(pl.col("time_series_id") == 1)["power_fcst"][0] == 10.0
+    assert preds.filter(pl.col("time_series_id") == 2)["power_fcst"][0] == 20.0

@@ -32,7 +32,7 @@ class LocalForecasters(BaseForecaster):
         """
         self.forecaster_cls = forecaster_cls
         self.forecaster_kwargs = forecaster_kwargs
-        self.models: dict[str, BaseForecaster] = {}
+        self.models: dict[int | str, BaseForecaster] = {}
 
     def train(
         self,
