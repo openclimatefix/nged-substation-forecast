@@ -156,7 +156,7 @@ def train_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("value").is_not_null())
+            substation_power_flows.filter(pl.col("power").is_not_null())
             .select("time_series_id")
             .unique()
             .collect(),
@@ -229,7 +229,7 @@ def evaluate_xgboost(
     healthy_substations = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("value").is_not_null())
+            substation_power_flows.filter(pl.col("power").is_not_null())
             .select("time_series_id")
             .unique()
             .collect(),

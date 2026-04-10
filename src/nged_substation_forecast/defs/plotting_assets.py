@@ -98,8 +98,8 @@ def forecast_vs_actual_plot(
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
     eval_df = pl.DataFrame(latest_predictions).join(
-        actuals_30m.rename({"value": "actual"}),
-        on=["end_time", "time_series_id"],
+        actuals_30m.rename({"power": "actual"}),
+        on=["period_end_time", "time_series_id"],
         how="left",
     )
 
@@ -113,7 +113,7 @@ def forecast_vs_actual_plot(
     # Filter plot to 14-day horizon starting from chosen_init_time
     horizon_end = chosen_init_time + timedelta(days=14)
     plot_df = eval_df.filter(
-        (pl.col("end_time") >= chosen_init_time) & (pl.col("end_time") <= horizon_end)
+        (pl.col("period_end_time") >= chosen_init_time) & (pl.col("period_end_time") <= horizon_end)
     )
 
     # Empty Plot Window Guard: Ensure we have data in the 14-day window.
@@ -139,13 +139,15 @@ def forecast_vs_actual_plot(
                 pl.col("time_series_id"),
             )
         )
-        .sort("end_time")
+        .sort("period_end_time")
     )
 
     # Prepare a single dataframe for Altair to avoid faceting issues and duplication
     # Forecasts: 51 members
     preds_df = (
-        plot_df.select(["end_time", "substation_name_with_id", "ensemble_member", "MW_or_MVA"])
+        plot_df.select(
+            ["period_end_time", "substation_name_with_id", "ensemble_member", "MW_or_MVA"]
+        )
         .rename({"MW_or_MVA": "power"})
         .with_columns(
             type=pl.lit("Forecast"),
@@ -155,7 +157,7 @@ def forecast_vs_actual_plot(
 
     # Actuals: single line per substation (avoiding 51x duplication)
     actuals_df = (
-        plot_df.select(["end_time", "substation_name_with_id", "actual"])
+        plot_df.select(["period_end_time", "substation_name_with_id", "actual"])
         .unique()
         .rename({"actual": "power"})
         .with_columns(
@@ -171,7 +173,7 @@ def forecast_vs_actual_plot(
     color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
 
     base = alt.Chart(combined_plot_df).encode(
-        x=alt.X("end_time:T", title="Time"),
+        x=alt.X("period_end_time:T", title="Time"),
         y=alt.Y("power:Q", title="Power (MW/MVA)"),
         color=alt.Color("type:N", scale=color_scale, title="Type"),
     )

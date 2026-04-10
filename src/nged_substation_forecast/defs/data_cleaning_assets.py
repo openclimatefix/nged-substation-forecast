@@ -2,13 +2,13 @@
 
 This module defines the `cleaned_actuals` asset, which takes raw live primary flows and
 applies data quality cleaning logic. The cleaning process identifies "stuck" sensors
-(rolling std below threshold) and "insane" values (outside physical bounds) and replaces
+(rolling std below threshold) and "insane" power (outside physical bounds) and replaces
 them with null.
 
 Key Design Decisions:
 ---------------------
 
-1. **Null Preservation for Temporal Grid**: We replace problematic values with null
+1. **Null Preservation for Temporal Grid**: We replace problematic power with null
    instead of removing rows or imputing. This preserves the strict 30-minute temporal
    grid which is critical for accurate lag and rolling feature generation downstream.
 
@@ -96,16 +96,16 @@ def cleaned_actuals(
 
     This asset manually scans the live primary flows Delta table for the current partition
     plus a 1-day lookback window. It applies data quality cleaning logic (stuck
-    sensor detection, insane value detection).
+    sensor detection, insane power detection).
     The output is validated against the PowerTimeSeries schema which allows null values,
     then saved to a Delta table named "cleaned_actuals".
 
     Cleaning Logic:
     ---------------
     - **Stuck sensors**: Rolling std dev < 0.01 MW over 48-period (24-hour) window.
-    - **Insane values**: MW < -20.0 or MW > 100.0 (physically implausible for primary substations).
+    - **Insane power**: MW < -20.0 or MW > 100.0 (physically implausible for primary substations).
     - Both checks are performed per-substation to prevent data leakage.
-    - Bad values are replaced with null (NOT removed) to preserve temporal grid.
+    - Bad power are replaced with null (NOT removed) to preserve temporal grid.
 
     Notes:
         - Rolling operations are strictly backward-looking to prevent data leakage.
