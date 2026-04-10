@@ -336,7 +336,7 @@ class XGBoostForecaster(BaseForecaster):
         telemetry_delay_hours = self.config.telemetry_delay_hours if hasattr(self, "config") else 24
         df_lf = add_autoregressive_lags(
             df_lf,
-            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
+            power_time_series,
             telemetry_delay_hours=telemetry_delay_hours,
         )
 
