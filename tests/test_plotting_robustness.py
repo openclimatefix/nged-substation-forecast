@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 import dagster as dg
 
 
+@patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
 @patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_actuals_lazy")
-def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
+def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parquet):
     """Test that the forecast vs actual plot asset doesn't crash with many actuals."""
     # Mock predictions for only 1 substation
     predictions = pl.DataFrame(
@@ -34,8 +35,8 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
     )
     mock_get_lazy.return_value = actuals.lazy()
 
-    # Mock substation_metadata using Patito
-    substation_metadata = TimeSeriesMetadata.validate(
+    # Mock time_series_metadata using Patito
+    time_series_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
                 "time_series_id": [110375],
@@ -61,6 +62,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
         allow_missing_columns=True,
         allow_superfluous_columns=True,
     )
+    mock_read_parquet.return_value = time_series_metadata
 
     config = PlotConfig(output_path="tests/temp_test_plot.html")
     settings = Settings()
@@ -70,7 +72,6 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
             result = forecast_vs_actual_plot(
                 context=context,
                 predictions=predictions,
-                substation_metadata=substation_metadata,
                 config=config,
                 settings=settings,
             )
@@ -82,8 +83,9 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
                 os.remove("tests/temp_test_plot.html")
 
 
+@patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
 @patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_actuals_lazy")
-def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
+def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy, mock_read_parquet):
     predictions = pl.DataFrame(
         {
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
@@ -104,8 +106,8 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
     )
     mock_get_lazy.return_value = actuals.lazy()
 
-    # Mock substation_metadata using Patito
-    substation_metadata = TimeSeriesMetadata.validate(
+    # Mock time_series_metadata using Patito
+    time_series_metadata = TimeSeriesMetadata.validate(
         pl.DataFrame(
             {
                 "time_series_id": [110375],
@@ -131,6 +133,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
         allow_missing_columns=True,
         allow_superfluous_columns=True,
     )
+    mock_read_parquet.return_value = time_series_metadata
 
     config = PlotConfig(output_path="tests/test_plot_no_overlap.html")
 
@@ -139,7 +142,6 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
         result = forecast_vs_actual_plot(
             context=context,
             predictions=predictions,
-            substation_metadata=substation_metadata,
             config=config,
             settings=Settings(),
         )
