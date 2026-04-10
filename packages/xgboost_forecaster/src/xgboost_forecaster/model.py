@@ -209,7 +209,7 @@ class XGBoostForecaster(BaseForecaster):
         substation metadata and NWP forecasts.
 
         Args:
-            flows_30m: Historical power flows downsampled to 30m.
+            flows_30m: Historical power flows at 30m resolution.
             metadata_lf: Substation metadata.
             combined_nwps_lf: Combined NWP forecasts.
 
@@ -284,7 +284,7 @@ class XGBoostForecaster(BaseForecaster):
         """Prepares data for training or prediction.
 
         Args:
-            flows_30m: Historical power flows downsampled to 30m.
+            flows_30m: Historical power flows at 30m resolution.
             time_series_metadata: Time series metadata.
             nwps: Dictionary of NWP data.
             inference_params: Inference parameters (only for prediction).

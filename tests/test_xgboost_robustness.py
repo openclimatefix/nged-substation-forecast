@@ -23,17 +23,17 @@ from xgboost_forecaster.model import XGBoostForecaster
 
 def test_substation_power_flows_validation_extreme_values():
     """Test PowerTimeSeries validation with values outside the ge/le range."""
-    # MW = 2000 is outside [-1000, 1000]
+    # power = 2000 is outside [-1000, 1000]
     df = pl.DataFrame(
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
+            "period_end_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "time_series_id": [123],
-            "MW": [2000.0],
+            "power": [2000.0],
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.Int32),
-            pl.col("MW").cast(pl.Float32),
+            pl.col("power").cast(pl.Float32),
         ]
     )
 
@@ -433,9 +433,9 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     flows = (
         pl.DataFrame(
             {
-                "timestamp": [valid_time, valid_time - timedelta(days=7)],
+                "period_end_time": [valid_time, valid_time - timedelta(days=7)],
                 "time_series_id": [1, 1],
-                "MW": [50.0, 50.0],
+                "power": [50.0, 50.0],
                 "MVA": [50.0, 50.0],
             }
         )
@@ -468,7 +468,7 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
 
     # Centralized data preparation
 
-    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"})
+    flows_30m = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
         forecaster.train(

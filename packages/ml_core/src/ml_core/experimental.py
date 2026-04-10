@@ -45,7 +45,7 @@ class LocalForecasters(BaseForecaster):
 
         Args:
             config: Model configuration object.
-            flows_30m: Historical power flow data downsampled to 30m.
+            flows_30m: Historical power flow data at 30m resolution.
             time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
@@ -86,7 +86,7 @@ class LocalForecasters(BaseForecaster):
         Args:
             time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
-            flows_30m: Historical power flow data downsampled to 30m (for lags).
+            flows_30m: Historical power flow data at 30m resolution (for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 

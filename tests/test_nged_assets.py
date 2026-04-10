@@ -24,7 +24,7 @@ def test_nged_json_live_asset(mock_settings, tmp_path: Path):
     file_path = json_dir / "test.json"
     with open(file_path, "w") as f:
         f.write(
-            '{"metadata_field": "value", "data": [{"timestamp": "2026-01-01T00:00:00Z", "MW": 10.0, "MVA": 12.0}]}'
+            '{"metadata_field": "value", "data": [{"period_end_time": "2026-01-01T00:00:00Z", "power": 10.0, "MVA": 12.0}]}'
         )
 
     # Build context
@@ -40,9 +40,9 @@ def test_nged_json_live_asset(mock_settings, tmp_path: Path):
             mock_load.return_value = (MagicMock(), MagicMock())
             mock_clean.return_value = pl.DataFrame(
                 {
-                    "timestamp": ["2026-01-01T00:00:00Z"],
+                    "period_end_time": ["2026-01-01T00:00:00Z"],
                     "substation_number": [1],
-                    "MW": [10.0],
+                    "power": [10.0],
                     "MVA": [12.0],
                     "MVAr": [0.0],
                     "ingested_at": [datetime.now()],
@@ -64,7 +64,7 @@ def test_nged_json_archive_asset(mock_settings, tmp_path: Path):
     file_path = json_dir / "test.json"
     with open(file_path, "w") as f:
         f.write(
-            '{"metadata_field": "value", "data": [{"timestamp": "2026-01-01T00:00:00Z", "MW": 10.0, "MVA": 12.0}]}'
+            '{"metadata_field": "value", "data": [{"period_end_time": "2026-01-01T00:00:00Z", "power": 10.0, "MVA": 12.0}]}'
         )
 
     # Build context
@@ -84,9 +84,9 @@ def test_nged_json_archive_asset(mock_settings, tmp_path: Path):
             mock_load.return_value = (MagicMock(), MagicMock())
             mock_clean.return_value = pl.DataFrame(
                 {
-                    "timestamp": ["2026-01-01T00:00:00Z"],
+                    "period_end_time": ["2026-01-01T00:00:00Z"],
                     "substation_number": [1],
-                    "MW": [10.0],
+                    "power": [10.0],
                     "MVA": [12.0],
                     "MVAr": [0.0],
                     "ingested_at": [datetime.now()],

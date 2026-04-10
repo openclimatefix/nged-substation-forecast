@@ -223,7 +223,7 @@ def test_mlflow_metric_thinning():
             model_name="test_model",
             forecaster=forecaster,
             config=config,
-            substation_power_flows=flows_30m,  # This will be downsampled in evaluate_and_save_model
+            substation_power_flows=flows_30m,
         )
 
         # Check logged metrics

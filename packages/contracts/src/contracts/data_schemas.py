@@ -23,7 +23,7 @@ class PowerTimeSeries(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description="The end time of the 30-minute period. Note that all the JSON time series data is already 30-minutely.",
     )
-    power: float | None = pt.Field(dtype=pl.Float32)
+    power: float | None = pt.Field(dtype=pl.Float32, ge=-1000, le=1000)
 
     @classmethod
     def validate(

@@ -78,7 +78,7 @@ def train_and_log_model(
 
         # 2. Call the Model-Specific Math
         # The trainer is responsible for joining and feature engineering.
-        # We downsample power flows to 30m to ensure consistency across models.
+        # We ensure power flows are at 30m resolution for consistency across models.
         if "substation_power_flows" in sliced_data:
             flows = sliced_data.pop("substation_power_flows")
 

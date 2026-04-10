@@ -40,10 +40,10 @@ def data_config(tmp_path):
 
     # Create dummy power data
     df_power = pl.DataFrame(
-        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "time_series_id": [123]}
+        {"period_end_time": ["2026-03-07T00:00:00"], "power": [1.0], "time_series_id": [123]}
     )
     df_power = df_power.with_columns(
-        pl.col("timestamp").str.to_datetime().dt.replace_time_zone("UTC"),
+        pl.col("period_end_time").str.to_datetime().dt.replace_time_zone("UTC"),
         pl.col("time_series_id").cast(pl.Int32),
     )
     df_power.write_delta(power_path, delta_write_options={"partition_by": ["time_series_id"]})
@@ -193,7 +193,7 @@ def test_prepare_training_data_prevents_row_explosion():
     valid_time = datetime(2024, 1, 3, 10, 30, tzinfo=timezone.utc)
     flows = pl.DataFrame(
         {
-            "timestamp": [
+            "period_end_time": [
                 valid_time,
                 valid_time - timedelta(days=7),
                 valid_time - timedelta(days=14),
@@ -201,7 +201,7 @@ def test_prepare_training_data_prevents_row_explosion():
                 valid_time - timedelta(days=28),
             ],
             "time_series_id": ["1"] * 5,
-            "MW": [50.0] * 5,
+            "power": [50.0] * 5,
             "MVA": [50.0] * 5,
         }
     ).lazy()
@@ -269,9 +269,7 @@ def test_prepare_training_data_prevents_row_explosion():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.Int32)
-    )
+    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.train(
@@ -362,7 +360,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     # Power flows
     flows = pl.DataFrame(
         {
-            "timestamp": [
+            "period_end_time": [
                 valid_time,  # Target row
                 valid_time - timedelta(days=7),
                 valid_time - timedelta(days=14),
@@ -370,7 +368,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
                 valid_time - timedelta(days=28),
             ],
             "time_series_id": ["1"] * 5,
-            "MW": [100.0, 77.0, 1414.0, 0.0, 0.0],  # Distinct values for 7d and 14d lags
+            "power": [100.0, 77.0, 1414.0, 0.0, 0.0],  # Distinct values for 7d and 14d lags
             "MVA": [100.0, 77.0, 1414.0, 0.0, 0.0],
         }
     ).lazy()
@@ -447,9 +445,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.Int32)
-    )
+    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
         forecaster.train(
@@ -512,24 +508,22 @@ def test_xgboost_predict_with_lags():
     flows = pl.DataFrame(
         [
             {
-                "timestamp": valid_time - timedelta(days=7),
+                "period_end_time": valid_time - timedelta(days=7),
                 "time_series_id": 1,
-                "MW": 77.0,
+                "power": 77.0,
                 "MVA": 77.0,
             },
             {
-                "timestamp": valid_time - timedelta(days=14),
+                "period_end_time": valid_time - timedelta(days=14),
                 "time_series_id": 1,
-                "MW": 1414.0,
+                "power": 1414.0,
                 "MVA": 1414.0,
             },
         ]
     ).lazy()
 
     # Centralized data preparation
-    flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.Int32)
-    )
+    flows_30m = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     forecaster = XGBoostForecaster()
 

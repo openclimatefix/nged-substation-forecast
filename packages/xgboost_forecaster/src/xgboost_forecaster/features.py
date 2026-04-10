@@ -21,7 +21,7 @@ def add_autoregressive_lags(
 
     Args:
         df: The input LazyFrame (schema: XGBoostInputFeatures).
-        flows_30m: Historical power flows downsampled to 30m.
+        flows_30m: Historical power flows at 30m resolution.
         telemetry_delay_hours: Delay in hours for telemetry availability.
 
     Returns:
