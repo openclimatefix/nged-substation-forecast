@@ -53,13 +53,20 @@ def _(df):
         )
     )
 
-    arrow_table = pyarrow.table(
-        {
-            "geometry": geo_array,
-            "name": df["time_series_name"],
-            "number": df["time_series_id"],
-        },
-    )
+    attributes_to_include = [
+        "time_series_id",
+        "time_series_name",
+        "time_series_type",
+        "units",
+        "licence_area",
+        "substation_number",
+        "substation_type",
+    ]
+
+    dict_for_table = {key: df[key] for key in attributes_to_include}
+    dict_for_table["geometry"] = geo_array
+
+    arrow_table = pyarrow.table(dict_for_table)
     return (arrow_table,)
 
 
@@ -110,9 +117,6 @@ def _(df, layer_widget, map):
             if filtered_demand.height == 0:
                 right_pane = mo.md("No data")
             else:
-                # Use metadata to get the preferred power column, falling back to power
-                power_column = "power"
-
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()
@@ -121,12 +125,12 @@ def _(df, layer_widget, map):
                             "period_end_time:T",
                             axis=alt.Axis(format="%H:%M %b %d"),
                         ),
-                        y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
+                        y=alt.Y(f"power:Q", title=f"Power ({selected_df['units'].item()})"),
                         color=alt.value("teal"),
-                        tooltip=["period_end_time", power_column],
+                        tooltip=["period_end_time", "power"],
                     )
                     .properties(
-                        title=selected_df["time_series_name"].item(),
+                        title=f"{selected_df['time_series_name'].item()} - {selected_df['substation_type'].item()} - {selected_df['time_series_type'].item()}",
                         height=300,
                         width="container",  # Fill available width
                     )
@@ -134,6 +138,11 @@ def _(df, layer_widget, map):
                 )
 
     mo.vstack([map, right_pane])
+    return
+
+
+@app.cell
+def _():
     return
 
 
