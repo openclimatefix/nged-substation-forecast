@@ -127,6 +127,7 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
+    time_series_metadata: pl.DataFrame | None = None,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -138,7 +139,7 @@ def train_xgboost(
     --------------------
     - Uses `cleaned_actuals` instead of `combined_actuals` to ensure the model
       trains only on physically plausible data points.
-    - `_get_target_substations` now uses `substation_metadata` as an efficient
+    - `_get_target_substations` now uses `time_series_metadata` as an efficient
       fallback instead of scanning the entire actuals dataset.
     - The `healthy_substations` dependency has been removed as it's no longer needed.
     """
@@ -148,9 +149,10 @@ def train_xgboost(
     hydra_config = _apply_config_overrides(hydra_config, config)
 
     # Load time series metadata
-    time_series_metadata = pl.read_parquet(
-        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-    )
+    if time_series_metadata is None:
+        time_series_metadata = pl.read_parquet(
+            settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+        )
 
     # Use get_cleaned_actuals_lazy to ensure we have the full training range.
     # This function serves as the single source of truth for accessing cleaned actuals.
@@ -215,6 +217,7 @@ def evaluate_xgboost(
     settings: dg.ResourceParam[Settings],
     model: XGBoostForecaster,
     nwp: pl.LazyFrame,
+    time_series_metadata: pl.DataFrame | None = None,
 ):
     """Evaluate the XGBoost model and generate forecasts.
 
@@ -248,9 +251,10 @@ def evaluate_xgboost(
     sub_ids = _get_target_substations(config, healthy_substations, context)
 
     # Load time series metadata
-    time_series_metadata = pl.read_parquet(
-        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-    )
+    if time_series_metadata is None:
+        time_series_metadata = pl.read_parquet(
+            settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+        )
 
     # If no substations are available, return an empty forecast gracefully
     if not sub_ids:
