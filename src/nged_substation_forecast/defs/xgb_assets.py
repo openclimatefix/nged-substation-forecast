@@ -117,6 +117,7 @@ def _get_target_substations(
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
+        "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -127,6 +128,7 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
+    substation_metadata: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -191,6 +193,7 @@ def train_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows_filtered,
+        time_series_metadata=substation_metadata,
     )
 
 

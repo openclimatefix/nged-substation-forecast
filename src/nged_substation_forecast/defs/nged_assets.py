@@ -118,3 +118,10 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
         append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
 
     context.log.info("Finished processing SharePoint JSON data.")
+
+
+@asset(group_name="NGED_JSON")
+def substation_metadata(settings: ResourceParam[Settings]) -> pl.DataFrame:
+    """Load substation metadata from Parquet."""
+    metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
+    return pl.read_parquet(metadata_path)

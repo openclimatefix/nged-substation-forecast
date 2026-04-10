@@ -62,8 +62,8 @@ def train_and_log_model(
 
     sliced_data = {}
     for key, val in kwargs.items():
-        if key == "substation_metadata":
-            sliced_data[key] = val
+        if key in ["substation_metadata", "time_series_metadata"]:
+            sliced_data["time_series_metadata"] = val
             continue
 
         time_col = "period_end_time" if "power_flows" in key else "valid_time"

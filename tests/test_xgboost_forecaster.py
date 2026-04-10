@@ -40,11 +40,11 @@ def data_config(tmp_path):
 
     # Create dummy power data
     df_power = pl.DataFrame(
-        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "time_series_id": ["123"]}
+        {"timestamp": ["2026-03-07T00:00:00"], "MW": [1.0], "time_series_id": [123]}
     )
     df_power = df_power.with_columns(
         pl.col("timestamp").str.to_datetime().dt.replace_time_zone("UTC"),
-        pl.col("time_series_id").cast(pl.String),
+        pl.col("time_series_id").cast(pl.Int32),
     )
     df_power.write_delta(power_path, delta_write_options={"partition_by": ["time_series_id"]})
 
@@ -209,11 +209,11 @@ def test_prepare_training_data_prevents_row_explosion():
     # Metadata
     metadata = pl.DataFrame(
         {
-            "time_series_id": ["1"],
+            "time_series_id": [1],
             "substation_number": [1],
             "h3_res_5": [1],
         }
-    )
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # 4 NWP forecast runs, each with 50 ensemble members
     nwp_rows = []
@@ -270,7 +270,7 @@ def test_prepare_training_data_prevents_row_explosion():
 
     # Centralized data preparation
     flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.String)
+        pl.col("time_series_id").cast(pl.Int32)
     )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
@@ -324,11 +324,18 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
         with patch(
             "src.nged_substation_forecast.defs.xgb_assets.train_and_log_model"
         ) as mock_train:
+            metadata = pl.DataFrame(
+                {
+                    "time_series_id": ["123"],
+                    "h3_res_5": [1],
+                }
+            )
             train_xgboost(
                 context=context,
                 config=config,
                 settings=settings,
                 nwp=nwp,
+                substation_metadata=metadata,
             )
 
             # Check the nwp passed to train_and_log_model
@@ -368,7 +375,9 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
         }
     ).lazy()
 
-    metadata = pl.DataFrame({"time_series_id": ["1"], "substation_number": [1], "h3_res_5": [1]})
+    metadata = pl.DataFrame(
+        {"time_series_id": [1], "substation_number": [1], "h3_res_5": [1]}
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     nwp = pl.DataFrame(
         [
@@ -439,7 +448,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
 
     # Centralized data preparation
     flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.String)
+        pl.col("time_series_id").cast(pl.Int32)
     )
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
@@ -475,7 +484,9 @@ def test_xgboost_predict_with_lags():
     nwp_init_time = valid_time - timedelta(days=1)
     inference_nwp_init_time = nwp_init_time + timedelta(hours=4)
 
-    metadata = pl.DataFrame({"time_series_id": ["1"], "h3_res_5": [1]})
+    metadata = pl.DataFrame({"time_series_id": [1], "h3_res_5": [1]}).with_columns(
+        pl.col("time_series_id").cast(pl.Int32)
+    )
     nwp = pl.DataFrame(
         [
             {
@@ -502,13 +513,13 @@ def test_xgboost_predict_with_lags():
         [
             {
                 "timestamp": valid_time - timedelta(days=7),
-                "time_series_id": "1",
+                "time_series_id": 1,
                 "MW": 77.0,
                 "MVA": 77.0,
             },
             {
                 "timestamp": valid_time - timedelta(days=14),
-                "time_series_id": "1",
+                "time_series_id": 1,
                 "MW": 1414.0,
                 "MVA": 1414.0,
             },
@@ -517,7 +528,7 @@ def test_xgboost_predict_with_lags():
 
     # Centralized data preparation
     flows_30m = flows.rename({"timestamp": "period_end_time", "MW": "power"}).with_columns(
-        pl.col("time_series_id").cast(pl.String)
+        pl.col("time_series_id").cast(pl.Int32)
     )
 
     forecaster = XGBoostForecaster()

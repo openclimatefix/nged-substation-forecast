@@ -28,7 +28,7 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
 
     sub_flows = pl.DataFrame(
         {
-            "time_series_id": ["1"] * len(timestamps),
+            "time_series_id": [1] * len(timestamps),
             "start_time": timestamps,
             "period_end_time": timestamps + timedelta(minutes=30),
             "power": [10.0] * len(timestamps),
@@ -36,7 +36,7 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
         }
     ).with_columns(
         [
-            pl.col("time_series_id").cast(pl.String),
+            pl.col("time_series_id").cast(pl.Int32),
             pl.col("start_time").cast(UTC_DATETIME_DTYPE),
             pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
             pl.col("power").cast(pl.Float32),
@@ -112,11 +112,19 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
     ):
         # Materialize assets
         with dg.build_asset_context() as context:
+            metadata = pl.DataFrame(
+                {
+                    "time_series_id": [1],
+                    "h3_res_5": [1],
+                }
+            ).with_columns(pl.col("time_series_id").cast(pl.Int32))
+
             model = train_xgboost(
                 context=context,
                 config=config,
                 settings=settings,
                 nwp=nwps,
+                substation_metadata=metadata,
             )
 
             assert isinstance(model, XGBoostForecaster)

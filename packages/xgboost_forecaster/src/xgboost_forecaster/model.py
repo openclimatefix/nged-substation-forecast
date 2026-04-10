@@ -217,7 +217,7 @@ class XGBoostForecaster(BaseForecaster):
             A LazyFrame containing the joined training data.
         """
         df_lf = (
-            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME})
+            flows_30m.rename({"period_end_time": NwpColumns.VALID_TIME, "power": "value"})
             .join(
                 metadata_lf.rename({"h3_res_5": NwpColumns.H3_INDEX}),
                 on="time_series_id",
@@ -328,12 +328,14 @@ class XGBoostForecaster(BaseForecaster):
         # 3. Add lags and features
         # Handle missing init_time (e.g. for autoregressive-only models)
         if NwpColumns.INIT_TIME not in df_lf.collect_schema().names():
-            df_lf = df_lf.with_columns(**{NwpColumns.INIT_TIME: pl.col(NwpColumns.VALID_TIME)})
+            df_lf = df_lf.with_columns(pl.col(NwpColumns.VALID_TIME).alias(NwpColumns.INIT_TIME))
 
         # Get telemetry delay from config, default to 24 hours if not set
         telemetry_delay_hours = self.config.telemetry_delay_hours if hasattr(self, "config") else 24
         df_lf = add_autoregressive_lags(
-            df_lf, flows_30m, telemetry_delay_hours=telemetry_delay_hours
+            df_lf,
+            cast(pt.LazyFrame[PowerTimeSeries], flows_30m.rename({"power": "value"})),
+            telemetry_delay_hours=telemetry_delay_hours,
         )
 
         # Normalize by peak capacity
