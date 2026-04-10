@@ -58,28 +58,28 @@ class TimeSeriesMetadata(pt.Model):
     time_series_id: int = pt.Field(dtype=pl.Int32, unique=True)
     time_series_name: str = pt.Field(dtype=pl.String)
     time_series_type: Literal[
-        "BESS",
-        "Biofuel",
-        "CHP",
-        "Data Centre",
-        "Disaggregated Demand",
-        "Energy from Waste",
-        "EV Charging",
-        "Geothermal",
-        "Hydro",
-        "Hydrogen Electrolysis",
-        "Industrial Demand",
-        "Mixed (Demand)",
-        "Mixed (Generation)",
-        "Other (Demand)",
-        "Other (Generation)",
-        "Other (Storage)",
-        "Peaking Plant",
-        "PV",
-        "Rail",
-        "Raw Flow",
-        "Synchronous Condenser",
-        "Wind",
+        "BESS",  # Present in trial area
+        "Biofuel",  # Present in trial area
+        "CHP",  # Not in trial area
+        "Data Centre",  # Not in trial area
+        "Disaggregated Demand",  # Present in trial area
+        "Energy from Waste",  # Not in trial area
+        "EV Charging",  # Not in trial area
+        "Geothermal",  # Not in trial area
+        "Hydro",  # Not in trial area
+        "Hydrogen Electrolysis",  # Not in trial area
+        "Industrial Demand",  # Not in trial area
+        "Mixed (Demand)",  # Not in trial area
+        "Mixed (Generation)",  # Not in trial area
+        "Other (Demand)",  # Not in trial area
+        "Other (Generation)",  # Present in trial area
+        "Other (Storage)",  # Not in trial area
+        "Peaking Plant",  # Not in trial area
+        "PV",  # Present in trial area
+        "Rail",  # Not in trial area
+        "Raw Flow",  # Present in trial area
+        "Synchronous Condenser",  # Not in trial area
+        "Wind",  # Present in trial area
     ] = pt.Field(dtype=pl.String)
     units: Literal["MVA", "MW"] = pt.Field(dtype=pl.String)
     licence_area: Literal["EMids"] = pt.Field(dtype=pl.String)
