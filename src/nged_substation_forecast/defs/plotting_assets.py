@@ -139,9 +139,9 @@ def forecast_vs_actual_plot(
     # Forecasts: 51 members
     preds_df = (
         plot_df.select(
-            ["period_end_time", "substation_name_with_id", "ensemble_member", "MW_or_MVA"]
+            ["period_end_time", "substation_name_with_id", "ensemble_member", "power_fcst"]
         )
-        .rename({"MW_or_MVA": "power"})
+        .rename({"power_fcst": "power"})
         .with_columns(
             type=pl.lit("Forecast"),
             ensemble_member=pl.col("ensemble_member").cast(pl.Int32),

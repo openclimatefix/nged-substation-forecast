@@ -16,7 +16,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy):
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
             "time_series_id": [110375],
             "ensemble_member": [0],
-            "MW_or_MVA": [10.0],
+            "power_fcst": [10.0],
             "nwp_init_time": [datetime(2026, 3, 1, 0, tzinfo=timezone.utc)],
             "power_fcst_model_name": ["test"],
             "power_fcst_init_time": [datetime(2026, 3, 1, 3, tzinfo=timezone.utc)],
@@ -89,7 +89,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy):
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
             "time_series_id": [110375],
             "ensemble_member": [0],
-            "MW_or_MVA": [10.0],
+            "power_fcst": [10.0],
             "nwp_init_time": [datetime(2026, 3, 1, 0, tzinfo=timezone.utc)],
         }
     )

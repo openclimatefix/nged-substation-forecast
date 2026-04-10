@@ -150,4 +150,4 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
 
             assert isinstance(forecasts, pl.DataFrame)
             assert not forecasts.is_empty()
-            assert "MW_or_MVA" in forecasts.columns
+            assert "power_fcst" in forecasts.columns

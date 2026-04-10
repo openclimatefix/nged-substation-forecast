@@ -172,14 +172,14 @@ def test_evaluate_and_save_model_logs_metrics():
             "valid_time": [valid_time],
             "time_series_id": [1],
             "ensemble_member": [0],
-            "value": [11.0],  # Prediction is 11.0, actual is 10.0
+            "power_fcst": [11.0],  # Prediction is 11.0, actual is 10.0
             "nwp_init_time": [valid_time - timedelta(hours=24)],
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.Int32),
             pl.col("ensemble_member").cast(pl.UInt8),
-            pl.col("value").cast(pl.Float32),
+            pl.col("power_fcst").cast(pl.Float32),
         ]
     )
 
