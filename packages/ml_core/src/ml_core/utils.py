@@ -62,7 +62,7 @@ def train_and_log_model(
 
     sliced_data = {}
     for key, val in kwargs.items():
-        if key in ["substation_metadata", "time_series_metadata"]:
+        if key == "time_series_metadata":
             sliced_data["time_series_metadata"] = val
             continue
 
