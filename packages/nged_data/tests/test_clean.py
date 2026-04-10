@@ -1,7 +1,7 @@
 import pytest
 import polars as pl
 from datetime import datetime, timedelta, timezone
-from nged_json_data.clean import clean_power_data
+from nged_data.clean import clean_power_data
 
 
 def test_clean_power_data():

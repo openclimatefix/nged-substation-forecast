@@ -60,7 +60,7 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 members = ["packages/*"]
 
 [tool.uv.sources]
-nged_json_data = { workspace = true }
+nged_data = { workspace = true }
 contracts = { workspace = true }
 ml_core = { workspace = true }
 xgboost_forecaster = { workspace = true }

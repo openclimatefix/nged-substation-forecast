@@ -14,7 +14,7 @@ members = [
     "dynamical-data",
     "geo",
     "ml-core",
-    "nged-json-data",
+    "nged-data",
     "nged-substation-forecast",
     "notebooks",
     "xgboost-forecaster",
@@ -1969,9 +1969,9 @@ wheels = [
 ]
 
 [[package]]
-name = "nged-json-data"
+name = "nged-data"
 version = "0.0.1"
-source = { editable = "packages/nged_json_data" }
+source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "polars" },
 ]

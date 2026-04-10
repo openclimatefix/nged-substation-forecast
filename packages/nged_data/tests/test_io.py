@@ -1,15 +1,19 @@
 import json
 import pytest
 from pathlib import Path
-from nged_json_data.io import load_nged_json
+from nged_data.io import load_nged_json
 
 
 def test_load_nged_json_valid(tmp_path: Path):
     # Create a dummy JSON file
     data = {
         "TimeSeriesID": 123,
+        "TimeSeriesName": "Test Substation",
+        "TimeSeriesType": "PV",
+        "Units": "MW",
+        "LicenceArea": "EMids",
         "SubstationNumber": 123,
-        "SubstationType": "primary",
+        "SubstationType": "Primary",
         "Latitude": 51.0,
         "Longitude": -1.0,
         "data": [
@@ -38,8 +42,12 @@ def test_load_nged_json_empty_data(tmp_path: Path):
     # Create a dummy JSON file with empty data
     data = {
         "TimeSeriesID": 123,
+        "TimeSeriesName": "Test Substation",
+        "TimeSeriesType": "PV",
+        "Units": "MW",
+        "LicenceArea": "EMids",
         "SubstationNumber": 123,
-        "SubstationType": "primary",
+        "SubstationType": "Primary",
         "Latitude": 51.0,
         "Longitude": -1.0,
         "data": [],

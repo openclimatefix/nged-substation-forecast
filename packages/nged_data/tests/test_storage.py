@@ -4,19 +4,19 @@ import patito as pt
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
-from nged_json_data.storage import append_to_delta
+from nged_data.storage import append_to_delta
 from contracts.data_schemas import PowerTimeSeries
 
 
 @pytest.fixture
 def mock_delta_table():
-    with patch("nged_json_data.storage.DeltaTable") as mock_dt:
+    with patch("nged_data.storage.DeltaTable") as mock_dt:
         yield mock_dt
 
 
 @pytest.fixture
 def mock_write_deltalake():
-    with patch("nged_json_data.storage.write_deltalake") as mock_write:
+    with patch("nged_data.storage.write_deltalake") as mock_write:
         yield mock_write
 
 

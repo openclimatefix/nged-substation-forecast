@@ -12,7 +12,7 @@ from dagster import (
     ResourceParam,
     asset,
 )
-from nged_json_data import (
+from nged_data import (
     append_to_delta,
     clean_power_data,
     load_nged_json,
