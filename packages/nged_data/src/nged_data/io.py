@@ -105,10 +105,12 @@ def load_nged_json(
 
     # Rename endTime to period_end_time and parse it as a UTC datetime.
     time_series_df = time_series_df.rename({"endTime": "period_end_time"})
+
+    # Parse ISO 8601 datetime strings directly to UTC.
+    # Polars natively infers ISO 8601 formats (including 'T' separators and 'Z' timezones)
+    # when no explicit format string is provided.
     time_series_df = time_series_df.with_columns(
-        pl.col("period_end_time")
-        .str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ")
-        .dt.replace_time_zone("UTC")
+        pl.col("period_end_time").str.to_datetime(time_zone="UTC")
     )
 
     # Add the time_series_id from the metadata to the time_series_df.
