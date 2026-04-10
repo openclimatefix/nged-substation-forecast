@@ -5,13 +5,11 @@ import logging
 import math
 from datetime import date, datetime
 from pathlib import Path
-from typing import cast
 
 import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     Nwp,
-    TimeSeriesMetadata,
 )
 from contracts.settings import Settings
 from ml_core.scaling import uint8_to_physical_unit

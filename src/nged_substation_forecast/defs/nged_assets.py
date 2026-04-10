@@ -1,9 +1,10 @@
 """Dagster assets for NGED data."""
 
-import dagster as dg
-import polars as pl
-import patito as pt
 from pathlib import Path
+
+import dagster as dg
+import patito as pt
+import polars as pl
 from contracts.data_schemas import (
     PowerTimeSeries,
 )
@@ -110,10 +111,3 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
         append_to_delta(validated_df, settings.nged_data_path / "delta" / "raw_power_time_series")
 
     context.log.info("Finished processing SharePoint JSON data.")
-
-
-@asset(group_name="NGED_JSON")
-def substation_metadata(settings: ResourceParam[Settings]) -> pl.DataFrame:
-    """Load substation metadata from Parquet."""
-    metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
-    return pl.read_parquet(metadata_path)

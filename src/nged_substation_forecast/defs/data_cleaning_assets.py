@@ -28,17 +28,18 @@ Complex Partitioning Note:
 The implementation uses a manual 1-day lookback window when scanning the Delta table. This ensures that when computing rolling std for the first timestamp in a partition, we have 48 periods (24 hours) of historical data available, even at the partition boundary.
 """
 
-import dagster as dg
-import polars as pl
-import patito as pt
 from typing import cast
-from dagster import ResourceParam
 
+import dagster as dg
+import patito as pt
+import polars as pl
 from contracts.data_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from .partitions import DAILY_PARTITIONS
-from ..utils import scan_delta_table, get_partition_window
+from dagster import ResourceParam
+
 from ..cleaning import clean_substation_flows
+from ..utils import get_partition_window, scan_delta_table
+from .partitions import DAILY_PARTITIONS
 
 
 def _get_delta_path(settings: Settings, table_name: str) -> str:
@@ -92,7 +93,7 @@ def cleaned_actuals(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
 ) -> pl.DataFrame:
-    """Clean raw live primary flows and apply data quality checks.
+    """Clean raw power time series and apply data quality checks.
 
     This asset manually scans the raw power time series Delta table for the current partition
     plus a 1-day lookback window. It applies data quality cleaning logic (stuck
@@ -137,7 +138,7 @@ def cleaned_actuals(
     # partition data, and raw_power_time_series is a side-effect only asset.
     # We use the new scan_delta_table helper which handles UTC timezone boilerplate.
     raw_flows = scan_delta_table(delta_path).filter(
-        pl.col("start_time").is_between(lookback_start, partition_end, closed="left")
+        pl.col("period_end_time").is_between(lookback_start, partition_end, closed="left")
     )
 
     # Materialize the LazyFrame once
@@ -165,9 +166,6 @@ def cleaned_actuals(
     validated_df = validated_df.filter(
         pl.col("period_end_time").is_between(partition_start, partition_end, closed="left")
     )
-
-    # Drop superfluous columns after validation and filtering
-    validated_df = validated_df.drop("start_time")
 
     context.log.info(
         f"Filtered cleaned actuals to current partition. "

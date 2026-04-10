@@ -20,7 +20,6 @@ class PlotConfig(dg.Config):
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "time_series_metadata": dg.AssetIn("time_series_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -29,7 +28,6 @@ class PlotConfig(dg.Config):
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    time_series_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
 ):
@@ -41,6 +39,11 @@ def forecast_vs_actual_plot(
     if predictions.is_empty():
         context.log.warning("Empty predictions, skipping plot.")
         return
+
+    # Load time series metadata
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
 
     # Extract unique substation numbers from predictions and limit for plotting.
     pred_substations = (

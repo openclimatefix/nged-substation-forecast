@@ -125,7 +125,7 @@ def _(df, layer_widget, map):
                             "period_end_time:T",
                             axis=alt.Axis(format="%H:%M %b %d"),
                         ),
-                        y=alt.Y(f"power:Q", title=f"Power ({selected_df['units'].item()})"),
+                        y=alt.Y("power:Q", title=f"Power ({selected_df['units'].item()})"),
                         color=alt.value("teal"),
                         tooltip=["period_end_time", "power"],
                     )
