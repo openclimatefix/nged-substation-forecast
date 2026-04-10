@@ -54,45 +54,107 @@ class PowerTimeSeries(pt.Model):
 class TimeSeriesMetadata(pt.Model):
     """Metadata for a time series, joining location data with live telemetry info."""
 
-    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
-    time_series_id: int = pt.Field(dtype=pl.Int32, unique=True)
-    time_series_name: str = pt.Field(dtype=pl.String)
+    time_series_id: int = pt.Field(
+        dtype=pl.Int32,
+        unique=True,
+        description=(
+            "Provided by NGED. This is the primary key for identifying the time series."
+            " There's _almost_ a one-to-one mapping between time_series_id and the"
+            " asset ID, so you can think of time_series_id as the asset ID"
+            " (where an 'asset' is a physical asset like a substation or PV farm)"
+        ),
+    )
+    time_series_name: str = pt.Field(
+        dtype=pl.String,
+        examples=[
+            "ALFORD 33 11kV S STN",
+            "BAMBERS FARM WIND GENERATION MABLETHORPE 33kV S ST",
+            "Leverton Solar Park",
+        ],
+    )
     time_series_type: Literal[
-        "BESS",  # Present in trial area
+        "BESS",  # Battery energy storage system. Present in trial area
         "Biofuel",  # Present in trial area
-        "CHP",  # Not in trial area
-        "Data Centre",  # Not in trial area
-        "Disaggregated Demand",  # Present in trial area
-        "Energy from Waste",  # Not in trial area
-        "EV Charging",  # Not in trial area
-        "Geothermal",  # Not in trial area
-        "Hydro",  # Not in trial area
-        "Hydrogen Electrolysis",  # Not in trial area
-        "Industrial Demand",  # Not in trial area
-        "Mixed (Demand)",  # Not in trial area
-        "Mixed (Generation)",  # Not in trial area
-        "Other (Demand)",  # Not in trial area
+        "CHP",
+        "Data Centre",
+        # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
+        # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
+        # "Disaggregated Demand" indicates that NGED have already removed any metered generation connected to that primary.
+        "Disaggregated Demand",  # Present in trial area.
+        "Energy from Waste",
+        "EV Charging",
+        "Geothermal",
+        "Hydro",
+        "Hydrogen Electrolysis",
+        "Industrial Demand",
+        "Mixed (Demand)",
+        "Mixed (Generation)",
+        "Other (Demand)",
         "Other (Generation)",  # Present in trial area
-        "Other (Storage)",  # Not in trial area
-        "Peaking Plant",  # Not in trial area
+        "Other (Storage)",
+        "Peaking Plant",
         "PV",  # Present in trial area
-        "Rail",  # Not in trial area
+        "Rail",
         "Raw Flow",  # Present in trial area
-        "Synchronous Condenser",  # Not in trial area
+        "Synchronous Condenser",
         "Wind",  # Present in trial area
     ] = pt.Field(dtype=pl.String)
     units: Literal["MVA", "MW"] = pt.Field(dtype=pl.String)
     licence_area: Literal["EMids"] = pt.Field(dtype=pl.String)
-    substation_number: int = pt.Field(dtype=pl.Int32, gt=0, lt=1_000_000)
+    substation_number: int = pt.Field(
+        dtype=pl.Int32,
+        gt=0,
+        lt=1_000_000,
+        description="For customer time series, substation_number is the substation to which that customer is connected.",
+    )
     substation_type: Literal["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"] = pt.Field(
         dtype=pl.Categorical
     )
-    latitude: float = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
-    longitude: float = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-    information: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    area_wkt: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-    area_center_lat: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    area_center_lon: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    latitude: float = pt.Field(
+        dtype=pl.Float32,
+        ge=49,
+        le=61,  # UK latitude range
+        description=(
+            "For customer time series, the latitude and longitude give the location of the"
+            " _substation_, not the customer's site."
+        ),
+    )
+    longitude: float = pt.Field(
+        dtype=pl.Float32,
+        ge=-9,
+        le=2,  # UK longitude range
+        description=(
+            "For customer time series, the latitude and longitude give the location of the"
+            " _substation_, not the customer's site."
+        ),
+    )
+    information: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description="Always None in the trial area",
+    )
+    area_wkt: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+            " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
+        ),
+    )
+    area_center_lat: float | None = pt.Field(
+        dtype=pl.Float32,
+        allow_missing=True,
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+        ),
+    )
+    area_center_lon: float | None = pt.Field(
+        dtype=pl.Float32,
+        allow_missing=True,
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+        ),
+    )
 
 
 class PowerForecast(pt.Model):
