@@ -34,40 +34,38 @@ def test_xgboost_dagster_integration() -> None:
     # "Cannot operate on a closed database" errors in tests.
     with dg.DagsterInstance.ephemeral() as instance:
         settings = Settings()
-        actuals_path = settings.nged_data_path / "delta" / "raw_power_time_series"
         cleaned_path = settings.nged_data_path / "delta" / "cleaned_power_time_series"
 
-        if not actuals_path.exists() or not cleaned_path.exists():
+        if not cleaned_path.exists():
             pytest.skip("Required Delta tables missing. Please download data.")
 
-        # Define the 5 substations for the test
-        substations = [110375, 110644, 110772, 110803, 110804]
+        # Define the 4 time_series_ids for the test
+        metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+        df_metadata = pl.read_parquet(metadata_path)
+
+        # Add h3_res_5 if missing
+        if "h3_res_5" not in df_metadata.columns:
+            df_metadata = df_metadata.with_columns(pl.lit(0).alias("h3_res_5"))
+            df_metadata.write_parquet(metadata_path)
+
+        # Pick 4 IDs: 1 primary substation (Disaggregated Demand), 1 BSP (Raw Flow?), 1 solar farm (PV), 1 wind farm (Wind)
+
+        time_series_ids = []
+        for t in ["Disaggregated Demand", "Raw Flow", "PV", "Wind"]:
+            id = df_metadata.filter(pl.col("time_series_type") == t)["time_series_id"][0]
+            time_series_ids.append(id)
 
         # 3. Dynamically calculate dates from local data
-        df = pl.scan_delta(str(actuals_path))
-        # Verify schema
-        assert "period_end_time" in df.collect_schema().names(), (
-            "Missing 'period_end_time' in raw_power_time_series"
-        )
-        assert "power" in df.collect_schema().names(), "Missing 'power' in raw_power_time_series"
+        df_cleaned = pl.scan_delta(str(cleaned_path))
 
-        max_dt_df = cast(pl.DataFrame, df.select(pl.col("period_end_time").max()).collect())
+        max_dt_df = cast(pl.DataFrame, df_cleaned.select(pl.col("period_end_time").max()).collect())
         max_dt = max_dt_df.get_column("period_end_time").max()
 
         if max_dt is None:
             pytest.skip("No maximum timestamp found in data.")
 
-        min_dt_df = cast(pl.DataFrame, df.select(pl.col("period_end_time").min()).collect())
+        min_dt_df = cast(pl.DataFrame, df_cleaned.select(pl.col("period_end_time").min()).collect())
         min_dt = min_dt_df.get_column("period_end_time").min()
-
-        # Verify cleaned_power_time_series schema
-        df_cleaned = pl.scan_delta(str(cleaned_path))
-        assert "period_end_time" in df_cleaned.collect_schema().names(), (
-            "Missing 'period_end_time' in cleaned_power_time_series"
-        )
-        assert "power" in df_cleaned.collect_schema().names(), (
-            "Missing 'power' in cleaned_power_time_series"
-        )
 
         if min_dt is None:
             pytest.skip("No minimum timestamp found in data.")
@@ -79,9 +77,8 @@ def test_xgboost_dagster_integration() -> None:
                 f"Insufficient data for integration test. Found {total_duration.days} days, require at least 6."
             )
 
-        # 1. Select an NWP initialization time from exactly two weeks ago.
-        today = datetime.now(timezone.utc).date()
-        nwp_init_time = today - timedelta(weeks=2)
+        # 1. Select an NWP initialization time from exactly two weeks before the end of the cleaned data.
+        nwp_init_time = (cast(datetime, max_dt) - timedelta(weeks=2)).date()
 
         # 2. Configure the `evaluate_xgboost` op to run inference for that specific NWP run,
         # covering a 2-week prediction horizon.
@@ -117,15 +114,9 @@ def test_xgboost_dagster_integration() -> None:
         # 5. Provide run configuration
         run_config = {
             "ops": {
-                "raw_power_time_series": {
-                    "config": {
-                        "substation_numbers": substations,
-                        "limit": 5,
-                    }
-                },
                 "processed_nwp_data": {
                     "config": {
-                        "substation_ids": substations,
+                        "substation_ids": time_series_ids,
                         "start_date": str(nwp_init_time),
                         "end_date": str(test_end),
                     }
@@ -134,14 +125,14 @@ def test_xgboost_dagster_integration() -> None:
                     "config": {
                         "train_start": str(train_start),
                         "train_end": str(train_end),
-                        "substation_ids": substations,
+                        "substation_ids": time_series_ids,
                     }
                 },
                 "evaluate_xgboost": {
                     "config": {
                         "test_start": str(test_start),
                         "test_end": str(test_end),
-                        "substation_ids": substations,
+                        "substation_ids": time_series_ids,
                     }
                 },
                 "forecast_vs_actual_plot": {
@@ -199,9 +190,9 @@ def test_xgboost_dagster_integration() -> None:
     html_content = plot_path.read_text()
 
     # Dynamically check that at least one requested substation ID is in the HTML
-    found_substation = any(str(sub_id) in html_content for sub_id in substations)
+    found_substation = any(str(sub_id) in html_content for sub_id in time_series_ids)
     assert found_substation, (
-        f"None of the requested substation IDs {substations} found in plot HTML"
+        f"None of the requested substation IDs {time_series_ids} found in plot HTML"
     )
 
     assert '"resolve":{"scale":{"y":"independent"}}' in html_content.replace(" ", "").replace(

@@ -117,7 +117,6 @@ def _get_target_substations(
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "time_series_metadata": dg.AssetIn("time_series_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -128,7 +127,6 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
-    time_series_metadata: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -148,6 +146,11 @@ def train_xgboost(
     model_name = "xgboost"
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
+
+    # Load time series metadata
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
 
     # Use get_cleaned_actuals_lazy to ensure we have the full training range.
     # This function serves as the single source of truth for accessing cleaned actuals.
