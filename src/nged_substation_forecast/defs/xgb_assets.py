@@ -13,7 +13,6 @@ from contracts.data_schemas import PowerForecast
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster
-from xgboost_forecaster.data import get_substation_metadata
 
 from .data_cleaning_assets import get_cleaned_actuals_lazy
 
@@ -118,7 +117,7 @@ def _get_target_substations(
 @dg.asset(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
-        "substation_metadata": dg.AssetIn("substation_metadata"),
+        "time_series_metadata": dg.AssetIn("time_series_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -129,7 +128,7 @@ def train_xgboost(
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
     nwp: pl.LazyFrame,
-    substation_metadata: pl.DataFrame,
+    time_series_metadata: pl.DataFrame,
 ):
     """Train the XGBoost model on cleaned substation data.
 
@@ -194,7 +193,7 @@ def train_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
         substation_power_flows=substation_power_flows_filtered,
-        time_series_metadata=substation_metadata,
+        time_series_metadata=time_series_metadata,
     )
 
 
@@ -245,8 +244,10 @@ def evaluate_xgboost(
     # Filter to target substations using metadata as efficient fallback
     sub_ids = _get_target_substations(config, healthy_substations, context)
 
-    # Load substation metadata
-    substation_metadata = get_substation_metadata()
+    # Load time series metadata
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
 
     # If no substations are available, return an empty forecast gracefully
     if not sub_ids:
@@ -261,7 +262,7 @@ def evaluate_xgboost(
     )
 
     # Filter metadata to target substations
-    substation_metadata_filtered = substation_metadata.filter(
+    time_series_metadata_filtered = time_series_metadata.filter(
         pl.col("time_series_id").is_in(sub_ids)
     )
 
@@ -276,5 +277,5 @@ def evaluate_xgboost(
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
         substation_power_flows=substation_power_flows_filtered,
-        time_series_metadata=substation_metadata_filtered,
+        time_series_metadata=time_series_metadata_filtered,
     )

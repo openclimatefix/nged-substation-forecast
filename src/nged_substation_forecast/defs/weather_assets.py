@@ -86,17 +86,21 @@ class ProcessedNWPConfig(dg.Config):
 @asset(
     ins={
         "all_nwp_data": AssetIn("all_nwp_data"),
-        "substation_metadata": AssetIn("substation_metadata"),
     }
 )
 def processed_nwp_data(
-    config: ProcessedNWPConfig, all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
+    config: ProcessedNWPConfig, all_nwp_data: pl.LazyFrame, settings: ResourceParam[Settings]
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
     WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
     if the input NWP data or the number of substations is very large.
     """
+    substation_metadata_path = settings.nged_data_path / "parquet" / "substation_metadata.parquet"
+    substation_metadata = pl.read_parquet(substation_metadata_path)
+    time_series_metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    time_series_metadata = pl.read_parquet(time_series_metadata_path)
+
     if config.start_date:
         all_nwp_data = all_nwp_data.filter(
             pl.col("init_time")
@@ -110,11 +114,11 @@ def processed_nwp_data(
             )
         )
 
+    metadata = time_series_metadata.join(substation_metadata, on="substation_number")
+
     if config.substation_ids:
-        substation_metadata = substation_metadata.filter(
-            pl.col("substation_number").is_in(config.substation_ids)
-        )
-    h3_indices = substation_metadata["h3_res_5"].unique().to_list()
+        metadata = metadata.filter(pl.col("time_series_id").is_in(config.substation_ids))
+    h3_indices = metadata["h3_res_5"].unique().to_list()
     return process_nwp_data(
         all_nwp_data,
         h3_indices,

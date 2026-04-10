@@ -35,28 +35,6 @@ class DataConfig:
     resolution: str = "30m"
 
 
-def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[TimeSeriesMetadata]:
-    """Load substation metadata and filter for those with available power data."""
-    config = config or DataConfig()
-    metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
-    metadata_df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
-
-    # Only return substations we have local power data for in Delta Lake.
-    # We use `pl.scan_delta` to perform a lazy, optimized scan of the Delta Lake
-    # table, which is more memory-efficient than `read_delta` for large tables.
-    # This helper also ensures the timestamp column is UTC-aware.
-    substations_with_telemetry = (
-        cast(
-            pl.DataFrame,
-            pl.scan_delta(config.base_power_path).select("time_series_id").unique().collect(),
-        )
-        .to_series()
-        .to_list()
-    )
-
-    return metadata_df.filter(pl.col("time_series_id").is_in(substations_with_telemetry))
-
-
 def load_nwp_run(
     init_time: datetime, h3_indices: list[int], config: DataConfig | None = None
 ) -> pt.DataFrame[Nwp]:
