@@ -141,16 +141,14 @@ class TimeSeriesMetadata(pt.Model):
             " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
         ),
     )
-    area_center_lat: float | None = pt.Field(
+    area_center_lat: float = pt.Field(
         dtype=pl.Float32,
-        allow_missing=True,
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
         ),
     )
-    area_center_lon: float | None = pt.Field(
+    area_center_lon: float = pt.Field(
         dtype=pl.Float32,
-        allow_missing=True,
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
         ),
