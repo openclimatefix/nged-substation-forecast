@@ -133,9 +133,8 @@ class TimeSeriesMetadata(pt.Model):
         allow_missing=True,
         description="Always None in the trial area",
     )
-    area_wkt: str | None = pt.Field(
+    area_wkt: str = pt.Field(
         dtype=pl.String,
-        allow_missing=True,
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
