@@ -30,7 +30,11 @@ def load_nged_json(
     """
     # Read the JSON file into a Polars DataFrame.
     # pl.read_json() is efficient for reading JSON files into a DataFrame.
-    df = pl.read_json(file_path)
+    try:
+        df = pl.read_json(file_path)
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        raise e
 
     # Extract metadata: all columns except 'data'.
     # This assumes that all columns other than 'data' are metadata.
@@ -42,6 +46,11 @@ def load_nged_json(
 
     # Convert metadata keys from CamelCase to snake_case
     metadata_df = metadata_df.rename({col: camel_to_snake(col) for col in metadata_df.columns})
+
+    # Drop superfluous columns
+    for col in ["is_valid", "geometry_type", "srid"]:
+        if col in metadata_df.columns:
+            metadata_df = metadata_df.drop(col)
 
     # Rename area fields if they exist
     rename_map = {}
@@ -70,6 +79,10 @@ def load_nged_json(
         metadata_df = metadata_df.with_columns(pl.col("area_center_lat").cast(pl.Float32))
     if "area_center_lon" in metadata_df.columns:
         metadata_df = metadata_df.with_columns(pl.col("area_center_lon").cast(pl.Float32))
+    if "information" in metadata_df.columns:
+        metadata_df = metadata_df.with_columns(pl.col("information").cast(pl.String))
+    if "area_wkt" in metadata_df.columns:
+        metadata_df = metadata_df.with_columns(pl.col("area_wkt").cast(pl.String))
 
     # Validate the metadata DataFrame against the new TimeSeriesMetadata contract.
     metadata_df = TimeSeriesMetadata.validate(metadata_df)
@@ -93,9 +106,7 @@ def load_nged_json(
     # Rename endTime to period_end_time and parse it as a UTC datetime.
     time_series_df = time_series_df.rename({"endTime": "period_end_time"})
     time_series_df = time_series_df.with_columns(
-        pl.col("period_end_time")
-        .str.to_datetime(format="%Y-%m-%dT%H:%M:%SZ")
-        .dt.replace_time_zone("UTC")
+        pl.col("period_end_time").str.to_datetime(format="%Y-%m-%d %H:%M:%S%z")
     )
 
     # Add the time_series_id from the metadata to the time_series_df.

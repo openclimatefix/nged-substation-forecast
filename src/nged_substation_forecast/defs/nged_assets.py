@@ -99,23 +99,31 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
         context.log.warning(f"Directory {json_dir} does not exist. Skipping ingestion.")
         return
 
-    for json_file in json_dir.glob("*.json"):
+    for json_file in json_dir.glob("TimeSeries_*.json"):
+        if "cleaned" in json_file.name:
+            continue
         context.log.info(f"Processing {json_file.name}")
         metadata_df, time_series_df = load_nged_json(json_file)
 
         # Upsert metadata to Parquet
-        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
+        upsert_metadata(
+            metadata_df, settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+        )
 
         # Clean power data
         time_series_id = int(metadata_df.get_column("time_series_id").item())
-        cleaned_df = clean_power_data(
-            time_series_df,
-            time_series_id=time_series_id,
-            variance_thresholds=settings.data_quality.variance_thresholds,
-        )
+        try:
+            cleaned_df = clean_power_data(
+                time_series_df,
+                time_series_id=time_series_id,
+                variance_thresholds=settings.data_quality.variance_thresholds,
+            )
+        except ValueError as e:
+            context.log.warning(f"Skipping {json_file.name} due to: {e}")
+            continue
 
         # Append to Delta table
-        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "power_time_series")
 
     context.log.info("Finished processing SharePoint JSON data.")
 
