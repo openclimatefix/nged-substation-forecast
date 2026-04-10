@@ -136,6 +136,7 @@ class TimeSeriesMetadata(pt.Model):
     area_wkt: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
+        # Maps to the nested Area.WKT field in the JSON data.
         description=(
             "For customer sites, the area, where present, refers to the area covered by the generator itself."
             " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
