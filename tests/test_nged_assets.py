@@ -30,29 +30,26 @@ def test_nged_json_live_asset(mock_settings, tmp_path: Path):
     # Build context
     context = dg.build_asset_context(partition_key="2026-01-26-00:00")
 
-    # Mock load_nged_json, clean_power_data, append_to_delta
-    with MagicMock() as mock_load, MagicMock() as mock_clean, MagicMock() as mock_append:
+    # Mock load_nged_json, PowerTimeSeries.validate, append_to_delta
+    with MagicMock() as mock_load, MagicMock() as mock_validate, MagicMock() as mock_append:
         with pytest.MonkeyPatch.context() as m:
             m.setattr("nged_substation_forecast.defs.nged_assets.load_nged_json", mock_load)
-            m.setattr("nged_substation_forecast.defs.nged_assets.clean_power_data", mock_clean)
+            m.setattr("contracts.data_schemas.PowerTimeSeries.validate", mock_validate)
             m.setattr("nged_substation_forecast.defs.nged_assets.append_to_delta", mock_append)
 
             mock_load.return_value = (MagicMock(), MagicMock())
-            mock_clean.return_value = pl.DataFrame(
+            mock_validate.return_value = pl.DataFrame(
                 {
-                    "period_end_time": ["2026-01-01T00:00:00Z"],
-                    "substation_number": [1],
+                    "time_series_id": [1],
+                    "period_end_time": [datetime(2026, 1, 1, 0, 0)],
                     "power": [10.0],
-                    "MVA": [12.0],
-                    "MVAr": [0.0],
-                    "ingested_at": [datetime.now()],
                 }
             )
 
             nged_json_live_asset(context, mock_settings)
 
             mock_load.assert_called_once()
-            mock_clean.assert_called_once()
+            mock_validate.assert_called_once()
             mock_append.assert_called_once()
 
 
@@ -70,31 +67,28 @@ def test_nged_json_archive_asset(mock_settings, tmp_path: Path):
     # Build context
     context = dg.build_asset_context()
 
-    # Mock load_nged_json, clean_power_data, append_to_delta
+    # Mock load_nged_json, PowerTimeSeries.validate, append_to_delta
     with (
         MagicMock() as mock_load,
-        MagicMock() as mock_clean,
+        MagicMock() as mock_validate,
         MagicMock() as mock_append,
     ):
         with pytest.MonkeyPatch.context() as m:
             m.setattr("nged_substation_forecast.defs.nged_assets.load_nged_json", mock_load)
-            m.setattr("nged_substation_forecast.defs.nged_assets.clean_power_data", mock_clean)
+            m.setattr("contracts.data_schemas.PowerTimeSeries.validate", mock_validate)
             m.setattr("nged_substation_forecast.defs.nged_assets.append_to_delta", mock_append)
 
             mock_load.return_value = (MagicMock(), MagicMock())
-            mock_clean.return_value = pl.DataFrame(
+            mock_validate.return_value = pl.DataFrame(
                 {
-                    "period_end_time": ["2026-01-01T00:00:00Z"],
-                    "substation_number": [1],
+                    "time_series_id": [1],
+                    "period_end_time": [datetime(2026, 1, 1, 0, 0)],
                     "power": [10.0],
-                    "MVA": [12.0],
-                    "MVAr": [0.0],
-                    "ingested_at": [datetime.now()],
                 }
             )
 
             nged_json_archive_asset(context, mock_settings)
 
             mock_load.assert_called_once()
-            mock_clean.assert_called_once()
+            mock_validate.assert_called_once()
             mock_append.assert_called_once()

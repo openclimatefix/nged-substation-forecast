@@ -15,7 +15,6 @@ from dagster import (
 )
 from nged_data import (
     append_to_delta,
-    clean_power_data,
     load_nged_json,
     upsert_metadata,
 )
@@ -32,16 +31,11 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
         # Upsert metadata
         upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
 
-        # Clean power data
-        time_series_id = int(metadata_df.get_column("time_series_id").item())
-        cleaned_df = clean_power_data(
-            time_series_df,
-            time_series_id=time_series_id,
-            variance_thresholds=settings.data_quality.variance_thresholds,
-        )
+        # Validate raw data
+        validated_df = PowerTimeSeries.validate(time_series_df)
 
         # Append to delta
-        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "json_data")
+        append_to_delta(validated_df, settings.nged_data_path / "delta" / "raw_power_time_series")
 
     context.log.info("Finished processing archive JSON data.")
 
@@ -69,21 +63,16 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
         # Upsert metadata
         upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
 
-        # Clean power data
-        time_series_id = int(metadata_df.get_column("time_series_id").item())
-        cleaned_df = clean_power_data(
-            time_series_df,
-            time_series_id=time_series_id,
-            variance_thresholds=settings.data_quality.variance_thresholds,
-        )
-        cleaned_dfs.append(cleaned_df)
+        # Validate raw data
+        validated_df = PowerTimeSeries.validate(time_series_df)
+        cleaned_dfs.append(validated_df)
 
     if cleaned_dfs:
-        # Combine all cleaned dataframes and append in a single operation
+        # Combine all validated dataframes and append in a single operation
         combined_df = pl.concat(cleaned_dfs)
         append_to_delta(
             pt.DataFrame[PowerTimeSeries](combined_df),
-            settings.nged_data_path / "delta" / "json_data",
+            settings.nged_data_path / "delta" / "raw_power_time_series",
         )
 
     context.log.info(f"Finished processing live JSON data for {partition_date}.")
@@ -110,20 +99,15 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
             metadata_df, settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
         )
 
-        # Clean power data
-        time_series_id = int(metadata_df.get_column("time_series_id").item())
+        # Validate raw data
         try:
-            cleaned_df = clean_power_data(
-                time_series_df,
-                time_series_id=time_series_id,
-                variance_thresholds=settings.data_quality.variance_thresholds,
-            )
+            validated_df = PowerTimeSeries.validate(time_series_df)
         except ValueError as e:
             context.log.warning(f"Skipping {json_file.name} due to: {e}")
             continue
 
         # Append to Delta table
-        append_to_delta(cleaned_df, settings.nged_data_path / "delta" / "power_time_series")
+        append_to_delta(validated_df, settings.nged_data_path / "delta" / "raw_power_time_series")
 
     context.log.info("Finished processing SharePoint JSON data.")
 
