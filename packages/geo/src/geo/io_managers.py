@@ -1,4 +1,5 @@
 import polars as pl
+import patito as pt
 from dagster import InputContext, OutputContext
 from dagster._core.storage.upath_io_manager import UPathIOManager
 from typing import Any, TYPE_CHECKING
@@ -12,6 +13,12 @@ class CompositeIOManager(UPathIOManager):
     extension = ""
 
     def dump_to_path(self, context: OutputContext, obj: Any, path: "UPath"):
+        if isinstance(obj, pt.DataFrame):
+            obj = obj.as_polars()
+        elif hasattr(obj, "as_polars"):
+            # If it's not a pt.DataFrame but has as_polars, try to convert it
+            obj = obj.as_polars()
+
         if isinstance(obj, pl.DataFrame):
             # Ensure the directory exists
             path.parent.mkdir(parents=True, exist_ok=True)

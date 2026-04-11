@@ -1,6 +1,8 @@
 import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
+from geo.io_managers import CompositeIOManager
+from upath import UPath
 from typing import cast
 
 import dagster as dg
@@ -12,7 +14,7 @@ from nged_substation_forecast.definitions import defs
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.manual
-def test_xgboost_dagster_integration() -> None:
+def test_xgboost_dagster_integration(tmp_path: Path) -> None:
     """True integration test for XGBoost pipeline inside Dagster.
 
     Note: This test requires actual data in the Delta tables and NWP parquet files.
@@ -149,6 +151,7 @@ def test_xgboost_dagster_integration() -> None:
         # standard development machine as it executes the full XGBoost pipeline
         # (data loading, cleaning, training, evaluation, and plotting).
         resources = defs.resources or {}
+        io_manager = CompositeIOManager(base_path=UPath(tmp_path))
 
         # Run for training and test partitions
         all_partitions = []
@@ -166,7 +169,7 @@ def test_xgboost_dagster_integration() -> None:
                 op_selection=["cleaned_actuals"],
                 resources={
                     **resources,
-                    "io_manager": dg.mem_io_manager,
+                    "io_manager": io_manager,
                 },
                 instance=instance,
             )
@@ -176,7 +179,7 @@ def test_xgboost_dagster_integration() -> None:
             partition_key=test_end.isoformat(),
             resources={
                 **resources,
-                "io_manager": dg.mem_io_manager,
+                "io_manager": io_manager,
             },
             instance=instance,
         )
