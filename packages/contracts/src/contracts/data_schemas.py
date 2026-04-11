@@ -435,3 +435,14 @@ class H3GridWeights(pt.Model):
     len: int = pt.Field(dtype=pl.UInt32)
     total: int = pt.Field(dtype=pl.UInt32)
     proportion: float = pt.Field(dtype=pl.Float64)
+
+
+class Metrics(pt.Model):
+    """Evaluation metrics for power forecasts."""
+
+    time_series_id: int = pt.Field(dtype=pl.Int32)
+    power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
+    mae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    rmse: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    nmae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
