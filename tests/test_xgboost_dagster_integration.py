@@ -1,3 +1,4 @@
+import logging
 import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -9,6 +10,9 @@ import dagster as dg
 import polars as pl
 from contracts.settings import Settings
 from nged_substation_forecast.definitions import defs
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 @pytest.mark.slow
@@ -163,6 +167,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             all_partitions.append(date.isoformat())
 
         for partition_key in all_partitions:
+            logging.info(f"Starting job execution for partition: {partition_key}")
             job.execute_in_process(
                 run_config=run_config,
                 partition_key=partition_key,
@@ -173,7 +178,9 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
                 },
                 instance=instance,
             )
+            logging.info(f"Finished job execution for partition: {partition_key}")
 
+        logging.info(f"Starting final job execution for test_end: {test_end.isoformat()}")
         result = job.execute_in_process(
             run_config=run_config,
             partition_key=test_end.isoformat(),
@@ -183,6 +190,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             },
             instance=instance,
         )
+        logging.info("Finished final job execution for test_end")
 
     # 7. Assertions
     assert result.success, "Dagster job failed"
