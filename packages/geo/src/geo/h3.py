@@ -1,11 +1,14 @@
 """H3-related utilities for geospatial operations."""
 
+import patito as pt
 import polars as pl
 import polars_h3 as plh3
 from contracts.data_schemas import H3GridWeights
 
 
-def compute_h3_grid_weights(df: pl.DataFrame, grid_size: float, child_res: int = 7) -> pl.DataFrame:
+def compute_h3_grid_weights(
+    df: pl.DataFrame, grid_size: float, child_res: int = 7
+) -> pt.DataFrame["H3GridWeights"]:
     """Computes the proportion mapping for H3 grid cells to a regular lat/lng grid.
 
     This function takes a DataFrame containing H3 indices and calculates how many

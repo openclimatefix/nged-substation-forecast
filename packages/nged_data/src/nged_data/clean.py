@@ -4,12 +4,15 @@ import dagster
 from contracts.data_schemas import PowerTimeSeries
 
 
-def sort_data(df: pl.DataFrame) -> pl.DataFrame:
+from typing import cast
+
+
+def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries]:
     """Sorts the DataFrame by 'period_end_time'."""
-    return df.sort("period_end_time")
+    return cast(pt.DataFrame[PowerTimeSeries], df.sort("period_end_time"))
 
 
-def calculate_rolling_variance(df: pl.DataFrame) -> pl.DataFrame:
+def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFrame:
     """Calculates rolling variance over a 6-hour window."""
     rolling_df = df.rolling(index_column="period_end_time", period="6h").agg(
         rolling_variance=pl.col("power").var()
@@ -30,20 +33,24 @@ def clean_power_data(
     variance_thresholds: dict[int, float] | None = None,
     default_threshold: float = 0.1,
 ) -> pt.DataFrame[PowerTimeSeries]:
-    # 1. Sort
+    # 1. Validate input
+    df = PowerTimeSeries.validate(df)
+
+    # 2. Sort
     df = sort_data(df)
 
-    # 2. Drop initial nulls
+    # 3. Drop initial nulls
     df = df.drop_nulls(subset=["power"])
     if df.is_empty():
         raise ValueError("All rows were removed after dropping nulls.")
+    df = PowerTimeSeries.validate(df)
 
     # Determine threshold
     threshold = default_threshold
     if variance_thresholds and time_series_id is not None and time_series_id in variance_thresholds:
         threshold = variance_thresholds[time_series_id]
 
-    # 3. Identify 'bad pre-amble data'
+    # 4. Identify 'bad pre-amble data'
     df = calculate_rolling_variance(df)
 
     # Find the first index where rolling variance exceeds the threshold
@@ -64,5 +71,5 @@ def clean_power_data(
     df = df.with_columns(power=pl.col("power").fill_nan(None)).drop_nulls(subset=["power"])
     dagster.get_dagster_logger().info(f"DF after dropping nulls: {df}")
 
-    # 4. Validate
+    # 5. Validate
     return validate_data(df)
