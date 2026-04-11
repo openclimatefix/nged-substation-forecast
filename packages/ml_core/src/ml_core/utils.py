@@ -170,6 +170,7 @@ def evaluate_and_save_model(
     results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     ).lazy()
+    results_df = results_lf.collect()
     context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
@@ -178,7 +179,7 @@ def evaluate_and_save_model(
 
         # Join predictions with actuals
         context.log.info("Joining predictions with actuals.")
-        eval_lf = results_lf.join(
+        eval_lf = results_df.lazy().join(
             actuals_lf.rename({"period_end_time": "valid_time", "power": "actual"}),
             on=["valid_time", "time_series_id"],
             how="inner",
@@ -220,63 +221,78 @@ def evaluate_and_save_model(
                 / 60.0
             )
 
-        # Group by lead_time_hours and calculate metrics
-        context.log.info("Calculating metrics by lead_time_hours.")
-        metrics_lf = (
-            eval_lf.group_by("lead_time_hours")
-            .agg(
-                [
-                    (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
-                    ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
+        # Sink to temporary file for caching
+        tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        eval_parquet_path = tmp_file.name
+        tmp_file.close()
+
+        try:
+            eval_lf.sink_parquet(eval_parquet_path)
+            eval_lf_cached = pl.scan_parquet(eval_parquet_path)
+
+            # Group by lead_time_hours and calculate metrics
+            context.log.info("Calculating metrics by lead_time_hours.")
+            metrics_lf = (
+                eval_lf_cached.group_by("lead_time_hours")
+                .agg(
+                    [
+                        (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
+                        ((pl.col("power_fcst") - pl.col("actual")) ** 2)
+                        .mean()
+                        .sqrt()
+                        .alias("RMSE"),
+                        ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
+                        .mean()
+                        .alias("nMAE"),
+                    ]
+                )
+                .sort("lead_time_hours")
+            )
+
+            # Log metrics to MLflow
+            mlflow.set_experiment(model_name)
+            with mlflow.start_run(run_name=f"{model_name}_eval"):
+                # 1. Metric Thinning: Log only key operational horizons
+                key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
+                metrics = cast(pl.DataFrame, metrics_lf.collect())
+                for row in metrics.iter_rows(named=True):
+                    lt = round(float(row["lead_time_hours"]), 1)
+                    if lt in key_horizons:
+                        if row["MAE"] is not None:
+                            mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                        if row["RMSE"] is not None:
+                            mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                        if row["nMAE"] is not None:
+                            mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+
+                # 2. Log global aggregate metrics
+                global_metrics_lf = eval_lf_cached.select(
+                    (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("mae_global"),
+                    ((pl.col("power_fcst") - pl.col("actual")) ** 2)
+                    .mean()
+                    .sqrt()
+                    .alias("rmse_global"),
                     ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
                     .mean()
-                    .alias("nMAE"),
-                ]
-            )
-            .sort("lead_time_hours")
-        )
+                    .alias("nmae_global"),
+                )
+                global_metrics = cast(pl.DataFrame, global_metrics_lf.collect()).to_dicts()[0]
 
-        # Log metrics to MLflow
-        mlflow.set_experiment(model_name)
-        with mlflow.start_run(run_name=f"{model_name}_eval"):
-            # 1. Metric Thinning: Log only key operational horizons
-            key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
-            metrics = metrics_lf.collect()
-            for row in metrics.iter_rows(named=True):
-                lt = round(float(row["lead_time_hours"]), 1)
-                if lt in key_horizons:
-                    if row["MAE"] is not None:
-                        mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
-                    if row["RMSE"] is not None:
-                        mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                    if row["nMAE"] is not None:
-                        mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+                if global_metrics["mae_global"] is not None:
+                    mlflow.log_metric("mean_mae_all_horizons", global_metrics["mae_global"])
+                    mlflow.log_metric("MAE_global", global_metrics["mae_global"])
 
-            # 2. Log global aggregate metrics
-            global_metrics_lf = eval_lf.select(
-                (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("mae_global"),
-                ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt().alias("rmse_global"),
-                ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
-                .mean()
-                .alias("nmae_global"),
-            )
-            global_metrics = global_metrics_lf.collect().to_dicts()[0]
+                if global_metrics["rmse_global"] is not None:
+                    mlflow.log_metric("RMSE_global", global_metrics["rmse_global"])
 
-            if global_metrics["mae_global"] is not None:
-                mlflow.log_metric("mean_mae_all_horizons", global_metrics["mae_global"])
-                mlflow.log_metric("MAE_global", global_metrics["mae_global"])
+                if global_metrics["nmae_global"] is not None:
+                    mlflow.log_metric("nMAE_global", global_metrics["nmae_global"])
 
-            if global_metrics["rmse_global"] is not None:
-                mlflow.log_metric("RMSE_global", global_metrics["rmse_global"])
-
-            if global_metrics["nmae_global"] is not None:
-                mlflow.log_metric("nMAE_global", global_metrics["nmae_global"])
-
-            # 3. Save full granular evaluation dataframe as Parquet artifact
-            with tempfile.TemporaryDirectory() as tmpdir:
-                eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
-                eval_lf.sink_parquet(eval_df_path)
-                mlflow.log_artifact(eval_df_path)
+                # 3. Save full granular evaluation dataframe as Parquet artifact
+                mlflow.log_artifact(eval_parquet_path)
+        finally:
+            if os.path.exists(eval_parquet_path):
+                os.remove(eval_parquet_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:
