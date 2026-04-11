@@ -170,17 +170,47 @@ def evaluate_and_save_model(
     results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     ).lazy()
-    results_df = results_lf.collect()
     context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
     if "power_time_series" in sliced_data:
         actuals_lf = sliced_data["power_time_series"]
 
-        # Join predictions with actuals
+        # Calculate lead_time_hours in results_lf BEFORE joining
+        if "nwp_init_time" in results_lf.collect_schema().names():
+            results_lf = results_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
+                / 60.0
+            )
+        else:
+            results_lf = results_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
+                / 60.0
+            )
+
+        # Aggregate results_lf (e.g., mean prediction per lead time)
+        results_lf = results_lf.group_by(["valid_time", "time_series_id", "lead_time_hours"]).agg(
+            pl.col("power_fcst").mean()
+        )
+
+        # Save results_lf and actuals_lf as separate Parquet files.
+        # We use temporary files for this.
+        results_tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        results_parquet_path = results_tmp_file.name
+        results_tmp_file.close()
+        results_lf.sink_parquet(results_parquet_path)
+
+        actuals_tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        actuals_parquet_path = actuals_tmp_file.name
+        actuals_tmp_file.close()
+        actuals_lf.sink_parquet(actuals_parquet_path)
+
+        # Join aggregated results_lf with actuals_lf
         context.log.info("Joining predictions with actuals.")
-        eval_lf = results_df.lazy().join(
-            actuals_lf.rename({"period_end_time": "valid_time", "power": "actual"}),
+        eval_lf = pl.scan_parquet(results_parquet_path).join(
+            pl.scan_parquet(actuals_parquet_path).rename(
+                {"period_end_time": "valid_time", "power": "actual"}
+            ),
             on=["valid_time", "time_series_id"],
             how="inner",
         )
@@ -205,21 +235,6 @@ def evaluate_and_save_model(
             test_start_dt = test_start
 
         eval_lf = eval_lf.filter(pl.col("valid_time") >= test_start_dt)
-
-        # Calculate lead_time_hours
-        if "nwp_init_time" in eval_lf.collect_schema().names():
-            context.log.info("Calculating lead_time_hours (with nwp_init_time).")
-            eval_lf = eval_lf.with_columns(
-                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
-                / 60.0
-            )
-        else:
-            # Fallback if nwp_init_time is not available
-            context.log.info("Calculating lead_time_hours (fallback).")
-            eval_lf = eval_lf.with_columns(
-                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
-                / 60.0
-            )
 
         # Sink to temporary file for caching
         tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
@@ -293,6 +308,10 @@ def evaluate_and_save_model(
         finally:
             if os.path.exists(eval_parquet_path):
                 os.remove(eval_parquet_path)
+            if os.path.exists(results_parquet_path):
+                os.remove(results_parquet_path)
+            if os.path.exists(actuals_parquet_path):
+                os.remove(actuals_parquet_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:
