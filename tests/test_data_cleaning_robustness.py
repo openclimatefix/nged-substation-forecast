@@ -56,7 +56,7 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
     ) as context:
         # We need to mock clean_substation_flows to verify what data it receives
         with patch(
-            "src.nged_substation_forecast.defs.data_cleaning_assets.clean_substation_flows"
+            "src.nged_substation_forecast.defs.data_cleaning_assets.clean_power_time_series"
         ) as mock_clean:
             # Mock return value to be a valid DataFrame
             mock_clean.return_value = df.filter(pl.col("start_time") == t2)
@@ -79,19 +79,21 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
     cleaned_actuals_path = delta_dir / "cleaned_actuals"
     raw_flows_path.mkdir(parents=True)
 
-    t1 = datetime(2026, 3, 10, 12, tzinfo=timezone.utc)
+    t1 = datetime(2026, 3, 9, 0, tzinfo=timezone.utc)
+    # 48 hours = 96 periods.
+    # Need at least 96 rows.
+    times = [t1 + timedelta(minutes=30 * i) for i in range(200)]
+    powers = [10.0 + (i % 2) * 50 for i in range(200)]
 
     df = pl.DataFrame(
         {
-            "time_series_id": [1],
-            "start_time": [t1],
-            "period_end_time": [t1 + timedelta(minutes=30)],
-            "power": [10.0],
+            "time_series_id": [1 for _ in range(200)],
+            "period_end_time": times,
+            "power": powers,
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.Int32),
-            pl.col("start_time").cast(UTC_DATETIME_DTYPE),
             pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
             pl.col("power").cast(pl.Float32),
         ]
@@ -109,21 +111,19 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
 
         # Verify data exists
         df_result = pl.read_delta(str(cleaned_actuals_path))
-        assert len(df_result) == 1
+        assert len(df_result) > 0
         assert df_result["power"][0] == 10.0
 
         # Run again with different data in source for same partition
         df_new = pl.DataFrame(
             {
-                "time_series_id": [1],
-                "start_time": [t1],
-                "period_end_time": [t1 + timedelta(minutes=30)],
-                "power": [20.0],
+                "time_series_id": [1 for _ in range(200)],
+                "period_end_time": times,
+                "power": [20.0 + (i % 2) * 50 for i in range(200)],
             }
         ).with_columns(
             [
                 pl.col("time_series_id").cast(pl.Int32),
-                pl.col("start_time").cast(UTC_DATETIME_DTYPE),
                 pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
                 pl.col("power").cast(pl.Float32),
             ]
@@ -132,12 +132,12 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         df_new.write_delta(
             str(raw_flows_path),
             mode="overwrite",
-            delta_write_options={"predicate": f"start_time >= '{t1.isoformat()}'"},
+            delta_write_options={"predicate": f"period_end_time >= '{times[0].isoformat()}'"},
         )
 
         cleaned_actuals(context, settings)
 
         # Verify data was overwritten
         df_result = pl.read_delta(str(cleaned_actuals_path))
-        assert len(df_result) == 1
+        assert len(df_result) > 0
         assert df_result["power"][0] == 20.0

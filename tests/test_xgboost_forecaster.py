@@ -305,19 +305,32 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
 
     flows = pl.DataFrame(
         {
-            "time_series_id": ["123"],
+            "time_series_id": [123],
             "start_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
             "period_end_time": [datetime(2024, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=30)],
             "power": [1.0],
             "MVA": [None],
         }
-    ).with_columns(pl.col("MVA").cast(pl.Float64))
+    ).with_columns(pl.col("MVA").cast(pl.Float64), pl.col("time_series_id").cast(pl.Int32))
 
     # Write flows to Delta as the asset now loads from Delta
     delta_dir = tmp_path / "delta"
     cleaned_actuals_path = delta_dir / "cleaned_actuals"
     cleaned_actuals_path.mkdir(parents=True)
     flows.write_delta(str(cleaned_actuals_path))
+
+    # Create time series metadata
+    metadata = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "substation_number": [1],
+            "h3_res_5": [1],
+        }
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
+
+    parquet_dir = tmp_path / "parquet"
+    parquet_dir.mkdir(parents=True)
+    metadata.write_parquet(parquet_dir / "time_series_metadata.parquet")
 
     settings = Settings(nged_data_path=tmp_path)
 

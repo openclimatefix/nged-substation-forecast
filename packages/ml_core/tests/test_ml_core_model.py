@@ -1,8 +1,9 @@
 import patito as pt
 import polars as pl
-from collections.abc import Mapping
+from typing import Any, Mapping
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
     PowerTimeSeries,
     TimeSeriesMetadata,
@@ -22,13 +23,13 @@ class MockForecaster(BaseForecaster):
         self.kwargs = kwargs
         self.trained = False
 
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        power_time_series: pl.LazyFrame,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
-    ):
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
+    ) -> Any:
         self.trained = True
         return self
 

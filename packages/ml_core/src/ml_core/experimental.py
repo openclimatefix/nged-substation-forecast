@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Mapping
-from typing import cast
+from typing import Any
 
 import patito as pt
 import polars as pl
@@ -37,13 +37,13 @@ class LocalForecasters(BaseForecaster):
         self.forecaster_kwargs = forecaster_kwargs
         self.models: dict[int | str, BaseForecaster] = {}
 
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        power_time_series: pl.LazyFrame,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
-    ) -> "LocalForecasters":
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
+    ) -> Any:
         """Train a separate model for each time series.
 
         Args:
@@ -62,15 +62,17 @@ class LocalForecasters(BaseForecaster):
         for ts_id in time_series_ids:
             log.debug(f"Training model for time series {ts_id}")
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
-            ts_flows = power_time_series.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = pt.LazyFrame[PowerTimeSeries](
+                power_time_series.filter(pl.col("time_series_id") == ts_id)
+            )
 
             # Instantiate and train
             model = self.forecaster_cls(**self.forecaster_kwargs)
             model.fit(
                 config=config,
-                power_time_series=cast(pt.LazyFrame[PowerTimeSeries], ts_flows),
+                power_time_series=ts_flows,
                 time_series_metadata=ts_meta,
-                nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps) if nwps is not None else None,
+                nwps=nwps if nwps is not None else None,
             )
             self.models[ts_id] = model
 
@@ -107,13 +109,17 @@ class LocalForecasters(BaseForecaster):
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
 
             # Filter inputs
-            ts_flows = power_time_series.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = pt.LazyFrame[PowerTimeSeries](
+                power_time_series.filter(pl.col("time_series_id") == ts_id)
+            )
 
             preds = self.models[ts_id].predict(
                 time_series_metadata=ts_meta,
                 inference_params=inference_params,
-                power_time_series=cast(pt.LazyFrame[PowerTimeSeries], ts_flows),
-                nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps) if nwps is not None else None,
+                power_time_series=ts_flows,
+                nwps={k: pt.LazyFrame[Nwp](v) for k, v in nwps.items()}
+                if nwps is not None
+                else None,
                 collapse_lead_times=collapse_lead_times,
             )
             all_preds.append(preds)

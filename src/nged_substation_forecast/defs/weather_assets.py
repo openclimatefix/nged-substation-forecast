@@ -56,8 +56,11 @@ def ecmwf_ens_forecast(
 
 
 @asset(deps=[ecmwf_ens_forecast])
-def all_nwp_data(settings: ResourceParam[Settings]) -> pt.LazyFrame[Nwp]:
-    """Provides a LazyFrame scanning all downloaded NWP data."""
+def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
+    """Provides a LazyFrame scanning all downloaded NWP data.
+
+    The returned LazyFrame adheres to the contracts.data_schemas.Nwp schema.
+    """
     nwp_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     if not nwp_dir.exists():
         # Return an empty LazyFrame with the expected schema if the directory doesn't exist.

@@ -27,8 +27,11 @@ def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
     return PowerTimeSeries.validate(df)
 
 
-def clean_power_data(
+def clean_power_time_series(
     df: pl.DataFrame,
+    stuck_std_threshold: float,
+    min_mw_threshold: float,
+    max_mw_threshold: float,
     time_series_id: int | None = None,
     variance_thresholds: dict[int, float] | None = None,
     default_threshold: float = 0.1,
@@ -67,9 +70,27 @@ def clean_power_data(
     # Drop the rolling_variance column
     df = df.drop("rolling_variance")
 
+    # 5. Identify 'stuck' and 'insane' values
+    # Stuck sensors: Rolling std dev < stuck_std_threshold over 48-period (24-hour) window.
+    # Insane power: power < min_mw_threshold or power > max_mw_threshold.
+
+    # Note: The original cleaning.py used "substation_number" for rolling_std.
+    # Assuming "time_series_id" is the equivalent here.
+
+    stuck_mask = (
+        pl.col("power").rolling_std(48).fill_null(0).over("time_series_id") < stuck_std_threshold
+    )
+    insane_mask = (pl.col("power") < min_mw_threshold) | (pl.col("power") > max_mw_threshold)
+
+    bad_value_mask = stuck_mask | insane_mask
+
+    df = df.with_columns(
+        pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col("power")).alias("power")
+    )
+
     # Drop nulls again
     df = df.with_columns(power=pl.col("power").fill_nan(None)).drop_nulls(subset=["power"])
     dagster.get_dagster_logger().info(f"DF after dropping nulls: {df}")
 
-    # 5. Validate
+    # 6. Validate
     return validate_data(df)
