@@ -1,17 +1,19 @@
 import polars as pl
+import patito as pt
 from pathlib import Path
 from dagster import get_dagster_logger
 import io
+from contracts.data_schemas import TimeSeriesMetadata
 
 
-def get_df_hash(df: pl.DataFrame) -> int:
+def get_df_hash(df: pt.DataFrame[TimeSeriesMetadata]) -> int:
     """Calculates a hash of the DataFrame."""
     buffer = io.BytesIO()
     df.write_parquet(buffer)
     return hash(buffer.getvalue())
 
 
-def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
+def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path) -> None:
     """
     Upserts metadata to a Parquet file.
 
@@ -35,15 +37,19 @@ def upsert_metadata(new_metadata: pl.DataFrame, metadata_path: Path) -> None:
         return
 
     # Read existing metadata
-    existing_metadata = pl.read_parquet(metadata_path)
+    existing_metadata = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
 
     # Ensure h3_res_5 is UInt64 in existing metadata if it exists
     if "h3_res_5" in existing_metadata.columns:
-        existing_metadata = existing_metadata.with_columns(pl.col("h3_res_5").cast(pl.UInt64))
+        existing_metadata = TimeSeriesMetadata.validate(
+            existing_metadata.with_columns(pl.col("h3_res_5").cast(pl.UInt64))
+        )
 
     # Merge metadata
     # Put new_metadata first so that unique() keeps the new version
-    merged_metadata = pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id")
+    merged_metadata = TimeSeriesMetadata.validate(
+        pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id")
+    )
 
     # Compare metadata
     # We use `hash_rows().sum()` to check if the DataFrames are identical.
