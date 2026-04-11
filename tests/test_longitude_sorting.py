@@ -2,24 +2,30 @@ import pytest
 import xarray as xr
 import numpy as np
 import polars as pl
+import patito as pt
+from contracts.data_schemas import H3GridWeights
 from dynamical_data.processing import download_ecmwf
+from typing import cast
 
 
 @pytest.fixture
-def h3_grid() -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "h3_index": [123456789, 123456790],
-            "nwp_lat": [56.0, 57.0],
-            "nwp_lng": [0.0, -5.0],
-            "proportion": [0.5, 0.5],
-        },
-        schema={
-            "h3_index": pl.UInt64,
-            "nwp_lat": pl.Float32,
-            "nwp_lng": pl.Float32,
-            "proportion": pl.Float32,
-        },
+def h3_grid() -> pt.DataFrame[H3GridWeights]:
+    return cast(
+        pt.DataFrame[H3GridWeights],
+        pl.DataFrame(
+            {
+                "h3_index": [123456789, 123456790],
+                "nwp_lat": [56.0, 57.0],
+                "nwp_lng": [0.0, -5.0],
+                "proportion": [0.5, 0.5],
+            },
+            schema={
+                "h3_index": pl.UInt64,
+                "nwp_lat": pl.Float32,
+                "nwp_lng": pl.Float32,
+                "proportion": pl.Float32,
+            },
+        ),
     )
 
 

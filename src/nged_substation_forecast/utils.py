@@ -1,10 +1,13 @@
 import polars as pl
+import patito as pt
 from datetime import datetime, timedelta, timezone
+from contracts.data_schemas import PowerTimeSeries
+from typing import cast
 
 
-def scan_delta_table(delta_path: str) -> pl.LazyFrame:
+def scan_delta_table(delta_path: str) -> pt.LazyFrame[PowerTimeSeries]:
     """Scan a Delta table."""
-    return pl.scan_delta(delta_path)
+    return cast(pt.LazyFrame[PowerTimeSeries], pl.scan_delta(delta_path))
 
 
 def get_partition_window(

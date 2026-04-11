@@ -7,7 +7,7 @@ from typing import cast
 import dagster as dg
 import patito as pt
 import polars as pl
-from contracts.data_schemas import H3GridWeights
+from contracts.data_schemas import H3GridWeights, Nwp
 from contracts.settings import Settings
 from dagster import (
     AssetCheckExecutionContext,
@@ -56,17 +56,15 @@ def ecmwf_ens_forecast(
 
 
 @asset(deps=[ecmwf_ens_forecast])
-def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
+def all_nwp_data(settings: ResourceParam[Settings]) -> pt.LazyFrame[Nwp]:
     """Provides a LazyFrame scanning all downloaded NWP data."""
     nwp_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     if not nwp_dir.exists():
         # Return an empty LazyFrame with the expected schema if the directory doesn't exist.
         # This prevents the pipeline from crashing before any data has been downloaded.
-        from contracts.data_schemas import Nwp
+        return cast(pt.LazyFrame[Nwp], pl.LazyFrame(schema=Nwp.dtypes))
 
-        return pl.LazyFrame(schema=Nwp.dtypes)
-
-    return pl.scan_parquet(nwp_dir / "*.parquet")
+    return cast(pt.LazyFrame[Nwp], pl.scan_parquet(nwp_dir / "*.parquet"))
 
 
 class ProcessedNWPConfig(dg.Config):
