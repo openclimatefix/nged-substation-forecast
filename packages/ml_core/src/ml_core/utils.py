@@ -139,6 +139,7 @@ def evaluate_and_save_model(
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data
     forecast_time = datetime.now(timezone.utc)
+    nwp_init_time = None
     if "nwps" in sliced_data:
         nwps_data = sliced_data["nwps"]
         first_nwp = None
@@ -152,8 +153,9 @@ def evaluate_and_save_model(
         if isinstance(first_nwp, pl.LazyFrame):
             df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
             if not df.is_empty() and df.item() is not None:
+                nwp_init_time = df.item()
                 delay_hours = getattr(config.model, "nwp_availability_delay_hours", 3)
-                forecast_time = df.item() + timedelta(hours=delay_hours)
+                forecast_time = nwp_init_time + timedelta(hours=delay_hours)
 
     inference_params = InferenceParams(
         forecast_time=forecast_time,
@@ -170,6 +172,10 @@ def evaluate_and_save_model(
     results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     ).lazy()
+
+    if nwp_init_time is not None and "nwp_init_time" not in results_lf.collect_schema().names():
+        results_lf = results_lf.with_columns(nwp_init_time=pl.lit(nwp_init_time))
+
     context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
@@ -189,9 +195,9 @@ def evaluate_and_save_model(
             )
 
         # Aggregate results_lf (e.g., mean prediction per lead time)
-        results_lf = results_lf.group_by(["valid_time", "time_series_id", "lead_time_hours"]).agg(
-            pl.col("power_fcst").mean()
-        )
+        results_lf = results_lf.group_by(
+            ["valid_time", "time_series_id", "lead_time_hours", "nwp_init_time"]
+        ).agg(pl.col("power_fcst").mean())
 
         # Save results_lf and actuals_lf as separate Parquet files.
         # We use temporary files for this.
