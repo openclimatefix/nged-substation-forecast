@@ -1,12 +1,14 @@
-from collections.abc import Sequence
 import polars as pl
 from contracts.settings import Settings
 
 
+# TODO: Rename function to clean_power_time_series.
+# TODO: Rename substation_flows_df to power_time_series, and its type should be
+# `pt.DataFrame[PowerTimeSeries]`
+# TODO: The return type should be pt.DataFrame[PowerTimeSeries]
 def clean_substation_flows(
     substation_flows_df: pl.DataFrame,
     settings: Settings,
-    group_by_cols: Sequence[str] | None = None,
 ) -> pl.DataFrame:
     """Clean substation flows by replacing stuck and insane values with null."""
 
@@ -21,6 +23,8 @@ def clean_substation_flows(
     def _compute_insane_mask(power_col: str, min_thresh: float, max_thresh: float) -> pl.Expr:
         return (pl.col(power_col) < min_thresh) | (pl.col(power_col) > max_thresh)
 
+    # TODO: This logic is a hang-over from when the dataframe contained MW and MVA. But now the code
+    # uses the PowerTimeSeries data contract, which just has a single `power` column.
     power_columns = [col for col in ["MW", "MVA"] if col in substation_flows_df.columns]
 
     if not power_columns:
