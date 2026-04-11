@@ -1,13 +1,15 @@
 import pytest
 import polars as pl
 import patito as pt
+from collections.abc import Mapping
 from datetime import datetime, timezone, timedelta
-from unittest.mock import patch
 from typing import cast
+from unittest.mock import patch
 
 from contracts.data_schemas import (
     InferenceParams,
-    ProcessedNwp,
+    Nwp,
+    PowerTimeSeries,
     TimeSeriesMetadata,
 )
 from xgboost_forecaster.data import (
@@ -266,17 +268,20 @@ def test_prepare_training_data_prevents_row_explosion():
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
+    from contracts.data_schemas import TimeSeriesMetadata
 
     # Centralized data preparation
     power_time_series = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )
 
         # Get the X dataframe passed to fit
@@ -441,17 +446,20 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     forecaster = XGBoostForecaster()
 
     import patito as pt
-    from contracts.data_schemas import TimeSeriesMetadata, ProcessedNwp
+    from contracts.data_schemas import TimeSeriesMetadata
 
     # Centralized data preparation
     power_time_series = flows.with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     with patch("xgboost_forecaster.model.XGBRegressor.fit") as mock_fit:
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )
 
         X_arrow = mock_fit.call_args[0][0]
@@ -549,8 +557,11 @@ def test_xgboost_predict_with_lags():
     preds = forecaster.predict(
         time_series_metadata=cast(pt.DataFrame[TimeSeriesMetadata], metadata),
         inference_params=inference_params,
-        nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-        power_time_series=cast(pt.LazyFrame, power_time_series),
+        nwps=cast(
+            Mapping[NwpModel, pt.LazyFrame[Nwp]],
+            {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+        ),
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
     )
 
     assert len(preds) == 1

@@ -85,7 +85,7 @@ def train_and_log_model(
             power_time_series = flows
             sliced_data["power_time_series"] = power_time_series
 
-    model = trainer.train(config=config.model, **sliced_data)
+    model = trainer.fit(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
     mlflow.set_experiment(model_name)

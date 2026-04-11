@@ -100,7 +100,7 @@ def test_local_forecasters():
     local_forecasters = LocalForecasters(forecaster_cls=MockForecaster, some_arg="value")
 
     # Train
-    local_forecasters.train(
+    local_forecasters.fit(
         config=config,
         power_time_series=sub_flows,
         time_series_metadata=sub_meta,

@@ -9,7 +9,9 @@ from omegaconf import OmegaConf
 from pydantic import Field, field_validator
 
 from contracts.hydra_schemas import NwpModel, TrainingConfig
-from contracts.data_schemas import PowerForecast
+from contracts.data_schemas import (
+    PowerForecast,
+)
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster

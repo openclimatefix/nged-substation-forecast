@@ -10,6 +10,7 @@ import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     NwpColumns,
     PowerForecast,
     PowerTimeSeries,
@@ -301,7 +302,7 @@ class XGBoostForecaster(BaseForecaster):
         self,
         power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        nwps: Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]] | None = None,
         inference_params: InferenceParams | None = None,
         collapse_lead_times: bool = False,
     ) -> pl.LazyFrame:
@@ -402,12 +403,12 @@ class XGBoostForecaster(BaseForecaster):
         return df_lf
 
     # TODO: Use Patito data contracts for inputs and outputs of this function.
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        power_time_series: pl.LazyFrame,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
     ) -> "XGBoostForecaster":
         """Train the XGBoost model.
 
@@ -443,9 +444,9 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("Model config requires NWPs, but none were provided.")
 
         joined_lf = self._prepare_data_for_model(
-            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
+            power_time_series=power_time_series,
             time_series_metadata=time_series_metadata,
-            nwps=nwps,
+            nwps=cast(Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]], nwps),
         )
 
         # Prepare features and target
@@ -534,8 +535,8 @@ class XGBoostForecaster(BaseForecaster):
         self,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        power_time_series: pl.LazyFrame,
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Execute the inference logic.
@@ -557,9 +558,9 @@ class XGBoostForecaster(BaseForecaster):
             raise ValueError("XGBoostForecaster requires NWP data for prediction.")
 
         df_lf = self._prepare_data_for_model(
-            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
+            power_time_series=power_time_series,
             time_series_metadata=time_series_metadata,
-            nwps=nwps,
+            nwps=cast(Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]], nwps),
             inference_params=inference_params,
             collapse_lead_times=collapse_lead_times,
         )
@@ -632,6 +633,13 @@ class XGBoostForecaster(BaseForecaster):
                 power_fcst_init_time=pl.lit(fcst_init_time).cast(pl.Datetime("us", "UTC")),
                 nwp_init_time=pl.col(NwpColumns.INIT_TIME).cast(pl.Datetime("us", "UTC")),
                 power_fcst_init_year_month=pl.lit(fcst_init_time.strftime("%Y-%m")).cast(pl.String),
+                nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
+                lead_time_hours=(
+                    (
+                        pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
+                    ).dt.total_minutes()
+                    / 60.0
+                ).cast(pl.Float32),
             )
             .select(
                 [

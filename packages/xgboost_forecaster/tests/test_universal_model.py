@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.data_schemas import (
+    Nwp,
     NwpColumns,
     PowerForecast,
     PowerTimeSeries,
@@ -102,7 +104,10 @@ def test_universal_training_data_integrity():
     forecaster.config = config
 
     # Prepare data for model (training mode)
-    nwps = {NwpModel.ECMWF_ENS_0_25DEG: nwps_lf}
+    nwps = cast(
+        Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]],
+        {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwps_lf)},
+    )
 
     prepared_lf = forecaster._prepare_data_for_model(
         power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
@@ -420,14 +425,17 @@ def test_lookahead_audit():
         },
     )
 
-    nwps = {NwpModel.ECMWF_ENS_0_25DEG: nwps_df.lazy()}
+    nwps = cast(
+        Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]],
+        {NwpModel.ECMWF_ENS_0_25DEG: nwps_df.lazy()},
+    )
 
     # Train the model
-    forecaster.train(
+    forecaster.fit(
         config=config,
-        power_time_series=flows_lf,
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
         time_series_metadata=metadata,
-        nwps=nwps,
+        nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps),
     )
 
     # Verify feature importance

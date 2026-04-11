@@ -5,6 +5,7 @@ import polars as pl
 import pytest
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     ProcessedNwp,
     PowerTimeSeries,
     TimeSeriesMetadata,
@@ -54,7 +55,7 @@ def test_xgboost_forecaster_train_and_predict():
     )
 
     # Centralized data preparation
-    power_time_series = sub_flows
+    power_time_series = cast(pt.LazyFrame[PowerTimeSeries], sub_flows)
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -114,11 +115,11 @@ def test_xgboost_forecaster_train_and_predict():
     forecaster = XGBoostForecaster()
 
     # Train
-    forecaster.train(
+    forecaster.fit(
         config=config,
         power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
-        nwps=nwps,
+        nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in nwps.items()},
     )
 
     # Create 4 weeks of data to satisfy the dynamic lag
@@ -142,7 +143,7 @@ def test_xgboost_forecaster_train_and_predict():
     )
 
     # Centralized data preparation
-    power_time_series = sub_flows
+    power_time_series = cast(pt.LazyFrame[PowerTimeSeries], sub_flows)
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -202,11 +203,11 @@ def test_xgboost_forecaster_train_and_predict():
     forecaster = XGBoostForecaster()
 
     # Train
-    forecaster.train(
+    forecaster.fit(
         config=config,
         power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
-        nwps=nwps,
+        nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in nwps.items()},
     )
 
     assert forecaster.model is not None
@@ -251,7 +252,7 @@ def test_xgboost_forecaster_train_and_predict():
     preds = forecaster.predict(
         time_series_metadata=time_series_metadata,
         inference_params=inference_params,
-        nwps=predict_nwps,
+        nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in predict_nwps.items()},
         power_time_series=power_time_series,
     )
 
@@ -296,7 +297,7 @@ def test_xgboost_forecaster_predict_empty():
     )
 
     # Centralized data preparation
-    power_time_series = sub_flows
+    power_time_series = cast(pt.LazyFrame[PowerTimeSeries], sub_flows)
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -356,11 +357,11 @@ def test_xgboost_forecaster_predict_empty():
     forecaster = XGBoostForecaster()
 
     # Train
-    forecaster.train(
+    forecaster.fit(
         config=config,
         power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
-        nwps=nwps,
+        nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in nwps.items()},
     )
 
     # Create 4 weeks of data to satisfy the dynamic lag
@@ -384,7 +385,7 @@ def test_xgboost_forecaster_predict_empty():
     )
 
     # Centralized data preparation
-    power_time_series = sub_flows
+    power_time_series = cast(pt.LazyFrame[PowerTimeSeries], sub_flows)
 
     # NWPs only for the training period (Jan 1st to Jan 15th)
     nwp_timestamps = pl.datetime_range(
@@ -444,11 +445,11 @@ def test_xgboost_forecaster_predict_empty():
     forecaster = XGBoostForecaster()
 
     # Train
-    forecaster.train(
+    forecaster.fit(
         config=config,
         power_time_series=power_time_series,
         time_series_metadata=time_series_metadata,
-        nwps=nwps,
+        nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in nwps.items()},
     )
 
     # Predict with forecast_time BEFORE any available NWPs
@@ -484,7 +485,7 @@ def test_xgboost_forecaster_predict_empty():
         forecaster.predict(
             time_series_metadata=time_series_metadata,
             inference_params=inference_params,
-            nwps=predict_nwps,
+            nwps={k: cast(pt.LazyFrame[Nwp], v) for k, v in predict_nwps.items()},
             power_time_series=power_time_series,
         )
 

@@ -14,6 +14,7 @@ from contracts.hydra_schemas import (
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     ProcessedNwp,
     TimeSeriesMetadata,
     PowerTimeSeries,
@@ -79,7 +80,7 @@ def test_train_handles_missing_init_time():
     # This should no longer raise ColumnNotFoundError for init_time
     # It might fail later due to missing features in the mock setup, but not on init_time
     try:
-        forecaster.train(
+        forecaster.fit(
             config=config,
             power_time_series=power_time_series,
             time_series_metadata=metadata,
@@ -190,5 +191,5 @@ def test_predict_with_missing_feature_column_fails_loudly():
             time_series_metadata=metadata,
             inference_params=inference_params,
             power_time_series=cast(pt.LazyFrame, power_time_series),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
         )

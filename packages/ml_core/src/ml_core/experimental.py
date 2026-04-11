@@ -2,12 +2,15 @@
 
 import logging
 from collections.abc import Mapping
+from typing import cast
 
 import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
+    PowerTimeSeries,
     TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
@@ -63,11 +66,11 @@ class LocalForecasters(BaseForecaster):
 
             # Instantiate and train
             model = self.forecaster_cls(**self.forecaster_kwargs)
-            model.train(
+            model.fit(
                 config=config,
-                power_time_series=ts_flows,
+                power_time_series=cast(pt.LazyFrame[PowerTimeSeries], ts_flows),
                 time_series_metadata=ts_meta,
-                nwps=nwps,
+                nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps) if nwps is not None else None,
             )
             self.models[ts_id] = model
 
@@ -109,8 +112,8 @@ class LocalForecasters(BaseForecaster):
             preds = self.models[ts_id].predict(
                 time_series_metadata=ts_meta,
                 inference_params=inference_params,
-                power_time_series=ts_flows,
-                nwps=nwps,
+                power_time_series=cast(pt.LazyFrame[PowerTimeSeries], ts_flows),
+                nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps) if nwps is not None else None,
                 collapse_lead_times=collapse_lead_times,
             )
             all_preds.append(preds)

@@ -1,14 +1,15 @@
 import pytest
 import polars as pl
 import patito as pt
+from collections.abc import Mapping
 from datetime import datetime, timezone, timedelta
 from typing import Any, cast
 from unittest.mock import MagicMock
 from contracts.data_schemas import (
-    Nwp,
-    ProcessedNwp,
-    TimeSeriesMetadata,
     InferenceParams,
+    Nwp,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import (
     ModelConfig,
@@ -140,14 +141,17 @@ def test_xgboost_forecaster_train_with_nans():
     power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
             ),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )
 
 
@@ -225,14 +229,17 @@ def test_xgboost_forecaster_train_with_infs():
     power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
             ),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )
 
 
@@ -311,8 +318,11 @@ def test_xgboost_forecaster_predict_with_nans():
                 metadata,
             ),
             inference_params=inference_params,
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
         )
 
 
@@ -396,14 +406,17 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     with pytest.raises(
         ValueError, match="No training data remaining after dropping nulls in critical columns."
     ):
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
             ),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )
 
     # Mock data with Inf in temperature_2m
@@ -449,12 +462,15 @@ def test_xgboost_forecaster_train_empty_data_after_drop_nulls():
     power_time_series = flows
 
     with pytest.raises(ValueError, match="Input features X contain NaN or Inf values"):
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            power_time_series=cast(pt.LazyFrame, power_time_series),
+            power_time_series=cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
             time_series_metadata=cast(
                 pt.DataFrame[TimeSeriesMetadata],
                 metadata,
             ),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwp)},
+            nwps=cast(
+                Mapping[NwpModel, pt.LazyFrame[Nwp]],
+                {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
+            ),
         )

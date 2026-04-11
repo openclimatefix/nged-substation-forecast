@@ -5,11 +5,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any
 
-import polars as pl
 import patito as pt
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
+    PowerTimeSeries,
     TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
@@ -29,12 +30,12 @@ class BaseForecaster(ABC):
     """
 
     @abstractmethod
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        power_time_series: pl.LazyFrame,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
     ) -> Any:
         """Train the model.
 
@@ -54,8 +55,8 @@ class BaseForecaster(ABC):
         self,
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        power_time_series: pl.LazyFrame,
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts.
