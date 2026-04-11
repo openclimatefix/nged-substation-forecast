@@ -6,7 +6,14 @@ import numpy as np
 import patito as pt
 import polars as pl
 import pytest
-from contracts.data_schemas import NwpColumns, PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.data_schemas import (
+    NwpColumns,
+    PowerForecast,
+    PowerTimeSeries,
+    ProcessedNwp,
+    TimeSeriesMetadata,
+    XGBoostInputFeatures,
+)
 from contracts.hydra_schemas import (
     DataSplitConfig,
     ModelConfig,
@@ -137,7 +144,7 @@ def test_nwp_init_hour_feature():
         }
     )
 
-    result = cast(pl.DataFrame, add_time_features(df).collect())
+    result = cast(pl.DataFrame, add_time_features(cast(pt.LazyFrame[ProcessedNwp], df)).collect())
 
     assert result["nwp_init_hour"].to_list() == [0, 12, 23]
 
@@ -452,7 +459,9 @@ def test_lookahead_audit():
     )
 
     # Now use the forecaster's _prepare_features
-    final_features_lf = forecaster._prepare_features(forbidden_lf)
+    final_features_lf = forecaster._prepare_features(
+        cast(pt.LazyFrame[XGBoostInputFeatures], forbidden_lf)
+    )
     assert isinstance(final_features_lf, pl.LazyFrame)
     final_features = cast(pl.DataFrame, final_features_lf.collect())
 

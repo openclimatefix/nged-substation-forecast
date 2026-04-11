@@ -2,10 +2,11 @@
 
 import logging
 from datetime import timedelta
+from typing import cast
 
 import polars as pl
 import patito as pt
-from contracts.data_schemas import NwpColumns, PowerTimeSeries
+from contracts.data_schemas import NwpColumns, PowerTimeSeries, ProcessedNwp
 
 log = logging.getLogger(__name__)
 
@@ -191,20 +192,23 @@ def add_weather_features(
     )
 
 
-def add_time_features(df: pl.LazyFrame) -> pl.LazyFrame:
+def add_time_features(df: pt.LazyFrame[ProcessedNwp]) -> pt.LazyFrame[ProcessedNwp]:
     """Add lead_time_hours and nwp_init_hour features.
 
     Args:
-        df: The input LazyFrame (schema: XGBoostInputFeatures).
+        df: The input LazyFrame (schema: ProcessedNwp).
 
     Returns:
-        LazyFrame with added time features (schema: XGBoostInputFeatures).
+        LazyFrame with added time features (schema: ProcessedNwp).
     """
 
-    return df.with_columns(
-        lead_time_hours=(
-            pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
-        ).dt.total_minutes()
-        / 60.0,
-        nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
+    return cast(
+        pt.LazyFrame[ProcessedNwp],
+        df.with_columns(
+            lead_time_hours=(
+                pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
+            ).dt.total_minutes()
+            / 60.0,
+            nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
+        ),
     )

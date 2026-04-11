@@ -17,6 +17,7 @@ from contracts.data_schemas import (
     ProcessedNwp,
     TimeSeriesMetadata,
     PowerTimeSeries,
+    XGBoostInputFeatures,
 )
 
 
@@ -38,7 +39,7 @@ def test_prepare_features_missing_column_fails_loudly():
     )
 
     with pytest.raises(pl_exc.ColumnNotFoundError):
-        forecaster._prepare_features(df)
+        forecaster._prepare_features(cast(pt.DataFrame[XGBoostInputFeatures], df))
 
 
 def test_train_handles_missing_init_time():

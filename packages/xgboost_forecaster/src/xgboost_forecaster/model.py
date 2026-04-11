@@ -13,6 +13,7 @@ from contracts.data_schemas import (
     NwpColumns,
     PowerForecast,
     PowerTimeSeries,
+    ProcessedNwp,
     TimeSeriesMetadata,
     XGBoostInputFeatures,
 )
@@ -59,7 +60,9 @@ class XGBoostForecaster(BaseForecaster):
             mlflow.xgboost.log_model(self.model, artifact_path="model")
 
     # TODO: Use Patito data contracts for inputs and outputs of this function.
-    def _prepare_features(self, df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame | pl.LazyFrame:
+    def _prepare_features(
+        self, df: pt.DataFrame[XGBoostInputFeatures] | pt.LazyFrame[XGBoostInputFeatures]
+    ) -> pt.DataFrame[XGBoostInputFeatures] | pt.LazyFrame[XGBoostInputFeatures]:
         """Extract the feature matrix.
 
         Args:
@@ -133,7 +136,7 @@ class XGBoostForecaster(BaseForecaster):
                 )
             )
 
-        return res
+        return cast(pt.DataFrame[XGBoostInputFeatures] | pt.LazyFrame[XGBoostInputFeatures], res)
 
     # TODO: Use Patito data contracts for inputs and outputs of this function.
     def _collapse_lead_times(
@@ -184,7 +187,7 @@ class XGBoostForecaster(BaseForecaster):
         # Add weather features (lags, trends, etc.)
         lf = add_weather_features(nwp_lf)
         # Add time features (lead_time_hours, nwp_init_hour)
-        lf = add_time_features(lf)
+        lf = add_time_features(cast(pt.LazyFrame[ProcessedNwp], lf))
 
         # CRITICAL: This filter is the sole mechanism preventing future data leakage.
         # It ensures that we only use NWP forecasts that would have been available
@@ -446,7 +449,7 @@ class XGBoostForecaster(BaseForecaster):
         )
 
         # Prepare features and target
-        feature_lf = self._prepare_features(joined_lf)
+        feature_lf = self._prepare_features(cast(pt.LazyFrame[XGBoostInputFeatures], joined_lf))
         feature_cols = feature_lf.collect_schema().names()
 
         # Collect only necessary columns and drop nulls
@@ -493,7 +496,10 @@ class XGBoostForecaster(BaseForecaster):
             joined_df, allow_missing_columns=True, allow_superfluous_columns=True
         )
 
-        X = cast(pl.DataFrame, self._prepare_features(joined_df))
+        X = cast(
+            pl.DataFrame,
+            self._prepare_features(cast(pt.DataFrame[XGBoostInputFeatures], joined_df)),
+        )
         y = joined_df.get_column("power")
 
         # NaN/Inf checks
@@ -558,7 +564,7 @@ class XGBoostForecaster(BaseForecaster):
             collapse_lead_times=collapse_lead_times,
         )
 
-        feature_lf = self._prepare_features(df_lf)
+        feature_lf = self._prepare_features(cast(pt.LazyFrame[XGBoostInputFeatures], df_lf))
         feature_cols = feature_lf.collect_schema().names()
 
         # Output columns needed for the final result
@@ -586,7 +592,10 @@ class XGBoostForecaster(BaseForecaster):
             df, allow_missing_columns=True, allow_superfluous_columns=True
         )
 
-        X = cast(pl.DataFrame, self._prepare_features(df))
+        X = cast(
+            pl.DataFrame,
+            self._prepare_features(cast(pt.DataFrame[XGBoostInputFeatures], df)),
+        )
 
         if (
             X.select(
