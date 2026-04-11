@@ -2,7 +2,7 @@
 
 import logging
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 import patito as pt
 import polars as pl
@@ -62,8 +62,9 @@ class LocalForecasters(BaseForecaster):
         for ts_id in time_series_ids:
             log.debug(f"Training model for time series {ts_id}")
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
-            ts_flows = pt.LazyFrame[PowerTimeSeries](
-                power_time_series.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = cast(
+                pt.LazyFrame[PowerTimeSeries],
+                power_time_series.filter(pl.col("time_series_id") == ts_id),
             )
 
             # Instantiate and train
@@ -109,8 +110,9 @@ class LocalForecasters(BaseForecaster):
             ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
 
             # Filter inputs
-            ts_flows = pt.LazyFrame[PowerTimeSeries](
-                power_time_series.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = cast(
+                pt.LazyFrame[PowerTimeSeries],
+                power_time_series.filter(pl.col("time_series_id") == ts_id),
             )
 
             preds = self.models[ts_id].predict(

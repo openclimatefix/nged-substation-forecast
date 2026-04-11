@@ -1,11 +1,12 @@
-Our task now is to figure out why tests/test_xgboost_dagster_integration.py is taking up so much RAM
+Our task is to figure out why tests/test_xgboost_dagster_integration.py is taking up so much RAM
 that it crashes my laptop (which has 32 GB of RAM). This same test ran fine at the end of yesterday.
 It seems that something we've done today (see git history) has increased RAM usage.
 
 I've captured the log whilst running the test, and whilst watching RAM usage. The logs show that
 training XGBoost doesn't use much RAM. And, for the first minute or so, the evaluation step also
-doesn't use that much RAM. But then the RAM spikes. I'm wondering if the output from running
-inference is being pickled to pass it to the plotting script?
+doesn't use that much RAM. But then the RAM spikes about 1 minute after starting the evaluation
+step. I'm wondering if the output from running inference is being pickled to pass it to the plotting
+script?
 
 ## Tasks
 

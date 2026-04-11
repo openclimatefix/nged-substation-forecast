@@ -6,9 +6,8 @@ from typing import Any, Union, cast
 
 import dagster as dg
 import mlflow
-import patito as pt
 import polars as pl
-from contracts.data_schemas import InferenceParams, PowerTimeSeries
+from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
 from ml_core.data import calculate_peak_capacity
 
@@ -168,131 +167,116 @@ def evaluate_and_save_model(
         power_time_series = flows
         sliced_data["power_time_series"] = power_time_series
 
-    results_df = forecaster.predict(
+    results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
-    )
+    ).lazy()
     context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
     if "power_time_series" in sliced_data:
-        actuals = cast(
-            pl.DataFrame,
-            sliced_data["power_time_series"].collect(),
-        )
+        actuals_lf = sliced_data["power_time_series"]
 
         # Join predictions with actuals
         context.log.info("Joining predictions with actuals.")
-        eval_df = results_df.join(
-            actuals.rename({"period_end_time": "valid_time", "power": "actual"}),
+        eval_lf = results_lf.join(
+            actuals_lf.rename({"period_end_time": "valid_time", "power": "actual"}),
             on=["valid_time", "time_series_id"],
             how="inner",
         )
 
         # Join the peak_capacity from the actuals
         context.log.info("Calculating peak capacity.")
-        peak_capacity_df = calculate_peak_capacity(
-            cast(pt.LazyFrame[PowerTimeSeries], actuals.lazy())
-        )
-        eval_df = pl.DataFrame(eval_df).join(
-            peak_capacity_df.select(["time_series_id", "peak_capacity"]),
+        peak_capacity_lf = calculate_peak_capacity(actuals_lf)
+        eval_lf = eval_lf.join(
+            peak_capacity_lf.select(["time_series_id", "peak_capacity"]),
             on="time_series_id",
             how="left",
         )
         # Fill missing peak_capacity with 1.0 to avoid division by zero
-        eval_df = eval_df.with_columns(pl.col("peak_capacity").fill_null(1.0))
+        eval_lf = eval_lf.with_columns(pl.col("peak_capacity").fill_null(1.0))
 
-        if not eval_df.is_empty():
-            # Filter out the lookback period to avoid data leakage in evaluation
-            if isinstance(test_start, date) and not isinstance(test_start, datetime):
-                test_start_dt = datetime.combine(test_start, datetime.min.time()).replace(
-                    tzinfo=timezone.utc
-                )
-            else:
-                test_start_dt = test_start
+        # Filter out the lookback period to avoid data leakage in evaluation
+        if isinstance(test_start, date) and not isinstance(test_start, datetime):
+            test_start_dt = datetime.combine(test_start, datetime.min.time()).replace(
+                tzinfo=timezone.utc
+            )
+        else:
+            test_start_dt = test_start
 
-            eval_df = eval_df.filter(pl.col("valid_time") >= test_start_dt)
+        eval_lf = eval_lf.filter(pl.col("valid_time") >= test_start_dt)
 
-            # Calculate lead_time_hours
-            if "nwp_init_time" in eval_df.columns:
-                context.log.info("Calculating lead_time_hours (with nwp_init_time).")
-                eval_df = eval_df.with_columns(
-                    lead_time_hours=(
-                        pl.col("valid_time") - pl.col("nwp_init_time")
-                    ).dt.total_minutes()
-                    / 60.0
-                )
-            else:
-                # Fallback if nwp_init_time is not available
-                context.log.info("Calculating lead_time_hours (fallback).")
-                eval_df = eval_df.with_columns(
-                    lead_time_hours=(
-                        pl.col("valid_time") - pl.lit(forecast_time)
-                    ).dt.total_minutes()
-                    / 60.0
-                )
-
-            # Group by lead_time_hours and calculate metrics
-            context.log.info("Calculating metrics by lead_time_hours.")
-            metrics = (
-                eval_df.group_by("lead_time_hours")
-                .agg(
-                    [
-                        (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
-                        ((pl.col("power_fcst") - pl.col("actual")) ** 2)
-                        .mean()
-                        .sqrt()
-                        .alias("RMSE"),
-                        ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
-                        .mean()
-                        .alias("nMAE"),
-                    ]
-                )
-                .sort("lead_time_hours")
+        # Calculate lead_time_hours
+        if "nwp_init_time" in eval_lf.collect_schema().names():
+            context.log.info("Calculating lead_time_hours (with nwp_init_time).")
+            eval_lf = eval_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
+                / 60.0
+            )
+        else:
+            # Fallback if nwp_init_time is not available
+            context.log.info("Calculating lead_time_hours (fallback).")
+            eval_lf = eval_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
+                / 60.0
             )
 
-            # Log metrics to MLflow
-            mlflow.set_experiment(model_name)
-            with mlflow.start_run(run_name=f"{model_name}_eval"):
-                # 1. Metric Thinning: Log only key operational horizons
-                key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
-                for row in metrics.iter_rows(named=True):
-                    lt = round(float(row["lead_time_hours"]), 1)
-                    if lt in key_horizons:
-                        if row["MAE"] is not None:
-                            mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
-                        if row["RMSE"] is not None:
-                            mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
-                        if row["nMAE"] is not None:
-                            mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
+        # Group by lead_time_hours and calculate metrics
+        context.log.info("Calculating metrics by lead_time_hours.")
+        metrics_lf = (
+            eval_lf.group_by("lead_time_hours")
+            .agg(
+                [
+                    (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
+                    ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
+                    ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
+                    .mean()
+                    .alias("nMAE"),
+                ]
+            )
+            .sort("lead_time_hours")
+        )
 
-                # 2. Log global aggregate metrics
-                mae_global = eval_df.select(
-                    (pl.col("power_fcst") - pl.col("actual")).abs().mean()
-                ).item()
-                if mae_global is not None:
-                    mlflow.log_metric("mean_mae_all_horizons", mae_global)
-                    # Keep MAE_global for backward compatibility
-                    mlflow.log_metric("MAE_global", mae_global)
+        # Log metrics to MLflow
+        mlflow.set_experiment(model_name)
+        with mlflow.start_run(run_name=f"{model_name}_eval"):
+            # 1. Metric Thinning: Log only key operational horizons
+            key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
+            metrics = metrics_lf.collect()
+            for row in metrics.iter_rows(named=True):
+                lt = round(float(row["lead_time_hours"]), 1)
+                if lt in key_horizons:
+                    if row["MAE"] is not None:
+                        mlflow.log_metric(f"MAE_LT_{lt}h", row["MAE"])
+                    if row["RMSE"] is not None:
+                        mlflow.log_metric(f"RMSE_LT_{lt}h", row["RMSE"])
+                    if row["nMAE"] is not None:
+                        mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
-                rmse_global = eval_df.select(
-                    ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt()
-                ).item()
-                if rmse_global is not None:
-                    mlflow.log_metric("RMSE_global", rmse_global)
+            # 2. Log global aggregate metrics
+            global_metrics_lf = eval_lf.select(
+                (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("mae_global"),
+                ((pl.col("power_fcst") - pl.col("actual")) ** 2).mean().sqrt().alias("rmse_global"),
+                ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
+                .mean()
+                .alias("nmae_global"),
+            )
+            global_metrics = global_metrics_lf.collect().to_dicts()[0]
 
-                nmae_global = eval_df.select(
-                    (
-                        (pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity")
-                    ).mean()
-                ).item()
-                if nmae_global is not None:
-                    mlflow.log_metric("nMAE_global", nmae_global)
+            if global_metrics["mae_global"] is not None:
+                mlflow.log_metric("mean_mae_all_horizons", global_metrics["mae_global"])
+                mlflow.log_metric("MAE_global", global_metrics["mae_global"])
 
-                # 3. Save full granular evaluation dataframe as Parquet artifact
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
-                    eval_df.write_parquet(eval_df_path)
-                    mlflow.log_artifact(eval_df_path)
+            if global_metrics["rmse_global"] is not None:
+                mlflow.log_metric("RMSE_global", global_metrics["rmse_global"])
+
+            if global_metrics["nmae_global"] is not None:
+                mlflow.log_metric("nMAE_global", global_metrics["nmae_global"])
+
+            # 3. Save full granular evaluation dataframe as Parquet artifact
+            with tempfile.TemporaryDirectory() as tmpdir:
+                eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
+                eval_lf.sink_parquet(eval_df_path)
+                mlflow.log_artifact(eval_df_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:
@@ -301,9 +285,9 @@ def evaluate_and_save_model(
     if hasattr(context, "add_output_metadata"):
         context.add_output_metadata(
             {
-                "num_rows": len(results_df),
+                "num_rows": results_lf.collect().height,
                 "power_fcst_model_name": model_name,
             }
         )
 
-    return results_df
+    return results_lf.collect()
