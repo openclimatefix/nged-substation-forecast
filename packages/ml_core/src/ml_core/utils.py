@@ -196,7 +196,7 @@ def evaluate_and_save_model(
 
         # Aggregate results_lf (e.g., mean prediction per lead time)
         results_lf = results_lf.group_by(
-            ["valid_time", "time_series_id", "lead_time_hours", "nwp_init_time"]
+            ["valid_time", "time_series_id", "lead_time_hours", "nwp_init_time", "ensemble_member"]
         ).agg(pl.col("power_fcst").mean())
 
         # Save results_lf and actuals_lf as separate Parquet files.
