@@ -181,6 +181,7 @@ def evaluate_and_save_model(
         )
 
         # Join predictions with actuals
+        context.log.info("Joining predictions with actuals.")
         eval_df = results_df.join(
             actuals.rename({"period_end_time": "valid_time", "power": "actual"}),
             on=["valid_time", "time_series_id"],
@@ -188,6 +189,7 @@ def evaluate_and_save_model(
         )
 
         # Join the peak_capacity from the actuals
+        context.log.info("Calculating peak capacity.")
         peak_capacity_df = calculate_peak_capacity(
             cast(pt.LazyFrame[PowerTimeSeries], actuals.lazy())
         )
@@ -212,6 +214,7 @@ def evaluate_and_save_model(
 
             # Calculate lead_time_hours
             if "nwp_init_time" in eval_df.columns:
+                context.log.info("Calculating lead_time_hours (with nwp_init_time).")
                 eval_df = eval_df.with_columns(
                     lead_time_hours=(
                         pl.col("valid_time") - pl.col("nwp_init_time")
@@ -220,6 +223,7 @@ def evaluate_and_save_model(
                 )
             else:
                 # Fallback if nwp_init_time is not available
+                context.log.info("Calculating lead_time_hours (fallback).")
                 eval_df = eval_df.with_columns(
                     lead_time_hours=(
                         pl.col("valid_time") - pl.lit(forecast_time)
@@ -228,6 +232,7 @@ def evaluate_and_save_model(
                 )
 
             # Group by lead_time_hours and calculate metrics
+            context.log.info("Calculating metrics by lead_time_hours.")
             metrics = (
                 eval_df.group_by("lead_time_hours")
                 .agg(
