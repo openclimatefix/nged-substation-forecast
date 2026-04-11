@@ -280,11 +280,22 @@ def evaluate_xgboost(
         pl.col("time_series_id").is_in(sub_ids)
     )
 
+    # Log shapes and ensemble members for debugging
+    context.log.info(
+        f"substation_power_flows_filtered shape: {cast(pl.DataFrame, substation_power_flows_filtered.collect()).shape}"
+    )
+    context.log.info(f"time_series_metadata_filtered shape: {time_series_metadata_filtered.shape}")
+    num_ensemble_members = cast(
+        pl.DataFrame, nwp.select("ensemble_member").unique().collect()
+    ).height
+    context.log.info(f"Number of NWP ensemble members: {num_ensemble_members}")
+
     # The Dagster asset now returns the full XGBoostForecaster instance
     forecaster = model
     forecaster.config = hydra_config.model
 
-    return evaluate_and_save_model(
+    context.log.info("Starting evaluation...")
+    result = evaluate_and_save_model(
         context=context,
         model_name=model_name,
         forecaster=forecaster,
@@ -293,3 +304,5 @@ def evaluate_xgboost(
         substation_power_flows=substation_power_flows_filtered,
         time_series_metadata=time_series_metadata_filtered,
     )
+    context.log.info("Evaluation complete.")
+    return result
