@@ -171,6 +171,7 @@ def evaluate_and_save_model(
     results_df = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     )
+    context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
     if "power_time_series" in sliced_data:
