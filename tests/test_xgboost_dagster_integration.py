@@ -1,18 +1,17 @@
 import logging
-import pytest
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from geo.io_managers import CompositeIOManager
-from upath import UPath
 from typing import cast
 
 import dagster as dg
 import polars as pl
+import pytest
 from contracts.settings import Settings
-from nged_substation_forecast.definitions import defs
+from geo.io_managers import CompositeIOManager
+from upath import UPath
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+from nged_substation_forecast.definitions import defs
 
 
 @pytest.mark.slow
@@ -33,6 +32,14 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
     # deprecation warning in newer Dagster versions. This ensures we correctly retrieve
     # the job definition.
     job = defs.resolve_job_def("xgboost_integration_job")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
+        force=True,  # This ensures it overrides any existing configuration
+    )
+    logger = logging.getLogger("test_logger")
+    logger.info("Starting test_xgboost_dagster_integration")
 
     # We use an ephemeral Dagster instance to ensure that all resources,
     # including SQLite databases and SQLAlchemy connection pools, are
@@ -49,21 +56,15 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
         metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
         df_metadata = pl.read_parquet(metadata_path)
 
-        # Add h3_res_5 if missing
-        if "h3_res_5" not in df_metadata.columns:
-            df_metadata = df_metadata.with_columns(pl.lit(0).alias("h3_res_5"))
-            df_metadata.write_parquet(metadata_path)
-
         # Pick 4 IDs: 1 primary substation (Disaggregated Demand), 1 BSP (Raw Flow?), 1 solar farm (PV), 1 wind farm (Wind)
-
         time_series_ids = []
         for t in ["Disaggregated Demand", "Raw Flow", "PV", "Wind"]:
             id = df_metadata.filter(pl.col("time_series_type") == t)["time_series_id"][0]
             time_series_ids.append(id)
 
-        # 3. Dynamically calculate dates from local data
         df_cleaned = pl.scan_delta(str(cleaned_path))
 
+        # Dynamically calculate dates from local data
         max_dt_df = cast(pl.DataFrame, df_cleaned.select(pl.col("period_end_time").max()).collect())
         max_dt = max_dt_df.get_column("period_end_time").max()
 
@@ -83,10 +84,10 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
                 f"Insufficient data for integration test. Found {total_duration.days} days, require at least 6."
             )
 
-        # 1. Select an NWP initialization time from exactly two weeks before the end of the cleaned data.
+        # Select an NWP initialization time from exactly two weeks before the end of the cleaned data.
         nwp_init_time = (cast(datetime, max_dt) - timedelta(weeks=2)).date()
 
-        # 2. Configure the `evaluate_xgboost` op to run inference for that specific NWP run,
+        # Configure the `evaluate_xgboost` op to run inference for that specific NWP run,
         # covering a 2-week prediction horizon.
         test_start = nwp_init_time
         test_end = nwp_init_time + timedelta(weeks=2)
@@ -100,7 +101,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             if not nwp_path.exists():
                 pytest.skip(f"Required NWP file missing: {nwp_path}. Please download data.")
 
-        # 3. Ensure the `train_xgboost` op is configured to train only on data *before* that 2-week period,
+        # Ensure the `train_xgboost` op is configured to train only on data *before* that 2-week period,
         # ensuring no data leakage.
         train_end = test_start - timedelta(days=1)
         min_dt_date = cast(datetime, min_dt).date()
@@ -110,19 +111,20 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
         if train_start > train_end:
             pytest.skip("Calculated train_start is after train_end. Insufficient data.")
 
-        print(f"min_dt: {min_dt}, max_dt: {max_dt}")
-        print(f"train_start: {train_start}, train_end: {train_end}")
-        print(f"nwp_init_time: {nwp_init_time}")
-        print(f"test_start: {test_start}, test_end: {test_end}")
+        logger.info(f"min_dt: {min_dt}, max_dt: {max_dt}")
+        logger.info(f"train_start: {train_start}, train_end: {train_end}")
+        logger.info(f"nwp_init_time: {nwp_init_time}")
+        logger.info(f"test_start: {test_start}, test_end: {test_end}")
 
-        # 4. Define plot output path
+        # Define plot output path
         plot_path = Path("tests/xgboost_dagster_integration_plot.html")
 
-        # 5. Provide run configuration
+        # Provide run configuration
         run_config = {
             "ops": {
                 "processed_nwp_data": {
                     "config": {
+                        # TODO: Change `substation_ids` to `time_series_ids`
                         "substation_ids": time_series_ids,
                         "start_date": str(train_start - timedelta(days=14)),
                         "end_date": str(test_end),
@@ -150,7 +152,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             }
         }
 
-        # 6. Execute the job in-process
+        #  Execute the job in-process
         # Note: This test takes approximately 3.5 minutes (215 seconds) to run on a
         # standard development machine as it executes the full XGBoost pipeline
         # (data loading, cleaning, training, evaluation, and plotting).
@@ -167,7 +169,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             all_partitions.append(date.isoformat())
 
         for partition_key in all_partitions:
-            logging.info(f"Starting job execution for partition: {partition_key}")
+            logger.info(f"Starting job execution for partition: {partition_key}")
             job.execute_in_process(
                 run_config=run_config,
                 partition_key=partition_key,
@@ -178,9 +180,9 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
                 },
                 instance=instance,
             )
-            logging.info(f"Finished job execution for partition: {partition_key}")
+            logger.info(f"Finished job execution for partition: {partition_key}")
 
-        logging.info(f"Starting final job execution for test_end: {test_end.isoformat()}")
+        logger.info(f"Starting final job execution for test_end: {test_end.isoformat()}")
         result = job.execute_in_process(
             run_config=run_config,
             partition_key=test_end.isoformat(),
@@ -190,9 +192,9 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             },
             instance=instance,
         )
-        logging.info("Finished final job execution for test_end")
+        logger.info("Finished final job execution for test_end")
 
-    # 7. Assertions
+    # Assertions
     assert result.success, "Dagster job failed"
 
     # Verify ensemble forecasts
