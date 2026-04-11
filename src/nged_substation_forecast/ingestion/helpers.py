@@ -27,7 +27,7 @@ class SubstationIngestionResult(NamedTuple):
     stage: IngestionStage  # This tells us at which stage in the process the failure occurred.
     error_message: str | None = None
     csv_snippet: str | None = None
-    df: pl.DataFrame | None = None
+    ingested_data_df: pl.DataFrame | None = None
 
 
 class SubstationResource(NamedTuple):
@@ -99,7 +99,9 @@ def merge_to_delta(
         return
 
     log.info(f"Merging {len(successes)} dataframes into Delta Lake...")
-    combined_df = pl.concat([r.df for r in successes if r.df is not None])
+    combined_df = pl.concat(
+        [r.ingested_data_df for r in successes if r.ingested_data_df is not None]
+    )
 
     if not Path(delta_path).exists():
         combined_df.write_delta(

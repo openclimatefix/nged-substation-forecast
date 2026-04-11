@@ -4,7 +4,9 @@ from contracts.settings import Settings
 
 
 def clean_substation_flows(
-    df: pl.DataFrame, settings: Settings, group_by_cols: Sequence[str] | None = None
+    substation_flows_df: pl.DataFrame,
+    settings: Settings,
+    group_by_cols: Sequence[str] | None = None,
 ) -> pl.DataFrame:
     """Clean substation flows by replacing stuck and insane values with null."""
 
@@ -19,10 +21,10 @@ def clean_substation_flows(
     def _compute_insane_mask(power_col: str, min_thresh: float, max_thresh: float) -> pl.Expr:
         return (pl.col(power_col) < min_thresh) | (pl.col(power_col) > max_thresh)
 
-    power_columns = [col for col in ["MW", "MVA"] if col in df.columns]
+    power_columns = [col for col in ["MW", "MVA"] if col in substation_flows_df.columns]
 
     if not power_columns:
-        return df
+        return substation_flows_df
 
     stuck_masks = [
         _compute_rolling_std(col, settings.data_quality.stuck_std_threshold)
@@ -40,7 +42,7 @@ def clean_substation_flows(
 
     bad_value_mask = stuck_mask | insane_mask
 
-    df_cleaned = df.with_columns(
+    df_cleaned = substation_flows_df.with_columns(
         [
             pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col(col)).alias(col)
             for col in power_columns
