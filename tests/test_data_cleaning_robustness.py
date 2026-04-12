@@ -110,7 +110,9 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         cleaned_actuals(context, settings)
 
         # Verify data exists
-        df_result = pl.read_delta(str(cleaned_actuals_path))
+        df_result = pl.read_delta(str(cleaned_actuals_path)).sort(
+            ["time_series_id", "period_end_time"]
+        )
         assert len(df_result) > 0
         assert df_result["power"][0] == 10.0
 
@@ -138,6 +140,8 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         cleaned_actuals(context, settings)
 
         # Verify data was overwritten
-        df_result = pl.read_delta(str(cleaned_actuals_path))
+        df_result = pl.read_delta(str(cleaned_actuals_path)).sort(
+            ["time_series_id", "period_end_time"]
+        )
         assert len(df_result) > 0
         assert df_result["power"][0] == 20.0

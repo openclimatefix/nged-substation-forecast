@@ -155,9 +155,9 @@ def cleaned_actuals(
     )
 
     # Remove duplicates
+    context.log.info(f"Data shape before unique in cleaned_actuals: {df_cleaned.shape}")
     df_cleaned = df_cleaned.unique(subset=["time_series_id", "period_end_time"])
-
-    context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
+    context.log.info(f"Data shape after unique in cleaned_actuals: {df_cleaned.shape}")
 
     # Validate the output against Patito schema
     validated_df = PowerTimeSeries.validate(df_cleaned, allow_superfluous_columns=True)
