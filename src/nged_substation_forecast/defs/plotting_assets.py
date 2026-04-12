@@ -15,7 +15,7 @@ class PlotConfig(dg.Config):
     """Configuration for the forecast vs actual plot asset."""
 
     output_path: str = "tests/xgboost_integration_plot.html"
-    max_substations: int = 6
+    max_time_series: int = 6
 
 
 @dg.asset(
@@ -42,7 +42,7 @@ def forecast_vs_actual_plot(
         return
 
     # Cleanup old plot data
-    for old_csv in Path(config.output_path).parent.glob("plot_data_substation_*.csv"):
+    for old_csv in Path(config.output_path).parent.glob("plot_data_ts_*.csv"):
         old_csv.unlink()
 
     # Load time series metadata
@@ -51,8 +51,8 @@ def forecast_vs_actual_plot(
     )
 
     # Extract unique substation numbers from predictions and limit for plotting.
-    pred_substations = (
-        predictions.get_column("time_series_id").unique().to_list()[: config.max_substations]
+    pred_time_series_ids = (
+        predictions.get_column("time_series_id").unique().to_list()[: config.max_time_series]
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
@@ -61,11 +61,11 @@ def forecast_vs_actual_plot(
     # Filter actuals by substation.
     actuals_30m = cast(
         pl.DataFrame,
-        cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_substations)).collect(),
+        cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_time_series_ids)).collect(),
     )
 
     if actuals_30m.is_empty():
-        context.log.warning("No actuals found for the predicted substations, skipping plot.")
+        context.log.warning("No actuals found for the predicted time series, skipping plot.")
         return
 
     # Calculate target_init_time = max_actual_time - 14 days.
@@ -134,7 +134,7 @@ def forecast_vs_actual_plot(
             how="inner",
         )
         .with_columns(
-            substation_name_with_id=pl.format(
+            time_series_name_with_id=pl.format(
                 "{} ({})",
                 pl.col("time_series_name"),
                 pl.col("time_series_id"),
@@ -148,14 +148,14 @@ def forecast_vs_actual_plot(
     color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
 
     charts = []
-    substations = plot_df.get_column("substation_name_with_id").unique().to_list()
+    time_series_names_with_ids = plot_df.get_column("time_series_name_with_id").unique().to_list()
 
-    for sub in substations:
-        sub_df = plot_df.filter(pl.col("substation_name_with_id") == sub)
+    for ts_name_with_id in time_series_names_with_ids:
+        ts_df = plot_df.filter(pl.col("time_series_name_with_id") == ts_name_with_id)
 
         # Forecasts: 51 members
         preds_df = (
-            sub_df.select(["period_end_time", "ensemble_member", "power_fcst"])
+            ts_df.select(["period_end_time", "ensemble_member", "power_fcst"])
             .rename({"power_fcst": "power"})
             .with_columns(
                 type=pl.lit("Forecast"),
@@ -166,7 +166,7 @@ def forecast_vs_actual_plot(
 
         # Actuals: single line per substation
         actuals_df = (
-            sub_df.select(["period_end_time", "actual"])
+            ts_df.select(["period_end_time", "actual"])
             .unique()
             .rename({"actual": "power"})
             .with_columns(
@@ -177,18 +177,18 @@ def forecast_vs_actual_plot(
         )
 
         # Combine and convert to CSV
-        substation_df = (
+        ts_data_df = (
             pl.concat([preds_df, actuals_df], how="diagonal")
             .select(["period_end_time", "power", "ensemble_member", "type"])
             .with_columns(period_end_time=pl.col("period_end_time").dt.replace_time_zone(None))
         )
 
         # Save to CSV
-        time_series_id = sub_df.get_column("time_series_id").unique().item()
+        time_series_id = ts_df.get_column("time_series_id").unique().item()
         output_path = Path(config.output_path)
-        csv_filename = f"plot_data_substation_{time_series_id}.csv"
+        csv_filename = f"plot_data_ts_{time_series_id}.csv"
         csv_path = output_path.parent / csv_filename
-        substation_df.to_pandas().to_csv(csv_path, index=False)
+        ts_data_df.to_pandas().to_csv(csv_path, index=False)
 
         data = alt.UrlData(url=csv_filename, format=alt.DataFormat(type="csv"))
 
@@ -206,10 +206,12 @@ def forecast_vs_actual_plot(
         )
 
         actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
-            strokeWidth=2, opacity=1.0
+            strokeWidth=1.0, opacity=1.0
         )
 
-        chart = alt.layer(preds_layer, actuals_layer).properties(width=400, height=200, title=sub)
+        chart = alt.layer(preds_layer, actuals_layer).properties(
+            width=400, height=200, title=ts_name_with_id
+        )
 
         charts.append(chart)
 
