@@ -41,6 +41,10 @@ def forecast_vs_actual_plot(
         context.log.warning("Empty predictions, skipping plot.")
         return
 
+    # Cleanup old plot data
+    for old_csv in Path(config.output_path).parent.glob("plot_data_substation_*.csv"):
+        old_csv.unlink()
+
     # Load time series metadata
     time_series_metadata = pl.read_parquet(
         settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
