@@ -154,6 +154,9 @@ def cleaned_actuals(
         max_mw_threshold=settings.data_quality.max_mw_threshold,
     )
 
+    # Remove duplicates
+    df_cleaned = df_cleaned.unique(subset=["time_series_id", "period_end_time"])
+
     context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
 
     # Validate the output against Patito schema
@@ -254,6 +257,9 @@ def cleaned_power_time_series(
         min_mw_threshold=settings.data_quality.min_mw_threshold,
         max_mw_threshold=settings.data_quality.max_mw_threshold,
     )
+
+    # Remove duplicates
+    df_cleaned = df_cleaned.unique(subset=["time_series_id", "period_end_time"])
 
     context.log.info(f"Cleaned data shape after cleaning: {df_cleaned.shape}")
 
