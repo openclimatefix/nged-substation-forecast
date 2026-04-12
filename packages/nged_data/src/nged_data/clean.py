@@ -14,9 +14,13 @@ def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries
 
 def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFrame:
     """Calculates rolling variance over a 6-hour window per time_series_id."""
-    # 6 hours = 12 periods of 30 minutes
+    # 6 hours = 12 periods of 30 minutes.
+    # We fill nulls with a small value to prevent artificial drops to zero at partition boundaries.
     return df.with_columns(
-        rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
+        rolling_variance=pl.col("power")
+        .rolling_var(window_size=12)
+        .fill_null(1.0)
+        .over("time_series_id")
     )
 
 
