@@ -149,9 +149,7 @@ def forecast_vs_actual_plot(
 
     # Generate Altair Chart using layers
     # We use a shared color scale to ensure the legend is consistent
-    color_scale = alt.Scale(
-        domain=["Forecast", "Actual", "Raw"], range=["blue", "black", "lightgrey"]
-    )
+    color_scale = alt.Scale(domain=["Forecast", "Actual", "Raw"], range=["blue", "red", "green"])
 
     charts = []
     time_series_names_with_ids = plot_df.get_column("time_series_name_with_id").unique().to_list()
@@ -216,16 +214,16 @@ def forecast_vs_actual_plot(
 
         preds_layer = (
             base.transform_filter(alt.datum.type == "Forecast")
-            .mark_line(strokeWidth=0.5, opacity=0.3)
+            .mark_line(strokeWidth=0.5, opacity=0.7)
             .encode(detail="ensemble_member:N")
         )
 
         actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
-            strokeWidth=1.0, opacity=1.0
+            strokeWidth=1.0, opacity=0.7
         )
 
         raw_layer = base.transform_filter(alt.datum.type == "Raw").mark_line(
-            strokeWidth=1.0, opacity=1.0, strokeDash=[5, 5]
+            strokeWidth=1.0, opacity=0.7, strokeDash=[5, 5]
         )
 
         chart = alt.layer(preds_layer, actuals_layer, raw_layer).properties(
