@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import cast
 
 import altair as alt
@@ -40,10 +39,6 @@ def forecast_vs_actual_plot(
     if predictions.is_empty():
         context.log.warning("Empty predictions, skipping plot.")
         return
-
-    # Cleanup old plot data
-    for old_csv in Path(config.output_path).parent.glob("plot_data_ts_*.csv"):
-        old_csv.unlink()
 
     # Load time series metadata
     time_series_metadata = pl.read_parquet(
@@ -185,14 +180,9 @@ def forecast_vs_actual_plot(
             .unique()
         )
 
-        # Save to CSV
-        time_series_id = ts_df.get_column("time_series_id").unique().item()
-        output_path = Path(config.output_path)
-        csv_filename = f"plot_data_ts_{time_series_id}.csv"
-        csv_path = output_path.parent / csv_filename
-        ts_data_df.to_pandas().to_csv(csv_path, index=False)
-
-        data = alt.UrlData(url=csv_filename, format=alt.DataFormat(type="csv"))
+        # Embed data directly
+        csv_string = ts_data_df.write_csv()
+        data = alt.Data(values=csv_string, format=alt.DataFormat(type="csv"))
 
         # Generate Altair Chart for this substation
         base = alt.Chart(data).encode(

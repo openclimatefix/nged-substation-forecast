@@ -33,7 +33,6 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 - **Run only the slow tests**: `uv run pytest -m "slow"`
 - **Run all tests**: `uv run pytest`
 - **Run tests with coverage**: `uv run pytest --cov`
-- **View generated plots**: To view the generated HTML plots (e.g., `tests/xgboost_dagster_integration_plot.html`), start a local web server in the project root: `uv run python -m http.server 8000`, then open [http://localhost:8000/tests/xgboost_dagster_integration_plot.html](http://localhost:8000/tests/xgboost_dagster_integration_plot.html) in your browser.
 
 ### Development
 
