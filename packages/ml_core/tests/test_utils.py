@@ -7,22 +7,22 @@ from ml_core.utils import _slice_temporal_data
 def test_slice_temporal_data_dataframe():
     df = pl.DataFrame(
         {
-            "timestamp": [
+            "period_end_time": [
                 "2023-01-01T00:00:00",
                 "2023-01-02T00:00:00",
                 "2023-01-03T00:00:00",
             ],
-            "value": [1, 2, 3],
+            "power": [1, 2, 3],
         }
-    ).with_columns(pl.col("timestamp").str.to_datetime())
+    ).with_columns(pl.col("period_end_time").str.to_datetime())
 
     start = date(2023, 1, 1)
     end = date(2023, 1, 2)
 
-    result = _slice_temporal_data(df, start, end, "timestamp")
+    result = _slice_temporal_data(df, start, end, "period_end_time")
 
     assert len(result) == 2
-    assert result["value"].to_list() == [1, 2]
+    assert result["power"].to_list() == [1, 2]
 
 
 def test_slice_temporal_data_lazyframe():
@@ -51,35 +51,35 @@ def test_slice_temporal_data_lazyframe():
 def test_slice_temporal_data_dict():
     df1 = pl.DataFrame(
         {
-            "timestamp": [
+            "period_end_time": [
                 "2023-01-01T00:00:00",
                 "2023-01-02T00:00:00",
             ],
-            "value": [1, 2],
+            "power": [1, 2],
         }
-    ).with_columns(pl.col("timestamp").str.to_datetime())
+    ).with_columns(pl.col("period_end_time").str.to_datetime())
 
     df2 = pl.DataFrame(
         {
-            "timestamp": [
+            "period_end_time": [
                 "2023-01-01T00:00:00",
                 "2023-01-02T00:00:00",
             ],
-            "value": [3, 4],
+            "power": [3, 4],
         }
-    ).with_columns(pl.col("timestamp").str.to_datetime())
+    ).with_columns(pl.col("period_end_time").str.to_datetime())
 
     data = {"flows": df1, "nwp": df2}
 
     start = date(2023, 1, 2)
     end = date(2023, 1, 2)
 
-    result = _slice_temporal_data(data, start, end, "timestamp")
+    result = _slice_temporal_data(data, start, end, "period_end_time")
 
     assert len(result["flows"]) == 1
-    assert result["flows"]["value"].to_list() == [2]
+    assert result["flows"]["power"].to_list() == [2]
     assert len(result["nwp"]) == 1
-    assert result["nwp"]["value"].to_list() == [4]
+    assert result["nwp"]["power"].to_list() == [4]
 
 
 def test_slice_temporal_data_no_time_col():
@@ -96,7 +96,7 @@ def test_slice_temporal_data_no_time_col():
     start = date(2023, 1, 2)
     end = date(2023, 1, 2)
 
-    result = _slice_temporal_data(df, start, end, "timestamp")
+    result = _slice_temporal_data(df, start, end, "period_end_time")
 
     # Should return unchanged
     assert len(result) == 2

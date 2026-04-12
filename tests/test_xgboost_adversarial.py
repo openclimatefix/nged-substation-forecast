@@ -5,7 +5,6 @@ import patito as pt
 from datetime import datetime, timezone
 from typing import cast
 from unittest.mock import MagicMock
-from ml_core.data import calculate_target_map, downsample_power_flows
 from xgboost_forecaster.model import XGBoostForecaster
 from contracts.hydra_schemas import (
     ModelConfig,
@@ -14,12 +13,12 @@ from contracts.hydra_schemas import (
 )
 from xgboost_forecaster.config import XGBoostHyperparameters
 from contracts.data_schemas import (
-    POWER_MW,
     InferenceParams,
+    Nwp,
     ProcessedNwp,
-    SubstationMetadata,
-    SubstationPowerFlows,
-    SubstationTargetMap,
+    TimeSeriesMetadata,
+    PowerTimeSeries,
+    XGBoostInputFeatures,
 )
 
 
@@ -36,12 +35,12 @@ def test_prepare_features_missing_column_fails_loudly():
     df = pl.DataFrame(
         {
             "valid_time": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [1],
+            "time_series_id": ["1"],
         }
     )
 
     with pytest.raises(pl_exc.ColumnNotFoundError):
-        forecaster._prepare_features(df)
+        forecaster._prepare_features(cast(pt.DataFrame[XGBoostInputFeatures], df))
 
 
 def test_train_handles_missing_init_time():
@@ -53,41 +52,38 @@ def test_train_handles_missing_init_time():
     )
     forecaster = XGBoostForecaster()
 
-    flows = pt.DataFrame[SubstationPowerFlows](
+    flows = pt.DataFrame[PowerTimeSeries](
         {
-            "timestamp": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
-            "substation_number": [1],
-            "MW": [10.0],
-            "MVA": [10.0],
-            "MVAr": [0.0],
-            "ingested_at": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "time_series_id": ["1"],
+            "start_time": [datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)],
+            "period_end_time": [datetime(2024, 1, 1, 10, 0, tzinfo=timezone.utc)],
+            "power": [10.0],
         }
-    ).lazy()
+    )
 
-    metadata = pt.DataFrame[SubstationMetadata](
+    time_series_id = "1"
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1],
-            "substation_name_in_location_table": ["Sub1"],
             "substation_type": ["Primary"],
             "latitude": [51.0],
             "longitude": [-1.0],
             "h3_res_5": [1],
             "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "time_series_id": [time_series_id],
         }
     )
 
     # Centralized data preparation
-    target_map = calculate_target_map(flows)
-    flows_30m = downsample_power_flows(flows, target_map=target_map.lazy())
+    power_time_series = flows.lazy()
 
     # This should no longer raise ColumnNotFoundError for init_time
     # It might fail later due to missing features in the mock setup, but not on init_time
     try:
-        forecaster.target_map = target_map
-        forecaster.train(
+        forecaster.fit(
             config=config,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
-            substation_metadata=metadata,
+            power_time_series=power_time_series,
+            time_series_metadata=metadata,
             nwps={},
         )
     except pl_exc.ColumnNotFoundError as e:
@@ -95,44 +91,6 @@ def test_train_handles_missing_init_time():
     except Exception:
         # Other errors are fine for this test as long as it's not init_time
         pass
-
-
-@pytest.mark.parametrize(
-    "mw,mva,expected_fail",
-    [
-        (10.0, 10.0, False),
-        (10.0, None, False),
-        (None, 10.0, False),
-        (None, None, True),
-    ],
-)
-def test_substation_power_flows_validation_mw_mva_combinations(mw, mva, expected_fail):
-    """Test SubstationPowerFlows validation with various MW/MVA combinations."""
-    df = pl.DataFrame(
-        {
-            "timestamp": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
-            "substation_number": [1],
-            "MW": [mw],
-            "MVA": [mva],
-            "MVAr": [0.0],
-            "ingested_at": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
-        }
-    ).with_columns(
-        [
-            pl.col("substation_number").cast(pl.Int32),
-            pl.col("MW").cast(pl.Float32),
-            pl.col("MVA").cast(pl.Float32),
-            pl.col("MVAr").cast(pl.Float32),
-        ]
-    )
-
-    from contracts.data_schemas import MissingCorePowerVariablesError
-
-    if expected_fail:
-        with pytest.raises(MissingCorePowerVariablesError):
-            SubstationPowerFlows.validate(df)
-    else:
-        SubstationPowerFlows.validate(df)
 
 
 def test_process_nwp_data_empty_input():
@@ -163,16 +121,8 @@ def test_predict_with_missing_feature_column_fails_loudly():
     forecaster.model = mock_model
     forecaster.feature_names = ["feature_a", "feature_b"]
 
-    # Mock target map
-    forecaster.target_map = pt.DataFrame[SubstationTargetMap](
-        {
-            "substation_number": [1],
-            "preferred_power_col": [POWER_MW],
-            "peak_capacity_MW_or_MVA": [100.0],
-        }
-    ).with_columns(pl.col("substation_number").cast(pl.Int32))
-
-    metadata = pt.DataFrame[SubstationMetadata](
+    time_series_id = "1"
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1],
             "substation_name_in_location_table": ["Sub1"],
@@ -181,6 +131,7 @@ def test_predict_with_missing_feature_column_fails_loudly():
             "longitude": [-1.0],
             "h3_res_5": [1],
             "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
+            "time_series_id": [time_series_id],
         }
     )
 
@@ -222,30 +173,23 @@ def test_predict_with_missing_feature_column_fails_loudly():
         .lazy(),
     )
 
-    flows = (
-        pl.DataFrame(
-            {
-                "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
-                "substation_number": [1],
-                "MW": [50.0],
-                "MVA": [50.0],
-                "MVAr": [0.0],
-                "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
-            }
-        )
-        .with_columns(pl.col("substation_number").cast(pl.Int32))
-        .lazy()
-    )
-    flows_30m = downsample_power_flows(
-        cast(pt.LazyFrame[SubstationPowerFlows], flows),
-        target_map=forecaster.target_map.lazy(),
-    )
+    flows = pl.DataFrame(
+        {
+            "timestamp": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+            "MW": [50.0],
+            "MVA": [50.0],
+            "MVAr": [0.0],
+            "ingested_at": [datetime(2023, 12, 25, tzinfo=timezone.utc)],
+            "time_series_id": ["1"],
+        }
+    ).lazy()
+    power_time_series = flows
 
     # This should fail because feature_a and feature_b are missing from the prepared data
     with pytest.raises(pl_exc.ColumnNotFoundError):
         forecaster.predict(
-            substation_metadata=metadata,
+            time_series_metadata=metadata,
             inference_params=inference_params,
-            flows_30m=cast(pt.LazyFrame, flows_30m),
-            nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
+            power_time_series=cast(pt.LazyFrame, power_time_series),
+            nwps={NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[Nwp], nwp)},
         )

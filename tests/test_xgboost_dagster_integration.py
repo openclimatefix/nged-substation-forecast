@@ -1,18 +1,23 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+import logging
+import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import cast
 
 import dagster as dg
 import polars as pl
+import pytest
 from contracts.settings import Settings
+from geo.io_managers import CompositeIOManager
+from upath import UPath
+
 from nged_substation_forecast.definitions import defs
 
 
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.manual
-def test_xgboost_dagster_integration() -> None:
+def test_xgboost_dagster_integration(tmp_path: Path) -> None:
     """True integration test for XGBoost pipeline inside Dagster.
 
     Note: This test requires actual data in the Delta tables and NWP parquet files.
@@ -27,6 +32,14 @@ def test_xgboost_dagster_integration() -> None:
     # deprecation warning in newer Dagster versions. This ensures we correctly retrieve
     # the job definition.
     job = defs.resolve_job_def("xgboost_integration_job")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        stream=sys.stdout,
+        force=True,  # This ensures it overrides any existing configuration
+    )
+    logger = logging.getLogger("test_logger")
+    logger.info("Starting test_xgboost_dagster_integration")
 
     # We use an ephemeral Dagster instance to ensure that all resources,
     # including SQLite databases and SQLAlchemy connection pools, are
@@ -34,25 +47,32 @@ def test_xgboost_dagster_integration() -> None:
     # "Cannot operate on a closed database" errors in tests.
     with dg.DagsterInstance.ephemeral() as instance:
         settings = Settings()
-        actuals_path = settings.nged_data_path / "delta" / "live_primary_flows"
-        cleaned_path = settings.nged_data_path / "delta" / "cleaned_actuals"
+        cleaned_path = settings.nged_data_path / "delta" / "cleaned_power_time_series"
 
-        if not actuals_path.exists() or not cleaned_path.exists():
+        if not cleaned_path.exists():
             pytest.skip("Required Delta tables missing. Please download data.")
 
-        # Define the 5 substations for the test
-        substations = [110375, 110644, 110772, 110803, 110804]
+        # Define the 4 time_series_ids for the test
+        metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+        df_metadata = pl.read_parquet(metadata_path)
 
-        # 3. Dynamically calculate dates from local data
-        df = pl.scan_delta(str(actuals_path))
-        max_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").max()).collect())
-        max_dt = max_dt_df.get_column("timestamp").max()
+        # Pick 4 IDs: 1 primary substation (Disaggregated Demand), 1 BSP (Raw Flow?), 1 solar farm (PV), 1 wind farm (Wind)
+        time_series_ids = []
+        for t in ["Disaggregated Demand", "Raw Flow", "PV", "Wind"]:
+            id = df_metadata.filter(pl.col("time_series_type") == t)["time_series_id"][0]
+            time_series_ids.append(id)
+
+        df_cleaned = pl.scan_delta(str(cleaned_path))
+
+        # Dynamically calculate dates from local data
+        max_dt_df = cast(pl.DataFrame, df_cleaned.select(pl.col("period_end_time").max()).collect())
+        max_dt = max_dt_df.get_column("period_end_time").max()
 
         if max_dt is None:
             pytest.skip("No maximum timestamp found in data.")
 
-        min_dt_df = cast(pl.DataFrame, df.select(pl.col("timestamp").min()).collect())
-        min_dt = min_dt_df.get_column("timestamp").min()
+        min_dt_df = cast(pl.DataFrame, df_cleaned.select(pl.col("period_end_time").min()).collect())
+        min_dt = min_dt_df.get_column("period_end_time").min()
 
         if min_dt is None:
             pytest.skip("No minimum timestamp found in data.")
@@ -64,11 +84,10 @@ def test_xgboost_dagster_integration() -> None:
                 f"Insufficient data for integration test. Found {total_duration.days} days, require at least 6."
             )
 
-        # 1. Select an NWP initialization time from exactly two weeks ago.
-        today = datetime.now(timezone.utc).date()
-        nwp_init_time = today - timedelta(weeks=2)
+        # Select an NWP initialization time from exactly two weeks before the end of the cleaned data.
+        nwp_init_time = (cast(datetime, max_dt) - timedelta(weeks=2)).date()
 
-        # 2. Configure the `evaluate_xgboost` op to run inference for that specific NWP run,
+        # Configure the `evaluate_xgboost` op to run inference for that specific NWP run,
         # covering a 2-week prediction horizon.
         test_start = nwp_init_time
         test_end = nwp_init_time + timedelta(weeks=2)
@@ -82,7 +101,7 @@ def test_xgboost_dagster_integration() -> None:
             if not nwp_path.exists():
                 pytest.skip(f"Required NWP file missing: {nwp_path}. Please download data.")
 
-        # 3. Ensure the `train_xgboost` op is configured to train only on data *before* that 2-week period,
+        # Ensure the `train_xgboost` op is configured to train only on data *before* that 2-week period,
         # ensuring no data leakage.
         train_end = test_start - timedelta(days=1)
         min_dt_date = cast(datetime, min_dt).date()
@@ -92,26 +111,22 @@ def test_xgboost_dagster_integration() -> None:
         if train_start > train_end:
             pytest.skip("Calculated train_start is after train_end. Insufficient data.")
 
-        print(f"train_start: {train_start}, train_end: {train_end}")
-        print(f"nwp_init_time: {nwp_init_time}")
-        print(f"test_start: {test_start}, test_end: {test_end}")
+        logger.info(f"min_dt: {min_dt}, max_dt: {max_dt}")
+        logger.info(f"train_start: {train_start}, train_end: {train_end}")
+        logger.info(f"nwp_init_time: {nwp_init_time}")
+        logger.info(f"test_start: {test_start}, test_end: {test_end}")
 
-        # 4. Define plot output path
+        # Define plot output path
         plot_path = Path("tests/xgboost_dagster_integration_plot.html")
 
-        # 5. Provide run configuration
+        # Provide run configuration
         run_config = {
             "ops": {
-                "live_primary_flows": {
-                    "config": {
-                        "substation_numbers": substations,
-                        "limit": 5,
-                    }
-                },
                 "processed_nwp_data": {
                     "config": {
-                        "substation_ids": substations,
-                        "start_date": str(nwp_init_time),
+                        # TODO: Change `substation_ids` to `time_series_ids`
+                        "substation_ids": time_series_ids,
+                        "start_date": str(train_start - timedelta(days=14)),
                         "end_date": str(test_end),
                     }
                 },
@@ -119,14 +134,14 @@ def test_xgboost_dagster_integration() -> None:
                     "config": {
                         "train_start": str(train_start),
                         "train_end": str(train_end),
-                        "substation_ids": substations,
+                        "substation_ids": time_series_ids,
                     }
                 },
                 "evaluate_xgboost": {
                     "config": {
                         "test_start": str(test_start),
                         "test_end": str(test_end),
-                        "substation_ids": substations,
+                        "substation_ids": time_series_ids,
                     }
                 },
                 "forecast_vs_actual_plot": {
@@ -137,23 +152,51 @@ def test_xgboost_dagster_integration() -> None:
             }
         }
 
-        # 6. Execute the job in-process
+        #  Execute the job in-process
         # Note: This test takes approximately 3.5 minutes (215 seconds) to run on a
         # standard development machine as it executes the full XGBoost pipeline
         # (data loading, cleaning, training, evaluation, and plotting).
         resources = defs.resources or {}
+        io_manager = CompositeIOManager(base_path=UPath(tmp_path))
 
+        # Run for training and test partitions
+        all_partitions = []
+        for i in range((train_end - train_start).days + 1):
+            date = train_start + timedelta(days=i)
+            all_partitions.append(date.isoformat())
+        for i in range((test_end - test_start).days + 1):
+            date = test_start + timedelta(days=i)
+            all_partitions.append(date.isoformat())
+
+        for partition_key in all_partitions:
+            logger.info(f"Starting job execution for partition: {partition_key}")
+            # The cleaned_actuals asset now enforces uniqueness, so we don't need to filter here.
+            # The pipeline will handle duplicates gracefully.
+            job.execute_in_process(
+                run_config=run_config,
+                partition_key=partition_key,
+                op_selection=["cleaned_actuals"],
+                resources={
+                    **resources,
+                    "io_manager": io_manager,
+                },
+                instance=instance,
+            )
+            logger.info(f"Finished job execution for partition: {partition_key}")
+
+        logger.info(f"Starting final job execution for test_end: {test_end.isoformat()}")
         result = job.execute_in_process(
             run_config=run_config,
             partition_key=test_end.isoformat(),
             resources={
                 **resources,
-                "io_manager": dg.mem_io_manager,
+                "io_manager": io_manager,
             },
             instance=instance,
         )
+        logger.info("Finished final job execution for test_end")
 
-    # 7. Assertions
+    # Assertions
     assert result.success, "Dagster job failed"
 
     # Verify ensemble forecasts
@@ -184,9 +227,9 @@ def test_xgboost_dagster_integration() -> None:
     html_content = plot_path.read_text()
 
     # Dynamically check that at least one requested substation ID is in the HTML
-    found_substation = any(str(sub_id) in html_content for sub_id in substations)
+    found_substation = any(str(sub_id) in html_content for sub_id in time_series_ids)
     assert found_substation, (
-        f"None of the requested substation IDs {substations} found in plot HTML"
+        f"None of the requested substation IDs {time_series_ids} found in plot HTML"
     )
 
     assert '"resolve":{"scale":{"y":"independent"}}' in html_content.replace(" ", "").replace(

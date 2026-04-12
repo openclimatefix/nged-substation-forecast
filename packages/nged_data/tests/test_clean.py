@@ -1,0 +1,97 @@
+import pytest
+import polars as pl
+from datetime import datetime, timedelta, timezone
+from nged_data.clean import clean_power_time_series
+
+
+def test_clean_power_time_series():
+    # Create dummy data
+    start_time = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    data = {
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0] * 48,  # Constant (variance 0)
+    }
+    df = pl.DataFrame(data).with_columns(
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
+    )
+
+    # Test with variance threshold 0.1
+    # Day 1 variance is 0, Day 2 variance is 0. Both should be removed.
+    with pytest.raises(
+        ValueError, match="All rows were removed after filtering by variance threshold."
+    ):
+        clean_power_time_series(
+            df,
+            stuck_std_threshold=0.0,
+            min_mw_threshold=-100.0,
+            max_mw_threshold=1000.0,
+            default_threshold=0.1,
+        )
+
+    # Test with data that should be kept
+    data_keep = {
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0, 2.0] * 24,  # Day 1: variance > 0, Day 2: variance > 0
+    }
+    df_keep = pl.DataFrame(data_keep).with_columns(
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
+    )
+    cleaned_df = clean_power_time_series(
+        df_keep,
+        stuck_std_threshold=0.0,
+        min_mw_threshold=-100.0,
+        max_mw_threshold=1000.0,
+        default_threshold=0.1,
+    )
+    assert len(cleaned_df) == 47
+
+    # Test with null values
+    data_null = {
+        "time_series_id": [1] * 48,
+        "period_end_time": [start_time + timedelta(hours=i) for i in range(48)],
+        "power": [1.0, 2.0] * 23 + [None, None],
+    }
+    df_null = pl.DataFrame(data_null).with_columns(
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
+    )
+    cleaned_df_null = clean_power_time_series(
+        df_null,
+        stuck_std_threshold=0.0,
+        min_mw_threshold=-100.0,
+        max_mw_threshold=1000.0,
+        default_threshold=0.1,
+    )
+    assert len(cleaned_df_null) == 45
+
+    # Test with time_series_id
+    cleaned_df_id = clean_power_time_series(
+        df_keep,
+        stuck_std_threshold=0.0,
+        min_mw_threshold=-100.0,
+        max_mw_threshold=1000.0,
+        time_series_id=1,
+        default_threshold=0.1,
+    )
+    assert len(cleaned_df_id) == 47
+
+    # Test with variance_thresholds and time_series_id
+    cleaned_df_thresholds = clean_power_time_series(
+        df_keep,
+        stuck_std_threshold=0.0,
+        min_mw_threshold=-100.0,
+        max_mw_threshold=1000.0,
+        time_series_id=1,
+        variance_thresholds={1: 0.0},
+        default_threshold=0.1,
+    )
+    # If threshold is 0.0, all rows should be kept (variance > 0)
+    # The first row has null variance, so it's dropped.
+    assert len(cleaned_df_thresholds) == 47

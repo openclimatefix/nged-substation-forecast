@@ -23,7 +23,6 @@ dependencies = [
     "requests>=2.31.0",
     "mlflow-skinny",
     "dynamical_data",
-    "nged-data",
     "contracts",
     "ml_core",
     "obstore",
@@ -61,7 +60,7 @@ repository = "https://github.com/openclimatefix/nged-substation-forecast"
 members = ["packages/*"]
 
 [tool.uv.sources]
-nged-data = { workspace = true }
+nged_data = { workspace = true }
 contracts = { workspace = true }
 ml_core = { workspace = true }
 xgboost_forecaster = { workspace = true }

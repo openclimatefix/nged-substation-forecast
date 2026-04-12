@@ -3,12 +3,9 @@ from typing import cast
 
 import altair as alt
 import dagster as dg
-import patito as pt
 import polars as pl
-from contracts.data_schemas import SubstationPowerFlows, SubstationTargetMap
 from contracts.settings import Settings
 from dagster import ResourceParam
-from ml_core.data import downsample_power_flows
 
 from .data_cleaning_assets import get_cleaned_actuals_lazy
 
@@ -17,13 +14,12 @@ class PlotConfig(dg.Config):
     """Configuration for the forecast vs actual plot asset."""
 
     output_path: str = "tests/xgboost_integration_plot.html"
-    max_substations: int = 6
+    max_time_series: int = 6
 
 
 @dg.asset(
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
-        "substation_metadata": dg.AssetIn("substation_metadata"),
     },
     deps=["cleaned_actuals"],
     compute_kind="python",
@@ -32,7 +28,6 @@ class PlotConfig(dg.Config):
 def forecast_vs_actual_plot(
     context: dg.AssetExecutionContext,
     predictions: pl.DataFrame,
-    substation_metadata: pl.DataFrame,
     config: PlotConfig,
     settings: ResourceParam[Settings],
 ):
@@ -45,35 +40,33 @@ def forecast_vs_actual_plot(
         context.log.warning("Empty predictions, skipping plot.")
         return
 
+    # Load time series metadata
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
+
     # Extract unique substation numbers from predictions and limit for plotting.
-    pred_substations = (
-        predictions.get_column("substation_number").unique().to_list()[: config.max_substations]
+    pred_time_series_ids = (
+        predictions.get_column("time_series_id").unique().to_list()[: config.max_time_series]
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
     cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
 
-    # Downsample actuals to 30m to match predictions, filtering by substation first.
-    # We use the substation_metadata to provide the necessary target_map.
+    # Filter actuals by substation.
     actuals_30m = cast(
         pl.DataFrame,
-        downsample_power_flows(
-            cast(
-                pt.LazyFrame[SubstationPowerFlows],
-                cleaned_actuals_lazy.filter(pl.col("substation_number").is_in(pred_substations)),
-            ),
-            target_map=cast(pt.DataFrame[SubstationTargetMap], substation_metadata),
-        ).collect(),
+        cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_time_series_ids)).collect(),
     )
 
     if actuals_30m.is_empty():
-        context.log.warning("No actuals found for the predicted substations, skipping plot.")
+        context.log.warning("No actuals found for the predicted time series, skipping plot.")
         return
 
     # Calculate target_init_time = max_actual_time - 14 days.
     # We select the latest nwp_init_time that is <= max_actual_time - 14 days to guarantee
     # that the entire 14-day forecast horizon has corresponding actuals for comparison.
-    max_actual_time = cast(datetime, actuals_30m.get_column("timestamp").max())
+    max_actual_time = cast(datetime, actuals_30m.get_column("period_end_time").max())
     target_init_time = max_actual_time - timedelta(days=14)
 
     # Select chosen_init_time: max nwp_init_time <= target_init_time
@@ -93,14 +86,16 @@ def forecast_vs_actual_plot(
             f"Falling back to earliest available: {chosen_init_time}"
         )
 
-    latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time)
+    latest_predictions = predictions.filter(pl.col("nwp_init_time") == chosen_init_time).rename(
+        {"valid_time": "period_end_time"}
+    )
 
     # Join predictions with actuals. We use a 'left' join with latest_predictions
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
     # in the plot, even if actuals are missing for the later days.
-    eval_df = pl.DataFrame(latest_predictions).join(
-        actuals_30m.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
-        on=["valid_time", "substation_number"],
+    eval_df = latest_predictions.join(
+        actuals_30m.rename({"power": "actual"}),
+        on=["period_end_time", "time_series_id"],
         how="left",
     )
 
@@ -114,7 +109,7 @@ def forecast_vs_actual_plot(
     # Filter plot to 14-day horizon starting from chosen_init_time
     horizon_end = chosen_init_time + timedelta(days=14)
     plot_df = eval_df.filter(
-        (pl.col("valid_time") >= chosen_init_time) & (pl.col("valid_time") <= horizon_end)
+        (pl.col("period_end_time") >= chosen_init_time) & (pl.col("period_end_time") <= horizon_end)
     )
 
     # Empty Plot Window Guard: Ensure we have data in the 14-day window.
@@ -124,81 +119,97 @@ def forecast_vs_actual_plot(
         )
         return
 
-    # Join with substation_metadata to get names. Joining after filtering minimizes DF size.
+    # Join with time_series_metadata to get names. Joining after filtering minimizes DF size.
     # We convert to plain Polars DataFrames to avoid Patito subclass join type mismatches.
     plot_df = (
         pl.DataFrame(plot_df)
         .join(
-            pl.DataFrame(substation_metadata).select(
-                ["substation_number", "substation_name_in_location_table"]
-            ),
-            on="substation_number",
+            pl.DataFrame(time_series_metadata).select(["time_series_id", "time_series_name"]),
+            on="time_series_id",
             how="inner",
         )
         .with_columns(
-            substation_name_with_id=pl.format(
+            time_series_name_with_id=pl.format(
                 "{} ({})",
-                pl.col("substation_name_in_location_table"),
-                pl.col("substation_number"),
+                pl.col("time_series_name"),
+                pl.col("time_series_id"),
             )
         )
-        .sort("valid_time")
+        .sort("period_end_time")
     )
-
-    # Prepare a single dataframe for Altair to avoid faceting issues and duplication
-    # Forecasts: 51 members
-    preds_df = (
-        plot_df.select(["valid_time", "substation_name_with_id", "ensemble_member", "MW_or_MVA"])
-        .rename({"MW_or_MVA": "power"})
-        .with_columns(
-            type=pl.lit("Forecast"),
-            ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
-        )
-    )
-
-    # Actuals: single line per substation (avoiding 51x duplication)
-    actuals_df = (
-        plot_df.select(["valid_time", "substation_name_with_id", "actual"])
-        .unique()
-        .rename({"actual": "power"})
-        .with_columns(
-            type=pl.lit("Actual"),
-            ensemble_member=pl.lit(0, dtype=pl.Int32),
-        )
-    )
-
-    combined_plot_df = pl.concat([preds_df, actuals_df], how="diagonal").to_pandas()
 
     # Generate Altair Chart using layers
     # We use a shared color scale to ensure the legend is consistent
     color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
 
-    base = alt.Chart(combined_plot_df).encode(
-        x=alt.X("valid_time:T", title="Time"),
-        y=alt.Y("power:Q", title="Power (MW/MVA)"),
-        color=alt.Color("type:N", scale=color_scale, title="Type"),
-    )
+    charts = []
+    time_series_names_with_ids = plot_df.get_column("time_series_name_with_id").unique().to_list()
 
-    # Layer 1: Ensemble predictions (51 members) with thin, semi-transparent lines
-    preds_layer = (
-        base.transform_filter(alt.datum.type == "Forecast")
-        .mark_line(strokeWidth=0.5, opacity=0.3)
-        .encode(detail="ensemble_member:N")
-    )
+    for ts_name_with_id in time_series_names_with_ids:
+        ts_df = plot_df.filter(pl.col("time_series_name_with_id") == ts_name_with_id)
 
-    # Layer 2: Actuals with a single thick, solid line
-    actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
-        strokeWidth=2, opacity=1.0
-    )
+        # Forecasts: 51 members
+        preds_df = (
+            ts_df.select(["period_end_time", "ensemble_member", "power_fcst"])
+            .rename({"power_fcst": "power"})
+            .with_columns(
+                type=pl.lit("Forecast"),
+                ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
+                power=pl.col("power").round(2),
+            )
+            .unique()
+        )
 
-    # Different substations have vastly different power capacities, so independent y-axes
-    # are necessary to visualize the forecast accuracy for smaller substations.
-    # Explicitly showing the chosen_init_time as a subtitle ensures users understand
-    # the exact forecast initialization time being visualized.
-    chart = (
-        alt.layer(preds_layer, actuals_layer)
-        .properties(width=400, height=200)
-        .facet(facet="substation_name_with_id:N", columns=2)
+        # Actuals: single line per substation
+        actuals_df = (
+            ts_df.select(["period_end_time", "actual"])
+            .unique()
+            .rename({"actual": "power"})
+            .with_columns(
+                type=pl.lit("Actual"),
+                ensemble_member=pl.lit(0, dtype=pl.Int32),
+                power=pl.col("power").round(2),
+            )
+        )
+
+        # Combine and convert to CSV
+        ts_data_df = (
+            pl.concat([preds_df, actuals_df], how="diagonal")
+            .select(["period_end_time", "power", "ensemble_member", "type"])
+            .with_columns(period_end_time=pl.col("period_end_time").dt.replace_time_zone(None))
+            .unique()
+        )
+
+        # Embed data directly
+        csv_string = ts_data_df.write_csv()
+        data = alt.Data(values=csv_string, format=alt.DataFormat(type="csv"))
+
+        # Generate Altair Chart for this substation
+        base = alt.Chart(data).encode(
+            x=alt.X("period_end_time:T", title="Time"),
+            y=alt.Y("power:Q", title="Power (MW/MVA)"),
+            color=alt.Color("type:N", scale=color_scale, title="Type"),
+        )
+
+        preds_layer = (
+            base.transform_filter(alt.datum.type == "Forecast")
+            .mark_line(strokeWidth=0.5, opacity=0.3)
+            .encode(detail="ensemble_member:N")
+        )
+
+        actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
+            strokeWidth=1.0, opacity=1.0
+        )
+
+        chart = alt.layer(preds_layer, actuals_layer).properties(
+            width=400, height=200, title=ts_name_with_id
+        )
+
+        charts.append(chart)
+
+    # Combine charts
+    final_chart = (
+        alt.concat(*charts, columns=2)
         .resolve_scale(y="independent")
         .properties(
             title=alt.TitleParams(
@@ -207,7 +218,7 @@ def forecast_vs_actual_plot(
         )
     )
 
-    chart.save(config.output_path)
+    final_chart.save(config.output_path)
     context.log.info(f"Plot saved to {config.output_path}")
 
     return dg.MaterializeResult(

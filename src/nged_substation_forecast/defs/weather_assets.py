@@ -7,7 +7,7 @@ from typing import cast
 import dagster as dg
 import patito as pt
 import polars as pl
-from contracts.data_schemas import H3GridWeights
+from contracts.data_schemas import H3GridWeights, Nwp
 from contracts.settings import Settings
 from dagster import (
     AssetCheckExecutionContext,
@@ -50,6 +50,7 @@ def ecmwf_ens_forecast(
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename
 
+    scaled_df = scaled_df.unique(subset=["time", "latitude", "longitude", "ensemble_member"])
     scaled_df.write_parquet(output_path, compression="zstd", compression_level=3)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")
@@ -57,16 +58,17 @@ def ecmwf_ens_forecast(
 
 @asset(deps=[ecmwf_ens_forecast])
 def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
-    """Provides a LazyFrame scanning all downloaded NWP data."""
+    """Provides a LazyFrame scanning all downloaded NWP data.
+
+    The returned LazyFrame adheres to the contracts.data_schemas.Nwp schema.
+    """
     nwp_dir = settings.nwp_data_path / "ECMWF" / "ENS"
     if not nwp_dir.exists():
         # Return an empty LazyFrame with the expected schema if the directory doesn't exist.
         # This prevents the pipeline from crashing before any data has been downloaded.
-        from contracts.data_schemas import Nwp
+        return cast(pt.LazyFrame[Nwp], pl.LazyFrame(schema=Nwp.dtypes))
 
-        return pl.LazyFrame(schema=Nwp.dtypes)
-
-    return pl.scan_parquet(nwp_dir / "*.parquet")
+    return cast(pt.LazyFrame[Nwp], pl.scan_parquet(nwp_dir / "*.parquet"))
 
 
 class ProcessedNWPConfig(dg.Config):
@@ -86,17 +88,24 @@ class ProcessedNWPConfig(dg.Config):
 @asset(
     ins={
         "all_nwp_data": AssetIn("all_nwp_data"),
-        "substation_metadata": AssetIn("substation_metadata"),
     }
 )
 def processed_nwp_data(
-    config: ProcessedNWPConfig, all_nwp_data: pl.LazyFrame, substation_metadata: pl.DataFrame
+    context: AssetExecutionContext,
+    config: ProcessedNWPConfig,
+    all_nwp_data: pl.LazyFrame,
+    settings: ResourceParam[Settings],
 ) -> pl.LazyFrame:
     """Process NWP data: lead-time filtering and 30m interpolation for all members.
 
     WARNING: The 30m interpolation step can be memory-intensive and may cause OOM errors
     if the input NWP data or the number of substations is very large.
     """
+    context.log.info(f"processed_nwp_data config: {config}")
+    context.log.info(f"all_nwp_data schema: {all_nwp_data.collect_schema().names()}")
+    time_series_metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    metadata = pl.read_parquet(time_series_metadata_path)
+
     if config.start_date:
         all_nwp_data = all_nwp_data.filter(
             pl.col("init_time")
@@ -111,10 +120,8 @@ def processed_nwp_data(
         )
 
     if config.substation_ids:
-        substation_metadata = substation_metadata.filter(
-            pl.col("substation_number").is_in(config.substation_ids)
-        )
-    h3_indices = substation_metadata["h3_res_5"].unique().to_list()
+        metadata = metadata.filter(pl.col("time_series_id").is_in(config.substation_ids))
+    h3_indices = metadata["h3_res_5"].unique().to_list()
     return process_nwp_data(
         all_nwp_data,
         h3_indices,

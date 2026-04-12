@@ -9,7 +9,7 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
-from ml_core.data import downsample_power_flows
+from ml_core.data import calculate_peak_capacity
 
 log = logging.getLogger(__name__)
 
@@ -61,11 +61,11 @@ def train_and_log_model(
 
     sliced_data = {}
     for key, val in kwargs.items():
-        if key == "substation_metadata":
-            sliced_data[key] = val
+        if key == "time_series_metadata":
+            sliced_data["time_series_metadata"] = val
             continue
 
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        time_col = "period_end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = train_start
@@ -77,30 +77,14 @@ def train_and_log_model(
 
         # 2. Call the Model-Specific Math
         # The trainer is responsible for joining and feature engineering.
-        # We downsample power flows to 30m and use the provided target map
-        # to ensure consistency across models.
+        # We ensure power flows are at 30m resolution for consistency across models.
         if "substation_power_flows" in sliced_data:
             flows = sliced_data.pop("substation_power_flows")
-            target_map = kwargs.get("target_map")
-            if target_map is None:
-                raise ValueError("target_map must be passed in kwargs to downsample power flows.")
 
-            flows_30m = downsample_power_flows(
-                flows,
-                target_map=target_map.lazy()
-                if isinstance(target_map, pl.DataFrame)
-                else target_map,
-            )
-            sliced_data["flows_30m"] = flows_30m
+            power_time_series = flows
+            sliced_data["power_time_series"] = power_time_series
 
-            # Store target_map on the trainer if it supports it
-            if hasattr(trainer, "target_map"):
-                trainer.target_map = target_map
-
-        # Remove target_map from sliced_data so it's not passed to trainer.train()
-        sliced_data.pop("target_map", None)
-
-    model = trainer.train(config=config.model, **sliced_data)
+    model = trainer.fit(config=config.model, **sliced_data)
 
     # 3. Universal MLflow Logging
     mlflow.set_experiment(model_name)
@@ -138,11 +122,11 @@ def evaluate_and_save_model(
 
     sliced_data = {}
     for key, val in kwargs.items():
-        if key == "substation_metadata":
+        if key == "time_series_metadata":
             sliced_data[key] = val
             continue
 
-        time_col = "timestamp" if "power_flows" in key else "valid_time"
+        time_col = "period_end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = test_start
@@ -155,6 +139,7 @@ def evaluate_and_save_model(
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data
     forecast_time = datetime.now(timezone.utc)
+    nwp_init_time = None
     if "nwps" in sliced_data:
         nwps_data = sliced_data["nwps"]
         first_nwp = None
@@ -168,8 +153,9 @@ def evaluate_and_save_model(
         if isinstance(first_nwp, pl.LazyFrame):
             df = cast(pl.DataFrame, first_nwp.select(pl.col("init_time").max()).collect())
             if not df.is_empty() and df.item() is not None:
+                nwp_init_time = df.item()
                 delay_hours = getattr(config.model, "nwp_availability_delay_hours", 3)
-                forecast_time = df.item() + timedelta(hours=delay_hours)
+                forecast_time = nwp_init_time + timedelta(hours=delay_hours)
 
     inference_params = InferenceParams(
         forecast_time=forecast_time,
@@ -179,101 +165,104 @@ def evaluate_and_save_model(
     # Downsample power flows to 30m for inference (lags)
     if "substation_power_flows" in sliced_data:
         flows = sliced_data.pop("substation_power_flows")
-        # Use the provided target_map for consistency
-        target_map = kwargs.get("target_map")
-        if target_map is None:
-            # Fallback if no target_map is available on the forecaster
-            # In production, the forecaster should always have one.
-            if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
-                target_map = forecaster.target_map
-            else:
-                raise ValueError(
-                    "target_map must be provided in kwargs or present on the forecaster to downsample power flows."
-                )
 
-        target_map_lf = target_map.lazy() if isinstance(target_map, pl.DataFrame) else target_map
-        flows_30m = downsample_power_flows(flows, target_map=target_map_lf)
-        sliced_data["flows_30m"] = flows_30m
+        power_time_series = flows
+        sliced_data["power_time_series"] = power_time_series
 
-    results_df = forecaster.predict(
+    results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
-    )
+    ).lazy()
+
+    if nwp_init_time is not None and "nwp_init_time" not in results_lf.collect_schema().names():
+        results_lf = results_lf.with_columns(nwp_init_time=pl.lit(nwp_init_time))
+
+    context.log.info("XGBoost inference finished.")
 
     # 3. Calculate Metrics per lead_time
-    if "flows_30m" in sliced_data:
-        actuals = cast(
-            pl.DataFrame,
-            sliced_data["flows_30m"].collect(),
-        )
+    if "power_time_series" in sliced_data:
+        actuals_lf = sliced_data["power_time_series"]
 
-        # Join predictions with actuals
-        eval_df = results_df.join(
-            actuals.rename({"timestamp": "valid_time", "MW_or_MVA": "actual"}),
-            on=["valid_time", "substation_number"],
+        # Calculate lead_time_hours in results_lf BEFORE joining
+        if "nwp_init_time" in results_lf.collect_schema().names():
+            results_lf = results_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_minutes()
+                / 60.0
+            )
+        else:
+            results_lf = results_lf.with_columns(
+                lead_time_hours=(pl.col("valid_time") - pl.lit(forecast_time)).dt.total_minutes()
+                / 60.0
+            )
+
+        # Aggregate results_lf (e.g., mean prediction per lead time)
+        results_lf = results_lf.group_by(
+            ["valid_time", "time_series_id", "lead_time_hours", "nwp_init_time", "ensemble_member"]
+        ).agg(pl.col("power_fcst").mean())
+
+        # Save results_lf and actuals_lf as separate Parquet files.
+        # We use temporary files for this.
+        results_tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        results_parquet_path = results_tmp_file.name
+        results_tmp_file.close()
+        results_lf.sink_parquet(results_parquet_path)
+
+        actuals_tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        actuals_parquet_path = actuals_tmp_file.name
+        actuals_tmp_file.close()
+        actuals_lf.sink_parquet(actuals_parquet_path)
+
+        # Join aggregated results_lf with actuals_lf
+        context.log.info("Joining predictions with actuals.")
+        eval_lf = pl.scan_parquet(results_parquet_path).join(
+            pl.scan_parquet(actuals_parquet_path).rename(
+                {"period_end_time": "valid_time", "power": "actual"}
+            ),
+            on=["valid_time", "time_series_id"],
             how="inner",
         )
 
-        # Join the peak_capacity_MW_or_MVA from the forecaster's target_map
-        if hasattr(forecaster, "target_map") and forecaster.target_map is not None:
-            target_map_df = forecaster.target_map
-            if isinstance(target_map_df, pl.LazyFrame):
-                target_map_df = target_map_df.collect()
+        # Join the peak_capacity from the actuals
+        context.log.info("Calculating peak capacity.")
+        peak_capacity_lf = calculate_peak_capacity(actuals_lf)
+        eval_lf = eval_lf.join(
+            peak_capacity_lf.select(["time_series_id", "peak_capacity"]),
+            on="time_series_id",
+            how="left",
+        )
+        # Fill missing peak_capacity with 1.0 to avoid division by zero
+        eval_lf = eval_lf.with_columns(pl.col("peak_capacity").fill_null(1.0))
 
-            # We cast to pl.DataFrame here because eval_df and target_map_df are
-            # different Patito models. Polars' join method on Patito subclasses
-            # enforces that both sides have the same type, which would fail here.
-            eval_df = pl.DataFrame(eval_df).join(
-                pl.DataFrame(target_map_df).select(
-                    ["substation_number", "peak_capacity_MW_or_MVA"]
-                ),
-                on="substation_number",
-                how="left",
+        # Filter out the lookback period to avoid data leakage in evaluation
+        if isinstance(test_start, date) and not isinstance(test_start, datetime):
+            test_start_dt = datetime.combine(test_start, datetime.min.time()).replace(
+                tzinfo=timezone.utc
             )
-            # Fill missing peak_capacity_MW_or_MVA with 1.0 to avoid division by zero
-            eval_df = eval_df.with_columns(pl.col("peak_capacity_MW_or_MVA").fill_null(1.0))
         else:
-            # Fallback if no target_map is available
-            eval_df = eval_df.with_columns(peak_capacity_MW_or_MVA=pl.lit(1.0))
+            test_start_dt = test_start
 
-        if not eval_df.is_empty():
-            # Filter out the lookback period to avoid data leakage in evaluation
-            if isinstance(test_start, date) and not isinstance(test_start, datetime):
-                test_start_dt = datetime.combine(test_start, datetime.min.time()).replace(
-                    tzinfo=timezone.utc
-                )
-            else:
-                test_start_dt = test_start
+        eval_lf = eval_lf.filter(pl.col("valid_time") >= test_start_dt)
 
-            eval_df = eval_df.filter(pl.col("valid_time") >= test_start_dt)
+        # Sink to temporary file for caching
+        tmp_file = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+        eval_parquet_path = tmp_file.name
+        tmp_file.close()
 
-            # Calculate lead_time_hours
-            if "nwp_init_time" in eval_df.columns:
-                eval_df = eval_df.with_columns(
-                    lead_time_hours=(
-                        pl.col("valid_time") - pl.col("nwp_init_time")
-                    ).dt.total_minutes()
-                    / 60.0
-                )
-            else:
-                # Fallback if nwp_init_time is not available
-                eval_df = eval_df.with_columns(
-                    lead_time_hours=(
-                        pl.col("valid_time") - pl.lit(forecast_time)
-                    ).dt.total_minutes()
-                    / 60.0
-                )
+        try:
+            eval_lf.sink_parquet(eval_parquet_path)
+            eval_lf_cached = pl.scan_parquet(eval_parquet_path)
 
             # Group by lead_time_hours and calculate metrics
-            metrics = (
-                eval_df.group_by("lead_time_hours")
+            context.log.info("Calculating metrics by lead_time_hours.")
+            metrics_lf = (
+                eval_lf_cached.group_by("lead_time_hours")
                 .agg(
                     [
-                        (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean().alias("MAE"),
-                        ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt().alias("RMSE"),
-                        (
-                            (pl.col("MW_or_MVA") - pl.col("actual")).abs()
-                            / pl.col("peak_capacity_MW_or_MVA")
-                        )
+                        (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("MAE"),
+                        ((pl.col("power_fcst") - pl.col("actual")) ** 2)
+                        .mean()
+                        .sqrt()
+                        .alias("RMSE"),
+                        ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
                         .mean()
                         .alias("nMAE"),
                     ]
@@ -286,6 +275,7 @@ def evaluate_and_save_model(
             with mlflow.start_run(run_name=f"{model_name}_eval"):
                 # 1. Metric Thinning: Log only key operational horizons
                 key_horizons = {24.0, 48.0, 72.0, 168.0, 336.0}
+                metrics = cast(pl.DataFrame, metrics_lf.collect())
                 for row in metrics.iter_rows(named=True):
                     lt = round(float(row["lead_time_hours"]), 1)
                     if lt in key_horizons:
@@ -297,34 +287,37 @@ def evaluate_and_save_model(
                             mlflow.log_metric(f"nMAE_LT_{lt}h", row["nMAE"])
 
                 # 2. Log global aggregate metrics
-                mae_global = eval_df.select(
-                    (pl.col("MW_or_MVA") - pl.col("actual")).abs().mean()
-                ).item()
-                if mae_global is not None:
-                    mlflow.log_metric("mean_mae_all_horizons", mae_global)
-                    # Keep MAE_global for backward compatibility
-                    mlflow.log_metric("MAE_global", mae_global)
+                global_metrics_lf = eval_lf_cached.select(
+                    (pl.col("power_fcst") - pl.col("actual")).abs().mean().alias("mae_global"),
+                    ((pl.col("power_fcst") - pl.col("actual")) ** 2)
+                    .mean()
+                    .sqrt()
+                    .alias("rmse_global"),
+                    ((pl.col("power_fcst") - pl.col("actual")).abs() / pl.col("peak_capacity"))
+                    .mean()
+                    .alias("nmae_global"),
+                )
+                global_metrics = cast(pl.DataFrame, global_metrics_lf.collect()).to_dicts()[0]
 
-                rmse_global = eval_df.select(
-                    ((pl.col("MW_or_MVA") - pl.col("actual")) ** 2).mean().sqrt()
-                ).item()
-                if rmse_global is not None:
-                    mlflow.log_metric("RMSE_global", rmse_global)
+                if global_metrics["mae_global"] is not None:
+                    mlflow.log_metric("mean_mae_all_horizons", global_metrics["mae_global"])
+                    mlflow.log_metric("MAE_global", global_metrics["mae_global"])
 
-                nmae_global = eval_df.select(
-                    (
-                        (pl.col("MW_or_MVA") - pl.col("actual")).abs()
-                        / pl.col("peak_capacity_MW_or_MVA")
-                    ).mean()
-                ).item()
-                if nmae_global is not None:
-                    mlflow.log_metric("nMAE_global", nmae_global)
+                if global_metrics["rmse_global"] is not None:
+                    mlflow.log_metric("RMSE_global", global_metrics["rmse_global"])
+
+                if global_metrics["nmae_global"] is not None:
+                    mlflow.log_metric("nMAE_global", global_metrics["nmae_global"])
 
                 # 3. Save full granular evaluation dataframe as Parquet artifact
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    eval_df_path = os.path.join(tmpdir, "evaluation_granular.parquet")
-                    eval_df.write_parquet(eval_df_path)
-                    mlflow.log_artifact(eval_df_path)
+                mlflow.log_artifact(eval_parquet_path)
+        finally:
+            if os.path.exists(eval_parquet_path):
+                os.remove(eval_parquet_path)
+            if os.path.exists(results_parquet_path):
+                os.remove(results_parquet_path)
+            if os.path.exists(actuals_parquet_path):
+                os.remove(actuals_parquet_path)
 
     # 4. Trigger Dynamic Partition
     if hasattr(context, "instance") and context.instance:
@@ -333,9 +326,9 @@ def evaluate_and_save_model(
     if hasattr(context, "add_output_metadata"):
         context.add_output_metadata(
             {
-                "num_rows": len(results_df),
+                "num_rows": results_lf.collect().height,
                 "power_fcst_model_name": model_name,
             }
         )
 
-    return results_df
+    return results_lf.collect()

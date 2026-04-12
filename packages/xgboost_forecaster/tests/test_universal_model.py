@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -6,7 +7,15 @@ import numpy as np
 import patito as pt
 import polars as pl
 import pytest
-from contracts.data_schemas import NwpColumns, PowerForecast, SubstationMetadata
+from contracts.data_schemas import (
+    Nwp,
+    NwpColumns,
+    PowerForecast,
+    PowerTimeSeries,
+    ProcessedNwp,
+    TimeSeriesMetadata,
+    XGBoostInputFeatures,
+)
 from contracts.hydra_schemas import (
     DataSplitConfig,
     ModelConfig,
@@ -22,7 +31,7 @@ from ml_core.utils import evaluate_and_save_model
 def test_universal_training_data_integrity():
     """Verify training data integrity: delay filter and lead_time_hours calculation."""
     # Setup
-    substation_number = 1
+    time_series_id = 1
     h3_index = 12345
 
     # Create a range of init times and valid times
@@ -58,37 +67,31 @@ def test_universal_training_data_integrity():
     for valid_time in valid_times:
         flows_data.append(
             {
-                "substation_number": substation_number,
-                "timestamp": valid_time,
-                "MW_or_MVA": 10.0,
+                "time_series_id": time_series_id,
+                "period_end_time": valid_time,
+                "power": 10.0,
             }
         )
-    flows_lf = pl.LazyFrame(flows_data)
+    flows_lf = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Metadata
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         pl.DataFrame(
             {
-                "substation_number": [substation_number],
+                "time_series_id": [time_series_id],
                 "h3_res_5": [h3_index],
                 "substation_name": ["Test Substation"],
+                "substation_type": ["primary"],
+                "substation_number": [123],
+                "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
                 "latitude": [51.5],
                 "longitude": [-0.1],
             }
-        )
-    )
-
-    # Target map
-    target_map = pl.DataFrame(
-        {
-            "substation_number": [substation_number],
-            "peak_capacity_MW_or_MVA": [100.0],
-        }
+        ).with_columns(pl.col("time_series_id").cast(pl.Int32))
     )
 
     # Forecaster
     forecaster = XGBoostForecaster()
-    forecaster.target_map = target_map
 
     # Config
     config = ModelConfig(
@@ -101,12 +104,14 @@ def test_universal_training_data_integrity():
     forecaster.config = config
 
     # Prepare data for model (training mode)
-    nwps = {NwpModel.ECMWF_ENS_0_25DEG: nwps_lf}
+    nwps = cast(
+        Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]],
+        {NwpModel.ECMWF_ENS_0_25DEG: cast(pt.LazyFrame[ProcessedNwp], nwps_lf)},
+    )
 
     prepared_lf = forecaster._prepare_data_for_model(
-        flows_30m=flows_lf,
-        substation_metadata=metadata,
-        target_map_df=target_map,
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
+        time_series_metadata=metadata,
         nwps=nwps,
     )
 
@@ -144,7 +149,7 @@ def test_nwp_init_hour_feature():
         }
     )
 
-    result = cast(pl.DataFrame, add_time_features(df).collect())
+    result = cast(pl.DataFrame, add_time_features(cast(pt.LazyFrame[ProcessedNwp], df)).collect())
 
     assert result["nwp_init_hour"].to_list() == [0, 12, 23]
 
@@ -154,13 +159,6 @@ def test_mlflow_metric_thinning():
     # Mock context, forecaster, and mlflow
     context = MagicMock()
     forecaster = MagicMock()
-    forecaster.target_map = pl.DataFrame(
-        {
-            "substation_number": [1],
-            "preferred_power_col": ["MW"],
-            "peak_capacity_MW_or_MVA": [100.0],
-        }
-    )
 
     # Mock predict to return a DataFrame with many lead times
     lead_times = np.arange(0, 337, 0.5)  # 0 to 336 hours every 30m
@@ -171,7 +169,7 @@ def test_mlflow_metric_thinning():
         results_data.append(
             {
                 NwpColumns.VALID_TIME: init_time + timedelta(hours=lt),
-                "substation_number": 1,
+                "time_series_id": 1,
                 NwpColumns.ENSEMBLE_MEMBER: 0,
                 "power_fcst_model_name": "test_model",
                 "power_fcst_init_time": init_time,
@@ -179,36 +177,38 @@ def test_mlflow_metric_thinning():
                 "power_fcst_init_year_month": "2024-01",
                 "nwp_init_hour": 0,
                 "lead_time_hours": float(lt),
-                "MW_or_MVA": 10.0,
+                "power_fcst": 10.0,
             }
         )
 
     results_df = PowerForecast.validate(
         pl.DataFrame(results_data).with_columns(
             [
-                pl.col("substation_number").cast(pl.Int32),
+                pl.col("time_series_id").cast(pl.Int32),
                 pl.col(NwpColumns.ENSEMBLE_MEMBER).cast(pl.UInt8),
                 pl.col("nwp_init_hour").cast(pl.Int32),
                 pl.col("lead_time_hours").cast(pl.Float32),
                 pl.col("power_fcst_model_name").cast(pl.Categorical),
-                pl.col("MW_or_MVA").cast(pl.Float32),
+                pl.col("power_fcst").cast(pl.Float32),
             ]
         )
     )
     forecaster.predict.return_value = results_df
 
-    # Mock flows_30m
+    # Mock power_time_series
     flows_data = []
     for lt in lead_times:
         flows_data.append(
             {
-                "substation_number": 1,
-                "timestamp": init_time + timedelta(hours=lt),
-                "MW": 11.0,  # Constant error of 1.0
-                "MVA": 11.0,
+                "time_series_id": 1,
+                "start_time": init_time + timedelta(hours=lt) - timedelta(minutes=30),
+                "period_end_time": init_time + timedelta(hours=lt),
+                "power": 11.0,  # Constant error of 1.0
             }
         )
-    flows_30m = pl.LazyFrame(flows_data)
+    power_time_series = pl.LazyFrame(flows_data).with_columns(
+        pl.col("time_series_id").cast(pl.Int32)
+    )
 
     config = TrainingConfig(
         data_split=DataSplitConfig(
@@ -237,7 +237,7 @@ def test_mlflow_metric_thinning():
             model_name="test_model",
             forecaster=forecaster,
             config=config,
-            substation_power_flows=flows_30m,  # This will be downsampled in evaluate_and_save_model
+            substation_power_flows=power_time_series,
         )
 
         # Check logged metrics
@@ -265,7 +265,6 @@ def test_mlflow_metric_thinning():
 
 def test_autoregressive_lag_consistency():
     """Verify that for a single valid_time, different init_times result in correct target_lag_times."""
-    substation_number = 1
     valid_time = datetime(2024, 1, 10, 12, 0, tzinfo=timezone.utc)
 
     # Two different init times for the same valid time
@@ -277,18 +276,19 @@ def test_autoregressive_lag_consistency():
 
     df = pl.LazyFrame(
         {
-            "substation_number": [substation_number, substation_number],
+            "time_series_id": [1, 1],
             "valid_time": [valid_time, valid_time],
             "init_time": [init_time_1, init_time_2],
         }
-    )
+    ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Empty flows for lag calculation (we only care about target_lag_time)
-    flows_30m = pl.LazyFrame(
+    power_time_series = pl.LazyFrame(
         {
-            "substation_number": pl.Series([], dtype=pl.Int32),
-            "timestamp": pl.Series([], dtype=pl.Datetime("us", "UTC")),
-            "MW_or_MVA": pl.Series([], dtype=pl.Float32),
+            "time_series_id": pl.Series([], dtype=pl.Int32),
+            "start_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
+            "period_end_time": pl.Series([], dtype=pl.Datetime("us", "UTC")),
+            "power": pl.Series([], dtype=pl.Float32),
         }
     )
 
@@ -296,7 +296,9 @@ def test_autoregressive_lag_consistency():
     result = cast(
         pl.DataFrame,
         add_autoregressive_lags(
-            df, flows_30m, telemetry_delay_hours=telemetry_delay_hours
+            df,
+            cast(pt.LazyFrame[PowerTimeSeries], power_time_series),
+            telemetry_delay_hours=telemetry_delay_hours,
         ).collect(),
     )
 
@@ -322,7 +324,7 @@ def test_lookahead_audit():
     # Create a synthetic dataset where the target is a function of a FUTURE weather variable
     # and verify the model's feature importance for that variable is zero.
 
-    substation_number = 1
+    time_series_id = 1
     h3_index = 12345
 
     # Create training data
@@ -377,38 +379,32 @@ def test_lookahead_audit():
             target = 0.5 * temp_now + 2.0 * temp_future
             flows_data.append(
                 {
-                    "substation_number": substation_number,
-                    "timestamp": valid_time,
-                    "MW_or_MVA": target,
+                    "time_series_id": 1,
+                    "period_end_time": valid_time,
+                    "power": target,
                 }
             )
 
-    flows_lf = pl.LazyFrame(flows_data)
+    flows_lf = pl.LazyFrame(flows_data).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     # Metadata
-    metadata = pt.DataFrame[SubstationMetadata](
+    metadata = pt.DataFrame[TimeSeriesMetadata](
         pl.DataFrame(
             {
-                "substation_number": [substation_number],
+                "time_series_id": [time_series_id],
                 "h3_res_5": [h3_index],
                 "substation_name": ["Test Substation"],
+                "substation_type": ["primary"],
+                "substation_number": [123],
+                "last_updated": [datetime(2024, 1, 1, tzinfo=timezone.utc)],
                 "latitude": [51.5],
                 "longitude": [-0.1],
             }
-        )
-    )
-
-    # Target map
-    target_map = pl.DataFrame(
-        {
-            "substation_number": [substation_number],
-            "peak_capacity_MW_or_MVA": [1.0],  # No scaling
-        }
+        ).with_columns(pl.col("time_series_id").cast(pl.Int32))
     )
 
     # Forecaster
     forecaster = XGBoostForecaster()
-    forecaster.target_map = target_map
 
     # Config
     config = ModelConfig(
@@ -429,14 +425,17 @@ def test_lookahead_audit():
         },
     )
 
-    nwps = {NwpModel.ECMWF_ENS_0_25DEG: nwps_df.lazy()}
+    nwps = cast(
+        Mapping[NwpModel, pt.LazyFrame[ProcessedNwp]],
+        {NwpModel.ECMWF_ENS_0_25DEG: nwps_df.lazy()},
+    )
 
     # Train the model
-    forecaster.train(
+    forecaster.fit(
         config=config,
-        flows_30m=flows_lf,
-        substation_metadata=metadata,
-        nwps=nwps,
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
+        time_series_metadata=metadata,
+        nwps=cast(Mapping[NwpModel, pt.LazyFrame[Nwp]], nwps),
     )
 
     # Verify feature importance
@@ -457,20 +456,22 @@ def test_lookahead_audit():
     # Add a feature that IS future data, and verify it's NOT in the final feature matrix.
 
     prepared_lf = forecaster._prepare_data_for_model(
-        flows_30m=flows_lf,
-        substation_metadata=metadata,
-        target_map_df=target_map,
+        power_time_series=cast(pt.LazyFrame[PowerTimeSeries], flows_lf),
+        time_series_metadata=metadata,
         nwps=nwps,
     )
 
     # Add a "forbidden" feature manually to the joined data
     forbidden_lf = prepared_lf.with_columns(
-        future_leak=pl.col(NwpColumns.TEMPERATURE_2M).shift(-24).over("substation_number")
+        future_leak=pl.col(NwpColumns.TEMPERATURE_2M).shift(-24).over("time_series_id")
     )
 
     # Now use the forecaster's _prepare_features
-    final_features_lf = forecaster._prepare_features(forbidden_lf)
-    final_features = cast(pl.DataFrame, cast(pl.LazyFrame, final_features_lf).collect())
+    final_features_lf = forecaster._prepare_features(
+        cast(pt.LazyFrame[XGBoostInputFeatures], forbidden_lf)
+    )
+    assert isinstance(final_features_lf, pl.LazyFrame)
+    final_features = cast(pl.DataFrame, final_features_lf.collect())
 
     assert "future_leak" not in final_features.columns
     assert NwpColumns.TEMPERATURE_2M in final_features.columns

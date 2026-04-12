@@ -1,21 +1,16 @@
 [project]
-name = "nged-data"
+name = "nged_data"
 version = "0.0.1"
-description = "Logic for downloading and prepping NGED data"
+description = "Package for handling NGED JSON data"
 requires-python = ">=3.14"
 dependencies = [
-    "contracts",
-    "requests>=2.31.0",
     "polars>=1.0.0",
-    "dotenv>=0.9.9",
-    "httpx>=0.28.1",
-    "patito",
-    "pydantic>=2.12.5",
+    "polars-h3",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv.sources]
-contracts = { workspace = true }
+[tool.hatch.build.targets.wheel]
+packages = ["src/nged_data"]

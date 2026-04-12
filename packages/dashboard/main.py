@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.23.0"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -20,21 +20,24 @@ with app.setup:
     import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import SubstationMetadata, SubstationPowerFlows
+    from contracts.data_schemas import TimeSeriesMetadata, PowerTimeSeries
 
     BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
 
-    BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "live_primary_flows"
+    BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "power_time_series"
 
 
 @app.cell
 def _():
-    metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "substation_metadata.parquet"
-    df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
-
-    # Filter for substations with live telemetry
-    df = df.filter(pl.col("url").is_not_null())
+    metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
     return (df,)
+
+
+@app.cell
+def _(df):
+    df
+    return
 
 
 @app.cell
@@ -50,13 +53,20 @@ def _(df):
         )
     )
 
-    arrow_table = pyarrow.table(
-        {
-            "geometry": geo_array,
-            "name": df["substation_name_in_location_table"],
-            "number": df["substation_number"],
-        },
-    )
+    attributes_to_include = [
+        "time_series_id",
+        "time_series_name",
+        "time_series_type",
+        "units",
+        "licence_area",
+        "substation_number",
+        "substation_type",
+    ]
+
+    dict_for_table = {key: df[key] for key in attributes_to_include}
+    dict_for_table["geometry"] = geo_array
+
+    arrow_table = pyarrow.table(dict_for_table)
     return (arrow_table,)
 
 
@@ -82,7 +92,7 @@ def _(arrow_table):
 @app.cell
 def _(df, layer_widget, map):
     delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
-        pl.col("timestamp") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
+        pl.col("period_end_time") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
     )
 
     if layer_widget.selected_index is None:
@@ -94,12 +104,12 @@ def _(df, layer_widget, map):
         )
     else:
         selected_df = df[layer_widget.selected_index]
-        substation_number = selected_df["substation_number"].item()
+        time_series_id = selected_df["time_series_id"].item()
 
         try:
             filtered_demand = cast(
-                pt.DataFrame[SubstationPowerFlows],
-                delta_df.filter(pl.col("substation_number") == substation_number).collect(),
+                pt.DataFrame[PowerTimeSeries],
+                delta_df.filter(pl.col("time_series_id") == time_series_id).collect(),
             )
         except Exception as e:
             right_pane = mo.md(f"{e}")
@@ -107,23 +117,20 @@ def _(df, layer_widget, map):
             if filtered_demand.height == 0:
                 right_pane = mo.md("No data")
             else:
-                # Use metadata to get the preferred power column, falling back to POWER_MW
-                power_column = selected_df["preferred_power_col"].item() or "POWER_MW"
-
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()
                     .encode(
                         x=alt.X(
-                            "timestamp:T",
+                            "period_end_time:T",
                             axis=alt.Axis(format="%H:%M %b %d"),
                         ),
-                        y=alt.Y(f"{power_column}:Q", title=f"Demand ({power_column})"),
+                        y=alt.Y("power:Q", title=f"Power ({selected_df['units'].item()})"),
                         color=alt.value("teal"),
-                        tooltip=["timestamp", power_column],
+                        tooltip=["period_end_time", "power"],
                     )
                     .properties(
-                        title=selected_df["substation_name_in_location_table"].item(),
+                        title=f"{selected_df['time_series_name'].item()} - {selected_df['substation_type'].item()} - {selected_df['time_series_type'].item()}",
                         height=300,
                         width="container",  # Fill available width
                     )
@@ -131,6 +138,11 @@ def _(df, layer_widget, map):
                 )
 
     mo.vstack([map, right_pane])
+    return
+
+
+@app.cell
+def _():
     return
 
 

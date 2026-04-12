@@ -1,11 +1,12 @@
 import patito as pt
 import polars as pl
-from collections.abc import Mapping
+from typing import Any, Mapping
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
-    SubstationPowerFlows,
-    SubstationMetadata,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import (
     ModelConfig,
@@ -22,43 +23,43 @@ class MockForecaster(BaseForecaster):
         self.kwargs = kwargs
         self.trained = False
 
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
-    ):
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
+    ) -> Any:
         self.trained = True
         return self
 
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         # Return a dummy prediction
-        sub_num = substation_metadata["substation_number"][0]
+        sub_id = time_series_metadata["time_series_id"][0]
         df = pl.DataFrame(
             {
                 "valid_time": [datetime(2026, 1, 2, tzinfo=timezone.utc)],
-                "substation_number": [sub_num],
+                "time_series_id": [sub_id],
                 "ensemble_member": [0],
                 "power_fcst_model_name": ["mock"],
                 "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
                 "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
                 "power_fcst_init_year_month": ["2026-01"],
-                "MW_or_MVA": [10.0 * sub_num],
+                "power_fcst": [10.0 * float(sub_id)],
             }
         ).with_columns(
             [
-                pl.col("substation_number").cast(pl.Int32),
+                pl.col("time_series_id").cast(pl.Int64),
                 pl.col("ensemble_member").cast(pl.UInt8),
                 pl.col("power_fcst_model_name").cast(pl.Categorical),
-                pl.col("MW_or_MVA").cast(pl.Float32),
+                pl.col("power_fcst").cast(pl.Float32),
             ]
         )
         return pt.DataFrame[PowerForecast](df)
@@ -69,7 +70,7 @@ class MockForecaster(BaseForecaster):
 
 def test_local_forecasters():
     # Setup dummy data
-    sub_meta = pt.DataFrame[SubstationMetadata](
+    sub_meta = pt.DataFrame[TimeSeriesMetadata](
         {
             "substation_number": [1, 2],
             "substation_name": ["Sub1", "Sub2"],
@@ -77,17 +78,16 @@ def test_local_forecasters():
             "longitude": [-1.0, -2.0],
             "h3_res_5": [123, 456],
             "last_updated": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "time_series_id": [1, 2],
         }
     )
 
-    sub_flows = pt.DataFrame[SubstationPowerFlows](
+    sub_flows = pt.DataFrame[PowerTimeSeries](
         {
-            "timestamp": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
-            "substation_number": [1, 2],
-            "MW": [10.0, 20.0],
-            "MVA": [10.0, 20.0],
-            "MVAr": [0.0, 0.0],
-            "ingested_at": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "time_series_id": [1, 2],
+            "start_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)] * 2,
+            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)] * 2,
+            "power": [10.0, 20.0],
         }
     ).lazy()
 
@@ -101,10 +101,10 @@ def test_local_forecasters():
     local_forecasters = LocalForecasters(forecaster_cls=MockForecaster, some_arg="value")
 
     # Train
-    local_forecasters.train(
+    local_forecasters.fit(
         config=config,
-        flows_30m=sub_flows,
-        substation_metadata=sub_meta,
+        power_time_series=sub_flows,
+        time_series_metadata=sub_meta,
     )
 
     assert len(local_forecasters.models) == 2
@@ -121,11 +121,11 @@ def test_local_forecasters():
     )
 
     preds = local_forecasters.predict(
-        substation_metadata=sub_meta,
+        time_series_metadata=sub_meta,
         inference_params=inference_params,
-        flows_30m=sub_flows,
+        power_time_series=sub_flows,
     )
 
     assert len(preds) == 2
-    assert preds.filter(pl.col("substation_number") == 1)["MW_or_MVA"][0] == 10.0
-    assert preds.filter(pl.col("substation_number") == 2)["MW_or_MVA"][0] == 20.0
+    assert preds.filter(pl.col("time_series_id") == 1)["power_fcst"][0] == 10.0
+    assert preds.filter(pl.col("time_series_id") == 2)["power_fcst"][0] == 20.0
