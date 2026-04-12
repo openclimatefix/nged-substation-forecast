@@ -13,11 +13,11 @@ def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries
 
 
 def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFrame:
-    """Calculates rolling variance over a 6-hour window."""
-    rolling_df = df.rolling(index_column="period_end_time", period="6h").agg(
-        rolling_variance=pl.col("power").var()
+    """Calculates rolling variance over a 6-hour window per time_series_id."""
+    # 6 hours = 12 periods of 30 minutes
+    return df.with_columns(
+        rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
     )
-    return df.join(rolling_df, on="period_end_time")
 
 
 def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
