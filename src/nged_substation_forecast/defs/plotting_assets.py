@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import io
+from pathlib import Path
 from typing import cast
 
 import altair as alt
@@ -177,12 +177,14 @@ def forecast_vs_actual_plot(
             ["period_end_time", "power", "ensemble_member", "type"]
         )
 
-        # Convert to CSV
-        csv_buffer = io.StringIO()
-        substation_df.to_pandas().to_csv(csv_buffer, index=False)
-        csv_string = csv_buffer.getvalue()
+        # Save to CSV
+        time_series_id = sub_df.get_column("time_series_id").unique().item()
+        output_path = Path(config.output_path)
+        csv_filename = f"plot_data_substation_{time_series_id}.csv"
+        csv_path = output_path.parent / csv_filename
+        substation_df.to_pandas().to_csv(csv_path, index=False)
 
-        data = alt.Data(values=csv_string, format=alt.DataFormat(type="csv"))
+        data = alt.UrlData(url=csv_filename, format=alt.DataFormat(type="csv"))
 
         # Generate Altair Chart for this substation
         base = alt.Chart(data).encode(
