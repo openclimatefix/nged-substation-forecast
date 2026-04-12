@@ -80,6 +80,28 @@ def get_cleaned_actuals_lazy(
     return lf
 
 
+def get_raw_power_time_series_lazy(
+    settings: Settings, context: dg.AssetExecutionContext | None = None
+) -> pt.LazyFrame[PowerTimeSeries]:
+    """Retrieves the raw power time series from the Delta table.
+
+    Args:
+        settings: Global settings object.
+        context: Optional Dagster context for logging.
+
+    Returns:
+        A Polars LazyFrame of the raw power time series.
+    """
+    delta_path = _get_delta_path(settings, "raw_power_time_series")
+
+    # Use the new scan_delta_table helper which handles UTC timezone boilerplate.
+    lf = scan_delta_table(delta_path)
+
+    if context:
+        context.log.info(f"Reading raw power time series from {delta_path}")
+    return lf
+
+
 @dg.asset(
     partitions_def=DAILY_PARTITIONS,
     # We use automation_condition instead of auto_materialize_policy because

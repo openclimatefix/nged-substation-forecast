@@ -7,7 +7,7 @@ import polars as pl
 from contracts.settings import Settings
 from dagster import ResourceParam
 
-from .data_cleaning_assets import get_cleaned_actuals_lazy
+from .data_cleaning_assets import get_cleaned_actuals_lazy, get_raw_power_time_series_lazy
 
 
 class PlotConfig(dg.Config):
@@ -52,11 +52,16 @@ def forecast_vs_actual_plot(
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
     cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
+    raw_power_lazy = get_raw_power_time_series_lazy(settings, context)
 
-    # Filter actuals by substation.
+    # Filter actuals and raw by substation.
     actuals_30m = cast(
         pl.DataFrame,
         cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_time_series_ids)).collect(),
+    )
+    raw_30m = cast(
+        pl.DataFrame,
+        raw_power_lazy.filter(pl.col("time_series_id").is_in(pred_time_series_ids)).collect(),
     )
 
     if actuals_30m.is_empty():
@@ -90,11 +95,15 @@ def forecast_vs_actual_plot(
         {"valid_time": "period_end_time"}
     )
 
-    # Join predictions with actuals. We use a 'left' join with latest_predictions
+    # Join predictions with actuals and raw. We use a 'left' join with latest_predictions
     # on the left to ensure that all 14 days of the forecast trajectory are preserved
-    # in the plot, even if actuals are missing for the later days.
+    # in the plot, even if actuals/raw are missing for the later days.
     eval_df = latest_predictions.join(
         actuals_30m.rename({"power": "actual"}),
+        on=["period_end_time", "time_series_id"],
+        how="left",
+    ).join(
+        raw_30m.rename({"power": "raw"}),
         on=["period_end_time", "time_series_id"],
         how="left",
     )
@@ -140,7 +149,9 @@ def forecast_vs_actual_plot(
 
     # Generate Altair Chart using layers
     # We use a shared color scale to ensure the legend is consistent
-    color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
+    color_scale = alt.Scale(
+        domain=["Forecast", "Actual", "Raw"], range=["blue", "black", "lightgrey"]
+    )
 
     charts = []
     time_series_names_with_ids = plot_df.get_column("time_series_name_with_id").unique().to_list()
@@ -155,7 +166,7 @@ def forecast_vs_actual_plot(
             .with_columns(
                 type=pl.lit("Forecast"),
                 ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
-                power=pl.col("power").round(2),
+                power=pl.col("power").cast(pl.Float64).round(2),
             )
             .unique()
         )
@@ -168,13 +179,25 @@ def forecast_vs_actual_plot(
             .with_columns(
                 type=pl.lit("Actual"),
                 ensemble_member=pl.lit(0, dtype=pl.Int32),
-                power=pl.col("power").round(2),
+                power=pl.col("power").cast(pl.Float64).round(2),
+            )
+        )
+
+        # Raw: single line per substation
+        raw_df = (
+            ts_df.select(["period_end_time", "raw"])
+            .unique()
+            .rename({"raw": "power"})
+            .with_columns(
+                type=pl.lit("Raw"),
+                ensemble_member=pl.lit(0, dtype=pl.Int32),
+                power=pl.col("power").cast(pl.Float64).round(2),
             )
         )
 
         # Combine and convert to CSV
         ts_data_df = (
-            pl.concat([preds_df, actuals_df], how="diagonal")
+            pl.concat([preds_df, actuals_df, raw_df], how="diagonal")
             .select(["period_end_time", "power", "ensemble_member", "type"])
             .with_columns(period_end_time=pl.col("period_end_time").dt.replace_time_zone(None))
             .unique()
@@ -201,7 +224,11 @@ def forecast_vs_actual_plot(
             strokeWidth=1.0, opacity=1.0
         )
 
-        chart = alt.layer(preds_layer, actuals_layer).properties(
+        raw_layer = base.transform_filter(alt.datum.type == "Raw").mark_line(
+            strokeWidth=1.0, opacity=1.0, strokeDash=[5, 5]
+        )
+
+        chart = alt.layer(preds_layer, actuals_layer, raw_layer).properties(
             width=400, height=200, title=ts_name_with_id
         )
 
