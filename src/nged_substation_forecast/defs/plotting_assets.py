@@ -162,6 +162,7 @@ def forecast_vs_actual_plot(
                 ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
                 power=pl.col("power").round(2),
             )
+            .unique()
         )
 
         # Actuals: single line per substation
@@ -181,6 +182,7 @@ def forecast_vs_actual_plot(
             pl.concat([preds_df, actuals_df], how="diagonal")
             .select(["period_end_time", "power", "ensemble_member", "type"])
             .with_columns(period_end_time=pl.col("period_end_time").dt.replace_time_zone(None))
+            .unique()
         )
 
         # Save to CSV
