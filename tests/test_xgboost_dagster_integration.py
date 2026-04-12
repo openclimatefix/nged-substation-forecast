@@ -170,6 +170,8 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
 
         for partition_key in all_partitions:
             logger.info(f"Starting job execution for partition: {partition_key}")
+            # The cleaned_actuals asset now enforces uniqueness, so we don't need to filter here.
+            # The pipeline will handle duplicates gracefully.
             job.execute_in_process(
                 run_config=run_config,
                 partition_key=partition_key,
