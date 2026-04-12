@@ -35,7 +35,7 @@ class PowerTimeSeries(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["PowerTimeSeries"]:
-        """Validate the given dataframe, ensuring period_end_time is at :00 or :30."""
+        """Validate the given dataframe, ensuring period_end_time is at :00 or :30 and uniqueness."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -50,6 +50,10 @@ class PowerTimeSeries(pt.Model):
             raise ValueError(
                 "period_end_time must be at the top or bottom of the hour (minute 00 or 30)."
             )
+
+        # Validate uniqueness of (time_series_id, period_end_time)
+        if validated_df.select(["time_series_id", "period_end_time"]).is_duplicated().any():
+            raise ValueError("Duplicate entries found for (time_series_id, period_end_time).")
 
         return cast(pt.DataFrame["PowerTimeSeries"], validated_df)
 
@@ -268,7 +272,7 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["Nwp"]:
-        """Validate the given dataframe, ensuring no nulls from second step onwards."""
+        """Validate the given dataframe, ensuring no nulls from second step onwards and uniqueness."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -295,6 +299,16 @@ class Nwp(pt.Model):
                     "step onwards. These variables are only allowed to be null for the first "
                     "forecast step (lead time 0)."
                 )
+
+        # Validate uniqueness of (init_time, valid_time, ensemble_member, h3_index)
+        if (
+            validated_df.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
+            .is_duplicated()
+            .any()
+        ):
+            raise ValueError(
+                "Duplicate entries found for (init_time, valid_time, ensemble_member, h3_index)."
+            )
 
         return cast(pt.DataFrame["Nwp"], validated_df)
 

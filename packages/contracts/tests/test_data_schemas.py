@@ -3,8 +3,9 @@ from datetime import datetime, timedelta, timezone
 import polars as pl
 import pytest
 from hypothesis import given, strategies as st
+from patito.exceptions import DataFrameValidationError
 
-from contracts.data_schemas import Nwp, PowerForecast, PowerTimeSeries
+from contracts.data_schemas import Nwp, PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 
 
 def test_power_time_series_validation_mw_or_mva():
@@ -207,3 +208,114 @@ def test_power_time_series_property_based(value):
     )
 
     PowerTimeSeries.validate(df)
+
+
+def test_power_time_series_uniqueness():
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123, 123],
+            "period_end_time": [
+                datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
+                datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc),
+            ],
+            "power": [10.0, 20.0],
+        }
+    ).cast(
+        {
+            "time_series_id": pl.Int32,
+            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "power": pl.Float32,
+        }
+    )
+
+    with pytest.raises(
+        ValueError, match=r"Duplicate entries found for \(time_series_id, period_end_time\)"
+    ):
+        PowerTimeSeries.validate(df)
+
+
+def test_time_series_metadata_uniqueness():
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123, 123],
+            "time_series_name": ["A", "B"],
+            "time_series_type": ["PV", "PV"],
+            "units": ["MW", "MW"],
+            "licence_area": ["EMids", "EMids"],
+            "substation_number": [1, 1],
+            "substation_type": ["Primary", "Primary"],
+            "latitude": [50.0, 50.0],
+            "longitude": [0.0, 0.0],
+            "h3_res_5": [12345, 12345],
+        }
+    ).cast(
+        {
+            "time_series_id": pl.Int32,
+            "time_series_name": pl.String,
+            "time_series_type": pl.String,
+            "units": pl.String,
+            "licence_area": pl.String,
+            "substation_number": pl.Int32,
+            "substation_type": pl.Categorical,
+            "latitude": pl.Float32,
+            "longitude": pl.Float32,
+            "h3_res_5": pl.UInt64,
+        }
+    )
+
+    with pytest.raises(DataFrameValidationError):
+        TimeSeriesMetadata.validate(df)
+
+
+def test_nwp_uniqueness():
+    init_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    valid_time = datetime(2026, 1, 1, 1, tzinfo=timezone.utc)
+
+    # Base data for Nwp
+    data = {
+        "init_time": [init_time, init_time],
+        "valid_time": [valid_time, valid_time],
+        "ensemble_member": [0, 0],
+        "h3_index": [123, 123],
+        "temperature_2m": [10.0, 11.0],
+        "dew_point_temperature_2m": [5.0, 6.0],
+        "wind_u_10m": [2.0, 3.0],
+        "wind_v_10m": [0.0, 0.0],
+        "wind_u_100m": [4.0, 5.0],
+        "wind_v_100m": [0.0, 0.0],
+        "pressure_surface": [100.0, 101.0],
+        "pressure_reduced_to_mean_sea_level": [102.0, 103.0],
+        "geopotential_height_500hpa": [50.0, 51.0],
+        "categorical_precipitation_type_surface": [0, 0],
+        "precipitation_surface": [1.0, 2.0],
+        "downward_short_wave_radiation_flux_surface": [100.0, 200.0],
+        "downward_long_wave_radiation_flux_surface": [200.0, 300.0],
+    }
+
+    df = pl.DataFrame(data).cast(
+        {
+            "init_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "valid_time": pl.Datetime(time_unit="us", time_zone="UTC"),
+            "ensemble_member": pl.UInt8,
+            "h3_index": pl.UInt64,
+            "temperature_2m": pl.Float32,
+            "dew_point_temperature_2m": pl.Float32,
+            "wind_u_10m": pl.Float32,
+            "wind_v_10m": pl.Float32,
+            "wind_u_100m": pl.Float32,
+            "wind_v_100m": pl.Float32,
+            "pressure_surface": pl.Float32,
+            "pressure_reduced_to_mean_sea_level": pl.Float32,
+            "geopotential_height_500hpa": pl.Float32,
+            "categorical_precipitation_type_surface": pl.UInt8,
+            "precipitation_surface": pl.Float32,
+            "downward_short_wave_radiation_flux_surface": pl.Float32,
+            "downward_long_wave_radiation_flux_surface": pl.Float32,
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"Duplicate entries found for \(init_time, valid_time, ensemble_member, h3_index\)",
+    ):
+        Nwp.validate(df)
