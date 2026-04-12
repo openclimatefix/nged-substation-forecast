@@ -173,8 +173,10 @@ def forecast_vs_actual_plot(
         )
 
         # Combine and convert to CSV
-        substation_df = pl.concat([preds_df, actuals_df], how="diagonal").select(
-            ["period_end_time", "power", "ensemble_member", "type"]
+        substation_df = (
+            pl.concat([preds_df, actuals_df], how="diagonal")
+            .select(["period_end_time", "power", "ensemble_member", "type"])
+            .with_columns(period_end_time=pl.col("period_end_time").dt.replace_time_zone(None))
         )
 
         # Save to CSV
