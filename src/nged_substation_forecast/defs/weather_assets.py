@@ -50,6 +50,7 @@ def ecmwf_ens_forecast(
     filename = f"{nwp_init_time.strftime('%Y-%m-%dT%H')}Z.parquet"
     output_path = output_dir / filename
 
+    scaled_df = scaled_df.unique(subset=["time", "latitude", "longitude", "ensemble_member"])
     scaled_df.write_parquet(output_path, compression="zstd", compression_level=3)
 
     context.log.info(f"Saved {len(scaled_df)} rows to {output_path}")

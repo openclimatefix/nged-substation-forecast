@@ -36,7 +36,11 @@ def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourcePa
         validated_df = PowerTimeSeries.validate(time_series_df)
 
         # Append to delta
-        append_to_delta(validated_df, settings.nged_data_path / "delta" / "raw_power_time_series")
+        validated_df = validated_df.unique(subset=["time_series_id", "period_end_time"])
+        append_to_delta(
+            pt.DataFrame[PowerTimeSeries](validated_df),
+            settings.nged_data_path / "delta" / "raw_power_time_series",
+        )
 
     context.log.info("Finished processing archive JSON data.")
 
@@ -70,7 +74,7 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
 
     if cleaned_dfs:
         # Combine all validated dataframes and append in a single operation
-        combined_df = pl.concat(cleaned_dfs)
+        combined_df = pl.concat(cleaned_dfs).unique(subset=["time_series_id", "period_end_time"])
         append_to_delta(
             pt.DataFrame[PowerTimeSeries](combined_df),
             settings.nged_data_path / "delta" / "raw_power_time_series",
@@ -108,6 +112,10 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
             continue
 
         # Append to Delta table
-        append_to_delta(validated_df, settings.nged_data_path / "delta" / "raw_power_time_series")
+        validated_df = validated_df.unique(subset=["time_series_id", "period_end_time"])
+        append_to_delta(
+            pt.DataFrame[PowerTimeSeries](validated_df),
+            settings.nged_data_path / "delta" / "raw_power_time_series",
+        )
 
     context.log.info("Finished processing SharePoint JSON data.")
