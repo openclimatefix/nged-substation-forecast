@@ -43,10 +43,10 @@ class DataQualitySettings(BaseSettings):
     here, not define them locally.
     """
 
-    stuck_std_threshold: float = 0.01
+    stuck_std_threshold: float = 0.005
     stuck_window_periods: int = 48
-    max_mw_threshold: float = 100.0
-    min_mw_threshold: float = -20.0
+    max_mw_threshold: float = 150.0
+    min_mw_threshold: float = -50.0
     variance_thresholds: dict[int, float] = Field(default_factory=dict)
 
 

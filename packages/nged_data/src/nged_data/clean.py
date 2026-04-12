@@ -93,9 +93,5 @@ def clean_power_time_series(
         pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col("power")).alias("power")
     )
 
-    # Drop nulls again
-    df = df.with_columns(power=pl.col("power").fill_nan(None)).drop_nulls(subset=["power"])
-    dagster.get_dagster_logger().info(f"DF after dropping nulls: {df}")
-
     # 6. Validate
     return validate_data(df)
