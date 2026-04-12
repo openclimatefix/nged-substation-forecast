@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import io
 from typing import cast
 
 import altair as alt
@@ -138,62 +139,75 @@ def forecast_vs_actual_plot(
         .sort("period_end_time")
     )
 
-    # Prepare a single dataframe for Altair to avoid faceting issues and duplication
-    # Forecasts: 51 members
-    preds_df = (
-        plot_df.select(
-            ["period_end_time", "substation_name_with_id", "ensemble_member", "power_fcst"]
-        )
-        .rename({"power_fcst": "power"})
-        .with_columns(
-            type=pl.lit("Forecast"),
-            ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
-        )
-    )
-
-    # Actuals: single line per substation (avoiding 51x duplication)
-    actuals_df = (
-        plot_df.select(["period_end_time", "substation_name_with_id", "actual"])
-        .unique()
-        .rename({"actual": "power"})
-        .with_columns(
-            type=pl.lit("Actual"),
-            ensemble_member=pl.lit(0, dtype=pl.Int32),
-        )
-    )
-
-    combined_plot_df = pl.concat([preds_df, actuals_df], how="diagonal").to_pandas()
-
     # Generate Altair Chart using layers
     # We use a shared color scale to ensure the legend is consistent
     color_scale = alt.Scale(domain=["Forecast", "Actual"], range=["blue", "black"])
 
-    base = alt.Chart(combined_plot_df).encode(
-        x=alt.X("period_end_time:T", title="Time"),
-        y=alt.Y("power:Q", title="Power (MW/MVA)"),
-        color=alt.Color("type:N", scale=color_scale, title="Type"),
-    )
+    charts = []
+    substations = plot_df.get_column("substation_name_with_id").unique().to_list()
 
-    # Layer 1: Ensemble predictions (51 members) with thin, semi-transparent lines
-    preds_layer = (
-        base.transform_filter(alt.datum.type == "Forecast")
-        .mark_line(strokeWidth=0.5, opacity=0.3)
-        .encode(detail="ensemble_member:N")
-    )
+    for sub in substations:
+        sub_df = plot_df.filter(pl.col("substation_name_with_id") == sub)
 
-    # Layer 2: Actuals with a single thick, solid line
-    actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
-        strokeWidth=2, opacity=1.0
-    )
+        # Forecasts: 51 members
+        preds_df = (
+            sub_df.select(["period_end_time", "ensemble_member", "power_fcst"])
+            .rename({"power_fcst": "power"})
+            .with_columns(
+                type=pl.lit("Forecast"),
+                ensemble_member=pl.col("ensemble_member").cast(pl.Int32),
+                power=pl.col("power").round(2),
+            )
+        )
 
-    # Different substations have vastly different power capacities, so independent y-axes
-    # are necessary to visualize the forecast accuracy for smaller substations.
-    # Explicitly showing the chosen_init_time as a subtitle ensures users understand
-    # the exact forecast initialization time being visualized.
-    chart = (
-        alt.layer(preds_layer, actuals_layer)
-        .properties(width=400, height=200)
-        .facet(facet="substation_name_with_id:N", columns=2)
+        # Actuals: single line per substation
+        actuals_df = (
+            sub_df.select(["period_end_time", "actual"])
+            .unique()
+            .rename({"actual": "power"})
+            .with_columns(
+                type=pl.lit("Actual"),
+                ensemble_member=pl.lit(0, dtype=pl.Int32),
+                power=pl.col("power").round(2),
+            )
+        )
+
+        # Combine and convert to CSV
+        substation_df = pl.concat([preds_df, actuals_df], how="diagonal").select(
+            ["period_end_time", "power", "ensemble_member", "type"]
+        )
+
+        # Convert to CSV
+        csv_buffer = io.StringIO()
+        substation_df.to_pandas().to_csv(csv_buffer, index=False)
+        csv_string = csv_buffer.getvalue()
+
+        data = alt.Data(values=csv_string, format=alt.DataFormat(type="csv"))
+
+        # Generate Altair Chart for this substation
+        base = alt.Chart(data).encode(
+            x=alt.X("period_end_time:T", title="Time"),
+            y=alt.Y("power:Q", title="Power (MW/MVA)"),
+            color=alt.Color("type:N", scale=color_scale, title="Type"),
+        )
+
+        preds_layer = (
+            base.transform_filter(alt.datum.type == "Forecast")
+            .mark_line(strokeWidth=0.5, opacity=0.3)
+            .encode(detail="ensemble_member:N")
+        )
+
+        actuals_layer = base.transform_filter(alt.datum.type == "Actual").mark_line(
+            strokeWidth=2, opacity=1.0
+        )
+
+        chart = alt.layer(preds_layer, actuals_layer).properties(width=400, height=200, title=sub)
+
+        charts.append(chart)
+
+    # Combine charts
+    final_chart = (
+        alt.concat(*charts, columns=2)
         .resolve_scale(y="independent")
         .properties(
             title=alt.TitleParams(
@@ -202,7 +216,7 @@ def forecast_vs_actual_plot(
         )
     )
 
-    chart.save(config.output_path)
+    final_chart.save(config.output_path)
     context.log.info(f"Plot saved to {config.output_path}")
 
     return dg.MaterializeResult(
