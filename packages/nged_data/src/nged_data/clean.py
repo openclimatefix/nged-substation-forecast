@@ -39,6 +39,11 @@ def clean_power_time_series(
     # 1. Validate input
     df = PowerTimeSeries.validate(df)
 
+    # 1.5 Remove duplicates
+    df = cast(
+        pt.DataFrame[PowerTimeSeries], df.unique(subset=["time_series_id", "period_end_time"])
+    )
+
     # 2. Sort
     df = sort_data(df)
 
