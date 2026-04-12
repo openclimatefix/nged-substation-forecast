@@ -73,12 +73,30 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
         cleaned_dfs.append(validated_df)
 
     if cleaned_dfs:
-        # Combine all validated dataframes and append in a single operation
+        # Combine all validated dataframes
         combined_df = pl.concat(cleaned_dfs).unique(subset=["time_series_id", "period_end_time"])
-        append_to_delta(
-            pt.DataFrame[PowerTimeSeries](combined_df),
-            settings.nged_data_path / "delta" / "raw_power_time_series",
-        )
+
+        delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
+
+        # 1. Read the existing raw_power_time_series Delta table.
+        if delta_path.exists():
+            # 2. Find the maximum period_end_time in the existing data.
+            # Read only period_end_time for efficiency.
+            existing_df = pl.read_delta(str(delta_path), columns=["period_end_time"])
+
+            if not existing_df.is_empty():
+                max_timestamp = existing_df["period_end_time"].max()
+
+                # 3. Filter the incoming combined_df to only include rows with period_end_time strictly greater than the maximum timestamp found.
+                combined_df = combined_df.filter(pl.col("period_end_time") > max_timestamp)
+
+        # 4. Append only the filtered, new data to the Delta table.
+        # 5. Handle the case where the Delta table is empty (implicitly handled by the if delta_path.exists() and if not existing_df.is_empty() checks).
+        if not combined_df.is_empty():
+            append_to_delta(
+                pt.DataFrame[PowerTimeSeries](combined_df),
+                delta_path,
+            )
 
     context.log.info(f"Finished processing live JSON data for {partition_date}.")
 
