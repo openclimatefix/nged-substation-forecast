@@ -110,31 +110,11 @@ class XGBoostForecaster(BaseForecaster):
 
         # Ensure categorical precipitation is treated as a categorical feature
         if "categorical_precipitation_type_surface" in res_schema.names():
+            precip_categories = [str(i) for i in range(16)]
             res = res.with_columns(
                 pl.col("categorical_precipitation_type_surface")
                 .cast(pl.String)
-                .cast(
-                    pl.Enum(
-                        [
-                            "0",
-                            "1",
-                            "2",
-                            "3",
-                            "4",
-                            "5",
-                            "6",
-                            "7",
-                            "8",
-                            "9",
-                            "10",
-                            "11",
-                            "12",
-                            "13",
-                            "14",
-                            "15",
-                        ]
-                    )
-                )
+                .cast(pl.Enum(precip_categories))
             )
 
         return cast(pt.DataFrame[XGBoostInputFeatures] | pt.LazyFrame[XGBoostInputFeatures], res)
