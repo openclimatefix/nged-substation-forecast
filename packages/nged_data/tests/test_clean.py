@@ -1,7 +1,9 @@
 import pytest
 import polars as pl
+import patito as pt
 from datetime import datetime, timedelta, timezone
 from nged_data.clean import clean_power_time_series
+from contracts.data_schemas import PowerTimeSeries
 
 
 def test_clean_power_time_series():
@@ -24,7 +26,7 @@ def test_clean_power_time_series():
         ValueError, match="All rows were removed after filtering by variance threshold."
     ):
         clean_power_time_series(
-            df,
+            pt.DataFrame[PowerTimeSeries](df),
             stuck_std_threshold=0.0,
             min_mw_threshold=-100.0,
             max_mw_threshold=1000.0,
@@ -43,7 +45,7 @@ def test_clean_power_time_series():
         pl.col("power").cast(pl.Float32),
     )
     cleaned_df = clean_power_time_series(
-        df_keep,
+        pt.DataFrame[PowerTimeSeries](df_keep),
         stuck_std_threshold=0.0,
         min_mw_threshold=-100.0,
         max_mw_threshold=1000.0,
@@ -63,7 +65,7 @@ def test_clean_power_time_series():
         pl.col("power").cast(pl.Float32),
     )
     cleaned_df_null = clean_power_time_series(
-        df_null,
+        pt.DataFrame[PowerTimeSeries](df_null),
         stuck_std_threshold=0.0,
         min_mw_threshold=-100.0,
         max_mw_threshold=1000.0,
@@ -73,7 +75,7 @@ def test_clean_power_time_series():
 
     # Test with time_series_id
     cleaned_df_id = clean_power_time_series(
-        df_keep,
+        pt.DataFrame[PowerTimeSeries](df_keep),
         stuck_std_threshold=0.0,
         min_mw_threshold=-100.0,
         max_mw_threshold=1000.0,
@@ -84,7 +86,7 @@ def test_clean_power_time_series():
 
     # Test with variance_thresholds and time_series_id
     cleaned_df_thresholds = clean_power_time_series(
-        df_keep,
+        pt.DataFrame[PowerTimeSeries](df_keep),
         stuck_std_threshold=0.0,
         min_mw_threshold=-100.0,
         max_mw_threshold=1000.0,
@@ -126,7 +128,7 @@ def test_clean_power_time_series_keeps_valid_zero_power():
     # max_mw_threshold = 2.0
 
     cleaned_df = clean_power_time_series(
-        df,
+        pt.DataFrame[PowerTimeSeries](df),
         stuck_std_threshold=0.1,
         min_mw_threshold=-1.0,
         max_mw_threshold=2.0,
@@ -164,7 +166,7 @@ def test_clean_power_time_series_handles_partition_boundary():
     # default_threshold = 0.0 (keep all rows)
 
     cleaned_df = clean_power_time_series(
-        df,
+        pt.DataFrame[PowerTimeSeries](df),
         stuck_std_threshold=0.1,
         min_mw_threshold=-1.0,
         max_mw_threshold=2.0,

@@ -31,8 +31,6 @@ The implementation uses a manual 1-day lookback window when scanning the Delta t
 import dagster as dg
 import patito as pt
 import polars as pl
-from datetime import datetime
-from typing import cast
 from contracts.data_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from dagster import ResourceParam
@@ -45,44 +43,6 @@ from ..utils import (
     scan_delta_table,
 )
 from .partitions import DAILY_PARTITIONS
-
-
-def _process_cleaned_partition(
-    raw_power_time_series: pt.DataFrame[PowerTimeSeries],
-    settings: Settings,
-    partition_start: datetime,
-    partition_end: datetime,
-) -> pt.DataFrame[PowerTimeSeries]:
-    """Process and validate a partition of raw power time series data.
-
-    This helper separates the core data transformation and validation logic from
-    the Dagster asset I/O and partitioning orchestration.
-
-    Args:
-        raw_power_time_series: The raw power time series data to process.
-        settings: Global settings containing data quality thresholds.
-        partition_start: Start of the partition window.
-        partition_end: End of the partition window.
-
-    Returns:
-        A cleaned and validated Patito DataFrame.
-    """
-    # Clean the data using the shared cleaning module
-    df_cleaned = clean_power_time_series(
-        raw_power_time_series,
-        stuck_std_threshold=settings.data_quality.stuck_std_threshold,
-        min_mw_threshold=settings.data_quality.min_mw_threshold,
-        max_mw_threshold=settings.data_quality.max_mw_threshold,
-    )
-
-    # Remove duplicates
-    df_cleaned = df_cleaned.unique(subset=["time_series_id", "period_end_time"])
-
-    # Validate the output against Patito schema
-    validated_df = PowerTimeSeries.validate(df_cleaned, allow_superfluous_columns=True)
-
-    # Filter validated_df to current partition's time window.
-    return filter_to_partition_window(validated_df, partition_start, partition_end)
 
 
 def _get_delta_path(settings: Settings, table_name: str) -> str:
@@ -98,57 +58,6 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
     return str(settings.nged_data_path / "delta" / table_name)
 
 
-def get_raw_power_time_series_lazy(
-    settings: Settings, context: dg.AssetExecutionContext | None = None
-) -> pt.LazyFrame[PowerTimeSeries]:
-    """Retrieves the raw power time series from the Delta table.
-
-    Args:
-        settings: Global settings object.
-        context: Optional Dagster context for logging.
-
-    Returns:
-        A Polars LazyFrame of the raw power time series.
-    """
-    delta_path = _get_delta_path(settings, "raw_power_time_series")
-
-    # Use the new scan_delta_table helper which handles UTC timezone boilerplate.
-    lf = scan_delta_table(delta_path)
-
-    if context:
-        context.log.info(f"Reading raw power time series from {delta_path}")
-    return lf
-
-
-def get_cleaned_power_time_series_lazy(
-    settings: Settings, context: dg.AssetExecutionContext | None = None
-) -> pt.LazyFrame[PowerTimeSeries]:
-    """Retrieves the cleaned power time series from the Delta table.
-
-    This function serves as the single source of truth for accessing cleaned power
-    time series data across the pipeline. It reads directly from the
-    `cleaned_power_time_series` Delta table.
-
-    Args:
-        settings: Global settings object.
-        context: Optional Dagster context for logging.
-
-    Returns:
-        A Polars LazyFrame of the cleaned power time series.
-    """
-    delta_path = _get_delta_path(settings, "cleaned_power_time_series")
-
-    # Use the new scan_delta_table helper which handles UTC timezone boilerplate.
-    lf = scan_delta_table(delta_path)
-
-    if context:
-        context.log.info(f"Reading cleaned power time series from {delta_path}")
-    return lf
-
-
-# ... (rest of the file)
-
-
 @dg.asset(
     partitions_def=DAILY_PARTITIONS,
     automation_condition=dg.AutomationCondition.eager(),
@@ -157,7 +66,7 @@ def get_cleaned_power_time_series_lazy(
 def cleaned_power_time_series(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
-) -> pl.DataFrame:
+) -> pt.DataFrame:
     """Clean raw power time series and apply data quality checks.
 
     This asset manually scans the raw power time series Delta table for the current partition
@@ -193,17 +102,22 @@ def cleaned_power_time_series(
         pl.col("period_end_time").is_between(lookback_start, partition_end, closed="left")
     )
 
-    # Materialize the LazyFrame once
-    df_joined_materialized: pl.DataFrame = cast(pl.DataFrame, raw_flows.collect())
+    # Materialize the LazyFrame once (no casts needed)
+    df_joined_materialized = pt.DataFrame[PowerTimeSeries](raw_flows.collect())
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 
-    # Clean, validate, and filter the data using the helper
-    validated_df = _process_cleaned_partition(
-        cast(pt.DataFrame[PowerTimeSeries], df_joined_materialized),
-        settings,
-        partition_start,
-        partition_end,
+    # Clean the data using the shared cleaning module directly
+    df_cleaned = clean_power_time_series(
+        pt.DataFrame[PowerTimeSeries](df_joined_materialized),
+        stuck_std_threshold=settings.data_quality.stuck_std_threshold,
+        min_mw_threshold=settings.data_quality.min_mw_threshold,
+        max_mw_threshold=settings.data_quality.max_mw_threshold,
+    )
+
+    # Filter to current partition's time window
+    validated_df = pt.DataFrame[PowerTimeSeries](
+        filter_to_partition_window(df_cleaned, partition_start, partition_end)
     )
 
     context.log.info(

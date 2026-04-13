@@ -18,8 +18,7 @@ from contracts.data_schemas import (
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster
-
-from .data_cleaning_assets import get_cleaned_power_time_series_lazy
+from ..utils import scan_delta_table
 
 
 class XGBoostConfig(dg.Config):
@@ -105,8 +104,10 @@ def _get_filtered_time_series_data(
         settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
     )
 
-    # Use get_cleaned_power_time_series_lazy to ensure we have the full range.
-    power_time_series = get_cleaned_power_time_series_lazy(settings, context)
+    # Use scan_delta_table to ensure we have the full range.
+    power_time_series = scan_delta_table(
+        str(settings.nged_data_path / "delta" / "cleaned_power_time_series")
+    )
 
     # Apply substation ID filter early if provided
     if config.time_series_ids:

@@ -6,8 +6,7 @@ import dagster as dg
 import polars as pl
 from contracts.settings import Settings
 from dagster import ResourceParam
-
-from .data_cleaning_assets import get_cleaned_power_time_series_lazy, get_raw_power_time_series_lazy
+from ..utils import scan_delta_table
 
 
 class PlotConfig(dg.Config):
@@ -51,8 +50,12 @@ def forecast_vs_actual_plot(
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
-    cleaned_power_time_series_lazy = get_cleaned_power_time_series_lazy(settings, context)
-    raw_power_lazy = get_raw_power_time_series_lazy(settings, context)
+    cleaned_power_time_series_lazy = scan_delta_table(
+        str(settings.nged_data_path / "delta" / "cleaned_power_time_series")
+    )
+    raw_power_lazy = scan_delta_table(
+        str(settings.nged_data_path / "delta" / "raw_power_time_series")
+    )
 
     # Filter actuals and raw by substation.
     actuals_30m = cast(

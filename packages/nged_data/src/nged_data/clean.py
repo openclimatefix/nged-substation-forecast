@@ -3,23 +3,22 @@ import patito as pt
 from contracts.data_schemas import PowerTimeSeries
 
 
-from typing import cast
-
-
 def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries]:
     """Sorts the DataFrame by 'period_end_time'."""
-    return cast(pt.DataFrame[PowerTimeSeries], df.sort("period_end_time"))
+    return pt.DataFrame[PowerTimeSeries](df.sort("period_end_time"))
 
 
-def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFrame:
+def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries]:
     """Calculates rolling variance over a 6-hour window per time_series_id."""
     # 6 hours = 12 periods of 30 minutes
-    return df.with_columns(
-        rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
+    return pt.DataFrame[PowerTimeSeries](
+        df.with_columns(
+            rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
+        )
     )
 
 
-def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
+def validate_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries]:
     """Validates the cleaned DataFrame."""
     if df.is_empty():
         raise ValueError("All rows were removed after filtering by variance threshold.")
@@ -27,7 +26,7 @@ def validate_data(df: pl.DataFrame) -> pt.DataFrame[PowerTimeSeries]:
 
 
 def clean_power_time_series(
-    df: pl.DataFrame,
+    df: pt.DataFrame[PowerTimeSeries],
     stuck_std_threshold: float,
     min_mw_threshold: float,
     max_mw_threshold: float,
@@ -35,19 +34,14 @@ def clean_power_time_series(
     variance_thresholds: dict[int, float] | None = None,
     default_threshold: float = 0.1,
 ) -> pt.DataFrame[PowerTimeSeries]:
-    # 1. Validate input
-    df = PowerTimeSeries.validate(df)
-
-    # 1.5 Remove duplicates
-    df = cast(
-        pt.DataFrame[PowerTimeSeries], df.unique(subset=["time_series_id", "period_end_time"])
-    )
+    # 1. Remove duplicates
+    df = pt.DataFrame[PowerTimeSeries](df.unique(subset=["time_series_id", "period_end_time"]))
 
     # 2. Sort
     df = sort_data(df)
 
     # 3. Drop initial nulls
-    df = df.drop_nulls(subset=["power"])
+    df = pt.DataFrame[PowerTimeSeries](df.drop_nulls(subset=["power"]))
     if df.is_empty():
         raise ValueError("All rows were removed after dropping nulls.")
     df = PowerTimeSeries.validate(df)
@@ -70,17 +64,16 @@ def clean_power_time_series(
     first_valid_time = valid_rows.select("period_end_time").min().item()
 
     # Slice the DataFrame from that index onwards.
-    df = df.filter(pl.col("period_end_time") >= first_valid_time)
+    df = pt.DataFrame[PowerTimeSeries](df.filter(pl.col("period_end_time") >= first_valid_time))
 
     # Drop the rolling_variance column
-    df = df.drop("rolling_variance")
+    df = pt.DataFrame[PowerTimeSeries](df.drop("rolling_variance"))
 
     # 5. Identify 'stuck' and 'insane' values
     # Stuck sensors: Rolling std dev < stuck_std_threshold over 48-period (24-hour) window.
     # Insane power: power < min_mw_threshold or power > max_mw_threshold.
-
-    # Note: The original cleaning.py used "time_series_id" for rolling_std.
-    # Assuming "time_series_id" is the equivalent here.
+    # Both checks are performed per-substation to prevent data leakage.
+    # Bad power are replaced with null (NOT removed) to preserve temporal grid.
 
     # We fill nulls with a large value to prevent artificial drops to zero at partition boundaries.
     stuck_mask = (
@@ -91,8 +84,10 @@ def clean_power_time_series(
 
     bad_value_mask = stuck_mask | insane_mask
 
-    df = df.with_columns(
-        pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col("power")).alias("power")
+    df = pt.DataFrame[PowerTimeSeries](
+        df.with_columns(
+            pl.when(bad_value_mask).then(pl.lit(None)).otherwise(pl.col("power")).alias("power")
+        )
     )
 
     # 6. Validate

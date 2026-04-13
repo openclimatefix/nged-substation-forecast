@@ -8,8 +8,8 @@ import dagster as dg
 
 
 @patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
-@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_power_time_series_lazy")
-def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parquet):
+@patch("src.nged_substation_forecast.defs.plotting_assets.scan_delta_table")
+def test_forecast_vs_actual_plot_filters_actuals(mock_scan_delta, mock_read_parquet):
     """Test that the forecast vs actual plot asset doesn't crash with many actuals."""
     # Mock predictions for only 1 substation
     predictions = pl.DataFrame(
@@ -33,7 +33,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parque
             "power": [1.0] * 11,
         }
     )
-    mock_get_lazy.return_value = actuals.lazy()
+    mock_scan_delta.return_value = actuals.lazy()
 
     # Mock time_series_metadata using Patito
     time_series_metadata = TimeSeriesMetadata.validate(
@@ -84,8 +84,8 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parque
 
 
 @patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
-@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_power_time_series_lazy")
-def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy, mock_read_parquet):
+@patch("src.nged_substation_forecast.defs.plotting_assets.scan_delta_table")
+def test_forecast_vs_actual_plot_handles_no_overlap(mock_scan_delta, mock_read_parquet):
     predictions = pl.DataFrame(
         {
             "valid_time": [datetime(2026, 3, 1, 12, tzinfo=timezone.utc)],
@@ -104,7 +104,7 @@ def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy, mock_read_par
             "power": [1.0],
         }
     )
-    mock_get_lazy.return_value = actuals.lazy()
+    mock_scan_delta.return_value = actuals.lazy()
 
     # Mock time_series_metadata using Patito
     time_series_metadata = TimeSeriesMetadata.validate(
