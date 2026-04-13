@@ -9,11 +9,17 @@ import mlflow
 import polars as pl
 from contracts.data_schemas import InferenceParams
 from contracts.hydra_schemas import TrainingConfig
+
+from ml_core import BaseForecaster
 from ml_core.data import calculate_peak_capacity
 
 log = logging.getLogger(__name__)
 
 
+# TODO: Is this function actually ever called with a `dict` for `data`? If not, let's make this
+# function take a `data: pl.DataFrame | pl.LazyFrame` and return `pl.DataFrame | pl.LazyFrame`.
+# Even better, if this function is only ever called with a `pt.DataFrame[PowerTimeSeries]` then make
+# the function even more specific.
 def _slice_temporal_data(data: Any, start: date | str, end: date | str, time_col: str) -> Any:
     """Recursively slice temporal data (LazyFrames, DataFrames, or dicts thereof)."""
     if isinstance(data, dict):
@@ -97,10 +103,11 @@ def train_and_log_model(
     return model
 
 
+# TODO: Shouldn't this be a method of the Universal Model Interface class?
 def evaluate_and_save_model(
     context: Union[dg.AssetExecutionContext, dg.OpExecutionContext],
     model_name: str,
-    forecaster,
+    forecaster: BaseForecaster,
     config: TrainingConfig,
     **kwargs,
 ):
@@ -126,6 +133,8 @@ def evaluate_and_save_model(
             sliced_data[key] = val
             continue
 
+        # TODO: This function should never be called with `power_flows`. That's a hang-over from
+        # when we used a `SubstationPowerFlows` data contract, instead of the new `PowerTimeSeries`.
         time_col = "period_end_time" if "power_flows" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
@@ -138,8 +147,13 @@ def evaluate_and_save_model(
 
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data
+
+    # TODO: No! We shouldn't just blindly use `now()`!
     forecast_time = datetime.now(timezone.utc)
+
+    # TODO: This makes no sense. Why are we setting nwp_init_time to forecast_time?
     nwp_init_time = forecast_time
+
     if "nwps" in sliced_data:
         nwps_data = sliced_data["nwps"]
         first_nwp = None
@@ -162,41 +176,27 @@ def evaluate_and_save_model(
         power_fcst_model_name=model_name,
     )
 
-    # Downsample power flows to 30m for inference (lags)
-    if "power_time_series" in sliced_data:
-        flows = sliced_data.pop("power_time_series")
-
-        power_time_series = flows
-        sliced_data["power_time_series"] = power_time_series
-
     results_lf = forecaster.predict(
         inference_params=inference_params, collapse_lead_times=False, **sliced_data
     ).lazy()
 
+    context.log.info("XGBoost inference finished.")
+
     # Add missing columns for PowerForecast schema
     results_lf = results_lf.with_columns(
-        [
-            pl.lit(config.model.power_fcst_model_name)
-            .cast(pl.Categorical)
-            .alias("power_fcst_model_name"),
-            pl.lit(forecast_time).alias("power_fcst_init_time"),
-            pl.lit(forecast_time.strftime("%Y-%m")).alias("power_fcst_init_year_month"),
-        ]
+        power_fcst_model_name=pl.lit(config.model.power_fcst_model_name).cast(pl.Categorical),
+        power_fcst_init_time=pl.lit(forecast_time),
+        power_fcst_init_year_month=pl.lit(forecast_time.strftime("%Y-%m")),
     )
 
-    if nwp_init_time is not None:
-        results_lf = results_lf.with_columns(
-            [
-                pl.lit(nwp_init_time).alias("nwp_init_time"),
-                pl.lit(nwp_init_time.hour).cast(pl.Int32).alias("nwp_init_hour"),
-            ]
-        )
-    else:
-        # If nwp_init_time is missing, we can't populate nwp_init_hour.
-        # This might be an issue, but let's see if it passes.
-        pass
+    assert nwp_init_time is not None
+    results_lf = results_lf.with_columns(
+        nwp_init_time=pl.lit(nwp_init_time),
+        nwp_init_hour=pl.lit(nwp_init_time.hour).cast(pl.Int32),
+    )
 
-    context.log.info("XGBoost inference finished.")
+    # TODO: All this metrics computation should be moved to a new metrics.py file in ml_core,
+    # and orchestrated from the Dagster metrics asset.
 
     # 3. Calculate Metrics per lead_time
     if "power_time_series" in sliced_data:
