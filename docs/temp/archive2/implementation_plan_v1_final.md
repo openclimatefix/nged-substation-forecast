@@ -56,7 +56,7 @@ This plan details the steps to remove the deprecated NGED CKAN data ingestion co
 ## 4. Remove Downsampling Code
 
 *   **Action:** In `packages/ml_core/src/ml_core/data.py`, delete the functions `calculate_target_map` and `downsample_power_flows`.
-*   **Action:** In `packages/ml_core/src/ml_core/utils.py`, remove the calls to `downsample_power_flows` in `train_and_log_model` and `evaluate_and_save_model`. The input data (`substation_power_flows`) will now be expected to be half-hourly and have a `value` column (which should be renamed to `power` or `power_fcst` as needed by the model). Remove any logic related to `target_map`.
+*   **Action:** In `packages/ml_core/src/ml_core/utils.py`, remove the calls to `downsample_power_flows` in `train_and_log_model` and `evaluate_and_save_model`. The input data (`power_time_series`) will now be expected to be half-hourly and have a `value` column (which should be renamed to `power` or `power_fcst` as needed by the model). Remove any logic related to `target_map`.
 *   **Action:** Verification Step: Ensure that the removal of `downsample_power_flows` and `target_map` does not leave any orphaned imports or unused helper functions in `packages/ml_core/src/ml_core/utils.py` or elsewhere. Perform a grep for these names after removal.
 *   **Rationale:** The new JSON data is already half-hourly, so downsampling is no longer required. The `target_map` concept is obsolete.
 

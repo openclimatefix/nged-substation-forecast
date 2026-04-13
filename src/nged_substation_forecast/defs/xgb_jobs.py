@@ -81,7 +81,7 @@ def train_cv_fold(
     context: dg.OpExecutionContext,
     config: Any,
     nwp: pl.LazyFrame,
-    substation_power_flows: pl.LazyFrame,
+    power_time_series: pl.LazyFrame,
 ) -> None:
     """Train and evaluate a single cross-validation fold.
 
@@ -89,7 +89,7 @@ def train_cv_fold(
         context: Dagster context.
         config: Training configuration for this fold.
         nwp: Processed NWP data.
-        substation_power_flows: Historical power flow data.
+        power_time_series: Historical power flow data.
     """
     config = cast(TrainingConfig, config)
     model_name = f"xgboost_cv_fold_{config.data_split.train_end}"
@@ -104,7 +104,7 @@ def train_cv_fold(
         trainer=XGBoostForecaster(),
         config=config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
-        substation_power_flows=substation_power_flows,
+        power_time_series=power_time_series,
     )
 
     # 2. Evaluate (on all members)
@@ -117,7 +117,7 @@ def train_cv_fold(
         forecaster=forecaster,
         config=config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
-        substation_power_flows=substation_power_flows,
+        power_time_series=power_time_series,
     )
 
 

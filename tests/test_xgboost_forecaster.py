@@ -391,7 +391,7 @@ def test_latest_available_weekly_power_lag_prevents_leakage():
     ).lazy()
 
     metadata = pl.DataFrame(
-        {"time_series_id": [1], "substation_number": [1], "h3_res_5": [1]}
+        {"substation_number": [1], "time_series_id": [1], "h3_res_5": [1]}
     ).with_columns(pl.col("time_series_id").cast(pl.Int32))
 
     nwp = pl.DataFrame(

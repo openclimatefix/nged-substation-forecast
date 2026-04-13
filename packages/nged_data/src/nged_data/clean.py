@@ -79,7 +79,7 @@ def clean_power_time_series(
     # Stuck sensors: Rolling std dev < stuck_std_threshold over 48-period (24-hour) window.
     # Insane power: power < min_mw_threshold or power > max_mw_threshold.
 
-    # Note: The original cleaning.py used "substation_number" for rolling_std.
+    # Note: The original cleaning.py used "time_series_id" for rolling_std.
     # Assuming "time_series_id" is the equivalent here.
 
     stuck_mask = (

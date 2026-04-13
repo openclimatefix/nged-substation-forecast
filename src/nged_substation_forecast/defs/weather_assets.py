@@ -74,7 +74,7 @@ def all_nwp_data(settings: ResourceParam[Settings]) -> pl.LazyFrame:
 class ProcessedNWPConfig(dg.Config):
     """Configuration for the processed NWP data asset."""
 
-    substation_ids: list[int] | None = Field(
+    time_series_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
     )
     start_date: str | None = Field(
@@ -119,8 +119,8 @@ def processed_nwp_data(
             )
         )
 
-    if config.substation_ids:
-        metadata = metadata.filter(pl.col("time_series_id").is_in(config.substation_ids))
+    if config.time_series_ids:
+        metadata = metadata.filter(pl.col("time_series_id").is_in(config.time_series_ids))
     h3_indices = metadata["h3_res_5"].unique().to_list()
     return process_nwp_data(
         all_nwp_data,

@@ -26,10 +26,10 @@ These functions handle the core ML pipeline, joining NWP data, power flows, and 
     *   **Inputs:** `power_time_series: pt.LazyFrame[PowerTimeSeries]`, `nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None`
     *   **Output (predict):** `pt.LazyFrame[PowerForecast]`
 *   **`xgboost_predictions` and `xgboost_model` (`src/nged_substation_forecast/defs/xgb_assets.py`)**
-    *   **Inputs:** `nwp: pt.LazyFrame[Nwp]`, `substation_power_flows: pt.LazyFrame[PowerTimeSeries]`
+    *   **Inputs:** `nwp: pt.LazyFrame[Nwp]`, `power_time_series: pt.LazyFrame[PowerTimeSeries]`
     *   **Output (xgboost_predictions):** `pt.DataFrame[PowerForecast]`
 *   **`train_xgboost_model_job` (`src/nged_substation_forecast/defs/xgb_jobs.py`)**
-    *   **Inputs:** `nwp: pt.LazyFrame[Nwp]`, `substation_power_flows: pt.LazyFrame[PowerTimeSeries]`
+    *   **Inputs:** `nwp: pt.LazyFrame[Nwp]`, `power_time_series: pt.LazyFrame[PowerTimeSeries]`
 *   **Intermediate Feature Functions (`xgboost_forecaster/features.py`, `xgboost_forecaster/data.py`, `xgboost_forecaster/model.py`)**
     *   *Recommendation:* Map inputs to existing contracts (`ProcessedNwp`, `PowerTimeSeries`, `TimeSeriesMetadata`, `XGBoostInputFeatures`) where applicable. For outputs that are intermediate and don't match a specific contract (e.g., adding a single column before the final join), keep `pl.LazyFrame` but add clear docstrings explaining the intermediate state.
 

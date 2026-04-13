@@ -26,7 +26,7 @@ target_modules: ["packages/contracts", "src/nged_substation_forecast", "packages
 **Why:** The `substation_metadata` asset has been removed from the pipeline, so it must be removed from the job definition to prevent Dagster from failing to resolve the asset.
 
 **File:** `src/nged_substation_forecast/defs/xgb_assets.py`
-**Action:** Remove the outdated comment in the `train_xgboost` docstring that mentions `substation_metadata` (`- _get_target_substations now uses substation_metadata as an efficient fallback...`).
+**Action:** Remove the outdated comment in the `train_xgboost` docstring that mentions `substation_metadata` (`- _get_target_time_series now uses substation_metadata as an efficient fallback...`).
 **Why:** To keep documentation accurate and avoid confusion.
 
 ## 3. Argument Mismatch

@@ -237,7 +237,7 @@ def test_mlflow_metric_thinning():
             model_name="test_model",
             forecaster=forecaster,
             config=config,
-            substation_power_flows=power_time_series,
+            power_time_series=power_time_series,
         )
 
         # Check logged metrics

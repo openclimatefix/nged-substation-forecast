@@ -9,7 +9,7 @@ target_modules: ["packages/nged_data", "packages/xgboost_forecaster", "src/nged_
 # Implementation Plan: Rename `substation_number` to `time_series_id`
 
 ## Objective
-Rename `substation_number` (and related terms like `substation_ids`, `substation_power_flows`) to `time_series_id` (and `time_series_ids`, `power_time_series`) throughout the codebase to align with the `TimeSeriesMetadata` and `PowerTimeSeries` data contracts.
+Rename `substation_number` (and related terms like `time_series_ids`, `power_time_series`) to `time_series_id` (and `time_series_ids`, `power_time_series`) throughout the codebase to align with the `TimeSeriesMetadata` and `PowerTimeSeries` data contracts.
 
 **CRITICAL CONSTRAINT:** Do NOT remove or rename `substation_number` within the `TimeSeriesMetadata` schema or any mock dataframes that are validated against it, as it remains a required field in the contract.
 
@@ -30,18 +30,18 @@ Rename `substation_number` (and related terms like `substation_ids`, `substation
 
 ### Step 3: Update Dagster Assets and Configs
 **File:** `src/nged_substation_forecast/defs/xgb_assets.py`
-*   **Action:** Rename `substation_ids` to `time_series_ids` in `XGBoostConfig`.
-*   **Action:** Rename `allow_empty_substations` to `allow_empty_time_series` in `XGBoostConfig`.
-*   **Action:** Rename the helper function `_get_target_substations` to `_get_target_time_series`.
-*   **Action:** Rename internal variables: `healthy_substations` -> `healthy_time_series`, `sub_ids` -> `ts_ids`.
-*   **Action:** Rename `substation_power_flows` to `power_time_series` in `train_xgboost` and `evaluate_xgboost` signatures and internal logic.
-*   **Action:** Rename `substation_power_flows_filtered` to `power_time_series_filtered`.
+*   **Action:** Rename `time_series_ids` to `time_series_ids` in `XGBoostConfig`.
+*   **Action:** Rename `allow_empty_time_series` to `allow_empty_time_series` in `XGBoostConfig`.
+*   **Action:** Rename the helper function `_get_target_time_series` to `_get_target_time_series`.
+*   **Action:** Rename internal variables: `healthy_time_series` -> `healthy_time_series`, `sub_ids` -> `ts_ids`.
+*   **Action:** Rename `power_time_series` to `power_time_series` in `train_xgboost` and `evaluate_xgboost` signatures and internal logic.
+*   **Action:** Rename `power_time_series_filtered` to `power_time_series_filtered`.
 
 **File:** `src/nged_substation_forecast/defs/xgb_jobs.py`
-*   **Action:** Rename `substation_power_flows` to `power_time_series` in function signatures and docstrings.
+*   **Action:** Rename `power_time_series` to `power_time_series` in function signatures and docstrings.
 
 **File:** `src/nged_substation_forecast/defs/weather_assets.py`
-*   **Action:** Rename `substation_ids` to `time_series_ids` in `WeatherConfig` and update the filtering logic accordingly.
+*   **Action:** Rename `time_series_ids` to `time_series_ids` in `WeatherConfig` and update the filtering logic accordingly.
 
 ### Step 4: Update ML Core Utilities
 **File:** `packages/ml_core/src/ml_core/utils.py`
@@ -50,21 +50,21 @@ Rename `substation_number` (and related terms like `substation_ids`, `substation
     *   *To:* `time_col = "period_end_time" if "power_time_series" in key else "valid_time"`
     *   *From:* `if "power_flows" in key or "nwps" in key:`
     *   *To:* `if "power_time_series" in key or "nwps" in key:`
-*   **Action:** Remove the redundant `if "substation_power_flows" in sliced_data:` block, as the caller will now pass `power_time_series` directly.
+*   **Action:** Remove the redundant `if "power_time_series" in sliced_data:` block, as the caller will now pass `power_time_series` directly.
 
 ### Step 5: Update Tests
 **File:** `tests/conftest.py`
 *   **Action:** Rename `"substation_number"` to `"time_series_id"` in the `mock_ckan_primary_substation_locations` fixture.
 
 **File:** `tests/test_xgboost_dagster_integration.py`
-*   **Action:** Update the config dictionary keys from `"substation_ids"` to `"time_series_ids"`.
-*   **Action:** Remove the `# TODO: Change substation_ids to time_series_ids` comments.
+*   **Action:** Update the config dictionary keys from `"time_series_ids"` to `"time_series_ids"`.
+*   **Action:** Remove the `# TODO: Change time_series_ids to time_series_ids` comments.
 
 **File:** `tests/test_xgboost_mlflow.py`
-*   **Action:** Rename `substation_power_flows` to `power_time_series` in the `evaluate_and_save_model` and `train_and_log_model` function calls.
+*   **Action:** Rename `power_time_series` to `power_time_series` in the `evaluate_and_save_model` and `train_and_log_model` function calls.
 
 **File:** `packages/xgboost_forecaster/tests/test_universal_model.py`
-*   **Action:** Rename `substation_power_flows` to `power_time_series` in the `evaluate_and_save_model` function call.
+*   **Action:** Rename `power_time_series` to `power_time_series` in the `evaluate_and_save_model` function call.
 
 *Note: Do NOT remove `substation_number` from `TimeSeriesMetadata` mock dataframes in any tests (e.g., `test_xgboost_dagster_mocked.py`, `test_xgboost_adversarial.py`, `test_plotting_robustness.py`, `test_xgboost_forecaster.py`, `test_xgboost_robustness.py`), as it is still a required field in the schema.*
 

@@ -12,7 +12,7 @@ target_modules: ["packages/contracts/src/contracts", "tests"]
 Fix FLAW-005 by updating the `PowerTimeSeries` schema in `packages/contracts/src/contracts/data_schemas.py` to enforce power value constraints. The power values must be constrained between -1000 and 1000.
 
 ## 1. Identify the Failing Test
-The test `test_substation_power_flows_validation_extreme_values` in `tests/test_xgboost_robustness.py` currently fails because it expects a `DataFrameValidationError` when a power value of `2000.0` is provided, but the schema currently lacks the constraints to trigger this error.
+The test `test_power_time_series_validation_extreme_values` in `tests/test_xgboost_robustness.py` currently fails because it expects a `DataFrameValidationError` when a power value of `2000.0` is provided, but the schema currently lacks the constraints to trigger this error.
 
 ## 2. Modify the Code
 Update the `PowerTimeSeries` class in `packages/contracts/src/contracts/data_schemas.py`.
@@ -42,7 +42,7 @@ Run the following commands to verify the fix:
 
 1. Run the specific failing test to ensure it now passes:
    ```bash
-   pytest tests/test_xgboost_robustness.py::test_substation_power_flows_validation_extreme_values
+   pytest tests/test_xgboost_robustness.py::test_power_time_series_validation_extreme_values
    ```
 2. Run all tests in the contracts package to ensure no regressions:
    ```bash

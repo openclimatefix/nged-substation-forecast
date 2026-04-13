@@ -196,7 +196,7 @@ def test_evaluate_and_save_model_logs_metrics():
             forecaster=forecaster,
             config=config,
             nwps=nwps,
-            substation_power_flows=sub_flows,
+            power_time_series=sub_flows,
             time_series_metadata=sub_meta,
         )
 
@@ -318,7 +318,7 @@ def test_evaluate_and_save_model_logs_metrics():
             model_name="xgboost",
             trainer=trainer,
             config=config,
-            substation_power_flows=sub_flows,
+            power_time_series=sub_flows,
             time_series_metadata=sub_meta,
             nwps=nwps,
         )

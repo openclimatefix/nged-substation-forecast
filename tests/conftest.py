@@ -55,35 +55,35 @@ def mock_ckan_primary_substation_locations():
     """Mock data for primary substation locations."""
     return [
         {
-            "substation_number": 110375,
+            "time_series_id": 110375,
             "name": "Woodland Way",
             "latitude": 52.5200,
             "longitude": -1.0000,
             "region": "West Midlands",
         },
         {
-            "substation_number": 110644,
+            "time_series_id": 110644,
             "name": "Test Substation B",
             "latitude": 52.5300,
             "longitude": -1.0100,
             "region": "West Midlands",
         },
         {
-            "substation_number": 110772,
+            "time_series_id": 110772,
             "name": "Test Substation C",
             "latitude": 52.5400,
             "longitude": -1.0200,
             "region": "West Midlands",
         },
         {
-            "substation_number": 110803,
+            "time_series_id": 110803,
             "name": "Test Substation D",
             "latitude": 52.5500,
             "longitude": -1.0300,
             "region": "West Midlands",
         },
         {
-            "substation_number": 110804,
+            "time_series_id": 110804,
             "name": "Test Substation E",
             "latitude": 52.5600,
             "longitude": -1.0400,

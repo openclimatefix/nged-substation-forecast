@@ -124,8 +124,8 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
             "ops": {
                 "processed_nwp_data": {
                     "config": {
-                        # TODO: Change `substation_ids` to `time_series_ids`
-                        "substation_ids": time_series_ids,
+                        # TODO: Change `time_series_ids` to `time_series_ids`
+                        "time_series_ids": time_series_ids,
                         "start_date": str(train_start - timedelta(days=14)),
                         "end_date": str(test_end),
                     }
@@ -134,14 +134,14 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
                     "config": {
                         "train_start": str(train_start),
                         "train_end": str(train_end),
-                        "substation_ids": time_series_ids,
+                        "time_series_ids": time_series_ids,
                     }
                 },
                 "evaluate_xgboost": {
                     "config": {
                         "test_start": str(test_start),
                         "test_end": str(test_end),
-                        "substation_ids": time_series_ids,
+                        "time_series_ids": time_series_ids,
                     }
                 },
                 "forecast_vs_actual_plot": {

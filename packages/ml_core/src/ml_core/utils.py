@@ -78,8 +78,8 @@ def train_and_log_model(
         # 2. Call the Model-Specific Math
         # The trainer is responsible for joining and feature engineering.
         # We ensure power flows are at 30m resolution for consistency across models.
-        if "substation_power_flows" in sliced_data:
-            flows = sliced_data.pop("substation_power_flows")
+        if "power_time_series" in sliced_data:
+            flows = sliced_data.pop("power_time_series")
 
             power_time_series = flows
             sliced_data["power_time_series"] = power_time_series
@@ -163,8 +163,8 @@ def evaluate_and_save_model(
     )
 
     # Downsample power flows to 30m for inference (lags)
-    if "substation_power_flows" in sliced_data:
-        flows = sliced_data.pop("substation_power_flows")
+    if "power_time_series" in sliced_data:
+        flows = sliced_data.pop("power_time_series")
 
         power_time_series = flows
         sliced_data["power_time_series"] = power_time_series

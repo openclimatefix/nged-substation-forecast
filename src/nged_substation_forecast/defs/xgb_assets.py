@@ -34,10 +34,10 @@ class XGBoostConfig(dg.Config):
     test_end: str | None = Field(
         default=None, description="End date for testing in ISO format (YYYY-MM-DD)."
     )
-    substation_ids: list[int] | None = Field(
+    time_series_ids: list[int] | None = Field(
         default=None, description="Optional list of substation IDs to include."
     )
-    allow_empty_substations: bool = Field(
+    allow_empty_time_series: bool = Field(
         default=True,
         description="Allow the pipeline to continue if no healthy substations are found.",
     )
@@ -78,9 +78,9 @@ def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) ->
     return config
 
 
-def _get_target_substations(
+def _get_target_time_series(
     config: XGBoostConfig,
-    healthy_substations: list[int],
+    healthy_time_series: list[int],
     context: dg.AssetExecutionContext,
 ) -> list[int]:
     """Intersects requested substation IDs with healthy/active ones and logs the result.
@@ -90,27 +90,27 @@ def _get_target_substations(
 
     Strategy:
     ---------
-    1. If `config.substation_ids` is provided, filter to only healthy substations.
+    1. If `config.time_series_ids` is provided, filter to only healthy substations.
     2. Otherwise, use all healthy substations.
 
     Args:
-        config: XGBoost configuration with optional substation_ids override.
-        healthy_substations: List of substations with healthy telemetry.
+        config: XGBoost configuration with optional time_series_ids override.
+        healthy_time_series: List of substations with healthy telemetry.
         context: Asset execution context for logging.
 
     Returns:
         List of substation IDs to use for training/evaluation.
     """
-    if config.substation_ids:
+    if config.time_series_ids:
         # Use provided substation IDs, filtered to only healthy ones
-        sub_ids = [s for s in config.substation_ids if s in healthy_substations]
+        sub_ids = [s for s in config.time_series_ids if s in healthy_time_series]
         context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
     else:
         # Fallback: use all healthy substations
-        sub_ids = healthy_substations
+        sub_ids = healthy_time_series
         context.log.info(f"Using {len(sub_ids)} healthy substations.")
 
-    if not sub_ids and not config.allow_empty_substations:
+    if not sub_ids and not config.allow_empty_time_series:
         raise ValueError("No healthy substations available for training/evaluation.")
 
     return sub_ids
@@ -140,9 +140,9 @@ def train_xgboost(
     --------------------
     - Uses `cleaned_actuals` instead of `combined_actuals` to ensure the model
       trains only on physically plausible data points.
-    - `_get_target_substations` now uses `time_series_metadata` as an efficient
+    - `_get_target_time_series` now uses `time_series_metadata` as an efficient
       fallback instead of scanning the entire actuals dataset.
-    - The `healthy_substations` dependency has been removed as it's no longer needed.
+    - The `healthy_time_series` dependency has been removed as it's no longer needed.
     """
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     model_name = "xgboost"
@@ -157,14 +157,14 @@ def train_xgboost(
     # Use get_cleaned_actuals_lazy to ensure we have the full training range.
 
     # This function serves as the single source of truth for accessing cleaned actuals.
-    substation_power_flows = get_cleaned_actuals_lazy(settings, context)
+    power_time_series = get_cleaned_actuals_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     # Note: The actuals may still have nulls; these will be dropped after feature engineering
-    healthy_substations = (
+    healthy_time_series = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("power").is_not_null())
+            power_time_series.filter(pl.col("power").is_not_null())
             .select("time_series_id")
             .unique()
             .collect(),
@@ -174,7 +174,7 @@ def train_xgboost(
     )
 
     # Filter to target substations using metadata as efficient fallback
-    sub_ids = _get_target_substations(config, healthy_substations, context)
+    sub_ids = _get_target_time_series(config, healthy_time_series, context)
 
     # If no substations are available, return an empty model gracefully
     if not sub_ids:
@@ -184,10 +184,8 @@ def train_xgboost(
         return XGBoostForecaster()
 
     # Filter the actuals data to target substations
-    substation_power_flows_filtered = substation_power_flows.filter(
-        pl.col("time_series_id").is_in(sub_ids)
-    )
-    # context.log.info(f"substation_power_flows_filtered: {substation_power_flows_filtered}")
+    power_time_series_filtered = power_time_series.filter(pl.col("time_series_id").is_in(sub_ids))
+    # context.log.info(f"power_time_series_filtered: {power_time_series_filtered}")
 
     # Filter metadata to target substations
     time_series_metadata_filtered = time_series_metadata.filter(
@@ -206,7 +204,7 @@ def train_xgboost(
         trainer=XGBoostForecaster(),
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp_train},
-        substation_power_flows=substation_power_flows_filtered,
+        power_time_series=power_time_series_filtered,
         time_series_metadata=time_series_metadata_filtered,
     )
 
@@ -240,13 +238,13 @@ def evaluate_xgboost(
 
     # Use get_cleaned_actuals_lazy to ensure we have the full evaluation range.
     # This function serves as the single source of truth for accessing cleaned actuals.
-    substation_power_flows = get_cleaned_actuals_lazy(settings, context)
+    power_time_series = get_cleaned_actuals_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
-    healthy_substations = (
+    healthy_time_series = (
         cast(
             pl.DataFrame,
-            substation_power_flows.filter(pl.col("power").is_not_null())
+            power_time_series.filter(pl.col("power").is_not_null())
             .select("time_series_id")
             .unique()
             .collect(),
@@ -256,7 +254,7 @@ def evaluate_xgboost(
     )
 
     # Filter to target substations using metadata as efficient fallback
-    sub_ids = _get_target_substations(config, healthy_substations, context)
+    sub_ids = _get_target_time_series(config, healthy_time_series, context)
 
     # Load time series metadata
     time_series_metadata = pl.read_parquet(
@@ -271,9 +269,7 @@ def evaluate_xgboost(
         return pl.DataFrame(schema=PowerForecast.dtypes)
 
     # Filter the actuals data to target substations
-    substation_power_flows_filtered = substation_power_flows.filter(
-        pl.col("time_series_id").is_in(sub_ids)
-    )
+    power_time_series_filtered = power_time_series.filter(pl.col("time_series_id").is_in(sub_ids))
 
     # Filter metadata to target substations
     time_series_metadata_filtered = time_series_metadata.filter(
@@ -282,7 +278,7 @@ def evaluate_xgboost(
 
     # Log shapes and ensemble members for debugging
     context.log.info(
-        f"substation_power_flows_filtered shape: {cast(pl.DataFrame, substation_power_flows_filtered.collect()).shape}"
+        f"power_time_series_filtered shape: {cast(pl.DataFrame, power_time_series_filtered.collect()).shape}"
     )
     context.log.info(f"time_series_metadata_filtered shape: {time_series_metadata_filtered.shape}")
     num_ensemble_members = cast(
@@ -301,7 +297,7 @@ def evaluate_xgboost(
         forecaster=forecaster,
         config=hydra_config,
         nwps={NwpModel.ECMWF_ENS_0_25DEG: nwp},
-        substation_power_flows=substation_power_flows_filtered,
+        power_time_series=power_time_series_filtered,
         time_series_metadata=time_series_metadata_filtered,
     )
     context.log.info("Evaluation complete.")

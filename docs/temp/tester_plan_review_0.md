@@ -15,7 +15,7 @@ The proposed implementation plan is a large-scale refactoring involving renaming
 ### FLAW-001 (Potential): Incomplete Renaming in Dynamic/Config Contexts
 * **The Issue:** Renaming variables across multiple packages (`nged_data`, `xgboost_forecaster`, `ml_core`, `nged_substation_forecast`) is prone to human error. If any configuration file or dynamic lookup (e.g., string-based dictionary access) is missed, the system will fail at runtime.
 * **Required Fix:**
-    1.  **Pre-refactor:** Run a full-text search (grep) for all instances of "substation_number", "substation_ids", "substation_power_flows" to establish a baseline count.
+    1.  **Pre-refactor:** Run a full-text search (grep) for all instances of "substation_number", "time_series_ids", "power_time_series" to establish a baseline count.
     2.  **Post-refactor:** Run the same search to ensure no instances remain (except where explicitly allowed, like in `TimeSeriesMetadata` schema definitions).
     3.  **Integration Tests:** Ensure that the CI pipeline includes a full integration test suite that exercises the entire pipeline with the new naming conventions.
 
