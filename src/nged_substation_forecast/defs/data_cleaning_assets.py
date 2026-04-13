@@ -37,12 +37,15 @@ from dagster import ResourceParam
 from nged_data.clean import clean_power_time_series
 
 from ..utils import (
+    create_dagster_type_from_patito_model,
     filter_to_partition_window,
     get_delta_partition_predicate,
     get_partition_window,
     scan_delta_table,
 )
 from .partitions import DAILY_PARTITIONS
+
+CleanedPowerTimeSeriesDagsterType = create_dagster_type_from_patito_model(PowerTimeSeries)
 
 
 def _get_delta_path(settings: Settings, table_name: str) -> str:
@@ -62,6 +65,7 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
     partitions_def=DAILY_PARTITIONS,
     automation_condition=dg.AutomationCondition.eager(),
     deps=["raw_power_time_series"],
+    dagster_type=CleanedPowerTimeSeriesDagsterType,
 )
 def cleaned_power_time_series(
     context: dg.AssetExecutionContext,

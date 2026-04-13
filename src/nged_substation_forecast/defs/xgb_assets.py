@@ -18,7 +18,9 @@ from contracts.data_schemas import (
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster
-from ..utils import scan_delta_table
+from ..utils import create_dagster_type_from_patito_model, scan_delta_table
+
+PowerForecastDagsterType = create_dagster_type_from_patito_model(PowerForecast)
 
 
 class XGBoostConfig(dg.Config):
@@ -240,6 +242,7 @@ def train_xgboost(
     deps=["cleaned_power_time_series"],
     compute_kind="python",
     group_name="models",
+    dagster_type=PowerForecastDagsterType,
 )
 def evaluate_xgboost(
     context: dg.AssetExecutionContext,

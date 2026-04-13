@@ -27,14 +27,12 @@ def test_cleaned_power_time_series_lookback_logic(tmp_path: Path):
     df = pl.DataFrame(
         {
             "time_series_id": [1, 1],
-            "start_time": [t1, t2],
             "period_end_time": [t1 + timedelta(minutes=30), t2 + timedelta(minutes=30)],
             "power": [10.0, 10.0],
         }
     ).with_columns(
         [
             pl.col("time_series_id").cast(pl.Int32),
-            pl.col("start_time").cast(UTC_DATETIME_DTYPE),
             pl.col("period_end_time").cast(UTC_DATETIME_DTYPE),
             pl.col("power").cast(pl.Float32),
         ]
@@ -59,7 +57,9 @@ def test_cleaned_power_time_series_lookback_logic(tmp_path: Path):
             "src.nged_substation_forecast.defs.data_cleaning_assets.clean_power_time_series"
         ) as mock_clean:
             # Mock return value to be a valid DataFrame
-            mock_clean.return_value = df.filter(pl.col("start_time") == t2)
+            mock_clean.return_value = df.filter(
+                pl.col("period_end_time") == t2 + timedelta(minutes=30)
+            )
 
             cleaned_power_time_series(context, settings)
 
@@ -67,8 +67,8 @@ def test_cleaned_power_time_series_lookback_logic(tmp_path: Path):
             # because of the 1-day lookback.
             called_df = mock_clean.call_args[0][0]
             assert len(called_df) == 2
-            assert t1 in called_df["start_time"].to_list()
-            assert t2 in called_df["start_time"].to_list()
+            assert (t1 + timedelta(minutes=30)) in called_df["period_end_time"].to_list()
+            assert (t2 + timedelta(minutes=30)) in called_df["period_end_time"].to_list()
 
 
 def test_cleaned_power_time_series_idempotency(tmp_path: Path):
