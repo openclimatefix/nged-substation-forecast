@@ -13,6 +13,7 @@ from contracts.hydra_schemas import NwpModel, TrainingConfig
 from contracts.data_schemas import (
     PowerForecast,
     PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
@@ -84,7 +85,7 @@ def _get_filtered_time_series_data(
     context: dg.AssetExecutionContext,
     config: XGBoostConfig,
     settings: dg.ResourceParam[Settings],
-) -> tuple[pt.LazyFrame[PowerTimeSeries], pl.DataFrame, list[int]]:
+) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], list[int]]:
     """Load and filter time series data and metadata lazily.
 
     This helper optimizes the data preparation pipeline by applying filters
@@ -137,7 +138,7 @@ def _get_filtered_time_series_data(
 
     return (
         cast(pt.LazyFrame[PowerTimeSeries], power_time_series_filtered),
-        time_series_metadata_filtered,
+        cast(pt.DataFrame[TimeSeriesMetadata], time_series_metadata_filtered),
         time_series_ids,
     )
 
