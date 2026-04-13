@@ -4,13 +4,13 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from src.nged_substation_forecast.defs.data_cleaning_assets import cleaned_actuals
+from src.nged_substation_forecast.defs.data_cleaning_assets import cleaned_power_time_series
 from contracts.settings import Settings, DataQualitySettings
 from contracts.data_schemas import UTC_DATETIME_DTYPE
 
 
-def test_cleaned_actuals_lookback_logic(tmp_path: Path):
-    """Test that cleaned_actuals correctly uses a 1-day lookback from Delta table."""
+def test_cleaned_power_time_series_lookback_logic(tmp_path: Path):
+    """Test that cleaned_power_time_series correctly uses a 1-day lookback from Delta table."""
 
     # 1. Setup paths
     delta_dir = tmp_path / "delta"
@@ -61,7 +61,7 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
             # Mock return value to be a valid DataFrame
             mock_clean.return_value = df.filter(pl.col("start_time") == t2)
 
-            cleaned_actuals(context, settings)
+            cleaned_power_time_series(context, settings)
 
             # Verify that clean_substation_flows was called with data from BOTH days
             # because of the 1-day lookback.
@@ -71,12 +71,12 @@ def test_cleaned_actuals_lookback_logic(tmp_path: Path):
             assert t2 in called_df["start_time"].to_list()
 
 
-def test_cleaned_actuals_idempotency(tmp_path: Path):
-    """Test that cleaned_actuals correctly overwrites only its partition."""
+def test_cleaned_power_time_series_idempotency(tmp_path: Path):
+    """Test that cleaned_power_time_series correctly overwrites only its partition."""
 
     delta_dir = tmp_path / "delta"
     raw_flows_path = delta_dir / "raw_power_time_series"
-    cleaned_actuals_path = delta_dir / "cleaned_actuals"
+    cleaned_power_time_series_path = delta_dir / "cleaned_power_time_series"
     raw_flows_path.mkdir(parents=True)
 
     t1 = datetime(2026, 3, 9, 0, tzinfo=timezone.utc)
@@ -107,10 +107,10 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         partition_key="2026-03-10",
     ) as context:
         # Run once
-        cleaned_actuals(context, settings)
+        cleaned_power_time_series(context, settings)
 
         # Verify data exists
-        df_result = pl.read_delta(str(cleaned_actuals_path)).sort(
+        df_result = pl.read_delta(str(cleaned_power_time_series_path)).sort(
             ["time_series_id", "period_end_time"]
         )
         print(df_result)
@@ -138,10 +138,10 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
             delta_write_options={"predicate": f"period_end_time >= '{times[0].isoformat()}'"},
         )
 
-        cleaned_actuals(context, settings)
+        cleaned_power_time_series(context, settings)
 
         # Verify data was overwritten
-        df_result = pl.read_delta(str(cleaned_actuals_path)).sort(
+        df_result = pl.read_delta(str(cleaned_power_time_series_path)).sort(
             ["time_series_id", "period_end_time"]
         )
         assert len(df_result) > 0

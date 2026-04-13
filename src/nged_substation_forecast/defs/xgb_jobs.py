@@ -132,7 +132,7 @@ def xgboost_cv_job() -> None:
 xgboost_integration_job = dg.define_asset_job(
     name="xgboost_integration_job",
     selection=dg.AssetSelection.assets(
-        "cleaned_actuals",
+        "cleaned_power_time_series",
         "all_nwp_data",
         "processed_nwp_data",
         "train_xgboost",

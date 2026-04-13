@@ -21,18 +21,18 @@ log = logging.getLogger(__name__)
 )
 def metrics(
     context: dg.AssetExecutionContext,
-    cleaned_actuals: pl.DataFrame,
+    cleaned_power_time_series: pl.DataFrame,
     settings: ResourceParam[Settings],
 ) -> pl.DataFrame:
     """Computes MAE/RMSE per substation for a specific model partition.
 
     This asset reads evaluation results from Delta Lake storage and computes
-    performance metrics against cleaned actuals data. It uses the cleaned_actuals
+    performance metrics against cleaned actuals data. It uses the cleaned_power_time_series
     asset which applies data quality checks and replaces problematic values with null.
 
     Args:
         context: Dagster asset execution context.
-        cleaned_actuals: Cleaned actuals data with problematic values replaced by null.
+        cleaned_power_time_series: Cleaned actuals data with problematic values replaced by null.
         settings: Global settings containing data paths.
 
     Returns:
@@ -41,9 +41,9 @@ def metrics(
 
     Notes:
         - The metrics computation reads from `evaluation_results.delta` table.
-        - Uses `cleaned_actuals` (not `combined_actuals`) to ensure evaluation
+        - Uses `cleaned_power_time_series` (not `combined_actuals`) to ensure evaluation
           is performed on physically plausible data.
-        - The cleaned_actuals DataFrame is eager (not lazy), so no .collect() needed.
+        - The cleaned_power_time_series DataFrame is eager (not lazy), so no .collect() needed.
     """
     model_name = context.partition_key
     log.info(f"Computing metrics for model: {model_name}")

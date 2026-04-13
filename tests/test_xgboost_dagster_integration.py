@@ -59,7 +59,7 @@ def run_job_partitions(
         job.execute_in_process(
             run_config=run_config,
             partition_key=partition_key,
-            op_selection=["cleaned_actuals"],
+            op_selection=["cleaned_power_time_series"],
             resources={
                 **resources,
                 "io_manager": io_manager,

@@ -16,7 +16,7 @@ from contracts.settings import PROJECT_ROOT, Settings
 from ml_core.utils import evaluate_and_save_model, train_and_log_model
 from xgboost_forecaster.model import XGBoostForecaster
 
-from .data_cleaning_assets import get_cleaned_actuals_lazy
+from .data_cleaning_assets import get_cleaned_power_time_series_lazy
 
 
 class XGBoostConfig(dg.Config):
@@ -120,7 +120,7 @@ def _get_target_time_series(
     ins={
         "nwp": dg.AssetIn("processed_nwp_data"),
     },
-    deps=["cleaned_actuals"],
+    deps=["cleaned_power_time_series"],
     compute_kind="python",
     group_name="models",
 )
@@ -138,7 +138,7 @@ def train_xgboost(
 
     Key Design Decisions:
     --------------------
-    - Uses `cleaned_actuals` instead of `combined_actuals` to ensure the model
+    - Uses `cleaned_power_time_series` instead of `combined_actuals` to ensure the model
       trains only on physically plausible data points.
     - `_get_target_time_series` now uses `time_series_metadata` as an efficient
       fallback instead of scanning the entire actuals dataset.
@@ -154,10 +154,10 @@ def train_xgboost(
         settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
     )
 
-    # Use get_cleaned_actuals_lazy to ensure we have the full training range.
+    # Use get_cleaned_power_time_series_lazy to ensure we have the full training range.
 
     # This function serves as the single source of truth for accessing cleaned actuals.
-    power_time_series = get_cleaned_actuals_lazy(settings, context)
+    power_time_series = get_cleaned_power_time_series_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     # Note: The actuals may still have nulls; these will be dropped after feature engineering
@@ -214,7 +214,7 @@ def train_xgboost(
         "model": dg.AssetIn("train_xgboost"),
         "nwp": dg.AssetIn("processed_nwp_data"),
     },
-    deps=["cleaned_actuals"],
+    deps=["cleaned_power_time_series"],
     compute_kind="python",
     group_name="models",
 )
@@ -228,7 +228,7 @@ def evaluate_xgboost(
     """Evaluate the XGBoost model and generate forecasts.
 
     This asset evaluates the trained model on cleaned actuals data. The evaluation:
-    - Uses `cleaned_actuals` instead of `combined_actuals` to ensure evaluation
+    - Uses `cleaned_power_time_series` instead of `combined_actuals` to ensure evaluation
       on physically plausible data only.
     """
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -236,9 +236,9 @@ def evaluate_xgboost(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Use get_cleaned_actuals_lazy to ensure we have the full evaluation range.
+    # Use get_cleaned_power_time_series_lazy to ensure we have the full evaluation range.
     # This function serves as the single source of truth for accessing cleaned actuals.
-    power_time_series = get_cleaned_actuals_lazy(settings, context)
+    power_time_series = get_cleaned_power_time_series_lazy(settings, context)
 
     # Identify healthy substations using lazy evaluation to avoid massive eager collection
     healthy_time_series = (

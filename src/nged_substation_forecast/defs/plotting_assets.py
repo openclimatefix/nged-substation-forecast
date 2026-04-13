@@ -7,7 +7,7 @@ import polars as pl
 from contracts.settings import Settings
 from dagster import ResourceParam
 
-from .data_cleaning_assets import get_cleaned_actuals_lazy, get_raw_power_time_series_lazy
+from .data_cleaning_assets import get_cleaned_power_time_series_lazy, get_raw_power_time_series_lazy
 
 
 class PlotConfig(dg.Config):
@@ -21,7 +21,7 @@ class PlotConfig(dg.Config):
     ins={
         "predictions": dg.AssetIn("evaluate_xgboost"),
     },
-    deps=["cleaned_actuals"],
+    deps=["cleaned_power_time_series"],
     compute_kind="python",
     group_name="plots",
 )
@@ -34,8 +34,8 @@ def forecast_vs_actual_plot(
     """Generates an Altair plot comparing forecast vs actuals."""
 
     # Empty Data Guard: Before performing any timestamp arithmetic, check if data is present.
-    # We use get_cleaned_actuals_lazy to ensure we have the full history required for the plot.
-    # This function serves as the single source of truth for accessing cleaned actuals.
+    # We use get_cleaned_power_time_series_lazy to ensure we have the full history required for the plot.
+    # This function serves as the single source of truth for accessing cleaned power time series.
     if predictions.is_empty():
         context.log.warning("Empty predictions, skipping plot.")
         return
@@ -51,13 +51,15 @@ def forecast_vs_actual_plot(
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
-    cleaned_actuals_lazy = get_cleaned_actuals_lazy(settings, context)
+    cleaned_power_time_series_lazy = get_cleaned_power_time_series_lazy(settings, context)
     raw_power_lazy = get_raw_power_time_series_lazy(settings, context)
 
     # Filter actuals and raw by substation.
     actuals_30m = cast(
         pl.DataFrame,
-        cleaned_actuals_lazy.filter(pl.col("time_series_id").is_in(pred_time_series_ids)).collect(),
+        cleaned_power_time_series_lazy.filter(
+            pl.col("time_series_id").is_in(pred_time_series_ids)
+        ).collect(),
     )
     raw_30m = cast(
         pl.DataFrame,
