@@ -71,11 +71,12 @@ def train_and_log_model(
             sliced_data["time_series_metadata"] = val
             continue
 
-        time_col = "period_end_time" if "power_flows" in key else "valid_time"
+        # Fix time_col to handle power_time_series
+        time_col = "period_end_time" if "power" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = train_start
-        if "power_flows" in key or "nwps" in key:
+        if "power" in key or "nwps" in key:
             lookback = getattr(config.model, "required_lookback_days", 14)
             slice_start = train_start - timedelta(days=lookback)
 
@@ -133,17 +134,26 @@ def evaluate_and_save_model(
             sliced_data[key] = val
             continue
 
-        # TODO: This function should never be called with `power_flows`. That's a hang-over from
-        # when we used a `SubstationPowerFlows` data contract, instead of the new `PowerTimeSeries`.
-        time_col = "period_end_time" if "power_flows" in key else "valid_time"
+        # Fix time_col to handle power_time_series
+        time_col = "period_end_time" if "power" in key else "valid_time"
 
         # Add a configurable lookback for autoregressive features
         slice_start = test_start
-        if "power_flows" in key or "nwps" in key:
+        if "power" in key or "nwps" in key:
             lookback = getattr(config.model, "required_lookback_days", 14)
             slice_start = test_start - timedelta(days=lookback)
 
-        sliced_data[key] = _slice_temporal_data(val, slice_start, test_end, time_col)
+        # Extend slice_end for NWPs to allow forecasting beyond test_end
+        # We extend the NWP data slice to include future weather data, enabling the model
+        # to generate forecasts beyond the test period. The evaluation remains restricted
+        # to the test period because the actuals (power_time_series) are still sliced
+        # to test_end, and the inner join with actuals naturally drops future predictions.
+        slice_end = test_end
+        if "nwps" in key:
+            forecast_horizon = getattr(config.model, "forecast_horizon_days", 14)
+            slice_end = test_end + timedelta(days=forecast_horizon)
+
+        sliced_data[key] = _slice_temporal_data(val, slice_start, slice_end, time_col)
 
     # 2. Call the Model-Specific Inference
     # Extract the actual init_time from the provided nwps data

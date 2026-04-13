@@ -50,12 +50,21 @@ def forecast_vs_actual_plot(
     )
 
     # Keep actuals lazy and filter by substation first to avoid eager collection.
+    # We need to ensure we have enough data for the 14-day plot.
+    # We calculate the required start time based on the predictions.
+    max_pred_time = predictions.get_column("valid_time").max()
+
+    # We need data from at least 14 days before the max_pred_time to ensure we have
+    # enough actuals for the comparison.
+    required_start_time = cast(datetime, max_pred_time) - timedelta(days=14)
+
     cleaned_power_time_series_lazy = scan_delta_table(
         str(settings.nged_data_path / "delta" / "cleaned_power_time_series")
-    )
+    ).filter(pl.col("period_end_time") >= required_start_time)
+
     raw_power_lazy = scan_delta_table(
         str(settings.nged_data_path / "delta" / "raw_power_time_series")
-    )
+    ).filter(pl.col("period_end_time") >= required_start_time)
 
     # Filter actuals and raw by substation.
     actuals_30m = cast(
