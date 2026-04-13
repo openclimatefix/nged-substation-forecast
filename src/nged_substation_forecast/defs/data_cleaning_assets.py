@@ -66,7 +66,7 @@ def _get_delta_path(settings: Settings, table_name: str) -> str:
 def cleaned_power_time_series(
     context: dg.AssetExecutionContext,
     settings: ResourceParam[Settings],
-) -> pt.DataFrame:
+) -> pt.DataFrame[PowerTimeSeries]:
     """Clean raw power time series and apply data quality checks.
 
     This asset manually scans the raw power time series Delta table for the current partition
@@ -87,7 +87,7 @@ def cleaned_power_time_series(
         settings: Global settings containing data quality thresholds.
 
     Returns:
-        MaterializeResult containing metadata about the cleaned data.
+        A Patito DataFrame validated against the PowerTimeSeries schema.
     """
     # Use the shared helper to get the partition window with a 1-day lookback.
     partition_start, partition_end, lookback_start = get_partition_window(
