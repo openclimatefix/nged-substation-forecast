@@ -48,28 +48,28 @@ from .partitions import DAILY_PARTITIONS
 
 
 def _process_cleaned_partition(
-    raw_flows: pl.DataFrame,
+    raw_power_time_series: pt.DataFrame[PowerTimeSeries],
     settings: Settings,
     partition_start: datetime,
     partition_end: datetime,
-) -> pl.DataFrame:
+) -> pt.DataFrame[PowerTimeSeries]:
     """Process and validate a partition of raw power time series data.
 
     This helper separates the core data transformation and validation logic from
     the Dagster asset I/O and partitioning orchestration.
 
     Args:
-        raw_flows: The raw power time series data to process.
+        raw_power_time_series: The raw power time series data to process.
         settings: Global settings containing data quality thresholds.
         partition_start: Start of the partition window.
         partition_end: End of the partition window.
 
     Returns:
-        A cleaned and validated Polars DataFrame.
+        A cleaned and validated Patito DataFrame.
     """
     # Clean the data using the shared cleaning module
     df_cleaned = clean_power_time_series(
-        raw_flows,
+        raw_power_time_series,
         stuck_std_threshold=settings.data_quality.stuck_std_threshold,
         min_mw_threshold=settings.data_quality.min_mw_threshold,
         max_mw_threshold=settings.data_quality.max_mw_threshold,
@@ -200,7 +200,10 @@ def cleaned_power_time_series(
 
     # Clean, validate, and filter the data using the helper
     validated_df = _process_cleaned_partition(
-        df_joined_materialized, settings, partition_start, partition_end
+        cast(pt.DataFrame[PowerTimeSeries], df_joined_materialized),
+        settings,
+        partition_start,
+        partition_end,
     )
 
     context.log.info(
