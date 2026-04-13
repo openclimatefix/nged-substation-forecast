@@ -315,9 +315,9 @@ def test_train_xgboost_asset_filters_to_control_member(tmp_path):
 
     # Write flows to Delta as the asset now loads from Delta
     delta_dir = tmp_path / "delta"
-    cleaned_actuals_path = delta_dir / "cleaned_actuals"
-    cleaned_actuals_path.mkdir(parents=True)
-    flows.write_delta(str(cleaned_actuals_path))
+    cleaned_power_time_series_path = delta_dir / "cleaned_power_time_series"
+    cleaned_power_time_series_path.mkdir(parents=True)
+    flows.write_delta(str(cleaned_power_time_series_path))
 
     # Create time series metadata
     metadata = pl.DataFrame(

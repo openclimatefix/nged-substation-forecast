@@ -46,12 +46,12 @@ def test_xgboost_dagster_assets_materialize_with_dummy_data(tmp_path: Path):
     # Write flows to Delta as the asset now loads from Delta
     delta_dir = tmp_path / "delta"
     raw_flows_path = delta_dir / "raw_power_time_series"
-    cleaned_actuals_path = delta_dir / "cleaned_actuals"
+    cleaned_power_time_series_path = delta_dir / "cleaned_power_time_series"
     raw_flows_path.mkdir(parents=True)
-    cleaned_actuals_path.mkdir(parents=True)
+    cleaned_power_time_series_path.mkdir(parents=True)
 
     sub_flows.write_delta(str(raw_flows_path))
-    sub_flows.write_delta(str(cleaned_actuals_path))
+    sub_flows.write_delta(str(cleaned_power_time_series_path))
 
     settings = Settings(nged_data_path=tmp_path)
 
