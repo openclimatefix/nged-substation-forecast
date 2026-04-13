@@ -19,27 +19,54 @@ from nged_data import (
     load_nged_json,
     upsert_metadata,
 )
+from nged_substation_forecast.utils import filter_new_delta_records
+
+
+def process_nged_json_file(
+    json_file: Path,
+    metadata_path: Path,
+    context: AssetExecutionContext,
+) -> pt.DataFrame[PowerTimeSeries]:
+    """Processes a single NGED JSON file: loads, upserts metadata, and validates.
+
+    This helper function centralizes the ingestion logic for NGED JSON files,
+    ensuring consistent metadata handling and strict data validation.
+    If validation fails, it logs the error and raises a RuntimeError to
+    prevent the pipeline from proceeding with invalid data.
+    """
+    context.log.info(f"Processing {json_file.name}")
+    metadata_df, time_series_df = load_nged_json(json_file)
+
+    # Upsert metadata
+    upsert_metadata(metadata_df, metadata_path)
+
+    # Validate raw data
+    try:
+        validated_df = PowerTimeSeries.validate(time_series_df)
+    except ValueError as e:
+        context.log.error(f"Validation failed for {json_file.name}: {e}")
+        raise RuntimeError(f"Failed to validate {json_file.name}") from e
+
+    return pt.DataFrame[PowerTimeSeries](validated_df)
 
 
 @asset(group_name="NGED_JSON")
 def nged_json_archive_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
     """One-off historical backfill of NGED JSON data."""
     json_dir = settings.nged_data_path / "json" / "archive"
+    metadata_path = settings.nged_data_path / "metadata" / "json_metadata"
+    delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
 
     for json_file in json_dir.glob("*.json"):
-        metadata_df, time_series_df = load_nged_json(json_file)
-
-        # Upsert metadata
-        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
-
-        # Validate raw data
-        validated_df = PowerTimeSeries.validate(time_series_df)
+        validated_df = process_nged_json_file(json_file, metadata_path, context)
 
         # Append to delta
-        validated_df = validated_df.unique(subset=["time_series_id", "period_end_time"])
+        validated_df = pt.DataFrame[PowerTimeSeries](
+            validated_df.unique(subset=["time_series_id", "period_end_time"])
+        )
         append_to_delta(
-            pt.DataFrame[PowerTimeSeries](validated_df),
-            settings.nged_data_path / "delta" / "raw_power_time_series",
+            validated_df,
+            delta_path,
         )
 
     context.log.info("Finished processing archive JSON data.")
@@ -60,38 +87,24 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
     # Assuming there's a directory with JSON files for the current partition
     partition_date = context.partition_time_window.start
     json_dir = settings.nged_data_path / "json" / "live" / partition_date.strftime("%Y-%m-%d-%H")
+    metadata_path = settings.nged_data_path / "metadata" / "json_metadata"
+    delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
 
     cleaned_dfs = []
     for json_file in json_dir.glob("*.json"):
-        metadata_df, time_series_df = load_nged_json(json_file)
-
-        # Upsert metadata
-        upsert_metadata(metadata_df, settings.nged_data_path / "metadata" / "json_metadata")
-
-        # Validate raw data
-        validated_df = PowerTimeSeries.validate(time_series_df)
+        validated_df = process_nged_json_file(json_file, metadata_path, context)
         cleaned_dfs.append(validated_df)
 
     if cleaned_dfs:
         # Combine all validated dataframes
         combined_df = pl.concat(cleaned_dfs).unique(subset=["time_series_id", "period_end_time"])
 
-        delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
+        # Use the new utility function to ensure idempotency
+        combined_df = filter_new_delta_records(
+            pt.DataFrame[PowerTimeSeries](combined_df), delta_path
+        )
 
-        # 1. Read the existing raw_power_time_series Delta table.
-        if delta_path.exists():
-            # 2. Find the maximum period_end_time in the existing data.
-            # Read only period_end_time for efficiency.
-            existing_df = pl.read_delta(str(delta_path), columns=["period_end_time"])
-
-            if not existing_df.is_empty():
-                max_timestamp = existing_df["period_end_time"].max()
-
-                # 3. Filter the incoming combined_df to only include rows with period_end_time strictly greater than the maximum timestamp found.
-                combined_df = combined_df.filter(pl.col("period_end_time") > max_timestamp)
-
-        # 4. Append only the filtered, new data to the Delta table.
-        # 5. Handle the case where the Delta table is empty (implicitly handled by the if delta_path.exists() and if not existing_df.is_empty() checks).
+        # Append only the filtered, new data to the Delta table.
         if not combined_df.is_empty():
             append_to_delta(
                 pt.DataFrame[PowerTimeSeries](combined_df),
@@ -106,6 +119,8 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
     """Ingest the 33 NGED JSON files provided via SharePoint."""
     # Hardcoded path for the specific SharePoint drop
     json_dir = Path("data/NGED/from_sharepoint/OneDrive_1_4-8-2026/1451606400000_1774512000000/")
+    metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
 
     if not json_dir.exists():
         context.log.warning(f"Directory {json_dir} does not exist. Skipping ingestion.")
@@ -114,26 +129,16 @@ def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: Resourc
     for json_file in json_dir.glob("TimeSeries_*.json"):
         if "cleaned" in json_file.name:
             continue
-        context.log.info(f"Processing {json_file.name}")
-        metadata_df, time_series_df = load_nged_json(json_file)
 
-        # Upsert metadata to Parquet
-        upsert_metadata(
-            metadata_df, settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
-        )
-
-        # Validate raw data
-        try:
-            validated_df = PowerTimeSeries.validate(time_series_df)
-        except ValueError as e:
-            context.log.warning(f"Skipping {json_file.name} due to: {e}")
-            continue
+        validated_df = process_nged_json_file(json_file, metadata_path, context)
 
         # Append to Delta table
-        validated_df = validated_df.unique(subset=["time_series_id", "period_end_time"])
+        validated_df = pt.DataFrame[PowerTimeSeries](
+            validated_df.unique(subset=["time_series_id", "period_end_time"])
+        )
         append_to_delta(
-            pt.DataFrame[PowerTimeSeries](validated_df),
-            settings.nged_data_path / "delta" / "raw_power_time_series",
+            validated_df,
+            delta_path,
         )
 
     context.log.info("Finished processing SharePoint JSON data.")
