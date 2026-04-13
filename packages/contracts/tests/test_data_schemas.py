@@ -267,6 +267,72 @@ def test_time_series_metadata_uniqueness():
         TimeSeriesMetadata.validate(df)
 
 
+def test_time_series_metadata_validation_success():
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time_series_name": ["Test Asset"],
+            "time_series_type": ["PV"],
+            "units": ["MW"],
+            "licence_area": ["EMids"],
+            "substation_number": [1],
+            "substation_type": ["Primary"],
+            "latitude": [50.0],
+            "longitude": [0.0],
+            "h3_res_5": [12345],
+        }
+    ).cast(
+        {
+            "time_series_id": pl.Int32,
+            "time_series_name": pl.String,
+            "time_series_type": pl.String,
+            "units": pl.String,
+            "licence_area": pl.String,
+            "substation_number": pl.Int32,
+            "substation_type": pl.Categorical,
+            "latitude": pl.Float32,
+            "longitude": pl.Float32,
+            "h3_res_5": pl.UInt64,
+        }
+    )
+
+    # Should pass
+    TimeSeriesMetadata.validate(df)
+
+
+def test_time_series_metadata_validation_missing_substation_number():
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time_series_name": ["Test Asset"],
+            "time_series_type": ["PV"],
+            "units": ["MW"],
+            "licence_area": ["EMids"],
+            # "substation_number" is missing
+            "substation_type": ["Primary"],
+            "latitude": [50.0],
+            "longitude": [0.0],
+            "h3_res_5": [12345],
+        }
+    ).cast(
+        {
+            "time_series_id": pl.Int32,
+            "time_series_name": pl.String,
+            "time_series_type": pl.String,
+            "units": pl.String,
+            "licence_area": pl.String,
+            "substation_type": pl.Categorical,
+            "latitude": pl.Float32,
+            "longitude": pl.Float32,
+            "h3_res_5": pl.UInt64,
+        }
+    )
+
+    # Should fail
+    with pytest.raises(DataFrameValidationError):
+        TimeSeriesMetadata.validate(df)
+
+
 def test_nwp_uniqueness():
     init_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
     valid_time = datetime(2026, 1, 1, 1, tzinfo=timezone.utc)
