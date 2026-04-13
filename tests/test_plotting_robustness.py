@@ -8,7 +8,7 @@ import dagster as dg
 
 
 @patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
-@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_actuals_lazy")
+@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_power_time_series_lazy")
 def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parquet):
     """Test that the forecast vs actual plot asset doesn't crash with many actuals."""
     # Mock predictions for only 1 substation
@@ -84,7 +84,7 @@ def test_forecast_vs_actual_plot_filters_actuals(mock_get_lazy, mock_read_parque
 
 
 @patch("src.nged_substation_forecast.defs.plotting_assets.pl.read_parquet")
-@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_actuals_lazy")
+@patch("src.nged_substation_forecast.defs.plotting_assets.get_cleaned_power_time_series_lazy")
 def test_forecast_vs_actual_plot_handles_no_overlap(mock_get_lazy, mock_read_parquet):
     predictions = pl.DataFrame(
         {
