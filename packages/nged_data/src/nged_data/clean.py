@@ -1,6 +1,5 @@
 import polars as pl
 import patito as pt
-import dagster
 from contracts.data_schemas import PowerTimeSeries
 
 
@@ -17,10 +16,7 @@ def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFram
     # 6 hours = 12 periods of 30 minutes.
     # We fill nulls with a small value to prevent artificial drops to zero at partition boundaries.
     return df.with_columns(
-        rolling_variance=pl.col("power")
-        .rolling_var(window_size=12)
-        .fill_null(1.0)
-        .over("time_series_id")
+        rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
     )
 
 
