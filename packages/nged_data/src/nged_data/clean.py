@@ -13,8 +13,7 @@ def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries
 
 def calculate_rolling_variance(df: pt.DataFrame[PowerTimeSeries]) -> pl.DataFrame:
     """Calculates rolling variance over a 6-hour window per time_series_id."""
-    # 6 hours = 12 periods of 30 minutes.
-    # We fill nulls with a small value to prevent artificial drops to zero at partition boundaries.
+    # 6 hours = 12 periods of 30 minutes
     return df.with_columns(
         rolling_variance=pl.col("power").rolling_var(window_size=12).over("time_series_id")
     )
@@ -62,7 +61,8 @@ def clean_power_time_series(
     df = calculate_rolling_variance(df)
 
     # Find the first index where rolling variance exceeds the threshold
-    valid_rows = df.filter(pl.col("rolling_variance") > threshold)
+    # We fill nulls with a small value to prevent artificial drops to zero at partition boundaries.
+    valid_rows = df.filter(pl.col("rolling_variance").fill_null(0) > threshold)
 
     if valid_rows.is_empty():
         raise ValueError("All rows were removed after filtering by variance threshold.")
@@ -82,8 +82,10 @@ def clean_power_time_series(
     # Note: The original cleaning.py used "time_series_id" for rolling_std.
     # Assuming "time_series_id" is the equivalent here.
 
+    # We fill nulls with a large value to prevent artificial drops to zero at partition boundaries.
     stuck_mask = (
-        pl.col("power").rolling_std(48).fill_null(0).over("time_series_id") < stuck_std_threshold
+        pl.col("power").rolling_std(48).over("time_series_id").fill_null(stuck_std_threshold + 1)
+        < stuck_std_threshold
     )
     insane_mask = (pl.col("power") < min_mw_threshold) | (pl.col("power") > max_mw_threshold)
 

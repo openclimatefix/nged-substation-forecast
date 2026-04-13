@@ -113,6 +113,7 @@ def test_cleaned_actuals_idempotency(tmp_path: Path):
         df_result = pl.read_delta(str(cleaned_actuals_path)).sort(
             ["time_series_id", "period_end_time"]
         )
+        print(df_result)
         assert len(df_result) > 0
         assert df_result["power"][0] == 10.0
 

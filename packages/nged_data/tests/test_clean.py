@@ -137,3 +137,40 @@ def test_clean_power_time_series_keeps_valid_zero_power():
     # We only check after the first 48 periods to avoid the fill_null(0) issue
     assert (cleaned_df["power"][48:] == 0.0).any()
     assert cleaned_df["power"][48:].null_count() == 0
+
+
+def test_clean_power_time_series_handles_partition_boundary():
+    # Create dummy data with 60 periods
+    start_time = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    num_periods = 60
+    # Power values: 0.0, 1.0, 0.0, 1.0... (high variance)
+    power_values = [float(i % 2) for i in range(num_periods)]
+    data = {
+        "time_series_id": [1] * num_periods,
+        "period_end_time": [start_time + timedelta(minutes=30 * i) for i in range(num_periods)],
+        "power": power_values,
+    }
+    df = pl.DataFrame(data).with_columns(
+        pl.col("time_series_id").cast(pl.Int32),
+        pl.col("period_end_time").cast(pl.Datetime(time_unit="us", time_zone="UTC")),
+        pl.col("power").cast(pl.Float32),
+    )
+
+    # Call clean_power_time_series
+    # Set thresholds such that it's not "stuck" and not "insane"
+    # stuck_std_threshold = 0.1
+    # min_mw_threshold = -1.0
+    # max_mw_threshold = 2.0
+    # default_threshold = 0.0 (keep all rows)
+
+    cleaned_df = clean_power_time_series(
+        df,
+        stuck_std_threshold=0.1,
+        min_mw_threshold=-1.0,
+        max_mw_threshold=2.0,
+        default_threshold=0.0,
+    )
+
+    # Check that the first 48 periods are not null
+    assert cleaned_df["power"].null_count() == 0
+    assert len(cleaned_df) == 49
