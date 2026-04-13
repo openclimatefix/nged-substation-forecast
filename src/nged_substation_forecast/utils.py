@@ -8,7 +8,10 @@ from typing import cast
 
 def scan_delta_table(delta_path: str) -> pt.LazyFrame[PowerTimeSeries]:
     """Scan a Delta table."""
-    return cast(pt.LazyFrame[PowerTimeSeries], pl.scan_delta(delta_path))
+    # Use from_existing and set_model to ensure the returned object is strictly
+    # a Patito LazyFrame with the correct schema attached, satisfying both
+    # runtime and static type checking.
+    return pt.LazyFrame.from_existing(pl.scan_delta(delta_path)).set_model(PowerTimeSeries)
 
 
 def get_partition_window(
