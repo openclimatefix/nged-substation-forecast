@@ -1,6 +1,6 @@
 import logging
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import cast
 
@@ -15,8 +15,13 @@ from nged_substation_forecast.definitions import defs
 
 
 def get_test_config(
-    settings, time_series_ids, train_start, train_end, test_start, test_end, plot_path
-):
+    time_series_ids: list[int],
+    train_start: date,
+    train_end: date,
+    test_start: date,
+    test_end: date,
+    plot_path: Path,
+) -> dict:
     """Generate run configuration for the integration test."""
     return {
         "ops": {
@@ -236,7 +241,7 @@ def test_xgboost_dagster_integration(tmp_path: Path) -> None:
 
         # Provide run configuration
         run_config = get_test_config(
-            settings, time_series_ids, train_start, train_end, test_start, test_end, plot_path
+            time_series_ids, train_start, train_end, test_start, test_end, plot_path
         )
 
         #  Execute the job in-process
