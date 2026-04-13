@@ -15,15 +15,16 @@ def get_partition_window(
     partition_key: str, lookback_days: int = 1
 ) -> tuple[datetime, datetime, datetime]:
     """Get the partition window with a lookback."""
-    # Try parsing with different formats
-    try:
+    if len(partition_key) == 10:  # YYYY-MM-DD
+        partition_date = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        partition_end = partition_date + timedelta(days=1)
+    elif len(partition_key) == 16:  # YYYY-MM-DD-HH:MM
         partition_date = datetime.strptime(partition_key, "%Y-%m-%d-%H:%M").replace(
             tzinfo=timezone.utc
         )
         partition_end = partition_date + timedelta(hours=6)
-    except ValueError:
-        partition_date = datetime.strptime(partition_key, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        partition_end = partition_date + timedelta(days=1)
+    else:
+        raise ValueError(f"Unsupported partition_key format: {partition_key}")
 
     partition_start = partition_date
     lookback_start = partition_date - timedelta(days=lookback_days)
