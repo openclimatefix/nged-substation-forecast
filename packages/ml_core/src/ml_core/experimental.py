@@ -2,13 +2,16 @@
 
 import logging
 from collections.abc import Mapping
+from typing import Any, cast
 
 import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
-    SubstationMetadata,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
 from ml_core.model import BaseForecaster
@@ -17,10 +20,10 @@ log = logging.getLogger(__name__)
 
 
 class LocalForecasters(BaseForecaster):
-    """Trains and manages a separate BaseForecaster per substation.
+    """Trains and manages a separate BaseForecaster per time series.
 
     This class implements the BaseForecaster interface by delegating to
-    individual forecaster instances for each substation.
+    individual forecaster instances for each time series.
     """
 
     def __init__(self, forecaster_cls: type[BaseForecaster], **forecaster_kwargs):
@@ -32,61 +35,64 @@ class LocalForecasters(BaseForecaster):
         """
         self.forecaster_cls = forecaster_cls
         self.forecaster_kwargs = forecaster_kwargs
-        self.models: dict[int, BaseForecaster] = {}
+        self.models: dict[int | str, BaseForecaster] = {}
 
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
-    ) -> "LocalForecasters":
-        """Train a separate model for each substation.
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
+    ) -> Any:
+        """Train a separate model for each time series.
 
         Args:
             config: Model configuration object.
-            flows_30m: Historical power flow data downsampled to 30m.
-            substation_metadata: The substation metadata.
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements).
+            time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
         Returns:
             The trained local forecasters instance.
         """
-        substations = substation_metadata["substation_number"].unique().to_list()
-        log.info(f"Training local models for {len(substations)} substations...")
+        time_series_ids = time_series_metadata["time_series_id"].unique().to_list()
+        log.info(f"Training local models for {len(time_series_ids)} time series...")
 
         # TODO: Implement parallelization of this sequential loop
-        for sub_num in substations:
-            log.debug(f"Training model for substation {sub_num}")
-            sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
-            sub_flows = flows_30m.filter(pl.col("substation_number") == sub_num)
+        for ts_id in time_series_ids:
+            log.debug(f"Training model for time series {ts_id}")
+            ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
+            ts_flows = cast(
+                pt.LazyFrame[PowerTimeSeries],
+                power_time_series.filter(pl.col("time_series_id") == ts_id),
+            )
 
             # Instantiate and train
             model = self.forecaster_cls(**self.forecaster_kwargs)
-            model.train(
+            model.fit(
                 config=config,
-                flows_30m=sub_flows,
-                substation_metadata=sub_meta,
-                nwps=nwps,
+                power_time_series=ts_flows,
+                time_series_metadata=ts_meta,
+                nwps=nwps if nwps is not None else None,
             )
-            self.models[sub_num] = model
+            self.models[ts_id] = model
 
         return self
 
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
+        power_time_series: pl.LazyFrame,
         nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts by routing to local models.
 
         Args:
-            substation_metadata: The substation metadata.
+            time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
-            flows_30m: Historical power flow data downsampled to 30m (for lags).
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements, used for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 
@@ -94,23 +100,28 @@ class LocalForecasters(BaseForecaster):
             A concatenated Patito DataFrame of PowerForecasts.
         """
         all_preds = []
-        substations = substation_metadata["substation_number"].unique().to_list()
+        time_series_ids = time_series_metadata["time_series_id"].unique().to_list()
 
-        for sub_num in substations:
-            if sub_num not in self.models:
-                log.warning(f"No model found for substation {sub_num}. Skipping.")
+        for ts_id in time_series_ids:
+            if ts_id not in self.models:
+                log.warning(f"No model found for time series {ts_id}. Skipping.")
                 continue
 
-            sub_meta = substation_metadata.filter(pl.col("substation_number") == sub_num)
+            ts_meta = time_series_metadata.filter(pl.col("time_series_id") == ts_id)
 
             # Filter inputs
-            sub_flows = flows_30m.filter(pl.col("substation_number") == sub_num)
+            ts_flows = cast(
+                pt.LazyFrame[PowerTimeSeries],
+                power_time_series.filter(pl.col("time_series_id") == ts_id),
+            )
 
-            preds = self.models[sub_num].predict(
-                substation_metadata=sub_meta,
+            preds = self.models[ts_id].predict(
+                time_series_metadata=ts_meta,
                 inference_params=inference_params,
-                flows_30m=sub_flows,
-                nwps=nwps,
+                power_time_series=ts_flows,
+                nwps={k: pt.LazyFrame[Nwp](v) for k, v in nwps.items()}
+                if nwps is not None
+                else None,
                 collapse_lead_times=collapse_lead_times,
             )
             all_preds.append(preds)

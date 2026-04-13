@@ -51,9 +51,6 @@ mlflow.db.bak
 #######################
 # opencode agents
 
-# Implementation plans and code reviews.
-docs/temp/
-
 # opencode's exploration scripts to test functionality
 exploration_scripts/
 

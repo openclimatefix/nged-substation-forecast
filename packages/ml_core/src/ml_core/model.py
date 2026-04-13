@@ -5,12 +5,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any
 
-import polars as pl
 import patito as pt
 from contracts.data_schemas import (
     InferenceParams,
+    Nwp,
     PowerForecast,
-    SubstationMetadata,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
 )
 from contracts.hydra_schemas import ModelConfig, NwpModel
 
@@ -29,19 +30,19 @@ class BaseForecaster(ABC):
     """
 
     @abstractmethod
-    def train(
+    def fit(
         self,
         config: ModelConfig,
-        flows_30m: pl.LazyFrame,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
     ) -> Any:
         """Train the model.
 
         Args:
             config: Model configuration object.
-            flows_30m: Historical power flow data downsampled to 30m.
-            substation_metadata: The substation metadata.
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements).
+            time_series_metadata: The time series metadata.
             nwps: A dictionary of weather forecast dataframes.
 
         Returns:
@@ -52,18 +53,18 @@ class BaseForecaster(ABC):
     @abstractmethod
     def predict(
         self,
-        substation_metadata: pt.DataFrame[SubstationMetadata],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         inference_params: InferenceParams,
-        flows_30m: pl.LazyFrame,
-        nwps: Mapping[NwpModel, pl.LazyFrame] | None = None,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        nwps: Mapping[NwpModel, pt.LazyFrame[Nwp]] | None = None,
         collapse_lead_times: bool = False,
     ) -> pt.DataFrame[PowerForecast]:
         """Generate power forecasts.
 
         Args:
-            substation_metadata: The substation metadata.
+            time_series_metadata: The time series metadata.
             inference_params: Parameters for inference.
-            flows_30m: Historical power flow data downsampled to 30m (for lags).
+            power_time_series: Historical power flow data at 30m resolution (source of truth for historical power measurements, used for lags).
             nwps: A dictionary of weather forecast dataframes.
             collapse_lead_times: Whether to collapse lead times (used in backtesting).
 

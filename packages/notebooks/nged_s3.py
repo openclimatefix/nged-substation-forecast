@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.22.5"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -72,8 +72,27 @@ def _(timeseries_df):
 
 
 @app.cell
-def _():
+def _(files):
+    json_files = [f.path for f in files if f.path.endswith(".json")]
+    print(f"Found {len(json_files)} JSON files.")
+    for json_file in json_files[:5]:
+        print(json_file)
     return
+
+
+app._unparsable_cell(
+    r"""
+    if json_files:
+        # Read the first JSON file
+        _result = store.get(json_files[0])
+        # Assuming it's a standard JSON file
+        json_df = pl.read_json(BytesIO(_result.bytes()))
+        print(f"Successfully read {json_files[0]}")
+        print(json_df.head())
+        return (json_df,)
+    """,
+    name="_",
+)
 
 
 if __name__ == "__main__":

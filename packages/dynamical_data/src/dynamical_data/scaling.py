@@ -1,18 +1,22 @@
 from pathlib import Path
 
+import patito as pt
 import polars as pl
+from contracts.data_schemas import Nwp, ScalingParams
 
 
-def load_scaling_params(csv_path: Path) -> pl.DataFrame:
+def load_scaling_params(csv_path: Path) -> pt.DataFrame[ScalingParams]:
     """Load scaling parameters from a CSV file."""
-    return pl.read_csv(csv_path)
+    return ScalingParams.validate(pl.read_csv(csv_path))
 
 
-def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFrame:
+def scale_to_uint8(
+    df: pt.DataFrame[Nwp], scaling_params: pt.DataFrame[ScalingParams]
+) -> pl.DataFrame:
     """Scale numeric columns to uint8 [0, 255] based on scaling parameters.
 
     Args:
-        df: Polars DataFrame with float32 columns.
+        df: Patito DataFrame with float32 columns.
         scaling_params: DataFrame with col_name, buffered_min, buffered_range.
 
     Returns:
@@ -53,7 +57,9 @@ def scale_to_uint8(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFra
     return df.with_columns(exprs)
 
 
-def recover_physical_units(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl.DataFrame:
+def recover_physical_units(
+    df: pl.DataFrame, scaling_params: pt.DataFrame[ScalingParams]
+) -> pt.DataFrame[Nwp]:
     """Convert uint8 columns back to physical units.
 
     DATA TYPE TRANSITION RATIONALE:
@@ -95,4 +101,4 @@ def recover_physical_units(df: pl.DataFrame, scaling_params: pl.DataFrame) -> pl
 
         exprs.append(expr)
 
-    return df.with_columns(exprs)
+    return Nwp.validate(df.with_columns(exprs))

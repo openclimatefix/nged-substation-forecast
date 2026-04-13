@@ -2,16 +2,19 @@
 
 import logging
 from datetime import timedelta
+from typing import cast
 
 import polars as pl
-
-from contracts.data_schemas import NwpColumns
+import patito as pt
+from contracts.data_schemas import NwpColumns, PowerTimeSeries, ProcessedNwp
 
 log = logging.getLogger(__name__)
 
 
 def add_autoregressive_lags(
-    df: pl.LazyFrame, flows_30m: pl.LazyFrame, telemetry_delay_hours: int = 24
+    df: pl.LazyFrame,
+    power_time_series: pt.LazyFrame[PowerTimeSeries],
+    telemetry_delay_hours: int = 24,
 ) -> pl.LazyFrame:
     """Add autoregressive lags to the feature matrix.
 
@@ -20,12 +23,12 @@ def add_autoregressive_lags(
     would have been available at the time the forecast was made.
 
     Args:
-        df: The input LazyFrame (schema: SubstationFeatures).
-        flows_30m: Historical power flows downsampled to 30m.
+        df: The input LazyFrame (schema: XGBoostInputFeatures).
+        power_time_series: Historical power flows at 30m resolution (source of truth for historical power measurements).
         telemetry_delay_hours: Delay in hours for telemetry availability.
 
     Returns:
-        LazyFrame with added lag features (schema: SubstationFeatures).
+        LazyFrame with added lag features (schema: XGBoostInputFeatures).
     """
     # 1. Calculate the required lag dynamically to strictly prevent lookahead bias
     df = (
@@ -47,15 +50,15 @@ def add_autoregressive_lags(
         )
     )
 
-    # 2. Join flows_30m on ["substation_number", "target_lag_time"] to extract the exact
+    # 2. Join power_time_series on ["time_series_id", "target_lag_time"] to extract the exact
     # latest_available_weekly_power_lag without needing pre-calculated lag_7d or lag_14d columns.
-    lag_df = flows_30m.select(
-        pl.col("substation_number"),
-        pl.col("timestamp").alias("target_lag_time"),
-        pl.col("MW_or_MVA").alias("latest_available_weekly_power_lag"),
+    lag_df = power_time_series.select(
+        pl.col("time_series_id"),
+        pl.col("period_end_time").alias("target_lag_time"),
+        pl.col("power").alias("latest_available_weekly_power_lag"),
     )
 
-    df = df.join(lag_df, on=["substation_number", "target_lag_time"], how="left")
+    df = df.join(lag_df, on=["time_series_id", "target_lag_time"], how="left")
 
     return df
 
@@ -189,20 +192,23 @@ def add_weather_features(
     )
 
 
-def add_time_features(df: pl.LazyFrame) -> pl.LazyFrame:
+def add_time_features(df: pt.LazyFrame[ProcessedNwp]) -> pt.LazyFrame[ProcessedNwp]:
     """Add lead_time_hours and nwp_init_hour features.
 
     Args:
-        df: The input LazyFrame (schema: SubstationFeatures).
+        df: The input LazyFrame (schema: ProcessedNwp).
 
     Returns:
-        LazyFrame with added time features (schema: SubstationFeatures).
+        LazyFrame with added time features (schema: ProcessedNwp).
     """
 
-    return df.with_columns(
-        lead_time_hours=(
-            pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
-        ).dt.total_minutes()
-        / 60.0,
-        nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
+    return cast(
+        pt.LazyFrame[ProcessedNwp],
+        df.with_columns(
+            lead_time_hours=(
+                pl.col(NwpColumns.VALID_TIME) - pl.col(NwpColumns.INIT_TIME)
+            ).dt.total_minutes()
+            / 60.0,
+            nwp_init_hour=pl.col(NwpColumns.INIT_TIME).dt.hour().cast(pl.Int32),
+        ),
     )

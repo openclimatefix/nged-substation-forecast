@@ -15,43 +15,16 @@ if TYPE_CHECKING:
 # Define our standard datetime type for all schemas
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
-POWER_MW = "MW"
-POWER_MVA = "MVA"
-POWER_MW_OR_MVA = "MW_or_MVA"
 
-PowerColumn = Literal["MW", "MVA"]
-
-
-class MissingCorePowerVariablesError(ValueError):
-    """Raised when a substation CSV lacks both MW and MVA data."""
-
-    pass
-
-
-class SubstationPowerFlows(pt.Model):
-    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-
-    # The unique identifier for the substation.
-    substation_number: int = pt.Field(dtype=pl.Int32)
-
-    # Primary substations usually have flows in the tens of MW.
-    # We'll set a loose range for now to catch extreme errors.
-    # If we want to reduce storage space we could store kW and kVAr as Int16.
-
-    # Active power:
-    MW: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
-
-    # Apparent power:
-    MVA: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
-
-    # Reactive power:
-    MVAr: float | None = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
-
-    # The datetime this data was ingested into our system. When we update our datasets, we examine
-    # `ingested_at` to figure out whether we need to get new data from NGED for this substation.
-    # `ingested_at` is only missing for data ingested before around mid-March 2026 (prior to this,
-    # we didn't record when the data was ingested).
-    ingested_at: datetime | None = pt.Field(dtype=UTC_DATETIME_DTYPE)
+class PowerTimeSeries(pt.Model):
+    time_series_id: int = pt.Field(dtype=pl.Int32)
+    # period_end_time represents the end of the 30-minute settlement period.
+    period_end_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description="The end time of the 30-minute period. Note that all the JSON time series data is already 30-minutely.",
+    )
+    # Constrain power values to a physically realistic range of [-1000, 1000] MW/MVA to prevent extreme outliers from affecting downstream models.
+    power: float | None = pt.Field(dtype=pl.Float32, ge=-1000, le=1000)
 
     @classmethod
     def validate(
@@ -61,128 +34,147 @@ class SubstationPowerFlows(pt.Model):
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["SubstationPowerFlows"]:
-        """Validate the given dataframe, ensuring either MW or MVA is present and has data.
-
-        NOTE: Fully null DataFrames are allowed to handle edge cases where:
-        1. An entire partition's data was cleaned and all values marked as stuck/insane
-        2. Ingestion failed completely for a partition (empty DataFrame after filtering)
-
-        In these cases, the validation passes through to the parent class which allows
-        null values for the columns. This prevents pipeline crashes from legitimate empty
-        data scenarios. The downstream model training logic will need to handle fully
-        null target variables by either skipping training or using fallback strategies.
-        """
-        # Ensure at least one of MW or MVA has non-null data
-        # Only raise error if there IS data but MW/MVA columns have no non-null values.
-        if len(dataframe) > 0:
-            mw_has_data = POWER_MW in dataframe.columns and dataframe[POWER_MW].is_not_null().any()
-            mva_has_data = (
-                POWER_MVA in dataframe.columns and dataframe[POWER_MVA].is_not_null().any()
-            )
-
-            if not mw_has_data and not mva_has_data:
-                raise MissingCorePowerVariablesError(
-                    f"SubstationPowerFlows dataframe must have non-null data in either '{POWER_MW}' "
-                    f"or '{POWER_MVA}' unless the entire DataFrame is empty (which is allowed for "
-                    "edge cases)."
-                )
-
-        return cast(
-            pt.DataFrame["SubstationPowerFlows"],
-            super().validate(
-                dataframe=dataframe,
-                columns=columns,
-                allow_missing_columns=allow_missing_columns,
-                allow_superfluous_columns=allow_superfluous_columns,
-                drop_superfluous_columns=drop_superfluous_columns,
-            ),
+    ) -> pt.DataFrame["PowerTimeSeries"]:
+        """Validate the given dataframe, ensuring period_end_time is at :00 or :30 and uniqueness."""
+        validated_df = super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
         )
 
+        # Validate period_end_time is at :00 or :30
+        minutes = validated_df["period_end_time"].dt.minute()
+        if not minutes.is_in([0, 30]).all():
+            raise ValueError(
+                "period_end_time must be at the top or bottom of the hour (minute 00 or 30)."
+            )
 
-class SimplifiedSubstationPowerFlows(pt.Model):
-    """Standardized, single-column representation of power flows.
+        # Validate uniqueness of (time_series_id, period_end_time)
+        if validated_df.select(["time_series_id", "period_end_time"]).is_duplicated().any():
+            raise ValueError("Duplicate entries found for (time_series_id, period_end_time).")
 
-    This model is used after the best available power column (MW or MVA) has been
-    selected and renamed to 'MW_or_MVA'.
-    """
-
-    timestamp: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    substation_number: int = pt.Field(dtype=pl.Int32)
-    MW_or_MVA: float = pt.Field(dtype=pl.Float32, ge=-1_000, le=1_000)
-
-
-class SubstationTargetMap(pt.Model):
-    """Maps substations to their primary power column and stores their peak capacity.
-
-    This model is used to determine whether to use MW or MVA as the target variable
-    for a given substation, and provides the peak capacity for scaling and validation.
-    """
-
-    substation_number: int = pt.Field(dtype=pl.Int32, unique=True)
-    preferred_power_col: PowerColumn = pt.Field(dtype=pl.String)
-    peak_capacity_MW_or_MVA: float = pt.Field(dtype=pl.Float32, gt=0)
+        return cast(pt.DataFrame["PowerTimeSeries"], validated_df)
 
 
-class SubstationLocations(pt.Model):
-    """The data structure of the raw substation location data from NGED."""
+class TimeSeriesMetadata(pt.Model):
+    """Metadata for a time series, joining location data with live telemetry info."""
 
-    # NGED has 192,000 substations.
-    substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
-
-    # The min and max string lengths are actually 3 and 48 chars, respectively.
-    # Note that there are two "Park Lane" substations, with different locations and different
-    # substation numbers.
-    substation_name: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
-
-    substation_type: str = pt.Field(dtype=pl.Categorical)
-    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
-    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-
-
-class SubstationLocationsWithH3(SubstationLocations):
-    """Substation locations including their H3 index."""
-
-    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)
-
-
-class SubstationMetadata(pt.Model):
-    """Metadata for a substation, joining location data with live telemetry info."""
-
-    # NGED has 192,000 substations.
-    substation_number: int = pt.Field(dtype=pl.Int32, unique=True, gt=0, lt=1_000_000)
-
-    # NGED's CKAN portal uses slightly different names for some substations in their location table
-    # versus in their live primary flows data. These names are matched by code in
-    # `packages/nged_data/src/nged_data/substation_names/`
-    substation_name_in_location_table: str = pt.Field(dtype=pl.String, min_length=2, max_length=64)
-
-    # This will be null if the substation doesn't have live telemetry.
-    substation_name_in_live_primaries: str | None = pt.Field(
-        dtype=pl.String, min_length=2, max_length=128, allow_missing=True
+    time_series_id: int = pt.Field(
+        dtype=pl.Int32,
+        unique=True,
+        description=(
+            "Provided by NGED. This is the primary key for identifying the time series."
+            " There's _almost_ a one-to-one mapping between time_series_id and the"
+            " asset ID, so you can think of time_series_id as the asset ID"
+            " (where an 'asset' is a physical asset like a substation or PV farm)"
+        ),
     )
-
-    # The URL to the live telemetry CSV on NGED's CKAN portal.
-    url: str | None = pt.Field(dtype=pl.String, allow_missing=True)
-
-    substation_type: str = pt.Field(dtype=pl.Categorical)
-    latitude: float | None = pt.Field(dtype=pl.Float32, ge=49, le=61)  # UK latitude range
-    longitude: float | None = pt.Field(dtype=pl.Float32, ge=-9, le=2)  # UK longitude range
-    h3_res_5: int | None = pt.Field(dtype=pl.UInt64)  # H3 discrete spatial index
-
-    # When this metadata record was last updated from the upstream NGED datasets.
-    last_updated: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-
-    # A globally computed preference for which power column (MW or MVA) to use, based on full history.
-    # This prioritizes MW but falls back to MVA if MW is unavailable or contains dead sensors.
-    preferred_power_col: str | None = pt.Field(dtype=pl.String, allow_missing=True)
+    time_series_name: str = pt.Field(
+        dtype=pl.String,
+        examples=[
+            "ALFORD 33 11kV S STN",
+            "BAMBERS FARM WIND GENERATION MABLETHORPE 33kV S ST",
+            "Leverton Solar Park",
+        ],
+    )
+    time_series_type: Literal[
+        "BESS",  # Battery energy storage system. Present in trial area
+        "Biofuel",  # Present in trial area
+        "CHP",
+        "Data Centre",
+        # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
+        # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
+        # "Disaggregated Demand" indicates that NGED have already removed any metered generation connected to that primary.
+        "Disaggregated Demand",  # Present in trial area.
+        "Energy from Waste",
+        "EV Charging",
+        "Geothermal",
+        "Hydro",
+        "Hydrogen Electrolysis",
+        "Industrial Demand",
+        "Mixed (Demand)",
+        "Mixed (Generation)",
+        "Other (Demand)",
+        "Other (Generation)",  # Present in trial area
+        "Other (Storage)",
+        "Peaking Plant",
+        "PV",  # Present in trial area
+        "Rail",
+        "Raw Flow",  # Present in trial area
+        "Synchronous Condenser",
+        "Wind",  # Present in trial area
+    ] = pt.Field(dtype=pl.String)
+    units: Literal["MVA", "MW"] = pt.Field(dtype=pl.String)
+    licence_area: Literal["EMids"] = pt.Field(dtype=pl.String)
+    substation_number: int = pt.Field(
+        dtype=pl.Int32,
+        gt=0,
+        lt=1_000_000,
+        description="For customer time series, substation_number is the substation to which that customer is connected.",
+    )
+    substation_type: Literal["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"] = pt.Field(
+        dtype=pl.Categorical
+    )
+    latitude: float = pt.Field(
+        dtype=pl.Float32,
+        ge=49,
+        le=61,  # UK latitude range
+        description=(
+            "For customer time series, the latitude and longitude give the location of the"
+            " _substation_, not the customer's site."
+        ),
+    )
+    longitude: float = pt.Field(
+        dtype=pl.Float32,
+        ge=-9,
+        le=2,  # UK longitude range
+        description=(
+            "For customer time series, the latitude and longitude give the location of the"
+            " _substation_, not the customer's site."
+        ),
+    )
+    information: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description="Always None in the trial area",
+    )
+    area_wkt: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        # Maps to the nested Area.WKT field in the JSON data.
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+            " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
+        ),
+    )
+    area_center_lat: float | None = pt.Field(
+        dtype=pl.Float32,
+        allow_missing=True,
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+        ),
+    )
+    area_center_lon: float | None = pt.Field(
+        dtype=pl.Float32,
+        allow_missing=True,
+        description=(
+            "For customer sites, the area, where present, refers to the area covered by the generator itself."
+        ),
+    )
+    h3_res_5: int = pt.Field(
+        dtype=pl.UInt64,
+        description="H3 spatial index at resolution 5.",
+    )
 
 
 class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts."""
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    substation_number: int = pt.Field(dtype=pl.Int32)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
 
     # The datetime that the underlying weather forecast was initialised.
@@ -205,7 +197,8 @@ class PowerForecast(pt.Model):
     power_fcst_init_year_month: str = pt.Field(dtype=pl.String)
 
     # The power forecast itself in units of MW (active power) or MVA (apparent power).
-    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
+    # The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`.
+    power_fcst: float = pt.Field(dtype=pl.Float32)
 
 
 class ScalingParams(pt.Model):
@@ -279,7 +272,7 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame["Nwp"]:
-        """Validate the given dataframe, ensuring no nulls from second step onwards."""
+        """Validate the given dataframe, ensuring no nulls from second step onwards and uniqueness."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -306,6 +299,16 @@ class Nwp(pt.Model):
                     "step onwards. These variables are only allowed to be null for the first "
                     "forecast step (lead time 0)."
                 )
+
+        # Validate uniqueness of (init_time, valid_time, ensemble_member, h3_index)
+        if (
+            validated_df.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
+            .is_duplicated()
+            .any()
+        ):
+            raise ValueError(
+                "Duplicate entries found for (init_time, valid_time, ensemble_member, h3_index)."
+            )
 
         return cast(pt.DataFrame["Nwp"], validated_df)
 
@@ -363,7 +366,7 @@ class ProcessedNwp(pt.Model):
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
 
-class SubstationFeatures(pt.Model):
+class XGBoostInputFeatures(pt.Model):
     """Final joined dataset ready for XGBoost.
 
     Weather features are kept in their physical units (e.g., degrees Celsius, m/s)
@@ -371,9 +374,11 @@ class SubstationFeatures(pt.Model):
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    substation_number: int = pt.Field(dtype=pl.Int32)
+    # time_series_id is an int32 for memory efficiency and consistency with substation numbers.
+    time_series_id: int = pt.Field(dtype=pl.Int32)
+    time_series_type: str = pt.Field(dtype=pl.Categorical)
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
-    MW_or_MVA: float = pt.Field(dtype=pl.Float32)
+    power: float = pt.Field(dtype=pl.Float32)
     lead_time_hours: float = pt.Field(dtype=pl.Float32)
     lead_time_days: float = pt.Field(dtype=pl.Float32)
     nwp_init_hour: int = pt.Field(dtype=pl.Int32)
@@ -444,3 +449,14 @@ class H3GridWeights(pt.Model):
     len: int = pt.Field(dtype=pl.UInt32)
     total: int = pt.Field(dtype=pl.UInt32)
     proportion: float = pt.Field(dtype=pl.Float64)
+
+
+class Metrics(pt.Model):
+    """Evaluation metrics for power forecasts."""
+
+    time_series_id: int = pt.Field(dtype=pl.Int32)
+    power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
+    lead_time_hours: float = pt.Field(dtype=pl.Float32)
+    mae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    rmse: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    nmae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)

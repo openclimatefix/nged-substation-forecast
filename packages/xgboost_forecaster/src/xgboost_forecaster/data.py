@@ -5,17 +5,14 @@ import logging
 import math
 from datetime import date, datetime
 from pathlib import Path
-from typing import cast
 
 import patito as pt
 import polars as pl
 from contracts.data_schemas import (
     Nwp,
-    SubstationMetadata,
 )
 from contracts.settings import Settings
 from ml_core.scaling import uint8_to_physical_unit
-from nged_data import scan_delta_table
 from xgboost_forecaster.scaling import load_scaling_params
 
 
@@ -28,34 +25,12 @@ _SETTINGS = Settings()
 class DataConfig:
     """Configuration for data loading and preprocessing."""
 
-    base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "live_primary_flows"
+    base_power_path: Path = _SETTINGS.nged_data_path / "delta" / "cleaned_power_time_series"
     base_weather_path: Path = _SETTINGS.nwp_data_path / "ECMWF" / "ENS"
     # Resolution 5 is the fixed standard for this model as it balances spatial
     # precision with feature dimensionality for the XGBoost model.
     h3_res: int = 5
     resolution: str = "30m"
-
-
-def get_substation_metadata(config: DataConfig | None = None) -> pt.DataFrame[SubstationMetadata]:
-    """Load substation metadata and filter for those with available power data."""
-    config = config or DataConfig()
-    metadata_path = _SETTINGS.nged_data_path / "parquet" / "substation_metadata.parquet"
-    metadata_df = SubstationMetadata.validate(pl.read_parquet(metadata_path))
-
-    # Only return substations we have local power data for in Delta Lake.
-    # We use `scan_delta_table` to perform a lazy, optimized scan of the Delta Lake
-    # table, which is more memory-efficient than `read_delta` for large tables.
-    # This helper also ensures the timestamp column is UTC-aware.
-    substations_with_telemetry = (
-        cast(
-            pl.DataFrame,
-            scan_delta_table(config.base_power_path).select("substation_number").unique().collect(),
-        )
-        .to_series()
-        .to_list()
-    )
-
-    return metadata_df.filter(pl.col("substation_number").is_in(substations_with_telemetry))
 
 
 def load_nwp_run(
@@ -262,7 +237,11 @@ def process_nwp_data(
     # temporal resolution (30m).
     lf = lf.with_columns(
         [
-            pl.col(c).interpolate().over(["init_time", "h3_index", "ensemble_member"])
+            pl.col(c)
+            .interpolate()
+            .forward_fill()
+            .backward_fill()
+            .over(["init_time", "h3_index", "ensemble_member"])
             for c in numeric_cols
         ]
         + [
