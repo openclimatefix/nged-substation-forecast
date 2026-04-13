@@ -78,42 +78,59 @@ def _apply_config_overrides(config: TrainingConfig, dg_config: XGBoostConfig) ->
     return config
 
 
-def _get_target_time_series(
-    config: XGBoostConfig,
-    healthy_time_series: list[int],
+def _get_filtered_time_series_data(
     context: dg.AssetExecutionContext,
-) -> list[int]:
-    """Intersects requested substation IDs with healthy/active ones and logs the result.
+    config: XGBoostConfig,
+    settings: dg.ResourceParam[Settings],
+) -> tuple[pl.LazyFrame, pl.DataFrame, list[int]]:
+    """Load and filter time series data and metadata lazily.
 
-    This helper centralizes the intersection and validation logic for target substations,
-    ensuring consistent behavior across training and evaluation assets.
-
-    Strategy:
-    ---------
-    1. If `config.time_series_ids` is provided, filter to only healthy substations.
-    2. Otherwise, use all healthy substations.
+    This helper optimizes the data preparation pipeline by applying filters
+    lazily and avoiding unnecessary materialization of the entire dataset.
 
     Args:
-        config: XGBoost configuration with optional time_series_ids override.
-        healthy_time_series: List of substations with healthy telemetry.
-        context: Asset execution context for logging.
+        context: Asset execution context.
+        config: XGBoost configuration.
+        settings: Global settings.
 
     Returns:
-        List of substation IDs to use for training/evaluation.
+        A tuple containing (filtered_power_time_series, filtered_metadata, sub_ids).
     """
+    # Load time series metadata
+    time_series_metadata = pl.read_parquet(
+        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    )
+
+    # Use get_cleaned_power_time_series_lazy to ensure we have the full range.
+    power_time_series = get_cleaned_power_time_series_lazy(settings, context)
+
+    # Apply substation ID filter early if provided
     if config.time_series_ids:
-        # Use provided substation IDs, filtered to only healthy ones
-        sub_ids = [s for s in config.time_series_ids if s in healthy_time_series]
-        context.log.info(f"Filtered requested substations to {len(sub_ids)} healthy ones.")
-    else:
-        # Fallback: use all healthy substations
-        sub_ids = healthy_time_series
-        context.log.info(f"Using {len(sub_ids)} healthy substations.")
+        power_time_series = power_time_series.filter(
+            pl.col("time_series_id").is_in(config.time_series_ids)
+        )
 
-    if not sub_ids and not config.allow_empty_time_series:
-        raise ValueError("No healthy substations available for training/evaluation.")
+    # Compute healthy substations lazily.
+    # We join with the main dataset to ensure we only keep healthy substations
+    # that are also within our requested ID set (if any).
+    valid_ids_lf = (
+        power_time_series.filter(pl.col("power").is_not_null()).select("time_series_id").unique()
+    )
 
-    return sub_ids
+    # Materialize only the list of healthy substation IDs
+    sub_ids = cast(pl.DataFrame, valid_ids_lf.collect()).get_column("time_series_id").to_list()
+
+    # Filter the main dataset lazily using an inner join to push down filters
+    power_time_series_filtered = power_time_series.join(
+        valid_ids_lf, on="time_series_id", how="inner"
+    )
+
+    # Filter metadata to target substations
+    time_series_metadata_filtered = time_series_metadata.filter(
+        pl.col("time_series_id").is_in(sub_ids)
+    )
+
+    return power_time_series_filtered, time_series_metadata_filtered, sub_ids
 
 
 def _prepare_xgboost_inputs(
@@ -140,37 +157,14 @@ def _prepare_xgboost_inputs(
     hydra_config = load_hydra_config(model_name)
     hydra_config = _apply_config_overrides(hydra_config, config)
 
-    # Load time series metadata
-    time_series_metadata = pl.read_parquet(
-        settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    # Load and filter data using the helper
+    power_time_series_filtered, time_series_metadata_filtered, sub_ids = (
+        _get_filtered_time_series_data(context, config, settings)
     )
 
-    # Use get_cleaned_power_time_series_lazy to ensure we have the full range.
-    power_time_series = get_cleaned_power_time_series_lazy(settings, context)
-
-    # Identify healthy substations using lazy evaluation to avoid massive eager collection
-    healthy_time_series = (
-        cast(
-            pl.DataFrame,
-            power_time_series.filter(pl.col("power").is_not_null())
-            .select("time_series_id")
-            .unique()
-            .collect(),
-        )
-        .get_column("time_series_id")
-        .to_list()
-    )
-
-    # Filter to target substations using metadata as efficient fallback
-    sub_ids = _get_target_time_series(config, healthy_time_series, context)
-
-    # Filter the actuals data to target substations
-    power_time_series_filtered = power_time_series.filter(pl.col("time_series_id").is_in(sub_ids))
-
-    # Filter metadata to target substations
-    time_series_metadata_filtered = time_series_metadata.filter(
-        pl.col("time_series_id").is_in(sub_ids)
-    )
+    # Validate that we have substations if required
+    if not sub_ids and not config.allow_empty_time_series:
+        raise ValueError("No healthy substations available for training/evaluation.")
 
     return hydra_config, power_time_series_filtered, time_series_metadata_filtered, sub_ids
 
@@ -264,9 +258,7 @@ def evaluate_xgboost(
         return pl.DataFrame(schema=PowerForecast.dtypes)
 
     # Log shapes and ensemble members for debugging
-    context.log.info(
-        f"power_time_series_filtered shape: {cast(pl.DataFrame, power_time_series_filtered.collect()).shape}"
-    )
+    context.log.info(f"Number of target substations: {len(sub_ids)}")
     context.log.info(f"time_series_metadata_filtered shape: {time_series_metadata_filtered.shape}")
     num_ensemble_members = cast(
         pl.DataFrame, nwp.select("ensemble_member").unique().collect()
