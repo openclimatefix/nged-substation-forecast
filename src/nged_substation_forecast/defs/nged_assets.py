@@ -19,6 +19,8 @@ from nged_data import (
     load_nged_json,
     upsert_metadata,
 )
+
+from nged_substation_forecast.exceptions import NGEDDataValidationError
 from nged_substation_forecast.utils import filter_new_delta_records
 
 
@@ -31,8 +33,9 @@ def process_nged_json_file(
 
     This helper function centralizes the ingestion logic for NGED JSON files,
     ensuring consistent metadata handling and strict data validation.
-    If validation fails, it logs the error and raises a RuntimeError to
-    prevent the pipeline from proceeding with invalid data.
+    If validation fails, it logs the error and raises an NGEDDataValidationError
+    to halt the pipeline explicitly on schema mismatch and provide clear
+    debugging context.
     """
     context.log.info(f"Processing {json_file.name}")
     metadata_df, time_series_df = load_nged_json(json_file)
@@ -45,7 +48,9 @@ def process_nged_json_file(
         validated_df = PowerTimeSeries.validate(time_series_df)
     except ValueError as e:
         context.log.error(f"Validation failed for {json_file.name}: {e}")
-        raise RuntimeError(f"Failed to validate {json_file.name}") from e
+        # Raise a specific validation error to halt the pipeline explicitly on
+        # schema mismatch and provide clear debugging context.
+        raise NGEDDataValidationError(f"Failed to validate {json_file.name}: {e}") from e
 
     return pt.DataFrame[PowerTimeSeries](validated_df)
 
@@ -117,7 +122,9 @@ def nged_json_live_asset(context: AssetExecutionContext, settings: ResourceParam
 @asset(group_name="NGED_JSON")
 def nged_sharepoint_json_asset(context: AssetExecutionContext, settings: ResourceParam[Settings]):
     """Ingest the 33 NGED JSON files provided via SharePoint."""
-    # Hardcoded path for the specific SharePoint drop
+    # Hardcoded path for the specific SharePoint drop.
+    # Note that `nged_sharepoint_json_asset` will be deleted soon. This asset only exists for
+    # temporary testing. So it's fine to use a hard-coded path for now.
     json_dir = Path("data/NGED/from_sharepoint/OneDrive_1_4-8-2026/1451606400000_1774512000000/")
     metadata_path = settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
     delta_path = settings.nged_data_path / "delta" / "raw_power_time_series"
