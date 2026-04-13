@@ -28,11 +28,10 @@ Complex Partitioning Note:
 The implementation uses a manual 1-day lookback window when scanning the Delta table. This ensures that when computing rolling std for the first timestamp in a partition, we have 48 periods (24 hours) of historical data available, even at the partition boundary.
 """
 
-from typing import cast
-
 import dagster as dg
 import patito as pt
 import polars as pl
+from typing import cast
 from contracts.data_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from dagster import ResourceParam
@@ -156,7 +155,7 @@ def cleaned_power_time_series(
     )
 
     # Materialize the LazyFrame once
-    df_joined_materialized = cast(pl.DataFrame, raw_flows.collect())
+    df_joined_materialized: pl.DataFrame = cast(pl.DataFrame, raw_flows.collect())
 
     context.log.info(f"Materialized data shape before cleaning: {df_joined_materialized.shape}")
 

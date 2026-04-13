@@ -45,14 +45,14 @@ def filter_new_delta_records(
     # We use scan_delta to avoid loading the whole table into memory.
     existing_data = scan_delta_table(str(delta_path))
 
-    # Check if the table is empty.
-    # We need to collect to check if it's empty, but we only need the max timestamp.
-    max_timestamp_df = pl.DataFrame(existing_data.select(pl.col("period_end_time").max()).collect())
+    # Extract the max timestamp directly. If the table is empty, this returns None.
+    # This avoids unnecessary DataFrame instantiation and is more idiomatic Polars.
+    max_timestamp = cast(
+        pl.DataFrame, existing_data.select(pl.col("period_end_time").max()).collect()
+    ).item()
 
-    if max_timestamp_df.is_empty() or max_timestamp_df.item(0, 0) is None:
+    if max_timestamp is None:
         return df
-
-    max_timestamp = max_timestamp_df.item(0, 0)
 
     # Filter the input dataframe to only include records newer than the max timestamp.
     return df.filter(pl.col("period_end_time") > max_timestamp)
