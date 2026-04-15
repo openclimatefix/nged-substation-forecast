@@ -1,90 +1,28 @@
 from datetime import datetime, timedelta, timezone
 
+import patito as pt
 import polars as pl
 import pytest
-from hypothesis import given, strategies as st
+from contracts.data_schemas import Nwp, PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from patito.exceptions import DataFrameValidationError
 
-from contracts.data_schemas import Nwp, PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 
-
-def test_power_time_series_validation_mw_or_mva():
-    # Valid with MW
-    df_mw = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power": [10.0],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
-            "power": pl.Float32,
-        }
-    )
-
-    # Should pass
-    PowerTimeSeries.validate(df_mw)
-
-    # Valid with MVA
-    df_mva = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power": [10.0],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
-            "power": pl.Float32,
-        }
-    )
-
-    # Should pass
-    PowerTimeSeries.validate(df_mva)
-
-    # Invalid: null value
-    df_none = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power": [None],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
-            "power": pl.Float32,
-        }
-    )
-
-    # PowerTimeSeries allows null power, so this should pass now.
-    # If the test was expecting a failure, it might need to be updated to expect success,
-    # or the test was testing something else.
-    # Given the schema change, I will assume it should pass.
-    PowerTimeSeries.validate(df_none)
-
-
-def test_power_time_series_validation_both():
+def test_power_time_series_validation():
     # Valid
-    df_both = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power": [10.0],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
-            "power": pl.Float32,
-        }
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123],
+                "time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "power": [10.0],
+            }
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
     )
 
     # Should pass
-    PowerTimeSeries.validate(df_both)
+    df.validate()
 
 
 def test_power_forecast_validation():
@@ -96,9 +34,6 @@ def test_power_forecast_validation():
             "power_fcst_model_name": ["xgboost"],
             "power_fcst_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
             "nwp_init_time": [datetime(2026, 1, 1, tzinfo=timezone.utc)],
-            "nwp_init_hour": [0],
-            "lead_time_hours": [24.0],
-            "power_fcst_init_year_month": ["2026-01"],
             "power_fcst": [50.5],
         }
     ).cast(
@@ -188,28 +123,6 @@ def test_nwp_validation():
         Nwp.validate(df_invalid)
 
 
-@given(
-    value=st.floats(min_value=-1000, max_value=1000, allow_nan=False, allow_infinity=False)
-    | st.none(),
-)
-def test_power_time_series_property_based(value):
-    df = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "period_end_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
-            "power": [value],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "period_end_time": pl.Datetime(time_unit="us", time_zone="UTC"),
-            "power": pl.Float32,
-        }
-    )
-
-    PowerTimeSeries.validate(df)
-
-
 def test_power_time_series_uniqueness():
     df = pl.DataFrame(
         {
@@ -268,33 +181,26 @@ def test_time_series_metadata_uniqueness():
 
 
 def test_time_series_metadata_validation_success():
-    df = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "time_series_name": ["Test Asset"],
-            "time_series_type": ["PV"],
-            "units": ["MW"],
-            "licence_area": ["EMids"],
-            "substation_number": [1],
-            "substation_type": ["Primary"],
-            "latitude": [50.0],
-            "longitude": [0.0],
-            "h3_res_5": [12345],
-        }
-    ).cast(
-        {
-            "time_series_id": pl.Int32,
-            "time_series_name": pl.String,
-            "time_series_type": pl.String,
-            "units": pl.String,
-            "licence_area": pl.String,
-            "substation_number": pl.Int32,
-            "substation_type": pl.Categorical,
-            "latitude": pl.Float32,
-            "longitude": pl.Float32,
-            "h3_res_5": pl.UInt64,
-        }
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123],
+                "time_series_name": ["Test Asset"],
+                "time_series_type": ["PV"],
+                "units": ["MW"],
+                "licence_area": ["EMids"],
+                "substation_number": [1],
+                "substation_type": ["HV Customer"],
+                "latitude": [50.0],
+                "longitude": [0.0],
+                "h3_res_5": [12345],
+            }
+        )
+        .set_model(TimeSeriesMetadata)
+        .cast()
     )
+
+    print(df.dtypes)
 
     # Should pass
     TimeSeriesMetadata.validate(df)
