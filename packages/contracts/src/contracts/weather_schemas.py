@@ -16,6 +16,11 @@ class _NwpBase(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(dtype=pl.UInt64)
 
+    # Categorical variables
+    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
+
+    categorical_variables: list[str] = ["categorical_precipitation_type_surface"]
+
 
 class NwpInMemory(_NwpBase):
     """Variables stored as Float32 in memory."""
@@ -37,9 +42,6 @@ class NwpInMemory(_NwpBase):
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
     precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
-
-    # Categorical variables
-    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
 
     @classmethod
     def validate(
@@ -112,16 +114,27 @@ class NwpOnDisk(_NwpBase):
     downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=pl.Int16)
     precipitation_surface: int | None = pt.Field(dtype=pl.Int16)
 
-    # Categorical variables
-    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
-
     @classmethod
     def from_nwp_in_memory(
         cls,
         nwp_in_memory: pt.DataFrame[NwpInMemory],
         scaling_params: pt.DataFrame[NwpScalingParams],
     ) -> Self:
-        pass
+        exprs = []
+
+        for row in scaling_params.to_dicts():
+            col_name = row["col_name"]
+            if col_name not in nwp_in_memory.columns:
+                continue
+
+            buffered_min = row["buffered_min"]
+            buffered_max = row["buffered_max"]
+            buffered_range = row["buffered_range"]
+
+            # Handle NaNs first (Polars treats NaN as > any finite number)
+            base_col = pl.col(col_name).fill_nan(None)
+
+            clipped_col = base_col.clip(lower_bound=buffered_min, upper_bound=buffered_max)
 
 
 class NwpScalingParams(pt.Model):
