@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Final, Self
 
 import patito as pt
 import polars as pl
@@ -36,7 +37,7 @@ class PowerTimeSeries(pt.Model):
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame["PowerTimeSeries"]:
+    ) -> pt.DataFrame[Self]:
         """Validate the given dataframe, ensuring time is at :00 or :30 and uniqueness."""
         validated_df = super().validate(
             dataframe=dataframe,
@@ -55,7 +56,36 @@ class PowerTimeSeries(pt.Model):
         if validated_df.select(["time_series_id", "time"]).is_duplicated().any():
             raise ValueError("Duplicate entries found for (time_series_id, time).")
 
-        return pt.DataFrame["PowerTimeSeries"](validated_df)
+        return validated_df
+
+
+LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
+    "BESS",  # Battery energy storage system. Present in trial area
+    "Biofuel",  # Present in trial area
+    "CHP",
+    "Data Centre",
+    # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
+    # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
+    # "Disaggregated Demand" indicates that NGED have already removed metered generation connected to that primary.
+    "Disaggregated Demand",  # Present in trial area.
+    "Energy from Waste",
+    "EV Charging",
+    "Geothermal",
+    "Hydro",
+    "Hydrogen Electrolysis",
+    "Industrial Demand",
+    "Mixed (Demand)",
+    "Mixed (Generation)",
+    "Other (Demand)",
+    "Other (Generation)",  # Present in trial area
+    "Other (Storage)",
+    "Peaking Plant",
+    "PV",  # Present in trial area
+    "Rail",
+    "Raw Flow",  # Present in trial area. Used for BSP and GSP substations.
+    "Synchronous Condenser",
+    "Wind",  # Present in trial area
+)
 
 
 class TimeSeriesMetadata(pt.Model):
@@ -68,37 +98,7 @@ class TimeSeriesMetadata(pt.Model):
             "Leverton Solar Park",
         ],
     )
-    time_series_type: str = pt.Field(
-        dtype=pl.Enum(
-            [
-                "BESS",  # Battery energy storage system. Present in trial area
-                "Biofuel",  # Present in trial area
-                "CHP",
-                "Data Centre",
-                # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
-                # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
-                # "Disaggregated Demand" indicates that NGED have already removed metered generation connected to that primary.
-                "Disaggregated Demand",  # Present in trial area.
-                "Energy from Waste",
-                "EV Charging",
-                "Geothermal",
-                "Hydro",
-                "Hydrogen Electrolysis",
-                "Industrial Demand",
-                "Mixed (Demand)",
-                "Mixed (Generation)",
-                "Other (Demand)",
-                "Other (Generation)",  # Present in trial area
-                "Other (Storage)",
-                "Peaking Plant",
-                "PV",  # Present in trial area
-                "Rail",
-                "Raw Flow",  # Present in trial area. Used for BSP and GSP substations.
-                "Synchronous Condenser",
-                "Wind",  # Present in trial area
-            ]
-        )
-    )
+    time_series_type: str = pt.Field(dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES))
     units: str = pt.Field(dtype=pl.Enum(["MW", "MVA"]))
     licence_area: str = pt.Field(dtype=pl.Enum(["EMids"]))
     substation_number: int = pt.Field(
@@ -167,7 +167,8 @@ class PowerForecast(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     time_series_id: int = _get_time_series_id_dtype()
-    ensemble_member: int = pt.Field(dtype=pl.UInt8)
+    ensemble_member: int = pt.Field(dtype=pl.Int8)
+    ml_flow_experiment_id: int = pt.Field(dtype=pl.Int32)
 
     nwp_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
@@ -184,7 +185,10 @@ class PowerForecast(pt.Model):
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The datetime that the power forecast was initialised.",
+        description=(
+            "The datetime that the power forecast was initialised."
+            " This might be called `t0` in some other OCF projects."
+        ),
     )
 
     power_fcst: float = pt.Field(

@@ -51,4 +51,4 @@ class TrainingConfig(BaseModel):
 
     data_split: DataSplitConfig
     model: ModelConfig
-    train_on_nwp_ensemble_member: Literal["control", "all"]
+    train_on_nwp_ensemble_member: Literal["control_member_only", "all_members"]

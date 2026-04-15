@@ -2,23 +2,10 @@ from datetime import datetime
 
 import patito as pt
 import polars as pl
-from pydantic import BaseModel
 
-from contracts.power_schemas import TimeSeriesMetadata
+from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES
 
 from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
-
-
-class InferenceParams(BaseModel):
-    """Parameters for ML model inference."""
-
-    # The time that we create our power forecast. This might be called `t0` in some other OCF
-    # projects. When running backtests, we cannot use any NWPs available after `forecast_time`
-    # (i.e. init_time + delay > forecast_time).
-    power_fcst_init_time: datetime
-
-    power_fcst_model_name: str
-
 
 _FEATURE_DTYPE = pt.Field(dtype=pl.Float32, allow_missing=True)
 
@@ -32,8 +19,9 @@ class AllFeatures(pt.Model):
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     time_series_id: int = _get_time_series_id_dtype()
-    time_series_type: str = TimeSeriesMetadata.time_series_type
+    time_series_type: str = pt.Field(dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES))
     ensemble_member: int | None = pt.Field(dtype=pl.UInt8, allow_missing=True)
+
     power: float = pt.Field(dtype=pl.Float32)
     lead_time_hours: float = pt.Field(dtype=pl.Float32)
 
@@ -65,10 +53,8 @@ class AllFeatures(pt.Model):
     temperature_2m_6h_ago: float | None = _FEATURE_DTYPE
     temperature_2m_trend_6h: float | None = _FEATURE_DTYPE
 
-    # Temporal features.
-    # `local` means "in the local timezone", e.g. "Europe/London".
-    # We use `local` as the main input feature, because it's the local time that mostly drives
-    # demand.
+    # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
+    # as the main input feature, because it's the local time that mostly drives demand.
     local_utc_offset: int | None = pt.Field(dtype=pl.Int8, allow_missing=True)
     local_time_of_day_sin: float | None = _FEATURE_DTYPE
     local_time_of_day_cos: float | None = _FEATURE_DTYPE
