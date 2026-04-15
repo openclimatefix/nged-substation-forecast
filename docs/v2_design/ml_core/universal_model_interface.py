@@ -1,3 +1,4 @@
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from abc import ABC, abstractmethod
 
 import patito as pt
@@ -19,10 +20,20 @@ class MLModel(ABC):
         self.selected_features = selected_features
         self.model_params = model_params
 
-    def train(self, data: pt.LazyFrame[RawData]) -> None:
+    def train(
+        self, 
+        power_time_series: pt.LazyFrame[PowerTimeSeries], 
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        nwp: pt.LazyFrame[NwpOnDisk] | None,
+    ) -> None:
         self._train_algo(self._engineer_features(data))
 
-    def predict(self, data: pt.LazyFrame[RawData]) -> pt.DataFrame[PowerForecast]:
+    def predict(
+        self, 
+        power_time_series: pt.LazyFrame[PowerTimeSeries], 
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        nwp: pt.LazyFrame[NwpOnDisk] | None,
+    ) -> pt.DataFrame[PowerForecast]:
         return self._predict_algo(self._engineer_features(data))
 
     @abstractmethod
@@ -33,7 +44,13 @@ class MLModel(ABC):
     def _predict_algo(self, data: pt.LazyFrame[AllFeatures]) -> pt.DataFrame[PowerForecast]:
         pass
 
-    def _engineer_features(self, raw_data: pt.LazyFrame[RawData]) -> pt.LazyFrame[AllFeatures]:
+    def _engineer_features(
+        self,
+        power_time_series: pt.LazyFrame[PowerTimeSeries], 
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        nwp: pt.LazyFrame[NwpOnDisk] | None,
+    ) -> pt.LazyFrame[AllFeatures]:
+
         exprs_to_evaluate: list[pl.Expr] = []
 
         for feature_name in self.selected_features:

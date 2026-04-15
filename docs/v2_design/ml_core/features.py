@@ -12,6 +12,7 @@ class RawData(pt.Model):
     power: float
 
 
+# AllFeatures has now been implemented in contracts/ml_schemas.py
 class AllFeatures(RawData):
     # Optional engineered features
     power_lag_1: Optional[float] = pt.Field(ge=0)
@@ -21,6 +22,7 @@ class AllFeatures(RawData):
     # Weather features...
 
 
+# This features reg still needs to be implemented in ml_core/features.py.
 STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
     "hour_of_day": pl.col("timestamp").dt.hour().alias("hour_of_day"),
     "time_sin": (pl.col("timestamp").dt.hour() / 24.0 * 2 * np.pi).sin().alias("time_sin"),
