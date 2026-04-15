@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
+from pathlib import Path
 from typing import Final, Self
 
 import patito as pt
@@ -220,3 +221,8 @@ class NwpScalingParams(pt.Model):
 
     # The maximum from the actual values, plus a small buffer.
     buffered_max: float = pt.Field(dtype=pl.Float32)
+
+    @classmethod
+    def load(cls, csv_path: Path) -> pt.DataFrame[Self]:
+        """Load scaling parameters from a CSV file."""
+        return cls.validate(pl.read_csv(csv_path))
