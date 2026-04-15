@@ -28,7 +28,7 @@ The ingestion pipeline is orchestrated by Dagster assets in `src/nged_substation
     - historical backfills (`nged_json_archive_asset`),
     - live updates (`nged_json_live_asset`) - NGED will provide new JSON files every 6 hours. The
       JSON files will each contain the last 2 weeks of data. So we must be sure we only append new
-      data to the Delta table, 
+      data to the Delta table,
     - and a temporary SharePoint drop `nged_sharepoint_json_asset` (this asset will be removed after testing)
 
 ### Manual TODO

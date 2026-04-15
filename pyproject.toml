@@ -87,6 +87,7 @@ registry_modules = [
 # See https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
 line-length = 100
+exclude = ["docs/v2_design/"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -98,6 +99,9 @@ line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = 100
 
+[tool.ty.src]
+exclude = ["docs/v2_design/"]
+
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
@@ -105,4 +109,4 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
-norecursedirs = [".venv", "venv", ".git", "__pycache__", ".hypothesis"]
+norecursedirs = [".venv", "venv", ".git", "__pycache__", ".hypothesis", "docs/v2_design/"]

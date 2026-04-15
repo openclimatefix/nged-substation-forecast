@@ -26,7 +26,7 @@ It also supports `delta_table_name` overrides (allowing multiple assets to write
 ## 2. Data Ingestion (Archive vs. Live)
 **See pseudocode:** [`docs/v2_design/nged/ingestion_assets.py`](nged/ingestion_assets.py)
 
-We face a partitioning mismatch: Archive data is partitioned by entity (substation), while live data is partitioned by time (6-hourly). 
+We face a partitioning mismatch: Archive data is partitioned by entity (substation), while live data is partitioned by time (6-hourly).
 To solve this, we use **two separate ingestion assets** that write to the **same physical Delta table** (`raw_power_time_series`).
 *   `archive_raw_power_time_series`: Unpartitioned. Runs once on initialization.
 *   `live_raw_power_time_series`: 6-hourly partitions. Runs continuously.
@@ -36,7 +36,7 @@ Both use the `incremental_append` strategy, so they safely upsert data without d
 ## 3. Data Cleaning
 **See pseudocode:** [`docs/v2_design/nged/cleaning_assets.py`](nged/cleaning_assets.py)
 
-Cleaning is handled by a single, daily-partitioned asset (`cleaned_power_time_series`). 
+Cleaning is handled by a single, daily-partitioned asset (`cleaned_power_time_series`).
 *   **Backfilling:** To clean the 4-year archive, we simply trigger a Dagster backfill on this asset. Dagster will run the daily partitions concurrently.
 *   **Lookback:** Because cleaning requires a 24-hour rolling standard deviation, the asset metadata requests a 1-day lookback. The IOManager automatically fetches the previous day's data, the asset computes the rolling features, filters out the lookback period, and overwrites the current partition.
 
