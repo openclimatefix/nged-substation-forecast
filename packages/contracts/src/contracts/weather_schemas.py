@@ -1,10 +1,12 @@
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Final, Self
+from typing import Final, Self, overload
 
 import patito as pt
 import polars as pl
+
+from contracts.common import validate_schema
 
 from .common import UTC_DATETIME_DTYPE
 
@@ -22,7 +24,10 @@ class _NwpBase(pt.Model):
 
 
 class NwpInMemory(_NwpBase):
-    """Variables stored as Float32 in memory."""
+    """Variables stored as Float32 in memory.
+
+    NWP data is first converted to NwpInMemory when ingested from Dynamical.
+    """
 
     temperature_2m: float = pt.Field(dtype=pl.Float32)
     dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
@@ -92,7 +97,7 @@ class NwpInMemory(_NwpBase):
         return validated_df
 
 
-_NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataType] = pl.Int16
+_NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataTypeClass] = pl.Int16
 _NWP_ON_DISK_MAX_INT_VALUE: Final[int] = 2**12 - 1  # We're using 12 bits per value
 
 
@@ -117,12 +122,30 @@ class NwpOnDisk(_NwpBase):
     downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
     precipitation_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
 
+    # overload to indicate that you get a DataFrame back if you feed in a DataFrame
+    @overload
     @classmethod
     def from_nwp_in_memory(
         cls,
         nwp_in_memory: pt.DataFrame[NwpInMemory],
         scaling_params: pt.DataFrame[NwpScalingParams],
-    ) -> pt.DataFrame[Self]:
+    ) -> pt.DataFrame[Self]: ...
+
+    # overload to indicate that you get a LazyFrame back if you feed in a LazyFrame
+    @overload
+    @classmethod
+    def from_nwp_in_memory(
+        cls,
+        nwp_in_memory: pt.LazyFrame[NwpInMemory],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.LazyFrame[Self]: ...
+
+    @classmethod
+    def from_nwp_in_memory(
+        cls,
+        nwp_in_memory: pt.DataFrame[NwpInMemory] | pt.LazyFrame[NwpInMemory],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.DataFrame[Self] | pt.LazyFrame[Self]:
         """Scale numeric columns to integer representation based on scaling parameters.
 
         Storing NWPs as integers on disk significantly reduces the storage requirements.
@@ -131,11 +154,11 @@ class NwpOnDisk(_NwpBase):
         in the range [0, 4,096) (where 4,096 == 2^12).
 
         Args:
-            nwp_in_memory: DataFrame with float32 columns.
+            nwp_in_memory: DataFrame or LazyFrame with float32 columns.
             scaling_params: DataFrame with col_name, buffered_min, buffered_max, buffered_range.
 
         Returns:
-            DataFrame with rescaled integer columns.
+            DataFrame or LazyFrame with rescaled integer columns.
         """
 
         exprs = []
@@ -148,7 +171,6 @@ class NwpOnDisk(_NwpBase):
             buffered_max = row["buffered_max"]
             buffered_range = row["buffered_range"]
 
-            # Handle NaNs first (Polars treats NaN as > any finite number)
             base_col = pl.col(col_name).fill_nan(None)
 
             clipped_col = base_col.clip(lower_bound=buffered_min, upper_bound=buffered_max)
@@ -160,16 +182,39 @@ class NwpOnDisk(_NwpBase):
                 .alias(col_name)
             )
 
-        exprs.append(expr)
+            exprs.append(expr)
 
-        return cls.validate(nwp_in_memory.with_columns(exprs))
+        # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
+        # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
+        nwp_on_disk = nwp_in_memory.with_columns(exprs).set_model(cls)  # ty: ignore[unresolved-attribute]
+        validate_schema(cls, nwp_on_disk)
+        return nwp_on_disk
 
+    # overload to indicate that you get a DataFrame back if you feed in a DataFrame
+    @overload
+    @classmethod
     def to_nwp_in_memory(
-        self,
-        nwp_on_disk: pt.DataFrame[NwpOnDisk],
+        cls,
+        nwp_on_disk: pt.DataFrame[Self],
         scaling_params: pt.DataFrame[NwpScalingParams],
-    ) -> pt.DataFrame[NwpInMemory]:
+    ) -> pt.DataFrame[NwpInMemory]: ...
 
+    # overload to indicate that you get a LazyFrame back if you feed in a LazyFrame
+    @overload
+    @classmethod
+    def to_nwp_in_memory(
+        cls,
+        nwp_on_disk: pt.LazyFrame[Self],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.LazyFrame[NwpInMemory]: ...
+
+    @classmethod
+    def to_nwp_in_memory(
+        cls,
+        nwp_on_disk: pt.DataFrame[Self] | pt.LazyFrame[Self],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.DataFrame[NwpInMemory] | pt.LazyFrame[NwpInMemory]:
+        """Scale integer columns to floating point representations in physical units."""
         exprs = []
         for row in scaling_params.to_dicts():
             col_name = row["col_name"]
@@ -186,7 +231,11 @@ class NwpOnDisk(_NwpBase):
 
             exprs.append(expr)
 
-        return NwpInMemory.validate(nwp_on_disk.with_columns(exprs))
+        # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
+        # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
+        nwp_in_memory = nwp_on_disk.with_columns(exprs).set_model(NwpInMemory)  # ty: ignore[unresolved-attribute]
+        validate_schema(NwpInMemory, nwp_in_memory)
+        return nwp_in_memory
 
 
 class NwpScalingParams(pt.Model):
@@ -195,7 +244,7 @@ class NwpScalingParams(pt.Model):
     Used when scaling between physical units (e.g. degrees C) and their integer representations."""
 
     col_name: str = pt.Field(
-        dtype=pl.Enum(  # Note this this does NOT include the categorical variables. We don't scale categorical variables!
+        dtype=pl.Enum(  # Note this this does NOT include the categorical variables because we don't scale categorical variables!
             [
                 "temperature_2m",
                 "dew_point_temperature_2m",
@@ -210,7 +259,8 @@ class NwpScalingParams(pt.Model):
                 "downward_short_wave_radiation_flux_surface",
                 "precipitation_surface",
             ]
-        )
+        ),
+        unique=True,
     )
 
     # The minimum from the actual values, minus a small buffer.
