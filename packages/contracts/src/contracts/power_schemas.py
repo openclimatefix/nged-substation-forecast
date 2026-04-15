@@ -93,7 +93,7 @@ class TimeSeriesMetadata(pt.Model):
                 "Peaking Plant",
                 "PV",  # Present in trial area
                 "Rail",
-                "Raw Flow",  # Present in trial area
+                "Raw Flow",  # Present in trial area. Used for BSP and GSP substations.
                 "Synchronous Condenser",
                 "Wind",  # Present in trial area
             ]
