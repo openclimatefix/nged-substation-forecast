@@ -55,9 +55,10 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
         .join(max_times.lazy(), on="time_series_id", how="left")
         .filter(pl.col("max_time").is_null() | (pl.col("time") > pl.col("max_time")))
         .drop("max_time")
-        .sort(["time_series_id", "time"])
         .collect(),
     )
+
+    new_power_ts = PowerTimeSeries.sort(new_power_ts)
 
     log.info(
         f"Appending {new_power_ts.height:,d} rows of new PowerTimeSeries"

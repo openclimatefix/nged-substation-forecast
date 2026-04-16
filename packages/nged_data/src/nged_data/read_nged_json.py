@@ -45,6 +45,8 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
         h3_res_5=polars_h3.latlng_to_cell(pl.col("latitude"), pl.col("longitude"), 5)
     )
 
+    metadata_df = metadata_df.sort("time_series_id")
+
     return pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata).drop().cast().validate()
 
 
@@ -65,6 +67,8 @@ def _extract_power_time_series(
     )
 
     time_series_df = time_series_df.with_columns(time_series_id=pl.lit(time_series_id))
+
+    time_series_df = PowerTimeSeries.sort(time_series_df)
 
     return pt.DataFrame(time_series_df).set_model(PowerTimeSeries).drop().cast().validate()
 

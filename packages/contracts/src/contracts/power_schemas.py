@@ -56,7 +56,23 @@ class PowerTimeSeries(pt.Model):
         if validated_df.select(["time_series_id", "time"]).is_duplicated().any():
             raise ValueError("Duplicate entries found for (time_series_id, time).")
 
+        # Validate the time_series_id column is sorted
+        if not validated_df["time_series_id"].is_sorted():
+            raise ValueError("time_series_id is not sorted!")
+
+        # Validate the time column is sorted (within each time_series_id group)
+        if (
+            not validated_df.group_by("time_series_id")
+            .agg(pl.col("time").diff().min() > 0)["time"]
+            .all()
+        ):
+            raise ValueError("the `time` column is not sorted!")
+
         return validated_df
+
+    @classmethod
+    def sort(cls, df: pt.DataFrame[Self]) -> pt.DataFrame[Self]:
+        return pt.DataFrame(df.sort(["time_series_id", "time"])).set_model(cls)
 
 
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
