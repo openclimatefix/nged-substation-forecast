@@ -1,16 +1,11 @@
-import polars as pl
-import patito as pt
+import logging
 from pathlib import Path
-from dagster import get_dagster_logger
-import io
-from contracts.data_schemas import TimeSeriesMetadata
 
+import patito as pt
+import polars as pl
+from contracts.power_schemas import TimeSeriesMetadata
 
-def get_df_hash(df: pt.DataFrame[TimeSeriesMetadata]) -> int:
-    """Calculates a hash of the DataFrame."""
-    buffer = io.BytesIO()
-    df.write_parquet(buffer)
-    return hash(buffer.getvalue())
+logger = logging.getLogger(__name__)
 
 
 def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path) -> None:
@@ -27,9 +22,10 @@ def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_pat
 
     Args:
         new_metadata: The new metadata DataFrame.
-        metadata_path: The path to the Parquet file.
+        metadata_path: The path to the Parquet file where we store our local version of the
+        metadata.
     """
-    logger = get_dagster_logger()
+    new_metadata: pl.DataFrame = new_metadata.sort("time_series_id")
 
     if not metadata_path.exists():
         logger.info(f"Metadata file not found at {metadata_path}. Creating new file.")
@@ -39,22 +35,15 @@ def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_pat
     # Read existing metadata
     existing_metadata = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
 
-    # Ensure h3_res_5 is UInt64 in existing metadata if it exists
-    if "h3_res_5" in existing_metadata.columns:
-        existing_metadata = TimeSeriesMetadata.validate(
-            existing_metadata.with_columns(pl.col("h3_res_5").cast(pl.UInt64))
-        )
-
     # Merge metadata
-    # Put new_metadata first so that unique() keeps the new version
+    # Put new_metadata first so that unique(keep="first") keeps the new version
     merged_metadata = TimeSeriesMetadata.validate(
-        pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id")
-    )
+        pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id", keep="first")
+    ).sort("time_series_id")
 
     # Compare metadata
-    # We use `hash_rows().sum()` to check if the DataFrames are identical.
-    if get_df_hash(existing_metadata) != get_df_hash(merged_metadata):
+    if existing_metadata.equals(merged_metadata):
+        logger.info("Metadata is up to date.")
+    else:
         logger.info(f"Metadata update detected at {metadata_path}. Updating metadata file.")
         merged_metadata.write_parquet(metadata_path)
-    else:
-        logger.info("Metadata is up to date.")
