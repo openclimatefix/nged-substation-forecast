@@ -1,9 +1,12 @@
+import logging
 from pathlib import Path
 from typing import cast
 
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries
+
+log = logging.getLogger(__name__)
 
 
 class _MaxTimePerTimeSeriesId(pt.Model):
@@ -18,16 +21,25 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
         power_time_series: The Patito DataFrame to append.
         delta_path: The path to the Delta table.
     """
+    log.info(f"Preparing to append_to_delta at {delta_path}...")
+
     if delta_path.exists():
         # Scan the existing delta table and find the max time per time_series_id
         max_times = cast(
-            pl.DataFrame,
+            pl.DataFrame,  # Cast to pl.DataFrame to keep type checkers happy.
             pl.scan_delta(delta_path)
             .group_by("time_series_id")
             .agg(pl.max("time").alias("max_time"))
             .collect(),
         )
+
+        log.info(
+            f"Loaded max times for {max_times.height} time_series_ids from {delta_path}."
+            f" Earliest time = {max_times['max_time'].min()}."
+            f" Latest time = {max_times['max_time'].max()}"
+        )
     else:
+        log.into(f"{delta_path=} does not exist. Creating...")
         delta_path.parent.mkdir(parents=True, exist_ok=True)
         # Create an empty DataFrame with the correct schema for the join
         max_times = pl.DataFrame(schema=_MaxTimePerTimeSeriesId.dtypes)
@@ -43,12 +55,18 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
         .join(max_times.lazy(), on="time_series_id", how="left")
         .filter(pl.col("max_time").is_null() | (pl.col("time") > pl.col("max_time")))
         .drop("max_time")
+        .sort(["time_series_id", "time"])
         .collect(),
+    )
+
+    log.info(
+        f"Appending {new_power_ts.height:,d} rows of new PowerTimeSeries"
+        f" (from {new_power_ts['time'].min()} to {new_power_ts['time'].max()}) to {delta_path=}"
     )
 
     PowerTimeSeries.validate(new_power_ts)
 
-    if new_power_ts.height > 0:
+    if not new_power_ts.is_empty():
         new_power_ts.write_delta(
             delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
         )
