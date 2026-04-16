@@ -39,7 +39,7 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
             f" Latest time = {max_times['max_time'].max()}"
         )
     else:
-        log.into(f"{delta_path=} does not exist. Creating...")
+        log.info(f"{delta_path=} does not exist. Creating...")
         delta_path.parent.mkdir(parents=True, exist_ok=True)
         # Create an empty DataFrame with the correct schema for the join
         max_times = pl.DataFrame(schema=_MaxTimePerTimeSeriesId.dtypes)

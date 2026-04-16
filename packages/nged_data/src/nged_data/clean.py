@@ -1,6 +1,8 @@
-import polars as pl
 import patito as pt
-from contracts.data_schemas import PowerTimeSeries
+import polars as pl
+from contracts.power_schemas import PowerTimeSeries
+
+# TODO: This file is still 100% AI-generated. It needs to be carefully re-written!
 
 
 def sort_data(df: pt.DataFrame[PowerTimeSeries]) -> pt.DataFrame[PowerTimeSeries]:
