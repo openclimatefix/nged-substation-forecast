@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import pytest
+import patito as pt
+import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.read_nged_json import nged_json_to_metadata_df_and_time_series_df
 
@@ -39,3 +41,18 @@ def test_nged_json_to_metadata_df_and_time_series_df(
     assert metadata_df["substation_type"].item() == "Primary"
     assert "POLYGON" in metadata_df["area_wkt"].item()
     assert metadata_df["h3_res_5"].item() == expected_h3
+
+
+def test_nged_json_to_metadata_df_and_time_series_df_invalid_json():
+    # JSON missing required fields
+    invalid_json = b'{"some": "data"}'
+    with pytest.raises((pt.exceptions.DataFrameValidationError, pl.exceptions.ColumnNotFoundError)):
+        nged_json_to_metadata_df_and_time_series_df(invalid_json)
+
+
+def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():
+    # Valid JSON structure but invalid data types
+    # The function expects a specific structure, so this might fail earlier
+    invalid_json = b'{"time_series_id": 1, "Area": {"latitude": 50, "longitude": 0}, "data": [{"endTime": "2026-01-01T00:00:00Z", "value": "not_a_float"}]}'
+    with pytest.raises(Exception):
+        nged_json_to_metadata_df_and_time_series_df(invalid_json)
