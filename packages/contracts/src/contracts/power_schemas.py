@@ -72,7 +72,12 @@ class PowerTimeSeries(pt.Model):
 
     @classmethod
     def sort(cls, df: pt.DataFrame[Self]) -> pt.DataFrame[Self]:
-        return pt.DataFrame(df.sort(["time_series_id", "time"])).set_model(cls)
+        return pt.DataFrame(df.sort(cls.sort_by_columns)).set_model(cls)
+
+    @classmethod
+    @property
+    def sort_by_columns(cls) -> list[str]:
+        return ["time_series_id", "time"]
 
 
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (

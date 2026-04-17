@@ -10,29 +10,29 @@ with app.setup:
     from contracts.settings import Settings, PROJECT_ROOT
     from nged_data.read_nged_json import nged_json_to_metadata_df_and_time_series_df
 
+
+@app.function
+def get_nged_s3_store() -> obstore.store.S3Store:
+
     assert (PROJECT_ROOT / ".env").exists()
 
     settings = Settings()
 
-
-@app.cell
-def _():
-    store = obstore.store.S3Store.from_url(
+    return obstore.store.S3Store.from_url(
         url=settings.nged_s3_bucket_url,
         config={
             "aws_access_key_id": settings.nged_s3_bucket_access_key,
             "aws_secret_access_key": settings.nged_s3_bucket_secret,
         },
     )
-    store
-    return (store,)
 
 
 @app.cell
-def _(store):
+def _():
     paths = []
-    for lst in list(store.list(prefix="timeseries")):
-        paths.extend([d["path"] for d in lst])
+    for listing in get_nged_s3_store().list(prefix="timeseries"):
+        paths_for_chunk = [item["path"] for item in listing if item["path"].endswith(".json")]
+        paths.extend(paths_for_chunk)
 
     paths
     return (paths,)
@@ -40,63 +40,17 @@ def _(store):
 
 @app.cell
 def _(paths):
-    paths_df = (
-        pl.DataFrame({"path": paths})
-        .with_columns(
-            split=pl.col("path")
-            .str.split_exact(by="/", n=2)
-            .struct.rename_fields(["part0_root", "part1_epochs", "part2_filename"])
-        )
-        .unnest("split")
-    )
 
-    paths_df
-    return (paths_df,)
-
-
-@app.cell
-def _(paths_df):
-    # Extract the start and end times from the filenames of the form
-    # "TimeSeries_3_20160101T003000Z_20260326T083000Z.json"
-    # Regex Pattern: Captures two blocks of 8 digits + T + 6 digits + Z
-    pattern = r"_(\d{8}T\d{6}Z)_(\d{8}T\d{6}Z)\."
-
-    paths_df2 = (
-        # Extract the datetimes in the filenames
-        paths_df.with_columns(
-            pl.col("part2_filename")
-            .str.extract_groups(pattern)
-            .struct.rename_fields(["start_time", "end_time"])
-            .alias("datetimes"),
-        )
-        .unnest("datetimes")
-        .with_columns(
-            pl.col("start_time", "end_time").str.to_datetime("%Y%m%dT%H%M%SZ", time_zone="UTC")
-        )
-        .sort(["start_time"])
-        #
-        # Extract the unix epochs from the middle part of the path
-        .with_columns(
-            pl.col("part1_epochs")
-            .str.split("_")
-            .list.to_struct(fields=["epoch_start", "epoch_end"])
-            .alias("epochs")
-        )
-        .unnest("epochs")
-        .with_columns(
-            pl.col("epoch_start", "epoch_end")
+    df = pl.DataFrame({"path": paths}).with_columns(
+        end_time=(
+            pl.col("path")
+            .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
             .cast(pl.Int64)
-            .cast(pl.Datetime("ms", time_zone="Europe/London"))
-        )
+            .cast(pl.Datetime("ms", time_zone="UTC"))
+        ),
+        time_series_id=(pl.col("path").str.extract(r"TimeSeries_(\d+)", 1).cast(pl.Int32)),
     )
-
-    paths_df2
-    return (paths_df2,)
-
-
-@app.cell
-def _(paths_df2):
-    paths_df2.select((pl.col("epoch_start").dt.replace_time_zone("UTC") == pl.col("start_time")))
+    df
     return
 
 
@@ -184,7 +138,7 @@ def _(ts_df):
 def _(all_metadata, ts_df):
     from datetime import datetime, timezone, timedelta
 
-    time_series_id = 21
+    time_series_id = 23
     start_date = datetime(2026, 3, 7, tzinfo=timezone.utc)
     duration = timedelta(weeks=10)
 
