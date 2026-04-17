@@ -30,6 +30,12 @@ def nged_json_to_metadata_df_and_time_series_df(
             - A DataFrame with the metadata.
             - A DataFrame with the power time series data.
     """
+    # TODO: Remove the `replace` line if/when NGED fix their archive JSON files.
+
+    # NGED's "archive" JSON files (the files that start in 2016) incorrectly use "NaN". But "NaN"
+    # isn't valid in JSON, and kills polars.read_json. So we must replace the invalid NaNs:
+    json_bytes = json_bytes.replace(b": NaN", b": null")
+
     df = pl.read_json(json_bytes)
 
     metadata_df = _extract_time_series_metadata(df)
