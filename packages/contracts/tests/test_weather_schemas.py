@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import patito as pt
 import polars as pl
-from contracts.weather_schemas import NwpInMemory, NwpOnDisk, NwpScalingParams
+from contracts.weather_schemas import NwpInMemory, NwpMetaData, NwpOnDisk, NwpScalingParams
 
 
 def test_nwp_scaling_roundtrip():
@@ -10,6 +10,7 @@ def test_nwp_scaling_roundtrip():
     in_memory_df = (
         pt.DataFrame(
             {
+                "nwp_model_id": "ECMWF_ENS_0_25_degree",
                 "init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
                 "ensemble_member": [1],
@@ -65,3 +66,10 @@ def test_nwp_scaling_roundtrip():
 
     # Check that temperature_2m is close to original (due to integer rounding)
     assert abs(back_in_memory_df["temperature_2m"][0] - in_memory_df["temperature_2m"][0]) < 1.0
+
+
+def test_nwp_metadata_load():
+    # The load method defaults to the correct path in metadata/
+    metadata = NwpMetaData.load()
+    assert metadata.height >= 1
+    assert "ECMWF_ENS_0_25_degree" in metadata["nwp_model_id"].to_list()

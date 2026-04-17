@@ -1,3 +1,2 @@
 nwp_model_id,provider,h3_resolution,is_ensemble
-ecmwf_ens_0_25_degree,ECMWF,5,true
-
+ECMWF_ENS_0_25_degree,ECMWF,5,true

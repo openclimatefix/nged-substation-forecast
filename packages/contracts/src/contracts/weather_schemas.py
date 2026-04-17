@@ -26,7 +26,7 @@ class NwpMetaData(pt.Model):
     """Metadata about numerical weather prediction models."""
 
     nwp_model_id: str = pt.Field(
-        dtype=pl.Enum(NwpModelId),
+        dtype=pl.Enum([model.name for model in NwpModelId]),
         description="The primary key for joining with NWP data.",
         unique=True,
     )
@@ -37,8 +37,8 @@ class NwpMetaData(pt.Model):
     @classmethod
     def load(cls, csv_path: Path = _NWP_METADATA_CSV_PATH) -> pt.DataFrame[Self]:
         """Load NWP metadata from a static CSV file."""
-        # We cast the Enum columns during read to ensure Patito validation passes
         df = pl.read_csv(csv_path)
+        # Patito's .cast() will handle the conversion to the Enum type defined in the model
         return pt.DataFrame(df).set_model(cls).cast().validate()
 
 
@@ -46,7 +46,7 @@ class _NwpBase(pt.Model):
     """Weather data schema for NWP forecasts, using"""
 
     nwp_model_id: str = pt.Field(
-        dtype=pl.Enum(NwpModelId),
+        dtype=NwpMetaData.dtypes["nwp_model_id"],
         description="The primary key for joining with NwpMetaData.",
     )
     init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
