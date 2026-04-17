@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
+from enum import StrEnum, auto
 from pathlib import Path
 from typing import Final, Self, overload
 
@@ -10,14 +11,51 @@ from contracts.common import validate_schema
 
 from .common import UTC_DATETIME_DTYPE
 
+_METADATA_PATH: Final[Path] = Path(__file__).parent.parent.parent.parent.parent / "metadata"
+_NWP_METADATA_CSV_PATH: Final[Path] = _METADATA_PATH / "nwp_metadata.csv"
+_SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH: Final[Path] = (
+    _METADATA_PATH / "scaling_params_for_ecmwf_ens_0_25_degree.csv"
+)
+
+
+class NwpModelId(StrEnum):
+    ECMWF_ENS_0_25_degree = auto()
+
+
+class NwpMetaData(pt.Model):
+    """Metadata about numerical weather prediction models."""
+
+    nwp_model_id: str = pt.Field(
+        dtype=pl.Enum(NwpModelId),
+        description="The primary key for joining with NWP data.",
+        unique=True,
+    )
+    provider: str = pt.Field(dtype=pl.Enum(["ECMWF"]))
+    h3_resolution: int = pt.Field(dtype=pl.Int8)
+    is_ensemble: bool
+
+    @classmethod
+    def load(cls, csv_path: Path = _NWP_METADATA_CSV_PATH) -> pt.DataFrame[Self]:
+        """Load NWP metadata from a static CSV file."""
+        # We cast the Enum columns during read to ensure Patito validation passes
+        df = pl.read_csv(csv_path)
+        return pt.DataFrame(df).set_model(cls).cast().validate()
+
 
 class _NwpBase(pt.Model):
     """Weather data schema for NWP forecasts, using"""
 
+    nwp_model_id: str = pt.Field(
+        dtype=pl.Enum(NwpModelId),
+        description="The primary key for joining with NwpMetaData.",
+    )
     init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
-    h3_index: int = pt.Field(dtype=pl.UInt64)
+    h3_index: int = pt.Field(
+        dtype=pl.UInt64,
+        description="The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
+    )
 
     # Categorical variables
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
@@ -273,6 +311,8 @@ class NwpScalingParams(pt.Model):
     buffered_max: float = pt.Field(dtype=pl.Float32)
 
     @classmethod
-    def load(cls, csv_path: Path) -> pt.DataFrame[Self]:
+    def load(
+        cls, csv_path: Path = _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH
+    ) -> pt.DataFrame[Self]:
         """Load scaling parameters from a CSV file."""
-        return cls.validate(pl.read_csv(csv_path))
+        return pt.DataFrame(pl.read_csv(csv_path)).set_model(cls).cast().validate()
