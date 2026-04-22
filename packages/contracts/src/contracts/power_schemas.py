@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Final, Self
+from typing import ClassVar, Final, Self
 
 import patito as pt
 import polars as pl
@@ -70,14 +70,8 @@ class PowerTimeSeries(pt.Model):
 
         return validated_df
 
-    @classmethod
-    def sort(cls, df: pt.DataFrame[Self]) -> pt.DataFrame[Self]:
-        return pt.DataFrame(df.sort(by=cls.columns_to_sort_by)).set_model(cls)
-
-    @classmethod
-    @property
-    def columns_to_sort_by(cls) -> list[str]:
-        return ["time_series_id", "time"]
+    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")
 
 
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (

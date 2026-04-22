@@ -41,7 +41,7 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
     log.info(f"Preparing to append_to_delta at {delta_path}...")
 
     new_power_ts = _select_new_rows(power_time_series, delta_path)
-    new_power_ts = PowerTimeSeries.sort(new_power_ts)
+    new_power_ts = new_power_ts.sort(by=PowerTimeSeries.columns_to_sort_by)
 
     log.info(
         f"Appending {new_power_ts.height:,d} rows of new PowerTimeSeries"
@@ -103,7 +103,7 @@ def load_new_data_from_nged_s3(
     time_series_df = (
         pl.concat(power_time_series_dfs)
         .unique(subset=["time_series_id", "time"], keep="last")
-        .sort(PowerTimeSeries.columns_to_sort_by)
+        .sort(by=PowerTimeSeries.columns_to_sort_by)
     )
 
     return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)

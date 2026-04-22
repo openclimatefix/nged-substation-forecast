@@ -30,10 +30,10 @@ def nged_json_to_metadata_df_and_time_series_df(
             - A DataFrame with the metadata.
             - A DataFrame with the power time series data.
     """
-    # TODO: Remove the `replace` line if/when NGED fix their archive JSON files.
 
     # NGED's "archive" JSON files (the files that start in 2016) incorrectly use "NaN". But "NaN"
     # isn't valid in JSON, and kills polars.read_json. So we must replace the invalid NaNs:
+    # TODO: James has fixed the NaNs in the JSONs. Remove this line once I've validated James' fix.
     json_bytes = json_bytes.replace(b": NaN", b": null")
 
     df = pl.read_json(json_bytes)
@@ -83,9 +83,9 @@ def _extract_power_time_series(
 
     time_series_df = time_series_df.with_columns(time_series_id=pl.lit(time_series_id))
     time_series_df = pt.DataFrame(time_series_df).set_model(PowerTimeSeries).drop().cast()
-    time_series_df = PowerTimeSeries.sort(time_series_df)
+    time_series_df = time_series_df.sort(by=PowerTimeSeries.columns_to_sort_by)
 
-    return time_series_df.validate()
+    return PowerTimeSeries.validate(time_series_df)
 
 
 def _camel_to_snake(camel_str: str) -> str:
