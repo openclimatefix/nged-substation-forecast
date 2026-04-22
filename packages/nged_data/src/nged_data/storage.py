@@ -104,7 +104,7 @@ def load_new_data_from_nged_s3(
 
             # TODO: Handle exception when JSON has null `data` field. James says:
             # "@Ben Willoughby can confirm, but I think that [null `data` fields] is the expected
-            # behaviour for when no values were recorded by the monitor.
+            # behaviour for when no values were recorded by the monitor."
             new_metadata_df, new_time_series_df = nged_json_to_metadata_df_and_time_series_df(
                 json_bytes
             )
