@@ -23,7 +23,10 @@ class _NgedJsonFileListing(pt.Model):
     time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
     end_time: int = pt.Field(
         dtype=PowerTimeSeries.dtypes["time"],
-        description="The end time of the JSON file, according to the Unix epoch in the path",
+        description=(
+            "The end of the time window recorded by the time series data in the JSON file,"
+            " according to the Unix epoch in the path"
+        ),
     )
 
 
@@ -37,7 +40,7 @@ def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path
     """
     log.info(f"Preparing to append_to_delta at {delta_path}...")
 
-    new_power_ts = _select_rows_more_recent_than_in_delta_table(power_time_series, delta_path)
+    new_power_ts = _select_new_rows(power_time_series, delta_path)
     new_power_ts = PowerTimeSeries.sort(new_power_ts)
 
     log.info(
@@ -76,7 +79,7 @@ def load_new_data_from_nged_s3(
     paths_df = paths_df.sort("end_time")
     paths_df = _NgedJsonFileListing.validate(paths_df)
 
-    paths_df = _select_rows_more_recent_than_in_delta_table(paths_df, delta_path)
+    paths_df = _select_new_rows(paths_df, delta_path)
 
     # Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     # there are any duplicates.
@@ -100,7 +103,7 @@ def load_new_data_from_nged_s3(
     time_series_df = (
         pl.concat(power_time_series_dfs)
         .unique(subset=["time_series_id", "time"], keep="last")
-        .sort(TimeSeriesMetadata.sort_by_columns)
+        .sort(PowerTimeSeries.columns_to_sort_by)
     )
 
     return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
@@ -119,20 +122,20 @@ def get_nged_s3_store() -> obstore.store.S3Store:
 
 
 @overload
-def _select_rows_more_recent_than_in_delta_table(
+def _select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
     delta_path: Path,
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
 @overload
-def _select_rows_more_recent_than_in_delta_table(
+def _select_new_rows(
     time_series: pt.DataFrame[_NgedJsonFileListing],
     delta_path: Path,
 ) -> pt.DataFrame[_NgedJsonFileListing]: ...
 
 
-def _select_rows_more_recent_than_in_delta_table(
+def _select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing],
     delta_path: Path,
 ) -> pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing]:
