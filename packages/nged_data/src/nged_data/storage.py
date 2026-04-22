@@ -61,25 +61,36 @@ def load_new_data_from_nged_s3(
     delta_path: Path,
 ) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
     store = get_nged_s3_store()
-    paths = []
-    for listing in store.list(prefix="timeseries"):
-        paths_for_chunk = [item["path"] for item in listing if item["path"].endswith(".json")]
+
+    # List all the JSON files on NGED's S3. The paths will be of the form:
+    # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    paths: list[str] = []
+    for chunk in store.list(prefix="timeseries"):
+        # `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.
+        paths_for_chunk = [item["path"] for item in chunk if item["path"].endswith(".json")]
         paths.extend(paths_for_chunk)
 
     # Create DataFrame of paths.
     paths_df = pl.DataFrame({"path": paths}).with_columns(
+        # Extract the end time:    ↓↓↓↓↓↓↓↓↓↓↓↓↓
+        # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
         end_time=(
             pl.col("path")
             .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
             .cast(pl.Int64)
             .cast(pl.Datetime("ms", time_zone="UTC"))
         ),
+        # Extract the time series ID:                       ↓↓
+        # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
         time_series_id=(pl.col("path").str.extract(r"TimeSeries_(\d+)", 1).cast(pl.Int32)),
     )
     paths_df = paths_df.sort("end_time")
     paths_df = _NgedJsonFileListing.validate(paths_df)
 
     paths_df = _select_new_rows(paths_df, delta_path)
+    # TODO: All the code in this function above this line should probably in a separate function,
+    # that will be wrapped in a Dagster ConfigurableResource. See:
+    # https://github.com/openclimatefix/nged-substation-forecast/issues/115
 
     # Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     # there are any duplicates.
@@ -90,7 +101,10 @@ def load_new_data_from_nged_s3(
             # TODO: Use `store.get_async` to get all files for this group concurrently.
             result = store.get(path)
             json_bytes = bytes(result.bytes())
-            # TODO: Handle exception when JSON has null `data` field.
+
+            # TODO: Handle exception when JSON has null `data` field. James says:
+            # "@Ben Willoughby can confirm, but I think that [null `data` fields] is the expected
+            # behaviour for when no values were recorded by the monitor.
             new_metadata_df, new_time_series_df = nged_json_to_metadata_df_and_time_series_df(
                 json_bytes
             )
@@ -142,7 +156,6 @@ def _select_new_rows(
     """
     Filter `time_series` the find rows that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
-    If max_time is null for this time_series_id then this time_series_id is new.
     """
 
     if not delta_path.exists():
@@ -152,10 +165,7 @@ def _select_new_rows(
     # Scan the existing delta table and find the max time per time_series_id
     max_times = cast(
         pl.DataFrame,  # Cast to pl.DataFrame to keep type checkers happy.
-        pl.scan_delta(delta_path)
-        .group_by("time_series_id")
-        .agg(pl.max("time").alias("max_time"))
-        .collect(),
+        pl.scan_delta(delta_path).group_by("time_series_id").agg(max_time=pl.max("time")).collect(),
     )
 
     log.info(
@@ -166,6 +176,7 @@ def _select_new_rows(
 
     _MaxTimePerTimeSeriesId.validate(max_times)
 
+    # Check whether `time_series` is a `PowerTimeSeries` or a `_NgedJsonFileListing`
     if "time" in time_series.columns:
         pt_model = PowerTimeSeries
         time_col = "time"
@@ -174,13 +185,15 @@ def _select_new_rows(
         time_col = "end_time"
     else:
         raise ValueError(
-            f"Expected `time_series` to have either a `time` column or an `end_time` column. {time_series.columns=}"
+            "Expected `time_series` to have either a `time` column or an `end_time` column,"
+            f" not {time_series.columns=}"
         )
 
     return cast(
         pt.DataFrame[pt_model],
         time_series.lazy()
         .join(max_times.lazy(), on="time_series_id", how="left")
+        # If max_time is null for this time_series_id then this is a new time_series_id.
         .filter(pl.col("max_time").is_null() | (pl.col(time_col) > pl.col("max_time")))
         .drop("max_time")
         .collect(),
