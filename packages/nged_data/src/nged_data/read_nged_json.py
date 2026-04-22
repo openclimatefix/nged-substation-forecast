@@ -10,6 +10,9 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 # H3 resolution for TimeSeriesMetadata, say res 9, and then use `polars_h3.cell_to_parent` to
 # dynamically convert `TimeSeriesMetadata.h3_res_9` to `NwpMetaData.h3_resolution` before joining.
 # See https://github.com/openclimatefix/nged-substation-forecast/issues/114
+#
+# For now, to keep things simple, we're just fixing the H3 resolution to 5 for the ECMWF NWP and for
+# the NGED locations.
 _H3_RESOLUTION: Final[int] = 5
 
 
