@@ -215,5 +215,7 @@ class PowerForecast(pt.Model):
         description=(
             "The power forecast itself in units of MW (active power) or MVA (apparent power)."
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
+            """ Positive values mean "power sent to NGED's grid","""
+            """ and negative values mean "power drawn from NGED's grid"."""
         ),
     )
