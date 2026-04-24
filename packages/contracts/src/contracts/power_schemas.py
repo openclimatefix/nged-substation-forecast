@@ -196,9 +196,11 @@ class PowerForecast(pt.Model):
         dtype=pl.Categorical,
         description=(
             "Identifier for our ML-based power forecasting model."
-            "This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`."
+            " This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`."
         ),
     )
+
+    power_fcst_model_version: int = pt.Field(dtype=pl.Int16)
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
