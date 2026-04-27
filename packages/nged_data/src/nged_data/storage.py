@@ -131,7 +131,9 @@ def load_new_data_from_nged_s3(
 
     # Concatenate and return:
     metadata_df = (
-        pl.concat(metadata_dfs).unique(subset="time_series_id", keep="last").sort("time_series_id")
+        pl.concat(metadata_dfs, how="diagonal")
+        .unique(subset="time_series_id", keep="last")
+        .sort("time_series_id")
     )
     time_series_df = (
         pl.concat(power_time_series_dfs)
