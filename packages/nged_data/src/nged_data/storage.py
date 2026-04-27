@@ -80,7 +80,7 @@ def load_new_data_from_nged_s3(
             pl.col("path")
             .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
             .cast(pl.Int64)
-            .cast(pl.Datetime("ms", time_zone="UTC"))
+            .cast(pl.Datetime("us", time_zone="UTC"))
         ),
         # Extract the time series ID:                       ↓↓
         # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
