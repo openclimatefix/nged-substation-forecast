@@ -4,7 +4,7 @@ from pathlib import Path
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data.storage import append_to_delta, upsert_metadata
+from nged_data.storage import append_time_series_to_delta_table, upsert_metadata
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -121,7 +121,7 @@ def test_append_to_delta_new_table(tmp_path: Path):
         .validate()
     )
 
-    append_to_delta(data, delta_path)
+    append_time_series_to_delta_table(data, delta_path)
 
     assert delta_path.exists()
 

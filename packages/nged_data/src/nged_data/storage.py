@@ -30,7 +30,9 @@ class _NgedJsonFileListing(pt.Model):
     )
 
 
-def append_to_delta(power_time_series: pt.DataFrame[PowerTimeSeries], delta_path: Path) -> None:
+def append_time_series_to_delta_table(
+    power_time_series: pt.DataFrame[PowerTimeSeries], delta_path: Path
+) -> None:
     """
     Appends data to a Delta table, ensuring no duplicates based on (time_series_id, period_end_time).
 
