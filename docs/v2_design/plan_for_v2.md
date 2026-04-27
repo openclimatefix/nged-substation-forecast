@@ -17,23 +17,6 @@ The project is structured as a modular monorepo using `uv` workspaces. The core 
 
 The codebase is divided into several packages under `packages/` (e.g., `contracts`, `ml_core`, `nged_data`, `xgboost_forecaster`) and a main Dagster application under `src/nged_substation_forecast/`.
 
-## Ingesting Power Data from NGED
-
-The ingestion pipeline is orchestrated by Dagster assets in `src/nged_substation_forecast/defs/nged_assets.py`.
-
-*   **Raw Data:** NGED provides power time-series data in JSON format.
-*   **Processing:** The `process_nged_json_file` function loads the JSON, extracts metadata, and validates the time-series data against the `PowerTimeSeries` Patito schema.
-*   **Storage:** Validated data is appended to a Delta table (`raw_power_time_series`).
-*   **Assets:** There are assets for:
-    - historical backfills (`nged_json_archive_asset`),
-    - live updates (`nged_json_live_asset`) - NGED will provide new JSON files every 6 hours. The
-      JSON files will each contain the last 2 weeks of data. So we must be sure we only append new
-      data to the Delta table,
-    - and a temporary SharePoint drop `nged_sharepoint_json_asset` (this asset will be removed after testing)
-
-### Manual TODO
-- [ ] Manually tweak `process_nged_json_file`.
-
 
 ## Data Cleaning
 
@@ -44,14 +27,6 @@ Data cleaning is handled by `cleaned_power_time_series` in `src/nged_substation_
     2.  **Insane Power:** Values outside the physically plausible range (-20.0 MW to 100.0 MW).
 *   **Null Preservation:** Crucially, bad values are replaced with `null` rather than being dropped or imputed. This preserves the strict 30-minute temporal grid required for downstream feature engineering (lags, rolling means).
 *   **Partitioning:** The asset uses a 1-day lookback when scanning the Delta table to ensure rolling window calculations have sufficient history at partition boundaries.
-
-## NWP Data
-
-* Maybe have two NWP contracts:
-    - NwpFloat32 (this is what we first put the NWP data into when it first arrives from Dynamical.
-      And also where we put the Nwp data after loading and rescaling back to physical.) Uses Patito
-      `derive` to calculate wind speed and direction and wind chill from u- and v-components.
-    - NwpInt12 (what's saved on disk). Has two methods: `from_float32` and `to_float32`.
 
 ## Model Training & Evaluation
 
