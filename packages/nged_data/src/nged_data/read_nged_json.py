@@ -37,7 +37,7 @@ def nged_json_to_metadata_df_and_time_series_df(
     # NGED's "archive" JSON files (the files that start in 2016) incorrectly use "NaN". But "NaN"
     # isn't valid in JSON, and kills polars.read_json. So we must replace the invalid NaNs:
     # TODO: James has fixed the NaNs in the JSONs. Remove this line once I've validated James' fix.
-    json_bytes = json_bytes.replace(b": NaN", b": null")
+    # json_bytes = json_bytes.replace(b": NaN", b": null")
 
     df = pl.read_json(json_bytes)
 
