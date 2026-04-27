@@ -21,7 +21,7 @@ The forecasting models rely on Numerical Weather Prediction (NWP) data. Our requ
 * **Why it was rejected:** Extremely inflexible. Changing from 1 to 3 NWPs requires changing function signatures across the entire ML pipeline and interface.
 
 ### Option C: Enum List in Config & Dict of DataFrames
-* **Description:** 
+* **Description:**
   1. Configuration defines a list of requested NWP sources using an `NwpModel` Enum (parsed via Pydantic).
   2. The orchestration layer loads the data and passes it to the `BaseForecaster` interface as a dictionary: `dict[NwpModel, pl.DataFrame]`.
   3. Inside the forecaster's feature engineering logic, columns are automatically prefixed with the Enum's name (e.g., `NwpModel.ECMWF.value + "_temperature"`) before joining or feature extraction.

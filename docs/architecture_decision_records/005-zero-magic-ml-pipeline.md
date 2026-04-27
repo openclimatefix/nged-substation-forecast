@@ -9,7 +9,7 @@ tags: ["mlops", "architecture", "dagster", "mlflow", "pythonic"]
 
 ## 1. Context & Problem Statement
 
-We needed a way to orchestrate the training and evaluation of multiple ML architectures (e.g., XGBoost, GNNs) using Dagster and MLflow. 
+We needed a way to orchestrate the training and evaluation of multiple ML architectures (e.g., XGBoost, GNNs) using Dagster and MLflow.
 
 Initially, we considered a highly abstracted "Write-Once" pipeline using Dagster Asset Factories, Pydantic data wrappers, and MLflow's generic `pyfunc` interface. This would allow a single `train` and `evaluate` asset definition to handle any model dynamically based on configuration.
 
@@ -30,7 +30,7 @@ However, this "magical" approach introduced significant cognitive load, disconne
 
 ## 3. Decision
 
-We chose **Option C: The "Zero Magic" Pythonic Architecture**. 
+We chose **Option C: The "Zero Magic" Pythonic Architecture**.
 
 Specifically, we implemented the following design patterns:
 1. **Explicit Dagster Assets**: We write explicit, "tiny wrapper" assets for each ML architecture. This makes the DAG instantly understandable and grep-able.

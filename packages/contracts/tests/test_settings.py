@@ -1,34 +1,25 @@
 import pytest
-from contracts.settings import Settings
+from pydantic import ValidationError
+from contracts.settings import DataQualitySettings, Settings
 
 
-def test_settings_load_from_env(monkeypatch):
-    monkeypatch.setenv("NGED_CKAN_TOKEN", "test_ckan_token")
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "http://test.s3.bucket")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "test_access_key")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "test_secret")
-
-    settings = Settings()
-
-    assert settings.nged_ckan_token == "test_ckan_token"
-    assert settings.nged_s3_bucket_url == "http://test.s3.bucket"
-    assert settings.nged_s3_bucket_access_key == "test_access_key"
-    assert settings.nged_s3_bucket_secret == "test_secret"
+def test_data_quality_settings_defaults():
+    settings = DataQualitySettings()
+    assert settings.stuck_std_threshold == 0.01
+    assert settings.max_mw_threshold == 150.0
+    assert settings.min_mw_threshold == -50.0
 
 
-def test_settings_no_defaults(monkeypatch):
-    # Ensure no env vars are interfering
-    monkeypatch.delenv("NGED_CKAN_TOKEN", raising=False)
-    monkeypatch.delenv("NGED_S3_BUCKET_URL", raising=False)
-    monkeypatch.delenv("NGED_S3_BUCKET_ACCESS_KEY", raising=False)
-    monkeypatch.delenv("NGED_S3_BUCKET_SECRET", raising=False)
+def test_settings_validation_missing_required():
+    # nged_s3_bucket_url, nged_s3_bucket_access_key, nged_s3_bucket_secret are required
+    with pytest.raises(ValidationError):
+        Settings()
 
-    from pydantic import ValidationError
-    from pydantic_settings import SettingsConfigDict
 
-    # Force a non-existent env file to ensure no loading from disk
-    class IsolatedSettings(Settings):
-        model_config = SettingsConfigDict(env_file="/non/existent/path")
-
-    with pytest.raises(ValidationError, match="nged_s3_bucket_access_key"):
-        IsolatedSettings()
+def test_settings_validation_invalid_url():
+    with pytest.raises(ValidationError, match="Input should be a valid URL"):
+        Settings(
+            nged_s3_bucket_url="not-a-url",
+            nged_s3_bucket_access_key="key",
+            nged_s3_bucket_secret="secret",
+        )

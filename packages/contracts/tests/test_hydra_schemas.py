@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from contracts.hydra_schemas import (
     DataSplitConfig,
     ModelFeaturesConfig,
-    NwpModel,
+    ModelConfig,
     TrainingConfig,
 )
 
@@ -12,10 +12,10 @@ from contracts.hydra_schemas import (
 def test_valid_training_config():
     valid_dict = {
         "data_split": {
-            "train_start": "2019-01-01",
-            "train_end": "2022-12-31",
-            "test_start": "2023-01-01",
-            "test_end": "2023-12-31",
+            "train_start": date(2019, 1, 1),
+            "train_end": date(2022, 12, 31),
+            "test_start": date(2023, 1, 1),
+            "test_end": date(2023, 12, 31),
         },
         "model": {
             "power_fcst_model_name": "xgboost",
@@ -25,14 +25,15 @@ def test_valid_training_config():
                 "max_depth": 6,
             },
             "features": {
-                "nwps": ["ecmwf_ens_0_25deg"],
+                "feature_names": ["temp", "wind"],
             },
         },
+        "train_on_nwp_ensemble_member": "control_member_only",
     }
     config = TrainingConfig(**valid_dict)  # type: ignore
     assert config.model.power_fcst_model_name == "xgboost"
     assert config.model.hyperparameters["learning_rate"] == 0.01
-    assert config.model.features.nwps == [NwpModel.ECMWF_ENS_0_25DEG]
+    assert config.model.features.feature_names == ["temp", "wind"]
 
 
 def test_missing_required_field():
@@ -46,4 +47,4 @@ def test_missing_required_field():
 
 def test_valid_model_features_config_empty():
     config = ModelFeaturesConfig()
-    assert config.nwps == []
+    assert config.feature_names == []

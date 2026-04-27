@@ -1,82 +1,131 @@
-import pytest
-import polars as pl
-import patito as pt
+from datetime import datetime, timezone
 from pathlib import Path
-from datetime import datetime
-from unittest.mock import patch
-from nged_data.storage import append_to_delta
-from contracts.data_schemas import PowerTimeSeries
+
+import patito as pt
+import polars as pl
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from nged_data.storage import append_time_series_to_delta_table, upsert_metadata
 
 
-@pytest.fixture
-def mock_delta_table():
-    with patch("nged_data.storage.DeltaTable") as mock_dt:
-        yield mock_dt
+def test_upsert_metadata_new_file(tmp_path: Path):
+    metadata_path = tmp_path / "metadata.parquet"
 
-
-@pytest.fixture
-def mock_write_deltalake():
-    with patch("nged_data.storage.write_deltalake") as mock_write:
-        yield mock_write
-
-
-def test_append_to_delta_new_table(tmp_path: Path, mock_write_deltalake):
-    delta_path = tmp_path / "delta"
-
-    # Create a dummy Patito DataFrame
-    df = pt.DataFrame[PowerTimeSeries](
-        pl.DataFrame(
-            {
-                "time_series_id": [1],
-                "period_end_time": [datetime(2026, 1, 1)],
-                "power": [10.0],
-            }
+    # Create dummy metadata
+    metadata = (
+        pt.DataFrame(
+            [
+                {
+                    "time_series_id": 1,
+                    "time_series_name": "Test Substation",
+                    "time_series_type": "Disaggregated Demand",
+                    "units": "MW",
+                    "licence_area": "EMids",
+                    "substation_number": 1,
+                    "substation_type": "Primary",
+                    "latitude": 52.0,
+                    "longitude": -1.0,
+                    "h3_res_5": 599423199024775167,
+                }
+            ]
         )
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
     )
 
-    append_to_delta(df, delta_path)
+    upsert_metadata(metadata, metadata_path)
 
-    mock_write_deltalake.assert_called_once()
-    args, kwargs = mock_write_deltalake.call_args
-    assert args[0] == delta_path
-    assert kwargs["mode"] == "overwrite"
+    assert metadata_path.exists()
+
+    # Read back and verify
+    read_metadata = pl.read_parquet(metadata_path)
+    assert read_metadata.height == 1
+    assert read_metadata["time_series_id"].item() == 1
 
 
-def test_append_to_delta_existing_table(tmp_path: Path, mock_delta_table, mock_write_deltalake):
-    delta_path = tmp_path / "delta"
-    delta_path.mkdir()
+def test_upsert_metadata_merge(tmp_path: Path):
+    metadata_path = tmp_path / "metadata.parquet"
 
-    # Mock existing keys
-    mock_dt = mock_delta_table.return_value
-    mock_dt.to_pyarrow_table.return_value = pl.DataFrame(
-        {
-            "time_series_id": [1],
-            "period_end_time": [datetime(2026, 1, 1)],
-        }
-    ).to_arrow()
-
-    # Create a dummy Patito DataFrame with new data
-    df = pt.DataFrame[PowerTimeSeries](
-        pl.DataFrame(
-            {
-                "time_series_id": [1, 2],
-                "period_end_time": [datetime(2026, 1, 1), datetime(2026, 1, 2)],
-                "power": [10.0, 20.0],
-            }
+    # Create initial metadata
+    initial_metadata = (
+        pt.DataFrame(
+            [
+                {
+                    "time_series_id": 1,
+                    "time_series_name": "Old Name",
+                    "time_series_type": "Disaggregated Demand",
+                    "units": "MW",
+                    "licence_area": "EMids",
+                    "substation_number": 1,
+                    "substation_type": "Primary",
+                    "latitude": 52.0,
+                    "longitude": -1.0,
+                    "h3_res_5": 599423199024775167,
+                }
+            ]
         )
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
     )
 
-    append_to_delta(df, delta_path)
+    initial_metadata.write_parquet(metadata_path)
 
-    # Should have called write_deltalake with only the new data (time_series_id=2)
-    mock_write_deltalake.assert_called_once()
-    args, kwargs = mock_write_deltalake.call_args
-    assert args[0] == delta_path
-    assert kwargs["mode"] == "append"
+    # Create new metadata for same ID
+    new_metadata = (
+        pt.DataFrame(
+            [
+                {
+                    "time_series_id": 1,
+                    "time_series_name": "New Name",
+                    "time_series_type": "Disaggregated Demand",
+                    "units": "MW",
+                    "licence_area": "EMids",
+                    "substation_number": 1,
+                    "substation_type": "Primary",
+                    "latitude": 52.0,
+                    "longitude": -1.0,
+                    "h3_res_5": 599423199024775167,
+                }
+            ]
+        )
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
+    )
 
-    # Check that only the new data was written
-    written_df = pl.from_arrow(args[1])
-    assert len(written_df) == 1
-    from typing import cast
+    upsert_metadata(new_metadata, metadata_path)
 
-    assert cast(pl.DataFrame, written_df).item(0, "time_series_id") == 2
+    # Read back and verify
+    read_metadata = pl.read_parquet(metadata_path)
+    assert read_metadata.height == 1
+    assert read_metadata["time_series_name"].item() == "New Name"
+
+
+def test_append_to_delta_new_table(tmp_path: Path):
+    delta_path = tmp_path / "delta_table"
+
+    # Create dummy power time series
+    data = (
+        pt.DataFrame(
+            [
+                {
+                    "time_series_id": 1,
+                    "time": datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
+                    "power": 10.0,
+                }
+            ]
+        )
+        .set_model(PowerTimeSeries)
+        .cast()
+        .validate()
+    )
+
+    append_time_series_to_delta_table(data, delta_path)
+
+    assert delta_path.exists()
+
+    # Read back and verify
+    read_data = pl.read_delta(delta_path)
+    assert read_data.height == 1
+    assert read_data["time_series_id"].item() == 1
