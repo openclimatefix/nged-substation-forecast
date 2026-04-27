@@ -8,7 +8,10 @@ import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import PROJECT_ROOT, Settings
 
-from nged_data.read_nged_json import nged_json_to_metadata_df_and_time_series_df
+from nged_data.read_nged_json import (
+    _extract_power_time_series,
+    _extract_time_series_metadata,
+)
 
 log = logging.getLogger(__name__)
 
@@ -103,16 +106,30 @@ def load_new_data_from_nged_s3(
             # TODO: Use `store.get_async` to get all files for this group concurrently.
             result = store.get(path)
             json_bytes = bytes(result.bytes())
+            df = pl.read_json(json_bytes)
 
-            # TODO: Handle exception when JSON has null `data` field. James says:
-            # "@Ben Willoughby can confirm, but I think that [null `data` fields] is the expected
-            # behaviour for when no values were recorded by the monitor."
-            new_metadata_df, new_time_series_df = nged_json_to_metadata_df_and_time_series_df(
-                json_bytes
-            )
+            # Extract TimeSeriesMetadata from df:
+            new_metadata_df = _extract_time_series_metadata(df)
             metadata_dfs.append(new_metadata_df)
-            power_time_series_dfs.append(new_time_series_df)
+            time_series_id: int = new_metadata_df["time_series_id"].item()
 
+            # Extract PowerTimeSeries from df:
+            try:
+                new_time_series_df = _extract_power_time_series(
+                    df=df, time_series_id=time_series_id
+                )
+            except pl.exceptions.InvalidOperationError as e:
+                if "invalid dtype: expected 'Struct', got 'Null' for 'data'" in str(e):
+                    log.warning(
+                        f"The 'data' field is 'null' in {path=}. This is expected behaviour if"
+                        " NGED's meter reported no values for the period covered by the JSON file."
+                    )
+                else:
+                    raise
+            else:
+                power_time_series_dfs.append(new_time_series_df)
+
+    # Concatenate and return:
     metadata_df = (
         pl.concat(metadata_dfs).unique(subset="time_series_id", keep="last").sort("time_series_id")
     )
