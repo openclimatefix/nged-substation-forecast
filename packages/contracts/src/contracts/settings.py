@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -72,6 +73,16 @@ class Settings(BaseSettings):
     nged_s3_bucket_url: str = Field(...)
     nged_s3_bucket_access_key: str = Field(...)
     nged_s3_bucket_secret: str = Field(...)
+
+    def get_nged_s3_store(self) -> obstore.store.S3Store:
+        """Returns an initialized obstore.store.S3Store instance for the NGED bucket."""
+        return obstore.store.S3Store.from_url(
+            url=self.nged_s3_bucket_url,
+            config={
+                "aws_access_key_id": self.nged_s3_bucket_access_key,
+                "aws_secret_access_key": self.nged_s3_bucket_secret,
+            },
+        )
 
     # ECMWF source bucket.
     ecmwf_s3_bucket: str = Field(
