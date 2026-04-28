@@ -1,3 +1,4 @@
+from contracts.common import UTC_DATETIME_DTYPE
 import logging
 from pathlib import Path
 from typing import cast, overload
@@ -15,22 +16,6 @@ from nged_data.read_nged_json import (
 
 log = logging.getLogger(__name__)
 
-
-class _MaxTimePerTimeSeriesId(pt.Model):
-    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
-    max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
-
-
-class _NgedJsonFileListing(pt.Model):
-    path: str
-    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
-    end_time: int = pt.Field(
-        dtype=PowerTimeSeries.dtypes["time"],
-        description=(
-            "The end of the time window recorded by the time series data in the JSON file,"
-            " according to the Unix epoch in the path"
-        ),
-    )
 
 
 def append_time_series_to_delta_table(
@@ -62,11 +47,26 @@ def append_time_series_to_delta_table(
         )
 
 
+
+class _NgedJsonFileListing(pt.Model):
+    path: str
+    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
+    end_time: int = pt.Field(
+        dtype=PowerTimeSeries.dtypes["time"],
+        description=(
+            "The end of the time window recorded by the time series data in the JSON file,"
+            " according to the Unix epoch in the path"
+        ),
+    )
+
 def get_new_file_listing(
     store: obstore.store.S3Store, delta_path: Path
 ) -> pt.DataFrame[_NgedJsonFileListing]:
-    # List all the JSON files on NGED's S3. The paths will be of the form:
-    # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    """List all the timeseries JSON files in NGED's S3 bucket. 
+
+    The paths will be of the form:
+    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+    """
     paths: list[str] = []
     for chunk in store.list(prefix="timeseries"):
         # `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.
@@ -81,7 +81,7 @@ def get_new_file_listing(
             pl.col("path")
             .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
             .cast(pl.Int64)
-            .cast(pl.Datetime("us", time_zone="UTC"))
+            .cast(UTC_DATETIME_DTYPE)
         ),
         # Extract the time series ID:                       ↓↓
         # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
@@ -162,6 +162,10 @@ def get_nged_s3_store() -> obstore.store.S3Store:
         },
     )
 
+
+class _MaxTimePerTimeSeriesId(pt.Model):
+    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
+    max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
 
 @overload
 def _select_new_rows(
