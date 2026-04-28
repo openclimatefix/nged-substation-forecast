@@ -2,7 +2,8 @@ from contracts.settings import Settings
 from dagster import AssetExecutionContext, asset
 from nged_data.storage import (
     append_time_series_to_delta_table,
-    load_new_data_from_nged_s3,
+    download_and_parse_files,
+    get_new_file_listing,
     upsert_metadata,
 )
 from nged_substation_forecast.resources import S3Resource
@@ -31,9 +32,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # Fetch new data from S3, using the existing delta table to determine what's new
     # Using injected S3Resource
     s3_resource = context.resources.s3
-    new_metadata, new_time_series = load_new_data_from_nged_s3(
-        delta_path, store=s3_resource.get_store()
-    )
+    store = s3_resource.get_store()
+    paths_df = get_new_file_listing(store, delta_path)
+    new_metadata, new_time_series = download_and_parse_files(store, paths_df)
 
     append_time_series_to_delta_table(new_time_series, delta_path)
     upsert_metadata(new_metadata, metadata_path)
