@@ -6,7 +6,6 @@ from nged_data.storage import (
     get_new_file_listing,
     upsert_metadata,
 )
-from nged_substation_forecast.resources import S3Resource
 
 
 @asset
@@ -30,9 +29,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     metadata_path = settings.nged_data_path / "metadata.parquet"
 
     # Fetch new data from S3, using the existing delta table to determine what's new
-    # Using injected S3Resource
-    s3_resource = context.resources.s3
-    store = s3_resource.get_store()
+    # We are deliberately keeping it simple for now, but may move to a ConfigurableResource in the future.
+    store = Settings().get_nged_s3_store()
     paths_df = get_new_file_listing(store, delta_path)
     new_metadata, new_time_series = download_and_parse_files(store, paths_df)
 
