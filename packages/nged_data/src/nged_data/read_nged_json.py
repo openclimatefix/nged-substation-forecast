@@ -24,8 +24,10 @@ _H3_RESOLUTION: Final[int] = 5
 
 
 def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMetadata]:
-    # Extract metadata: all columns except 'data'.
-    # This assumes that all columns other than 'data' are metadata.
+    """Extract TimeSeriesMetadata from NGED's JSON data converted to DataFrame.
+
+    This assumes that all columns other than 'data' are metadata.
+    """
     metadata_df = df.drop("data")
 
     metadata_df = metadata_df.unnest("Area", separator="_")
@@ -46,7 +48,7 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
 def _extract_power_time_series(
     df: pl.DataFrame, time_series_id: int
 ) -> pt.DataFrame[PowerTimeSeries]:
-    """Extract PowerTimeSeries from JSON data converted to DataFrame.
+    """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
     If NGED's meter reported no values, then the `data` field in the JSON will be Null,
     and this function will raise the following exception:

@@ -1,10 +1,10 @@
 from pathlib import Path
 
-import pytest
 import patito as pt
 import polars as pl
+import pytest
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data.read_nged_json import nged_json_to_metadata_df_and_time_series_df
+from nged_data.read_nged_json import _extract_power_time_series, _extract_time_series_metadata
 
 
 @pytest.mark.parametrize(
@@ -26,7 +26,10 @@ def test_nged_json_to_metadata_df_and_time_series_df(
     with open(file_path, "rb") as f:
         json_bytes = f.read()
 
-    metadata_df, time_series_df = nged_json_to_metadata_df_and_time_series_df(json_bytes)
+    df = pl.read_json(json_bytes)
+    metadata_df = _extract_time_series_metadata(df)
+    time_series_id = metadata_df["time_series_id"].item()
+    time_series_df = _extract_power_time_series(df, time_series_id)
 
     TimeSeriesMetadata.validate(metadata_df)
     PowerTimeSeries.validate(time_series_df)
@@ -46,13 +49,15 @@ def test_nged_json_to_metadata_df_and_time_series_df(
 def test_nged_json_to_metadata_df_and_time_series_df_invalid_json():
     # JSON missing required fields
     invalid_json = b'{"some": "data"}'
+    df = pl.read_json(invalid_json)
     with pytest.raises((pt.exceptions.DataFrameValidationError, pl.exceptions.ColumnNotFoundError)):
-        nged_json_to_metadata_df_and_time_series_df(invalid_json)
+        _extract_time_series_metadata(df)
 
 
 def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():
     # Valid JSON structure but invalid data types
     # The function expects a specific structure, so this might fail earlier
     invalid_json = b'{"time_series_id": 1, "Area": {"latitude": 50, "longitude": 0}, "data": [{"endTime": "2026-01-01T00:00:00Z", "value": "not_a_float"}]}'
+    df = pl.read_json(invalid_json)
     with pytest.raises(Exception):
-        nged_json_to_metadata_df_and_time_series_df(invalid_json)
+        _extract_time_series_metadata(df)

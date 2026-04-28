@@ -3,8 +3,9 @@ from pathlib import Path
 
 import patito as pt
 import polars as pl
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data.storage import append_time_series_to_delta_table, upsert_metadata
+import pytest
+from contracts.power_schemas import TimeSeriesMetadata
+from nged_data.storage import _parse_file_listing, _RawFileListing, upsert_metadata
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -102,30 +103,150 @@ def test_upsert_metadata_merge(tmp_path: Path):
     assert read_metadata["time_series_name"].item() == "New Name"
 
 
-def test_append_to_delta_new_table(tmp_path: Path):
-    delta_path = tmp_path / "delta_table"
+def test_upsert_metadata_returns_diff(tmp_path: Path):
+    metadata_path = tmp_path / "metadata.parquet"
 
-    # Create dummy power time series
-    data = (
-        pt.DataFrame(
-            [
-                {
-                    "time_series_id": 1,
-                    "time": datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
-                    "power": 10.0,
-                }
-            ]
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-        .validate()
+    # 1. Create initial metadata
+    initial_data = [
+        {
+            "time_series_id": 1,
+            "time_series_name": "ID 1 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 1,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        {
+            "time_series_id": 2,
+            "time_series_name": "ID 2 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 2,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+    ]
+    initial_metadata = pt.DataFrame(initial_data).set_model(TimeSeriesMetadata).cast().validate()
+    initial_metadata.write_parquet(metadata_path)
+
+    # 2. Create new metadata
+    new_data = [
+        # Identical to ID 1
+        {
+            "time_series_id": 1,
+            "time_series_name": "ID 1 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 1,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        # Updated ID 2
+        {
+            "time_series_id": 2,
+            "time_series_name": "ID 2 - Updated",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 2,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        # New ID 3
+        {
+            "time_series_id": 3,
+            "time_series_name": "ID 3 - New",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 3,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+    ]
+    new_metadata = pt.DataFrame(new_data).set_model(TimeSeriesMetadata).cast().validate()
+
+    # 3. Call upsert_metadata
+    metadata_diff = upsert_metadata(new_metadata, metadata_path)
+
+    # 4. Assertions
+    assert metadata_diff.height == 2
+    assert set(metadata_diff["time_series_id"]) == {2, 3}
+
+    # Verify ID 2 is updated
+    assert (
+        metadata_diff.filter(pl.col("time_series_id") == 2)["time_series_name"].item()
+        == "ID 2 - Updated"
     )
 
-    append_time_series_to_delta_table(data, delta_path)
+    # Verify ID 3 is new
+    assert (
+        metadata_diff.filter(pl.col("time_series_id") == 3)["time_series_name"].item()
+        == "ID 3 - New"
+    )
 
-    assert delta_path.exists()
+    # Verify file content
+    final_metadata = pl.read_parquet(metadata_path)
+    assert final_metadata.height == 3
+    assert (
+        final_metadata.filter(pl.col("time_series_id") == 1)["time_series_name"].item()
+        == "ID 1 - Original"
+    )
+    assert (
+        final_metadata.filter(pl.col("time_series_id") == 2)["time_series_name"].item()
+        == "ID 2 - Updated"
+    )
+    assert (
+        final_metadata.filter(pl.col("time_series_id") == 3)["time_series_name"].item()
+        == "ID 3 - New"
+    )
 
-    # Read back and verify
-    read_data = pl.read_delta(delta_path)
-    assert read_data.height == 1
-    assert read_data["time_series_id"].item() == 1
+
+def test_parse_file_listing_valid():
+    raw_file_listing: _RawFileListing = [
+        {
+            "path": "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json",
+            "filesize_bytes": 1024,
+        }
+    ]
+
+    result = _parse_file_listing(raw_file_listing)
+
+    assert result.height == 1
+    assert result["time_series_id"][0] == 23
+    assert (
+        result["path"][0]
+        == "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json"
+    )
+    assert result["filesize_bytes"][0] == 1024
+    assert result["start_time"][0] == datetime(2026, 3, 26, 8, 0, 0, tzinfo=timezone.utc)
+    assert result["end_time"][0] == datetime(2026, 3, 26, 14, 0, 0, tzinfo=timezone.utc)
+
+
+def test_parse_file_listing_invalid():
+    # Invalid path format
+    raw_file_listing: _RawFileListing = [
+        {
+            "path": "invalid/path/format.json",
+            "filesize_bytes": 1024,
+        }
+    ]
+
+    # The function uses `_TimeSeriesJsonFileListing.validate(paths_df)`
+    # If the regex fails, the columns will be null, and validation should fail.
+    with pytest.raises(pt.exceptions.DataFrameValidationError):
+        _parse_file_listing(raw_file_listing)
