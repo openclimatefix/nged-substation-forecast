@@ -28,11 +28,13 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     delta_path = settings.nged_data_path / "power_time_series.delta"
     metadata_path = settings.nged_data_path / "metadata.parquet"
 
-    # Fetch new data from S3, using the existing delta table to determine what's new
-    # We are deliberately keeping it simple for now, but may move to a ConfigurableResource in the future.
-    store = Settings().get_nged_s3_store()
+    # Fetch new data from S3, using the existing delta table to determine what's new.
+    # We are deliberately keeping the code simple for now, but may move the S3 store
+    # to a Dagster ConfigurableResource in the future.
+    store = settings.get_nged_s3_store()
     paths_df = get_new_file_listing(store, delta_path)
     new_metadata, new_time_series = download_and_parse_files(store, paths_df)
 
+    # Save new data:
     append_time_series_to_delta_table(new_time_series, delta_path)
     upsert_metadata(new_metadata, metadata_path)

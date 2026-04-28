@@ -17,7 +17,6 @@ from nged_data.read_nged_json import (
 log = logging.getLogger(__name__)
 
 
-
 def append_time_series_to_delta_table(
     power_time_series: pt.DataFrame[PowerTimeSeries], delta_path: Path
 ) -> None:
@@ -47,7 +46,6 @@ def append_time_series_to_delta_table(
         )
 
 
-
 class _NgedJsonFileListing(pt.Model):
     path: str
     time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
@@ -59,10 +57,11 @@ class _NgedJsonFileListing(pt.Model):
         ),
     )
 
+
 def get_new_file_listing(
     store: obstore.store.S3Store, delta_path: Path
 ) -> pt.DataFrame[_NgedJsonFileListing]:
-    """List all the timeseries JSON files in NGED's S3 bucket. 
+    """List all the timeseries JSON files in NGED's S3 bucket.
 
     The paths will be of the form:
     timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
@@ -158,6 +157,7 @@ def get_nged_s3_store() -> obstore.store.S3Store:
 class _MaxTimePerTimeSeriesId(pt.Model):
     time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
     max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
+
 
 @overload
 def _select_new_rows(
