@@ -62,11 +62,9 @@ def append_time_series_to_delta_table(
         )
 
 
-def load_new_data_from_nged_s3(
-    delta_path: Path,
-) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
-    store = get_nged_s3_store()
-
+def get_new_file_listing(
+    store: obstore.store.S3Store, delta_path: Path
+) -> pt.DataFrame[_NgedJsonFileListing]:
     # List all the JSON files on NGED's S3. The paths will be of the form:
     # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     paths: list[str] = []
@@ -92,11 +90,12 @@ def load_new_data_from_nged_s3(
     paths_df = paths_df.sort("end_time")
     paths_df = _NgedJsonFileListing.validate(paths_df)
 
-    paths_df = _select_new_rows(paths_df, delta_path)
-    # TODO: All the code in this function above this line should probably in a separate function,
-    # that will be wrapped in a Dagster ConfigurableResource. See:
-    # https://github.com/openclimatefix/nged-substation-forecast/issues/115
+    return _select_new_rows(paths_df, delta_path)
 
+
+def download_and_parse_files(
+    store: obstore.store.S3Store, paths_df: pt.DataFrame[_NgedJsonFileListing]
+) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
     # Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     # there are any duplicates.
     metadata_dfs = []
@@ -142,6 +141,14 @@ def load_new_data_from_nged_s3(
     )
 
     return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
+
+
+def load_new_data_from_nged_s3(
+    delta_path: Path,
+) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
+    store = get_nged_s3_store()
+    paths_df = get_new_file_listing(store, delta_path)
+    return download_and_parse_files(store, paths_df)
 
 
 def get_nged_s3_store() -> obstore.store.S3Store:
