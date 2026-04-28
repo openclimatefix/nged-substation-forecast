@@ -143,10 +143,10 @@ def download_and_parse_files(
     return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
 
 
-def load_new_data_from_nged_s3(
+def load_new_data_from_nged_s3(store: obstore.store.S3Store | None = None, 
     delta_path: Path,
 ) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
-    store = get_nged_s3_store()
+    store = store or get_nged_s3_store()
     paths_df = get_new_file_listing(store, delta_path)
     return download_and_parse_files(store, paths_df)
 

@@ -1,14 +1,15 @@
 from contracts.settings import Settings
-from dagster import asset
+from dagster import AssetExecutionContext, asset
 from nged_data.storage import (
     append_time_series_to_delta_table,
     load_new_data_from_nged_s3,
     upsert_metadata,
 )
+from nged_substation_forecast.resources import S3Resource
 
 
 @asset
-def power_time_series_and_metadata() -> None:
+def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     """
     Ingests raw telemetry and metadata from NGED S3 into our local storage.
 
@@ -28,7 +29,11 @@ def power_time_series_and_metadata() -> None:
     metadata_path = settings.nged_data_path / "metadata.parquet"
 
     # Fetch new data from S3, using the existing delta table to determine what's new
-    new_metadata, new_time_series = load_new_data_from_nged_s3(delta_path)
+    # Using injected S3Resource
+    s3_resource = context.resources.s3
+    new_metadata, new_time_series = load_new_data_from_nged_s3(
+        delta_path, store=s3_resource.get_store()
+    )
 
     append_time_series_to_delta_table(new_time_series, delta_path)
     upsert_metadata(new_metadata, metadata_path)
