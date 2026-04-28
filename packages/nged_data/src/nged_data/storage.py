@@ -7,7 +7,6 @@ import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.settings import PROJECT_ROOT, Settings
 
 from nged_data.read_nged_json import (
     _extract_power_time_series,
@@ -122,18 +121,6 @@ def download_and_parse_files(
         return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
     else:
         return None
-
-
-def get_nged_s3_store() -> obstore.store.S3Store:
-    assert (PROJECT_ROOT / ".env").exists()
-    settings = Settings()
-    return obstore.store.S3Store.from_url(
-        url=settings.nged_s3_bucket_url,
-        config={
-            "aws_access_key_id": settings.nged_s3_bucket_access_key,
-            "aws_secret_access_key": settings.nged_s3_bucket_secret,
-        },
-    )
 
 
 class _MaxTimePerTimeSeriesId(pt.Model):
