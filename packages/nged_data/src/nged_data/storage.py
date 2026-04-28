@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import cast, overload
+from typing import Final, cast, overload
 
 import obstore
 import patito as pt
@@ -15,35 +15,6 @@ from nged_data.read_nged_json import (
 )
 
 log = logging.getLogger(__name__)
-
-
-def append_time_series_to_delta_table(
-    power_time_series: pt.DataFrame[PowerTimeSeries], delta_path: Path
-) -> None:
-    """
-    Appends data to a Delta table, ensuring no duplicates based on (time_series_id, period_end_time).
-
-    Args:
-        power_time_series: The Patito DataFrame to append.
-        delta_path: The path to the Delta table.
-    """
-    log.info(f"Preparing to append_to_delta at {delta_path}...")
-
-    new_power_ts = select_new_rows(power_time_series, delta_path)
-    new_power_ts = new_power_ts.sort(by=PowerTimeSeries.columns_to_sort_by)
-
-    log.info(
-        f"Appending {new_power_ts.height:,d} rows of new PowerTimeSeries"
-        f" (from {new_power_ts['time'].min()} to {new_power_ts['time'].max()}) to {delta_path=}"
-    )
-
-    PowerTimeSeries.validate(new_power_ts)
-
-    if not new_power_ts.is_empty():
-        delta_path.parent.mkdir(parents=True, exist_ok=True)
-        new_power_ts.write_delta(
-            delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
-        )
 
 
 class _NgedJsonFileListing(pt.Model):
@@ -100,8 +71,8 @@ def download_and_parse_files(
     """
     metadata_dfs = []
     power_time_series_dfs = []
-    for _end_time, df_for_group in paths_df.group_by("end_time", maintain_order=True):
-        for path in df_for_group["path"]:
+    for end_time, df_for_end_time in paths_df.group_by("end_time", maintain_order=True):
+        for path in df_for_end_time["path"]:
             # TODO: Use `store.get_async` to get all files for this group concurrently.
             result = store.get(path)
             json_bytes = bytes(result.bytes())
@@ -123,6 +94,9 @@ def download_and_parse_files(
                         f"The 'data' field is 'null' in {path=}. This is expected behaviour if"
                         " NGED's meter reported no values for the period covered by the JSON file."
                     )
+                    # TODO: Maybe we need a way to stop our system from downloading files with no
+                    # data in them, every time we run. Maybe filter out JSON files below a certain
+                    # filesize???
                 else:
                     raise
             else:
@@ -216,31 +190,38 @@ def select_new_rows(
     if "time" in time_series.columns:
         pt_model = PowerTimeSeries
         time_col = "time"
+        columns_to_sort_by = PowerTimeSeries.columns_to_sort_by
     elif "end_time" in time_series.columns:
         pt_model = _NgedJsonFileListing
         time_col = "end_time"
+        columns_to_sort_by = "end_time"
     else:
         raise ValueError(
             "Expected `time_series` to have either a `time` column or an `end_time` column,"
             f" not {time_series.columns=}"
         )
 
-    return cast(
-        pt.DataFrame[pt_model],
+    filtered_df = cast(
+        pl.DataFrame,
         time_series.lazy()
         .join(max_times.lazy(), on="time_series_id", how="left")
         # If max_time is null for this time_series_id then this is a new time_series_id.
         .filter(pl.col("max_time").is_null() | (pl.col(time_col) > pl.col("max_time")))
         .drop("max_time")
+        .sort(by=columns_to_sort_by)
         .collect(),
     )
 
+    return pt.DataFrame(filtered_df).set_model(pt_model).validate()
 
-def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path) -> None:
+
+def upsert_metadata(
+    new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path
+) -> pt.DataFrame[TimeSeriesMetadata]:
     """
     Upserts metadata to a Parquet file.
 
-    This function assumes it is called by the exclusive owner asset, so no
+    This function assumes it is called by one thread at a time so no
     explicit locking is required.
 
     If the local Parquet file does not exist, it saves the new_metadata.
@@ -253,26 +234,44 @@ def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_pat
         metadata_path: The path to the Parquet file where we store our local version of the
         metadata.
     """
-    new_metadata: pl.DataFrame = new_metadata.sort("time_series_id")
-    TimeSeriesMetadata.validate(new_metadata)
+    COMPRESSION: Final[str] = "zstd"
 
+    new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
+
+    # FIXME: `path.exists()` won't work when metadata_path is on S3!
     if not metadata_path.exists():
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
-        new_metadata.write_parquet(metadata_path)
-        return
+        new_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+        return new_metadata
 
     # Read existing metadata
-    existing_metadata = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
+    existing_metadata = pl.read_parquet(metadata_path)
+    TimeSeriesMetadata.validate(existing_metadata)
 
-    # Merge metadata
-    # Put new_metadata first so that unique(keep="first") keeps the new version
-    merged_metadata = TimeSeriesMetadata.validate(
-        pl.concat([new_metadata, existing_metadata]).unique(subset="time_series_id", keep="first")
-    ).sort("time_series_id")
+    # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
+    # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
+    metadata_diff = new_metadata.filter(
+        ~new_metadata.hash_rows().is_in(existing_metadata.hash_rows())
+    )
+    metadata_diff = TimeSeriesMetadata.validate(metadata_diff)
 
-    # Compare metadata
-    if existing_metadata.equals(merged_metadata):
-        log.info("Metadata is up to date.")
+    if metadata_diff.is_empty():
+        log.info("TimeSeriesMetadata is up to date.")
     else:
-        log.info(f"Metadata update detected at {metadata_path}. Updating metadata file.")
-        merged_metadata.write_parquet(metadata_path)
+        log.info(
+            f"New TimeSeriesMetadata available for {metadata_diff.height} timeseries_ids."
+            f" Updating {metadata_path}."
+        )
+
+        # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
+        merged_metadata = (
+            pl.concat([new_metadata, existing_metadata])
+            .unique(subset="time_series_id", keep="first")
+            .sort("time_series_id")
+        )
+
+        TimeSeriesMetadata.validate(merged_metadata)
+
+        merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+
+    return metadata_diff

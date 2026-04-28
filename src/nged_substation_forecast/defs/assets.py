@@ -5,7 +5,6 @@ import polars as pl
 from contracts.settings import Settings
 from dagster import AssetExecutionContext, MetadataValue, asset
 from nged_data.storage import (
-    append_time_series_to_delta_table,
     download_and_parse_files,
     get_new_file_listing,
     select_new_rows,
@@ -55,19 +54,29 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
     new_metadata_and_time_series = download_and_parse_files(store, new_paths_df)
     if new_metadata_and_time_series:
-        new_metadata, new_time_series = new_metadata_and_time_series
+        new_metadata, new_power_ts_downloaded = new_metadata_and_time_series
 
-        # Save new data:
-        # TODO: Modify these two functions so they return a summary of what they did, so we can log
-        # this.
-        append_time_series_to_delta_table(new_time_series, delta_path)
-        upsert_metadata(new_metadata, metadata_path)
+        # Save TimeSeriesMetadata:
+        metadata_diff = upsert_metadata(new_metadata, metadata_path)
+
+        # Save PowerTimeSeries:
+        new_power_ts_deduped = select_new_rows(new_power_ts_downloaded, delta_path)
+        if not new_power_ts_deduped.is_empty():
+            # FIXME: mkdir won't work when delta_path is on S3!
+            delta_path.parent.mkdir(parents=True, exist_ok=True)
+            new_power_ts_deduped.write_delta(
+                delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
+            )
 
         context.add_output_metadata(
             {
-                "new_power_time_series_rows_downloaded": MetadataValue.json(
-                    _formatted_summary_of_dataframe(new_time_series, time_col="time")
-                )
+                "downloaded_power_time_series_rows": MetadataValue.json(
+                    _formatted_summary_of_dataframe(new_power_ts_downloaded, time_col="time")
+                ),
+                "deduped_power_time_series_rows": MetadataValue.json(
+                    _formatted_summary_of_dataframe(new_power_ts_deduped, time_col="time")
+                ),
+                "new_metadata_rows": len(metadata_diff),
             }
         )
     else:
