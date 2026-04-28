@@ -61,11 +61,14 @@ def _parse_file_listing(
 ) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
     """Create DataFrame of paths.
 
-    Extracts the start_time, end_time, and time_series_id from the path string.
+    Extracts the start_time, end_time, and time_series_id from the path string. The input paths
+    should be of the form:
+
+    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     """
     paths_df = (
         pl.DataFrame(raw_file_listing)
-        .select(
+        .with_columns(
             # Extract:    start_time,    end_time,       time_series_id
             #            ↓↓↓↓↓↓↓↓↓↓↓↓↓ ↓↓↓↓↓↓↓↓↓↓↓↓↓            ↓↓
             # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
@@ -267,7 +270,7 @@ def upsert_metadata(
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
     # exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719
     metadata_diff = new_metadata.filter(
-        ~new_metadata.hash_rows().is_in(existing_metadata.hash_rows())
+        ~new_metadata.hash_rows().is_in(existing_metadata.hash_rows().implode())
     )
     metadata_diff = TimeSeriesMetadata.validate(metadata_diff)
 
