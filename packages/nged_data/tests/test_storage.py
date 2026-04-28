@@ -103,6 +103,114 @@ def test_upsert_metadata_merge(tmp_path: Path):
     assert read_metadata["time_series_name"].item() == "New Name"
 
 
+def test_upsert_metadata_returns_diff(tmp_path: Path):
+    metadata_path = tmp_path / "metadata.parquet"
+
+    # 1. Create initial metadata
+    initial_data = [
+        {
+            "time_series_id": 1,
+            "time_series_name": "ID 1 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 1,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        {
+            "time_series_id": 2,
+            "time_series_name": "ID 2 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 2,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+    ]
+    initial_metadata = (
+        pt.DataFrame(initial_data)
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
+    )
+    initial_metadata.write_parquet(metadata_path)
+
+    # 2. Create new metadata
+    new_data = [
+        # Identical to ID 1
+        {
+            "time_series_id": 1,
+            "time_series_name": "ID 1 - Original",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 1,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        # Updated ID 2
+        {
+            "time_series_id": 2,
+            "time_series_name": "ID 2 - Updated",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 2,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+        # New ID 3
+        {
+            "time_series_id": 3,
+            "time_series_name": "ID 3 - New",
+            "time_series_type": "Disaggregated Demand",
+            "units": "MW",
+            "licence_area": "EMids",
+            "substation_number": 3,
+            "substation_type": "Primary",
+            "latitude": 52.0,
+            "longitude": -1.0,
+            "h3_res_5": 599423199024775167,
+        },
+    ]
+    new_metadata = (
+        pt.DataFrame(new_data)
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
+    )
+
+    # 3. Call upsert_metadata
+    metadata_diff = upsert_metadata(new_metadata, metadata_path)
+
+    # 4. Assertions
+    assert metadata_diff.height == 2
+    assert set(metadata_diff["time_series_id"]) == {2, 3}
+
+    # Verify ID 2 is updated
+    assert metadata_diff.filter(pl.col("time_series_id") == 2)["time_series_name"].item() == "ID 2 - Updated"
+
+    # Verify ID 3 is new
+    assert metadata_diff.filter(pl.col("time_series_id") == 3)["time_series_name"].item() == "ID 3 - New"
+
+    # Verify file content
+    final_metadata = pl.read_parquet(metadata_path)
+    assert final_metadata.height == 3
+    assert final_metadata.filter(pl.col("time_series_id") == 1)["time_series_name"].item() == "ID 1 - Original"
+    assert final_metadata.filter(pl.col("time_series_id") == 2)["time_series_name"].item() == "ID 2 - Updated"
+    assert final_metadata.filter(pl.col("time_series_id") == 3)["time_series_name"].item() == "ID 3 - New"
+
+
 def test_parse_file_listing_valid():
     raw_file_listing: _RawFileListing = [
         {
