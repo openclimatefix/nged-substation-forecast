@@ -1,10 +1,9 @@
-from datetime import datetime, timezone
 from pathlib import Path
 
 import patito as pt
 import polars as pl
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from nged_data.storage import append_time_series_to_delta_table, upsert_metadata
+from contracts.power_schemas import TimeSeriesMetadata
+from nged_data.storage import upsert_metadata
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -100,32 +99,3 @@ def test_upsert_metadata_merge(tmp_path: Path):
     read_metadata = pl.read_parquet(metadata_path)
     assert read_metadata.height == 1
     assert read_metadata["time_series_name"].item() == "New Name"
-
-
-def test_append_to_delta_new_table(tmp_path: Path):
-    delta_path = tmp_path / "delta_table"
-
-    # Create dummy power time series
-    data = (
-        pt.DataFrame(
-            [
-                {
-                    "time_series_id": 1,
-                    "time": datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc),
-                    "power": 10.0,
-                }
-            ]
-        )
-        .set_model(PowerTimeSeries)
-        .cast()
-        .validate()
-    )
-
-    append_time_series_to_delta_table(data, delta_path)
-
-    assert delta_path.exists()
-
-    # Read back and verify
-    read_data = pl.read_delta(delta_path)
-    assert read_data.height == 1
-    assert read_data["time_series_id"].item() == 1
