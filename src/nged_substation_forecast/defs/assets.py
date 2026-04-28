@@ -6,7 +6,7 @@ from contracts.settings import Settings
 from dagster import AssetExecutionContext, MetadataValue, asset
 from nged_data.storage import (
     download_and_parse_files,
-    get_new_file_listing,
+    list_timeseries_json_files,
     select_new_rows,
     upsert_metadata,
 )
@@ -38,7 +38,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # We are deliberately keeping the code simple for now, but may move the S3 store
     # to a Dagster ConfigurableResource in the future.
     store = settings.get_nged_s3_store()
-    paths_df = get_new_file_listing(store)
+    paths_df = list_timeseries_json_files(store)
     new_paths_df = select_new_rows(paths_df, delta_path)
 
     context.add_output_metadata(

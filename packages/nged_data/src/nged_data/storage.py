@@ -1,12 +1,13 @@
 import logging
 from pathlib import Path
-from typing import Final, cast, overload
+from typing import Final, Literal, cast, overload
 
 import obstore
 import patito as pt
 import polars as pl
-from contracts.common import UTC_DATETIME_DTYPE
+from contracts.common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.settings import PROJECT_ROOT, Settings
 
 from nged_data.read_nged_json import (
     _extract_power_time_series,
@@ -15,12 +16,22 @@ from nged_data.read_nged_json import (
 
 log = logging.getLogger(__name__)
 
+type _RawFileListing = list[dict[Literal["path", "filesize_bytes"], str | int]]
 
-class _NgedJsonFileListing(pt.Model):
+
+class _TimeSeriesJsonFileListing(pt.Model):
     path: str
-    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
+    filesize_bytes: int
+    time_series_id: int = _get_time_series_id_dtype()
+    start_time: int = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description=(
+            "The start of the time window recorded by the time series data in the JSON file,"
+            " according to the Unix epoch in the path"
+        ),
+    )
     end_time: int = pt.Field(
-        dtype=PowerTimeSeries.dtypes["time"],
+        dtype=UTC_DATETIME_DTYPE,
         description=(
             "The end of the time window recorded by the time series data in the JSON file,"
             " according to the Unix epoch in the path"
@@ -28,40 +39,59 @@ class _NgedJsonFileListing(pt.Model):
     )
 
 
-def get_new_file_listing(store: obstore.store.S3Store) -> pt.DataFrame[_NgedJsonFileListing]:
+def list_timeseries_json_files(
+    store: obstore.store.S3Store,
+) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
     The paths are assumed to be of the form:
     timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     """
-    paths: list[str] = []
+    raw_file_listing: _RawFileListing = []
     for chunk in store.list(prefix="timeseries"):
         # `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.
-        paths_for_chunk = [item["path"] for item in chunk if item["path"].endswith(".json")]
-        paths.extend(paths_for_chunk)
+        for item in chunk:
+            if item["path"].endswith(".json"):
+                raw_file_listing.append({"path": item["path"], "filesize_bytes": item["size"]})
 
-    # Create DataFrame of paths.
-    # TODO: Also extract the start_time, as it's useful for logging.
-    paths_df = pl.DataFrame({"path": paths}).with_columns(
-        # Extract the end time:    ↓↓↓↓↓↓↓↓↓↓↓↓↓
-        # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
-        end_time=(
-            pl.col("path")
-            .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
+    return _parse_file_listing(raw_file_listing)
+
+
+def _parse_file_listing(
+    raw_file_listing: _RawFileListing,
+) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
+    """Create DataFrame of paths.
+
+    Extracts the start_time, end_time, and time_series_id from the path string.
+    """
+    paths_df = (
+        pl.DataFrame(raw_file_listing)
+        .select(
+            # Extract:    start_time,    end_time,       time_series_id
+            #            ↓↓↓↓↓↓↓↓↓↓↓↓↓ ↓↓↓↓↓↓↓↓↓↓↓↓↓            ↓↓
+            # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
+            regex_captures=(
+                pl.col("path").str.extract_groups(
+                    r"/(?<start_time>\d+)_(?<end_time>\d+)/TimeSeries_(?<time_series_id>\d{1,2})"
+                )
+            )
+        )
+        .unnest("regex_captures")
+        # Convert strings to datetimes and ints:
+        .with_columns(
+            pl.col(["start_time", "end_time"])
             .cast(pl.Int64)
             .cast(pl.Datetime(time_unit="ms", time_zone="UTC"))
-            .cast(UTC_DATETIME_DTYPE)  # Cast from time_unit="ms" to "us"
-        ),
-        # Extract the time series ID:                       ↓↓
-        # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
-        time_series_id=(pl.col("path").str.extract(r"TimeSeries_(\d+)", 1).cast(pl.Int32)),
+            .cast(UTC_DATETIME_DTYPE),  # Cast from time_unit="ms" to "us"
+            pl.col("time_series_id").cast(pl.Int32),
+        )
+        .sort(by="end_time")
     )
-    paths_df = paths_df.sort("end_time")
-    return _NgedJsonFileListing.validate(paths_df)
+    return _TimeSeriesJsonFileListing.validate(paths_df)
 
 
 def download_and_parse_files(
-    store: obstore.store.S3Store, paths_df: pt.DataFrame[_NgedJsonFileListing]
+    store: obstore.store.S3Store, paths_df: pt.DataFrame[_TimeSeriesJsonFileListing]
 ) -> None | tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
     """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     there are any duplicates.
@@ -123,6 +153,18 @@ def download_and_parse_files(
         return None
 
 
+def get_nged_s3_store() -> obstore.store.S3Store:
+    assert (PROJECT_ROOT / ".env").exists()
+    settings = Settings()
+    return obstore.store.S3Store.from_url(
+        url=settings.nged_s3_bucket_url,
+        config={
+            "aws_access_key_id": settings.nged_s3_bucket_access_key,
+            "aws_secret_access_key": settings.nged_s3_bucket_secret,
+        },
+    )
+
+
 class _MaxTimePerTimeSeriesId(pt.Model):
     time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
     max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
@@ -141,15 +183,15 @@ def select_new_rows(
 # `select_new_rows` then you get a `pt.DataFrame[_NgedJsonFileListing]` back.
 @overload
 def select_new_rows(
-    time_series: pt.DataFrame[_NgedJsonFileListing],
+    time_series: pt.DataFrame[_TimeSeriesJsonFileListing],
     delta_path: Path,
-) -> pt.DataFrame[_NgedJsonFileListing]: ...
+) -> pt.DataFrame[_TimeSeriesJsonFileListing]: ...
 
 
 def select_new_rows(
-    time_series: pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing],
+    time_series: pt.DataFrame[PowerTimeSeries | _TimeSeriesJsonFileListing],
     delta_path: Path,
-) -> pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing]:
+) -> pt.DataFrame[PowerTimeSeries | _TimeSeriesJsonFileListing]:
     """
     Return rows in `time_series` that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
@@ -179,7 +221,7 @@ def select_new_rows(
         time_col = "time"
         columns_to_sort_by = PowerTimeSeries.columns_to_sort_by
     elif "end_time" in time_series.columns:
-        pt_model = _NgedJsonFileListing
+        pt_model = _TimeSeriesJsonFileListing
         time_col = "end_time"
         columns_to_sort_by = "end_time"
     else:
