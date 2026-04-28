@@ -1,18 +1,18 @@
 from datetime import datetime
-from typing import Final, cast
+from typing import Any, cast
 
-import polars as pl
+import patito as pt
+from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, MetadataValue, asset
+from dagster import AssetExecutionContext, MetadataValue, TableRecord, asset
 from nged_data.storage import (
+    _TimeSeriesJsonFileListing,
     download_and_parse_files,
     list_timeseries_json_files,
     remove_small_files_from_listing,
     select_new_rows,
     upsert_metadata,
 )
-
-_DATETIME_FMT: Final[str] = "%Y-%m-%d %H:%M"
 
 
 @asset
@@ -39,28 +39,19 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # We are deliberately keeping the code simple for now, but may move the S3 store
     # to a Dagster ConfigurableResource in the future.
     store = settings.get_nged_s3_store()
-    paths_df = list_timeseries_json_files(store)
-    paths_without_small_files = remove_small_files_from_listing(paths_df)
-    new_paths_df = select_new_rows(paths_without_small_files, delta_path)
+    all_paths_df = list_timeseries_json_files(store)
+    paths_without_small_files = remove_small_files_from_listing(all_paths_df)
+    paths_with_new_data_df = select_new_rows(paths_without_small_files, delta_path)
 
-    context.add_output_metadata(
-        {
-            "all_timeseries_files_on_nged_s3": MetadataValue.json(
-                _formatted_summary_of_dataframe(paths_df)
-            ),
-            "n_small_file_removed": len(paths_df) - len(paths_without_small_files),
-            "filtered_timeseries_files": MetadataValue.json(
-                _formatted_summary_of_dataframe(new_paths_df)
-            ),
-        }
-    )
+    _log_paths_stats(context, all_paths_df, paths_without_small_files, paths_with_new_data_df)
 
-    new_metadata_and_time_series = download_and_parse_files(store, new_paths_df)
+    new_metadata_and_time_series = download_and_parse_files(store, paths_with_new_data_df)
     if new_metadata_and_time_series:
         new_metadata, new_power_ts_downloaded = new_metadata_and_time_series
 
         # Save TimeSeriesMetadata:
-        metadata_diff = upsert_metadata(new_metadata, metadata_path)
+        metadata_update_stats = upsert_metadata(new_metadata, metadata_path)
+        context.add_output_metadata(metadata_update_stats)
 
         # Save PowerTimeSeries:
         new_power_ts_deduped = select_new_rows(new_power_ts_downloaded, delta_path)
@@ -71,30 +62,77 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                 delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
             )
 
-        context.add_output_metadata(
-            {
-                "downloaded_power_time_series_rows": MetadataValue.json(
-                    _formatted_summary_of_dataframe(new_power_ts_downloaded, time_col="time")
-                ),
-                "deduped_power_time_series_rows": MetadataValue.json(
-                    _formatted_summary_of_dataframe(new_power_ts_deduped, time_col="time")
-                ),
-                "new_metadata_rows": len(metadata_diff),
-            }
-        )
+        _log_power_timeseries_stats(context, new_power_ts_downloaded, new_power_ts_deduped)
+
     else:
-        context.add_output_metadata({"new_power_time_series_rows_downloaded": 0})
+        context.add_output_metadata({"Rows of new power TS downloaded": 0, "New metadata rows": 0})
 
 
-def _formatted_summary_of_dataframe(
-    df: pl.DataFrame, time_col: str = "end_time"
+def _log_paths_stats(
+    context: AssetExecutionContext,
+    all_paths_df: pt.DataFrame[_TimeSeriesJsonFileListing],
+    paths_without_small_files: pt.DataFrame[_TimeSeriesJsonFileListing],
+    paths_with_new_data_df: pt.DataFrame[_TimeSeriesJsonFileListing],
+) -> None:
+    table = [
+        TableRecord(_summarise_paths_df(all_paths_df, "All JSON files on S3")),
+        TableRecord(_summarise_paths_df(paths_without_small_files, "Files larger than 1kB")),
+        TableRecord(_summarise_paths_df(paths_with_new_data_df, "Files with new data")),
+    ]
+    context.add_output_metadata({"nged_s3_paths": MetadataValue.table(table)})
+
+
+def _summarise_paths_df(
+    paths_df: pt.DataFrame[_TimeSeriesJsonFileListing], stage_name: str
 ) -> dict[str, str | int]:
-    summary: dict[str, str | int] = {"len": len(df)}
-    if len(df) > 0:
+    summary: dict[str, str | int] = {
+        "Stage": stage_name,
+        "Files": len(paths_df),
+        "Start Date": "N/A",
+        "End Date": "N/A",
+    }
+    if len(paths_df) > 0:
         summary.update(
             {
-                "start_date": cast(datetime, df[time_col].min()).strftime(_DATETIME_FMT),
-                "end_date": cast(datetime, df[time_col].max()).strftime(_DATETIME_FMT),
+                "Start Date": _format_datetime(paths_df["start_time"].min()),
+                "End Date": _format_datetime(paths_df["end_time"].max()),
             }
         )
     return summary
+
+
+def _log_power_timeseries_stats(
+    context: AssetExecutionContext,
+    new_power_ts_downloaded: pt.DataFrame[PowerTimeSeries],
+    new_power_ts_deduped: pt.DataFrame[PowerTimeSeries],
+) -> None:
+    table = [
+        TableRecord(_summarise_power_ts(new_power_ts_downloaded, "Downloaded timeseries")),
+        TableRecord(_summarise_power_ts(new_power_ts_deduped, "De-duped rows appended to disk")),
+    ]
+    context.add_output_metadata({"PowerTimeSeries": MetadataValue.table(table)})
+
+
+def _summarise_power_ts(
+    time_series_df: pt.DataFrame[PowerTimeSeries], stage_name: str
+) -> dict[str, str | int]:
+    summary: dict[str, str | int] = {
+        "Stage": stage_name,
+        "Rows": len(time_series_df),
+        "Start Date": "N/A",
+        "End Date": "N/A",
+        "TimeSeriesIDs": "N/A",
+    }
+    if len(time_series_df) > 0:
+        summary.update(
+            {
+                "Start Date": _format_datetime(time_series_df["time"].min()),
+                "End Date": _format_datetime(time_series_df["time"].max()),
+                "TimeSeriesIDs": str(time_series_df["time_series_id"].unique().to_list()),
+            }
+        )
+    return summary
+
+
+def _format_datetime(dt: Any) -> str:
+    return cast(datetime, dt).strftime("%Y-%m-%d %H:%M")

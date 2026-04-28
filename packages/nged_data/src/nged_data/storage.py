@@ -249,9 +249,7 @@ def select_new_rows(
     return pt.DataFrame(filtered_df).set_model(pt_model).validate()
 
 
-def upsert_metadata(
-    new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path
-) -> pt.DataFrame[TimeSeriesMetadata]:
+def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path) -> dict:
     """
     Upserts metadata to a Parquet file.
 
@@ -267,6 +265,8 @@ def upsert_metadata(
         new_metadata: The new metadata DataFrame.
         metadata_path: The path to the Parquet file where we store our local version of the
         metadata.
+
+    Returns stats about new metadata
     """
     COMPRESSION: Final[str] = "zstd"
 
@@ -276,7 +276,10 @@ def upsert_metadata(
     if not metadata_path.exists():
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
         new_metadata.write_parquet(metadata_path, compression=COMPRESSION)
-        return new_metadata
+        return {
+            "metadata_n_new_TimeSeriesIDs": new_metadata.height,
+            "metadata_n_updated_TimeSeriesIDs": 0,
+        }
 
     # Read existing metadata
     existing_metadata = pl.read_parquet(metadata_path)
@@ -291,6 +294,7 @@ def upsert_metadata(
 
     if metadata_diff.is_empty():
         log.info("TimeSeriesMetadata is up to date.")
+        return {"metadata_n_new_TimeSeriesIDs": 0, "metadata_n_updated_TimeSeriesIDs": 0}
     else:
         log.info(
             f"New TimeSeriesMetadata available for {metadata_diff.height} timeseries_ids."
@@ -308,4 +312,13 @@ def upsert_metadata(
 
         merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
 
-    return metadata_diff
+        # Compute stats
+        new_ids = set(new_metadata["time_series_ids"]) - set(existing_metadata["time_series_ids"])
+        updated_ids = set(metadata_diff["time_series_ids"]).intersection(
+            existing_metadata["time_series_ids"]
+        )
+        return {
+            "metadata_n_new_TimeSeriesIDs": len(new_ids),
+            "metadata_n_updated_TimeSeriesIDs": len(updated_ids),
+            "metadata_updated_TimeSeriesIDs": updated_ids,
+        }
