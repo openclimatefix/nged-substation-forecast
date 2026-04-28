@@ -7,6 +7,7 @@ from dagster import AssetExecutionContext, MetadataValue, asset
 from nged_data.storage import (
     download_and_parse_files,
     list_timeseries_json_files,
+    remove_small_files_from_listing,
     select_new_rows,
     upsert_metadata,
 )
@@ -39,13 +40,15 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # to a Dagster ConfigurableResource in the future.
     store = settings.get_nged_s3_store()
     paths_df = list_timeseries_json_files(store)
-    new_paths_df = select_new_rows(paths_df, delta_path)
+    paths_without_small_files = remove_small_files_from_listing(paths_df)
+    new_paths_df = select_new_rows(paths_without_small_files, delta_path)
 
     context.add_output_metadata(
         {
             "all_timeseries_files_on_nged_s3": MetadataValue.json(
                 _formatted_summary_of_dataframe(paths_df)
             ),
+            "n_small_file_removed": len(paths_df) - len(paths_without_small_files),
             "filtered_timeseries_files": MetadataValue.json(
                 _formatted_summary_of_dataframe(new_paths_df)
             ),

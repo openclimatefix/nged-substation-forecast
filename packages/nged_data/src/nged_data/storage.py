@@ -92,6 +92,21 @@ def _parse_file_listing(
     return _TimeSeriesJsonFileListing.validate(paths_df)
 
 
+def remove_small_files_from_listing(
+    file_listing: pt.DataFrame[_TimeSeriesJsonFileListing],
+    size_threshold_bytes: int = 1000,
+) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
+    """Remove files that are too small. This is used to remove NGED JSON files that have no `data`
+    field.
+
+    Typical files sizes for NGED JSON files:
+        -  486 bytes: no `data` and no `WKT`.
+        - 2011 bytes: 12 timesteps in `data` and no `WKT`.
+        - 4328 bytes: no `data` but a large `WKT` string.
+    """
+    return file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
+
+
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_TimeSeriesJsonFileListing]
 ) -> None | tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
@@ -102,7 +117,7 @@ def download_and_parse_files(
     """
     metadata_dfs = []
     power_time_series_dfs = []
-    for end_time, df_for_end_time in paths_df.group_by("end_time", maintain_order=True):
+    for _end_time, df_for_end_time in paths_df.group_by("end_time", maintain_order=True):
         for path in df_for_end_time["path"]:
             # TODO: Use `store.get_async` to get all files for this group concurrently.
             result = store.get(path)
