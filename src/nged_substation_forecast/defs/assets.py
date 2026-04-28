@@ -33,8 +33,10 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # to a Dagster ConfigurableResource in the future.
     store = settings.get_nged_s3_store()
     paths_df = get_new_file_listing(store, delta_path)
-    new_metadata, new_time_series = download_and_parse_files(store, paths_df)
+    new_metadata_and_time_series = download_and_parse_files(store, paths_df)
+    if new_metadata_and_time_series:
+        new_metadata, new_time_series = new_metadata_and_time_series
 
-    # Save new data:
-    append_time_series_to_delta_table(new_time_series, delta_path)
-    upsert_metadata(new_metadata, metadata_path)
+        # Save new data:
+        append_time_series_to_delta_table(new_time_series, delta_path)
+        upsert_metadata(new_metadata, metadata_path)

@@ -1,4 +1,3 @@
-from contracts.common import UTC_DATETIME_DTYPE
 import logging
 from pathlib import Path
 from typing import cast, overload
@@ -6,6 +5,7 @@ from typing import cast, overload
 import obstore
 import patito as pt
 import polars as pl
+from contracts.common import UTC_DATETIME_DTYPE
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import PROJECT_ROOT, Settings
 
@@ -94,9 +94,12 @@ def get_new_file_listing(
 
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_NgedJsonFileListing]
-) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
-    # Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
-    # there are any duplicates.
+) -> None | tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
+    """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
+    there are any duplicates.
+
+    Returns None if there is no new data.
+    """
     metadata_dfs = []
     power_time_series_dfs = []
     for _end_time, df_for_group in paths_df.group_by("end_time", maintain_order=True):
@@ -127,19 +130,26 @@ def download_and_parse_files(
             else:
                 power_time_series_dfs.append(new_time_series_df)
 
+    log.info(
+        f"{len(metadata_dfs)} new TimeSeriesMetadata DataFrames and {len(power_time_series_dfs)}"
+        " new PowerTimeSeries dataframes extracted from NGED JSON data."
+    )
     # Concatenate and return:
-    metadata_df = (
-        pl.concat(metadata_dfs, how="diagonal")
-        .unique(subset="time_series_id", keep="last")
-        .sort("time_series_id")
-    )
-    time_series_df = (
-        pl.concat(power_time_series_dfs)
-        .unique(subset=["time_series_id", "time"], keep="last")
-        .sort(by=PowerTimeSeries.columns_to_sort_by)
-    )
+    if metadata_dfs and power_time_series_dfs:
+        metadata_df = (
+            pl.concat(metadata_dfs, how="diagonal")
+            .unique(subset="time_series_id", keep="last")
+            .sort("time_series_id")
+        )
+        time_series_df = (
+            pl.concat(power_time_series_dfs)
+            .unique(subset=["time_series_id", "time"], keep="last")
+            .sort(by=PowerTimeSeries.columns_to_sort_by)
+        )
 
-    return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
+        return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
+    else:
+        return None
 
 
 def get_nged_s3_store() -> obstore.store.S3Store:
