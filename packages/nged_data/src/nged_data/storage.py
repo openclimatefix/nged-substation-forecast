@@ -29,7 +29,7 @@ def append_time_series_to_delta_table(
     """
     log.info(f"Preparing to append_to_delta at {delta_path}...")
 
-    new_power_ts = _select_new_rows(power_time_series, delta_path)
+    new_power_ts = select_new_rows(power_time_series, delta_path)
     new_power_ts = new_power_ts.sort(by=PowerTimeSeries.columns_to_sort_by)
 
     log.info(
@@ -58,12 +58,10 @@ class _NgedJsonFileListing(pt.Model):
     )
 
 
-def get_new_file_listing(
-    store: obstore.store.S3Store, delta_path: Path
-) -> pt.DataFrame[_NgedJsonFileListing]:
+def get_new_file_listing(store: obstore.store.S3Store) -> pt.DataFrame[_NgedJsonFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
-    The paths will be of the form:
+    The paths are assumed to be of the form:
     timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     """
     paths: list[str] = []
@@ -73,6 +71,7 @@ def get_new_file_listing(
         paths.extend(paths_for_chunk)
 
     # Create DataFrame of paths.
+    # TODO: Also extract the start_time, as it's useful for logging.
     paths_df = pl.DataFrame({"path": paths}).with_columns(
         # Extract the end time:    ↓↓↓↓↓↓↓↓↓↓↓↓↓
         # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
@@ -80,16 +79,15 @@ def get_new_file_listing(
             pl.col("path")
             .str.extract(r"/(\d+)_(\d+)/", 2)  # Capture group 2: the digits after the underscore
             .cast(pl.Int64)
-            .cast(UTC_DATETIME_DTYPE)
+            .cast(pl.Datetime(time_unit="ms", time_zone="UTC"))
+            .cast(UTC_DATETIME_DTYPE)  # Cast from time_unit="ms" to "us"
         ),
         # Extract the time series ID:                       ↓↓
         # timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
         time_series_id=(pl.col("path").str.extract(r"TimeSeries_(\d+)", 1).cast(pl.Int32)),
     )
     paths_df = paths_df.sort("end_time")
-    paths_df = _NgedJsonFileListing.validate(paths_df)
-
-    return _select_new_rows(paths_df, delta_path)
+    return _NgedJsonFileListing.validate(paths_df)
 
 
 def download_and_parse_files(
@@ -170,20 +168,20 @@ class _MaxTimePerTimeSeriesId(pt.Model):
 
 
 @overload
-def _select_new_rows(
+def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
     delta_path: Path,
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
 @overload
-def _select_new_rows(
+def select_new_rows(
     time_series: pt.DataFrame[_NgedJsonFileListing],
     delta_path: Path,
 ) -> pt.DataFrame[_NgedJsonFileListing]: ...
 
 
-def _select_new_rows(
+def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing],
     delta_path: Path,
 ) -> pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing]:
