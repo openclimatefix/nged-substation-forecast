@@ -167,6 +167,8 @@ class _MaxTimePerTimeSeriesId(pt.Model):
     max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
 
 
+# This overload tells type checkers that if you pass a `pt.DataFrame[PowerTimeSeries]` into
+# `select_new_rows` then you get a `pt.DataFrame[PowerTimeSeries]` back.
 @overload
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
@@ -174,6 +176,8 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
+# This overload tells type checkers that if you pass a `pt.DataFrame[_NgedJsonFileListing]` into
+# `select_new_rows` then you get a `pt.DataFrame[_NgedJsonFileListing]` back.
 @overload
 def select_new_rows(
     time_series: pt.DataFrame[_NgedJsonFileListing],
@@ -186,7 +190,7 @@ def select_new_rows(
     delta_path: Path,
 ) -> pt.DataFrame[PowerTimeSeries | _NgedJsonFileListing]:
     """
-    Filter `time_series` the find rows that are more recent than the most recent
+    Return rows in `time_series` that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
     """
 
