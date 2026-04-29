@@ -115,13 +115,17 @@ def remove_small_files_from_listing(
     return file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
 
 
+class NoNewData(Exception):
+    pass
+
+
 def download_and_parse_files(
     store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
-) -> None | tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
+) -> tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
     """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     there are any duplicates.
 
-    Returns None if there is no new data.
+    Raises NoNewData if there is no new data.
     """
     metadata_dfs = []
     power_time_series_dfs = []
@@ -160,26 +164,27 @@ def download_and_parse_files(
         f"{len(metadata_dfs)} new TimeSeriesMetadata DataFrames and {len(power_time_series_dfs)}"
         " new PowerTimeSeries dataframes extracted from NGED JSON data."
     )
-    # Concatenate and return:
-    if metadata_dfs and power_time_series_dfs:
-        metadata_df = (
-            pl.concat(metadata_dfs, how="diagonal")
-            .unique(subset="time_series_id", keep="last")
-            .sort("time_series_id")
-        )
-        time_series_df = (
-            pl.concat(power_time_series_dfs)
-            .unique(subset=["time_series_id", "time"], keep="last")
-            .sort(by=PowerTimeSeries.columns_to_sort_by)
-        )
 
-        return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
-    else:
-        return None
+    if len(metadata_dfs) == 0 or len(power_time_series_dfs) == 0:
+        raise NoNewData
+
+    # Concatenate and return:
+    metadata_df = (
+        pl.concat(metadata_dfs, how="diagonal")
+        .unique(subset="time_series_id", keep="last")
+        .sort("time_series_id")
+    )
+    time_series_df = (
+        pl.concat(power_time_series_dfs)
+        .unique(subset=["time_series_id", "time"], keep="last")
+        .sort(by=PowerTimeSeries.columns_to_sort_by)
+    )
+
+    return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
 
 
 class _MaxTimePerTimeSeriesId(pt.Model):
-    time_series_id: int = pt.Field(dtype=PowerTimeSeries.dtypes["time_series_id"])
+    time_series_id: int = _get_time_series_id_dtype(unique=True)
     max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
 
 
