@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any, cast
+from typing import Any, Self, cast
 
 import patito as pt
+import polars as pl
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from dagster import AssetExecutionContext, MetadataValue, TableRecord, asset
@@ -14,6 +15,7 @@ from nged_data.storage import (
     select_new_rows,
     upsert_metadata,
 )
+from pydantic import BaseModel, field_validator
 
 
 @asset
@@ -45,7 +47,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     list_of_new_json_files = select_new_rows(list_of_large_json_files, delta_path)
 
     # Log statistics to be shown in Dagster's UI.
-    _log_paths_stats(
+    _log_summaries_of_file_listings(
         context, list_of_all_json_files, list_of_large_json_files, list_of_new_json_files
     )
 
@@ -71,50 +73,77 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     _log_power_timeseries_stats(context, new_power_ts, new_power_ts_deduped)
 
 
-def _log_paths_stats(
+# TODO: Maybe these _log_summaries_of_file_listings functions should take a dict[str, pl.DataFrame],
+# e.g. {"All JSON files on S3": list_of_all_json_files}
+# TODO: Also update the PowerTimeSeries summary code
+
+
+def _log_summaries_of_file_listings(
     context: AssetExecutionContext,
     list_of_all_json_files: pt.DataFrame[_ProcessedFileListing],
     list_of_large_json_files: pt.DataFrame[_ProcessedFileListing],
     list_of_new_json_files: pt.DataFrame[_ProcessedFileListing],
 ) -> None:
     table = [
-        TableRecord(_summarise_file_listing(list_of_all_json_files, "All JSON files on S3")),
-        TableRecord(_summarise_file_listing(list_of_large_json_files, "Files larger than 1kB")),
-        TableRecord(_summarise_file_listing(list_of_new_json_files, "Files with new data")),
+        file_listing_to_table_record(list_of_all_json_files, "All JSON files on S3"),
+        file_listing_to_table_record(list_of_large_json_files, "Files larger than 1kB"),
+        file_listing_to_table_record(list_of_new_json_files, "Files with new data"),
     ]
     context.add_output_metadata({"nged_s3_paths": MetadataValue.table(table)})
 
 
-# TODO: Think about reducing duplication and tidying. Some thoughts:
-# - Should the _summarise_* functions be methods on the data contract class?
-# - Can we reduce duplication between _summarise_paths_df and _summarise_power_ts?
-# - Should we use a TypedDict for these summaries? That sets defaults to N/A?
+class _Summary(BaseModel):
+    stage: str
+    start_time: str = "N/A"
+    end_time: str = "N/A"
+    time_series_ids: str = "N/A"  # str representation of a list of ints
+
+    @field_validator("start_time", "end_time", mode="before")
+    @classmethod
+    def datetime_to_string(cls, v: Any) -> Any:
+        return v.strftime("%Y-%m-%d %H:%M") if isinstance(v, datetime) else v
+
+    @field_validator("time_series_ids", mode="before")
+    @classmethod
+    def unique_time_series_ids(cls, v: Any) -> Any:
+        if isinstance(v, pl.Series):
+            return str(v.unique().sort().to_list())
+        return v
+
+    def to_table_record(self) -> TableRecord:
+        return TableRecord(self.model_dump())
 
 
-def _summarise_file_listing(
-    paths_df: pt.DataFrame[_ProcessedFileListing], stage_name: str
-) -> dict[str, str | int]:
-    summary: dict[str, str | int] = {
-        "Stage": stage_name,
-        "Files": len(paths_df),
-        "Start Date": "N/A",
-        "End Date": "N/A",
-        "TimeSeriesIDs": "N/A",
-        "Min file size": "N/A",
-        "Max file size": "N/A",
-    }
-    if len(paths_df) > 0:
-        summary.update(
-            {
-                "Start Date": _format_datetime(paths_df["start_time"].min()),
-                "End Date": _format_datetime(paths_df["end_time"].max()),
+class _FileListingSummary(_Summary):
+    n_files: int
+    min_file_size_bytes: int = 0
+    max_file_size_bytes: int = 0
+
+    @classmethod
+    def from_file_listing(
+        cls, file_listing: pt.DataFrame[_ProcessedFileListing], stage_name: str
+    ) -> Self:
+        # The `ty: ignore` comments are because `ty` only looks at the types specified in the BaseModel.
+        # `ty` doesn't know that we're casting the types in the `field_validator` methods.
+        if len(file_listing) > 0:
+            return cls(
+                stage=stage_name,
+                n_files=len(file_listing),
+                start_time=file_listing["start_time"].min(),  # ty: ignore[invalid-argument-type]
+                end_time=file_listing["end_time"].max(),  # ty: ignore[invalid-argument-type]
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                "TimeSeriesIDs": str(paths_df["time_series_id"].unique().sort().to_list()),
-                "Min file size": paths_df["filesize_bytes"].min(),
-                "Max file size": paths_df["filesize_bytes"].max(),
-            }
-        )
-    return summary
+                time_series_ids=file_listing["time_series_ids"],  # ty: ignore[invalid-argument-type]
+                min_file_size_bytes=file_listing["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
+                max_file_size_bytes=file_listing["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
+            )
+        else:
+            return cls(stage=stage_name, n_files=0)
+
+
+def file_listing_to_table_record(
+    file_listing: pt.DataFrame[_ProcessedFileListing], stage_name: str
+) -> TableRecord:
+    return _FileListingSummary.from_file_listing(file_listing, stage_name).to_table_record()
 
 
 def _log_power_timeseries_stats(
