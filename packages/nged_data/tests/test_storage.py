@@ -5,7 +5,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.power_schemas import TimeSeriesMetadata
-from nged_data.storage import _parse_file_listing, _RawFileListing, upsert_metadata
+from nged_data.storage import _process_file_listing, _RawFileListing, upsert_metadata
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -224,7 +224,7 @@ def test_parse_file_listing_valid():
         }
     ]
 
-    result = _parse_file_listing(raw_file_listing)
+    result = _process_file_listing(raw_file_listing)
 
     assert result.height == 1
     assert result["time_series_id"][0] == 23
@@ -249,4 +249,4 @@ def test_parse_file_listing_invalid():
     # The function uses `_TimeSeriesJsonFileListing.validate(paths_df)`
     # If the regex fails, the columns will be null, and validation should fail.
     with pytest.raises(pt.exceptions.DataFrameValidationError):
-        _parse_file_listing(raw_file_listing)
+        _process_file_listing(raw_file_listing)

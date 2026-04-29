@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Final, Literal, cast, overload
+from typing import Final, TypedDict, cast, overload
 
 import obstore
 import patito as pt
@@ -15,10 +15,13 @@ from nged_data.read_nged_json import (
 
 log = logging.getLogger(__name__)
 
-type _RawFileListing = list[dict[Literal["path", "filesize_bytes"], str | int]]
+
+class _RawFileListItem(TypedDict):
+    path: str
+    filesize_bytes: int
 
 
-class _TimeSeriesJsonFileListing(pt.Model):
+class _ProcessedFileListing(pt.Model):
     path: str
     filesize_bytes: int
     time_series_id: int = _get_time_series_id_dtype()
@@ -40,25 +43,30 @@ class _TimeSeriesJsonFileListing(pt.Model):
 
 def list_timeseries_json_files(
     store: obstore.store.S3Store,
-) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
+) -> pt.DataFrame[_ProcessedFileListing]:
     """List all the timeseries JSON files in NGED's S3 bucket.
 
     The paths are assumed to be of the form:
     timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     """
-    raw_file_listing: _RawFileListing = []
+    raw_file_listing: list[_RawFileListItem] = []
     for chunk in store.list(prefix="timeseries"):
         # `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.
-        for item in chunk:
-            if item["path"].endswith(".json"):
-                raw_file_listing.append({"path": item["path"], "filesize_bytes": item["size"]})
+        for object_meta in chunk:
+            if object_meta["path"].endswith(".json"):
+                raw_file_listing.append(
+                    _RawFileListItem(
+                        path=object_meta["path"],
+                        filesize_bytes=object_meta["size"],
+                    ),
+                )
 
-    return _parse_file_listing(raw_file_listing)
+    return _process_file_listing(raw_file_listing)
 
 
-def _parse_file_listing(
-    raw_file_listing: _RawFileListing,
-) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
+def _process_file_listing(
+    raw_file_listing: list[_RawFileListItem],
+) -> pt.DataFrame[_ProcessedFileListing]:
     """Create DataFrame of paths.
 
     Extracts the start_time, end_time, and time_series_id from the path string. The input paths
@@ -89,13 +97,13 @@ def _parse_file_listing(
         )
         .sort(by="end_time")
     )
-    return _TimeSeriesJsonFileListing.validate(paths_df)
+    return _ProcessedFileListing.validate(paths_df)
 
 
 def remove_small_files_from_listing(
-    file_listing: pt.DataFrame[_TimeSeriesJsonFileListing],
+    file_listing: pt.DataFrame[_ProcessedFileListing],
     size_threshold_bytes: int = 1000,
-) -> pt.DataFrame[_TimeSeriesJsonFileListing]:
+) -> pt.DataFrame[_ProcessedFileListing]:
     """Remove files that are too small. This is used to remove NGED JSON files that have no `data`
     field.
 
@@ -108,7 +116,7 @@ def remove_small_files_from_listing(
 
 
 def download_and_parse_files(
-    store: obstore.store.S3Store, paths_df: pt.DataFrame[_TimeSeriesJsonFileListing]
+    store: obstore.store.S3Store, paths_df: pt.DataFrame[_ProcessedFileListing]
 ) -> None | tuple[pt.DataFrame[TimeSeriesMetadata], pt.DataFrame[PowerTimeSeries]]:
     """Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
     there are any duplicates.
@@ -188,15 +196,15 @@ def select_new_rows(
 # `select_new_rows` then you get a `pt.DataFrame[_NgedJsonFileListing]` back.
 @overload
 def select_new_rows(
-    time_series: pt.DataFrame[_TimeSeriesJsonFileListing],
+    time_series: pt.DataFrame[_ProcessedFileListing],
     delta_path: Path,
-) -> pt.DataFrame[_TimeSeriesJsonFileListing]: ...
+) -> pt.DataFrame[_ProcessedFileListing]: ...
 
 
 def select_new_rows(
-    time_series: pt.DataFrame[PowerTimeSeries | _TimeSeriesJsonFileListing],
+    time_series: pt.DataFrame[PowerTimeSeries | _ProcessedFileListing],
     delta_path: Path,
-) -> pt.DataFrame[PowerTimeSeries | _TimeSeriesJsonFileListing]:
+) -> pt.DataFrame[PowerTimeSeries | _ProcessedFileListing]:
     """
     Return rows in `time_series` that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
@@ -226,7 +234,7 @@ def select_new_rows(
         time_col = "time"
         columns_to_sort_by = PowerTimeSeries.columns_to_sort_by
     elif "end_time" in time_series.columns:
-        pt_model = _TimeSeriesJsonFileListing
+        pt_model = _ProcessedFileListing
         time_col = "end_time"
         columns_to_sort_by = "end_time"
     else:
@@ -249,7 +257,15 @@ def select_new_rows(
     return pt.DataFrame(filtered_df).set_model(pt_model).validate()
 
 
-def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path) -> dict:
+class UpsertMetadataStats(TypedDict, total=False):
+    metadata_n_new_TimeSeriesIDs: int
+    metadata_n_updated_TimeSeriesIDs: int
+    metadata_updated_TimeSeriesIDs: list[int]
+
+
+def upsert_metadata(
+    new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path
+) -> UpsertMetadataStats:
     """
     Upserts metadata to a Parquet file.
 
@@ -276,10 +292,10 @@ def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_pat
     if not metadata_path.exists():
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
         new_metadata.write_parquet(metadata_path, compression=COMPRESSION)
-        return {
-            "metadata_n_new_TimeSeriesIDs": new_metadata.height,
-            "metadata_n_updated_TimeSeriesIDs": 0,
-        }
+        return UpsertMetadataStats(
+            metadata_n_new_TimeSeriesIDs=new_metadata.height,
+            metadata_n_updated_TimeSeriesIDs=0,
+        )
 
     # Read existing metadata
     existing_metadata = pl.read_parquet(metadata_path)
@@ -290,35 +306,38 @@ def upsert_metadata(new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_pat
     metadata_diff = new_metadata.filter(
         ~new_metadata.hash_rows().is_in(existing_metadata.hash_rows().implode())
     )
-    metadata_diff = TimeSeriesMetadata.validate(metadata_diff)
+    TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():
         log.info("TimeSeriesMetadata is up to date.")
-        return {"metadata_n_new_TimeSeriesIDs": 0, "metadata_n_updated_TimeSeriesIDs": 0}
-    else:
-        log.info(
-            f"New TimeSeriesMetadata available for {metadata_diff.height} timeseries_ids."
-            f" Updating {metadata_path}."
+        return UpsertMetadataStats(
+            metadata_n_new_TimeSeriesIDs=0,
+            metadata_n_updated_TimeSeriesIDs=0,
         )
 
-        # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
-        merged_metadata = (
-            pl.concat([new_metadata, existing_metadata])
-            .unique(subset="time_series_id", keep="first")
-            .sort("time_series_id")
-        )
+    log.info(
+        f"New TimeSeriesMetadata available for {metadata_diff.height} timeseries_ids."
+        f" Updating {metadata_path}."
+    )
 
-        TimeSeriesMetadata.validate(merged_metadata)
+    # Merge metadata. Put new_metadata first so that unique(keep="first") keeps the new version
+    merged_metadata = (
+        pl.concat([new_metadata, existing_metadata])
+        .unique(subset="time_series_id", keep="first")
+        .sort("time_series_id")
+    )
 
-        merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+    TimeSeriesMetadata.validate(merged_metadata)
 
-        # Compute stats
-        new_ids = set(new_metadata["time_series_ids"]) - set(existing_metadata["time_series_ids"])
-        updated_ids = set(metadata_diff["time_series_ids"]).intersection(
-            existing_metadata["time_series_ids"]
-        )
-        return {
-            "metadata_n_new_TimeSeriesIDs": len(new_ids),
-            "metadata_n_updated_TimeSeriesIDs": len(updated_ids),
-            "metadata_updated_TimeSeriesIDs": updated_ids,
-        }
+    merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+
+    # Compute stats
+    new_ids = set(new_metadata["time_series_ids"]) - set(existing_metadata["time_series_ids"])
+    updated_ids = list(
+        set(metadata_diff["time_series_ids"]).intersection(existing_metadata["time_series_ids"])
+    )
+    return UpsertMetadataStats(
+        metadata_n_new_TimeSeriesIDs=len(new_ids),
+        metadata_n_updated_TimeSeriesIDs=len(updated_ids),
+        metadata_updated_TimeSeriesIDs=sorted(updated_ids),
+    )

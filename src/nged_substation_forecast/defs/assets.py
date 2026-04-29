@@ -6,7 +6,7 @@ from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from dagster import AssetExecutionContext, MetadataValue, TableRecord, asset
 from nged_data.storage import (
-    _TimeSeriesJsonFileListing,
+    _ProcessedFileListing,
     download_and_parse_files,
     list_timeseries_json_files,
     remove_small_files_from_listing,
@@ -43,6 +43,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     paths_without_small_files = remove_small_files_from_listing(all_paths_df)
     paths_with_new_data_df = select_new_rows(paths_without_small_files, delta_path)
 
+    # Log statistics to be shown in Dagster's UI.
     _log_paths_stats(context, all_paths_df, paths_without_small_files, paths_with_new_data_df)
 
     new_metadata_and_time_series = download_and_parse_files(store, paths_with_new_data_df)
@@ -70,9 +71,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 
 def _log_paths_stats(
     context: AssetExecutionContext,
-    all_paths_df: pt.DataFrame[_TimeSeriesJsonFileListing],
-    paths_without_small_files: pt.DataFrame[_TimeSeriesJsonFileListing],
-    paths_with_new_data_df: pt.DataFrame[_TimeSeriesJsonFileListing],
+    all_paths_df: pt.DataFrame[_ProcessedFileListing],
+    paths_without_small_files: pt.DataFrame[_ProcessedFileListing],
+    paths_with_new_data_df: pt.DataFrame[_ProcessedFileListing],
 ) -> None:
     table = [
         TableRecord(_summarise_paths_df(all_paths_df, "All JSON files on S3")),
@@ -83,7 +84,7 @@ def _log_paths_stats(
 
 
 def _summarise_paths_df(
-    paths_df: pt.DataFrame[_TimeSeriesJsonFileListing], stage_name: str
+    paths_df: pt.DataFrame[_ProcessedFileListing], stage_name: str
 ) -> dict[str, str | int]:
     summary: dict[str, str | int] = {
         "Stage": stage_name,
