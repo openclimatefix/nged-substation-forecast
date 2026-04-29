@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Final, TypedDict, cast, overload
+from typing import Final, Sequence, TypedDict, cast, overload
 
 import obstore
 import patito as pt
@@ -50,9 +50,11 @@ def list_timeseries_json_files(
     timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json
     """
     raw_file_listing: list[_RawFileListItem] = []
+    total_objects = 0
     for chunk in store.list(prefix="timeseries"):
         # `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.
         for object_meta in chunk:
+            total_objects += 1
             if object_meta["path"].endswith(".json"):
                 raw_file_listing.append(
                     _RawFileListItem(
@@ -60,7 +62,7 @@ def list_timeseries_json_files(
                         filesize_bytes=object_meta["size"],
                     ),
                 )
-
+    log.info(f"JSON files on NGED's S3: {len(raw_file_listing)} out of {total_objects=}")
     return _process_file_listing(raw_file_listing)
 
 
@@ -219,16 +221,16 @@ def select_new_rows(
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
 
-    # Scan the existing delta table and find the max time per time_series_id
+    # Scan the existing delta table and find the most recent time per time_series_id
     max_times = cast(
         pl.DataFrame,  # Cast to pl.DataFrame to keep type checkers happy.
         pl.scan_delta(delta_path).group_by("time_series_id").agg(max_time=pl.max("time")).collect(),
     )
 
     log.info(
-        f"Loaded max times for {max_times.height} time_series_ids from {delta_path}."
-        f" Earliest time = {max_times['max_time'].min()}."
-        f" Latest time = {max_times['max_time'].max()}"
+        f"Found the most recent data we have on disk for {max_times.height} time_series_ids from {delta_path}."
+        f" {max_times['max_time'].min()=}."
+        f" {max_times['max_time'].max()=}"
     )
 
     _MaxTimePerTimeSeriesId.validate(max_times)
@@ -265,7 +267,7 @@ def select_new_rows(
 class UpsertMetadataStats(TypedDict, total=False):
     metadata_n_new_TimeSeriesIDs: int
     metadata_n_updated_TimeSeriesIDs: int
-    metadata_updated_TimeSeriesIDs: list[int]
+    metadata_updated_TimeSeriesIDs: Sequence[int]
 
 
 def upsert_metadata(

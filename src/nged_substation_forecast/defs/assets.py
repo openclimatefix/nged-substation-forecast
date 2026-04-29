@@ -1,13 +1,16 @@
+import ast
+from abc import abstractmethod
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import Any, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, MetadataValue, TableRecord, asset
+from dagster import AssetExecutionContext, MetadataValue, TableMetadataValue, TableRecord, asset
 from nged_data.storage import (
     NoNewData,
+    UpsertMetadataStats,
     _ProcessedFileListing,
     download_and_parse_files,
     list_timeseries_json_files,
@@ -15,7 +18,7 @@ from nged_data.storage import (
     select_new_rows,
     upsert_metadata,
 )
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
 
 
 @asset
@@ -47,14 +50,23 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     list_of_new_json_files = select_new_rows(list_of_large_json_files, delta_path)
 
     # Log statistics to be shown in Dagster's UI.
-    _log_summaries_of_file_listings(
-        context, list_of_all_json_files, list_of_large_json_files, list_of_new_json_files
+    context.add_output_metadata(
+        _FileListingSummary.make_table(
+            "nged_s3_paths",
+            {
+                "All JSON files on S3": list_of_all_json_files,
+                "Files larger than 1kB": list_of_large_json_files,
+                "Files with new data": list_of_new_json_files,
+            },
+        )
     )
 
     try:
         new_metadata, new_power_ts = download_and_parse_files(store, list_of_new_json_files)
     except NoNewData:
-        context.add_output_metadata({"Rows of new power TS downloaded": 0, "New metadata rows": 0})
+        context.add_output_metadata(
+            UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
+        )
         return
 
     # Save TimeSeriesMetadata:
@@ -70,29 +82,29 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
             delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
         )
 
-    _log_power_timeseries_stats(context, new_power_ts, new_power_ts_deduped)
+    # Log statistics to be shown in Dagster's UI.
+    context.add_output_metadata(
+        _PowerTimeSeriesSummary.make_table(
+            "PowerTimeSeries",
+            {
+                "Downloaded timeseries": new_power_ts,
+                "De-duped rows appended to disk": new_power_ts_deduped,
+            },
+        )
+    )
 
 
-# TODO: Maybe these _log_summaries_of_file_listings functions should take a dict[str, pl.DataFrame],
-# e.g. {"All JSON files on S3": list_of_all_json_files}
-# TODO: Also update the PowerTimeSeries summary code
+##############################################################################
+# All the code below this line is just for outputting summary stats to Dagster
+# TODO: Move the code below this line to a separate file.
 
 
-def _log_summaries_of_file_listings(
-    context: AssetExecutionContext,
-    list_of_all_json_files: pt.DataFrame[_ProcessedFileListing],
-    list_of_large_json_files: pt.DataFrame[_ProcessedFileListing],
-    list_of_new_json_files: pt.DataFrame[_ProcessedFileListing],
-) -> None:
-    table = [
-        file_listing_to_table_record(list_of_all_json_files, "All JSON files on S3"),
-        file_listing_to_table_record(list_of_large_json_files, "Files larger than 1kB"),
-        file_listing_to_table_record(list_of_new_json_files, "Files with new data"),
-    ]
-    context.add_output_metadata({"nged_s3_paths": MetadataValue.table(table)})
+T = TypeVar("T", bound=pt.Model)
 
 
-class _Summary(BaseModel):
+class _Summary(BaseModel, Generic[T]):
+    """The Generic[T] makes this superclass generic over pt.Models."""
+
     stage: str
     start_time: str = "N/A"
     end_time: str = "N/A"
@@ -106,79 +118,69 @@ class _Summary(BaseModel):
     @field_validator("time_series_ids", mode="before")
     @classmethod
     def unique_time_series_ids(cls, v: Any) -> Any:
-        if isinstance(v, pl.Series):
-            return str(v.unique().sort().to_list())
-        return v
+        return str(v.unique().sort().to_list()) if isinstance(v, pl.Series) else v
 
-    def to_table_record(self) -> TableRecord:
-        return TableRecord(self.model_dump())
+    @computed_field
+    @property
+    def n_time_series_ids(self) -> int:
+        return 0 if self.time_series_ids == "N/A" else len(ast.literal_eval(self.time_series_ids))
+
+    @classmethod
+    def make_table(
+        cls, key: str, dataframes: dict[str, pt.DataFrame[T]]
+    ) -> dict[str, TableMetadataValue]:
+        table: list[TableRecord] = []
+        for stage_name, df in dataframes.items():
+            summary = cls.from_data_frame(stage_name, df)
+            table_record = TableRecord(summary.model_dump())
+            table.append(table_record)
+        return {key: MetadataValue.table(table)}
+
+    @classmethod
+    @abstractmethod
+    def from_data_frame(cls, stage_name: str, df: pt.DataFrame[T]) -> Self:
+        pass
 
 
-class _FileListingSummary(_Summary):
+class _FileListingSummary(_Summary[_ProcessedFileListing]):
     n_files: int
     min_file_size_bytes: int = 0
     max_file_size_bytes: int = 0
 
     @classmethod
-    def from_file_listing(
-        cls, file_listing: pt.DataFrame[_ProcessedFileListing], stage_name: str
-    ) -> Self:
+    def from_data_frame(cls, stage_name: str, df: pt.DataFrame[_ProcessedFileListing]) -> Self:
         # The `ty: ignore` comments are because `ty` only looks at the types specified in the BaseModel.
         # `ty` doesn't know that we're casting the types in the `field_validator` methods.
-        if len(file_listing) > 0:
+        if len(df) > 0:
             return cls(
                 stage=stage_name,
-                n_files=len(file_listing),
-                start_time=file_listing["start_time"].min(),  # ty: ignore[invalid-argument-type]
-                end_time=file_listing["end_time"].max(),  # ty: ignore[invalid-argument-type]
+                n_files=len(df),
+                start_time=df["start_time"].min(),  # ty: ignore[invalid-argument-type]
+                end_time=df["end_time"].max(),  # ty: ignore[invalid-argument-type]
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                time_series_ids=file_listing["time_series_ids"],  # ty: ignore[invalid-argument-type]
-                min_file_size_bytes=file_listing["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
-                max_file_size_bytes=file_listing["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
+                time_series_ids=df["time_series_id"],  # ty: ignore[invalid-argument-type]
+                min_file_size_bytes=df["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
+                max_file_size_bytes=df["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
             )
         else:
             return cls(stage=stage_name, n_files=0)
 
 
-def file_listing_to_table_record(
-    file_listing: pt.DataFrame[_ProcessedFileListing], stage_name: str
-) -> TableRecord:
-    return _FileListingSummary.from_file_listing(file_listing, stage_name).to_table_record()
+class _PowerTimeSeriesSummary(_Summary[PowerTimeSeries]):
+    n_rows: int
 
-
-def _log_power_timeseries_stats(
-    context: AssetExecutionContext,
-    new_power_ts_downloaded: pt.DataFrame[PowerTimeSeries],
-    new_power_ts_deduped: pt.DataFrame[PowerTimeSeries],
-) -> None:
-    table = [
-        TableRecord(_summarise_power_ts(new_power_ts_downloaded, "Downloaded timeseries")),
-        TableRecord(_summarise_power_ts(new_power_ts_deduped, "De-duped rows appended to disk")),
-    ]
-    context.add_output_metadata({"PowerTimeSeries": MetadataValue.table(table)})
-
-
-def _summarise_power_ts(
-    time_series_df: pt.DataFrame[PowerTimeSeries], stage_name: str
-) -> dict[str, str | int]:
-    summary: dict[str, str | int] = {
-        "Stage": stage_name,
-        "Rows": len(time_series_df),
-        "Start Date": "N/A",
-        "End Date": "N/A",
-        "TimeSeriesIDs": "N/A",
-    }
-    if len(time_series_df) > 0:
-        summary.update(
-            {
-                "Start Date": _format_datetime(time_series_df["time"].min()),
-                "End Date": _format_datetime(time_series_df["time"].max()),
+    @classmethod
+    def from_data_frame(cls, stage_name: str, df: pt.DataFrame[PowerTimeSeries]) -> Self:
+        # The `ty: ignore` comments are because `ty` only looks at the types specified in the BaseModel.
+        # `ty` doesn't know that we're casting the types in the `field_validator` methods.
+        if len(df) > 0:
+            return cls(
+                stage=stage_name,
+                n_rows=len(df),
+                start_time=df["time"].min(),  # ty: ignore[invalid-argument-type]
+                end_time=df["time"].max(),  # ty: ignore[invalid-argument-type]
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                "TimeSeriesIDs": str(time_series_df["time_series_id"].unique().sort().to_list()),
-            }
-        )
-    return summary
-
-
-def _format_datetime(dt: Any) -> str:
-    return cast(datetime, dt).strftime("%Y-%m-%d %H:%M")
+                time_series_ids=df["time_series_id"],  # ty: ignore[invalid-argument-type]
+            )
+        else:
+            return cls(stage=stage_name, n_rows=0)
