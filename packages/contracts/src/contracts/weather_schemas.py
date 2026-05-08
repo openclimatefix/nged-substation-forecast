@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import Final, Self, overload
+from typing import ClassVar, Final, Self, overload
 
 import patito as pt
 import polars as pl
@@ -59,6 +59,9 @@ class _NwpBase(pt.Model):
 
     # Categorical variables
     categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
+
+    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    categorical_var_names: ClassVar[tuple[str, ...]] = ("categorical_precipitation_type_surface",)
 
 
 class NwpInMemory(_NwpBase):

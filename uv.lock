@@ -849,12 +849,27 @@ wheels = [
 ]
 
 [[package]]
+name = "dynamical-catalog"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "icechunk" },
+    { name = "xarray" },
+    { name = "zarr" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/24/c5/247243d48723fce9df20812f36237a933f714fdb6d5d05acb4dbf3fe3dd7/dynamical_catalog-0.5.0.tar.gz", hash = "sha256:fec68ee754609d64b092b1d321fbeaca0d1f6b0569baebdfa119cbe529b6b660", size = 45228, upload-time = "2026-04-23T20:36:52.882Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/db/f8b9a37879d372be8695bac4652e42b1cbc27cd6e7a3f70521bcd7f0cdeb/dynamical_catalog-0.5.0-py3-none-any.whl", hash = "sha256:b90f27c3489aada5bf49cf3d9dbdcf6b2b76d1d16c2819840841a35b1a5610be", size = 5387, upload-time = "2026-04-23T20:36:51.322Z" },
+]
+
+[[package]]
 name = "dynamical-data"
 version = "0.1.0"
 source = { editable = "packages/dynamical_data" }
 dependencies = [
     { name = "altair" },
     { name = "deltalake" },
+    { name = "dynamical-catalog" },
     { name = "geo" },
     { name = "icechunk" },
     { name = "lonboard" },
@@ -875,6 +890,7 @@ dev = [
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
     { name = "deltalake", specifier = ">=1.4.2" },
+    { name = "dynamical-catalog", specifier = ">=0.5.0" },
     { name = "geo", editable = "packages/geo" },
     { name = "icechunk", specifier = ">=1.1.18" },
     { name = "lonboard", specifier = ">=0.14.0" },

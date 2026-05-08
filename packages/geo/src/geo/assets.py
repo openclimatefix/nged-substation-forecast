@@ -2,12 +2,10 @@ import importlib.resources
 
 import h3.api.basic_int as h3
 import polars as pl
-import pyproj
 import shapely
-from contracts.data_schemas import H3GridWeights
+from contracts.geo_schemas import H3GridWeights
 from dagster import AssetExecutionContext, Config, asset
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import transform
 
 from geo.h3 import compute_h3_grid_weights
 
@@ -41,26 +39,12 @@ def uk_boundary(context: AssetExecutionContext) -> BaseGeometry:
 
     context.log.info(f"Loading UK boundary from {geojson_path}")
     file_contents = geojson_path.read_text()
-
     shape: BaseGeometry = shapely.from_geojson(file_contents)
 
-    # Project to OSGB36 (EPSG:27700) for metric buffering
-    project_to_osgb = pyproj.Transformer.from_crs(
-        "EPSG:4326", "EPSG:27700", always_xy=True
-    ).transform
-    project_to_wgs84 = pyproj.Transformer.from_crs(
-        "EPSG:27700", "EPSG:4326", always_xy=True
-    ).transform
-
-    shape_osgb = transform(project_to_osgb, shape)
     # Buffer by 25,000 meters (25km) to ensure that even the most coastal H3 cells
     # will have at least one overlapping NWP grid cell (given the 0.25-degree
-    # resolution, which is ~28km at UK latitudes). This prevents coastal
-    # substations from losing coverage from the nearest NWP grid points.
-    shape_osgb_buffered = shape_osgb.buffer(25000)
-    shape_buffered = transform(project_to_wgs84, shape_osgb_buffered)
-
-    return shape_buffered
+    # resolution, which is ~28km at UK latitudes).
+    return shape.buffer(distance=25000)
 
 
 @asset(group_name="reference_data")
