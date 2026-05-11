@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     power_forecasts_data_path: Path = Path("data/power_forecasts")
     forecast_metrics_data_path: Path = Path("data/forecast_metrics")
     trained_ml_model_params_base_path: Path = Path("data/trained_ML_model_params")
+    h3_grid_weights_path: Path = Path("data/h3_grid_weights.parquet")
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

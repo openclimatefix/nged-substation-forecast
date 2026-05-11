@@ -27,12 +27,13 @@ def _(boundary):
 
 @app.cell
 def _(h3_grid_weights):
-    # Example: An Arrow table with H3 identifiers as a column
-    layer = H3HexagonLayer(
-        h3_grid_weights,
-        get_hexagon=h3_grid_weights["h3_index"],
-    )
-    m = Map(layer)
+    unique_h3 = h3_grid_weights["h3_index"].unique().sort()
+    return (unique_h3,)
+
+
+@app.cell
+def _(unique_h3):
+    Map(H3HexagonLayer(unique_h3, get_hexagon=unique_h3, opacity=0.1))
     return
 
 

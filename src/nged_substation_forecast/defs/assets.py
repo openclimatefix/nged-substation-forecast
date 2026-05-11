@@ -8,6 +8,9 @@ import polars as pl
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from dagster import AssetExecutionContext, MetadataValue, TableMetadataValue, TableRecord, asset
+from geo.great_britain.load import load_gb_boundary
+from geo.h3 import compute_h3_grid_weights_for_boundary
+from nged_data.read_nged_json import _H3_RESOLUTION
 from nged_data.storage import (
     NoNewData,
     UpsertMetadataStats,
@@ -91,6 +94,34 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
                 "De-duped rows appended to disk": new_power_ts_deduped,
             },
         )
+    )
+
+
+@asset
+def h3_grid_weights(context: AssetExecutionContext) -> None:
+    """
+    Computes H3 grid weights for the Great Britain boundary.
+
+    This asset calculates the fractional overlap of H3 cells with the GB boundary
+    at various resolutions, which is used for spatial aggregation of weather data.
+    """
+    settings = Settings()
+    boundary = load_gb_boundary()
+    weights = compute_h3_grid_weights_for_boundary(
+        boundary, nwp_grid_size_degrees=0.25, h3_res=_H3_RESOLUTION
+    )
+
+    # Save to parquet
+    # FIXME: mkdir won't work when we're saving to S3!
+    settings.h3_grid_weights_path.parent.mkdir(parents=True, exist_ok=True)
+    weights.write_parquet(settings.h3_grid_weights_path)
+
+    # Add metadata to Dagster context
+    context.add_output_metadata(
+        {
+            "n_rows": len(weights),
+            "path": str(settings.h3_grid_weights_path),
+        }
     )
 
 

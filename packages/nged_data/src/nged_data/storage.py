@@ -339,9 +339,9 @@ def upsert_metadata(
     merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
 
     # Compute stats
-    new_ids = set(new_metadata["time_series_ids"]) - set(existing_metadata["time_series_ids"])
+    new_ids = set(new_metadata["time_series_id"]) - set(existing_metadata["time_series_id"])
     updated_ids = list(
-        set(metadata_diff["time_series_ids"]).intersection(existing_metadata["time_series_ids"])
+        set(metadata_diff["time_series_id"]).intersection(existing_metadata["time_series_id"])
     )
     return UpsertMetadataStats(
         metadata_n_new_TimeSeriesIDs=len(new_ids),
