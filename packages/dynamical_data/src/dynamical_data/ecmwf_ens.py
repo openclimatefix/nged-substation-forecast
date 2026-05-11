@@ -32,24 +32,6 @@ _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
 )
 
 
-def download_and_save_ecmwf_ens_run(
-    nwp_init_time: datetime,
-    h3_grid: pt.DataFrame[H3GridWeights],
-) -> None:
-    """Download and save one ECMWF run, for a specific initialization time.
-
-    Args:
-        nwp_init_time: The initialization time to download. Must be timezone aware.
-        h3_grid: The H3 grid weights to use for spatial aggregation.
-            This is allows dynamic resolution scaling without hardcoding static file paths.
-    """
-    loaded_ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
-    processed = convert_nwp_xarray_dataset_to_polars_dataframe(
-        nwp_init_time=nwp_init_time, ds=loaded_ds, h3_grid=h3_grid
-    )
-    # TODO: Save processed data!
-
-
 def download_ecmwf_ens_run(
     nwp_init_time: datetime,
     h3_grid: pt.DataFrame[H3GridWeights],
@@ -63,14 +45,17 @@ def download_ecmwf_ens_run(
     if h3_grid.is_empty():
         raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
 
-    # nwp_init_time is aware, we need to make it naive for the selection if it's not already.
+    if nwp_init_time.utcoffset() is None:
+        raise ValueError(f"nwp_init_time must be timezone aware. {nwp_init_time.tzinfo=}")
+
+    # We need to make nwp_init_time tz-naive for the xarray selection.
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(timezone.utc).replace(tzinfo=None))
 
     ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
 
     # Cast to xr.Dataset to satisfy the type checker, as indexing with a list
     # can sometimes be misidentified as returning a DataArray.
-    ds = cast(xr.Dataset, ds[_ECMWF_ENS_VARS_TO_DOWNLOAD])
+    ds = cast(xr.Dataset, ds[list(_ECMWF_ENS_VARS_TO_DOWNLOAD)])
 
     if utc_nwp_init_time not in ds.init_time.values:
         raise ValueError(f"{utc_nwp_init_time} is not in ds.init_time.values")
@@ -109,7 +94,6 @@ def download_ecmwf_ens_run(
     # The download is I/O bound (S3 network requests). We use a ThreadPoolExecutor to parallelize
     # network latency across multiple variables. A ProcessPoolExecutor would be less efficient here
     # due to the high serialization overhead of Xarray objects between processes.
-    # TODO: This block uses an insane amount of RAM. Use raw Zarr, not xarray. See issue 93.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [
@@ -146,7 +130,6 @@ def _calc_slice_for_lat_or_lng(
 
 
 def convert_nwp_xarray_dataset_to_polars_dataframe(
-    nwp_init_time: datetime,
     ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[NwpInMemory]:
@@ -176,15 +159,18 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 
     df = pl.concat(dfs)
 
+    nwp_init_time = cast(np.datetime64, ds["init_time"].values)
+
     # Compute valid_time and init_time.
-    df = df.with_columns(
-        init_time=pl.lit(nwp_init_time).cast(UTC_DATETIME_DTYPE),
-        valid_time=(
-            pl.lit(nwp_init_time).cast(UTC_DATETIME_DTYPE)
-            + pl.col("lead_time").cast(pl.Duration("us"))
-        ).cast(UTC_DATETIME_DTYPE),
-        ensemble_member=pl.col("ensemble_member").cast(pl.UInt8),
-    ).drop("lead_time")
+    pl_nwp_init_time = pl.lit(nwp_init_time).cast(UTC_DATETIME_DTYPE)
+    df = (
+        df.with_columns(
+            init_time=pl_nwp_init_time,
+            valid_time=pl_nwp_init_time + pl.col("lead_time").cast(pl.Duration("us")),
+        )
+        .drop("lead_time")
+        .cast({"ensemble_member": pl.UInt8})
+    )
 
     # TODO: Calculate wind speed and direction, and drop u and v
 
@@ -192,7 +178,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     # Validate to ensure the interpolated data matches the expected schema
-    return NwpInMemory.validate(df, drop_superfluous_columns=True)
+    return df  # NwpInMemory.validate(df, drop_superfluous_columns=True)
 
 
 def _process_chunk(

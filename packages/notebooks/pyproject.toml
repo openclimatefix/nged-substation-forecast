@@ -11,4 +11,5 @@ dependencies = [
     "polars>=1.37.1",
     "geo",
     "lonboard>=0.16.0",
+    "matplotlib>=3.10.9",
 ]

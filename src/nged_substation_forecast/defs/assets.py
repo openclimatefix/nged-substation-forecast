@@ -1,5 +1,5 @@
 import ast
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Generic, Self, TypeVar
 
@@ -133,8 +133,10 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
 T = TypeVar("T", bound=pt.Model)
 
 
-class _Summary(BaseModel, Generic[T]):
-    """The Generic[T] makes this superclass generic over pt.Models."""
+class _BaseSummary(ABC, BaseModel, Generic[T]):
+    """Create a Dagster table of summary statistics.
+
+    The Generic[T] makes this superclass generic over pt.Models."""
 
     stage: str
     start_time: str = "N/A"
@@ -173,7 +175,7 @@ class _Summary(BaseModel, Generic[T]):
         pass
 
 
-class _FileListingSummary(_Summary[_ProcessedFileListing]):
+class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
     n_files: int
     min_file_size_bytes: int = 0
     max_file_size_bytes: int = 0
@@ -197,7 +199,7 @@ class _FileListingSummary(_Summary[_ProcessedFileListing]):
             return cls(stage=stage_name, n_files=0)
 
 
-class _PowerTimeSeriesSummary(_Summary[PowerTimeSeries]):
+class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
     n_rows: int
 
     @classmethod
