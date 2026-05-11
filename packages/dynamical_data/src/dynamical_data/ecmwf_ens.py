@@ -1,6 +1,6 @@
 import concurrent.futures
 from datetime import datetime, timezone
-from typing import Any, Final, Literal, cast
+from typing import Final, Literal, cast
 
 import dynamical_catalog
 import numpy as np
@@ -148,18 +148,23 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     for lead_time in ds.lead_time.values:
         for ensemble_member in ds.ensemble_member.values:
             ds_chunk = ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
-            dfs.append(
-                _process_chunk_for_1_lead_time_and_1_ens_member(
-                    ds_chunk,
-                    h3_grid,
-                    lat_grid=lat_grid_raveled,
-                    lon_grid=lon_grid_raveled,
-                )
+            df = _process_chunk_for_1_lead_time_and_1_ens_member(
+                ds_chunk,
+                h3_grid,
+                lat_grid=lat_grid_raveled,
+                lon_grid=lon_grid_raveled,
+            ).with_columns(
+                ensemble_member=pl.lit(ensemble_member).cast(pl.UInt8),
+                valid_time=pl.lit(ds_chunk["valid_time"].values).cast(UTC_DATETIME_DTYPE),
             )
+            dfs.append(df)
 
-    df = pl.concat(dfs)
+    df = pl.concat(dfs).with_columns(
+        init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE)
+    )
 
-    # TODO: Calculate wind speed and direction, and drop u and v
+    # TODO: Calculate wind speed and direction, and drop u and v, and validate in return statement,
+    # and uncomment all the NWP variable names!
 
     # Sort before validation to ensure consistent output order, and to optimise compression.
     df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
@@ -176,65 +181,27 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
 ) -> pl.DataFrame:
     """Processes a single chunk of the ECMWF dataset."""
     # Prepare data dictionary
-    data_dict: dict[str, Any] = {"latitude": lat_grid, "longitude": lon_grid}
+    data_dict: dict[str, np.ndarray] = {"latitude": lat_grid, "longitude": lon_grid}
 
     # Add data variables
     for var_name in ds.data_vars:
         data_dict[str(var_name)] = ds[var_name].values.ravel()
 
-    # Add scalar coordinates. Polars will broadcast these.
-    data_dict["ensemble_member"] = ds["ensemble_member"].values.item()
-    for coord_name in ["init_time", "valid_time"]:
-        data_dict[coord_name] = int(ds[coord_name].values.astype("datetime64[s]").astype(int))
-
     # Create Polars DataFrame.
-    nwp_df = pl.DataFrame(data_dict, schema_overrides={"ensemble_member": pl.UInt8}).with_columns(
-        pl.from_epoch(pl.col(["init_time", "valid_time"])).cast(UTC_DATETIME_DTYPE)
-    )
-
-    print(nwp_df.columns)
+    nwp_df = pl.DataFrame(data_dict)
 
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lon", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
     )
 
-    # Aggregate to H3 resolution 5.
-
-    # TODO: I think a lot of this aggregation logic is over-complex, and possibly is filling things
-    # with zeros when they shouldn't be.
-    def weight_sum_expr(x: str) -> pl.Expr:
-        return (
-            pl.when(pl.col(x).fill_nan(None).is_not_null())
-            .then(pl.col("proportion"))
-            .otherwise(0.0)  # TODO: This zero makes me nervous!
-            .sum()
-        )
-
-    # Define variables for aggregation
+    # Aggregate NWP variables to H3 index.
     all_nwp_vars = [str(v) for v in ds.data_vars]
     numeric_vars = [v for v in all_nwp_vars if v not in NwpInMemory.categorical_var_names]
-
-    # Aggregate numeric variables
-    agg_exprs = [
-        pl.when(weight_sum_expr(x) > 0)
-        .then((pl.col(x).fill_nan(None) * pl.col("proportion")).sum() / weight_sum_expr(x))
-        .otherwise(None)
-        .cast(pl.Float32)
-        .alias(x)
-        for x in numeric_vars
-    ]
-
-    processed = joined.group_by("h3_index").agg(agg_exprs)
-
-    # WEIGHTED CATEGORICAL AGGREGATION:
-    for categorical_var_name in NwpInMemory.categorical_var_names:
-        df_cat = (
-            joined.group_by(["h3_index", categorical_var_name])
-            .agg(pl.col("proportion").sum().alias("weight"))
-            .sort(["h3_index", "weight"])
-            .group_by("h3_index")
-            .agg(pl.col(categorical_var_name).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
+    return (
+        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
+        .group_by("h3_index")
+        .agg(
+            pl.col(numeric_vars).sum(),
+            pl.col(NwpInMemory.categorical_var_names).mode().first(),
         )
-        processed = processed.join(df_cat, on="h3_index", how="left")
-
-    return processed
+    )

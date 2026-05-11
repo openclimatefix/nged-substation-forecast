@@ -124,6 +124,7 @@ def compute_h3_grid_weights(
         .with_columns(
             proportion=pl.col("h3_children_in_nwp_grid_box") / pl.col("h3_children_per_h3_parent")
         )
+        .sort(["h3_index", "nwp_lat", "nwp_lon"])
     )
 
     return pt.DataFrame(weights_df).set_model(H3GridWeights).drop().cast().validate()

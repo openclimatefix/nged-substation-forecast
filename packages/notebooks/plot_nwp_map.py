@@ -46,8 +46,8 @@ def _(ds, h3_grid):
 
 @app.cell
 def _(ds):
-    valid_time = datetime(2026, 5, 3, 12)
-    ds["temperature_2m"].sel(valid_time=valid_time, ensemble_member=0).plot.imshow()
+    valid_time = datetime(2026, 5, 6, 12)
+    ds["categorical_precipitation_type_surface"].sel(valid_time=valid_time, ensemble_member=0).plot.imshow()
     return (valid_time,)
 
 
@@ -63,7 +63,7 @@ def _(filtered_df):
     from palettable.matplotlib import Viridis_20
     from lonboard.colormap import apply_continuous_cmap
 
-    temperature = filtered_df["temperature_2m"]
+    temperature = filtered_df["categorical_precipitation_type_surface"]
     min_bound = temperature.min()
     max_bound = temperature.max() - min_bound
 
@@ -86,32 +86,81 @@ def _(Viridis_20, apply_continuous_cmap, filtered_df, normalized):
 
 
 @app.cell
-def _():
+def _(ds, h3_grid):
+    import xarray as xr
     import numpy as np
-    ndt = np.datetime64(datetime(2024, 1, 1))
-    return (ndt,)
 
+    ds_chunk = ds.isel(ensemble_member=0, lead_time=0)
 
-@app.cell
-def _(ndt):
-    pl.DataFrame(
-        {"a": [0, 1, 2], "b": 10, "c": ndt.astype("datetime64[s]").astype(int), "e": [10, 20, 30]},
-        schema_overrides={"b": pl.UInt8},
-    ).with_columns(
-        pl.from_epoch(pl.col(["c"])).cast(pl.Datetime(time_zone="utc"))
+    lat_grid, lon_grid = np.meshgrid(
+        ds_chunk.latitude.values.astype(np.float32),
+        ds_chunk.longitude.values.astype(np.float32),
+        indexing="ij",
     )
+
+    # Prepare data dictionary
+    data_dict = {"latitude": lat_grid.ravel(), "longitude": lon_grid.ravel()}
+
+    # Add data variables
+    for var_name in ds_chunk.data_vars:
+        data_dict[str(var_name)] = ds_chunk[var_name].values.ravel()
+
+    # Create Polars DataFrame.
+    nwp_df = pl.DataFrame(data_dict)
+
+    joined = h3_grid.join(nwp_df, left_on=["nwp_lon", "nwp_lat"], right_on=["longitude", "latitude"], how="left")
+
+    # Aggregate to H3 resolution 5.
+
+
+    # TODO: I think a lot of this aggregation logic is over-complex, and possibly is filling things
+    # with zeros when they shouldn't be.
+    def weight_sum_expr(x: str) -> pl.Expr:
+        return (
+            pl.when(pl.col(x).fill_nan(None).is_not_null())
+            .then(pl.col("proportion"))
+            .otherwise(0.0)  # TODO: This zero makes me nervous!
+            .sum()
+        )
+
+
+    # Define variables for aggregation
+    all_nwp_vars = [str(v) for v in ds_chunk.data_vars]
+    numeric_vars = [v for v in all_nwp_vars if v not in ["categorical_precipitation_type_surface"]]
+
+    # Aggregate numeric variables
+    agg_exprs = [
+        pl.when(weight_sum_expr(x) > 0)
+        .then((pl.col(x).fill_nan(None) * pl.col("proportion")).sum() / weight_sum_expr(x))
+        .otherwise(None)
+        .cast(pl.Float32)
+        .alias(x)
+        for x in numeric_vars
+    ]
+
+    processed = joined.group_by("h3_index").agg(agg_exprs)
+
+    # WEIGHTED CATEGORICAL AGGREGATION:
+    for categorical_var_name in ["categorical_precipitation_type_surface"]:
+        df_cat = (
+            joined.group_by(["h3_index", categorical_var_name])
+            .agg(pl.col("proportion").sum().alias("weight"))
+            .sort(["h3_index", "weight"])
+            .group_by("h3_index")
+            .agg(pl.col(categorical_var_name).last().cast(pl.UInt8))
+        )
+        processed = processed.join(df_cat, on="h3_index", how="left")
+    return (processed,)
+
+
+@app.cell
+def _(processed):
+    processed.sort("h3_index")
     return
 
 
 @app.cell
-def _(ndt):
-    ndt.astype("datetime64[s]")
-    return
-
-
-@app.cell
-def _(ds):
-    ds.sel(ensemble_member=0)["ensemble_member"].values.item()
+def _():
     return
 
 
