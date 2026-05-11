@@ -9,4 +9,6 @@ dependencies = [
     "marimo>=0.19.7",
     "obstore>=0.8.2",
     "polars>=1.37.1",
+    "geo",
+    "lonboard>=0.16.0",
 ]

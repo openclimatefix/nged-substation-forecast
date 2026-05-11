@@ -2,12 +2,9 @@
 
 This package contains generic geospatial logic and data for the NGED substation forecast project.
 
-## Contents
+## Map of Great Britain using H3 resolution 5 hexagons
 
-- `geo.h3`: H3-related utilities, including grid weight computation.
-- `assets/`: Generic geospatial assets like GeoJSON files.
-
-![Map of Great Britain using H3 resolution 5 hexagons](assets/map-of-Great-Britain-H3-resolution-5.png)
+![](src/geo/united_kingdom/map-of-Great-Britain-H3-resolution-5.png)
 
 ## Purpose
 

@@ -2125,6 +2125,8 @@ version = "0.1.0"
 source = { virtual = "packages/notebooks" }
 dependencies = [
     { name = "altair" },
+    { name = "geo" },
+    { name = "lonboard" },
     { name = "marimo" },
     { name = "obstore" },
     { name = "polars" },
@@ -2133,6 +2135,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
+    { name = "geo", editable = "packages/geo" },
+    { name = "lonboard", specifier = ">=0.16.0" },
     { name = "marimo", specifier = ">=0.19.7" },
     { name = "obstore", specifier = ">=0.8.2" },
     { name = "polars", specifier = ">=1.37.1" },
