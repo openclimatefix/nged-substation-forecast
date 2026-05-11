@@ -44,12 +44,12 @@ def compute_h3_grid_weights_for_boundary(
         )
 
     return compute_h3_grid_weights(
-        h3_index=h3_index, nwp_grid_size_degrees=nwp_grid_size_degrees, child_h3_res=child_h3_res
+        nwp_grid_size_degrees=nwp_grid_size_degrees, h3_index=h3_index, child_h3_res=child_h3_res
     )
 
 
 def compute_h3_grid_weights(
-    h3_index: list[int], nwp_grid_size_degrees: float, child_h3_res: int | None = None
+    nwp_grid_size_degrees: float, h3_index: list[int], child_h3_res: int | None = None
 ) -> pt.DataFrame[H3GridWeights]:
     """Computes the proportion mapping for H3 grid cells to a regular lat/lng grid.
 

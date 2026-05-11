@@ -17,17 +17,17 @@ _SETTINGS = Settings()
 
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_u_10m",
-    "wind_v_10m",
-    "wind_u_100m",
-    "wind_v_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
+    # "dew_point_temperature_2m",
+    # "wind_u_10m",
+    # "wind_v_10m",
+    # "wind_u_100m",
+    # "wind_v_100m",
+    # "pressure_surface",
+    # "pressure_reduced_to_mean_sea_level",
+    # "geopotential_height_500hpa",
+    # "downward_long_wave_radiation_flux_surface",
+    # "downward_short_wave_radiation_flux_surface",
+    # "precipitation_surface",
     "categorical_precipitation_type_surface",
 )
 
@@ -149,7 +149,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         for ensemble_member in ds.ensemble_member.values:
             ds_chunk = ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
             dfs.append(
-                _process_chunk(
+                _process_chunk_for_1_lead_time_and_1_ens_member(
                     ds_chunk,
                     h3_grid,
                     lat_grid=lat_grid_raveled,
@@ -158,19 +158,6 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
             )
 
     df = pl.concat(dfs)
-
-    nwp_init_time = cast(np.datetime64, ds["init_time"].values)
-
-    # Compute valid_time and init_time.
-    pl_nwp_init_time = pl.lit(nwp_init_time).cast(UTC_DATETIME_DTYPE)
-    df = (
-        df.with_columns(
-            init_time=pl_nwp_init_time,
-            valid_time=pl_nwp_init_time + pl.col("lead_time").cast(pl.Duration("us")),
-        )
-        .drop("lead_time")
-        .cast({"ensemble_member": pl.UInt8})
-    )
 
     # TODO: Calculate wind speed and direction, and drop u and v
 
@@ -181,7 +168,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     return df  # NwpInMemory.validate(df, drop_superfluous_columns=True)
 
 
-def _process_chunk(
+def _process_chunk_for_1_lead_time_and_1_ens_member(
     ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
     lat_grid: np.ndarray,
@@ -195,20 +182,23 @@ def _process_chunk(
     for var_name in ds.data_vars:
         data_dict[str(var_name)] = ds[var_name].values.ravel()
 
-    # Add scalar coordinates
-    for coord_name in ["init_time", "lead_time", "ensemble_member"]:
-        val = ds[coord_name].values
-        # Broadcast to the same length as the flattened arrays
-        data_dict[coord_name] = np.full(lat_grid.size, val)
+    # Add scalar coordinates. Polars will broadcast these.
+    data_dict["ensemble_member"] = ds["ensemble_member"].values.item()
+    for coord_name in ["init_time", "valid_time"]:
+        data_dict[coord_name] = int(ds[coord_name].values.astype("datetime64[s]").astype(int))
 
-    nwp_df = pl.DataFrame(data_dict)
+    # Create Polars DataFrame.
+    nwp_df = pl.DataFrame(data_dict, schema_overrides={"ensemble_member": pl.UInt8}).with_columns(
+        pl.from_epoch(pl.col(["init_time", "valid_time"])).cast(UTC_DATETIME_DTYPE)
+    )
+
+    print(nwp_df.columns)
 
     joined = h3_grid.join(
         nwp_df, left_on=["nwp_lon", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
     )
 
     # Aggregate to H3 resolution 5.
-    cols_to_aggregate_by = ("h3_index", "lead_time", "ensemble_member")
 
     # TODO: I think a lot of this aggregation logic is over-complex, and possibly is filling things
     # with zeros when they shouldn't be.
@@ -233,17 +223,18 @@ def _process_chunk(
         .alias(x)
         for x in numeric_vars
     ]
-    processed = joined.group_by(cols_to_aggregate_by).agg(agg_exprs)
+
+    processed = joined.group_by("h3_index").agg(agg_exprs)
 
     # WEIGHTED CATEGORICAL AGGREGATION:
-    for c in NwpInMemory.categorical_var_names:
+    for categorical_var_name in NwpInMemory.categorical_var_names:
         df_cat = (
-            joined.group_by(cols_to_aggregate_by + (c,))
+            joined.group_by(["h3_index", categorical_var_name])
             .agg(pl.col("proportion").sum().alias("weight"))
-            .sort(cols_to_aggregate_by + ("weight",))
-            .group_by(cols_to_aggregate_by)
-            .agg(pl.col(c).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
+            .sort(["h3_index", "weight"])
+            .group_by("h3_index")
+            .agg(pl.col(categorical_var_name).last().fill_nan(0).cast(pl.Float32).cast(pl.UInt8))
         )
-        processed = processed.join(df_cat, on=cols_to_aggregate_by, how="left")
+        processed = processed.join(df_cat, on="h3_index", how="left")
 
     return processed

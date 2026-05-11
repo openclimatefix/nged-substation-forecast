@@ -87,6 +87,36 @@ def _(Viridis_20, apply_continuous_cmap, filtered_df, normalized):
 
 @app.cell
 def _():
+    import numpy as np
+    ndt = np.datetime64(datetime(2024, 1, 1))
+    return (ndt,)
+
+
+@app.cell
+def _(ndt):
+    pl.DataFrame(
+        {"a": [0, 1, 2], "b": 10, "c": ndt.astype("datetime64[s]").astype(int), "e": [10, 20, 30]},
+        schema_overrides={"b": pl.UInt8},
+    ).with_columns(
+        pl.from_epoch(pl.col(["c"])).cast(pl.Datetime(time_zone="utc"))
+    )
+    return
+
+
+@app.cell
+def _(ndt):
+    ndt.astype("datetime64[s]")
+    return
+
+
+@app.cell
+def _(ds):
+    ds.sel(ensemble_member=0)["ensemble_member"].values.item()
+    return
+
+
+@app.cell
+def _():
     return
 
 
