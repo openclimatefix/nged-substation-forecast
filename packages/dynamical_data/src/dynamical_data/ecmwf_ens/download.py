@@ -7,27 +7,25 @@ import numpy as np
 import patito as pt
 import polars as pl
 import xarray as xr
-from contracts.common import UTC_DATETIME_DTYPE
 from contracts.geo_schemas import H3GridWeights
 from contracts.settings import Settings
-from contracts.weather_schemas import NwpInMemory
 
 _SETTINGS = Settings()
 
 
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "temperature_2m",
-    # "dew_point_temperature_2m",
-    # "wind_u_10m",
-    # "wind_v_10m",
-    # "wind_u_100m",
-    # "wind_v_100m",
-    # "pressure_surface",
-    # "pressure_reduced_to_mean_sea_level",
-    # "geopotential_height_500hpa",
-    # "downward_long_wave_radiation_flux_surface",
-    # "downward_short_wave_radiation_flux_surface",
-    # "precipitation_surface",
+    "dew_point_temperature_2m",
+    "wind_u_10m",
+    "wind_v_10m",
+    "wind_u_100m",
+    "wind_v_100m",
+    "pressure_surface",
+    "pressure_reduced_to_mean_sea_level",
+    "geopotential_height_500hpa",
+    "downward_long_wave_radiation_flux_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "precipitation_surface",
     "categorical_precipitation_type_surface",
 )
 
@@ -53,8 +51,8 @@ def download_ecmwf_ens_run(
 
     ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
 
-    # Cast to xr.Dataset to satisfy the type checker, as indexing with a list
-    # can sometimes be misidentified as returning a DataArray.
+    # Cast to xr.Dataset to satisfy the type checker, as indexing with a list is misidentified as
+    # returning a DataArray.
     ds = cast(xr.Dataset, ds[list(_ECMWF_ENS_VARS_TO_DOWNLOAD)])
 
     if utc_nwp_init_time not in ds.init_time.values:
@@ -127,81 +125,3 @@ def _calc_slice_for_lat_or_lng(
 
     is_ascending = coord_array[0] < coord_array[-1]
     return slice(min_coord, max_coord) if is_ascending else slice(max_coord, min_coord)
-
-
-def convert_nwp_xarray_dataset_to_polars_dataframe(
-    ds: xr.Dataset,
-    h3_grid: pt.DataFrame[H3GridWeights],
-) -> pt.DataFrame[NwpInMemory]:
-    """Vectorized processing of ECMWF dataset to H3 grid."""
-    # Precompute latitude and longitude grids
-    lat_grid, lon_grid = np.meshgrid(
-        ds.latitude.values.astype(np.float32),
-        ds.longitude.values.astype(np.float32),
-        indexing="ij",
-    )
-    lat_grid_raveled = lat_grid.ravel()
-    lon_grid_raveled = lon_grid.ravel()
-
-    # Iterate over lead_time and ensemble_member to process in chunks.
-    dfs: list[pl.DataFrame] = []
-    for lead_time in ds.lead_time.values:
-        for ensemble_member in ds.ensemble_member.values:
-            ds_chunk = ds.sel(lead_time=lead_time, ensemble_member=ensemble_member)
-            df = _process_chunk_for_1_lead_time_and_1_ens_member(
-                ds_chunk,
-                h3_grid,
-                lat_grid=lat_grid_raveled,
-                lon_grid=lon_grid_raveled,
-            ).with_columns(
-                ensemble_member=pl.lit(ensemble_member).cast(pl.UInt8),
-                valid_time=pl.lit(ds_chunk["valid_time"].values).cast(UTC_DATETIME_DTYPE),
-            )
-            dfs.append(df)
-
-    df = pl.concat(dfs).with_columns(
-        init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE)
-    )
-
-    # TODO: Calculate wind speed and direction, and drop u and v, and validate in return statement,
-    # and uncomment all the NWP variable names!
-
-    # Sort before validation to ensure consistent output order, and to optimise compression.
-    df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
-
-    # Validate to ensure the interpolated data matches the expected schema
-    return df  # NwpInMemory.validate(df, drop_superfluous_columns=True)
-
-
-def _process_chunk_for_1_lead_time_and_1_ens_member(
-    ds: xr.Dataset,
-    h3_grid: pt.DataFrame[H3GridWeights],
-    lat_grid: np.ndarray,
-    lon_grid: np.ndarray,
-) -> pl.DataFrame:
-    """Processes a single chunk of the ECMWF dataset."""
-    # Prepare data dictionary
-    data_dict: dict[str, np.ndarray] = {"latitude": lat_grid, "longitude": lon_grid}
-
-    # Add data variables
-    for var_name in ds.data_vars:
-        data_dict[str(var_name)] = ds[var_name].values.ravel()
-
-    # Create Polars DataFrame.
-    nwp_df = pl.DataFrame(data_dict)
-
-    joined = h3_grid.join(
-        nwp_df, left_on=["nwp_lon", "nwp_lat"], right_on=["longitude", "latitude"], how="left"
-    )
-
-    # Aggregate NWP variables to H3 index.
-    all_nwp_vars = [str(v) for v in ds.data_vars]
-    numeric_vars = [v for v in all_nwp_vars if v not in NwpInMemory.categorical_var_names]
-    return (
-        joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
-        .group_by("h3_index")
-        .agg(
-            pl.col(numeric_vars).sum(),
-            pl.col(NwpInMemory.categorical_var_names).mode().first(),
-        )
-    )

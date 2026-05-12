@@ -11,6 +11,7 @@ from contracts.common import validate_schema
 
 from .common import UTC_DATETIME_DTYPE
 
+# TODO: These paths should be moved to `contracts.settings`.
 _METADATA_PATH: Final[Path] = Path(__file__).parent.parent.parent.parent.parent / "metadata"
 _NWP_METADATA_CSV_PATH: Final[Path] = _METADATA_PATH / "nwp_metadata.csv"
 _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH: Final[Path] = (
@@ -22,11 +23,14 @@ class NwpModelId(StrEnum):
     ECMWF_ENS_0_25_degree = auto()
 
 
+NWP_MODEL_ID_DTYPE = pl.Enum([model.name for model in NwpModelId])
+
+
 class NwpMetaData(pt.Model):
     """Metadata about numerical weather prediction models."""
 
     nwp_model_id: str = pt.Field(
-        dtype=pl.Enum([model.name for model in NwpModelId]),
+        dtype=NWP_MODEL_ID_DTYPE,
         description="The primary key for joining with NWP data.",
         unique=True,
     )
@@ -42,11 +46,14 @@ class NwpMetaData(pt.Model):
         return pt.DataFrame(df).set_model(cls).cast().validate()
 
 
+_NULL_FOR_LEAD_TIME_0 = "Note that this variable is all-null for lead time 0. "
+
+
 class _NwpBase(pt.Model):
     """Weather data schema for NWP forecasts, using"""
 
     nwp_model_id: str = pt.Field(
-        dtype=NwpMetaData.dtypes["nwp_model_id"],
+        dtype=NWP_MODEL_ID_DTYPE,
         description="The primary key for joining with NwpMetaData.",
     )
     init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -58,10 +65,34 @@ class _NwpBase(pt.Model):
     )
 
     # Categorical variables
-    categorical_precipitation_type_surface: int = pt.Field(dtype=pl.UInt8)
+    categorical_precipitation_type_surface: int | None = pt.Field(
+        dtype=pl.UInt8,
+        description=(
+            "CAUTION: Spurious NaN values! See https://github.com/dynamical-org/reformatters/issues/596"
+            " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
+            " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
+            " 10=Hail; 11=Drizzle; 12=Freezing drizzle; 13=Hail (less than 5 mm);"
+            " 14=Hail (greater than or equal to 5 mm);"
+            " 15-191=Reserved; 192-254=Reserved for local use; 255=Missing"
+        ),
+    )
 
     # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
     categorical_var_names: ClassVar[tuple[str, ...]] = ("categorical_precipitation_type_surface",)
+
+
+_WIND_SPEED_DTYPE = pt.Field(
+    dtype=pl.Float32,
+    description="Meters per second",
+    ge=0,
+    le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+)
+_WIND_DIRECTION_DTYPE = pt.Field(
+    dtype=pl.Float32,
+    description="The angle where the wind is coming *from*. Degrees. 0° is North; 90° is East",
+    ge=0,
+    le=360,
+)
 
 
 class NwpInMemory(_NwpBase):
@@ -70,23 +101,55 @@ class NwpInMemory(_NwpBase):
     NWP data is first converted to NwpInMemory when ingested from Dynamical.
     """
 
-    temperature_2m: float = pt.Field(dtype=pl.Float32)
-    dew_point_temperature_2m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_10m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_10m: float = pt.Field(dtype=pl.Float32)
-    wind_speed_100m: float = pt.Field(dtype=pl.Float32)
-    wind_direction_100m: float = pt.Field(dtype=pl.Float32)
-    pressure_surface: float = pt.Field(dtype=pl.Float32)
-    pressure_reduced_to_mean_sea_level: float = pt.Field(dtype=pl.Float32)
-    geopotential_height_500hpa: float = pt.Field(dtype=pl.Float32)
+    temperature_2m: float = pt.Field(dtype=pl.Float32, description="Degrees C", ge=-100, le=100)
+    dew_point_temperature_2m: float = pt.Field(
+        dtype=pl.Float32, description="Degrees C", ge=-100, le=100
+    )
+    wind_speed_10m: float = _WIND_SPEED_DTYPE
+    wind_direction_10m: float = _WIND_DIRECTION_DTYPE
+    wind_speed_100m: float = _WIND_SPEED_DTYPE
+    wind_direction_100m: float = _WIND_DIRECTION_DTYPE
+    pressure_surface: float = pt.Field(
+        dtype=pl.Float32,
+        description="Pa",
+        ge=0,
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_760
+    )
+    pressure_reduced_to_mean_sea_level: float = pt.Field(
+        dtype=pl.Float32,
+        description="Pa",
+        ge=0,
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_727
+    )
+    geopotential_height_500hpa: float = pt.Field(
+        dtype=pl.Float32,
+        description="m",
+        ge=0,
+        le=10_000,  # Max in 2 years of ECMWF ENS = 6_030
+    )
 
     # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
     # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
     # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
     # values before we receive them. So these are true _rates_.
-    downward_long_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    downward_short_wave_radiation_flux_surface: float | None = pt.Field(dtype=pl.Float32)
-    precipitation_surface: float | None = pt.Field(dtype=pl.Float32)
+    downward_long_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        ge=0,
+        le=1500,  # Max in 2 years of ECMWF ENS = 445
+    )
+    downward_short_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        ge=0,
+        le=1500,  # Max in 2 years of ECMWF ENS = 892
+    )
+    precipitation_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: kg m-2 s-1",
+        ge=0,
+        le=0.01,  # Max in 2 years of ECMWF ENS = 0.006
+    )
 
     @classmethod
     def validate(
