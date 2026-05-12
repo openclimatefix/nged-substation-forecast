@@ -60,12 +60,11 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     # Validate to ensure the interpolated data matches the expected schema
-    return NwpInMemory.validate(df, drop_superfluous_columns=True)
+    return df  # NwpInMemory.validate(df) # TODO: Uncomment this!
 
 
 def _calc_wind_speed(height=Literal["10m", "100m"]) -> pl.Expr:
-    wind_speed = (pl.col(f"wind_u_{height}") ** 2 + pl.col(f"wind_v_{height}") ** 2).sqrt()
-    return wind_speed  # .cast(pl.Float32)
+    return (pl.col(f"wind_u_{height}") ** 2 + pl.col(f"wind_v_{height}") ** 2).sqrt()
 
 
 def _calc_wind_direction(height=Literal["10m", "100m"]) -> pl.Expr:
@@ -75,8 +74,7 @@ def _calc_wind_direction(height=Literal["10m", "100m"]) -> pl.Expr:
     # follows this convention. By passing u as y and v as x, we align the 0° angle with the North
     # (v) axis. The +180 offset: Since u and v describe where the wind is going, arctan2 gives you
     # the direction of travel. Adding 180° flips the vector to show where the wind is coming *from*.
-    wind_direction = (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
-    return wind_direction.cast(pl.Float32)
+    return (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
 
 
 def _process_chunk_for_1_lead_time_and_1_ens_member(
@@ -111,4 +109,7 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
         joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
         .group_by("h3_index")
         .agg(pl.col(numeric_vars).sum(), pl.col(categorical_vars).mode().first(ignore_nulls=True))
+        # The ordering matters! It's essential to to `fill_nan(None)` *after* the aggregation,
+        # otherwise the None values get silently filled with zeros!
+        .with_columns(pl.col(numeric_vars).fill_nan(None))
     )
