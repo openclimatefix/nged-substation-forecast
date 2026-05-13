@@ -12,6 +12,12 @@ with app.setup:
 
 @app.cell
 def _():
+    # TODO: Load polars DataFrame from local Delta Table of NWP data.
+    return
+
+
+@app.cell
+def _():
     nwp_vars = [
         "geopotential_height_500hpa",
         "pressure_reduced_to_mean_sea_level",
