@@ -5,9 +5,22 @@ from typing import Any, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
+from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, MetadataValue, TableMetadataValue, TableRecord, asset
+from contracts.weather_schemas import NwpOnDisk, NwpScalingParams
+from dagster import (
+    AssetExecutionContext,
+    DailyPartitionsDefinition,
+    MetadataValue,
+    TableMetadataValue,
+    TableRecord,
+    asset,
+)
+from dynamical_data.ecmwf_ens.convert_to_polars import (
+    convert_nwp_xarray_dataset_to_polars_dataframe,
+)
+from dynamical_data.ecmwf_ens.download import download_ecmwf_ens_run
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
 from nged_data.read_nged_json import _H3_RESOLUTION
@@ -121,6 +134,50 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
         {
             "n_rows": len(weights),
             "path": str(settings.h3_grid_weights_path),
+        }
+    )
+
+
+@asset(
+    partitions_def=DailyPartitionsDefinition(start_date="2024-01-01"),
+    deps=[h3_grid_weights],
+)
+def ecmwf_ens(context: AssetExecutionContext) -> None:
+    """
+    Downloads and processes ECMWF ensemble NWP data for a specific day.
+
+    This asset fetches the 00Z NWP run for the partition date, converts it to a
+    Polars DataFrame, scales it to integer representation, and appends it to the
+    Delta table.
+    """
+    settings = Settings()
+    partition_date_str = context.partition_key
+    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d")
+
+    # Load dependencies
+    h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
+    scaling_params = NwpScalingParams.load()
+
+    # Download and convert
+    ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
+    nwp_in_memory = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+
+    # Validate and scale
+    nwp_on_disk = NwpOnDisk.from_nwp_in_memory(nwp_in_memory, scaling_params)
+
+    # Save to Delta
+    settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
+    nwp_on_disk.write_delta(
+        settings.nwp_data_path,
+        mode="append",
+        delta_write_options={"partition_by": ["nwp_model_id", "init_time"]},
+    )
+
+    context.add_output_metadata(
+        {
+            "n_rows": len(nwp_on_disk),
+            "path": str(settings.nwp_data_path),
+            "init_time": str(nwp_init_time),
         }
     )
 
