@@ -170,7 +170,6 @@ class NwpInMemory(_NwpBase):
         )
 
         # Check for nulls from second forecast step onwards
-        # (i.e. where valid_time > init_time)
         cols_to_check = [
             "precipitation_surface",
             "downward_short_wave_radiation_flux_surface",
