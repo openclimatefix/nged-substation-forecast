@@ -1,6 +1,6 @@
 import ast
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Generic, Self, TypeVar
 
 import patito as pt
@@ -139,8 +139,13 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
 
 
 @asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2024-01-01"),
-    deps=[h3_grid_weights],
+    partitions_def=DailyPartitionsDefinition(start_date="2024-01-01", timezone="UTC", end_offset=1),
+    deps=["h3_grid_weights"],
+    # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
+    # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
+    # concurrently. This is crucial because downloading ECMWF data is memory-intensive.
+    # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    pool="ECMWF",
 )
 def ecmwf_ens(context: AssetExecutionContext) -> None:
     """
@@ -152,7 +157,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     """
     settings = Settings()
     partition_date_str = context.partition_key
-    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d")
+    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
     # Load dependencies
     h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
