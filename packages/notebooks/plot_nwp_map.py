@@ -26,9 +26,15 @@ def _():
 
 
 @app.cell
-def _(h3_grid):
+def _():
+    NWP_INIT_TIME = datetime(2026, 5, 13, tzinfo=timezone.utc)
+    return (NWP_INIT_TIME,)
+
+
+@app.cell
+def _(NWP_INIT_TIME, h3_grid):
     ds = dynamical_data.ecmwf_ens.download.download_ecmwf_ens_run(
-        nwp_init_time=datetime(2026, 5, 13, tzinfo=timezone.utc),
+        nwp_init_time=NWP_INIT_TIME,
         h3_grid=h3_grid,
     )
     return (ds,)
@@ -72,15 +78,22 @@ def _(df):
 
 @app.cell
 def _(NWP_VAR_TO_PLOT, ds):
-    valid_time = datetime(2026, 5, 3, 9)
-    ds[NWP_VAR_TO_PLOT].sel(valid_time=valid_time, ensemble_member=0).plot.imshow()
-    return (valid_time,)
+    VALID_TIME_TO_PLOT = datetime(2026, 5, 13, hour=12, tzinfo=timezone.utc)
+    ENS_MEMBER_TO_PLOT = 0
+
+    ds[NWP_VAR_TO_PLOT].sel(
+        valid_time=VALID_TIME_TO_PLOT.replace(tzinfo=None), ensemble_member=ENS_MEMBER_TO_PLOT
+    ).plot.imshow()
+    return ENS_MEMBER_TO_PLOT, VALID_TIME_TO_PLOT
 
 
 @app.cell
-def _(df, valid_time):
+def _(ENS_MEMBER_TO_PLOT, VALID_TIME_TO_PLOT, df):
     filtered_df = df.filter(
-        [pl.col("ensemble_member") == 0, pl.col("valid_time") == valid_time.replace(tzinfo=timezone.utc)]
+        [
+            pl.col("ensemble_member") == ENS_MEMBER_TO_PLOT,
+            pl.col("valid_time") == VALID_TIME_TO_PLOT,
+        ]
     )
     filtered_df
     return (filtered_df,)
