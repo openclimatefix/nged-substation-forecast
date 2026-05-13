@@ -289,6 +289,11 @@ class NwpOnDisk(_NwpBase):
         # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
         # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
         nwp_on_disk = nwp_in_memory.with_columns(exprs).set_model(cls)  # ty: ignore[unresolved-attribute]
+
+        # Use use `validate_schema` no `validate` because `validate` won't work on LazyFrames.
+        # And we want this function to be compatible with LazyFrames.
+        # TODO: Maybe we don't need this function to be compatible with LazyFrames because this
+        # function is only called from the ecmwf_ens Dagster asset, which loads eager DataFrames.
         validate_schema(cls, nwp_on_disk)
         return nwp_on_disk
 
@@ -336,6 +341,9 @@ class NwpOnDisk(_NwpBase):
         # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
         # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
         nwp_in_memory = nwp_on_disk.with_columns(exprs).set_model(NwpInMemory)  # ty: ignore[unresolved-attribute]
+
+        # Use use `validate_schema` no `validate` because `validate` won't work on LazyFrames.
+        # And we want this function to be compatible with LazyFrames.
         validate_schema(NwpInMemory, nwp_in_memory)
         return nwp_in_memory
 
