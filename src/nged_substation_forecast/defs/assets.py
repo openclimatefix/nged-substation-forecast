@@ -170,6 +170,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     # Validate and scale
     nwp_on_disk = NwpOnDisk.from_nwp_in_memory(nwp_in_memory, scaling_params)
 
+    context.log.info(f"Columns: {nwp_on_disk.columns}")
+
     # Save to Delta
     settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
     nwp_on_disk.write_delta(
