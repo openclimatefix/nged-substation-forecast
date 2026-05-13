@@ -65,10 +65,9 @@ class _NwpBase(pt.Model):
     )
 
     # Categorical variables
-    categorical_precipitation_type_surface: int | None = pt.Field(
+    categorical_precipitation_type_surface: int = pt.Field(
         dtype=pl.UInt8,
         description=(
-            "CAUTION: Spurious NaN values! See https://github.com/dynamical-org/reformatters/issues/596"
             " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
             " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
             " 10=Hail; 11=Drizzle; 12=Freezing drizzle; 13=Hail (less than 5 mm);"
@@ -380,4 +379,4 @@ class NwpScalingParams(pt.Model):
         cls, csv_path: Path = _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH
     ) -> pt.DataFrame[Self]:
         """Load scaling parameters from a CSV file."""
-        return pt.DataFrame(pl.read_csv(csv_path)).set_model(cls).cast().validate()
+        return pt.DataFrame(pl.read_csv(csv_path)).set_model(cls).drop().cast().validate()
