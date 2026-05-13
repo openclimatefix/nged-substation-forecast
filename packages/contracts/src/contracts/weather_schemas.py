@@ -224,30 +224,12 @@ class NwpOnDisk(_NwpBase):
     downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
     precipitation_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
 
-    # overload to indicate that you get a DataFrame back if you feed in a DataFrame
-    @overload
     @classmethod
     def from_nwp_in_memory(
         cls,
         nwp_in_memory: pt.DataFrame[NwpInMemory],
         scaling_params: pt.DataFrame[NwpScalingParams],
-    ) -> pt.DataFrame[Self]: ...
-
-    # overload to indicate that you get a LazyFrame back if you feed in a LazyFrame
-    @overload
-    @classmethod
-    def from_nwp_in_memory(
-        cls,
-        nwp_in_memory: pt.LazyFrame[NwpInMemory],
-        scaling_params: pt.DataFrame[NwpScalingParams],
-    ) -> pt.LazyFrame[Self]: ...
-
-    @classmethod
-    def from_nwp_in_memory(
-        cls,
-        nwp_in_memory: pt.DataFrame[NwpInMemory] | pt.LazyFrame[NwpInMemory],
-        scaling_params: pt.DataFrame[NwpScalingParams],
-    ) -> pt.DataFrame[Self] | pt.LazyFrame[Self]:
+    ) -> pt.DataFrame[Self]:
         """Scale numeric columns to integer representation based on scaling parameters.
 
         Storing NWPs as integers on disk significantly reduces the storage requirements.
@@ -273,29 +255,18 @@ class NwpOnDisk(_NwpBase):
             buffered_max = row["buffered_max"]
             buffered_range = row["buffered_range"]
 
-            base_col = pl.col(col_name).fill_nan(None)
-
-            clipped_col = base_col.clip(lower_bound=buffered_min, upper_bound=buffered_max)
+            clipped_col = pl.col(col_name).clip(lower_bound=buffered_min, upper_bound=buffered_max)
 
             expr = (
                 (((clipped_col - buffered_min) / buffered_range) * _NWP_ON_DISK_MAX_INT_VALUE)
                 .round()
                 .cast(_NWP_ON_DISK_DTYPE)
-                .alias(col_name)
             )
 
             exprs.append(expr)
 
-        # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
-        # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
-        nwp_on_disk = nwp_in_memory.with_columns(exprs).set_model(cls)  # ty: ignore[unresolved-attribute]
-
-        # Use use `validate_schema` no `validate` because `validate` won't work on LazyFrames.
-        # And we want this function to be compatible with LazyFrames.
-        # TODO: Maybe we don't need this function to be compatible with LazyFrames because this
-        # function is only called from the ecmwf_ens Dagster asset, which loads eager DataFrames.
-        validate_schema(cls, nwp_on_disk)
-        return nwp_on_disk
+        nwp_on_disk = nwp_in_memory.with_columns(exprs)
+        return cls.validate(nwp_on_disk)
 
     # overload to indicate that you get a DataFrame back if you feed in a DataFrame
     @overload
@@ -332,9 +303,8 @@ class NwpOnDisk(_NwpBase):
             buffered_range = row["buffered_range"]
 
             expr = (
-                (pl.col(col_name).cast(pl.Float32) / _NWP_ON_DISK_MAX_INT_VALUE) * buffered_range
-                + buffered_min
-            ).alias(col_name)
+                pl.col(col_name).cast(pl.Float32) / _NWP_ON_DISK_MAX_INT_VALUE
+            ) * buffered_range + buffered_min
 
             exprs.append(expr)
 
@@ -342,7 +312,7 @@ class NwpOnDisk(_NwpBase):
         # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
         nwp_in_memory = nwp_on_disk.with_columns(exprs).set_model(NwpInMemory)  # ty: ignore[unresolved-attribute]
 
-        # Use use `validate_schema` no `validate` because `validate` won't work on LazyFrames.
+        # Use use `validate_schema` not `validate` because `validate` won't work on LazyFrames.
         # And we want this function to be compatible with LazyFrames.
         validate_schema(NwpInMemory, nwp_in_memory)
         return nwp_in_memory
