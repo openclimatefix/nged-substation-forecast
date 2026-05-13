@@ -20,6 +20,8 @@ with app.setup:
 
 @app.cell
 def _():
+    # TODO: Remove all this code that loads from Dynamical. Instead load from our local Delta table.
+
     h3_grid = pl.read_parquet(PROJECT_ROOT / SETTINGS.h3_grid_weights_path)
     h3_grid
     return (h3_grid,)
@@ -123,6 +125,11 @@ def _(Viridis_20, apply_continuous_cmap, filtered_df, normalized):
             opacity=1,
         )
     )
+    return
+
+
+@app.cell
+def _():
     return
 
 
