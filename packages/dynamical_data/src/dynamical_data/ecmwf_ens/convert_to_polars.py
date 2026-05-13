@@ -60,7 +60,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
 
     # Validate to ensure the interpolated data matches the expected schema
-    return df  # NwpInMemory.validate(df) # TODO: Uncomment this!
+    return NwpInMemory.validate(df)
 
 
 def _calc_wind_speed(height=Literal["10m", "100m"]) -> pl.Expr:
