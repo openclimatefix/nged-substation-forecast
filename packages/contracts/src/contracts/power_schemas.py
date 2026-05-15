@@ -120,7 +120,7 @@ class TimeSeriesMetadata(pt.Model):
         dtype=pl.Int32,
         gt=0,
         lt=1_000_000,
-        description="For customer time series, substation_number is the substation to which that customer is connected.",
+        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number.",
     )
     substation_type: str = pt.Field(
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])

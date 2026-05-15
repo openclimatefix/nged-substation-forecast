@@ -84,22 +84,13 @@ class Settings(BaseSettings):
             },
         )
 
-    # ECMWF source bucket.
-    ecmwf_s3_bucket: str = Field(
-        default="dynamical-ecmwf-ifs-ens",
-        description="S3 bucket for ECMWF Icechunk store.",
-    )
-    ecmwf_s3_prefix: str = Field(
-        default="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
-        description="S3 prefix for ECMWF Icechunk store.",
-    )
-
     # Paths to the data we manage
     nged_data_path: Path = Path("data/NGED")
     nwp_data_path: Path = Path("data/NWP")
     power_forecasts_data_path: Path = Path("data/power_forecasts")
     forecast_metrics_data_path: Path = Path("data/forecast_metrics")
     trained_ml_model_params_base_path: Path = Path("data/trained_ML_model_params")
+    h3_grid_weights_path: Path = Path("data/h3_grid_weights.parquet")
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

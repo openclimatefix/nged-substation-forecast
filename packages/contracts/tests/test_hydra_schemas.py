@@ -4,7 +4,6 @@ from pydantic import ValidationError
 from contracts.hydra_schemas import (
     DataSplitConfig,
     ModelFeaturesConfig,
-    ModelConfig,
     TrainingConfig,
 )
 

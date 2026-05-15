@@ -5,7 +5,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.power_schemas import TimeSeriesMetadata
-from nged_data.storage import _process_file_listing, _RawFileListing, upsert_metadata
+from nged_data.storage import _process_file_listing, _RawFileListItem, upsert_metadata
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -217,7 +217,7 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
 
 
 def test_parse_file_listing_valid():
-    raw_file_listing: _RawFileListing = [
+    raw_file_listing: list[_RawFileListItem] = [
         {
             "path": "timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json",
             "filesize_bytes": 1024,
@@ -239,7 +239,7 @@ def test_parse_file_listing_valid():
 
 def test_parse_file_listing_invalid():
     # Invalid path format
-    raw_file_listing: _RawFileListing = [
+    raw_file_listing: list[_RawFileListItem] = [
         {
             "path": "invalid/path/format.json",
             "filesize_bytes": 1024,

@@ -34,7 +34,7 @@ Optional: To allow Dagster to remember its state after you shut it down:
 
     concurrency:
       pools:
-        default_limit: 1
+        default_limit: 2  # Used to limit concurrency of ecmwf_ens asset.
 
     python_logs:
       managed_python_loggers:

@@ -1,13 +1,30 @@
 import ast
-from abc import abstractmethod
-from datetime import datetime
+from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from typing import Any, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
+from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, MetadataValue, TableMetadataValue, TableRecord, asset
+from contracts.weather_schemas import NwpOnDisk, NwpScalingParams
+from dagster import (
+    AssetExecutionContext,
+    DailyPartitionsDefinition,
+    MetadataValue,
+    TableMetadataValue,
+    TableRecord,
+    asset,
+)
+from deltalake import WriterProperties, write_deltalake
+from dynamical_data.ecmwf_ens.convert_to_polars import (
+    convert_nwp_xarray_dataset_to_polars_dataframe,
+)
+from dynamical_data.ecmwf_ens.download import download_ecmwf_ens_run
+from geo.great_britain.load import load_gb_boundary
+from geo.h3 import compute_h3_grid_weights_for_boundary
+from nged_data.read_nged_json import _H3_RESOLUTION
 from nged_data.storage import (
     NoNewData,
     UpsertMetadataStats,
@@ -94,6 +111,90 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     )
 
 
+@asset
+def h3_grid_weights(context: AssetExecutionContext) -> None:
+    """
+    Computes H3 grid weights for the Great Britain boundary.
+
+    This asset calculates the fractional overlap of H3 cells with the GB boundary
+    at various resolutions, which is used for spatial aggregation of weather data.
+    """
+    settings = Settings()
+    boundary = load_gb_boundary()
+    weights = compute_h3_grid_weights_for_boundary(
+        boundary, nwp_grid_size_degrees=0.25, h3_res=_H3_RESOLUTION
+    )
+
+    # Save to parquet
+    # FIXME: mkdir won't work when we're saving to S3!
+    settings.h3_grid_weights_path.parent.mkdir(parents=True, exist_ok=True)
+    weights.write_parquet(settings.h3_grid_weights_path)
+
+    # Add metadata to Dagster context
+    context.add_output_metadata(
+        {
+            "n_rows": len(weights),
+            "path": str(settings.h3_grid_weights_path),
+        }
+    )
+
+
+@asset(
+    partitions_def=DailyPartitionsDefinition(start_date="2024-04-01", timezone="UTC", end_offset=1),
+    deps=["h3_grid_weights"],
+    # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
+    # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
+    # concurrently. This is crucial because downloading ECMWF data is memory-intensive.
+    # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
+    pool="ECMWF",
+)
+def ecmwf_ens(context: AssetExecutionContext) -> None:
+    """
+    Downloads and processes ECMWF ensemble NWP data for a specific day.
+
+    This asset fetches the 00Z NWP run for the partition date, converts it to a
+    Polars DataFrame, scales it to integer representation, and appends it to the
+    Delta table.
+    """
+    settings = Settings()
+    partition_date_str = context.partition_key
+    nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    # Load dependencies
+    h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
+    scaling_params = NwpScalingParams.load()
+
+    # Download and convert
+    ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
+    nwp_in_memory = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+
+    # Validate and scale
+    nwp_on_disk = NwpOnDisk.from_nwp_in_memory(nwp_in_memory, scaling_params)
+
+    context.log.info(f"Columns: {nwp_on_disk.columns}")
+
+    settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Delta Lake doesn't support Enums, so we must cast to String:
+    df_to_write = nwp_on_disk.as_polars().cast({"nwp_model_id": pl.String})
+
+    write_deltalake(
+        table_or_uri=settings.nwp_data_path,
+        data=df_to_write,
+        mode="append",
+        partition_by=["nwp_model_id", "init_time"],
+        writer_properties=WriterProperties(compression="ZSTD", compression_level=14),
+    )
+
+    context.add_output_metadata(
+        {
+            "n_rows": len(nwp_on_disk),
+            "path": str(settings.nwp_data_path),
+            "init_time": str(nwp_init_time),
+        }
+    )
+
+
 ##############################################################################
 # All the code below this line is just for outputting summary stats to Dagster
 # TODO: Move the code below this line to a separate file.
@@ -102,8 +203,10 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
 T = TypeVar("T", bound=pt.Model)
 
 
-class _Summary(BaseModel, Generic[T]):
-    """The Generic[T] makes this superclass generic over pt.Models."""
+class _BaseSummary(ABC, BaseModel, Generic[T]):
+    """Create a Dagster table of summary statistics.
+
+    The Generic[T] makes this superclass generic over pt.Models."""
 
     stage: str
     start_time: str = "N/A"
@@ -142,7 +245,7 @@ class _Summary(BaseModel, Generic[T]):
         pass
 
 
-class _FileListingSummary(_Summary[_ProcessedFileListing]):
+class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
     n_files: int
     min_file_size_bytes: int = 0
     max_file_size_bytes: int = 0
@@ -166,7 +269,7 @@ class _FileListingSummary(_Summary[_ProcessedFileListing]):
             return cls(stage=stage_name, n_files=0)
 
 
-class _PowerTimeSeriesSummary(_Summary[PowerTimeSeries]):
+class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
     n_rows: int
 
     @classmethod

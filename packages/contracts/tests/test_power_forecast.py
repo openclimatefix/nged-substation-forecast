@@ -16,6 +16,7 @@ def test_power_forecast_validation():
                 "ml_flow_experiment_id": [1],
                 "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst_model_name": ["model_a"],
+                "power_fcst_model_version": [1],
                 "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst": [10.0],
             }
@@ -40,6 +41,7 @@ def test_power_forecast_validation():
                 "ml_flow_experiment_id": [1],
                 "nwp_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst_model_name": ["model_a"],
+                "power_fcst_model_version": [1],
                 "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst": [10.0],
             },

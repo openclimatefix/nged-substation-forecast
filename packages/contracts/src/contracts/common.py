@@ -37,19 +37,17 @@ def validate_schema(model: Type[pt.Model], df: pl.DataFrame | pl.LazyFrame) -> N
     else:
         actual_schema = dict(df.schema)
 
-    expected_dtypes = model.dtypes
-    errors = []
-
     # Check for missing columns
-    missing = set(expected_dtypes.keys()) - set(actual_schema.keys())
-    if missing:
-        # Wrap the error with the location of the missing columns
-        errors.append(
-            ErrorWrapper(MissingColumnsError(f"Missing columns: {missing}"), loc=tuple(missing))
+    missing_cols = set(model.dtypes.keys()) - set(actual_schema.keys())
+    if missing_cols:
+        error = ErrorWrapper(
+            MissingColumnsError(f"Missing columns: {missing_cols}"), loc=tuple(missing_cols)
         )
+        raise DataFrameValidationError([error], model)
 
     # Check for dtype mismatches
-    for col, expected_dtype in expected_dtypes.items():
+    errors = []
+    for col, expected_dtype in model.dtypes.items():
         if col in actual_schema:
             actual_dtype = actual_schema[col]
             if actual_dtype != expected_dtype:
