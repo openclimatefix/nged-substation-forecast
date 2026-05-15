@@ -181,23 +181,12 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     new_metadata = pt.DataFrame(new_data).set_model(TimeSeriesMetadata).cast().validate()
 
     # 3. Call upsert_metadata
-    metadata_diff = upsert_metadata(new_metadata, metadata_path)
+    stats = upsert_metadata(new_metadata, metadata_path)
 
     # 4. Assertions
-    assert metadata_diff.height == 2
-    assert set(metadata_diff["time_series_id"]) == {2, 3}
-
-    # Verify ID 2 is updated
-    assert (
-        metadata_diff.filter(pl.col("time_series_id") == 2)["time_series_name"].item()
-        == "ID 2 - Updated"
-    )
-
-    # Verify ID 3 is new
-    assert (
-        metadata_diff.filter(pl.col("time_series_id") == 3)["time_series_name"].item()
-        == "ID 3 - New"
-    )
+    assert stats["metadata_n_new_TimeSeriesIDs"] == 1
+    assert stats["metadata_n_updated_TimeSeriesIDs"] == 1
+    assert set(stats["metadata_updated_TimeSeriesIDs"]) == {2}
 
     # Verify file content
     final_metadata = pl.read_parquet(metadata_path)

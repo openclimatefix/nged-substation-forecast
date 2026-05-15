@@ -199,8 +199,8 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
-# This overload tells type checkers that if you pass a `pt.DataFrame[_NgedJsonFileListing]` into
-# `select_new_rows` then you get a `pt.DataFrame[_NgedJsonFileListing]` back.
+# This overload tells type checkers that if you pass a `pt.DataFrame[_ProcessedFileListing]` into
+# `select_new_rows` then you get a `pt.DataFrame[_ProcessedFileListing]` back.
 @overload
 def select_new_rows(
     time_series: pt.DataFrame[_ProcessedFileListing],
@@ -209,9 +209,9 @@ def select_new_rows(
 
 
 def select_new_rows(
-    time_series: pt.DataFrame[PowerTimeSeries | _ProcessedFileListing],
+    time_series: pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing],
     delta_path: Path,
-) -> pt.DataFrame[PowerTimeSeries | _ProcessedFileListing]:
+) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """
     Return rows in `time_series` that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
@@ -235,7 +235,7 @@ def select_new_rows(
 
     _MaxTimePerTimeSeriesId.validate(max_times)
 
-    # Check whether `time_series` is a `PowerTimeSeries` or a `_NgedJsonFileListing`
+    # Check whether `time_series` is a `PowerTimeSeries` or a `_ProcessedFileListing`
     if "time" in time_series.columns:
         pt_model = PowerTimeSeries
         time_col = "time"
