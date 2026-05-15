@@ -20,6 +20,29 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 2. **Install dependencies**: `uv sync`
 3. **Install pre-commit hooks**: `uv run pre-commit install`
 
+To run Dagster:
+1. `uv run dg dev`
+2. Open http://localhost:3000 in your browser to see the project.
+
+Optional: To allow Dagster to remember its state after you shut it down:
+1. `mkdir ~/dagster_home/`
+2. Put the following into `~/dagster_home/dagster.yaml`:
+    ```yaml
+    storage:
+      sqlite:
+        base_dir: "dagster_history"
+
+    concurrency:
+      pools:
+        default_limit: 2  # Used to limit concurrency of ecmwf_ens asset.
+
+    python_logs:
+      managed_python_loggers:
+        - nged_data
+      python_log_level: DEBUG
+    ```
+3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
+
 ### Linting & Formatting
 
 - **Check linting**: `uv run ruff check .`

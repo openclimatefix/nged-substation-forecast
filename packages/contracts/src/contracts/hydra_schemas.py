@@ -1,8 +1,7 @@
 """Hydra configuration schemas for the NGED substation forecast project."""
 
 from datetime import date
-from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,17 +15,9 @@ class DataSplitConfig(BaseModel):
     test_end: date
 
 
-class NwpModel(str, Enum):
-    """Available NWP datasets."""
-
-    ECMWF_ENS_0_25DEG = "ecmwf_ens_0_25deg"
-    GFS_0_25DEG = "gfs_0_25deg"
-
-
 class ModelFeaturesConfig(BaseModel):
     """Configuration for model features."""
 
-    nwps: list[NwpModel] = Field(default_factory=list)
     feature_names: list[str] = Field(default_factory=list)
 
 
@@ -44,20 +35,15 @@ class ModelConfig(BaseModel):
         ),
     )
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
-    required_lookback_days: int = Field(default=21)
     features: ModelFeaturesConfig
 
     # The latency between the NWP init time and when the NWP is actually downloaded and processed
     # and ready for use.
-    nwp_availability_delay_hours: int = Field(default=3)
+    nwp_delay_hours: int = Field(default=3)
 
     # The latency between the telemetry timestamp and when it is actually available for use
     # in our forecasting pipeline.
-    telemetry_delay_hours: int = Field(default=24)
-
-    # Maximum number of samples to use for training to prevent OOM errors.
-    # If set, the training data will be randomly sampled before collection.
-    max_training_samples: int | None = Field(default=None, gt=0)
+    power_telemetry_delay_hours: int = Field(default=24)
 
 
 class TrainingConfig(BaseModel):
@@ -65,3 +51,4 @@ class TrainingConfig(BaseModel):
 
     data_split: DataSplitConfig
     model: ModelConfig
+    train_on_nwp_ensemble_member: Literal["control_member_only", "all_members"]

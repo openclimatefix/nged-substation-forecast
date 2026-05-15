@@ -1,0 +1,403 @@
+from collections.abc import Sequence
+from datetime import datetime, timezone
+from enum import StrEnum, auto
+from pathlib import Path
+from typing import ClassVar, Final, Self, overload
+
+import patito as pt
+import polars as pl
+
+from contracts.common import validate_schema
+
+from .common import UTC_DATETIME_DTYPE
+
+# TODO: These paths should be moved to `contracts.settings`.
+_METADATA_PATH: Final[Path] = Path(__file__).parent.parent.parent.parent.parent / "metadata"
+_NWP_METADATA_CSV_PATH: Final[Path] = _METADATA_PATH / "nwp_metadata.csv"
+_SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH: Final[Path] = (
+    _METADATA_PATH / "scaling_params_for_ecmwf_ens_0_25_degree.csv"
+)
+
+
+class NwpModelId(StrEnum):
+    ECMWF_ENS_0_25_degree = auto()
+
+
+NWP_MODEL_ID_DTYPE = pl.Enum([model.name for model in NwpModelId])
+
+
+class NwpMetaData(pt.Model):
+    """Metadata about numerical weather prediction models."""
+
+    nwp_model_id: str = pt.Field(
+        dtype=NWP_MODEL_ID_DTYPE,
+        description="The primary key for joining with NWP data.",
+        unique=True,
+    )
+    provider: str = pt.Field(dtype=pl.Enum(["ECMWF"]))
+    h3_resolution: int = pt.Field(dtype=pl.Int8)
+    is_ensemble: bool
+
+    @classmethod
+    def load(cls, csv_path: Path = _NWP_METADATA_CSV_PATH) -> pt.DataFrame[Self]:
+        """Load NWP metadata from a static CSV file."""
+        df = pl.read_csv(csv_path)
+        # Patito's .cast() will handle the conversion to the Enum type defined in the model
+        return pt.DataFrame(df).set_model(cls).cast().validate()
+
+
+_NULL_FOR_LEAD_TIME_0 = "Note that this variable is all-null for lead time 0. "
+
+
+class _NwpBase(pt.Model):
+    """Weather data schema for NWP forecasts, using"""
+
+    nwp_model_id: str = pt.Field(
+        dtype=NWP_MODEL_ID_DTYPE,
+        description="The primary key for joining with NwpMetaData.",
+    )
+    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    ensemble_member: int = pt.Field(dtype=pl.UInt8)
+    h3_index: int = pt.Field(
+        dtype=pl.UInt64,
+        description="The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
+    )
+
+    # Categorical variables
+    categorical_precipitation_type_surface: int | None = pt.Field(
+        dtype=pl.UInt8,
+        description=(
+            "This field is always NaN for init_times on and before 2024-11-13. Derived from"
+            " ECMWF's `ptype` field, which was added to ECMWF's Open Data dataset when IFS Cycle"
+            " 49r1 was released in Nov 2024. See https://codes.ecmwf.int/grib/param-db/260015"
+            " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
+            " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
+            " 10=Hail; 11=Drizzle; 12=Freezing drizzle; 13=Hail (less than 5 mm);"
+            " 14=Hail (greater than or equal to 5 mm);"
+            " 15-191=Reserved; 192-254=Reserved for local use; 255=Missing"
+        ),
+    )
+
+    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    categorical_var_names: ClassVar[tuple[str, ...]] = ("categorical_precipitation_type_surface",)
+
+
+_WIND_SPEED_DTYPE = pt.Field(
+    dtype=pl.Float32,
+    description="Meters per second",
+    ge=0,
+    le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+)
+_WIND_DIRECTION_DTYPE = pt.Field(
+    dtype=pl.Float32,
+    description="The angle where the wind is coming *from*. Degrees. 0° is North; 90° is East",
+    ge=0,
+    le=360,
+)
+
+
+class NwpInMemory(_NwpBase):
+    """Variables stored as Float32 in memory.
+
+    NWP data is first converted to NwpInMemory when ingested from Dynamical.
+    """
+
+    temperature_2m: float = pt.Field(dtype=pl.Float32, description="Degrees C", ge=-100, le=100)
+    dew_point_temperature_2m: float = pt.Field(
+        dtype=pl.Float32, description="Degrees C", ge=-100, le=100
+    )
+    wind_speed_10m: float = _WIND_SPEED_DTYPE
+    wind_direction_10m: float = _WIND_DIRECTION_DTYPE
+    wind_speed_100m: float = _WIND_SPEED_DTYPE
+    wind_direction_100m: float = _WIND_DIRECTION_DTYPE
+    pressure_surface: float = pt.Field(
+        dtype=pl.Float32,
+        description="Pa",
+        ge=0,
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_760
+    )
+    pressure_reduced_to_mean_sea_level: float = pt.Field(
+        dtype=pl.Float32,
+        description="Pa",
+        ge=0,
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_727
+    )
+    geopotential_height_500hpa: float = pt.Field(
+        dtype=pl.Float32,
+        description="m",
+        ge=0,
+        le=10_000,  # Max in 2 years of ECMWF ENS = 6_030
+    )
+
+    # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
+    # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
+    # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
+    # values before we receive them. So these are true _rates_.
+    downward_long_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        ge=0,
+        le=1500,  # Max in 2 years of ECMWF ENS = 445
+    )
+    downward_short_wave_radiation_flux_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        ge=0,
+        le=1500,  # Max in 2 years of ECMWF ENS = 892
+    )
+    precipitation_surface: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=_NULL_FOR_LEAD_TIME_0 + "Unit: kg m-2 s-1",
+        ge=0,
+        le=0.01,  # Max in 2 years of ECMWF ENS = 0.006
+    )
+
+    @classmethod
+    def validate(
+        cls,
+        dataframe: pl.DataFrame,
+        columns: Sequence[str] | None = None,
+        allow_missing_columns: bool = False,
+        allow_superfluous_columns: bool = False,
+        drop_superfluous_columns: bool = False,
+    ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
+        """Validate the given dataframe, ensuring no nulls from second step onwards and uniqueness."""
+        validated_df = super().validate(
+            dataframe=dataframe,
+            columns=columns,
+            allow_missing_columns=allow_missing_columns,
+            allow_superfluous_columns=allow_superfluous_columns,
+            drop_superfluous_columns=drop_superfluous_columns,
+        )
+
+        cls._check_nulls_from_second_forecast_step_onwards(validated_df)
+        cls._check_unique(validated_df)
+        cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)
+        return validated_df
+
+    @classmethod
+    def _check_nulls_from_second_forecast_step_onwards(cls, dataframe: pt.DataFrame[Self]) -> None:
+        cols_to_check = [
+            "precipitation_surface",
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
+        ]
+
+        second_step_onwards = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
+
+        for col in cols_to_check:
+            has_nulls = second_step_onwards[col].is_null().any()
+            if has_nulls:
+                raise ValueError(
+                    f"Column '{col}' contains has null values from the second forecast "
+                    "step onwards. These variables are only allowed to be null for the first "
+                    "forecast step (lead time 0)."
+                )
+
+    @classmethod
+    def _check_unique(cls, dataframe: pt.DataFrame[Self]) -> None:
+        if (
+            dataframe.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
+            .is_duplicated()
+            .any()
+        ):
+            raise ValueError(
+                "Duplicate entries found for (init_time, valid_time, ensemble_member, h3_index)."
+            )
+
+    @classmethod
+    def _check_variables_that_were_introduced_after_start_of_dataset(
+        cls, dataframe: pt.DataFrame[Self]
+    ) -> None:
+        """Check that `categorical_precipitation_type_surface` is all-null when
+        init_time <= 2024-11-13, and is never null afterwards.
+
+        ECMWF only introduced `ptype` into their public data on 2024-11-14.
+        """
+        threshold_date = datetime(2024, 11, 13, tzinfo=timezone.utc)
+
+        # Partition the dataframe based on the threshold date
+        partition_col = "is_before_or_on_threshold"
+        partitioned_df = dataframe.with_columns(
+            (pl.col("init_time") <= threshold_date).alias(partition_col)
+        )
+        partitions = partitioned_df.partition_by(partition_col, as_dict=True)
+
+        empty_df = pl.DataFrame(schema=dataframe.schema)
+        before_or_on = partitions.get((True,), empty_df)
+        after = partitions.get((False,), empty_df)
+
+        # Check before or on threshold
+        if not before_or_on["categorical_precipitation_type_surface"].is_null().all():
+            raise ValueError(
+                "categorical_precipitation_type_surface must be all null for "
+                "init_time <= 2024-11-13"
+            )
+
+        # Check after threshold
+        if after["categorical_precipitation_type_surface"].is_null().any():
+            raise ValueError(
+                "categorical_precipitation_type_surface must not be null for init_time > 2024-11-13"
+            )
+
+
+_NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataTypeClass] = pl.Int16
+_NWP_ON_DISK_MAX_INT_VALUE: Final[int] = 2**12 - 1  # Use 12 bits per value
+
+
+class NwpOnDisk(_NwpBase):
+    """Variables stored as integers on disk to reduce storage requirements."""
+
+    temperature_2m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    dew_point_temperature_2m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    wind_speed_10m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    wind_direction_10m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    wind_speed_100m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    wind_direction_100m: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    pressure_surface: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    pressure_reduced_to_mean_sea_level: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    geopotential_height_500hpa: int = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+
+    # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
+    # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
+    # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
+    # values before we receive them. So these are true _rates_.
+    downward_long_wave_radiation_flux_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    downward_short_wave_radiation_flux_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+    precipitation_surface: int | None = pt.Field(dtype=_NWP_ON_DISK_DTYPE)
+
+    @classmethod
+    def from_nwp_in_memory(
+        cls,
+        nwp_in_memory: pt.DataFrame[NwpInMemory],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.DataFrame[Self]:
+        """Scale numeric columns to integer representation based on scaling parameters.
+
+        Storing NWPs as integers on disk significantly reduces the storage requirements.
+
+        For example, if we use 12 bits per value, then we will encode each value as an integer
+        in the range [0, 4,096) (where 4,096 == 2^12).
+
+        Args:
+            nwp_in_memory: DataFrame or LazyFrame with float32 columns.
+            scaling_params: DataFrame with col_name, buffered_min, buffered_max, buffered_range.
+
+        Returns:
+            DataFrame or LazyFrame with rescaled integer columns.
+        """
+
+        exprs = []
+        for row in scaling_params.to_dicts():
+            col_name = row["col_name"]
+            if col_name not in nwp_in_memory.columns:
+                raise ValueError(f"Column {col_name} is not in `nwp_in_memory`!")
+
+            buffered_min = row["buffered_min"]
+            buffered_max = row["buffered_max"]
+            buffered_range = row["buffered_range"]
+
+            clipped_col = pl.col(col_name).clip(lower_bound=buffered_min, upper_bound=buffered_max)
+
+            expr = (
+                (((clipped_col - buffered_min) / buffered_range) * _NWP_ON_DISK_MAX_INT_VALUE)
+                .round()
+                .cast(_NWP_ON_DISK_DTYPE)
+            )
+
+            exprs.append(expr)
+
+        nwp_on_disk = nwp_in_memory.with_columns(exprs)
+        return cls.validate(nwp_on_disk)
+
+    # overload to indicate that you get a DataFrame back if you feed in a DataFrame
+    @overload
+    @classmethod
+    def to_nwp_in_memory(
+        cls,
+        nwp_on_disk: pt.DataFrame[Self],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.DataFrame[NwpInMemory]: ...
+
+    # overload to indicate that you get a LazyFrame back if you feed in a LazyFrame
+    @overload
+    @classmethod
+    def to_nwp_in_memory(
+        cls,
+        nwp_on_disk: pt.LazyFrame[Self],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.LazyFrame[NwpInMemory]: ...
+
+    @classmethod
+    def to_nwp_in_memory(
+        cls,
+        nwp_on_disk: pt.DataFrame[Self] | pt.LazyFrame[Self],
+        scaling_params: pt.DataFrame[NwpScalingParams],
+    ) -> pt.DataFrame[NwpInMemory] | pt.LazyFrame[NwpInMemory]:
+        """Scale integer columns to floating point representations in physical units."""
+        exprs = []
+        for row in scaling_params.to_dicts():
+            col_name = row["col_name"]
+            if col_name not in nwp_on_disk.columns:
+                raise ValueError(f"Column {col_name} is not in `nwp_on_disk`!")
+
+            buffered_min = row["buffered_min"]
+            buffered_range = row["buffered_range"]
+
+            expr = (
+                pl.col(col_name).cast(pl.Float32) / _NWP_ON_DISK_MAX_INT_VALUE
+            ) * buffered_range + buffered_min
+
+            exprs.append(expr)
+
+        # The `ignore[unresolved-attribute]` is necessary because `ty` doesn't believe that
+        # `.set_model` is defined on `pt.LazyFrame`. But `pt.LazyFrame.set_model()` DOES exist!
+        nwp_in_memory = nwp_on_disk.with_columns(exprs).set_model(NwpInMemory)  # ty: ignore[unresolved-attribute]
+
+        # Use use `validate_schema` not `validate` because `validate` won't work on LazyFrames.
+        # And we want this function to be compatible with LazyFrames.
+        validate_schema(NwpInMemory, nwp_in_memory)
+        return nwp_in_memory
+
+
+class NwpScalingParams(pt.Model):
+    """Schema for weather variable scaling parameters.
+
+    Used when scaling between physical units (e.g. degrees C) and their integer representations."""
+
+    col_name: str = pt.Field(
+        dtype=pl.Enum(  # Note this this does NOT include the categorical variables because we don't scale categorical variables!
+            [
+                "temperature_2m",
+                "dew_point_temperature_2m",
+                "wind_speed_10m",
+                "wind_direction_10m",
+                "wind_speed_100m",
+                "wind_direction_100m",
+                "pressure_surface",
+                "pressure_reduced_to_mean_sea_level",
+                "geopotential_height_500hpa",
+                "downward_long_wave_radiation_flux_surface",
+                "downward_short_wave_radiation_flux_surface",
+                "precipitation_surface",
+            ]
+        ),
+        unique=True,
+    )
+
+    # The minimum from the actual values, minus a small buffer.
+    buffered_min: float = pt.Field(dtype=pl.Float32)
+
+    # The range from the actual values, plus a small buffer.
+    buffered_range: float = pt.Field(dtype=pl.Float32)
+
+    # The maximum from the actual values, plus a small buffer.
+    buffered_max: float = pt.Field(dtype=pl.Float32)
+
+    @classmethod
+    def load(
+        cls, csv_path: Path = _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH
+    ) -> pt.DataFrame[Self]:
+        """Load scaling parameters from a CSV file."""
+        return pt.DataFrame(pl.read_csv(csv_path)).set_model(cls).drop().cast().validate()

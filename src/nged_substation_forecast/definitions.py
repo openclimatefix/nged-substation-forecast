@@ -1,30 +1,15 @@
-"""Dagster definitions for the NGED substation forecast project."""
+"""Dagster definitions entry point."""
 
-from pathlib import Path
-
-from dagster import Definitions, ResourceDefinition, load_from_defs_folder
-from geo.io_managers import CompositeIOManager
-from upath import UPath
-
+from dagster import Definitions, load_assets_from_modules
 from contracts.settings import Settings
 
+from nged_substation_forecast.defs import assets, schedules
 
-def create_defs() -> Definitions:
-    """Create Dagster definitions."""
-    settings = Settings()
-    loaded_defs = load_from_defs_folder(path_within_project=Path(__file__).parent)
+all_assets = load_assets_from_modules([assets])
 
-    return Definitions(
-        assets=loaded_defs.assets,
-        asset_checks=loaded_defs.asset_checks,
-        jobs=loaded_defs.jobs,
-        schedules=loaded_defs.schedules,
-        sensors=loaded_defs.sensors,
-        resources={
-            "settings": ResourceDefinition.hardcoded_resource(settings),
-            "io_manager": CompositeIOManager(base_path=UPath("/home/jack/dagster_home/storage")),
-        },
-    )
+settings = Settings()
 
-
-defs = create_defs()
+defs = Definitions(
+    assets=all_assets,
+    schedules=[schedules.power_time_series_and_metadata_schedule],
+)

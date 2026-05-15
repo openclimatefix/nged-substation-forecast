@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,18 +24,18 @@ class DataQualitySettings(BaseSettings):
 
     These thresholds are used to identify problematic telemetry data:
     - `stuck_std_threshold`: When the rolling standard deviation falls below this value
-      (across a 48-period/24-hour window), the sensor is likely stuck. We replace such
+      (across `stuck_window_periods`), the sensor is likely stuck. We replace such
       values with null to preserve the temporal grid. A value of 0.01 MW was chosen
       because substations with normal operation typically have much higher variability.
 
     - `max_mw_threshold`: Active power above this value is considered physically
-      unrealistic for primary substations in the NGED portfolio. A threshold of 100.0 MW
+      unrealistic for primary substations in the NGED portfolio. A threshold of 150 MW
       was chosen because typical primary substations operate in the tens of MW range,
       and values exceeding 100 MW are extremely rare anomalies.
 
     - `min_mw_threshold`: Active power below this value is potentially erroneous
       (negative values can occur at times of high renewable generation). A threshold of
-      -20.0 MW was chosen to allow for reverse power flow during high renewable
+      -50.0 MW was chosen to allow for reverse power flow during high renewable
       generation periods while still catching implausible extreme negative values.
 
     Centralizing these in Settings allows them to be configurable per environment
@@ -43,36 +44,14 @@ class DataQualitySettings(BaseSettings):
     here, not define them locally.
     """
 
-    stuck_std_threshold: float = 0.005
-    stuck_window_periods: int = 48
+    stuck_std_threshold: float = 0.01
+    stuck_window_periods: int = 48  # Each period is 30 minutes.
     max_mw_threshold: float = 150.0
     min_mw_threshold: float = -50.0
-    variance_thresholds: dict[int, float] = Field(default_factory=dict)
 
 
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
-
-    # NGED Connected Data CKAN token
-    nged_ckan_token: str = Field(...)
-
-    # NWP Data Settings
-    nwp_ensemble_member: int = Field(
-        default=0,
-        description=(
-            "Which NWP ensemble member to use for training the ML model (typically 0, the "
-            "control member)."
-        ),
-    )
-
-    # ML Model Settings
-    ml_model_ensemble_size: int = Field(
-        default=10,
-        description=(
-            "Number of ML models to train in an ensemble (e.g. using different random seeds) "
-            "to improve robustness and provide uncertainty estimates at inference time."
-        ),
-    )
 
     # MLflow Tracking URI
     # We centralize the MLflow tracking URI here to allow for environment-specific
@@ -90,31 +69,33 @@ class Settings(BaseSettings):
         description="Configurable thresholds for data quality checks.",
     )
 
-    # S3 Storage
+    # NGED source bucket. These fields are typically stored in the .env file.
     nged_s3_bucket_url: str = Field(...)
     nged_s3_bucket_access_key: str = Field(...)
     nged_s3_bucket_secret: str = Field(...)
 
-    # ECMWF Data Settings
-    ecmwf_s3_bucket: str = Field(
-        default="dynamical-ecmwf-ifs-ens",
-        description="S3 bucket for ECMWF Icechunk store.",
-    )
-    ecmwf_s3_prefix: str = Field(
-        default="ecmwf-ifs-ens-forecast-15-day-0-25-degree/v0.1.0.icechunk/",
-        description="S3 prefix for ECMWF Icechunk store.",
-    )
+    def get_nged_s3_store(self) -> obstore.store.S3Store:
+        """Returns an initialized obstore.store.S3Store instance for the NGED bucket."""
+        return obstore.store.S3Store.from_url(
+            url=self.nged_s3_bucket_url,
+            config={
+                "aws_access_key_id": self.nged_s3_bucket_access_key,
+                "aws_secret_access_key": self.nged_s3_bucket_secret,
+            },
+        )
 
-    # Paths
+    # Paths to the data we manage
     nged_data_path: Path = Path("data/NGED")
     nwp_data_path: Path = Path("data/NWP")
     power_forecasts_data_path: Path = Path("data/power_forecasts")
     forecast_metrics_data_path: Path = Path("data/forecast_metrics")
     trained_ml_model_params_base_path: Path = Path("data/trained_ML_model_params")
+    h3_grid_weights_path: Path = Path("data/h3_grid_weights.parquet")
 
+    # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
-        extra="ignore",
+        extra="forbid",
         env_file_encoding="utf-8",
         env_prefix="",
     )
