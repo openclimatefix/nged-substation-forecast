@@ -139,7 +139,7 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
 
 
 @asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2024-01-01", timezone="UTC", end_offset=1),
+    partitions_def=DailyPartitionsDefinition(start_date="2024-04-01", timezone="UTC", end_offset=1),
     deps=["h3_grid_weights"],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
     # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
