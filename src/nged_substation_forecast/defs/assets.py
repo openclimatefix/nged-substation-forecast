@@ -174,7 +174,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     # Save to Delta
     settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
-    nwp_on_disk.write_delta(
+    nwp_on_disk.with_columns(
+        # Delta Lake doesn't support Enums, so we must cast to String:
+        pl.col("nwp_model_id").cast(pl.String),
+    ).write_delta(
         settings.nwp_data_path,
         mode="append",
         delta_write_options={"partition_by": ["nwp_model_id", "init_time"]},
