@@ -243,7 +243,7 @@ class NwpInMemory(_NwpBase):
 
 
 _NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataTypeClass] = pl.Int16
-_NWP_ON_DISK_MAX_INT_VALUE: Final[int] = 2**12 - 1  # We're using 12 bits per value
+_NWP_ON_DISK_MAX_INT_VALUE: Final[int] = 2**12 - 1  # Use 12 bits per value
 
 
 class NwpOnDisk(_NwpBase):
