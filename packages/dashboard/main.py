@@ -1,4 +1,6 @@
 import marimo
+from anywidget import AnyWidget
+from contracts.common import UTC_DATETIME_DTYPE
 
 __generated_with = "0.23.6"
 app = marimo.App(width="full")
@@ -6,12 +8,11 @@ app = marimo.App(width="full")
 with app.setup:
     from typing import cast
 
-    from contracts.settings import Settings, PROJECT_ROOT
+    from contracts.settings import PROJECT_ROOT, Settings
 
     settings = Settings()
 
     from datetime import datetime
-    from pathlib import Path
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
@@ -20,7 +21,7 @@ with app.setup:
     import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.power_schemas import TimeSeriesMetadata, PowerTimeSeries
+    from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 
     BASE_DELTA_PATH = PROJECT_ROOT / settings.nged_data_path / "power_time_series.delta"
 
@@ -83,14 +84,15 @@ def _(arrow_table):
     map = lonboard.Map(layers=[layer])
 
     # Enable reactivity in Marimo:
-    layer_widget = mo.ui.anywidget(layer)
+    layer_widget = mo.ui.anywidget(cast(AnyWidget, layer))
     return layer_widget, map
 
 
 @app.cell
 def _():
     delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
-        pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
+        # Filter to only show recent data. Altair crashes if you try to show too much data.
+        pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
 

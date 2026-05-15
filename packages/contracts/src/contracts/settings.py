@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
-        extra="ignore",
+        extra="forbid",
         env_file_encoding="utf-8",
         env_prefix="",
     )
