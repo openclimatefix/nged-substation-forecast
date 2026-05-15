@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum, auto
 from pathlib import Path
 from typing import ClassVar, Final, Self, overload
@@ -210,7 +210,36 @@ class NwpInMemory(_NwpBase):
     def _check_variables_that_were_introduced_after_start_of_dataset(
         cls, dataframe: pt.DataFrame[Self]
     ) -> None:
-        pass
+        """Check that `categorical_precipitation_type_surface` is all-null when
+        init_time <= 2024-11-13, and is never null afterwards.
+
+        ECMWF only introduced `ptype` into their public data on 2024-11-14.
+        """
+        threshold_date = datetime(2024, 11, 13, tzinfo=timezone.utc)
+
+        # Partition the dataframe based on the threshold date
+        partition_col = "is_before_or_on_threshold"
+        partitioned_df = dataframe.with_columns(
+            (pl.col("init_time") <= threshold_date).alias(partition_col)
+        )
+        partitions = partitioned_df.partition_by(partition_col, as_dict=True)
+
+        empty_df = pl.DataFrame(schema=dataframe.schema)
+        before_or_on = partitions.get((True,), empty_df)
+        after = partitions.get((False,), empty_df)
+
+        # Check before or on threshold
+        if not before_or_on["categorical_precipitation_type_surface"].is_null().all():
+            raise ValueError(
+                "categorical_precipitation_type_surface must be all null for "
+                "init_time <= 2024-11-13"
+            )
+
+        # Check after threshold
+        if after["categorical_precipitation_type_surface"].is_null().any():
+            raise ValueError(
+                "categorical_precipitation_type_surface must not be null for init_time > 2024-11-13"
+            )
 
 
 _NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataTypeClass] = pl.Int16
