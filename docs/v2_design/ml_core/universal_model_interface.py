@@ -53,6 +53,17 @@ class MLModel(ABC):
 
         exprs_to_evaluate: list[pl.Expr] = []
 
+        # TODO: Convert nwp to NwpInMemory.
+        # TODO: Interpolate nwp to half-hourly.
+        # TODO: Use self.model_params to select only what we need from power_time_series,
+        # time_series_metadata, and nwp.
+        # TODO: After selection, join power_time_series, time_series_metadata, and nwp, to create
+        # raw_data.
+        # TODO: I'm actually leaning towards seeing if we can use Patito's `derive` for all the
+        # features, so the implementation would all live in contracts/ml_schemas.py. Especially
+        # because `.derive` can be called with a list of columns to derive. 
+        # https://github.com/JakobGM/patito/blob/main/src/patito/polars.py#L132
+
         for feature_name in self.selected_features:
             # 1. Check static registry
             if feature_name in STATIC_FEATURE_REGISTRY:
@@ -75,6 +86,7 @@ class MLModel(ABC):
 
         # TODO: Lazily validate the *schema* of raw_data_with_engineered_features.
         # We can't materialized the data yet, so we can't call AllFeatures.validate() yet.
+        # Use our contracts.common.validate_schema
 
         # Assert all requested features were actually created (Catch silent failures)
         missing_cols = set(self.selected_features) - set(raw_data_with_engineered_features.columns)

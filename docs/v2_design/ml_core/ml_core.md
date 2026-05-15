@@ -11,7 +11,7 @@ From here: https://gemini.google.com/app/291f2b313ae1aa20
 To ensure perfect symmetry between training and inference (preventing train-serve skew) and to protect junior developers from boilerplate errors, the ML pipeline relies on an Abstract Base Class (ABC) using the Template Method pattern.
 
 * **Public Interface (Unbreakable):** The ABC defines standard `train(raw_data)` and `predict(raw_data)` methods. These internally trigger data validation, feature engineering, and `.collect()` materialization.
-* **Protected Interface (Extensible):** Concrete implementations (e.g., `XGBoostEnergyModel`, `PyTorchEnergyModel`) only implement the pure math layer via `_fit_algo(X, y)` and `_predict_algo(X)`. 
+* **Protected Interface (Extensible):** Concrete implementations (e.g., `XGBoostForecaster`, `PyTorchForecaster`) only implement the pure math layer via `_fit_algo(X, y)` and `_predict_algo(X)`. 
 * **Config Separation:** The `__init__` explicitly separates `selected_features: list[str]` (consumed by the base class for data prep) and `model_params: dict` (unpacked by the concrete subclass for algorithm config) to avoid kwarg pollution.
 
 ### 3. Feature Engineering Pattern
@@ -21,7 +21,7 @@ Feature engineering logic is decoupled from both Dagster and the concrete ML alg
 * **Execution:** The ABC's `_engineer_features()` method parses the requested features, gathers the corresponding `pl.Expr` objects from the registry/factories, and evaluates them simultaneously using a single `.with_columns()` call on the `LazyFrame`.
 
 ### 4. Data Contracts & Validation (Patito)
-Patito is used strictly as a boundary validation layer ("Health Inspector"), not for complex ML transformations (`derive` rules are avoided for ML logic).
+Patito is used strictly as a boundary validation layer ("Health Inspector"), not for complex ML transformations. For example, we won't use Patito `derive` rules to build features.
 
 * **Input Contract:** Dagster passes data conforming to a `RawData` Patito model.
 * **Output Contract:** Feature engineering returns an `AllFeatures` Patito model, where all possible engineered features are defined as `Optional` with strict bounds (e.g., ensuring sine/cosine bounds are exactly `[-1, 1]`).

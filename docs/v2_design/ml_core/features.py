@@ -6,6 +6,8 @@ import patito as pt
 import polars as pl
 
 
+# Jack's comment: I'm 99% certain we don't need this. We'll just use PowerTimeSeries etc.
+# That's what happens in universal_model_interface.py.
 class RawData(pt.Model):
     # Base columns
     timestamp: datetime
@@ -23,6 +25,7 @@ class AllFeatures(RawData):
 
 
 # This features reg still needs to be implemented in ml_core/features.py.
+# Jack's comment: I'm leaning towards implementing these as derive features in the data contract.
 STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
     "hour_of_day": pl.col("timestamp").dt.hour().alias("hour_of_day"),
     "time_sin": (pl.col("timestamp").dt.hour() / 24.0 * 2 * np.pi).sin().alias("time_sin"),
