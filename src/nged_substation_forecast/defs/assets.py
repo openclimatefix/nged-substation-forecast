@@ -17,6 +17,7 @@ from dagster import (
     TableRecord,
     asset,
 )
+from deltalake import WriterProperties, write_deltalake
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
@@ -172,15 +173,17 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     context.log.info(f"Columns: {nwp_on_disk.columns}")
 
-    # Save to Delta
     settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
-    nwp_on_disk.with_columns(
-        # Delta Lake doesn't support Enums, so we must cast to String:
-        pl.col("nwp_model_id").cast(pl.String),
-    ).write_delta(
-        settings.nwp_data_path,
+
+    # Delta Lake doesn't support Enums, so we must cast to String:
+    df_to_write = nwp_on_disk.as_polars().cast({"nwp_model_id": pl.String})
+
+    write_deltalake(
+        table_or_uri=settings.nwp_data_path,
+        data=df_to_write,
         mode="append",
-        delta_write_options={"partition_by": ["nwp_model_id", "init_time"]},
+        partition_by=["nwp_model_id", "init_time"],
+        writer_properties=WriterProperties(compression="ZSTD", compression_level=14),
     )
 
     context.add_output_metadata(
