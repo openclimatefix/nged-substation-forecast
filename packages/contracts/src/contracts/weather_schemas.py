@@ -65,9 +65,12 @@ class _NwpBase(pt.Model):
     )
 
     # Categorical variables
-    categorical_precipitation_type_surface: int = pt.Field(
+    categorical_precipitation_type_surface: int | None = pt.Field(
         dtype=pl.UInt8,
         description=(
+            "This field is always NaN for init_times on and before 2024-11-13. Derived from"
+            " ECMWF's `ptype` field, which was added to ECMWF's Open Data dataset when IFS Cycle"
+            " 49r1 was released in Nov 2024. See https://codes.ecmwf.int/grib/param-db/260015"
             " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
             " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
             " 10=Hail; 11=Drizzle; 12=Freezing drizzle; 13=Hail (less than 5 mm);"
@@ -168,14 +171,20 @@ class NwpInMemory(_NwpBase):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        # Check for nulls from second forecast step onwards
+        cls._check_nulls_from_second_forecast_step_onwards(validated_df)
+        cls._check_unique(validated_df)
+        cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)
+        return validated_df
+
+    @classmethod
+    def _check_nulls_from_second_forecast_step_onwards(cls, dataframe: pt.DataFrame[Self]) -> None:
         cols_to_check = [
             "precipitation_surface",
             "downward_short_wave_radiation_flux_surface",
             "downward_long_wave_radiation_flux_surface",
         ]
 
-        second_step_onwards = validated_df.filter(pl.col("valid_time") > pl.col("init_time"))
+        second_step_onwards = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
 
         for col in cols_to_check:
             has_nulls = second_step_onwards[col].is_null().any()
@@ -186,9 +195,10 @@ class NwpInMemory(_NwpBase):
                     "forecast step (lead time 0)."
                 )
 
-        # Validate uniqueness of (init_time, valid_time, ensemble_member, h3_index)
+    @classmethod
+    def _check_unique(cls, dataframe: pt.DataFrame[Self]) -> None:
         if (
-            validated_df.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
+            dataframe.select(["init_time", "valid_time", "ensemble_member", "h3_index"])
             .is_duplicated()
             .any()
         ):
@@ -196,7 +206,11 @@ class NwpInMemory(_NwpBase):
                 "Duplicate entries found for (init_time, valid_time, ensemble_member, h3_index)."
             )
 
-        return validated_df
+    @classmethod
+    def _check_variables_that_were_introduced_after_start_of_dataset(
+        cls, dataframe: pt.DataFrame[Self]
+    ) -> None:
+        pass
 
 
 _NWP_ON_DISK_DTYPE: Final[pl.datatypes.DataTypeClass] = pl.Int16
