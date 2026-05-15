@@ -14,7 +14,7 @@ def test_categorical_precipitation_type_surface_validation():
             datetime(2024, 11, 14, tzinfo=timezone.utc)
         ],
         "valid_time": [
-            datetime(2024, 11, 13, 1, tzinfo=timezone.utc),
+            datetime(2024, 11, 13, 0, tzinfo=timezone.utc),
             datetime(2024, 11, 14, 1, tzinfo=timezone.utc)
         ],
         "ensemble_member": [1, 1],

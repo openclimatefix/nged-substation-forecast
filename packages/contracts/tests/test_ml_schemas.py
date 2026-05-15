@@ -1,10 +1,8 @@
 from datetime import datetime, timezone
 
 import patito as pt
-import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures, Metrics
-from patito.exceptions import DataFrameValidationError
 
 
 def test_all_features_validation():

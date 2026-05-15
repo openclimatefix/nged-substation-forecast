@@ -17,6 +17,7 @@ class H3GridWeights(pt.Model):
     nwp_lon: float = pt.Field(
         dtype=pl.Float32, ge=-180, le=180, description="The longitude of the NWP grid box."
     )
+
     proportion: float = pt.Field(
         dtype=pl.Float32,
         ge=0,
