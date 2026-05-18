@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import polars as pl
 import pytest
@@ -8,8 +8,88 @@ from ml_core.features import (
     apply_local_time_features,
     apply_rolling_mean_feature,
     calculate_lead_time,
+    engineer_features,
     nullify_leaky_lags,
 )
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.weather_schemas import NwpOnDisk
+import patito as pt
+
+def test_engineer_features_nwp_historical_best():
+    # Create dummy data
+    # 2 ensemble members, 2 lead times for the same valid_time
+    # We want to ensure only the one with minimum lead_time is kept
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    
+    nwp_df = pl.DataFrame({
+        "time_series_id": ["ts1", "ts1", "ts1", "ts1"],
+        "valid_time": [valid_time, valid_time, valid_time, valid_time],
+        "ensemble_member": [1, 1, 2, 2],
+        "init_time": [
+            valid_time - timedelta(hours=10), # lead 10
+            valid_time - timedelta(hours=20), # lead 20
+            valid_time - timedelta(hours=5),  # lead 5
+            valid_time - timedelta(hours=15), # lead 15
+        ],
+        "temperature_2m": [10.0, 11.0, 12.0, 13.0],
+    })
+    
+    power_df = pl.DataFrame({
+        "time_series_id": ["ts1"],
+        "time": [valid_time],
+        "power": [100.0],
+    })
+    
+    metadata_df = pl.DataFrame({
+        "time_series_id": ["ts1"],
+        "time_series_type": ["substation"],
+    })
+    
+    # Run engineer_features
+    engineered = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        selected_features={"temperature_2m", "temperature_2m_lag_24h"},
+    ).collect()
+    
+    # Check that we have 2 ensemble members (1 and 2)
+    # And for each, we have the temperature corresponding to the minimum lead time
+    # Member 1: min lead is 10h (temp 10.0)
+    # Member 2: min lead is 5h (temp 12.0)
+    
+    assert len(engineered) == 2
+    assert set(engineered["ensemble_member"].to_list()) == {1, 2}
+    
+    # Check temperatures
+    temp_1 = engineered.filter(pl.col("ensemble_member") == 1)["temperature_2m"][0]
+    temp_2 = engineered.filter(pl.col("ensemble_member") == 2)["temperature_2m"][0]
+    
+    assert temp_1 == 10.0
+    assert temp_2 == 12.0
+
+def test_apply_lag_feature_with_source():
+    # Test that apply_lag_feature correctly pulls from source_lf
+    target_df = pl.DataFrame({
+        "time_series_id": ["ts1"],
+        "valid_time": [datetime(2023, 1, 1, 12, 0)],
+        "power": [100.0],
+    })
+    
+    source_df = pl.DataFrame({
+        "time_series_id": ["ts1"],
+        "valid_time": [datetime(2023, 1, 1, 11, 0)],
+        "power": [90.0],
+    })
+    
+    result = apply_lag_feature(
+        target_df.lazy(),
+        source_df.lazy(),
+        "power",
+        1
+    ).collect()
+    
+    assert result["power_lag_1h"][0] == 90.0
 
 
 def test_calculate_lead_time():

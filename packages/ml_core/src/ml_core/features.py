@@ -1,6 +1,13 @@
 import math
+import re
+from dataclasses import dataclass
+from typing import NamedTuple
 
+import patito as pt
 import polars as pl
+from contracts.ml_schemas import AllFeatures
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.weather_schemas import NwpOnDisk
 
 # Static features registry
 # These are basic features that don't require parameterization.
@@ -14,7 +21,196 @@ STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
 }
 
 
-def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.LazyFrame:
+class LagFeature(NamedTuple):
+    base_col: str
+    lag_hours: int
+
+
+class RollingFeature(NamedTuple):
+    base_col: str
+    window_hours: int
+
+
+@dataclass
+class ParsedFeatures:
+    lags: dict[str, LagFeature]
+    rolling_means: dict[str, RollingFeature]
+    static: list[str]
+    local_time: list[str]
+    leaky_lags: dict[str, int]
+
+
+def parse_feature_names(selected_features: set[str]) -> ParsedFeatures:
+    lags: dict[str, LagFeature] = {}
+    rolling_means: dict[str, RollingFeature] = {}
+    static: list[str] = []
+    local_time: list[str] = []
+    leaky_lags: dict[str, int] = {}
+
+    local_time_features = {
+        "local_time_of_day_sin",
+        "local_time_of_day_cos",
+        "local_time_of_year_sin",
+        "local_time_of_year_cos",
+        "local_day_of_week_sin",
+        "local_day_of_week_cos",
+        "local_day_of_week",
+        "local_utc_offset",
+    }
+
+    for feature_name in selected_features:
+        if "lag" in feature_name and "rolling_mean" in feature_name:
+            raise ValueError(f"Feature stacking is not supported: {feature_name}")
+
+        lag_match = re.match(r"^(.*)_lag_(\d+)h$", feature_name)
+        if lag_match:
+            base_col, lag_hours_str = lag_match.groups()
+            lag_hours = int(lag_hours_str)
+            lags[feature_name] = LagFeature(base_col=base_col, lag_hours=lag_hours)
+            if base_col == "power":
+                leaky_lags[feature_name] = lag_hours
+            continue
+
+        rolling_match = re.match(r"^(.*)_rolling_mean_(\d+)h$", feature_name)
+        if rolling_match:
+            base_col, window_hours_str = rolling_match.groups()
+            window_hours = int(window_hours_str)
+            rolling_means[feature_name] = RollingFeature(
+                base_col=base_col, window_hours=window_hours
+            )
+            if base_col == "power":
+                leaky_lags[feature_name] = 0
+            continue
+
+        if feature_name in STATIC_FEATURE_REGISTRY:
+            static.append(feature_name)
+        elif feature_name in local_time_features:
+            local_time.append(feature_name)
+
+    return ParsedFeatures(
+        lags=lags,
+        rolling_means=rolling_means,
+        static=static,
+        local_time=local_time,
+        leaky_lags=leaky_lags,
+    )
+
+
+def engineer_features(
+    selected_features: set[str],
+    power_time_series: pt.LazyFrame[PowerTimeSeries],
+    time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
+    nwp: pt.LazyFrame[NwpOnDisk] | None = None,
+) -> pt.LazyFrame[AllFeatures]:
+    """Engineer features."""
+    # Convert Patito to Polars immediately for cleaner downstream code
+    power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
+    metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
+    nwp_lf = pl.LazyFrame._from_pyldf(nwp._ldf) if nwp is not None else None
+
+    parsed_features = parse_feature_names(selected_features)
+
+    # Detect if weather lags are requested
+    weather_lag_requested = False
+    if nwp_lf is not None:
+        nwp_cols = nwp_lf.collect_schema().names()
+        for lag_feat in parsed_features.lags.values():
+            if lag_feat.base_col in nwp_cols and lag_feat.base_col != "power":
+                weather_lag_requested = True
+                break
+
+    # Process NWP for current forecast
+    processed_nwp = None
+    if nwp_lf is not None:
+        processed_nwp = calculate_lead_time(nwp_lf)
+
+    # Compute historical_weather for lags
+    historical_weather = None
+    if nwp_lf is not None and weather_lag_requested:
+        historical_weather = (
+            processed_nwp.filter(pl.col("ensemble_member") == 0)
+            .drop("ensemble_member")
+            .group_by(["time_series_id", "valid_time"])
+            .agg(pl.all().sort_by("lead_time_hours").first())
+            .sort(["time_series_id", "valid_time"])
+        )
+
+    # Join Data
+    raw_data = power_lf.join(metadata_lf, on="time_series_id", how="left")
+    if processed_nwp is not None:
+        raw_data = processed_nwp.join(raw_data, on=["time_series_id", "valid_time"], how="left")
+        # Ensure unique rows if multiple init_times exist in the provided nwp
+        raw_data = raw_data.unique(["time_series_id", "valid_time", "ensemble_member"])
+
+    # Apply Features
+    engineered_lf = _apply_post_join_features(raw_data, parsed_features, historical_weather)
+
+    # Schema Assertion and Selection
+    available_columns = engineered_lf.collect_schema().names()
+    missing_cols = set(selected_features) - set(available_columns)
+    if missing_cols:
+        if "lead_time_hours" in missing_cols and "lead_time_hours" not in selected_features:
+            missing_cols.remove("lead_time_hours")
+        if missing_cols:
+            raise ValueError(f"Feature engineering failed to create or find: {missing_cols}")
+
+    base_cols = ["valid_time", "time_series_id", "time_series_type", "power"]
+    if "lead_time_hours" in engineered_lf.collect_schema().names():
+        base_cols.append("lead_time_hours")
+    if "ensemble_member" in engineered_lf.collect_schema().names():
+        base_cols.append("ensemble_member")
+
+    cols_to_select = list(set(base_cols + list(selected_features)))
+    final_lf = engineered_lf.select(cols_to_select)
+
+    return pt.LazyFrame.from_existing(final_lf).set_model(AllFeatures)
+
+
+def _apply_post_join_features(
+    raw_data: pl.LazyFrame,
+    parsed_features: ParsedFeatures,
+    historical_weather: pl.LazyFrame | None = None,
+) -> pl.LazyFrame:
+    """Applies requested features dynamically based on parsed feature configurations."""
+    engineered_lf = raw_data
+
+    # Static and Local Time
+    if parsed_features.local_time:
+        engineered_lf = apply_local_time_features(engineered_lf)
+
+    if parsed_features.static:
+        exprs = [STATIC_FEATURE_REGISTRY[f] for f in parsed_features.static]
+        engineered_lf = engineered_lf.with_columns(exprs)
+
+    # Lags
+    for feature_name, lag_feat in parsed_features.lags.items():
+        source_lf = engineered_lf
+        if historical_weather is not None and lag_feat.base_col != "power":
+            if lag_feat.base_col in historical_weather.collect_schema().names():
+                source_lf = historical_weather
+
+        if lag_feat.base_col in source_lf.collect_schema().names():
+            engineered_lf = apply_lag_feature(
+                engineered_lf, source_lf, lag_feat.base_col, lag_feat.lag_hours
+            )
+
+    # Rolling Means
+    for feature_name, rolling_feat in parsed_features.rolling_means.items():
+        if rolling_feat.base_col in engineered_lf.collect_schema().names():
+            engineered_lf = apply_rolling_mean_feature(
+                engineered_lf, rolling_feat.base_col, rolling_feat.window_hours
+            )
+
+    # Nullify leaky lags
+    if parsed_features.leaky_lags and "lead_time_hours" in engineered_lf.collect_schema().names():
+        engineered_lf = nullify_leaky_lags(engineered_lf, parsed_features.leaky_lags)
+
+    return engineered_lf
+
+
+def apply_lag_feature(
+    target_lf: pl.LazyFrame, source_lf: pl.LazyFrame, base_col: str, lag_hours: int
+) -> pl.LazyFrame:
     """
     Applies a lag feature using a time-aware lazy self-join.
 
@@ -24,7 +220,8 @@ def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.Laz
     mathematical safety: if the lagged time doesn't exist, it correctly returns null.
 
     Args:
-        lf: The LazyFrame to apply the lag to.
+        target_lf: The LazyFrame to apply the lag to.
+        source_lf: The LazyFrame containing the historical data to pull from.
         base_col: The column to lag (e.g., 'power').
         lag_hours: The number of hours to lag.
 
@@ -32,13 +229,23 @@ def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.Laz
         A LazyFrame with the new lagged column.
     """
     # Create a dataframe with the target time we want to join against
-    lf_with_target_time = lf.with_columns(
+    lf_with_target_time = target_lf.with_columns(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_hours)
     )
 
+    target_schema = target_lf.collect_schema().names()
+    source_schema = source_lf.collect_schema().names()
+    join_keys = ["time_series_id"]
+    if "ensemble_member" in target_schema and "ensemble_member" in source_schema:
+        join_keys.append("ensemble_member")
+
     # The right side of the join only needs the keys and the base column
-    right_lf = lf.select(
-        pl.col("time_series_id"),
+    # We dynamically check if base_col exists in the schema to avoid errors
+    if base_col not in source_lf.collect_schema().names():
+        raise ValueError(f"Base column '{base_col}' not found in source dataframe for lag feature.")
+
+    right_lf = source_lf.select(
+        *join_keys,
         pl.col("valid_time"),
         pl.col(base_col).alias(f"{base_col}_lag_{lag_hours}h"),
     )
@@ -46,8 +253,8 @@ def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.Laz
     # Join target_lf with right_lf
     result = lf_with_target_time.join(
         right_lf,
-        left_on=["time_series_id", "target_time"],
-        right_on=["time_series_id", "valid_time"],
+        left_on=join_keys + ["target_time"],
+        right_on=join_keys + ["valid_time"],
         how="left",
     ).drop("target_time")
 
@@ -89,7 +296,6 @@ def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFra
             .alias(col_name)
         )
     return lf
-
 
 
 def apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: int) -> pl.LazyFrame:

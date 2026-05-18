@@ -55,12 +55,6 @@ class AllFeatures(pt.Model):
     # Derived weather features
     windchill: float | None = _FEATURE_DTYPE
 
-    # Lagged features
-    # (None)
-
-    # Temperature trends
-    temperature_2m_lag_6h: float | None = _FEATURE_DTYPE
-
     # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
     # as the main input feature, because it's the local time that mostly drives demand.
     local_utc_offset: int | None = pt.Field(dtype=pl.Int8, allow_missing=True)
