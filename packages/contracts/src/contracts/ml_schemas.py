@@ -15,6 +15,18 @@ class AllFeatures(pt.Model):
 
     Weather features are kept in their physical units (e.g., degrees Celsius, m/s)
     to ensure precision during interpolation and feature engineering.
+
+    DYNAMIC FEATURES:
+    In addition to the explicitly defined columns below, the pipeline supports 
+    dynamically generated features. You can request these in your model config:
+    
+    * `power_lag_{hours}h`: The power value shifted by X hours (e.g., `power_lag_24h`).
+    * `temperature_rolling_mean_{hours}h`: Rolling average of temperature over X hours (e.g., `temperature_rolling_mean_6h`).
+
+    Note: Dynamic features are not explicitly typed as Pydantic fields below. 
+    This is intentional to allow infinite parameterization (e.g., any lag hour) 
+    without the overhead of metaprogramming or defining hundreds of static fields.
+    The pipeline dynamically asserts their presence during feature engineering.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
