@@ -100,9 +100,10 @@ def test_engineer_features_missing_base_col(dummy_power_data, dummy_metadata):
     selected_features = {"temperature_rolling_mean_2h"}
     forecaster = DummyForecaster(selected_features=selected_features, model_params={})
 
-    with pytest.raises(pl.exceptions.ColumnNotFoundError):
+    # Since nwp is None, the feature is never created, so the dynamic schema assertion catches it
+    with pytest.raises(ValueError, match="Feature engineering failed to create or find"):
         forecaster._engineer_features(
             power_time_series=dummy_power_data,
             time_series_metadata=dummy_metadata,
             nwp=None,
-        ).collect()
+        )

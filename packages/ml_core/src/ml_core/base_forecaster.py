@@ -7,7 +7,7 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
 
-from ml_core.features import STATIC_FEATURE_REGISTRY, build_lag_expr, build_rolling_mean_expr
+from ml_core.features import STATIC_FEATURE_REGISTRY, apply_lag_feature, apply_rolling_mean_feature
 
 
 class BaseForecaster(ABC):
@@ -67,18 +67,39 @@ class BaseForecaster(ABC):
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwp: pt.LazyFrame[NwpOnDisk] | None,
     ) -> pt.LazyFrame[AllFeatures]:
+        """Engineer features.
 
-        # 1. Data Joining
+        Ensemble filtering (e.g., selecting the control member for training) must happen *before*
+        _engineer_features is called (likely in Dagster or the train/predict methods).
+        _engineer_features is designed to safely process whatever ensemble members it is given.
+        """
+
         # Rename 'time' to 'valid_time' in power_time_series to match NWP and AllFeatures
         power_lf = power_time_series.rename({"time": "valid_time"})
+
+        # Pre-Join Power Features
+        for feature_name in self.selected_features:
+            if feature_name.startswith("power_lag_") and feature_name.endswith("h"):
+                lag_val = int(feature_name.split("_")[-1][:-1])
+                power_lf = apply_lag_feature(power_lf, "power", lag_val)
+
+        # Pre-Join Weather Features
+        nwp_lf = nwp
+        if nwp_lf is not None:
+            for feature_name in self.selected_features:
+                if feature_name.startswith("temperature_rolling_mean_") and feature_name.endswith(
+                    "h"
+                ):
+                    window = int(feature_name.split("_")[-1][:-1])
+                    nwp_lf = apply_rolling_mean_feature(nwp_lf, "temperature_2m", window)
 
         # Join power data with metadata
         raw_data = power_lf.join(time_series_metadata.lazy(), on="time_series_id", how="left")
 
-        if nwp is not None:
+        if nwp_lf is not None:
             # TODO: Convert nwp to NwpInMemory.
             # TODO: Interpolate nwp to half-hourly.
-            raw_data = raw_data.join(nwp, on=["time_series_id", "valid_time"], how="left")
+            raw_data = raw_data.join(nwp_lf, on=["time_series_id", "valid_time"], how="left")
             # Calculate lead_time_hours if nwp is provided
             if "init_time" in raw_data.collect_schema().names():
                 raw_data = raw_data.with_columns(
@@ -87,35 +108,19 @@ class BaseForecaster(ABC):
                     ).cast(pl.Float32)
                 )
 
-        # 2. Feature Generation
+        # Apply Static Features
         exprs_to_evaluate: list[pl.Expr] = []
-
         for feature_name in self.selected_features:
-            # Check static registry
             if feature_name in STATIC_FEATURE_REGISTRY:
                 exprs_to_evaluate.append(STATIC_FEATURE_REGISTRY[feature_name])
 
-            # Parse parameterized features (e.g., "power_lag_24h")
-            elif feature_name.startswith("power_lag_") and feature_name.endswith("h"):
-                lag_val = int(feature_name.split("_")[-1][:-1])
-                exprs_to_evaluate.append(build_lag_expr("power", lag_val))
-
-            elif feature_name.startswith("temperature_rolling_mean_") and feature_name.endswith("h"):
-                window = int(feature_name.split("_")[-1][:-1])
-                exprs_to_evaluate.append(build_rolling_mean_expr("temperature_2m", window))
-
-            else:
-                # If it's not in the registry or a dynamic feature, it might be a base column.
-                # We don't need to generate an expression for it, but we'll check its existence later.
-                pass
-
-        # Apply all expressions simultaneously
+        # Apply all static expressions simultaneously
         if exprs_to_evaluate:
             engineered_lf = raw_data.with_columns(exprs_to_evaluate)
         else:
             engineered_lf = raw_data
 
-        # 3. Dynamic Schema Assertion
+        # Dynamic Schema Assertion
         # Why two-step validation?
         # Step 1 (Here): We dynamically check the Polars schema to ensure all requested features
         # (especially dynamic ones like 'power_lag_24') were actually created or exist.
@@ -125,7 +130,7 @@ class BaseForecaster(ABC):
         if missing_cols:
             raise ValueError(f"Feature engineering failed to create or find: {missing_cols}")
 
-        # 4. Select & Cast
+        # 7. Select & Cast
         # Step 2: Cast to the Patito model. Patito ignores extra columns, so we explicitly select
         # the base columns and the requested features to keep the dataframe clean and memory-efficient.
         base_cols = ["valid_time", "time_series_id", "time_series_type", "power"]
