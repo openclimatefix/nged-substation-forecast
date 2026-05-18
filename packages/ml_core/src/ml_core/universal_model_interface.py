@@ -1,16 +1,11 @@
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 import patito as pt
 import polars as pl
-
-from .features import (
-    STATIC_FEATURE_REGISTRY,
-    AllFeatures,
-    RawData,
-    build_lag_expr,
-    build_rolling_mean_expr,
-)
+from contracts.ml_schemas import AllFeatures
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.weather_schemas import NwpOnDisk
 
 
 class MLModel(ABC):
@@ -21,20 +16,32 @@ class MLModel(ABC):
         self.model_params = model_params
 
     def train(
-        self, 
-        power_time_series: pt.LazyFrame[PowerTimeSeries], 
-        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        self,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwp: pt.LazyFrame[NwpOnDisk] | None,
     ) -> None:
-        self._train_algo(self._engineer_features(data))
+        self._train_algo(
+            self._engineer_features(
+                power_time_series=power_time_series,
+                time_series_metadata=time_series_metadata,
+                nwp=nwp,
+            )
+        )
 
     def predict(
-        self, 
-        power_time_series: pt.LazyFrame[PowerTimeSeries], 
-        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        self,
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwp: pt.LazyFrame[NwpOnDisk] | None,
     ) -> pt.DataFrame[PowerForecast]:
-        return self._predict_algo(self._engineer_features(data))
+        return self._predict_algo(
+            self._engineer_features(
+                power_time_series=power_time_series,
+                time_series_metadata=time_series_metadata,
+                nwp=nwp,
+            )
+        )
 
     @abstractmethod
     def _train_algo(self, data: pt.LazyFrame[AllFeatures]) -> None:
@@ -46,8 +53,8 @@ class MLModel(ABC):
 
     def _engineer_features(
         self,
-        power_time_series: pt.LazyFrame[PowerTimeSeries], 
-        time_series_metadata: pt.DataFrame[TimeSeriesMetadata], 
+        power_time_series: pt.LazyFrame[PowerTimeSeries],
+        time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwp: pt.LazyFrame[NwpOnDisk] | None,
     ) -> pt.LazyFrame[AllFeatures]:
 
@@ -61,7 +68,7 @@ class MLModel(ABC):
         # raw_data.
         # TODO: I'm actually leaning towards seeing if we can use Patito's `derive` for all the
         # features, so the implementation would all live in contracts/ml_schemas.py. Especially
-        # because `.derive` can be called with a list of columns to derive. 
+        # because `.derive` can be called with a list of columns to derive.
         # https://github.com/JakobGM/patito/blob/main/src/patito/polars.py#L132
 
         for feature_name in self.selected_features:
@@ -97,3 +104,13 @@ class MLModel(ABC):
         # we can train batch-by-batch.) Validation must be done after the LazyFrame is
         # materialized into RAM.
         return pt.LazyFrame[AllFeatures](raw_data_with_engineered_features)
+
+    @abstractmethod
+    def save(self, path: Path) -> None:
+        """Save model params. Concrete classes implement their native save logic here."""
+        pass
+
+    @abstractmethod
+    def load(self, path: Path) -> None:
+        """Load model params. Concrete classes implement their native load logic here."""
+        pass
