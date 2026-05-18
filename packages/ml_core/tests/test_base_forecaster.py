@@ -6,6 +6,7 @@ import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.weather_schemas import NwpOnDisk
 from ml_core.base_forecaster import BaseForecaster
 
 
@@ -81,6 +82,62 @@ def test_engineer_features_success(dummy_power_data, dummy_metadata):
     # lead_time_hours is only present if NWP data is provided
     assert "lead_time_hours" not in result_df.columns
 
+
+@pytest.fixture
+def dummy_nwp_data() -> pt.LazyFrame[NwpOnDisk]:
+    df = pl.DataFrame(
+        {
+            "valid_time": [
+                datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc),
+                datetime(2024, 1, 1, 1, 0, tzinfo=timezone.utc),
+                datetime(2024, 1, 1, 2, 0, tzinfo=timezone.utc),
+            ],
+            "init_time": [
+                datetime(2023, 12, 31, 12, 0, tzinfo=timezone.utc),
+                datetime(2023, 12, 31, 12, 0, tzinfo=timezone.utc),
+                datetime(2023, 12, 31, 12, 0, tzinfo=timezone.utc),
+            ],
+            "time_series_id": [1, 1, 1],
+            "ensemble_member": [0, 0, 0],
+            "temperature_2m": [10.0, 12.0, 14.0],
+            "wind_speed_10m": [5.0, 6.0, 7.0],
+            "downward_short_wave_radiation_flux_surface": [0.0, 100.0, 200.0],
+        }
+    )
+    return pt.LazyFrame.from_existing(df.lazy()).set_model(NwpOnDisk)  # type: ignore[unresolved-attribute]
+
+def test_engineer_features_with_nwp(dummy_power_data, dummy_metadata, dummy_nwp_data):
+    selected_features = {
+        "windchill",
+        "temperature_2m_trend_6h",
+        "latest_weekly_lagged_power",
+        "latest_weekly_lagged_temperature_2m",
+        "latest_weekly_lagged_wind_speed_10m",
+        "latest_weekly_lagged_downward_short_wave_radiation_flux_surface",
+    }
+    forecaster = DummyForecaster(selected_features=selected_features, model_params={})
+
+    result_lf = forecaster._engineer_features(
+        power_time_series=dummy_power_data,
+        time_series_metadata=dummy_metadata,
+        nwp=dummy_nwp_data,
+    )
+
+    result_df = result_lf.collect()
+
+    assert "windchill" in result_df.columns
+    assert "temperature_2m_trend_6h" in result_df.columns
+    assert "latest_weekly_lagged_power" in result_df.columns
+    assert "latest_weekly_lagged_temperature_2m" in result_df.columns
+    assert "latest_weekly_lagged_wind_speed_10m" in result_df.columns
+    assert "latest_weekly_lagged_downward_short_wave_radiation_flux_surface" in result_df.columns
+    assert "lead_time_hours" in result_df.columns
+    
+    # Check lead time calculation (valid_time - init_time)
+    # 2024-01-01 00:00 - 2023-12-31 12:00 = 12 hours
+    assert result_df["lead_time_hours"][0] == 12.0
+    assert result_df["lead_time_hours"][1] == 13.0
+    assert result_df["lead_time_hours"][2] == 14.0
 
 def test_engineer_features_typo(dummy_power_data, dummy_metadata):
     selected_features = {"power_lagg_24h"}  # Typo

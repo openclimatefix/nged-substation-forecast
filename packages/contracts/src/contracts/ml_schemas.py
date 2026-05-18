@@ -17,14 +17,14 @@ class AllFeatures(pt.Model):
     to ensure precision during interpolation and feature engineering.
 
     DYNAMIC FEATURES:
-    In addition to the explicitly defined columns below, the pipeline supports 
+    In addition to the explicitly defined columns below, the pipeline supports
     dynamically generated features. You can request these in your model config:
-    
+
     * `power_lag_{hours}h`: The power value shifted by X hours (e.g., `power_lag_24h`).
     * `temperature_rolling_mean_{hours}h`: Rolling average of temperature over X hours (e.g., `temperature_rolling_mean_6h`).
 
-    Note: Dynamic features are not explicitly typed as Pydantic fields below. 
-    This is intentional to allow infinite parameterization (e.g., any lag hour) 
+    Note: Dynamic features are not explicitly typed as Pydantic fields below.
+    This is intentional to allow infinite parameterization (e.g., any lag hour)
     without the overhead of metaprogramming or defining hundreds of static fields.
     The pipeline dynamically asserts their presence during feature engineering.
     """
@@ -62,7 +62,7 @@ class AllFeatures(pt.Model):
     latest_weekly_lagged_downward_short_wave_radiation_flux_surface: float | None = _FEATURE_DTYPE
 
     # Temperature trends
-    temperature_2m_6h_ago: float | None = _FEATURE_DTYPE
+    temperature_2m_lag_6h: float | None = _FEATURE_DTYPE
     temperature_2m_trend_6h: float | None = _FEATURE_DTYPE
 
     # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
