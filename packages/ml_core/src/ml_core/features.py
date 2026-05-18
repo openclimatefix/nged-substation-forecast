@@ -11,21 +11,7 @@ STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
         - 11.37 * ((pl.col("wind_speed_10m") * 3.6) ** 0.16)
         + 0.3965 * pl.col("temperature_2m") * ((pl.col("wind_speed_10m") * 3.6) ** 0.16)
     ).alias("windchill"),
-    "temperature_2m_trend_6h": (pl.col("temperature_2m") - pl.col("temperature_2m_6h_ago")).alias(
-        "temperature_2m_trend_6h"
-    ),
 }
-
-
-def calculate_lead_time(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Calculates the lead time in hours if 'init_time' is present in the schema."""
-    if "init_time" in lf.collect_schema().names():
-        return lf.with_columns(
-            lead_time_hours=(
-                (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
-            ).cast(pl.Float32)
-        )
-    return lf
 
 
 def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.LazyFrame:
@@ -66,6 +52,44 @@ def apply_lag_feature(lf: pl.LazyFrame, base_col: str, lag_hours: int) -> pl.Laz
     ).drop("target_time")
 
     return result
+
+
+def calculate_lead_time(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Calculates the lead time in hours if 'init_time' is present in the schema."""
+    if "init_time" in lf.collect_schema().names():
+        return lf.with_columns(
+            lead_time_hours=(
+                (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
+            ).cast(pl.Float32)
+        )
+    return lf
+
+
+def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFrame:
+    """
+    Nullifies lagged features that would cause lookahead bias.
+
+    During training, we must ensure that the model cannot access actual data that
+    would not be available at inference time. If a requested lag is shorter than
+    or equal to the forecast lead time, the feature is effectively a "future"
+    value and must be nullified.
+
+    Args:
+        lf: The LazyFrame containing the features and 'lead_time_hours'.
+        lag_cols: A dictionary mapping column names to their lag in hours.
+
+    Returns:
+        A LazyFrame with leaky lag columns set to null.
+    """
+    for col_name, lag_hours in lag_cols.items():
+        lf = lf.with_columns(
+            pl.when(pl.col("lead_time_hours") >= lag_hours)
+            .then(pl.lit(None))
+            .otherwise(pl.col(col_name))
+            .alias(col_name)
+        )
+    return lf
+
 
 
 def apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: int) -> pl.LazyFrame:

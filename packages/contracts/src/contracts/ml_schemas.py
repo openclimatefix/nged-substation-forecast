@@ -56,14 +56,10 @@ class AllFeatures(pt.Model):
     windchill: float | None = _FEATURE_DTYPE
 
     # Lagged features
-    latest_weekly_lagged_power: float | None = _FEATURE_DTYPE
-    latest_weekly_lagged_temperature_2m: float | None = _FEATURE_DTYPE
-    latest_weekly_lagged_wind_speed_10m: float | None = _FEATURE_DTYPE
-    latest_weekly_lagged_downward_short_wave_radiation_flux_surface: float | None = _FEATURE_DTYPE
+    # (None)
 
     # Temperature trends
     temperature_2m_lag_6h: float | None = _FEATURE_DTYPE
-    temperature_2m_trend_6h: float | None = _FEATURE_DTYPE
 
     # Temporal features. `local` means "in the local timezone", e.g. "Europe/London". We use `local`
     # as the main input feature, because it's the local time that mostly drives demand.

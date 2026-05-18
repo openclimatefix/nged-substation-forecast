@@ -109,11 +109,6 @@ def dummy_nwp_data() -> pt.LazyFrame[NwpOnDisk]:
 def test_engineer_features_with_nwp(dummy_power_data, dummy_metadata, dummy_nwp_data):
     selected_features = {
         "windchill",
-        "temperature_2m_trend_6h",
-        "latest_weekly_lagged_power",
-        "latest_weekly_lagged_temperature_2m",
-        "latest_weekly_lagged_wind_speed_10m",
-        "latest_weekly_lagged_downward_short_wave_radiation_flux_surface",
     }
     forecaster = DummyForecaster(selected_features=selected_features, model_params={})
 
@@ -126,11 +121,6 @@ def test_engineer_features_with_nwp(dummy_power_data, dummy_metadata, dummy_nwp_
     result_df = result_lf.collect()
 
     assert "windchill" in result_df.columns
-    assert "temperature_2m_trend_6h" in result_df.columns
-    assert "latest_weekly_lagged_power" in result_df.columns
-    assert "latest_weekly_lagged_temperature_2m" in result_df.columns
-    assert "latest_weekly_lagged_wind_speed_10m" in result_df.columns
-    assert "latest_weekly_lagged_downward_short_wave_radiation_flux_surface" in result_df.columns
     assert "lead_time_hours" in result_df.columns
     
     # Check lead time calculation (valid_time - init_time)

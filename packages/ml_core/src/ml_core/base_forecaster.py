@@ -10,10 +10,10 @@ from contracts.weather_schemas import NwpOnDisk
 from ml_core.features import (
     STATIC_FEATURE_REGISTRY,
     apply_lag_feature,
-    apply_latest_weekly_lag_feature,
     apply_local_time_features,
     apply_rolling_mean_feature,
     calculate_lead_time,
+    nullify_leaky_lags,
 )
 
 
@@ -102,7 +102,7 @@ class BaseForecaster(ABC):
 
         raw_data = self._join_data(power_lf, time_series_metadata, nwp_lf)
 
-        engineered_lf = self._apply_post_join_features(raw_data, power_lf, nwp_lf)
+        engineered_lf = self._apply_post_join_features(raw_data)
 
         # Dynamic Schema Assertion
         # Why two-step validation?
@@ -112,12 +112,21 @@ class BaseForecaster(ABC):
         available_columns = engineered_lf.collect_schema().names()
         missing_cols = set(self.selected_features) - set(available_columns)
         if missing_cols:
-            raise ValueError(f"Feature engineering failed to create or find: {missing_cols}")
+            # If lead_time_hours is missing, it's okay if it's not in selected_features
+            if (
+                "lead_time_hours" in missing_cols
+                and "lead_time_hours" not in self.selected_features
+            ):
+                missing_cols.remove("lead_time_hours")
+            if missing_cols:
+                raise ValueError(f"Feature engineering failed to create or find: {missing_cols}")
 
         # Select & Cast
         # Step 2: Cast to the Patito model. Patito ignores extra columns, so we explicitly select
         # the base columns and the requested features to keep the dataframe clean and memory-efficient.
         base_cols = ["valid_time", "time_series_id", "time_series_type", "power"]
+
+        # Only add lead_time_hours if it exists in the engineered dataframe
         if "lead_time_hours" in engineered_lf.collect_schema().names():
             base_cols.append("lead_time_hours")
         if "ensemble_member" in engineered_lf.collect_schema().names():
@@ -171,49 +180,18 @@ class BaseForecaster(ABC):
             raw_data = calculate_lead_time(raw_data)
         return raw_data
 
-    def _apply_post_join_features(
-        self, raw_data: pl.LazyFrame, power_lf: pl.LazyFrame, nwp_lf: pl.LazyFrame | None
-    ) -> pl.LazyFrame:
+    def _apply_post_join_features(self, raw_data: pl.LazyFrame) -> pl.LazyFrame:
         engineered_lf = raw_data
 
-        # Dynamic Lags
-        if "latest_weekly_lagged_power" in self.selected_features:
-            engineered_lf = apply_latest_weekly_lag_feature(
-                engineered_lf, power_lf, "power", "latest_weekly_lagged_power", ["time_series_id"]
-            )
+        # Nullify leaky lags
+        lag_cols = {}
+        for feature_name in self.selected_features:
+            if feature_name.startswith("power_lag_") and feature_name.endswith("h"):
+                lag_val = int(feature_name.split("_")[-1][:-1])
+                lag_cols[feature_name] = lag_val
 
-        if nwp_lf is not None:
-            join_cols = ["time_series_id"]
-            if "ensemble_member" in nwp_lf.collect_schema().names():
-                join_cols.append("ensemble_member")
-
-            if "latest_weekly_lagged_temperature_2m" in self.selected_features:
-                engineered_lf = apply_latest_weekly_lag_feature(
-                    engineered_lf,
-                    nwp_lf,
-                    "temperature_2m",
-                    "latest_weekly_lagged_temperature_2m",
-                    join_cols,
-                )
-            if "latest_weekly_lagged_wind_speed_10m" in self.selected_features:
-                engineered_lf = apply_latest_weekly_lag_feature(
-                    engineered_lf,
-                    nwp_lf,
-                    "wind_speed_10m",
-                    "latest_weekly_lagged_wind_speed_10m",
-                    join_cols,
-                )
-            if (
-                "latest_weekly_lagged_downward_short_wave_radiation_flux_surface"
-                in self.selected_features
-            ):
-                engineered_lf = apply_latest_weekly_lag_feature(
-                    engineered_lf,
-                    nwp_lf,
-                    "downward_short_wave_radiation_flux_surface",
-                    "latest_weekly_lagged_downward_short_wave_radiation_flux_surface",
-                    join_cols,
-                )
+        if lag_cols and "lead_time_hours" in engineered_lf.collect_schema().names():
+            engineered_lf = nullify_leaky_lags(engineered_lf, lag_cols)
 
         # Local Time Features
         local_time_features = {

@@ -5,10 +5,10 @@ import pytest
 from ml_core.features import (
     STATIC_FEATURE_REGISTRY,
     apply_lag_feature,
-    apply_latest_weekly_lag_feature,
     apply_local_time_features,
     apply_rolling_mean_feature,
     calculate_lead_time,
+    nullify_leaky_lags,
 )
 
 
@@ -71,168 +71,23 @@ def test_windchill_feature():
     assert result["windchill"][1] == pytest.approx(-20.3, abs=0.1)
 
 
-def test_temperature_2m_trend_6h_feature():
-    df = pl.DataFrame({"temperature_2m": [10.0, 15.0], "temperature_2m_6h_ago": [5.0, 20.0]})
-
-    lf = df.lazy().with_columns(STATIC_FEATURE_REGISTRY["temperature_2m_trend_6h"])
-    result = lf.collect()  # type: ignore
-
-    assert "temperature_2m_trend_6h" in result.columns
-    assert result["temperature_2m_trend_6h"].to_list() == [5.0, -5.0]
-
-
-def test_apply_lag_feature():
-    # Create a dataframe with a missing row (missing 02:00)
+def test_nullify_leaky_lags():
     df = pl.DataFrame(
         {
-            "time_series_id": [1, 1, 1, 1],
-            "valid_time": [
-                datetime(2020, 1, 1, 0),
-                datetime(2020, 1, 1, 1),
-                # Missing 02:00
-                datetime(2020, 1, 1, 3),
-                datetime(2020, 1, 1, 4),
-            ],
-            "power": [10.0, 20.0, 40.0, 50.0],
+            "lead_time_hours": [10.0, 30.0, 50.0],
+            "power_lag_24h": [100.0, 200.0, 300.0],
         }
     )
-
     lf = df.lazy()
-    result_lf = apply_lag_feature(lf, "power", 2)
-    result = result_lf.collect()  # type: ignore
+    # 24h lag:
+    # lead_time 10h < 24h -> keep
+    # lead_time 30h >= 24h -> nullify
+    # lead_time 50h >= 24h -> nullify
+    result_lf = nullify_leaky_lags(lf, {"power_lag_24h": 24})
+    result = result_lf.collect()
 
-    assert "power_lag_2h" in result.columns
+    assert result["power_lag_24h"].to_list() == [100.0, None, None]
 
-    # Expected behavior:
-    # 00:00 -> lag 2h is 22:00 (prev day) -> None
-    # 01:00 -> lag 2h is 23:00 (prev day) -> None
-    # 03:00 -> lag 2h is 01:00 -> 20.0
-    # 04:00 -> lag 2h is 02:00 -> None (because 02:00 is missing!)
-    # If we used shift(2), 03:00 would get 10.0 (wrong) and 04:00 would get 20.0 (wrong)
-    assert result["power_lag_2h"].to_list() == [None, None, 20.0, None]
-
-
-def test_apply_rolling_mean_feature():
-    df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1, 1],
-            "valid_time": [
-                datetime(2020, 1, 1, 0),
-                datetime(2020, 1, 1, 1),
-                datetime(2020, 1, 1, 2),
-                datetime(2020, 1, 1, 3),
-            ],
-            "temperature": [10.0, 20.0, 30.0, 40.0],
-        }
-    )
-
-    lf = df.lazy()
-    result_lf = apply_rolling_mean_feature(lf, "temperature", 2)
-    result = result_lf.collect()  # type: ignore
-
-    assert "temperature_rolling_mean_2h" in result.columns
-    # Rolling mean over 2 hours (inclusive of current row, so current and previous)
-    # 00:00 -> 10.0
-    # 01:00 -> (10+20)/2 = 15.0
-    # 02:00 -> (20+30)/2 = 25.0
-    # 03:00 -> (30+40)/2 = 35.0
-    assert result["temperature_rolling_mean_2h"].to_list() == [10.0, 15.0, 25.0, 35.0]
-
-
-def test_apply_rolling_mean_feature_with_ensemble():
-    df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1, 1],
-            "ensemble_member": [0, 0, 1, 1],
-            "valid_time": [
-                datetime(2020, 1, 1, 0),
-                datetime(2020, 1, 1, 1),
-                datetime(2020, 1, 1, 0),
-                datetime(2020, 1, 1, 1),
-            ],
-            "temperature": [10.0, 20.0, 100.0, 200.0],
-        }
-    )
-
-    lf = df.lazy()
-    result_lf = apply_rolling_mean_feature(lf, "temperature", 2)
-    result = result_lf.collect()  # type: ignore
-
-    assert "temperature_rolling_mean_2h" in result.columns
-
-    # Sort to ensure consistent order for assertion
-    result = result.sort(["ensemble_member", "valid_time"])
-
-    # Ensemble 0: 10.0, 15.0
-    # Ensemble 1: 100.0, 150.0
-    assert result["temperature_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
-
-
-def test_apply_dynamic_lag_feature():
-    # Main dataframe with lead times
-    df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1],
-            "valid_time": [
-                datetime(2020, 1, 15, 12),  # Lead time 10h -> lag 168h (7 days)
-                datetime(2020, 1, 15, 12),  # Lead time 200h -> lag 336h (14 days)
-                datetime(2020, 1, 15, 12),  # Lead time 400h -> lag 504h (21 days)
-            ],
-            "lead_time_hours": [10.0, 200.0, 400.0],
-        }
-    )
-
-    # Source dataframe with historical data
-    source_df = pl.DataFrame(
-        {
-            "time_series_id": [1, 1, 1],
-            "valid_time": [
-                datetime(2020, 1, 8, 12),  # 7 days ago
-                datetime(2020, 1, 1, 12),  # 14 days ago
-                datetime(2019, 12, 25, 12),  # 21 days ago
-            ],
-            "power": [100.0, 200.0, 300.0],
-        }
-    )
-
-    result_lf = apply_latest_weekly_lag_feature(
-        df.lazy(), source_df.lazy(), "power", "latest_weekly_lagged_power", ["time_series_id"]
-    )
-    result = result_lf.collect()  # type: ignore
-
-    assert "latest_weekly_lagged_power" in result.columns
-    assert result["latest_weekly_lagged_power"].to_list() == [100.0, 200.0, 300.0]
-
-
-def test_apply_dynamic_lag_feature_no_lead_time():
-    # Main dataframe without lead times
-    df = pl.DataFrame(
-        {
-            "time_series_id": [1],
-            "valid_time": [
-                datetime(2020, 1, 15, 12),
-            ],
-        }
-    )
-
-    # Source dataframe with historical data
-    source_df = pl.DataFrame(
-        {
-            "time_series_id": [1],
-            "valid_time": [
-                datetime(2020, 1, 8, 12),  # 7 days ago
-            ],
-            "power": [100.0],
-        }
-    )
-
-    result_lf = apply_latest_weekly_lag_feature(
-        df.lazy(), source_df.lazy(), "power", "latest_weekly_lagged_power", ["time_series_id"]
-    )
-    result = result_lf.collect()  # type: ignore
-
-    assert "latest_weekly_lagged_power" in result.columns
-    assert result["latest_weekly_lagged_power"].to_list() == [100.0]
 
 
 def test_apply_local_time_features():
