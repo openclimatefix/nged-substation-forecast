@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import cast
 
 import patito as pt
 import polars as pl
@@ -93,9 +94,10 @@ def test_apply_lag_feature_with_source():
         }
     )
 
-    result: pl.DataFrame = apply_lag_feature(
-        target_df.lazy(), source_df.lazy(), "power", 1
-    ).collect()  # type: ignore
+    result = cast(
+        pl.DataFrame,
+        apply_lag_feature(target_df.lazy(), source_df.lazy(), "power", 1).collect(),
+    )
 
     assert result["power_lag_1h"][0] == 90.0
 
@@ -116,7 +118,7 @@ def test_calculate_lead_time():
 
     lf = df.lazy()
     result_lf = calculate_lead_time(lf)
-    result: pl.DataFrame = result_lf.collect()  # type: ignore
+    result = cast(pl.DataFrame, result_lf.collect())
 
     assert "lead_time_hours" in result.columns
     assert result["lead_time_hours"].to_list() == [12.0, 13.0]
@@ -134,7 +136,7 @@ def test_calculate_lead_time_no_init_time():
 
     lf = df.lazy()
     result_lf = calculate_lead_time(lf)
-    result: pl.DataFrame = result_lf.collect()  # type: ignore
+    result = cast(pl.DataFrame, result_lf.collect())
 
     assert "lead_time_hours" not in result.columns
 
@@ -170,7 +172,7 @@ def test_nullify_leaky_lags():
     # lead_time 10h < 24h -> keep
     # lead_time 30h >= 24h -> nullify
     # lead_time 50h >= 24h -> nullify
-    result: pl.DataFrame = nullify_leaky_lags(lf, {"power_lag_24h": 24}).collect()  # type: ignore
+    result = cast(pl.DataFrame, nullify_leaky_lags(lf, {"power_lag_24h": 24}).collect())
 
     assert result["power_lag_24h"].to_list() == [100.0, None, None]
 
@@ -186,7 +188,7 @@ def test_apply_local_time_features():
         }
     )
 
-    result: pl.DataFrame = apply_local_time_features(df.lazy()).collect()  # type: ignore
+    result = cast(pl.DataFrame, apply_local_time_features(df.lazy()).collect())
 
     assert "local_utc_offset" in result.columns
     assert result["local_utc_offset"].to_list() == [0.0, 1.0]
