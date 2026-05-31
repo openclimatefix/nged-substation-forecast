@@ -9,7 +9,7 @@ with app.setup:
 
     import altair as alt
     import polars as pl
-    from contracts.settings import PROJECT_ROOT, Settings
+    from contracts.settings import Settings
     from contracts.weather_schemas import NwpOnDisk
     from lonboard import H3HexagonLayer, Map
 

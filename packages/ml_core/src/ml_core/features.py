@@ -120,13 +120,13 @@ def engineer_features(
                 break
 
     # Process NWP for current forecast
-    processed_nwp = None
+    processed_nwp: pl.LazyFrame | None = None
     if nwp_lf is not None:
         processed_nwp = calculate_lead_time(nwp_lf)
 
     # Compute historical_weather for lags
-    historical_weather = None
-    if nwp_lf is not None and weather_lag_requested:
+    historical_weather: pl.LazyFrame | None = None
+    if processed_nwp is not None and weather_lag_requested:
         historical_weather = (
             processed_nwp.filter(pl.col("ensemble_member") == 0)
             .drop("ensemble_member")
