@@ -1,7 +1,23 @@
+"""Declarative feature engineering pipeline for time-series forecasting.
+
+Architecture/Flow:
+    `engineer_features` is the main orchestrator of this module. It takes raw string requests,
+    compiles them into structured instructions using `ParsedFeatures.from_selected_features`, joins the necessary
+    base data (power, weather, metadata), and then executes the instructions via
+    `_apply_post_join_features`.
+
+Nullify Leaky Lags Rationale:
+    `nullify_leaky_lags` is called at the end of the pipeline to enforce physical forecasting
+    constraints. In a real-world scenario, you cannot use a 24-hour lag if you are forecasting
+    48 hours ahead (the 24-hour lag hasn't happened yet at the time the forecast is issued).
+    This function prevents lookahead bias by nullifying any lag that is shorter than or equal
+    to the forecast `lead_time_hours`.
+"""
+
 import math
 import re
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import Final, Literal, NamedTuple, Self, cast, get_args
 
 import patito as pt
 import polars as pl
@@ -9,9 +25,43 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
 
+# Valid base columns that can be lagged or rolled (from AllFeatures and NwpInMemory contracts)
+BaseColumn = Literal[
+    "power",
+    "temperature_2m",
+    "dew_point_temperature_2m",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_speed_100m",
+    "wind_direction_100m",
+    "pressure_surface",
+    "pressure_reduced_to_mean_sea_level",
+    "geopotential_height_500hpa",
+    "downward_long_wave_radiation_flux_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "precipitation_surface",
+    "categorical_precipitation_type_surface",
+]
+
+# Valid time features (from AllFeatures contract)
+TimeFeature = Literal[
+    "local_time_of_day_sin",
+    "local_time_of_day_cos",
+    "local_time_of_year_sin",
+    "local_time_of_year_cos",
+    "local_day_of_week_sin",
+    "local_day_of_week_cos",
+    "local_day_of_week",
+    "local_utc_offset",
+]
+
+StaticFeature = Literal["windchill"]
+
+TIME_FEATURES: Final[set[TimeFeature]] = set(get_args(TimeFeature))
+
 # Static features registry
 # These are basic features that don't require parameterization.
-STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
+STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
     "windchill": (
         13.12
         + 0.6215 * pl.col("temperature_2m")
@@ -22,78 +72,109 @@ STATIC_FEATURE_REGISTRY: dict[str, pl.Expr] = {
 
 
 class LagFeature(NamedTuple):
-    base_col: str
+    base_col: BaseColumn
     lag_hours: int
 
 
 class RollingFeature(NamedTuple):
-    base_col: str
+    base_col: BaseColumn
     window_hours: int
 
 
 @dataclass
 class ParsedFeatures:
+    """Compiled configuration object for feature engineering.
+
+    This class acts as a compiled configuration object. It translates raw string requests
+    (e.g., `"power_lag_24h"`) into structured, typed instructions so downstream execution
+    functions don't have to parse strings.
+
+    Attributes:
+        lags: Maps feature names to `LagFeature` definitions. Dictates which base columns to
+            shift and by how much, enabling safe, time-aware joins for historical data.
+        rolling_means: Maps feature names to `RollingFeature` definitions. Defines moving
+            average computations, ensuring they are grouped correctly by time series and
+            ensemble member.
+        static: List of static features. Identifies simple row-wise transformations (like
+            windchill) that require no time-shifting or complex aggregations.
+        local_time: List of time-based features. Triggers timezone conversions. Energy
+            consumption is driven by human behavior, which follows local time (including DST),
+            not UTC.
+        leaky_lags: Maps target-derived lag features to their lag hours. Explicitly tracks
+            features (like lagged power) that could cause lookahead bias, allowing the pipeline
+            to selectively nullify them based on the forecast lead time.
+    """
+
     lags: dict[str, LagFeature]
     rolling_means: dict[str, RollingFeature]
-    static: list[str]
-    local_time: list[str]
+    static: list[StaticFeature]
+    local_time: list[TimeFeature]
     leaky_lags: dict[str, int]
 
+    @classmethod
+    def from_selected_features(cls, selected_features: set[str]) -> Self:
+        """Parse a list of selected features into a ParsedFeatures object.
 
-def parse_feature_names(selected_features: set[str]) -> ParsedFeatures:
-    lags: dict[str, LagFeature] = {}
-    rolling_means: dict[str, RollingFeature] = {}
-    static: list[str] = []
-    local_time: list[str] = []
-    leaky_lags: dict[str, int] = {}
+        Rationale:
+            Parsing upfront allows us to fail fast on invalid requests and cleanly separates the parsing
+            logic from the execution logic. It specifically identifies lags on the target variable
+            (`power`) and flags them in the `leaky_lags` dictionary, ensuring the execution phase knows
+            exactly which features require lags to be nullified.
 
-    local_time_features = {
-        "local_time_of_day_sin",
-        "local_time_of_day_cos",
-        "local_time_of_year_sin",
-        "local_time_of_year_cos",
-        "local_day_of_week_sin",
-        "local_day_of_week_cos",
-        "local_day_of_week",
-        "local_utc_offset",
-    }
+        Args:
+            selected_features: A set of raw feature name strings requested for engineering. Valid Includes all
+            TIME_FEATURES, and all StaticFeatures, and feature names like 'power_lag_24h'.
 
-    for feature_name in selected_features:
-        if "lag" in feature_name and "rolling_mean" in feature_name:
-            raise ValueError(f"Feature stacking is not supported: {feature_name}")
+        Returns:
+            A ParsedFeatures configuration object containing structured instructions.
+        """
+        lags: dict[str, LagFeature] = {}
+        rolling_means: dict[str, RollingFeature] = {}
+        static: list[StaticFeature] = []
+        local_time: list[TimeFeature] = []
+        leaky_lags: dict[str, int] = {}
 
-        lag_match = re.match(r"^(.*)_lag_(\d+)h$", feature_name)
-        if lag_match:
-            base_col, lag_hours_str = lag_match.groups()
-            lag_hours = int(lag_hours_str)
-            lags[feature_name] = LagFeature(base_col=base_col, lag_hours=lag_hours)
-            if base_col == "power":
-                leaky_lags[feature_name] = lag_hours
-            continue
+        for feature_name in selected_features:
+            if "lag" in feature_name and "rolling_mean" in feature_name:
+                raise ValueError(f"Feature stacking is not supported: {feature_name}")
 
-        rolling_match = re.match(r"^(.*)_rolling_mean_(\d+)h$", feature_name)
-        if rolling_match:
-            base_col, window_hours_str = rolling_match.groups()
-            window_hours = int(window_hours_str)
-            rolling_means[feature_name] = RollingFeature(
-                base_col=base_col, window_hours=window_hours
-            )
-            if base_col == "power":
-                leaky_lags[feature_name] = 0
-            continue
+            # Extract lagged features like 'power_lag_24h`
+            lag_match = re.match(r"^(.*)_lag_(\d+)h$", feature_name)
+            if lag_match:
+                base_col, lag_hours_str = lag_match.groups()
+                lag_hours = int(lag_hours_str)
+                lags[feature_name] = LagFeature(
+                    base_col=cast(BaseColumn, base_col), lag_hours=lag_hours
+                )
+                if base_col == "power":
+                    leaky_lags[feature_name] = lag_hours
+                continue
 
-        if feature_name in STATIC_FEATURE_REGISTRY:
-            static.append(feature_name)
-        elif feature_name in local_time_features:
-            local_time.append(feature_name)
+            rolling_match = re.match(r"^(.*)_rolling_mean_(\d+)h$", feature_name)
+            if rolling_match:
+                base_col, window_hours_str = rolling_match.groups()
+                window_hours = int(window_hours_str)
+                rolling_means[feature_name] = RollingFeature(
+                    base_col=cast(BaseColumn, base_col), window_hours=window_hours
+                )
+                if base_col == "power":
+                    leaky_lags[feature_name] = 0
+                continue
 
-    return ParsedFeatures(
-        lags=lags,
-        rolling_means=rolling_means,
-        static=static,
-        local_time=local_time,
-        leaky_lags=leaky_lags,
-    )
+            if feature_name in STATIC_FEATURE_REGISTRY:
+                static.append(cast(StaticFeature, feature_name))
+            elif feature_name in TIME_FEATURES:
+                local_time.append(cast(TimeFeature, feature_name))
+            else:
+                raise ValueError(f"Unrecognised feature name: {feature_name}")
+
+        return cls(
+            lags=lags,
+            rolling_means=rolling_means,
+            static=static,
+            local_time=local_time,
+            leaky_lags=leaky_lags,
+        )
 
 
 def engineer_features(
@@ -108,7 +189,7 @@ def engineer_features(
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     nwp_lf = pl.LazyFrame._from_pyldf(nwp._ldf) if nwp is not None else None
 
-    parsed_features = parse_feature_names(selected_features)
+    parsed_features = ParsedFeatures.from_selected_features(selected_features)
 
     # Detect if weather lags are requested
     weather_lag_requested = False
@@ -209,7 +290,7 @@ def _apply_post_join_features(
 
 
 def apply_lag_feature(
-    target_lf: pl.LazyFrame, source_lf: pl.LazyFrame, base_col: str, lag_hours: int
+    target_lf: pl.LazyFrame, source_lf: pl.LazyFrame, base_col: BaseColumn, lag_hours: int
 ) -> pl.LazyFrame:
     """
     Applies a lag feature using a time-aware lazy self-join.
@@ -298,7 +379,9 @@ def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFra
     return lf
 
 
-def apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: int) -> pl.LazyFrame:
+def apply_rolling_mean_feature(
+    lf: pl.LazyFrame, base_col: BaseColumn, window_hours: int
+) -> pl.LazyFrame:
     """
     Applies a rolling mean feature using time-aware rolling aggregations.
 
@@ -330,7 +413,11 @@ def apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: in
 
 
 def apply_latest_weekly_lag_feature(
-    lf: pl.LazyFrame, source_lf: pl.LazyFrame, base_col: str, new_col: str, join_cols: list[str]
+    lf: pl.LazyFrame,
+    source_lf: pl.LazyFrame,
+    base_col: BaseColumn,
+    new_col: str,
+    join_cols: list[Literal["time_series_id", "ensemble_member"]],
 ) -> pl.LazyFrame:
     """
     Applies a dynamic lag feature based on the lead time.

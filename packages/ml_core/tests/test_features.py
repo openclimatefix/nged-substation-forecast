@@ -8,6 +8,7 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
 from ml_core.features import (
     STATIC_FEATURE_REGISTRY,
+    ParsedFeatures,
     apply_lag_feature,
     apply_local_time_features,
     calculate_lead_time,
@@ -204,3 +205,37 @@ def test_apply_local_time_features():
     # 2023-01-10 is a Tuesday (2)
     # 2023-07-10 is a Monday (1)
     assert result["local_day_of_week"].to_list() == ["Tuesday", "Monday"]
+
+
+def test_parsed_features_from_selected_features():
+    selected = {
+        "power_lag_24h",
+        "temperature_2m_lag_12h",
+        "temperature_2m_rolling_mean_6h",
+        "windchill",
+        "local_time_of_day_sin",
+    }
+    parsed = ParsedFeatures.from_selected_features(selected)
+
+    assert "power_lag_24h" in parsed.lags
+    assert parsed.lags["power_lag_24h"].base_col == "power"
+    assert parsed.lags["power_lag_24h"].lag_hours == 24
+
+    assert "temperature_2m_lag_12h" in parsed.lags
+    assert parsed.lags["temperature_2m_lag_12h"].base_col == "temperature_2m"
+    assert parsed.lags["temperature_2m_lag_12h"].lag_hours == 12
+
+    assert "temperature_2m_rolling_mean_6h" in parsed.rolling_means
+    assert parsed.rolling_means["temperature_2m_rolling_mean_6h"].base_col == "temperature_2m"
+    assert parsed.rolling_means["temperature_2m_rolling_mean_6h"].window_hours == 6
+
+    assert parsed.static == ["windchill"]
+    assert parsed.local_time == ["local_time_of_day_sin"]
+
+    # Leaky lags should track power lags
+    assert parsed.leaky_lags == {"power_lag_24h": 24}
+
+
+def test_parsed_features_from_selected_features_invalid_stacking():
+    with pytest.raises(ValueError, match="Feature stacking is not supported"):
+        ParsedFeatures.from_selected_features({"power_lag_24h_rolling_mean_6h"})
