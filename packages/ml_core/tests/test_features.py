@@ -220,22 +220,22 @@ def test_parsed_features_from_selected_features():
         "windchill",
         "local_time_of_day_sin",
     }
-    parsed = ParsedFeatures.from_selected_features(selected)
+    parsed = ParsedFeatures.from_strings(selected)
 
-    assert "power_lag_24h" in parsed.lags
-    assert parsed.lags["power_lag_24h"].base_col == "power"
-    assert parsed.lags["power_lag_24h"].hours == 24
+    assert len(parsed.lags) == 2
+    power_lag = next(f for f in parsed.lags if f.base_col == "power" and f.hours == 24)
+    assert power_lag is not None
 
-    assert "temperature_2m_lag_12h" in parsed.lags
-    assert parsed.lags["temperature_2m_lag_12h"].base_col == "temperature_2m"
-    assert parsed.lags["temperature_2m_lag_12h"].hours == 12
+    temp_lag = next(f for f in parsed.lags if f.base_col == "temperature_2m" and f.hours == 12)
+    assert temp_lag is not None
 
-    assert "temperature_2m_rolling_mean_6h" in parsed.rolling_means
-    assert parsed.rolling_means["temperature_2m_rolling_mean_6h"].base_col == "temperature_2m"
-    assert parsed.rolling_means["temperature_2m_rolling_mean_6h"].hours == 6
+    assert len(parsed.rolling_means) == 1
+    temp_rolling = parsed.rolling_means[0]
+    assert temp_rolling.base_col == "temperature_2m"
+    assert temp_rolling.hours == 6
 
-    assert parsed.static == ["windchill"]
-    assert parsed.local_time == ["local_time_of_day_sin"]
+    assert parsed.static_features == ["windchill"]
+    assert parsed.time_features == ["local_time_of_day_sin"]
 
     # Leaky lags should track power lags
     assert parsed.leaky_lags == {"power_lag_24h": 24}
@@ -243,50 +243,50 @@ def test_parsed_features_from_selected_features():
 
 def test_parsed_features_from_selected_features_invalid_stacking():
     with pytest.raises(ValueError, match="Feature stacking is not supported"):
-        ParsedFeatures.from_selected_features({"power_lag_24h_rolling_mean_6h"})
+        ParsedFeatures.from_strings({"power_lag_24h_rolling_mean_6h"})
 
 
 def test_parsed_features_from_selected_features_invalid_hours():
     # Lag hours must be gt=0 and le=17520 (2 years)
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"power_lag_0h"})
+        ParsedFeatures.from_strings({"power_lag_0h"})
 
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"power_lag_17521h"})
+        ParsedFeatures.from_strings({"power_lag_17521h"})
 
 
 def test_parsed_features_from_selected_features_invalid_rolling_hours():
     # Rolling window hours must be gt=0 and le=17520 (2 years)
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"power_rolling_mean_0h"})
+        ParsedFeatures.from_strings({"power_rolling_mean_0h"})
 
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"power_rolling_mean_17521h"})
+        ParsedFeatures.from_strings({"power_rolling_mean_17521h"})
 
 
 def test_parsed_features_from_selected_features_invalid_base_column():
     # Base column must be a valid BaseColumn literal
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"invalid_col_lag_24h"})
+        ParsedFeatures.from_strings({"invalid_col_lag_24h"})
 
     with pytest.raises(ValidationError):
-        ParsedFeatures.from_selected_features({"invalid_col_rolling_mean_6h"})
+        ParsedFeatures.from_strings({"invalid_col_rolling_mean_6h"})
 
 
 def test_parsed_features_from_selected_features_malformed_patterns():
     # Negative hours, non-integer hours, or other malformed patterns should raise ValueError
     # because they do not match the regex and fall through to unrecognized feature check.
     with pytest.raises(ValueError, match="Unrecognised feature name"):
-        ParsedFeatures.from_selected_features({"power_lag_-5h"})
+        ParsedFeatures.from_strings({"power_lag_-5h"})
 
     with pytest.raises(ValueError, match="Unrecognised feature name"):
-        ParsedFeatures.from_selected_features({"power_rolling_mean_-2h"})
+        ParsedFeatures.from_strings({"power_rolling_mean_-2h"})
 
     with pytest.raises(ValueError, match="Unrecognised feature name"):
-        ParsedFeatures.from_selected_features({"power_lag_12.5h"})
+        ParsedFeatures.from_strings({"power_lag_12.5h"})
 
     with pytest.raises(ValueError, match="Unrecognised feature name"):
-        ParsedFeatures.from_selected_features({"power_rolling_mean_abch"})
+        ParsedFeatures.from_strings({"power_rolling_mean_abch"})
 
 
 def test_lag_feature_validation():
@@ -461,6 +461,6 @@ def test_apply_latest_weekly_lag_feature_no_lead_time():
 
 def test_parsed_features_from_selected_features_forbids_power_rolling_mean():
     with pytest.raises(ValueError, match="Rolling features on the target variable 'power' are currently forbidden"):
-        ParsedFeatures.from_selected_features({"power_rolling_mean_6h"})
+        ParsedFeatures.from_strings({"power_rolling_mean_6h"})
 
 
