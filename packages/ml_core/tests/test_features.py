@@ -4,6 +4,7 @@ from typing import cast
 import patito as pt
 import polars as pl
 import pytest
+from pydantic import ValidationError
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
 from ml_core.features import (
@@ -239,3 +240,46 @@ def test_parsed_features_from_selected_features():
 def test_parsed_features_from_selected_features_invalid_stacking():
     with pytest.raises(ValueError, match="Feature stacking is not supported"):
         ParsedFeatures.from_selected_features({"power_lag_24h_rolling_mean_6h"})
+
+
+def test_parsed_features_from_selected_features_invalid_lag_hours():
+    # Lag hours must be gt=0 and le=8760
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"power_lag_0h"})
+
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"power_lag_8761h"})
+
+
+def test_parsed_features_from_selected_features_invalid_rolling_hours():
+    # Rolling window hours must be gt=0 and le=8760
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"power_rolling_mean_0h"})
+
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"power_rolling_mean_8761h"})
+
+
+def test_parsed_features_from_selected_features_invalid_base_column():
+    # Base column must be a valid BaseColumn literal
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"invalid_col_lag_24h"})
+
+    with pytest.raises(ValidationError):
+        ParsedFeatures.from_selected_features({"invalid_col_rolling_mean_6h"})
+
+
+def test_parsed_features_from_selected_features_malformed_patterns():
+    # Negative hours, non-integer hours, or other malformed patterns should raise ValueError
+    # because they do not match the regex and fall through to unrecognized feature check.
+    with pytest.raises(ValueError, match="Unrecognised feature name"):
+        ParsedFeatures.from_selected_features({"power_lag_-5h"})
+
+    with pytest.raises(ValueError, match="Unrecognised feature name"):
+        ParsedFeatures.from_selected_features({"power_rolling_mean_-2h"})
+
+    with pytest.raises(ValueError, match="Unrecognised feature name"):
+        ParsedFeatures.from_selected_features({"power_lag_12.5h"})
+
+    with pytest.raises(ValueError, match="Unrecognised feature name"):
+        ParsedFeatures.from_selected_features({"power_rolling_mean_abch"})

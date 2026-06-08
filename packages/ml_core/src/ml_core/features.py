@@ -17,13 +17,15 @@ Nullify Leaky Lags Rationale:
 import math
 import re
 from dataclasses import dataclass
-from typing import Final, Literal, NamedTuple, Self, cast, get_args
+from typing import Annotated, Final, Literal, Self, cast, get_args
 
 import patito as pt
 import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
+from pydantic import Field
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 # Valid base columns that can be lagged or rolled (from AllFeatures and NwpInMemory contracts)
 BaseColumn = Literal[
@@ -71,14 +73,21 @@ STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
 }
 
 
-class LagFeature(NamedTuple):
-    base_col: BaseColumn
-    lag_hours: int
+# Prevents physically impossible time shifts and lookahead bias by enforcing strict bounds on lag
+# hours and rolling window hours.
+Hours = Annotated[int, Field(gt=0, le=8760)]
 
 
-class RollingFeature(NamedTuple):
+@pydantic_dataclass(frozen=True)
+class LagFeature:
     base_col: BaseColumn
-    window_hours: int
+    lag_hours: Hours
+
+
+@pydantic_dataclass(frozen=True)
+class RollingFeature:
+    base_col: BaseColumn
+    window_hours: Hours
 
 
 @dataclass
@@ -109,7 +118,7 @@ class ParsedFeatures:
     rolling_means: dict[str, RollingFeature]
     static: list[StaticFeature]
     local_time: list[TimeFeature]
-    leaky_lags: dict[str, int]
+    leaky_lags: dict[str, Hours]
 
     @classmethod
     def from_selected_features(cls, selected_features: set[str]) -> Self:
@@ -130,9 +139,9 @@ class ParsedFeatures:
         """
         lags: dict[str, LagFeature] = {}
         rolling_means: dict[str, RollingFeature] = {}
-        static: list[StaticFeature] = []
-        local_time: list[TimeFeature] = []
-        leaky_lags: dict[str, int] = {}
+        static_features: list[StaticFeature] = []
+        time_features: list[TimeFeature] = []
+        leaky_lags: dict[str, Hours] = {}
 
         for feature_name in selected_features:
             if "lag" in feature_name and "rolling_mean" in feature_name:
@@ -162,17 +171,17 @@ class ParsedFeatures:
                 continue
 
             if feature_name in STATIC_FEATURE_REGISTRY:
-                static.append(cast(StaticFeature, feature_name))
+                static_features.append(cast(StaticFeature, feature_name))
             elif feature_name in TIME_FEATURES:
-                local_time.append(cast(TimeFeature, feature_name))
-            else:
+                time_features.append(cast(TimeFeature, feature_name))
+            elif feature_name not in get_args(BaseColumn):
                 raise ValueError(f"Unrecognised feature name: {feature_name}")
 
         return cls(
             lags=lags,
             rolling_means=rolling_means,
-            static=static,
-            local_time=local_time,
+            static=static_features,
+            local_time=time_features,
             leaky_lags=leaky_lags,
         )
 
@@ -264,7 +273,7 @@ def _apply_post_join_features(
         engineered_lf = engineered_lf.with_columns(exprs)
 
     # Lags
-    for feature_name, lag_feat in parsed_features.lags.items():
+    for _feature_name, lag_feat in parsed_features.lags.items():
         source_lf = engineered_lf
         if historical_weather is not None and lag_feat.base_col != "power":
             if lag_feat.base_col in historical_weather.collect_schema().names():
@@ -276,7 +285,7 @@ def _apply_post_join_features(
             )
 
     # Rolling Means
-    for feature_name, rolling_feat in parsed_features.rolling_means.items():
+    for _feature_name, rolling_feat in parsed_features.rolling_means.items():
         if rolling_feat.base_col in engineered_lf.collect_schema().names():
             engineered_lf = apply_rolling_mean_feature(
                 engineered_lf, rolling_feat.base_col, rolling_feat.window_hours
