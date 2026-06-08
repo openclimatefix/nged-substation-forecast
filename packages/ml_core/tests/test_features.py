@@ -458,3 +458,9 @@ def test_apply_latest_weekly_lag_feature_no_lead_time():
     assert "power_weekly_lag" in result.columns
     assert result["power_weekly_lag"].to_list() == [50.0]
 
+
+def test_parsed_features_from_selected_features_forbids_power_rolling_mean():
+    with pytest.raises(ValueError, match="Rolling features on the target variable 'power' are currently forbidden"):
+        ParsedFeatures.from_selected_features({"power_rolling_mean_6h"})
+
+

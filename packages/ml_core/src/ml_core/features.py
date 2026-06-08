@@ -79,7 +79,10 @@ Hours = Annotated[int, Field(gt=0, le=_HOURS_PER_YEAR * 2)]
 
 
 class BaseLookbackFeature(BaseModel):
-    """Base class for lookback features like lags and rolling means."""
+    """Base class for lookback features like lags and rolling means.
+
+    Its main job is to parse strings like 'power_lag_24h'.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -89,28 +92,27 @@ class BaseLookbackFeature(BaseModel):
     hours: Hours
 
     @classmethod
-    def _get_pattern(cls) -> re.Pattern[str]:
-        return re.compile(rf"^(.*)_{cls._FEATURE_SUFFIX}_(\d+)h$")
-
-    @classmethod
     def is_valid(cls, value: str) -> bool:
         """Check if a string matches the feature name pattern."""
-        return bool(cls._get_pattern().match(value))
+        return bool(cls._match(value))
 
     @classmethod
     def from_str(cls, value: str) -> Self:
         """Parse and validate a feature name string into an instance."""
-        match = cls._get_pattern().match(value)
+        match = cls._match(value)
         if not match:
-            feature_name = cls._FEATURE_SUFFIX.replace("_", " ")
-            raise ValueError(f"Invalid {feature_name} feature name format: {value}")
+            raise ValueError(f"Invalid {cls._FEATURE_SUFFIX} feature name format: {value}")
         base_col, hours_str = match.groups()
         try:
             hours = int(hours_str)
         except ValueError:
-            feature_name = cls._FEATURE_SUFFIX.replace("_", " ")
-            raise ValueError(f"{feature_name.capitalize()} hours must be an integer: {hours_str}")
+            raise ValueError(f"{cls._FEATURE_SUFFIX} hours must be an integer, not '{hours_str}'")
         return cls(base_col=cast(BaseColumn, base_col), hours=hours)
+
+    @classmethod
+    def _match(cls, value: str) -> re.Match | None:
+        pattern = re.compile(rf"^(.*)_{cls._FEATURE_SUFFIX}_(\d+)h$")
+        return pattern.match(value)
 
 
 class LagFeature(BaseLookbackFeature):
@@ -123,7 +125,6 @@ class RollingFeature(BaseLookbackFeature):
     """Represents a parsed rolling mean feature."""
 
     _FEATURE_SUFFIX: ClassVar[str] = "rolling_mean"
-
 
 
 @dataclass
@@ -140,9 +141,9 @@ class ParsedFeatures:
         rolling_means: Maps feature names to `RollingFeature` definitions. Defines moving
             average computations, ensuring they are grouped correctly by time series and
             ensemble member.
-        static: List of static features. Identifies simple row-wise transformations (like
+        static_features: List of static features. Identifies simple row-wise transformations (like
             windchill) that require no time-shifting or complex aggregations.
-        local_time: List of time-based features. Triggers timezone conversions. Energy
+        time_features: List of time-based features. Triggers timezone conversions. Energy
             consumption is driven by human behavior, which follows local time (including DST),
             not UTC.
         leaky_lags: Maps target-derived lag features to their lag hours. Explicitly tracks
@@ -152,12 +153,12 @@ class ParsedFeatures:
 
     lags: dict[str, LagFeature]
     rolling_means: dict[str, RollingFeature]
-    static: list[StaticFeature]
-    local_time: list[TimeFeature]
+    static_features: list[StaticFeature]
+    time_features: list[TimeFeature]
     leaky_lags: dict[str, Hours]
 
     @classmethod
-    def from_selected_features(cls, selected_features: set[str]) -> Self:
+    def from_strings(cls, selected_features: set[str]) -> Self:
         """Parse a list of selected features into a ParsedFeatures object.
 
         Rationale:
@@ -194,7 +195,14 @@ class ParsedFeatures:
                 rolling_feat = RollingFeature.from_str(feature_name)
                 rolling_means[feature_name] = rolling_feat
                 if rolling_feat.base_col == "power":
-                    leaky_lags[feature_name] = 0
+                    # TODO: Implement "Latest Available Rolling Mean anchored to T_init"
+                    # to allow non-leaky rolling power features. Maybe also give the model
+                    # other stats about recent observed power over some time window, like
+                    # min, max, std, mean.
+                    raise ValueError(
+                        f"Rolling features on the target variable 'power' are currently forbidden "
+                        f"to prevent lookahead bias: {feature_name}"
+                    )
                 continue
 
             if feature_name in STATIC_FEATURE_REGISTRY:
@@ -207,8 +215,8 @@ class ParsedFeatures:
         return cls(
             lags=lags,
             rolling_means=rolling_means,
-            static=static_features,
-            local_time=time_features,
+            static_features=static_features,
+            time_features=time_features,
             leaky_lags=leaky_lags,
         )
 
@@ -225,14 +233,20 @@ def engineer_features(
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     nwp_lf = pl.LazyFrame._from_pyldf(nwp._ldf) if nwp is not None else None
 
-    parsed_features = ParsedFeatures.from_selected_features(selected_features)
+    parsed_features = ParsedFeatures.from_strings(selected_features)
 
     # Detect if weather lags are requested
+    # TODO: Throw an error if a weather feature is requested but `nwp` is None.
+    # TODO: Maybe move the three blocks of code below which start with `if nwp is not None`
+    # into a separate function, and only call `if nwp_lf is not None` once, here.
     weather_lag_requested = False
     if nwp_lf is not None:
         nwp_cols = nwp_lf.collect_schema().names()
+        # TODO: It feels like there's a more readable way to do the below. Like:
+        # `weather_lag_requested = any([lag_feature in nwp_cols for lag_features in
+        # parsed_features.lags])`
         for lag_feat in parsed_features.lags.values():
-            if lag_feat.base_col in nwp_cols and lag_feat.base_col != "power":
+            if lag_feat.base_col in nwp_cols:
                 weather_lag_requested = True
                 break
 
@@ -292,11 +306,11 @@ def _apply_post_join_features(
     engineered_lf = raw_data
 
     # Static and Local Time
-    if parsed_features.local_time:
+    if parsed_features.time_features:
         engineered_lf = apply_local_time_features(engineered_lf)
 
-    if parsed_features.static:
-        exprs = [STATIC_FEATURE_REGISTRY[f] for f in parsed_features.static]
+    if parsed_features.static_features:
+        exprs = [STATIC_FEATURE_REGISTRY[f] for f in parsed_features.static_features]
         engineered_lf = engineered_lf.with_columns(exprs)
 
     # Lags
