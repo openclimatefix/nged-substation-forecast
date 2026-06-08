@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import cast
 
+from hypothesis import given, strategies as st
 import patito as pt
 import polars as pl
 import pytest
@@ -460,7 +461,170 @@ def test_apply_latest_weekly_lag_feature_no_lead_time():
 
 
 def test_parsed_features_from_selected_features_forbids_power_rolling_mean():
-    with pytest.raises(ValueError, match="Rolling features on the target variable 'power' are currently forbidden"):
+    with pytest.raises(
+        ValueError, match="Rolling features on the target variable 'power' are currently forbidden"
+    ):
         ParsedFeatures.from_strings({"power_rolling_mean_6h"})
 
 
+def test_engineer_features_no_nwp():
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time": [valid_time],
+            "power": [100.0],
+        }
+    )
+    metadata_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time_series_name": ["ALFORD 33 11kV S STN"],
+            "time_series_type": ["BESS"],
+            "units": ["MW"],
+            "licence_area": ["EMids"],
+            "substation_number": [1],
+            "substation_type": ["BSP"],
+            "latitude": [52.0],
+            "longitude": [-1.0],
+            "h3_res_5": [123456789],
+        }
+    )
+
+    # Run engineer_features with nwp=None
+    engineered = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=None,
+        selected_features={"power_lag_24h", "local_time_of_day_sin"},
+    ).collect()
+
+    assert len(engineered) == 1
+    assert "power_lag_24h" in engineered.columns
+    assert "local_time_of_day_sin" in engineered.columns
+
+
+def test_engineer_features_empty_data():
+    # Test with empty DataFrames to ensure it doesn't crash and handles empty inputs gracefully
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([], dtype=pl.Int64),
+            "time": pl.Series([], dtype=pl.Datetime),
+            "power": pl.Series([], dtype=pl.Float32),
+        }
+    )
+    metadata_df = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([], dtype=pl.Int64),
+            "time_series_name": pl.Series([], dtype=pl.String),
+            "time_series_type": pl.Series([], dtype=pl.String),
+            "units": pl.Series([], dtype=pl.String),
+            "licence_area": pl.Series([], dtype=pl.String),
+            "substation_number": pl.Series([], dtype=pl.Int32),
+            "substation_type": pl.Series([], dtype=pl.String),
+            "latitude": pl.Series([], dtype=pl.Float32),
+            "longitude": pl.Series([], dtype=pl.Float32),
+            "h3_res_5": pl.Series([], dtype=pl.UInt64),
+        }
+    )
+
+    engineered = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=None,
+        selected_features={"power_lag_24h", "local_time_of_day_sin"},
+    ).collect()
+
+    assert len(engineered) == 0
+    assert "power_lag_24h" in engineered.columns
+    assert "local_time_of_day_sin" in engineered.columns
+
+
+@given(
+    st.sets(
+        st.sampled_from(
+            [
+                "power_lag_24h",
+                "temperature_2m_lag_12h",
+                "temperature_2m_rolling_mean_6h",
+                "windchill",
+                "local_time_of_day_sin",
+            ]
+        )
+    )
+)
+def test_hypothesis_parsed_features(selected):
+    parsed = ParsedFeatures.from_strings(selected)
+    assert isinstance(parsed, ParsedFeatures)
+
+
+@given(st.text())
+def test_hypothesis_parsed_features_random_strings(s):
+    try:
+        ParsedFeatures.from_strings({s})
+    except ValueError, ValidationError:
+        pass
+
+
+def test_engineer_features_raises_value_error_when_weather_requested_but_nwp_none():
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time": [valid_time],
+            "power": [100.0],
+        }
+    )
+    metadata_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time_series_name": ["ALFORD 33 11kV S STN"],
+            "time_series_type": ["BESS"],
+            "units": ["MW"],
+            "licence_area": ["EMids"],
+            "substation_number": [1],
+            "substation_type": ["BSP"],
+            "latitude": [52.0],
+            "longitude": [-1.0],
+            "h3_res_5": [123456789],
+        }
+    )
+
+    # Requesting a weather lag feature without NWP should raise ValueError
+    with pytest.raises(
+        ValueError, match="Weather features were requested but no NWP data was provided"
+    ):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=None,
+            selected_features={"temperature_2m_lag_12h"},
+        )
+
+    # Requesting a weather rolling feature without NWP should raise ValueError
+    with pytest.raises(
+        ValueError, match="Weather features were requested but no NWP data was provided"
+    ):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=None,
+            selected_features={"temperature_2m_rolling_mean_6h"},
+        )
+
+    # Requesting a static weather feature without NWP should raise ValueError
+    with pytest.raises(
+        ValueError, match="Weather features were requested but no NWP data was provided"
+    ):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=None,
+            selected_features={"windchill"},
+        )

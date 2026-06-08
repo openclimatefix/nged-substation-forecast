@@ -235,36 +235,18 @@ def engineer_features(
 
     parsed_features = ParsedFeatures.from_strings(selected_features)
 
-    # Detect if weather lags are requested
-    # TODO: Throw an error if a weather feature is requested but `nwp` is None.
-    # TODO: Maybe move the three blocks of code below which start with `if nwp is not None`
-    # into a separate function, and only call `if nwp_lf is not None` once, here.
-    weather_lag_requested = False
-    if nwp_lf is not None:
-        nwp_cols = nwp_lf.collect_schema().names()
-        # TODO: It feels like there's a more readable way to do the below. Like:
-        # `weather_lag_requested = any([lag_feature in nwp_cols for lag_features in
-        # parsed_features.lags])`
-        for lag_feat in parsed_features.lags:
-            if lag_feat.base_col in nwp_cols:
-                weather_lag_requested = True
-                break
+    # Check if weather features are requested
+    # TODO: Maybe move this code into `ParsedFeatures.weather_features_requested`
+    weather_features_requested = (
+        any(lag_feat.base_col != "power" for lag_feat in parsed_features.lags)
+        or any(roll_feat.base_col != "power" for roll_feat in parsed_features.rolling_means)
+        or len(parsed_features.static_features) > 0
+    )
+    if nwp_lf is None and weather_features_requested:
+        raise ValueError("Weather features were requested but no NWP data was provided.")
 
-    # Process NWP for current forecast
-    processed_nwp: pl.LazyFrame | None = None
-    if nwp_lf is not None:
-        processed_nwp = calculate_lead_time(nwp_lf)
-
-    # Compute historical_weather for lags
-    historical_weather: pl.LazyFrame | None = None
-    if processed_nwp is not None and weather_lag_requested:
-        historical_weather = (
-            processed_nwp.filter(pl.col("ensemble_member") == 0)
-            .drop("ensemble_member")
-            .group_by(["time_series_id", "valid_time"])
-            .agg(pl.all().sort_by("lead_time_hours").first())
-            .sort(["time_series_id", "valid_time"])
-        )
+    # Process NWP data
+    processed_nwp, historical_weather = _process_nwp_data(nwp_lf, parsed_features)
 
     # Join Data
     raw_data = power_lf.join(metadata_lf, on="time_series_id", how="left")
@@ -295,6 +277,32 @@ def engineer_features(
     final_lf = engineered_lf.select(cols_to_select)
 
     return pt.LazyFrame.from_existing(final_lf).set_model(AllFeatures)
+
+
+def _process_nwp_data(
+    nwp_lf: pl.LazyFrame | None,
+    parsed_features: ParsedFeatures,
+) -> tuple[pl.LazyFrame | None, pl.LazyFrame | None]:
+    """Process NWP data for current forecast and compute historical weather for lags."""
+    if nwp_lf is None:
+        return None, None
+
+    processed_nwp = calculate_lead_time(nwp_lf)
+
+    # Simplify weather lag check (TODO 4)
+    weather_lag_requested = any(lag_feat.base_col != "power" for lag_feat in parsed_features.lags)
+
+    historical_weather = None
+    if weather_lag_requested:
+        historical_weather = (
+            processed_nwp.filter(pl.col("ensemble_member") == 0)
+            .drop("ensemble_member")
+            .group_by(["time_series_id", "valid_time"])
+            .agg(pl.all().sort_by("lead_time_hours").first())
+            .sort(["time_series_id", "valid_time"])
+        )
+
+    return processed_nwp, historical_weather
 
 
 def _apply_post_join_features(
