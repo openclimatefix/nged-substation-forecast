@@ -136,9 +136,9 @@ class ParsedFeatures:
     functions don't have to parse strings.
 
     Attributes:
-        lags: Maps feature names to `LagFeature` definitions. Dictates which base columns to
+        lags: List of `LagFeature` definitions. Dictates which base columns to
             shift and by how much, enabling safe, time-aware joins for historical data.
-        rolling_means: Maps feature names to `RollingFeature` definitions. Defines moving
+        rolling_means: List of `RollingFeature` definitions. Defines moving
             average computations, ensuring they are grouped correctly by time series and
             ensemble member.
         static_features: List of static features. Identifies simple row-wise transformations (like
@@ -151,8 +151,8 @@ class ParsedFeatures:
             to selectively nullify them based on the forecast lead time.
     """
 
-    lags: dict[str, LagFeature]
-    rolling_means: dict[str, RollingFeature]
+    lags: list[LagFeature]
+    rolling_means: list[RollingFeature]
     static_features: list[StaticFeature]
     time_features: list[TimeFeature]
     leaky_lags: dict[str, Hours]
@@ -174,8 +174,8 @@ class ParsedFeatures:
         Returns:
             A ParsedFeatures configuration object containing structured instructions.
         """
-        lags: dict[str, LagFeature] = {}
-        rolling_means: dict[str, RollingFeature] = {}
+        lags: list[LagFeature] = []
+        rolling_means: list[RollingFeature] = []
         static_features: list[StaticFeature] = []
         time_features: list[TimeFeature] = []
         leaky_lags: dict[str, Hours] = {}
@@ -186,14 +186,14 @@ class ParsedFeatures:
 
             if LagFeature.is_valid(feature_name):
                 lag_feat = LagFeature.from_str(feature_name)
-                lags[feature_name] = lag_feat
+                lags.append(lag_feat)
                 if lag_feat.base_col == "power":
                     leaky_lags[feature_name] = lag_feat.hours
                 continue
 
             if RollingFeature.is_valid(feature_name):
                 rolling_feat = RollingFeature.from_str(feature_name)
-                rolling_means[feature_name] = rolling_feat
+                rolling_means.append(rolling_feat)
                 if rolling_feat.base_col == "power":
                     # TODO: Implement "Latest Available Rolling Mean anchored to T_init"
                     # to allow non-leaky rolling power features. Maybe also give the model
@@ -245,7 +245,7 @@ def engineer_features(
         # TODO: It feels like there's a more readable way to do the below. Like:
         # `weather_lag_requested = any([lag_feature in nwp_cols for lag_features in
         # parsed_features.lags])`
-        for lag_feat in parsed_features.lags.values():
+        for lag_feat in parsed_features.lags:
             if lag_feat.base_col in nwp_cols:
                 weather_lag_requested = True
                 break
@@ -314,7 +314,7 @@ def _apply_post_join_features(
         engineered_lf = engineered_lf.with_columns(exprs)
 
     # Lags
-    for _feature_name, lag_feat in parsed_features.lags.items():
+    for lag_feat in parsed_features.lags:
         source_lf = engineered_lf
         if historical_weather is not None and lag_feat.base_col != "power":
             if lag_feat.base_col in historical_weather.collect_schema().names():
@@ -326,7 +326,7 @@ def _apply_post_join_features(
             )
 
     # Rolling Means
-    for _feature_name, rolling_feat in parsed_features.rolling_means.items():
+    for rolling_feat in parsed_features.rolling_means:
         if rolling_feat.base_col in engineered_lf.collect_schema().names():
             engineered_lf = apply_rolling_mean_feature(
                 engineered_lf, rolling_feat.base_col, rolling_feat.hours
