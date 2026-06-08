@@ -17,15 +17,14 @@ Nullify Leaky Lags Rationale:
 import math
 import re
 from dataclasses import dataclass
-from typing import Annotated, Final, Literal, Self, cast, get_args
+from typing import Annotated, ClassVar, Final, Literal, Self, cast, get_args
 
 import patito as pt
 import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
-from pydantic import Field
-from pydantic.dataclasses import dataclass as pydantic_dataclass
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator  # noqa: F401
 
 # Valid base columns that can be lagged or rolled (from AllFeatures and NwpInMemory contracts)
 BaseColumn = Literal[
@@ -75,19 +74,56 @@ STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
 
 # Prevents physically impossible time shifts and lookahead bias by enforcing strict bounds on lag
 # hours and rolling window hours.
-Hours = Annotated[int, Field(gt=0, le=8760)]
+_HOURS_PER_YEAR: Final[int] = 365 * 24
+Hours = Annotated[int, Field(gt=0, le=_HOURS_PER_YEAR * 2)]
 
 
-@pydantic_dataclass(frozen=True)
-class LagFeature:
+class BaseLookbackFeature(BaseModel):
+    """Base class for lookback features like lags and rolling means."""
+
+    model_config = ConfigDict(frozen=True)
+
+    _FEATURE_SUFFIX: ClassVar[str]
+
     base_col: BaseColumn
-    lag_hours: Hours
+    hours: Hours
+
+    @classmethod
+    def _get_pattern(cls) -> re.Pattern[str]:
+        return re.compile(rf"^(.*)_{cls._FEATURE_SUFFIX}_(\d+)h$")
+
+    @classmethod
+    def is_valid(cls, value: str) -> bool:
+        """Check if a string matches the feature name pattern."""
+        return bool(cls._get_pattern().match(value))
+
+    @classmethod
+    def from_str(cls, value: str) -> Self:
+        """Parse and validate a feature name string into an instance."""
+        match = cls._get_pattern().match(value)
+        if not match:
+            feature_name = cls._FEATURE_SUFFIX.replace("_", " ")
+            raise ValueError(f"Invalid {feature_name} feature name format: {value}")
+        base_col, hours_str = match.groups()
+        try:
+            hours = int(hours_str)
+        except ValueError:
+            feature_name = cls._FEATURE_SUFFIX.replace("_", " ")
+            raise ValueError(f"{feature_name.capitalize()} hours must be an integer: {hours_str}")
+        return cls(base_col=cast(BaseColumn, base_col), hours=hours)
 
 
-@pydantic_dataclass(frozen=True)
-class RollingFeature:
-    base_col: BaseColumn
-    window_hours: Hours
+class LagFeature(BaseLookbackFeature):
+    """Represents a parsed lag feature."""
+
+    _FEATURE_SUFFIX: ClassVar[str] = "lag"
+
+
+class RollingFeature(BaseLookbackFeature):
+    """Represents a parsed rolling mean feature."""
+
+    _FEATURE_SUFFIX: ClassVar[str] = "rolling_mean"
+
 
 
 @dataclass
@@ -147,26 +183,17 @@ class ParsedFeatures:
             if "lag" in feature_name and "rolling_mean" in feature_name:
                 raise ValueError(f"Feature stacking is not supported: {feature_name}")
 
-            # Extract lagged features like 'power_lag_24h`
-            lag_match = re.match(r"^(.*)_lag_(\d+)h$", feature_name)
-            if lag_match:
-                base_col, lag_hours_str = lag_match.groups()
-                lag_hours = int(lag_hours_str)
-                lags[feature_name] = LagFeature(
-                    base_col=cast(BaseColumn, base_col), lag_hours=lag_hours
-                )
-                if base_col == "power":
-                    leaky_lags[feature_name] = lag_hours
+            if LagFeature.is_valid(feature_name):
+                lag_feat = LagFeature.from_str(feature_name)
+                lags[feature_name] = lag_feat
+                if lag_feat.base_col == "power":
+                    leaky_lags[feature_name] = lag_feat.hours
                 continue
 
-            rolling_match = re.match(r"^(.*)_rolling_mean_(\d+)h$", feature_name)
-            if rolling_match:
-                base_col, window_hours_str = rolling_match.groups()
-                window_hours = int(window_hours_str)
-                rolling_means[feature_name] = RollingFeature(
-                    base_col=cast(BaseColumn, base_col), window_hours=window_hours
-                )
-                if base_col == "power":
+            if RollingFeature.is_valid(feature_name):
+                rolling_feat = RollingFeature.from_str(feature_name)
+                rolling_means[feature_name] = rolling_feat
+                if rolling_feat.base_col == "power":
                     leaky_lags[feature_name] = 0
                 continue
 
@@ -281,14 +308,14 @@ def _apply_post_join_features(
 
         if lag_feat.base_col in source_lf.collect_schema().names():
             engineered_lf = apply_lag_feature(
-                engineered_lf, source_lf, lag_feat.base_col, lag_feat.lag_hours
+                engineered_lf, source_lf, lag_feat.base_col, lag_feat.hours
             )
 
     # Rolling Means
     for _feature_name, rolling_feat in parsed_features.rolling_means.items():
         if rolling_feat.base_col in engineered_lf.collect_schema().names():
             engineered_lf = apply_rolling_mean_feature(
-                engineered_lf, rolling_feat.base_col, rolling_feat.window_hours
+                engineered_lf, rolling_feat.base_col, rolling_feat.hours
             )
 
     # Nullify leaky lags
