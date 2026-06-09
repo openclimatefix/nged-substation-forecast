@@ -105,8 +105,8 @@ class BaseLookbackFeature(BaseModel):
 
     @abstractmethod
     def is_leaky(self) -> bool:
-        """Returns True if this feature leaks information from the future into the ML model's
-        inputs, and hence must be nullified."""
+        """Returns True if this feature leaks information that wouldn't be available at inference
+        time into the ML model's inputs, and hence must be nullified."""
         pass
 
     def is_weather_feature(self) -> bool:
@@ -127,12 +127,11 @@ class RollingFeature(BaseLookbackFeature):
     """Represents a parsed rolling mean feature.
 
     Note that computing the rolling mean of 'power' is currently forbidden to prevent lookahead
-    bias.
+    bias."""
 
-    TODO: Implement "Latest Available Rolling Mean anchored to T_init" to allow non-leaky
-    rolling power features. Maybe also give the model other stats about recent observed
-    power over some time window, like min, max, std, mean.
-    """
+    # TODO: Implement "Latest Available Rolling Mean anchored to T_init" to allow non-leaky
+    # rolling power features. Maybe also give the model other stats about recent observed
+    # power over some time window, like min, max, std, mean.
 
     SUFFIX: ClassVar[str] = "rolling_mean"
 
