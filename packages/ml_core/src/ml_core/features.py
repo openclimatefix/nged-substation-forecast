@@ -440,8 +440,8 @@ def nullify_leaky_lags(
         lf = lf.with_columns(
             pl.when(pl.col("lead_time_hours") >= feature.hours)
             .then(pl.lit(None))
-            .otherwise(pl.col(feature.base_col))
-            .alias(feature.base_col)
+            .otherwise(pl.col(feature.string_repr))
+            .alias(feature.string_repr)
         )
     return lf
 
@@ -477,65 +477,6 @@ def apply_rolling_mean_feature(
     # Join the result back to the original lf
     join_keys = group_by_cols + ["valid_time"]
     return lf.join(rolled, on=join_keys, how="left")
-
-
-def apply_latest_weekly_lag_feature(
-    lf: pl.LazyFrame,
-    source_lf: pl.LazyFrame,
-    base_col: WeatherFeature,
-    new_col: str,
-    join_cols: list[Literal["time_series_id", "ensemble_member"]],
-) -> pl.LazyFrame:
-    """
-    Applies a dynamic lag feature based on the lead time.
-
-    Why dynamic lags? If we are forecasting 10 days ahead, a 7-day lag is useless because
-    we won't have the actual data 7 days from now. We need to use the *latest available*
-    weekly lag (e.g., 14 days ago). This function calculates the appropriate multiple of
-    168 hours (1 week) based on the lead time.
-
-    Args:
-        lf: The main LazyFrame containing the target times and lead times.
-        source_lf: The LazyFrame containing the historical data to pull from.
-        base_col: The column in source_lf to lag (e.g., 'power').
-        new_col: The name of the resulting lagged column.
-        join_cols: Additional columns to join on (e.g., ['time_series_id', 'ensemble_member']).
-
-    Returns:
-        A LazyFrame with the new dynamically lagged column.
-    """
-    schema_names = lf.collect_schema().names()
-
-    if "lead_time_hours" in schema_names:
-        # Calculate the required lag in hours.
-        # If lead_time is 0-167, lag is 168.
-        # If lead_time is 168-335, lag is 336.
-        lag_hours = (((pl.col("lead_time_hours") / 168).floor() + 1) * 168).cast(pl.Int64)
-    else:
-        # Default to 1 week if no lead time is available
-        lag_hours = pl.lit(168).cast(pl.Int64)
-
-    # Calculate the target time we need to look up in the source data
-    lf_with_target = lf.with_columns(
-        target_time=pl.col("valid_time") - pl.duration(hours=lag_hours)
-    )
-
-    # Prepare the right side of the join
-    right_lf = source_lf.select(
-        *join_cols,
-        pl.col("valid_time"),
-        pl.col(base_col).alias(new_col),
-    )
-
-    # Perform the join
-    result = lf_with_target.join(
-        right_lf,
-        left_on=join_cols + ["target_time"],
-        right_on=join_cols + ["valid_time"],
-        how="left",
-    ).drop("target_time")
-
-    return result
 
 
 def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -579,6 +520,7 @@ def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
     # Calculate local day of week (1-7)
     local_weekday = pl.col("local_time").dt.weekday()
 
+    # TODO: This map could just be a list, surely?
     weekday_map = {
         1: "Monday",
         2: "Tuesday",
