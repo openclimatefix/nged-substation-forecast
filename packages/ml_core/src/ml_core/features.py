@@ -16,6 +16,7 @@ Nullify Leaky Lags Rationale:
 
 import math
 import re
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Annotated, ClassVar, Final, Literal, Self, cast, get_args
 
@@ -26,9 +27,8 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpOnDisk
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator  # noqa: F401
 
-# Valid base columns that can be lagged or rolled (from AllFeatures and NwpInMemory contracts)
-BaseColumn = Literal[
-    "power",
+# Valid weather features (from NwpInMemory contract)
+WeatherFeature = Literal[
     "temperature_2m",
     "dew_point_temperature_2m",
     "wind_speed_10m",
@@ -44,6 +44,7 @@ BaseColumn = Literal[
     "categorical_precipitation_type_surface",
 ]
 
+
 # Valid time features (from AllFeatures contract)
 TimeFeature = Literal[
     "local_time_of_day_sin",
@@ -56,12 +57,13 @@ TimeFeature = Literal[
     "local_utc_offset",
 ]
 
-StaticFeature = Literal["windchill"]
-
 TIME_FEATURES: Final[set[TimeFeature]] = set(get_args(TimeFeature))
+
 
 # Static features registry
 # These are basic features that don't require parameterization.
+StaticFeature = Literal["windchill"]
+
 STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
     "windchill": (
         13.12
@@ -74,8 +76,7 @@ STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
 
 # Prevents physically impossible time shifts and lookahead bias by enforcing strict bounds on lag
 # hours and rolling window hours.
-_HOURS_PER_YEAR: Final[int] = 365 * 24
-Hours = Annotated[int, Field(gt=0, le=_HOURS_PER_YEAR * 2)]
+Hours = Annotated[int, Field(gt=0, le=365 * 24 * 2)]
 
 
 class BaseLookbackFeature(BaseModel):
@@ -86,45 +87,57 @@ class BaseLookbackFeature(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    _FEATURE_SUFFIX: ClassVar[str]
+    SUFFIX: ClassVar[str]
 
-    base_col: BaseColumn
+    base_col: WeatherFeature
     hours: Hours
-
-    @classmethod
-    def is_valid(cls, value: str) -> bool:
-        """Check if a string matches the feature name pattern."""
-        return bool(cls._match(value))
+    string_repr: str  # String representation, e.g. 'power_lag_24h'
 
     @classmethod
     def from_str(cls, value: str) -> Self:
         """Parse and validate a feature name string into an instance."""
-        match = cls._match(value)
+        pattern = re.compile(rf"^(.*)_{cls.SUFFIX}_(\d+)h$")
+        match = pattern.match(value)
         if not match:
-            raise ValueError(f"Invalid {cls._FEATURE_SUFFIX} feature name format: {value}")
+            raise ValueError(f"Invalid {cls.SUFFIX} feature name format: {value}")
         base_col, hours_str = match.groups()
-        try:
-            hours = int(hours_str)
-        except ValueError:
-            raise ValueError(f"{cls._FEATURE_SUFFIX} hours must be an integer, not '{hours_str}'")
-        return cls(base_col=cast(BaseColumn, base_col), hours=hours)
+        return cls(base_col=base_col, hours=hours_str, string_repr=value)  # ty: ignore[invalid-argument-type]
 
-    @classmethod
-    def _match(cls, value: str) -> re.Match | None:
-        pattern = re.compile(rf"^(.*)_{cls._FEATURE_SUFFIX}_(\d+)h$")
-        return pattern.match(value)
+    @abstractmethod
+    def is_leaky(self) -> bool:
+        """Returns True if this feature leaks information from the future into the ML model's
+        inputs, and hence must be nullified."""
+        pass
+
+    def is_weather_feature(self) -> bool:
+        return self.base_col in get_args(WeatherFeature)
 
 
 class LagFeature(BaseLookbackFeature):
     """Represents a parsed lag feature."""
 
-    _FEATURE_SUFFIX: ClassVar[str] = "lag"
+    SUFFIX: ClassVar[str] = "lag"
+    base_col: WeatherFeature | Literal["power"]
+
+    def is_leaky(self) -> bool:
+        return self.base_col == "power"
 
 
 class RollingFeature(BaseLookbackFeature):
-    """Represents a parsed rolling mean feature."""
+    """Represents a parsed rolling mean feature.
 
-    _FEATURE_SUFFIX: ClassVar[str] = "rolling_mean"
+    Note that computing the rolling mean of 'power' is currently forbidden to prevent lookahead
+    bias.
+
+    TODO: Implement "Latest Available Rolling Mean anchored to T_init" to allow non-leaky
+    rolling power features. Maybe also give the model other stats about recent observed
+    power over some time window, like min, max, std, mean.
+    """
+
+    SUFFIX: ClassVar[str] = "rolling_mean"
+
+    def is_leaky(self) -> bool:
+        return False
 
 
 @dataclass
@@ -146,16 +159,12 @@ class ParsedFeatures:
         time_features: List of time-based features. Triggers timezone conversions. Energy
             consumption is driven by human behavior, which follows local time (including DST),
             not UTC.
-        leaky_lags: Maps target-derived lag features to their lag hours. Explicitly tracks
-            features (like lagged power) that could cause lookahead bias, allowing the pipeline
-            to selectively nullify them based on the forecast lead time.
     """
 
     lags: list[LagFeature]
     rolling_means: list[RollingFeature]
     static_features: list[StaticFeature]
     time_features: list[TimeFeature]
-    leaky_lags: dict[str, Hours]
 
     @classmethod
     def from_strings(cls, selected_features: set[str]) -> Self:
@@ -164,12 +173,13 @@ class ParsedFeatures:
         Rationale:
             Parsing upfront allows us to fail fast on invalid requests and cleanly separates the parsing
             logic from the execution logic. It specifically identifies lags on the target variable
-            (`power`) and flags them in the `leaky_lags` dictionary, ensuring the execution phase knows
+            (`power`) and flags them in the `get_leaky_features` method, ensuring the execution phase knows
             exactly which features require lags to be nullified.
 
         Args:
             selected_features: A set of raw feature name strings requested for engineering. Valid Includes all
-            TIME_FEATURES, and all StaticFeatures, and feature names like 'power_lag_24h'.
+            TIME_FEATURES, and all StaticFeatures, and feature names like 'power_lag_24h' and
+            'temperature_2m_rolling_mean_6h'.
 
         Returns:
             A ParsedFeatures configuration object containing structured instructions.
@@ -178,38 +188,26 @@ class ParsedFeatures:
         rolling_means: list[RollingFeature] = []
         static_features: list[StaticFeature] = []
         time_features: list[TimeFeature] = []
-        leaky_lags: dict[str, Hours] = {}
 
         for feature_name in selected_features:
-            if "lag" in feature_name and "rolling_mean" in feature_name:
+            if LagFeature.SUFFIX in feature_name and RollingFeature.SUFFIX in feature_name:
                 raise ValueError(f"Feature stacking is not supported: {feature_name}")
 
-            if LagFeature.is_valid(feature_name):
-                lag_feat = LagFeature.from_str(feature_name)
-                lags.append(lag_feat)
-                if lag_feat.base_col == "power":
-                    leaky_lags[feature_name] = lag_feat.hours
-                continue
+            elif LagFeature.SUFFIX in feature_name:
+                lags.append(LagFeature.from_str(feature_name))
 
-            if RollingFeature.is_valid(feature_name):
-                rolling_feat = RollingFeature.from_str(feature_name)
-                rolling_means.append(rolling_feat)
-                if rolling_feat.base_col == "power":
-                    # TODO: Implement "Latest Available Rolling Mean anchored to T_init"
-                    # to allow non-leaky rolling power features. Maybe also give the model
-                    # other stats about recent observed power over some time window, like
-                    # min, max, std, mean.
-                    raise ValueError(
-                        f"Rolling features on the target variable 'power' are currently forbidden "
-                        f"to prevent lookahead bias: {feature_name}"
-                    )
-                continue
+            elif RollingFeature.SUFFIX in feature_name:
+                rolling_means.append(RollingFeature.from_str(feature_name))
 
-            if feature_name in STATIC_FEATURE_REGISTRY:
+            elif feature_name in STATIC_FEATURE_REGISTRY:
                 static_features.append(cast(StaticFeature, feature_name))
+
             elif feature_name in TIME_FEATURES:
                 time_features.append(cast(TimeFeature, feature_name))
-            elif feature_name not in get_args(BaseColumn):
+
+            # TODO: Extract WeatherFeature and PowerFeatures?
+
+            elif feature_name not in get_args(WeatherFeature):
                 raise ValueError(f"Unrecognised feature name: {feature_name}")
 
         return cls(
@@ -217,8 +215,25 @@ class ParsedFeatures:
             rolling_means=rolling_means,
             static_features=static_features,
             time_features=time_features,
-            leaky_lags=leaky_lags,
         )
+
+    def _get_all_lookback_features(self) -> list[LagFeature | RollingFeature]:
+        return self.lags + self.rolling_means
+
+    def get_leaky_features(self) -> list[LagFeature | RollingFeature]:
+        """List features (like lagged power) that could cause lookahead bias, allowing the pipeline
+        to selectively nullify them based on the forecast lead time."""
+        return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
+
+    def requires_weather_data(self) -> bool:
+        lookback_features_require_weather = any(
+            [feature.is_weather_feature() for feature in self._get_all_lookback_features()]
+        )
+        static_features_require_weather = any(
+            [feature in ["windchill"] for feature in self.static_features]
+        )
+        # TODO: Include .weather_features if we implement that.
+        return lookback_features_require_weather or static_features_require_weather
 
 
 def engineer_features(
@@ -235,14 +250,7 @@ def engineer_features(
 
     parsed_features = ParsedFeatures.from_strings(selected_features)
 
-    # Check if weather features are requested
-    # TODO: Maybe move this code into `ParsedFeatures.weather_features_requested`
-    weather_features_requested = (
-        any(lag_feat.base_col != "power" for lag_feat in parsed_features.lags)
-        or any(roll_feat.base_col != "power" for roll_feat in parsed_features.rolling_means)
-        or len(parsed_features.static_features) > 0
-    )
-    if nwp_lf is None and weather_features_requested:
+    if nwp_lf is None and parsed_features.requires_weather_data():
         raise ValueError("Weather features were requested but no NWP data was provided.")
 
     # Process NWP data
@@ -289,7 +297,6 @@ def _process_nwp_data(
 
     processed_nwp = calculate_lead_time(nwp_lf)
 
-    # Simplify weather lag check (TODO 4)
     weather_lag_requested = any(lag_feat.base_col != "power" for lag_feat in parsed_features.lags)
 
     historical_weather = None
@@ -329,9 +336,7 @@ def _apply_post_join_features(
                 source_lf = historical_weather
 
         if lag_feat.base_col in source_lf.collect_schema().names():
-            engineered_lf = apply_lag_feature(
-                engineered_lf, source_lf, lag_feat.base_col, lag_feat.hours
-            )
+            engineered_lf = apply_lag_feature(engineered_lf, source_lf, lag_feat)
 
     # Rolling Means
     for rolling_feat in parsed_features.rolling_means:
@@ -348,7 +353,7 @@ def _apply_post_join_features(
 
 
 def apply_lag_feature(
-    target_lf: pl.LazyFrame, source_lf: pl.LazyFrame, base_col: BaseColumn, lag_hours: int
+    target_lf: pl.LazyFrame, source_lf: pl.LazyFrame, lag_feature: LagFeature
 ) -> pl.LazyFrame:
     """
     Applies a lag feature using a time-aware lazy self-join.
@@ -361,13 +366,15 @@ def apply_lag_feature(
     Args:
         target_lf: The LazyFrame to apply the lag to.
         source_lf: The LazyFrame containing the historical data to pull from.
-        base_col: The column to lag (e.g., 'power').
-        lag_hours: The number of hours to lag.
+        lag_feature: The LagFeature.
 
     Returns:
         A LazyFrame with the new lagged column.
     """
     # Create a dataframe with the target time we want to join against
+    lag_hours = lag_feature.hours
+    base_col = lag_feature.base_col
+
     lf_with_target_time = target_lf.with_columns(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_hours)
     )
@@ -386,7 +393,7 @@ def apply_lag_feature(
     right_lf = source_lf.select(
         *join_keys,
         pl.col("valid_time"),
-        pl.col(base_col).alias(f"{base_col}_lag_{lag_hours}h"),
+        pl.col(base_col).alias(f"{lag_feature.string_repr}"),
     )
 
     # Join target_lf with right_lf
@@ -438,7 +445,7 @@ def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFra
 
 
 def apply_rolling_mean_feature(
-    lf: pl.LazyFrame, base_col: BaseColumn, window_hours: int
+    lf: pl.LazyFrame, base_col: WeatherFeature, window_hours: int
 ) -> pl.LazyFrame:
     """
     Applies a rolling mean feature using time-aware rolling aggregations.
@@ -473,7 +480,7 @@ def apply_rolling_mean_feature(
 def apply_latest_weekly_lag_feature(
     lf: pl.LazyFrame,
     source_lf: pl.LazyFrame,
-    base_col: BaseColumn,
+    base_col: WeatherFeature,
     new_col: str,
     join_cols: list[Literal["time_series_id", "ensemble_member"]],
 ) -> pl.LazyFrame:
