@@ -18,7 +18,7 @@ import math
 import re
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Annotated, ClassVar, Final, Literal, Self, cast, get_args
+from typing import Annotated, ClassVar, Final, Literal, Self, Sequence, cast, get_args
 
 import patito as pt
 import polars as pl
@@ -345,8 +345,9 @@ def _apply_post_join_features(
             )
 
     # Nullify leaky lags
-    if parsed_features.leaky_lags and "lead_time_hours" in engineered_lf.collect_schema().names():
-        engineered_lf = nullify_leaky_lags(engineered_lf, parsed_features.leaky_lags)
+    leaky_features = parsed_features.get_leaky_features()
+    if leaky_features and "lead_time_hours" in engineered_lf.collect_schema().names():
+        engineered_lf = nullify_leaky_lags(engineered_lf, leaky_features)
 
     return engineered_lf
 
@@ -417,7 +418,9 @@ def calculate_lead_time(lf: pl.LazyFrame) -> pl.LazyFrame:
     return lf
 
 
-def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFrame:
+def nullify_leaky_lags(
+    lf: pl.LazyFrame, leaky_features: Sequence[LagFeature | RollingFeature]
+) -> pl.LazyFrame:
     """
     Nullifies lagged features that would cause lookahead bias.
 
@@ -433,12 +436,12 @@ def nullify_leaky_lags(lf: pl.LazyFrame, lag_cols: dict[str, int]) -> pl.LazyFra
     Returns:
         A LazyFrame with leaky lag columns set to null.
     """
-    for col_name, lag_hours in lag_cols.items():
+    for feature in leaky_features:
         lf = lf.with_columns(
-            pl.when(pl.col("lead_time_hours") >= lag_hours)
+            pl.when(pl.col("lead_time_hours") >= feature.hours)
             .then(pl.lit(None))
-            .otherwise(pl.col(col_name))
-            .alias(col_name)
+            .otherwise(pl.col(feature.base_col))
+            .alias(feature.base_col)
         )
     return lf
 
