@@ -332,7 +332,9 @@ def engineer_features(
         if missing_cols:
             raise ValueError(f"Feature engineering failed to create or find: {missing_cols}")
 
+    # TODO: Can we use the get_args(SafeInputBaseColumns) on the line below?
     base_cols = ["valid_time", "time_series_id", "time_series_type", "power"]
+    # TODO: Are these two if blocks necessary? Won't "lead_time_hours" and "ensemble_member" always be present?
     if "lead_time_hours" in engineered_lf.collect_schema().names():
         base_cols.append("lead_time_hours")
     if "ensemble_member" in engineered_lf.collect_schema().names():
