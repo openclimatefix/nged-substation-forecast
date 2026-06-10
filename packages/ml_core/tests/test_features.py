@@ -555,3 +555,107 @@ def test_engineer_features_raises_value_error_when_weather_requested_but_nwp_non
             nwp=None,
             selected_features={"windchill"},
         )
+
+
+def test_parsed_features_raw_weather_features():
+    """Verify that raw weather features are parsed correctly.
+
+    This test ensures that raw weather variables (e.g., 'temperature_2m') are correctly
+    identified and parsed into the `weather_features` list, and that requesting them
+    correctly triggers the requirement for weather (NWP) data.
+    """
+    selected = {"temperature_2m", "wind_speed_10m"}
+    parsed = ParsedFeatures.from_strings(selected)
+
+    assert set(parsed.weather_features) == {"temperature_2m", "wind_speed_10m"}
+    assert parsed.requires_weather_data() is True
+
+
+def test_parsed_features_safe_input_base_columns():
+    """Verify that safe input base columns are parsed correctly.
+
+    This test ensures that base columns that are safe to use as direct input features
+    (e.g., 'lead_time_hours', 'time_series_type') are correctly identified and parsed
+    into the `base_features` list, allowing downstream models to use them without
+    triggering target leakage or index column errors.
+    """
+    selected = {"lead_time_hours", "time_series_type"}
+    parsed = ParsedFeatures.from_strings(selected)
+
+    assert set(parsed.base_features) == {"lead_time_hours", "time_series_type"}
+
+
+def test_parsed_features_forbids_power_target_leakage():
+    """Verify that requesting 'power' as an input feature raises a ValueError.
+
+    This test ensures that the target leakage prevention guardrail is active. Requesting
+    the raw target variable 'power' as an input feature must raise a clear, helpful
+    ValueError explaining target leakage and guiding the user to use lagged power features.
+    """
+    with pytest.raises(
+        ValueError,
+        match="The target variable 'power' cannot be requested as an input feature",
+    ) as exc_info:
+        ParsedFeatures.from_strings({"power"})
+
+    assert "prevent target leakage" in str(exc_info.value)
+    assert "power_lag_24h" in str(exc_info.value)
+
+
+def test_parsed_features_forbids_valid_time_index():
+    """Verify that requesting 'valid_time' as an input feature raises a ValueError.
+
+    This test ensures that the index column guardrail is active. Requesting 'valid_time'
+    as an input feature must raise a clear, helpful ValueError explaining that it is an
+    index column and guiding the user to use local time features instead.
+    """
+    with pytest.raises(
+        ValueError,
+        match="The index column 'valid_time' cannot be requested as an input feature",
+    ) as exc_info:
+        ParsedFeatures.from_strings({"valid_time"})
+
+    assert "local_time_of_day_sin" in str(exc_info.value)
+
+
+def test_engineer_features_raises_weather_error_for_raw_weather_feature():
+    """Verify that calling engineer_features with a raw weather feature and no NWP raises a ValueError.
+
+    This test ensures that if a raw weather feature (e.g., 'temperature_2m') is requested
+    but no NWP data is provided, the pipeline fails fast with a specific, helpful error
+    message rather than a generic missing column error later in the pipeline.
+    """
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time": [valid_time],
+            "power": [100.0],
+        }
+    )
+    metadata_df = pl.DataFrame(
+        {
+            "time_series_id": [123],
+            "time_series_name": ["ALFORD 33 11kV S STN"],
+            "time_series_type": ["BESS"],
+            "units": ["MW"],
+            "licence_area": ["EMids"],
+            "substation_number": [1],
+            "substation_type": ["BSP"],
+            "latitude": [52.0],
+            "longitude": [-1.0],
+            "h3_res_5": [123456789],
+        }
+    )
+
+    with pytest.raises(
+        ValueError, match="Weather features were requested but no NWP data was provided"
+    ):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=None,
+            selected_features={"temperature_2m"},
+        )

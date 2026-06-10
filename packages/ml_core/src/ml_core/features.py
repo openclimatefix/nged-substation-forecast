@@ -57,14 +57,22 @@ TimeFeature = Literal[
     "local_utc_offset",
 ]
 
-TIME_FEATURES: Final[set[TimeFeature]] = set(get_args(TimeFeature))
+
+# Base columns that are safe to use as direct input features for the ML model.
+# These do not cause target leakage or lookahead bias.
+SafeInputBaseColumn = Literal[
+    "time_series_id",
+    "time_series_type",
+    "lead_time_hours",
+    "ensemble_member",
+]
 
 
 # Static features registry
 # These are basic features that don't require parameterization.
 StaticFeature = Literal["windchill"]
 
-STATIC_FEATURE_REGISTRY: dict[StaticFeature, pl.Expr] = {
+STATIC_FEATURE_REGISTRY: Final[dict[StaticFeature, pl.Expr]] = {
     "windchill": (
         13.12
         + 0.6215 * pl.col("temperature_2m")
@@ -120,6 +128,8 @@ class LagFeature(BaseLookbackFeature):
     base_col: WeatherFeature | Literal["power"]
 
     def is_leaky(self) -> bool:
+        """A power lag is only known at inference time if the lagged time is in the past
+        relative to the init time."""
         return self.base_col == "power"
 
 
@@ -136,6 +146,8 @@ class RollingFeature(BaseLookbackFeature):
     SUFFIX: ClassVar[str] = "rolling_mean"
 
     def is_leaky(self) -> bool:
+        """Weather forecasts (NWP) are available for the future, so a weather lag (e.g., temperature
+        6 hours ago relative to the forecast target time) is always known at inference time."""
         return False
 
 
@@ -158,12 +170,18 @@ class ParsedFeatures:
         time_features: List of time-based features. Triggers timezone conversions. Energy
             consumption is driven by human behavior, which follows local time (including DST),
             not UTC.
+        weather_features: List of raw weather features. Identifies raw weather variables
+            requested directly as input features.
+        base_features: List of safe input base columns. Identifies base columns
+            requested directly as input features.
     """
 
     lags: list[LagFeature]
     rolling_means: list[RollingFeature]
     static_features: list[StaticFeature]
     time_features: list[TimeFeature]
+    weather_features: list[WeatherFeature]
+    base_features: list[SafeInputBaseColumn]
 
     @classmethod
     def from_strings(cls, selected_features: set[str]) -> Self:
@@ -174,6 +192,13 @@ class ParsedFeatures:
             logic from the execution logic. It specifically identifies lags on the target variable
             (`power`) and flags them in the `get_leaky_features` method, ensuring the execution phase knows
             exactly which features require lags to be nullified.
+
+            Furthermore, this parser enforces strict architectural guardrails to prevent target leakage
+            and index column misuse. For example, requesting the raw target variable 'power' as an input
+            feature is forbidden because it would allow downstream models to learn a trivial identity function,
+            rendering them useless at inference time when the actual power is unknown. Similarly, 'valid_time'
+            is an index column and should not be used directly as a feature; instead, local time features
+            should be used to capture behavioral patterns.
 
         Args:
             selected_features: A set of raw feature name strings requested for engineering. Valid Includes all
@@ -187,6 +212,8 @@ class ParsedFeatures:
         rolling_means: list[RollingFeature] = []
         static_features: list[StaticFeature] = []
         time_features: list[TimeFeature] = []
+        weather_features: list[WeatherFeature] = []
+        base_features: list[SafeInputBaseColumn] = []
 
         for feature_name in selected_features:
             if LagFeature.SUFFIX in feature_name and RollingFeature.SUFFIX in feature_name:
@@ -201,12 +228,31 @@ class ParsedFeatures:
             elif feature_name in STATIC_FEATURE_REGISTRY:
                 static_features.append(cast(StaticFeature, feature_name))
 
-            elif feature_name in TIME_FEATURES:
+            elif feature_name in get_args(TimeFeature):
                 time_features.append(cast(TimeFeature, feature_name))
 
-            # TODO: Extract WeatherFeature and PowerFeatures?
+            elif feature_name == "power":
+                # Target leakage prevention guardrail:
+                raise ValueError(
+                    "The target variable 'power' cannot be requested as an input feature "
+                    "in 'selected_features' to prevent target leakage. Use lagged power features "
+                    "(e.g., 'power_lag_24h') instead."
+                )
 
-            elif feature_name not in get_args(WeatherFeature):
+            elif feature_name == "valid_time":
+                # Index column guardrail:
+                raise ValueError(
+                    "The index column 'valid_time' cannot be requested as an input feature. "
+                    "Use local time features (e.g., 'local_time_of_day_sin') instead."
+                )
+
+            elif feature_name in get_args(WeatherFeature):
+                weather_features.append(cast(WeatherFeature, feature_name))
+
+            elif feature_name in get_args(SafeInputBaseColumn):
+                base_features.append(cast(SafeInputBaseColumn, feature_name))
+
+            else:
                 raise ValueError(f"Unrecognised feature name: {feature_name}")
 
         return cls(
@@ -214,6 +260,8 @@ class ParsedFeatures:
             rolling_means=rolling_means,
             static_features=static_features,
             time_features=time_features,
+            weather_features=weather_features,
+            base_features=base_features,
         )
 
     def _get_all_lookback_features(self) -> list[LagFeature | RollingFeature]:
@@ -225,14 +273,24 @@ class ParsedFeatures:
         return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
 
     def requires_weather_data(self) -> bool:
+        """Determine if the requested features require weather (NWP) data.
+
+        This checks:
+        1. If any lookback features (lags or rolling means) are based on weather variables.
+        2. If any static features (like windchill) require weather variables.
+        3. If any raw weather features are requested directly.
+        """
         lookback_features_require_weather = any(
             [feature.is_weather_feature() for feature in self._get_all_lookback_features()]
         )
         static_features_require_weather = any(
             [feature in ["windchill"] for feature in self.static_features]
         )
-        # TODO: Include .weather_features if we implement that.
-        return lookback_features_require_weather or static_features_require_weather
+        return (
+            lookback_features_require_weather
+            or static_features_require_weather
+            or len(self.weather_features) > 0
+        )
 
 
 def engineer_features(
