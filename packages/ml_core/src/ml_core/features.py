@@ -408,8 +408,6 @@ def _join_nwp_bulk_mode(
         result = power_with_metadata.with_columns(
             power_fcst_init_time=pl.col("valid_time"),
             nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
-            nwp_lead_time_hours=pl.lit(None, dtype=pl.Float32),
-            ensemble_member=pl.lit(None, dtype=pl.UInt8),
         )
     else:
         nwp_with_init = processed_nwp.with_columns(
@@ -445,10 +443,7 @@ def _join_nwp_single_run(
         nwp_init_time=pl.lit(nwp_init_time_val),
     )
     if processed_nwp is None:
-        result = power_with_init.with_columns(
-            nwp_lead_time_hours=pl.lit(None, dtype=pl.Float32),
-            ensemble_member=pl.lit(None, dtype=pl.UInt8),
-        )
+        result = power_with_init
     else:
         result = power_with_init.join(
             processed_nwp, on=["time_series_id", "valid_time", "nwp_init_time"], how="left"
@@ -558,17 +553,19 @@ def _apply_power_lag(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
     )
 
+    has_ensemble = "ensemble_member" in source_lf.collect_schema().names()
+    id_keys = ["time_series_id", "ensemble_member"] if has_ensemble else ["time_series_id"]
+
     right_lf = source_lf.select(
-        "time_series_id",
-        "ensemble_member",
+        *id_keys,
         pl.col("valid_time"),
         pl.col("power").alias(lag_feature.string_repr),
     )
 
     return lf_with_target_time.join(
         right_lf,
-        left_on=["time_series_id", "ensemble_member", "target_time"],
-        right_on=["time_series_id", "ensemble_member", "valid_time"],
+        left_on=[*id_keys, "target_time"],
+        right_on=[*id_keys, "valid_time"],
         how="left",
     ).drop("target_time")
 

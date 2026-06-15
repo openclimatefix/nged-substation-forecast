@@ -48,7 +48,7 @@ class AllFeatures(pt.Model):
     )
 
     power: float = pt.Field(dtype=pl.Float32)
-    nwp_lead_time_hours: float = pt.Field(dtype=pl.Float32)
+    nwp_lead_time_hours: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
 
     # Weather features
     temperature_2m: float | None = _FEATURE_DTYPE
