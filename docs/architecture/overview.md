@@ -15,7 +15,7 @@ The system is designed as a modular monorepo using [uv workspaces](https://docs.
 
 ## The Universal Model Interface
 
-To decouple the Dagster data pipeline from the ML code, all models are saved using native MLflow flavors (e.g., `mlflow.xgboost.log_model`), which serialize the raw model object directly (see [ADR-005](../architecture_decision_records/005-zero-magic-ml-pipeline.md)).
+To decouple the Dagster data pipeline from the ML code, all models are saved using native MLflow flavors (e.g., `mlflow.xgboost.log_model`), which serialize the raw model object directly.
 
 **The Adapter Pattern**: The model wrapper encapsulates the model weights and all translation logic.
 
