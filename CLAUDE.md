@@ -66,8 +66,8 @@ All tabular data flowing through the system is validated with **Patito** models.
 **Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are nullified via `nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run for past target times.
 
 Two operating modes:
-- **Production/backtest**: `power_fcst_init_time` is provided; NWP is joined on `(time_series_id, valid_time, nwp_init_time)`.
-- **Bulk training**: `power_fcst_init_time` is `None`; it is derived as `nwp_init_time + nwp_publication_delay_hours`.
+- **Bulk training and multi-run backtesting** (recommended for most callers): `power_fcst_init_time` is `None`; it is derived per-row as `nwp_init_time + nwp_publication_delay_hours`.
+- **Single-run inference or backfilling**: `power_fcst_init_time` is provided; NWP is joined on `(time_series_id, valid_time, nwp_init_time)` for the one matching NWP run.
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 

@@ -2,7 +2,7 @@
 
 Architecture/Flow:
     `engineer_features` is the main orchestrator of this module. It takes raw string requests,
-    compiles them into structured instructions using `ParsedFeatures.from_selected_features`, joins the necessary
+    compiles them into structured instructions using `ParsedFeatures.from_strings`, joins the necessary
     base data (power, weather, metadata), and then executes the instructions via
     `_apply_post_join_features`.
 
@@ -135,8 +135,9 @@ class LagFeature(BaseLookbackFeature):
     base_col: WeatherFeature | Literal["power"]
 
     def is_leaky(self) -> bool:
-        """A power lag is only known at inference time if the lagged time is in the past
-        relative to the init time."""
+        """Power lags are always leaky: observed power may not exist at forecast-issue time
+        if the lagged observation post-dates power_fcst_init_time. Per-row nullification is
+        handled downstream by _nullify_leaky_lags."""
         return self.base_col == "power"
 
 
@@ -153,8 +154,9 @@ class RollingFeature(BaseLookbackFeature):
     SUFFIX: ClassVar[str] = "rolling_mean"
 
     def is_leaky(self) -> bool:
-        """Weather forecasts (NWP) are available for the future, so a weather lag (e.g., temperature
-        6 hours ago relative to the forecast target time) is always known at inference time."""
+        """Weather rolling means are never leaky: NWP forecasts are available for future valid_times,
+        so a weather rolling mean (e.g., mean temperature over the 6h window ending at valid_time)
+        is always known at inference time."""
         return False
 
 
@@ -208,7 +210,7 @@ class ParsedFeatures:
             should be used to capture behavioral patterns.
 
         Args:
-            selected_features: A set of raw feature name strings requested for engineering. Valid Includes all
+            selected_features: A set of raw feature name strings requested for engineering. Valid values include all
             TIME_FEATURES, and all StaticFeatures, and feature names like 'power_lag_24h' and
             'temperature_2m_rolling_mean_6h'.
 
