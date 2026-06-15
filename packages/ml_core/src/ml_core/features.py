@@ -7,7 +7,7 @@ Architecture/Flow:
     `_apply_post_join_features`.
 
 Nullify Leaky Lags Rationale:
-    `nullify_leaky_lags` is called at the end of the pipeline to enforce physical forecasting
+    `_nullify_leaky_lags` is called at the end of the pipeline to enforce physical forecasting
     constraints. In a real-world scenario, you cannot use a 24-hour lag if you are forecasting
     48 hours ahead (the 24-hour lag hasn't happened yet at the time the forecast is issued).
     This function prevents lookahead bias by nullifying any lag that is shorter than or equal
@@ -285,10 +285,10 @@ class ParsedFeatures:
         3. If any raw weather features are requested directly.
         """
         lookback_features_require_weather = any(
-            [feature.is_weather_feature() for feature in self._get_all_lookback_features()]
+            feature.is_weather_feature() for feature in self._get_all_lookback_features()
         )
         static_features_require_weather = any(
-            [feature in ["windchill"] for feature in self.static_features]
+            feature in ["windchill"] for feature in self.static_features
         )
         return (
             lookback_features_require_weather
@@ -303,6 +303,7 @@ def engineer_features(
     time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
     nwp: pt.LazyFrame[NwpOnDisk] | None = None,
     power_fcst_init_time: datetime | None = None,
+    nwp_init_time: datetime | None = None,
     nwp_publication_delay_hours: int = 6,
 ) -> pt.LazyFrame[AllFeatures]:
     """Engineer features.
@@ -323,19 +324,35 @@ def engineer_features(
             historical dataset here and filter the output to valid_time >= power_fcst_init_time
             before evaluating.
 
-            **Single datetime — real-time production inference only:**
+            **Single datetime — real-time production inference or backfilling:**
             A constant power_fcst_init_time is stamped onto every row, and the NWP join
-            matches exclusively the one NWP run whose nwp_init_time equals
-            power_fcst_init_time - nwp_publication_delay_hours. This branch is only
-            appropriate when power_time_series contains observations for a single forecast
-            run. Passing a multi-run dataset (e.g., a full year of data) will silently
-            produce null weather features for every row except those belonging to the
-            matching NWP run.
+            matches exclusively the one NWP run identified by nwp_init_time (see below).
+            This branch is only appropriate when power_time_series contains observations
+            for a single forecast run. Passing a multi-run dataset (e.g., a full year of
+            data) will silently produce null weather features for every row except those
+            belonging to the matching NWP run.
+
+        nwp_init_time: The NWP run to join in single-run mode (when power_fcst_init_time
+            is not None).
+
+            **Live production:** pass the init_time of the NWP run you actually downloaded.
+            This is the preferred path because it is exact regardless of publication delays.
+
+            **Backfilling / None:** if omitted, nwp_init_time is derived as
+            power_fcst_init_time - nwp_publication_delay_hours (useful when replaying
+            historical runs and the exact run is not known).
+
+            Must be None when power_fcst_init_time is None (bulk mode).
 
         nwp_publication_delay_hours: The delay in hours between the initialization time
-            of the NWP forecast and when it becomes publicly available for use in power
-            forecasting.
+            of the NWP forecast and when it becomes publicly available. Used only when
+            nwp_init_time is None and power_fcst_init_time is not None.
     """
+    if nwp_init_time is not None and power_fcst_init_time is None:
+        raise ValueError(
+            "nwp_init_time can only be provided in single-run mode (when power_fcst_init_time "
+            "is not None). In bulk mode, nwp_init_time is derived per-row from the NWP data."
+        )
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     nwp_lf = pl.LazyFrame._from_pyldf(nwp._ldf) if nwp is not None else None
@@ -344,7 +361,14 @@ def engineer_features(
     if nwp_lf is None and parsed_features.requires_weather_data():
         raise ValueError("Weather features were requested but no NWP data was provided.")
 
-    processed_nwp, historical_weather = _process_nwp_data(nwp_lf, parsed_features)
+    processed_nwp = _process_nwp(nwp_lf) if nwp_lf is not None else None
+    weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
+    historical_weather = (
+        _build_historical_weather(processed_nwp)
+        if processed_nwp is not None and weather_lags
+        else None
+    )
+
     power_with_metadata = power_lf.join(metadata_lf, on="time_series_id", how="left")
 
     if power_fcst_init_time is None:
@@ -353,7 +377,11 @@ def engineer_features(
         )
     else:
         raw_data = _join_nwp_single_run(
-            power_with_metadata, processed_nwp, power_fcst_init_time, nwp_publication_delay_hours
+            power_with_metadata,
+            processed_nwp,
+            power_fcst_init_time,
+            nwp_init_time,
+            nwp_publication_delay_hours,
         )
 
     engineered_lf = _apply_post_join_features(
@@ -398,14 +426,20 @@ def _join_nwp_single_run(
     power_with_metadata: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None,
     power_fcst_init_time: datetime,
+    nwp_init_time: datetime | None,
     nwp_publication_delay_hours: int,
 ) -> pl.LazyFrame:
-    """Power-centric join for single-run production inference.
+    """Power-centric join for single-run production inference or backfilling.
 
     Stamps a constant power_fcst_init_time across all rows and joins exclusively the one NWP
-    run whose nwp_init_time equals power_fcst_init_time - nwp_publication_delay_hours.
+    run identified by nwp_init_time. If nwp_init_time is None, it is derived as
+    power_fcst_init_time - nwp_publication_delay_hours.
     """
-    nwp_init_time_val = power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
+    nwp_init_time_val = (
+        nwp_init_time
+        if nwp_init_time is not None
+        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
+    )
     power_with_init = power_with_metadata.with_columns(
         power_fcst_init_time=pl.lit(power_fcst_init_time),
         nwp_init_time=pl.lit(nwp_init_time_val),
@@ -450,36 +484,28 @@ def _select_output_columns(
     return engineered_lf.select(cols_to_select)
 
 
-def _process_nwp_data(
-    nwp_lf: pl.LazyFrame | None,
-    parsed_features: ParsedFeatures,
-) -> tuple[pl.LazyFrame | None, pl.LazyFrame | None]:
-    """Process NWP data and prepare historical weather for lag features.
+def _process_nwp(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Calculates NWP lead time and renames 'init_time' to 'nwp_init_time'."""
+    return nwp_lf.with_columns(
+        nwp_lead_time_hours=(
+            (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
+        ).cast(pl.Float32)
+    ).rename({"init_time": "nwp_init_time"})
 
-    Unlike the previous implementation, we do NOT pre-aggregate to the "best" forecast run.
-    Instead, we keep all available forecast runs (init_times) to allow the caller to perform
-    an explicit temporal alignment join. This naturally prevents row multiplication and lookahead bias.
+
+def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:
+    """Builds the historical weather frame used by weather lag features.
+
+    Uses the control member (ensemble_member == 0) and selects the freshest forecast run
+    (shortest lead time) for each (time_series_id, valid_time).
     """
-    if nwp_lf is None:
-        return None, None
-
-    processed_nwp = calculate_nwp_lead_time(nwp_lf)
-
-    weather_lag_requested = any(lag_feat.base_col != "power" for lag_feat in parsed_features.lags)
-
-    historical_weather = None
-    if weather_lag_requested:
-        # For weather lags, we use the control member (ensemble_member == 0)
-        # and select the "freshest" forecast run (shortest lead time) for each valid_time.
-        historical_weather = (
-            processed_nwp.filter(pl.col("ensemble_member") == 0)
-            .drop("ensemble_member")
-            .group_by(["time_series_id", "valid_time"])
-            .agg(pl.all().sort_by("nwp_lead_time_hours").first())
-            .sort(["time_series_id", "valid_time"])
-        )
-
-    return processed_nwp, historical_weather
+    return (
+        processed_nwp.filter(pl.col("ensemble_member") == 0)
+        .drop("ensemble_member")
+        .group_by(["time_series_id", "valid_time"])
+        .agg(pl.all().sort_by("nwp_lead_time_hours").first())
+        .sort(["time_series_id", "valid_time"])
+    )
 
 
 def _apply_post_join_features(
@@ -491,168 +517,126 @@ def _apply_post_join_features(
     """Applies requested features dynamically based on parsed feature configurations."""
     engineered_lf = raw_data
 
-    # Static and Local Time
     if parsed_features.time_features:
-        engineered_lf = apply_local_time_features(engineered_lf)
+        engineered_lf = _apply_local_time_features(engineered_lf)
 
     if parsed_features.static_features:
         exprs = [STATIC_FEATURE_REGISTRY[f] for f in parsed_features.static_features]
         engineered_lf = engineered_lf.with_columns(exprs)
 
-    # Lags
     for lag_feat in parsed_features.lags:
         if lag_feat.base_col == "power":
-            engineered_lf = apply_lag_feature(
-                engineered_lf,
-                source_lf=engineered_lf,
-                lag_feature=lag_feat,
-            )
+            engineered_lf = _apply_power_lag(engineered_lf, engineered_lf, lag_feat)
         else:
             if processed_nwp is None:
                 raise ValueError(
                     "processed_nwp cannot be None when applying a weather lag feature."
                 )
-            # Weather lag: use the dual-strategy
-            engineered_lf = apply_lag_feature(
-                engineered_lf,
-                source_lf=processed_nwp,
-                lag_feature=lag_feat,
-                historical_weather_lf=historical_weather,
+            engineered_lf = _apply_weather_lag(
+                engineered_lf, processed_nwp, lag_feat, historical_weather
             )
 
-    # Rolling Means
     for rolling_feat in parsed_features.rolling_means:
-        if rolling_feat.base_col in engineered_lf.collect_schema().names():
-            engineered_lf = apply_rolling_mean_feature(
-                engineered_lf, rolling_feat.base_col, rolling_feat.hours
-            )
+        engineered_lf = _apply_rolling_mean_feature(
+            engineered_lf, rolling_feat.base_col, rolling_feat.hours
+        )
 
-    # Nullify leaky lags
     leaky_features = parsed_features.get_leaky_features()
     if leaky_features and "power_fcst_init_time" in engineered_lf.collect_schema().names():
-        engineered_lf = nullify_leaky_lags(engineered_lf, leaky_features)
+        engineered_lf = _nullify_leaky_lags(engineered_lf, leaky_features)
 
     return engineered_lf
 
 
-def apply_lag_feature(
+def _apply_power_lag(
     target_lf: pl.LazyFrame,
     source_lf: pl.LazyFrame,
     lag_feature: LagFeature,
-    historical_weather_lf: pl.LazyFrame | None = None,
 ) -> pl.LazyFrame:
-    """Applies a lag feature using a time-aware lazy self-join.
+    """Applies a power lag using a time-aware lazy self-join on valid_time - lag_hours."""
+    lf_with_target_time = target_lf.with_columns(
+        target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
+    )
 
-    For power lags, we use an exact join on valid_time - lag_hours.
-    For weather lags, we implement a dual-strategy:
-      - If target_time > power_fcst_init_time (future relative to power forecast run time),
-        we use the exact same NWP run (nwp_init_time) and ensemble member as the weather used for valid_time.
-      - If target_time <= power_fcst_init_time (past relative to power forecast run time),
-        we use the "freshest" NWP run (control member, ensemble 0) for that target time.
+    right_lf = source_lf.select(
+        "time_series_id",
+        "ensemble_member",
+        pl.col("valid_time"),
+        pl.col("power").alias(lag_feature.string_repr),
+    )
+
+    return lf_with_target_time.join(
+        right_lf,
+        left_on=["time_series_id", "ensemble_member", "target_time"],
+        right_on=["time_series_id", "ensemble_member", "valid_time"],
+        how="left",
+    ).drop("target_time")
+
+
+def _apply_weather_lag(
+    target_lf: pl.LazyFrame,
+    source_lf: pl.LazyFrame,
+    lag_feature: LagFeature,
+    historical_weather_lf: pl.LazyFrame | None,
+) -> pl.LazyFrame:
+    """Applies a weather lag using a dual-strategy time-aware join.
+
+    - If target_time > power_fcst_init_time (in the NWP forecast window), uses the exact same
+      NWP run (nwp_init_time) and ensemble member as the weather used for valid_time.
+    - If target_time <= power_fcst_init_time (in the past), uses the freshest NWP run
+      (control member, ensemble 0) for that target time.
     """
-    lag_hours = lag_feature.hours
     base_col = lag_feature.base_col
 
-    if base_col == "power":
-        # Power lag: exact join on valid_time - lag_hours
-        lf_with_target_time = target_lf.with_columns(
-            target_time=pl.col("valid_time") - pl.duration(hours=lag_hours)
-        )
+    lf_with_target_time = target_lf.with_columns(
+        target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
+    )
 
-        join_keys = ["time_series_id"]
-        if (
-            "ensemble_member" in target_lf.collect_schema().names()
-            and "ensemble_member" in source_lf.collect_schema().names()
-        ):
-            join_keys.append("ensemble_member")
+    # Join 1: Same-Run Join (for target_time > power_fcst_init_time)
+    right_same_lf = source_lf.select(
+        "time_series_id",
+        "nwp_init_time",
+        "ensemble_member",
+        pl.col("valid_time").alias("target_time"),
+        pl.col(base_col).alias(f"{lag_feature.string_repr}_same_run"),
+    )
 
-        right_lf = source_lf.select(
-            *join_keys,
-            pl.col("valid_time"),
-            pl.col(base_col).alias(lag_feature.string_repr),
-        )
+    lf_joined = lf_with_target_time.join(
+        right_same_lf,
+        on=["time_series_id", "nwp_init_time", "ensemble_member", "target_time"],
+        how="left",
+    )
 
-        return lf_with_target_time.join(
-            right_lf,
-            left_on=join_keys + ["target_time"],
-            right_on=join_keys + ["valid_time"],
-            how="left",
-        ).drop("target_time")
-
-    else:
-        # Weather lag: dual-strategy
-        lf_with_target_time = target_lf.with_columns(
-            target_time=pl.col("valid_time") - pl.duration(hours=lag_hours)
-        )
-
-        # Join 1: Same-Run Join (for target_time > power_fcst_init_time)
-        join_keys_same = ["time_series_id", "nwp_init_time"]
-        if (
-            "ensemble_member" in target_lf.collect_schema().names()
-            and "ensemble_member" in source_lf.collect_schema().names()
-        ):
-            join_keys_same.append("ensemble_member")
-
-        right_same_lf = source_lf.select(
-            *join_keys_same,
+    # Join 2: Freshest-Run Join (for target_time <= power_fcst_init_time)
+    if historical_weather_lf is not None:
+        right_freshest_lf = historical_weather_lf.select(
+            "time_series_id",
             pl.col("valid_time").alias("target_time"),
-            pl.col(base_col).alias(f"{lag_feature.string_repr}_same_run"),
+            pl.col(base_col).alias(f"{lag_feature.string_repr}_freshest_run"),
+        )
+        lf_joined = lf_joined.join(
+            right_freshest_lf, on=["time_series_id", "target_time"], how="left"
+        )
+    else:
+        lf_joined = lf_joined.with_columns(
+            **{f"{lag_feature.string_repr}_freshest_run": pl.lit(None, dtype=pl.Float32)}
         )
 
-        lf_joined = lf_with_target_time.join(
-            right_same_lf,
-            on=join_keys_same + ["target_time"],
-            how="left",
-        )
-
-        # Join 2: Freshest-Run Join (for target_time <= power_fcst_init_time)
-        if historical_weather_lf is not None:
-            right_freshest_lf = historical_weather_lf.select(
-                "time_series_id",
-                pl.col("valid_time").alias("target_time"),
-                pl.col(base_col).alias(f"{lag_feature.string_repr}_freshest_run"),
-            )
-
-            lf_joined = lf_joined.join(
-                right_freshest_lf,
-                on=["time_series_id", "target_time"],
-                how="left",
-            )
-        else:
-            lf_joined = lf_joined.with_columns(
-                **{f"{lag_feature.string_repr}_freshest_run": pl.lit(None, dtype=pl.Float32)}
-            )
-
-        # Combine using the dual-strategy
-        return lf_joined.with_columns(
-            pl.when(pl.col("target_time") > pl.col("power_fcst_init_time"))
-            .then(pl.col(f"{lag_feature.string_repr}_same_run"))
-            .otherwise(pl.col(f"{lag_feature.string_repr}_freshest_run"))
-            .alias(lag_feature.string_repr)
-        ).drop(
-            [
-                f"{lag_feature.string_repr}_same_run",
-                f"{lag_feature.string_repr}_freshest_run",
-                "target_time",
-            ]
-        )
+    return lf_joined.with_columns(
+        pl.when(pl.col("target_time") > pl.col("power_fcst_init_time"))
+        .then(pl.col(f"{lag_feature.string_repr}_same_run"))
+        .otherwise(pl.col(f"{lag_feature.string_repr}_freshest_run"))
+        .alias(lag_feature.string_repr)
+    ).drop(
+        [
+            f"{lag_feature.string_repr}_same_run",
+            f"{lag_feature.string_repr}_freshest_run",
+            "target_time",
+        ]
+    )
 
 
-def calculate_nwp_lead_time(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Calculates the NWP lead time in hours if 'init_time' is present in the schema.
-
-    Also renames 'init_time' to 'nwp_init_time' to distinguish it from power forecast init time.
-    """
-    if "init_time" in lf.collect_schema().names():
-        return lf.with_columns(
-            nwp_lead_time_hours=(
-                (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
-            ).cast(pl.Float32)
-        ).rename({"init_time": "nwp_init_time"})
-    return lf
-
-
-def nullify_leaky_lags(
+def _nullify_leaky_lags(
     lf: pl.LazyFrame, leaky_features: Sequence[LagFeature | RollingFeature]
 ) -> pl.LazyFrame:
     """Nullifies lagged features that would cause lookahead bias.
@@ -665,7 +649,6 @@ def nullify_leaky_lags(
     To prevent over-nullification (FLAW-001), we calculate power_lead_time_hours
     relative to power_fcst_init_time, not nwp_init_time.
     """
-    # Calculate power_lead_time_hours dynamically
     lf = lf.with_columns(
         power_lead_time_hours=(
             (pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_seconds() / 3600
@@ -683,46 +666,29 @@ def nullify_leaky_lags(
             .alias(feature.string_repr)
         )
 
-    # Drop power_lead_time_hours to keep the schema clean
     return lf.drop("power_lead_time_hours")
 
 
-def apply_rolling_mean_feature(
+def _apply_rolling_mean_feature(
     lf: pl.LazyFrame, base_col: WeatherFeature, window_hours: int
 ) -> pl.LazyFrame:
+    """Applies a rolling mean feature, grouped by (time_series_id, nwp_init_time, ensemble_member).
+
+    Grouping by nwp_init_time prevents the rolling window from mixing values across different
+    NWP runs, which would contaminate the feature with data from other forecast initializations.
     """
-    Applies a rolling mean feature using time-aware rolling aggregations.
-
-    Why dynamically check for ensemble_member? If we group by time_series_id alone
-    when ensemble members are present, the rolling window will mix data across different
-    ensemble members, causing data contamination. Grouping by ensemble_member (if present)
-    prevents this.
-
-    Args:
-        lf: The LazyFrame to apply the rolling mean to.
-        base_col: The column to calculate the rolling mean for.
-        window_hours: The window size in hours.
-
-    Returns:
-        A LazyFrame with the new rolling mean column.
-    """
-    schema_names = lf.collect_schema().names()
-    group_by_cols = ["time_series_id"]
-    if "ensemble_member" in schema_names:
-        group_by_cols.append("ensemble_member")
-
     rolled = lf.rolling(
-        index_column="valid_time", period=f"{window_hours}h", group_by=group_by_cols
+        index_column="valid_time",
+        period=f"{window_hours}h",
+        group_by=["time_series_id", "nwp_init_time", "ensemble_member"],
     ).agg(pl.col(base_col).mean().alias(f"{base_col}_rolling_mean_{window_hours}h"))
 
-    # Join the result back to the original lf
-    join_keys = group_by_cols + ["valid_time"]
+    join_keys = ["time_series_id", "nwp_init_time", "ensemble_member", "valid_time"]
     return lf.join(rolled, on=join_keys, how="left")
 
 
-def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
-    """
-    Applies local time features (time of day, day of week, time of year) to the LazyFrame.
+def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Applies local time features (time of day, day of week, time of year) to the LazyFrame.
 
     Why local time? Energy consumption patterns are driven by human behavior, which follows
     local time (including Daylight Saving Time), not UTC. A 9 AM peak in winter (UTC) is
@@ -734,16 +700,12 @@ def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
     Returns:
         A LazyFrame with new local time features.
     """
-    # Convert valid_time to Europe/London timezone
-    # We first ensure it's treated as UTC, then convert to the target timezone
     lf = lf.with_columns(
         local_time=pl.col("valid_time")
         .dt.replace_time_zone("UTC")
         .dt.convert_time_zone("Europe/London")
     )
 
-    # Calculate local UTC offset in hours
-    # base_utc_offset + dst_offset gives the total offset from UTC
     lf = lf.with_columns(
         local_utc_offset=(
             pl.col("local_time").dt.base_utc_offset() + pl.col("local_time").dt.dst_offset()
@@ -751,17 +713,10 @@ def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
         / 3600
     )
 
-    # Calculate local time of day (0-24)
     local_hour_float = pl.col("local_time").dt.hour() + pl.col("local_time").dt.minute() / 60.0
-
-    # Calculate local time of year (0-1)
-    # Using 366 to safely handle leap years without complex logic
     local_year_fraction = pl.col("local_time").dt.ordinal_day() / 366.0
-
-    # Calculate local day of week (1-7)
     local_weekday = pl.col("local_time").dt.weekday()
 
-    # TODO: This map could just be a list, surely?
     weekday_map = {
         1: "Monday",
         2: "Tuesday",
@@ -784,5 +739,4 @@ def apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
         ),
     )
 
-    # Drop the temporary local_time column
     return lf.drop("local_time")

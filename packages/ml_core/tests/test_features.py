@@ -10,12 +10,12 @@ from ml_core.features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
     ParsedFeatures,
-    apply_lag_feature,
-    apply_local_time_features,
-    calculate_nwp_lead_time,
+    _apply_local_time_features,
+    _apply_power_lag,
+    _apply_rolling_mean_feature,
+    _nullify_leaky_lags,
+    _process_nwp,
     engineer_features,
-    nullify_leaky_lags,
-    apply_rolling_mean_feature,
 )
 
 
@@ -69,11 +69,12 @@ def test_engineer_features_bulk_mode_keeps_all_nwp_runs():
     assert set(engineered["ensemble_member"].to_list()) == {1, 2}
 
 
-def test_apply_lag_feature_with_source():
-    # Test that apply_lag_feature correctly pulls from source_lf
+def test_apply_power_lag_with_source():
+    # Test that _apply_power_lag correctly pulls from source_lf
     target_df = pl.DataFrame(
         {
             "time_series_id": ["ts1"],
+            "ensemble_member": [0],
             "valid_time": [datetime(2023, 1, 1, 12, 0)],
             "power": [100.0],
         }
@@ -82,18 +83,19 @@ def test_apply_lag_feature_with_source():
     source_df = pl.DataFrame(
         {
             "time_series_id": ["ts1"],
+            "ensemble_member": [0],
             "valid_time": [datetime(2023, 1, 1, 11, 0)],
             "power": [90.0],
         }
     )
 
     lag_feat = LagFeature.from_str("power_lag_1h")
-    result = apply_lag_feature(target_df.lazy(), source_df.lazy(), lag_feat).collect()
+    result = _apply_power_lag(target_df.lazy(), source_df.lazy(), lag_feat).collect()
 
     assert result["power_lag_1h"][0] == 90.0
 
 
-def test_calculate_nwp_lead_time():
+def test_process_nwp():
     df = pl.DataFrame(
         {
             "valid_time": [
@@ -107,31 +109,12 @@ def test_calculate_nwp_lead_time():
         }
     )
 
-    lf = df.lazy()
-    result_lf = calculate_nwp_lead_time(lf)
-    result = result_lf.collect()
+    result = _process_nwp(df.lazy()).collect()
 
     assert "nwp_lead_time_hours" in result.columns
     assert "nwp_init_time" in result.columns
     assert "init_time" not in result.columns
     assert result["nwp_lead_time_hours"].to_list() == [12.0, 13.0]
-
-
-def test_calculate_nwp_lead_time_no_init_time():
-    df = pl.DataFrame(
-        {
-            "valid_time": [
-                datetime(2020, 1, 1, 12),
-                datetime(2020, 1, 1, 13),
-            ]
-        }
-    )
-
-    lf = df.lazy()
-    result_lf = calculate_nwp_lead_time(lf)
-    result = result_lf.collect()
-
-    assert "nwp_lead_time_hours" not in result.columns
 
 
 def test_windchill_feature():
@@ -172,7 +155,7 @@ def test_nullify_leaky_lags():
     # lead_time 30h >= 24h -> nullify
     # lead_time 50h >= 24h -> nullify
     leaky_features = [LagFeature.from_str("power_lag_24h")]
-    result = nullify_leaky_lags(lf, leaky_features).collect()
+    result = _nullify_leaky_lags(lf, leaky_features).collect()
 
     assert result["power_lag_24h"].to_list() == [100.0, None, None]
 
@@ -188,7 +171,7 @@ def test_apply_local_time_features():
         }
     )
 
-    result = apply_local_time_features(df.lazy()).collect()
+    result = _apply_local_time_features(df.lazy()).collect()
 
     assert "local_utc_offset" in result.columns
     assert result["local_utc_offset"].to_list() == [0.0, 1.0]
@@ -281,10 +264,12 @@ def test_parsed_features_from_selected_features_malformed_patterns():
 
 
 def test_apply_rolling_mean_feature():
-    # Create a simple dataframe with hourly data
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(
         {
             "time_series_id": ["ts1"] * 4,
+            "nwp_init_time": [nwp_init_time] * 4,
+            "ensemble_member": [0] * 4,
             "valid_time": [
                 datetime(2023, 1, 1, 0, 0),
                 datetime(2023, 1, 1, 1, 0),
@@ -299,15 +284,17 @@ def test_apply_rolling_mean_feature():
     # For 1:00: mean([10.0, 20.0]) = 15.0
     # For 2:00: mean([20.0, 30.0]) = 25.0
     # For 3:00: mean([30.0, 40.0]) = 35.0
-    result = apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
+    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
     assert "temperature_2m_rolling_mean_2h" in result.columns
     assert result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 25.0, 35.0]
 
 
 def test_apply_rolling_mean_feature_with_ensemble():
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(
         {
             "time_series_id": ["ts1"] * 4,
+            "nwp_init_time": [nwp_init_time] * 4,
             "ensemble_member": [1, 1, 2, 2],
             "valid_time": [
                 datetime(2023, 1, 1, 0, 0),
@@ -318,10 +305,35 @@ def test_apply_rolling_mean_feature_with_ensemble():
             "temperature_2m": [10.0, 20.0, 100.0, 200.0],
         }
     )
-    result = apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
+    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
     assert "temperature_2m_rolling_mean_2h" in result.columns
     # Sort to ensure deterministic order
     sorted_result = result.sort(["ensemble_member", "valid_time"])
+    assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
+
+
+def test_apply_rolling_mean_feature_does_not_mix_nwp_runs():
+    # Two NWP runs covering the same valid_times; the rolling mean must stay within each run.
+    init_time_a = datetime(2023, 1, 1, 0, 0)
+    init_time_b = datetime(2023, 1, 1, 6, 0)
+    df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * 4,
+            "nwp_init_time": [init_time_a, init_time_a, init_time_b, init_time_b],
+            "ensemble_member": [0] * 4,
+            "valid_time": [
+                datetime(2023, 1, 1, 6, 0),
+                datetime(2023, 1, 1, 7, 0),
+                datetime(2023, 1, 1, 6, 0),
+                datetime(2023, 1, 1, 7, 0),
+            ],
+            "temperature_2m": [10.0, 20.0, 100.0, 200.0],
+        }
+    )
+    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
+    sorted_result = result.sort(["nwp_init_time", "valid_time"])
+    # Run A: mean([10]) = 10, mean([10, 20]) = 15
+    # Run B: mean([100]) = 100, mean([100, 200]) = 150
     assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
 
 
@@ -563,6 +575,24 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     assert nwp_init_times == {nwp_init_time_1, nwp_init_time_2}
 
 
+def test_engineer_features_raises_when_nwp_init_time_given_without_power_fcst_init_time():
+    power_df = pl.DataFrame(
+        {"time_series_id": ["ts1"], "time": [datetime(2023, 1, 1, 12)], "power": [100.0]}
+    )
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    with pytest.raises(ValueError, match="nwp_init_time can only be provided in single-run mode"):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            selected_features={"power_lag_24h"},
+            power_fcst_init_time=None,
+            nwp_init_time=datetime(2023, 1, 1, 0),
+        )
+
+
 def test_engineer_features_weather_lag_leakage_prevention():
     # Create dummy data to verify weather lag leakage prevention
     valid_time = datetime(2026, 6, 11, 12, 0)
@@ -619,7 +649,7 @@ def test_engineer_features_weather_lag_leakage_prevention():
         nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
         selected_features={"temperature_2m", "temperature_2m_lag_2h", "temperature_2m_lag_36h"},
         power_fcst_init_time=power_fcst_init_time,
-        nwp_publication_delay_hours=6,
+        nwp_init_time=nwp_init_time,
     ).collect()
 
     # Verify that temperature_2m_lag_2h is 10.0 (from run 1), NOT 12.0 (from run 2)
