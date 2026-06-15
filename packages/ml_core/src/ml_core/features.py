@@ -103,7 +103,10 @@ class BaseLookbackFeature(BaseModel):
 
     base_col: WeatherFeature
     hours: Hours
-    string_repr: str  # String representation, e.g. 'power_lag_24h'
+
+    @property
+    def string_repr(self) -> str:
+        return f"{self.base_col}_{self.SUFFIX}_{self.hours}h"
 
     @classmethod
     def from_str(cls, value: str) -> Self:
@@ -113,7 +116,7 @@ class BaseLookbackFeature(BaseModel):
         if not match:
             raise ValueError(f"Invalid {cls.SUFFIX} feature name format: {value}")
         base_col, hours_str = match.groups()
-        return cls(base_col=base_col, hours=hours_str, string_repr=value)  # ty: ignore[invalid-argument-type]
+        return cls(base_col=base_col, hours=int(hours_str))  # ty: ignore[invalid-argument-type]
 
     @abstractmethod
     def is_leaky(self) -> bool:
@@ -527,6 +530,7 @@ def _apply_post_join_features(
                 raise ValueError(
                     "processed_nwp cannot be None when applying a weather lag feature."
                 )
+            assert historical_weather is not None
             engineered_lf = _apply_weather_lag(
                 engineered_lf, processed_nwp, lag_feat, historical_weather
             )
@@ -574,7 +578,7 @@ def _apply_weather_lag(
     target_lf: pl.LazyFrame,
     source_lf: pl.LazyFrame,
     lag_feature: LagFeature,
-    historical_weather_lf: pl.LazyFrame | None,
+    historical_weather_lf: pl.LazyFrame,
 ) -> pl.LazyFrame:
     """Applies a weather lag using a dual-strategy time-aware join.
 
@@ -605,19 +609,12 @@ def _apply_weather_lag(
     )
 
     # Join 2: Freshest-Run Join (for target_time <= power_fcst_init_time)
-    if historical_weather_lf is not None:
-        right_freshest_lf = historical_weather_lf.select(
-            "time_series_id",
-            pl.col("valid_time").alias("target_time"),
-            pl.col(base_col).alias(f"{lag_feature.string_repr}_freshest_run"),
-        )
-        lf_joined = lf_joined.join(
-            right_freshest_lf, on=["time_series_id", "target_time"], how="left"
-        )
-    else:
-        lf_joined = lf_joined.with_columns(
-            **{f"{lag_feature.string_repr}_freshest_run": pl.lit(None, dtype=pl.Float32)}
-        )
+    right_freshest_lf = historical_weather_lf.select(
+        "time_series_id",
+        pl.col("valid_time").alias("target_time"),
+        pl.col(base_col).alias(f"{lag_feature.string_repr}_freshest_run"),
+    )
+    lf_joined = lf_joined.join(right_freshest_lf, on=["time_series_id", "target_time"], how="left")
 
     return lf_joined.with_columns(
         pl.when(pl.col("target_time") > pl.col("power_fcst_init_time"))

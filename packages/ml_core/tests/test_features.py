@@ -19,56 +19,6 @@ from ml_core.features import (
 )
 
 
-def test_engineer_features_bulk_mode_keeps_all_nwp_runs():
-    # Create dummy data
-    # 2 ensemble members, 2 lead times for the same valid_time
-    # In bulk training mode, we keep all available forecast runs (init_times)
-    # because they represent different initialization times under the expanded primary key design.
-    valid_time = datetime(2023, 1, 1, 12, 0)
-
-    nwp_df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1", "ts1", "ts1", "ts1"],
-            "valid_time": [valid_time, valid_time, valid_time, valid_time],
-            "ensemble_member": [1, 1, 2, 2],
-            "init_time": [
-                valid_time - timedelta(hours=10),  # lead 10
-                valid_time - timedelta(hours=20),  # lead 20
-                valid_time - timedelta(hours=5),  # lead 5
-                valid_time - timedelta(hours=15),  # lead 15
-            ],
-            "temperature_2m": [10.0, 11.0, 12.0, 13.0],
-        }
-    )
-
-    power_df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1"],
-            "time": [valid_time],
-            "power": [100.0],
-        }
-    )
-
-    metadata_df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1"],
-            "time_series_type": ["substation"],
-        }
-    )
-
-    # Run engineer_features
-    engineered = engineer_features(
-        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
-        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
-        selected_features={"temperature_2m", "temperature_2m_lag_24h"},
-    ).collect()
-
-    # In bulk training mode, we keep all 4 rows because they represent different forecast runs
-    assert len(engineered) == 4
-    assert set(engineered["ensemble_member"].to_list()) == {1, 2}
-
-
 def test_apply_power_lag_with_source():
     # Test that _apply_power_lag correctly pulls from source_lf
     target_df = pl.DataFrame(
@@ -140,24 +90,21 @@ def test_nullify_leaky_lags():
     power_fcst_init_time = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(
         {
-            "power_fcst_init_time": [power_fcst_init_time] * 3,
+            "power_fcst_init_time": [power_fcst_init_time] * 4,
             "valid_time": [
-                power_fcst_init_time + timedelta(hours=10),
-                power_fcst_init_time + timedelta(hours=30),
-                power_fcst_init_time + timedelta(hours=50),
+                power_fcst_init_time + timedelta(hours=10),  # 10h lead < 24h -> keep
+                power_fcst_init_time + timedelta(hours=24),  # 24h lead == 24h -> nullify (>=)
+                power_fcst_init_time + timedelta(hours=30),  # 30h lead > 24h -> nullify
+                power_fcst_init_time + timedelta(hours=50),  # 50h lead > 24h -> nullify
             ],
-            "power_lag_24h": [100.0, 200.0, 300.0],
+            "power_lag_24h": [100.0, 200.0, 300.0, 400.0],
         }
     )
     lf = df.lazy()
-    # 24h lag:
-    # lead_time 10h < 24h -> keep
-    # lead_time 30h >= 24h -> nullify
-    # lead_time 50h >= 24h -> nullify
     leaky_features = [LagFeature.from_str("power_lag_24h")]
     result = _nullify_leaky_lags(lf, leaky_features).collect()
 
-    assert result["power_lag_24h"].to_list() == [100.0, None, None]
+    assert result["power_lag_24h"].to_list() == [100.0, None, None, None]
 
 
 def test_apply_local_time_features():
@@ -658,3 +605,132 @@ def test_engineer_features_weather_lag_leakage_prevention():
 
     # Verify that temperature_2m_lag_36h is 8.0 (from freshest run)
     assert engineered["temperature_2m_lag_36h"][0] == 8.0
+
+
+def test_engineer_features_power_lag_nullification_end_to_end():
+    """Power lags are null when lead_time >= lag_hours, including the exact boundary case."""
+    power_fcst_init_time = datetime(2023, 1, 3, 0, 0)
+    # Power data spans both the lag source times and the forecast valid times so we confirm
+    # that the lag VALUE exists before nullification (it's not null due to missing data).
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * 6,
+            "time": [
+                datetime(2023, 1, 2, 6, 0),  # lag source for 6h-lead row
+                datetime(2023, 1, 3, 0, 0),  # lag source for 24h-lead row (boundary)
+                datetime(2023, 1, 3, 6, 0),  # valid_time_1: 6h lead  — lag kept
+                datetime(2023, 1, 3, 12, 0),  # lag source for 36h-lead row
+                datetime(2023, 1, 4, 0, 0),  # valid_time_2: 24h lead — nullified (lead == lag)
+                datetime(2023, 1, 4, 12, 0),  # valid_time_3: 36h lead — nullified
+            ],
+            "power": [50.0, 60.0, 80.0, 70.0, 90.0, 100.0],
+        }
+    )
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    result = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        selected_features={"power_lag_24h"},
+        power_fcst_init_time=power_fcst_init_time,
+    ).collect()
+
+    row_6h = result.filter(pl.col("valid_time") == datetime(2023, 1, 3, 6, 0))
+    row_24h = result.filter(pl.col("valid_time") == datetime(2023, 1, 4, 0, 0))
+    row_36h = result.filter(pl.col("valid_time") == datetime(2023, 1, 4, 12, 0))
+
+    assert row_6h["power_lag_24h"][0] == 50.0  # 6h lead < 24h lag: kept
+    assert row_24h["power_lag_24h"][0] is None  # 24h lead == 24h lag: nullified (>= boundary)
+    assert row_36h["power_lag_24h"][0] is None  # 36h lead > 24h lag: nullified
+
+
+def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
+    """In bulk mode, weather lag boundary differs per row because power_fcst_init_time varies.
+
+    NWP run A: power_fcst_init_time = 2023-01-01 06:00  (init 00:00 + 6h delay)
+    NWP run B: power_fcst_init_time = 2023-01-02 06:00  (init 00:00 + 6h delay)
+    valid_time = 2023-01-02 12:00, lag = 12h → target_time = 2023-01-02 00:00
+
+    Run A: target_time (Jan-02 00:00) > power_fcst_init_time (Jan-01 06:00) → same-run join → 10.0
+    Run B: target_time (Jan-02 00:00) < power_fcst_init_time (Jan-02 06:00) → freshest-run join → 20.0
+    """
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * 4,
+            "valid_time": [
+                datetime(2023, 1, 2, 12),  # run A: main valid_time
+                datetime(2023, 1, 2, 0),  # run A: lag target (temperature = 10.0)
+                datetime(2023, 1, 2, 12),  # run B: main valid_time
+                datetime(
+                    2023, 1, 2, 0
+                ),  # run B: lag target and freshest at that time (temperature = 20.0)
+            ],
+            "ensemble_member": [0, 0, 0, 0],
+            "init_time": [
+                datetime(2023, 1, 1, 0),
+                datetime(2023, 1, 1, 0),
+                datetime(2023, 1, 2, 0),
+                datetime(2023, 1, 2, 0),
+            ],
+            "temperature_2m": [15.0, 10.0, 18.0, 20.0],
+        }
+    )
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "time": [datetime(2023, 1, 2, 12)],
+            "power": [100.0],
+        }
+    )
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    all_rows = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        selected_features={"temperature_2m_lag_12h"},
+        power_fcst_init_time=None,
+        nwp_publication_delay_hours=6,
+    ).collect()
+
+    # Bulk mode is NWP-centric: it fans out over all NWP (valid_time, init_time) pairs.
+    # Filter to only the forecast valid_time rows (the lag-target rows also appear with power=null).
+    result = all_rows.filter(pl.col("valid_time") == datetime(2023, 1, 2, 12, 0)).sort(
+        "nwp_init_time"
+    )
+
+    assert len(result) == 2
+    # Run A row: same-run join because target_time is in run A's forecast window
+    assert result["temperature_2m_lag_12h"][0] == 10.0
+    # Run B row: freshest-run join because target_time is before run B's power_fcst_init_time
+    assert result["temperature_2m_lag_12h"][1] == 20.0
+
+
+def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
+    """In bulk mode, power_fcst_init_time must equal nwp_init_time + nwp_publication_delay_hours."""
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    nwp_publication_delay_hours = 9  # non-default to confirm the parameter is used
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "valid_time": [valid_time],
+            "ensemble_member": [0],
+            "init_time": [nwp_init_time],
+            "temperature_2m": [10.0],
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    result = engineer_features(
+        power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
+        time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        selected_features={"temperature_2m"},
+        nwp_publication_delay_hours=nwp_publication_delay_hours,
+    ).collect()
+
+    expected = nwp_init_time + timedelta(hours=nwp_publication_delay_hours)
+    assert result["power_fcst_init_time"][0] == expected
