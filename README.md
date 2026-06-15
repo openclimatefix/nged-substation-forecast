@@ -52,8 +52,6 @@ Optional: To allow Dagster to remember its state after you shut it down:
 
 ### Testing
 
-- **Run only the fast tests**: `uv run pytest -m "not slow"`
-- **Run only the slow tests**: `uv run pytest -m "slow"`
 - **Run all tests**: `uv run pytest`
 - **Run tests with coverage**: `uv run pytest --cov`
 

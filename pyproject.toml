@@ -23,6 +23,7 @@ dependencies = [
     "requests>=2.31.0",
     "mlflow-skinny",
     "dynamical_data",
+    "nged_data",
     "contracts",
     "ml_core",
     "obstore",
@@ -44,7 +45,6 @@ dev = [
     "ruff>=0.14.13",
     "ty>=0.0.16",
     "unittest-xml-reporting>=4.0.0",
-    "hypothesis>=6.0.0",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
     "mkdocs-include-markdown-plugin>=7.2.2",
@@ -105,8 +105,5 @@ exclude = ["docs/v2_design/"]
 [tool.pytest.ini_options]
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 norecursedirs = [".venv", "venv", ".git", "__pycache__", ".hypothesis", "docs/v2_design/"]

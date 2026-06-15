@@ -8,7 +8,7 @@ features:
     - "ecmwf_ens_0_25deg"
   feature_names:
     - "time_series_id"
-    - "lead_time_hours"
+    - "nwp_lead_time_hours"
     - "nwp_init_hour"
     - "latest_available_weekly_power_lag"
     - "temperature_2m"

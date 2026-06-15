@@ -11,10 +11,12 @@ def test_all_features_validation():
         pt.DataFrame(
             {
                 "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
                 "time_series_id": [123],
                 "time_series_type": ["BESS"],
                 "power": [10.0],
-                "lead_time_hours": [1.0],
+                "nwp_lead_time_hours": [1.0],
                 "local_day_of_week": ["Monday"],
             }
         )
@@ -29,10 +31,12 @@ def test_all_features_invalid_day_of_week():
     df = pt.DataFrame(
         {
             "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
             "time_series_id": [123],
             "time_series_type": ["BESS"],
             "power": [10.0],
-            "lead_time_hours": [1.0],
+            "nwp_lead_time_hours": [1.0],
             "local_day_of_week": ["InvalidDay"],
         }
     ).set_model(AllFeatures)
@@ -47,10 +51,12 @@ def test_all_features_invalid_time_series_type():
     df = pt.DataFrame(
         {
             "valid_time": [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+            "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
+            "nwp_init_time": [datetime(2025, 12, 31, 18, 0, tzinfo=timezone.utc)],
             "time_series_id": [123],
             "time_series_type": ["InvalidType"],
             "power": [10.0],
-            "lead_time_hours": [1.0],
+            "nwp_lead_time_hours": [1.0],
             "local_day_of_week": ["Monday"],
         }
     ).set_model(AllFeatures)
@@ -67,7 +73,7 @@ def test_metrics_validation():
             {
                 "time_series_id": [123],
                 "power_fcst_model_name": ["model_a"],
-                "lead_time_hours": [1.0],
+                "nwp_lead_time_hours": [1.0],
                 "mae": [0.5],
             }
         )
