@@ -4,7 +4,6 @@ __generated_with = "0.23.5"
 app = marimo.App(width="full")
 
 with app.setup:
-    import marimo as mo
     from lonboard import Map, H3HexagonLayer
 
     from geo.great_britain.load import load_gb_boundary

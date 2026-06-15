@@ -4,20 +4,21 @@ __generated_with = "0.23.6"
 app = marimo.App(width="full")
 
 with app.setup:
-    import marimo as mo
     from datetime import datetime, timezone
-    import polars as pl
-    from lonboard import Map, H3HexagonLayer
-    import altair as alt
-    from contracts.settings import Settings, PROJECT_ROOT
     from typing import cast
+
+    import altair as alt
+    import polars as pl
+    from contracts.settings import Settings
+    from contracts.weather_schemas import NwpOnDisk
+    from lonboard import H3HexagonLayer, Map
 
     SETTINGS = Settings()
 
 
 @app.cell
 def _():
-    df = pl.scan_delta(PROJECT_ROOT / SETTINGS.nwp_data_path).drop("nwp_model_id").cast({"h3_index": pl.UInt64})
+    df = NwpOnDisk.scan_delta().drop("nwp_model_id")
     return (df,)
 
 
@@ -84,8 +85,8 @@ def _(ENS_MEMBER_TO_PLOT, NWP_INIT_TIME, VALID_TIME_TO_PLOT, df):
 
 @app.cell
 def _(NWP_VAR_TO_PLOT, filtered_df):
-    from palettable.matplotlib import Viridis_20  # ty: ignore[unresolved-import]
     from lonboard.colormap import apply_continuous_cmap
+    from palettable.matplotlib import Viridis_20  # ty: ignore[unresolved-import]
 
     values = filtered_df[NWP_VAR_TO_PLOT]
     min_bound = values.min()

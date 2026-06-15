@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Final
 
 import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator
@@ -7,16 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 url_adapter = TypeAdapter(AnyHttpUrl)
 
 
-def find_project_root() -> Path:
-    """Find the project root by looking for uv.lock."""
-    current = Path.cwd()
-    for parent in [current, *current.parents]:
-        if (parent / "uv.lock").exists():
-            return parent
-    return current
-
-
-PROJECT_ROOT = find_project_root()
+PROJECT_ROOT: Final[Path] = Path(__file__).parents[4]
 
 
 class DataQualitySettings(BaseSettings):
@@ -85,12 +77,12 @@ class Settings(BaseSettings):
         )
 
     # Paths to the data we manage
-    nged_data_path: Path = Path("data/NGED")
-    nwp_data_path: Path = Path("data/NWP")
-    power_forecasts_data_path: Path = Path("data/power_forecasts")
-    forecast_metrics_data_path: Path = Path("data/forecast_metrics")
-    trained_ml_model_params_base_path: Path = Path("data/trained_ML_model_params")
-    h3_grid_weights_path: Path = Path("data/h3_grid_weights.parquet")
+    nged_data_path: Path = PROJECT_ROOT / "data" / "NGED"
+    nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
+    power_forecasts_data_path: Path = PROJECT_ROOT / "data" / "power_forecasts"
+    forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
+    trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
+    h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

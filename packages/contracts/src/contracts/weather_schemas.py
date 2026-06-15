@@ -8,15 +8,19 @@ import patito as pt
 import polars as pl
 
 from contracts.common import validate_schema
+from contracts.settings import PROJECT_ROOT, Settings
 
 from .common import UTC_DATETIME_DTYPE
 
 # TODO: These paths should be moved to `contracts.settings`.
-_METADATA_PATH: Final[Path] = Path(__file__).parent.parent.parent.parent.parent / "metadata"
+_METADATA_PATH: Final[Path] = PROJECT_ROOT / "metadata"
 _NWP_METADATA_CSV_PATH: Final[Path] = _METADATA_PATH / "nwp_metadata.csv"
 _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH: Final[Path] = (
     _METADATA_PATH / "scaling_params_for_ecmwf_ens_0_25_degree.csv"
 )
+
+
+SETTINGS = Settings()
 
 
 class NwpModelId(StrEnum):
@@ -317,7 +321,7 @@ class NwpOnDisk(_NwpBase):
     def to_nwp_in_memory(
         cls,
         nwp_on_disk: pt.DataFrame[Self],
-        scaling_params: pt.DataFrame[NwpScalingParams],
+        scaling_params: pt.DataFrame[NwpScalingParams] | None = None,
     ) -> pt.DataFrame[NwpInMemory]: ...
 
     # overload to indicate that you get a LazyFrame back if you feed in a LazyFrame
@@ -326,16 +330,18 @@ class NwpOnDisk(_NwpBase):
     def to_nwp_in_memory(
         cls,
         nwp_on_disk: pt.LazyFrame[Self],
-        scaling_params: pt.DataFrame[NwpScalingParams],
+        scaling_params: pt.DataFrame[NwpScalingParams] | None = None,
     ) -> pt.LazyFrame[NwpInMemory]: ...
 
     @classmethod
     def to_nwp_in_memory(
         cls,
         nwp_on_disk: pt.DataFrame[Self] | pt.LazyFrame[Self],
-        scaling_params: pt.DataFrame[NwpScalingParams],
+        scaling_params: pt.DataFrame[NwpScalingParams] | None = None,
     ) -> pt.DataFrame[NwpInMemory] | pt.LazyFrame[NwpInMemory]:
         """Scale integer columns to floating point representations in physical units."""
+        scaling_params = NwpScalingParams.load() if scaling_params is None else scaling_params
+
         exprs = []
         for row in scaling_params.to_dicts():
             col_name = row["col_name"]
@@ -359,6 +365,11 @@ class NwpOnDisk(_NwpBase):
         # And we want this function to be compatible with LazyFrames.
         validate_schema(NwpInMemory, nwp_in_memory)
         return nwp_in_memory
+
+    @classmethod
+    def scan_delta(cls, path: Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
+        df = pl.scan_delta(path)
+        return pt.LazyFrame.from_existing(df).set_model(cls).cast()
 
 
 class NwpScalingParams(pt.Model):

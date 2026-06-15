@@ -4,7 +4,6 @@ __generated_with = "0.23.6"
 app = marimo.App()
 
 with app.setup:
-    import marimo as mo
     from datetime import datetime, timezone
     import altair as alt
     import polars as pl
@@ -40,11 +39,16 @@ def _():
 def _(df, nwp_vars):
     def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
         # 1. Filter down to the specific init_time and h3_index
-        filtered = df.filter((pl.col("init_time") == target_init_time) & (pl.col("h3_index") == target_h3_index))
+        filtered = df.filter(
+            (pl.col("init_time") == target_init_time) & (pl.col("h3_index") == target_h3_index)
+        )
 
         # 2. Unpivot (melt) the data so we can plot all variables on a single Y-axis
         melted = filtered.unpivot(
-            on=nwp_vars, index=["valid_time", "ensemble_member"], variable_name="variable", value_name="value"
+            on=nwp_vars,
+            index=["valid_time", "ensemble_member"],
+            variable_name="variable",
+            value_name="value",
         )
 
         # 3. Create a boolean flag for missing data and a combined label for the Y-axis
@@ -57,7 +61,9 @@ def _(df, nwp_vars):
         )
 
         # 5. Build the Altair Chart
-        base = alt.Chart(plot_df).encode(y=alt.Y("row_label:N", title="Ensemble Member", sort="ascending"))
+        base = alt.Chart(plot_df).encode(
+            y=alt.Y("row_label:N", title="Ensemble Member", sort="ascending")
+        )
 
         # Layer 1: A light gray background line showing the full time series extent
         background_lines = base.mark_line(color="lightgray", strokeWidth=1).encode(
@@ -67,7 +73,7 @@ def _(df, nwp_vars):
 
         # Layer 2: Red ticks superimposed exactly where the data is missing
         missing_marks = (
-            base.transform_filter(alt.datum.is_missing == True)
+            base.transform_filter(alt.datum.is_missing)
             .mark_tick(
                 color="red",
                 thickness=3,  # Make the red mark stand out
@@ -88,7 +94,6 @@ def _(df, nwp_vars):
         )
 
         return chart
-
 
     chart = plot_null_distribution(
         df,
