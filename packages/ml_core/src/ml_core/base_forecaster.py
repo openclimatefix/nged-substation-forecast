@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import Self
 
 import patito as pt
 from contracts.ml_schemas import AllFeatures
@@ -7,34 +8,47 @@ from contracts.power_schemas import PowerForecast
 from pydantic import BaseModel
 
 
+class BaseForecasterConfig(BaseModel):
+    """Universal configuration for all forecasting models.
+
+    Subclasses add model-specific hyperparameters. Having a shared base ensures that every
+    forecaster carries its own identity (name, version, optional MLflow experiment) and its
+    feature list in one serialisable object, simplifying save/load and Hydra config wiring.
+    """
+
+    selected_features: set[str]
+    power_fcst_model_name: str
+    power_fcst_model_version: int
+    ml_flow_experiment_id: int | None = None
+
+
 class BaseForecaster(ABC):
     """Defines the universal interface for all energy forecasting ML models.
 
-    Every energy forecasting model, ranging from a simple seasonal persistence model, up to a
-    sophisticated neural net, will subclass this abstract base class. This will allow us to re-use
-    as much code as possible, and to minimise the amount of code that must be written for each new
-    ML model.
+    Every forecasting model subclasses this abstract base to allow shared Dagster assets and
+    evaluation code to remain completely agnostic to the underlying model implementation.
     """
 
-    def __init__(self, selected_features: set[str], model_params: BaseModel):
-        self.selected_features = selected_features
+    def __init__(self, model_params: BaseForecasterConfig) -> None:
         self.model_params = model_params
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Save model params. Concrete classes implement their native save logic here."""
+        """Save the trained model state to a directory."""
         pass
 
+    @classmethod
     @abstractmethod
-    def load(self, path: Path) -> None:
-        """Load model params. Concrete classes implement their native load logic here."""
+    def load(cls, path: Path) -> Self:
+        """Reconstruct a trained instance from a previously saved directory."""
         pass
 
     @abstractmethod
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
-        """Create the AllFeatures LazyFrame using features.engineer_features."""
+        """Fit the model on the given AllFeatures data."""
         pass
 
     @abstractmethod
     def predict(self, data: pt.LazyFrame[AllFeatures]) -> pt.DataFrame[PowerForecast]:
+        """Return power forecasts for all rows in the given AllFeatures data."""
         pass
