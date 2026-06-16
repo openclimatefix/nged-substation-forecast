@@ -77,9 +77,18 @@ All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatur
 
 - **Python 3.14+** required.
 - **Polars only** — pandas is strictly forbidden. Use `pl.LazyFrame` and only `.collect()` when necessary.
-- **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations in **public** function signatures only — private helpers (`_foo`) use plain `pl.DataFrame` / `pl.LazyFrame`.
+- **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
 - `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
 - All function signatures must have complete type hints including return types.
 - Never relax an existing test to make it pass.
-- `docs/v2_design/` is excluded from ruff and ty checks.
+
+## Polars Style
+
+These rules are all about making Polars code easy to read.
+
+- When casting, prefer using the `cast` method like this: `df.cast({"foo": pl.Int8})`, in favour of
+  using `df.with_columns(pl.col("foo").cast(pl.Int8))`
+- When using `.with_columns`, prefer specifying the destination column name as a key word argument
+  like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
+  `df.with_columns(pl.col("foo").expression().alias("bar"))`

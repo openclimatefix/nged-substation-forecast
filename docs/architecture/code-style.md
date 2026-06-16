@@ -24,7 +24,7 @@
 ## Data Handling
 - **Tabular Data**: Use **Polars** (`import polars as pl`) for dataframes. Pandas is strictly forbidden. Use Polars for all tabular data.
 - **Gridded/NWP Data**: Use **Xarray** and **Zarr**.
-- **Data Contracts**: Use **Patito** for defining and validating data schemas. Use Patito type annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) in **public** function signatures — these are system boundaries where validation is genuinely needed. Private helpers (`_foo`) operate on plain `pl.DataFrame` / `pl.LazyFrame`, since their inputs are already validated at the public boundary.
+- **Data Contracts**: Use **Patito** for defining and validating data schemas. Use Patito type annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Persistence**: Prefer partitioned Parquet files for tabular data.
 
 ## Machine Learning (PyTorch)
