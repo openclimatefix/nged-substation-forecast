@@ -4,6 +4,7 @@ from pathlib import Path
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
+from pydantic import BaseModel
 
 
 class BaseForecaster(ABC):
@@ -15,9 +16,7 @@ class BaseForecaster(ABC):
     ML model.
     """
 
-    # TODO: The type of `model_params` in each concrete class should be the Pydantic Model for
-    # that ML model
-    def __init__(self, selected_features: set[str], model_params: dict):
+    def __init__(self, selected_features: set[str], model_params: BaseModel):
         self.selected_features = selected_features
         self.model_params = model_params
 
