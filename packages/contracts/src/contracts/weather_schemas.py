@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import ClassVar, Final, Self, overload
+from typing import ClassVar, Final, Literal, Self, overload
 
 import patito as pt
 import polars as pl
@@ -21,6 +21,23 @@ _SCALING_PARAMS_FOR_ECMWF_ENS_0_25_DEGREE_CSV_PATH: Final[Path] = (
 
 
 SETTINGS = Settings()
+
+
+WeatherFeature = Literal[
+    "temperature_2m",
+    "dew_point_temperature_2m",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_speed_100m",
+    "wind_direction_100m",
+    "pressure_surface",
+    "pressure_reduced_to_mean_sea_level",
+    "geopotential_height_500hpa",
+    "downward_long_wave_radiation_flux_surface",
+    "downward_short_wave_radiation_flux_surface",
+    "precipitation_surface",
+    "categorical_precipitation_type_surface",
+]
 
 
 class NwpModelId(StrEnum):
@@ -83,8 +100,21 @@ class _NwpBase(pt.Model):
         ),
     )
 
-    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    # ClassVars: excluded from Patito/Pydantic model fields so they're not treated as data columns.
     categorical_var_names: ClassVar[tuple[str, ...]] = ("categorical_precipitation_type_surface",)
+    _non_var_column_names: ClassVar[frozenset[str]] = frozenset(
+        {"nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"}
+    )
+
+    @classmethod
+    def all_weather_var_names(cls) -> frozenset[str]:
+        """All meteorological variable field names (continuous + categorical)."""
+        return frozenset(cls.model_fields) - cls._non_var_column_names
+
+    @classmethod
+    def continuous_var_names(cls) -> frozenset[str]:
+        """Meteorological variable field names suitable for linear interpolation."""
+        return cls.all_weather_var_names() - frozenset(cls.categorical_var_names)
 
 
 _WIND_SPEED_DTYPE = pt.Field(

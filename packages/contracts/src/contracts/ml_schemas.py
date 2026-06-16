@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Sequence
+from typing import Literal, Sequence
 
 import patito as pt
 import polars as pl
@@ -10,6 +10,27 @@ from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES
 from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 
 _FEATURE_DTYPE = pt.Field(dtype=pl.Float32, allow_missing=True)
+
+
+TimeFeature = Literal[
+    "local_time_of_day_sin",
+    "local_time_of_day_cos",
+    "local_time_of_year_sin",
+    "local_time_of_year_cos",
+    "local_day_of_week_sin",
+    "local_day_of_week_cos",
+    "local_day_of_week",
+    "local_utc_offset",
+]
+
+SafeInputBaseColumn = Literal[
+    "time_series_id",
+    "time_series_type",
+    "nwp_lead_time_hours",
+    "ensemble_member",
+    "power_fcst_init_time",
+    "nwp_init_time",
+]
 
 
 class AllFeatures(pt.Model):
