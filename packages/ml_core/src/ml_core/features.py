@@ -24,53 +24,10 @@ from typing import Annotated, ClassVar, Final, Literal, Self, Sequence, cast, ge
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.ml_schemas import AllFeatures
+from contracts.ml_schemas import AllFeatures, SafeInputBaseColumn, TimeFeature
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpOnDisk
+from contracts.weather_schemas import NwpOnDisk, WeatherFeature
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator  # noqa: F401
-
-# Valid weather features (from NwpInMemory contract)
-WeatherFeature = Literal[
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_speed_100m",
-    "wind_direction_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
-    "categorical_precipitation_type_surface",
-]
-
-
-# Valid time features (from AllFeatures contract)
-TimeFeature = Literal[
-    "local_time_of_day_sin",
-    "local_time_of_day_cos",
-    "local_time_of_year_sin",
-    "local_time_of_year_cos",
-    "local_day_of_week_sin",
-    "local_day_of_week_cos",
-    "local_day_of_week",
-    "local_utc_offset",
-]
-
-
-# Base columns that are safe to use as direct input features for the ML model.
-# These do not cause target leakage or lookahead bias.
-SafeInputBaseColumn = Literal[
-    "time_series_id",
-    "time_series_type",
-    "nwp_lead_time_hours",
-    "ensemble_member",
-    "power_fcst_init_time",
-    "nwp_init_time",
-]
-
 
 # Static features registry
 # These are basic features that don't require parameterization.
@@ -484,13 +441,77 @@ def _select_output_columns(
     return engineered_lf.select(cols_to_select)
 
 
+def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Upsample NWP data to 30-minute resolution.
+
+    Assumes 'init_time' has already been renamed to 'nwp_init_time'. Continuous weather
+    variables are linearly interpolated within each group; categorical variables are
+    forward-filled within each group. All other columns (e.g. nwp_init_time,
+    ensemble_member) are used as group-by keys.
+
+    The implementation stays fully lazy: a 30-min time grid is generated per group via
+    datetime_ranges + explode, then the original NWP values are left-joined back in, and
+    interpolate/forward_fill are applied with over() to stay within group boundaries.
+    """
+    schema_names = nwp_lf.collect_schema().names()
+    all_weather_vars = NwpOnDisk.all_weather_var_names()
+    group_cols = [
+        col for col in schema_names if col != "valid_time" and col not in all_weather_vars
+    ]
+    continuous_cols = [col for col in schema_names if col in NwpOnDisk.continuous_var_names()]
+    categorical_cols = [
+        col for col in schema_names if col in frozenset(NwpOnDisk.categorical_var_names)
+    ]
+
+    # Build 30-min time grid per group: aggregate min/max valid_time per group,
+    # expand each row into a list of half-hourly datetimes, then explode to rows.
+    time_grid = (
+        nwp_lf.group_by(group_cols)
+        .agg(
+            pl.col("valid_time").min().alias("_start"),
+            pl.col("valid_time").max().alias("_end"),
+        )
+        .with_columns(
+            pl.datetime_ranges(
+                start=pl.col("_start"),
+                end=pl.col("_end"),
+                interval="30m",
+            ).alias("valid_time")
+        )
+        .drop("_start", "_end")
+        .explode("valid_time")
+    )
+
+    # Left-join original NWP onto the grid; new 30-min rows come in as nulls.
+    upsampled = time_grid.join(nwp_lf, on=[*group_cols, "valid_time"], how="left").sort(
+        [*group_cols, "valid_time"]
+    )
+
+    # Fill nulls within each group, never crossing group boundaries.
+    # order_by="valid_time" ensures correct temporal ordering within each group window.
+    if continuous_cols:
+        upsampled = upsampled.with_columns(
+            pl.col(col).interpolate().over(group_cols, order_by="valid_time")
+            for col in continuous_cols
+        )
+    if categorical_cols:
+        upsampled = upsampled.with_columns(
+            pl.col(col).forward_fill().over(group_cols, order_by="valid_time")
+            for col in categorical_cols
+        )
+
+    return upsampled
+
+
 def _process_nwp(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Calculates NWP lead time and renames 'init_time' to 'nwp_init_time'."""
-    return nwp_lf.with_columns(
+    """Renames 'init_time', upsamples to 30-minute resolution, and calculates NWP lead time."""
+    renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
+    upsampled = _upsample_nwp_to_half_hourly(renamed)
+    return upsampled.with_columns(
         nwp_lead_time_hours=(
-            (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
+            (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600
         ).cast(pl.Float32)
-    ).rename({"init_time": "nwp_init_time"})
+    )
 
 
 def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:

@@ -15,6 +15,7 @@ from ml_core.features import (
     _apply_rolling_mean_feature,
     _nullify_leaky_lags,
     _process_nwp,
+    _upsample_nwp_to_half_hourly,
     engineer_features,
 )
 
@@ -50,7 +51,7 @@ def test_process_nwp():
         {
             "valid_time": [
                 datetime(2020, 1, 1, 12),
-                datetime(2020, 1, 1, 13),
+                datetime(2020, 1, 1, 15),
             ],
             "init_time": [
                 datetime(2020, 1, 1, 0),
@@ -59,12 +60,174 @@ def test_process_nwp():
         }
     )
 
-    result = _process_nwp(df.lazy()).collect()
+    result = _process_nwp(df.lazy()).collect().sort("valid_time")
 
     assert "nwp_lead_time_hours" in result.columns
     assert "nwp_init_time" in result.columns
     assert "init_time" not in result.columns
-    assert result["nwp_lead_time_hours"].to_list() == [12.0, 13.0]
+    # 3-hourly input (12:00→15:00) upsampled to 30-min gives 7 rows
+    assert len(result) == 7
+    assert result["nwp_lead_time_hours"].to_list() == [12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0]
+
+
+def test_upsample_nwp_to_half_hourly_interpolates_continuous_vars():
+    """Continuous weather vars are linearly interpolated between steps."""
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
+            "ensemble_member": [0, 0],
+            "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
+            "temperature_2m": [10.0, 16.0],
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort("valid_time")
+
+    assert len(result) == 7  # 0:00, 0:30, 1:00, 1:30, 2:00, 2:30, 3:00
+    # Midpoint at 1:30: 10.0 + (3/6) * (16.0 - 10.0) = 13.0
+    mid = result.filter(pl.col("valid_time") == datetime(2020, 1, 1, 1, 30))
+    assert mid["temperature_2m"][0] == pytest.approx(13.0)
+
+
+def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
+    """Categorical vars are forward-filled, not interpolated."""
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
+            "ensemble_member": [0, 0],
+            "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
+            "categorical_precipitation_type_surface": pl.Series([0, 5], dtype=pl.UInt8),
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort("valid_time")
+
+    # At 1:30 (before the 3:00 step), categorical should still be 0
+    before = result.filter(pl.col("valid_time") == datetime(2020, 1, 1, 1, 30))
+    assert before["categorical_precipitation_type_surface"][0] == 0
+    # At 3:00, it transitions to 5
+    at = result.filter(pl.col("valid_time") == datetime(2020, 1, 1, 3, 0))
+    assert at["categorical_precipitation_type_surface"][0] == 5
+
+
+def test_upsample_nwp_no_cross_group_interpolation():
+    """interpolate().over() must not fill nulls across group boundaries.
+
+    precipitation_surface is legitimately null at lead time 0 in each NWP group.
+    After upsampling, those nulls must stay null — they must not be back-filled by
+    the preceding group's last known value via global interpolation.
+    """
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 0),  # group A: 0h, 3h
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 6),  # group B: 0h, 3h
+            ],
+            "ensemble_member": [0, 0, 0, 0],
+            "valid_time": [
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 3),
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 9),
+            ],
+            "precipitation_surface": pl.Series([None, 0.002, None, 0.003], dtype=pl.Float32),
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort(["nwp_init_time", "valid_time"])
+
+    # Group A lead-time-0 null stays null
+    a_lt0 = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 0))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 0))
+    )
+    assert a_lt0["precipitation_surface"][0] is None
+
+    # Group B lead-time-0 null must NOT be contaminated by Group A's last value (0.002)
+    b_lt0 = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 6))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 6))
+    )
+    assert b_lt0["precipitation_surface"][0] is None
+
+
+def test_upsample_nwp_no_cross_group_forward_fill():
+    """forward_fill().over() must not fill categorical nulls across group boundaries.
+
+    Group B starts with a null at lead time 0. After forward-filling, Group B's leading
+    null must NOT be filled with Group A's last known categorical value.
+    """
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 0),  # group A
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 6),  # group B
+            ],
+            "ensemble_member": [0, 0, 0, 0],
+            "valid_time": [
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 3),
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 9),
+            ],
+            # Group A: both steps have value 5. Group B: lead-time-0 is null, then 2.
+            "categorical_precipitation_type_surface": pl.Series([5, 5, None, 2], dtype=pl.UInt8),
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect().sort(["nwp_init_time", "valid_time"])
+
+    # Group B lead-time-0 (06:00) must stay null — not forward-filled from Group A's 5
+    b_lt0 = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 6))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 6))
+    )
+    assert b_lt0["categorical_precipitation_type_surface"][0] is None
+
+    # The upsampled rows between 6:00 and 9:00 should also be null (forward-filled from None)
+    b_mid = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 6))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 7, 30))
+    )
+    assert b_mid["categorical_precipitation_type_surface"][0] is None
+
+
+def test_upsample_nwp_to_half_hourly_groups_independently():
+    """Each (nwp_init_time, ensemble_member) group is upsampled independently."""
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 0),
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 6),
+            ],
+            "ensemble_member": [0, 0, 0, 0],
+            "valid_time": [
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 9),
+                datetime(2020, 1, 1, 6),
+                datetime(2020, 1, 1, 9),
+            ],
+            "temperature_2m": [10.0, 16.0, 20.0, 26.0],
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect()
+
+    # Each group spans 3h at 30-min resolution → 7 rows; 2 groups → 14 total
+    assert len(result) == 14
+
+    mid_a = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 0))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 7, 30))
+    )
+    assert mid_a["temperature_2m"][0] == pytest.approx(13.0)
+
+    mid_b = result.filter(
+        (pl.col("nwp_init_time") == datetime(2020, 1, 1, 6))
+        & (pl.col("valid_time") == datetime(2020, 1, 1, 7, 30))
+    )
+    assert mid_b["temperature_2m"][0] == pytest.approx(23.0)
 
 
 def test_windchill_feature():
