@@ -7,15 +7,6 @@ from pydantic import BaseModel, Field
 from contracts.power_schemas import FoldId
 
 
-class DataSplitConfig(BaseModel):
-    """Configuration for temporal data splitting."""
-
-    train_start: date
-    train_end: date
-    test_start: date
-    test_end: date
-
-
 class CvFoldConfig(BaseModel):
     """Configuration for a single expanding-window CV fold."""
 
