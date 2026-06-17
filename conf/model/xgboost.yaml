@@ -52,7 +52,6 @@ model_params:
   objective: "reg:squarederror"
 
   # MLflow experiment tags (used for leaderboard grouping)
-  task: "primary_substation_demand"
   model_family: "xgboost"
   weather_source: "ecmwf_control"
   training_strategy: "horizon_as_feature"
