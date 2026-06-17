@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
     trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
     h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
+    cv_power_forecasts_data_path: Path = PROJECT_ROOT / "data" / "cv_power_forecasts.delta"
+    cv_metrics_data_path: Path = PROJECT_ROOT / "data" / "cv_metrics.delta"
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(
