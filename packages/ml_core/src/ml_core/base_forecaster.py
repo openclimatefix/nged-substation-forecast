@@ -15,8 +15,8 @@ class BaseForecasterConfig(BaseModel):
     forecaster carries its own feature list and optional MLflow experiment id in one
     serialisable object, simplifying save/load and Hydra config wiring.
 
-    The tag fields (model_family, weather_source, training_strategy) are stamped onto MLflow
-    runs for leaderboard grouping. They live here so that
+    The tag fields (weather_source, training_strategy) are stamped onto MLflow runs for
+    leaderboard grouping. They live here so that
     ``hydra.utils.instantiate(model_cfg.model_params)`` validates them at load time — they
     are present in every ``conf/model/*.yaml`` file under ``model_params``.
 
@@ -27,7 +27,6 @@ class BaseForecasterConfig(BaseModel):
 
     selected_features: set[str]
     ml_flow_experiment_id: int | None = None
-    model_family: str = ""
     weather_source: str = ""
     training_strategy: str = ""
 

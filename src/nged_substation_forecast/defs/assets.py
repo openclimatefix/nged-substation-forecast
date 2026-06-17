@@ -358,7 +358,6 @@ def cv_metrics(context: AssetExecutionContext) -> None:
         # Tag with experiment dimensions for leaderboard grouping.
         mlflow.set_tags(
             {
-                "model_family": forecaster_config.model_family,
                 "weather_source": forecaster_config.weather_source,
                 "training_strategy": forecaster_config.training_strategy,
                 "power_fcst_model_name": experiment_name,
