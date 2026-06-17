@@ -78,7 +78,18 @@ class _NwpBase(pt.Model):
         description="The primary key for joining with NwpMetaData.",
     )
     init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    valid_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description=(
+            "The time for which this NWP value is valid. Most variables (temperature, wind, "
+            "pressure, geopotential) are instantaneous — they describe conditions at this moment. "
+            "Precipitation and radiation (downward_long_wave_radiation_flux_surface, "
+            "downward_short_wave_radiation_flux_surface, precipitation_surface) are period-ending "
+            "rates: each value represents the average rate over the period that ends at valid_time "
+            "(i.e. the preceding forecast step interval). Dynamical.org de-accumulates these from "
+            "ECMWF's raw cumulative fields before we receive them."
+        ),
+    )
     ensemble_member: int = pt.Field(dtype=pl.UInt8)
     h3_index: int = pt.Field(
         dtype=pl.UInt64,
