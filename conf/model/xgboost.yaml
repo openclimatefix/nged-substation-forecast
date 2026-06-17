@@ -13,13 +13,11 @@ _target_: xgboost_forecaster.forecaster.XGBoostForecaster
 model_params:
   _target_: xgboost_forecaster.forecaster.XGBoostConfig
 
-  power_fcst_model_name: "xgboost_v1"
-  power_fcst_model_version: 1
-
   selected_features:
     - "power_lag_24h"
     - "power_lag_48h"
-    - "power_lag_168h"
+    - "power_lag_168h" # 1 week ago
+    - "power_lag_336h" # 2 weeks ago
     - "local_time_of_day_sin"
     - "local_time_of_day_cos"
     - "local_time_of_year_sin"

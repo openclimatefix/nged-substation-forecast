@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Self
+from typing import ClassVar, Self
 
 import patito as pt
 from contracts.ml_schemas import AllFeatures
@@ -12,18 +12,20 @@ class BaseForecasterConfig(BaseModel):
     """Universal configuration for all forecasting models.
 
     Subclasses add model-specific hyperparameters. Having a shared base ensures that every
-    forecaster carries its own identity (name, version, optional MLflow experiment) and its
-    feature list in one serialisable object, simplifying save/load and Hydra config wiring.
+    forecaster carries its own feature list and optional MLflow experiment id in one
+    serialisable object, simplifying save/load and Hydra config wiring.
 
     The tag fields (model_family, weather_source, training_strategy) are stamped onto MLflow
     runs for leaderboard grouping. They live here so that
     ``hydra.utils.instantiate(model_cfg.model_params)`` validates them at load time — they
     are present in every ``conf/model/*.yaml`` file under ``model_params``.
+
+    Model identity (name and version) lives on the ``BaseForecaster`` class itself as
+    ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not
+    the experiment config.
     """
 
     selected_features: set[str]
-    power_fcst_model_name: str
-    power_fcst_model_version: int
     ml_flow_experiment_id: int | None = None
     model_family: str = ""
     weather_source: str = ""
@@ -36,11 +38,19 @@ class BaseForecaster(ABC):
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
 
+    Subclasses must define ``MODEL_NAME`` and ``MODEL_VERSION`` as class-level constants.
+    These are stamped onto every ``PowerForecast`` row at predict time and used as the MLflow
+    experiment name. Bumping ``MODEL_VERSION`` requires a code change (intentional), not a
+    config edit.
+
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Subclasses should call `.collect()` exactly once, as late as possible — typically right
     before handing data to the underlying model library. Callers must not collect before passing
     data in; doing so wastes memory and prevents Polars from optimising the full query plan.
     """
+
+    MODEL_NAME: ClassVar[str]
+    MODEL_VERSION: ClassVar[int]
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
         self.model_params = model_params

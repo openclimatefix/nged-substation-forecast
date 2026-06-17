@@ -293,7 +293,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "n_rows": cv_results.height,
             "n_folds": cv_results["fold_id"].n_unique(),
             "n_time_series": cv_results["time_series_id"].n_unique(),
-            "model_name": forecaster_config.power_fcst_model_name,
+            "model_name": forecaster_class.MODEL_NAME,
             "path": str(settings.power_forecasts_data_path),
         }
     )
@@ -313,7 +313,9 @@ def cv_metrics(context: AssetExecutionContext) -> None:
        leaderboard can group and filter entries.
     """
     settings = Settings()
-    _, forecaster_config = _load_model_config(PROJECT_ROOT / "conf" / "model" / "xgboost.yaml")
+    forecaster_class, forecaster_config = _load_model_config(
+        PROJECT_ROOT / "conf" / "model" / "xgboost.yaml"
+    )
 
     # --- Load data (CV rows only — exclude live production forecasts) ---
     cv_forecasts_df = PowerForecast.validate(
@@ -344,7 +346,7 @@ def cv_metrics(context: AssetExecutionContext) -> None:
 
     # --- Log aggregate metrics to MLflow ---
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    experiment_name = forecaster_config.power_fcst_model_name
+    experiment_name = forecaster_class.MODEL_NAME
     mlflow.set_experiment(experiment_name)
 
     # Compute mean-across-folds for each (metric_name, metric_param, horizon_slice).

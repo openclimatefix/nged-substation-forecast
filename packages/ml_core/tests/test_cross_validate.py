@@ -24,6 +24,9 @@ class _StubConfig(BaseForecasterConfig):
 class _StubForecaster(BaseForecaster):
     """Returns a constant power_fcst of 10.0 for every row."""
 
+    MODEL_NAME = "stub"
+    MODEL_VERSION = 1
+
     model_params: _StubConfig
 
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
@@ -35,8 +38,8 @@ class _StubForecaster(BaseForecaster):
             ensemble_member=pl.lit(0, dtype=pl.Int8),
             nwp_init_time=pl.lit(None, dtype=pl.Datetime("us", "UTC")),
             power_fcst=pl.lit(10.0, dtype=pl.Float32),
-            power_fcst_model_name=pl.lit("stub").cast(pl.Categorical),
-            power_fcst_model_version=pl.lit(1, dtype=pl.Int16),
+            power_fcst_model_name=pl.lit(self.MODEL_NAME).cast(pl.Categorical),
+            power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
             ml_flow_experiment_id=pl.lit(None, dtype=pl.Int32),
             fold_id=pl.lit("live").cast(pl.Categorical),
         )
@@ -47,13 +50,7 @@ class _StubForecaster(BaseForecaster):
 
     @classmethod
     def load(cls, path):  # type: ignore[override]
-        return cls(
-            _StubConfig(
-                selected_features=set(),
-                power_fcst_model_name="stub",
-                power_fcst_model_version=1,
-            )
-        )
+        return cls(_StubConfig(selected_features=set()))
 
 
 # ---------------------------------------------------------------------------
@@ -97,11 +94,7 @@ def _make_metadata() -> pt.DataFrame[TimeSeriesMetadata]:
 
 
 def _make_config() -> _StubConfig:
-    return _StubConfig(
-        selected_features={"power_lag_24h"},
-        power_fcst_model_name="stub",
-        power_fcst_model_version=1,
-    )
+    return _StubConfig(selected_features={"power_lag_24h"})
 
 
 def _single_fold() -> CvFoldConfig:
