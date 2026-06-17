@@ -83,7 +83,7 @@ All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatur
 - All function signatures must have complete type hints including return types.
 - Never relax an existing test to make it pass.
 
-## Polars Style
+### Polars Style
 
 These rules are all about making Polars code easy to read.
 
@@ -92,3 +92,15 @@ These rules are all about making Polars code easy to read.
 - When using `.with_columns`, prefer specifying the destination column name as a key word argument
   like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
   `df.with_columns(pl.col("foo").expression().alias("bar"))`
+
+## This is a young project
+
+The project is a new, green-field project. No one else is using this code yet. Which means:
+
+- It's 100% fine to make changes that aren't backwards compatible.
+- Our aim is to make the code as well-organised, and as easy to use as possible.
+- None of this code is "written in stone" or battle-tested.
+- If you see a design mistake _anywhere_ in the code, then please flag that design mistake to me.
+  I'd much rather end up with a project that's well engineered. (That said, if we're working on
+  feature X, and you spot a mistake in some code that isn't obviously in scope for X, then please
+  discuss the change with me first. Definitely don't make out-of-scope changes with asking me!)
