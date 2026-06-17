@@ -5,7 +5,7 @@ import polars as pl
 import pytest
 from pydantic import ValidationError
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpOnDisk
+from contracts.weather_schemas import NwpInMemory
 from ml_core.features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
@@ -49,18 +49,16 @@ def test_apply_power_lag_with_source():
 def test_process_nwp():
     df = pl.DataFrame(
         {
-            "valid_time": [
-                datetime(2020, 1, 1, 12),
-                datetime(2020, 1, 1, 15),
-            ],
-            "init_time": [
-                datetime(2020, 1, 1, 0),
-                datetime(2020, 1, 1, 0),
-            ],
+            "valid_time": [datetime(2020, 1, 1, 12), datetime(2020, 1, 1, 15)],
+            "init_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 0)],
         }
     )
 
-    result = _process_nwp(df.lazy()).collect().sort("valid_time")
+    result = (
+        _process_nwp(pt.LazyFrame.from_existing(df.lazy()).set_model(NwpInMemory))
+        .collect()
+        .sort("valid_time")
+    )
 
     assert "nwp_lead_time_hours" in result.columns
     assert "nwp_init_time" in result.columns
@@ -674,7 +672,7 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     result = engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
         selected_features={"temperature_2m"},
         power_fcst_init_time=None,  # backtest / training mode
     ).collect()
@@ -756,7 +754,7 @@ def test_engineer_features_weather_lag_leakage_prevention():
     engineered = engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
         selected_features={"temperature_2m", "temperature_2m_lag_2h", "temperature_2m_lag_36h"},
         power_fcst_init_time=power_fcst_init_time,
         nwp_init_time=nwp_init_time,
@@ -850,7 +848,7 @@ def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
     all_rows = engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
         selected_features={"temperature_2m_lag_12h"},
         power_fcst_init_time=None,
         nwp_publication_delay_hours=6,
@@ -890,7 +888,7 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
     result = engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
         selected_features={"temperature_2m"},
         nwp_publication_delay_hours=nwp_publication_delay_hours,
     ).collect()
@@ -922,7 +920,7 @@ def test_engineer_features_raises_when_no_control_member_for_weather_lag():
                 PowerTimeSeries
             ),
             time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-            nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+            nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
             selected_features={"temperature_2m_lag_6h"},
             power_fcst_init_time=datetime(2023, 1, 1, 6, 0),
             nwp_init_time=nwp_init_time,
