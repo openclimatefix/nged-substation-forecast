@@ -71,7 +71,7 @@ Two operating modes:
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 
-All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)` and `predict(AllFeatures) -> PowerForecast`. Models are saved/loaded using native MLflow flavors and must encapsulate all input/output translation logic.
+All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`, `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` with the full `XGBoostConfig`. Model identity fields (`power_fcst_model_name`, `power_fcst_model_version`, `ml_flow_experiment_id`) live in `BaseForecasterConfig` so they travel with the saved model and are stamped onto every `PowerForecast` row at predict time.
 
 ## Code Style
 

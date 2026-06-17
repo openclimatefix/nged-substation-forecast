@@ -15,9 +15,9 @@ The system is designed as a modular monorepo using [uv workspaces](https://docs.
 
 ## The Universal Model Interface
 
-To decouple the Dagster data pipeline from the ML code, all models are saved using native MLflow flavors (e.g., `mlflow.xgboost.log_model`), which serialize the raw model object directly.
+All forecasting models subclass `BaseForecaster` (defined in `ml_core`), which provides a common `train` / `predict` / `save` / `load` interface. The model wrapper encapsulates the model weights and all translation logic, keeping Dagster assets completely agnostic to the underlying implementation.
 
-**The Adapter Pattern**: The model wrapper encapsulates the model weights and all translation logic.
-
-- _Input translation_: Transforms the canonical Polars DataFrame into the required model shape.
-- _Output translation_: Converts native model outputs into the strict target quantile schema.
+- _Input translation_: Transforms the canonical `AllFeatures` Polars LazyFrame into the required model shape.
+- _Output translation_: Converts native model outputs into the strict `PowerForecast` schema.
+- _Persistence_: Each subclass owns its own save/load format. `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` containing the full serialised `XGBoostConfig`.
+- _Identity_: Model name, version, and optional MLflow experiment ID travel with the config, so every `PowerForecast` row is self-describing.
