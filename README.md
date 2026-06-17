@@ -1,8 +1,12 @@
-# NGED substation forecast
+# NGED Flexpectation
 
 [![ease of contribution: hard](https://img.shields.io/badge/ease%20of%20contribution:%20hard-bb2629)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
 
-To external contributors: Please note that this repo holds the very-early-stage research code for a new project, and there will be a lot of code churn over the next few months. As such, this repo isn't suitable for external contributions at the moment, sorry.
+**NGED Flexpectation** is an NIA-funded project by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for [National Grid Electricity Distribution](https://www.nationalgrid.com/electricity-distribution) (NGED). The forecasts cover NGED's substations and customer meters, with a 14-day horizon at half-hourly resolution, updated every 6 hours. The goal is to help NGED optimise flexibility procurement and manage network congestion.
+
+This repository is the research and production-harness codebase. The system is orchestrated with Dagster, uses XGBoost as the initial forecasting model, and stores all data and forecasts as Delta Lake tables on S3.
+
+To external contributors: this repo is in early-stage development with frequent breaking changes, so it is not suitable for external contributions at the moment.
 
 ---
 
