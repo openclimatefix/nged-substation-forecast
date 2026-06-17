@@ -183,7 +183,7 @@ def cross_validate(
         fold_forecast = forecaster.predict(val_features_lf)
         # Overwrite the "live" default with the validation year for this fold.
         fold_forecast = fold_forecast.with_columns(
-            fold_id=pl.lit(str(fold.val_start.year)).cast(pl.Categorical)
+            fold_id=pl.lit(fold.fold_id).cast(pl.Categorical)
         )
         all_fold_forecasts.append(fold_forecast)
 

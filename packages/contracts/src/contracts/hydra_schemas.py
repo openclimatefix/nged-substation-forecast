@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from contracts.power_schemas import FoldId
+
 
 class DataSplitConfig(BaseModel):
     """Configuration for temporal data splitting."""
@@ -18,7 +20,7 @@ class DataSplitConfig(BaseModel):
 class CvFoldConfig(BaseModel):
     """Configuration for a single expanding-window CV fold."""
 
-    fold_id: int = Field(..., ge=1)
+    fold_id: FoldId
     train_start: date
     train_end: date
     val_start: date

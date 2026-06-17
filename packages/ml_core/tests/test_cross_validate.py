@@ -105,9 +105,8 @@ def _make_config() -> _StubConfig:
 
 
 def _single_fold() -> CvFoldConfig:
-    # val_start.year must be in FoldId ("2022" is the first valid CV year)
     return CvFoldConfig(
-        fold_id=1,
+        fold_id="2022",
         train_start=date(2020, 1, 1),
         train_end=date(2021, 12, 31),
         val_start=date(2022, 1, 1),
@@ -148,14 +147,14 @@ def test_cross_validate_creates_fresh_forecaster_per_fold():
     )
     folds = [
         CvFoldConfig(
-            fold_id=1,
+            fold_id="2022",
             train_start=date(2019, 1, 1),
             train_end=date(2021, 12, 31),
             val_start=date(2022, 1, 1),
             val_end=date(2022, 12, 31),
         ),
         CvFoldConfig(
-            fold_id=2,
+            fold_id="2023",
             train_start=date(2019, 1, 1),
             train_end=date(2022, 12, 31),
             val_start=date(2023, 1, 1),
