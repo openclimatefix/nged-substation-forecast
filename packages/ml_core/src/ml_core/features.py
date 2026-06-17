@@ -6,6 +6,13 @@ Architecture/Flow:
     base data (power, weather, metadata), and then executes the instructions via
     `_apply_post_join_features`.
 
+Lazy Evaluation:
+    The entire pipeline is lazy. `engineer_features` returns a `pt.LazyFrame[AllFeatures]` and
+    never calls `.collect()`. Callers should defer `.collect()` as late as possible — ideally only
+    at the model boundary (e.g., inside `BaseForecaster.train` or `BaseForecaster.predict`), so
+    that Polars can optimise the full query plan end-to-end. The only eager operations in this
+    module are `collect_schema()` calls, which inspect the query plan without executing it.
+
 Nullify Leaky Lags Rationale:
     `_nullify_leaky_lags` is called at the end of the pipeline to enforce physical forecasting
     constraints. In a real-world scenario, you cannot use a 24-hour lag if you are forecasting
@@ -24,53 +31,10 @@ from typing import Annotated, ClassVar, Final, Literal, Self, Sequence, cast, ge
 import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.ml_schemas import AllFeatures
+from contracts.ml_schemas import AllFeatures, SafeInputBaseColumn, TimeFeature
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpOnDisk
+from contracts.weather_schemas import NwpInMemory, WeatherFeature
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator  # noqa: F401
-
-# Valid weather features (from NwpInMemory contract)
-WeatherFeature = Literal[
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_speed_100m",
-    "wind_direction_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
-    "categorical_precipitation_type_surface",
-]
-
-
-# Valid time features (from AllFeatures contract)
-TimeFeature = Literal[
-    "local_time_of_day_sin",
-    "local_time_of_day_cos",
-    "local_time_of_year_sin",
-    "local_time_of_year_cos",
-    "local_day_of_week_sin",
-    "local_day_of_week_cos",
-    "local_day_of_week",
-    "local_utc_offset",
-]
-
-
-# Base columns that are safe to use as direct input features for the ML model.
-# These do not cause target leakage or lookahead bias.
-SafeInputBaseColumn = Literal[
-    "time_series_id",
-    "time_series_type",
-    "nwp_lead_time_hours",
-    "ensemble_member",
-    "power_fcst_init_time",
-    "nwp_init_time",
-]
-
 
 # Static features registry
 # These are basic features that don't require parameterization.
@@ -306,7 +270,7 @@ def engineer_features(
     selected_features: set[str],
     power_time_series: pt.LazyFrame[PowerTimeSeries],
     time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-    nwp: pt.LazyFrame[NwpOnDisk] | None = None,
+    nwp: pt.LazyFrame[NwpInMemory] | None = None,
     power_fcst_init_time: datetime | None = None,
     nwp_init_time: datetime | None = None,
     nwp_publication_delay_hours: int = 6,
@@ -317,7 +281,9 @@ def engineer_features(
         selected_features: Set of features to engineer.
         power_time_series: Input power time series.
         time_series_metadata: Metadata for the time series.
-        nwp: NWP weather forecast data.
+        nwp: NWP weather forecast data in physical units (NwpInMemory). Callers loading
+            from Delta Lake should convert with NwpOnDisk.to_nwp_in_memory() first, which
+            is lazy and does not trigger a collect.
         power_fcst_init_time: Controls the operating mode of the function.
 
             **None — bulk training and multi-run backtesting (recommended for most callers):**
@@ -360,7 +326,7 @@ def engineer_features(
         )
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
-    nwp_lf = pl.LazyFrame._from_pyldf(nwp._ldf) if nwp is not None else None
+    nwp_lf: pt.LazyFrame[NwpInMemory] | None = nwp
 
     parsed_features = ParsedFeatures.from_strings(selected_features)
     if nwp_lf is None and parsed_features.requires_weather_data():
@@ -368,6 +334,12 @@ def engineer_features(
 
     processed_nwp = _process_nwp(nwp_lf) if nwp_lf is not None else None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
+    if processed_nwp is not None and weather_lags:
+        if processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty():
+            raise ValueError(
+                "Weather lag features require the NWP control member (ensemble_member == 0) "
+                "to build historical weather, but no such rows were found in the NWP data."
+            )
     historical_weather = (
         _build_historical_weather(processed_nwp)
         if processed_nwp is not None and weather_lags
@@ -484,13 +456,87 @@ def _select_output_columns(
     return engineered_lf.select(cols_to_select)
 
 
-def _process_nwp(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
-    """Calculates NWP lead time and renames 'init_time' to 'nwp_init_time'."""
-    return nwp_lf.with_columns(
+def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
+    """Upsample NWP data to 30-minute resolution.
+
+    Assumes 'init_time' has already been renamed to 'nwp_init_time'. Continuous weather
+    variables are linearly interpolated within each group; categorical variables are
+    forward-filled within each group. All other columns (e.g. nwp_init_time,
+    ensemble_member) are used as group-by keys.
+
+    The implementation stays fully lazy: a 30-min time grid is generated per group via
+    datetime_ranges + explode, then the original NWP values are left-joined back in, and
+    interpolate/forward_fill are applied with over() to stay within group boundaries.
+
+    Leading-null propagation: Polars' interpolate() fills interior nulls but leaves leading
+    nulls (before the first non-null value in a group) as null. Some ECMWF ENS variables
+    (precipitation, radiation fluxes) are null at lead time 0 by convention. After upsampling
+    from native 3-hourly steps, all interpolated 30-min rows before the first non-null step
+    remain null — typically a 3-hour window per NWP run. Callers and downstream models should
+    treat these as genuinely missing values, not as a data quality issue.
+    """
+    schema_names = nwp_lf.collect_schema().names()
+    all_weather_vars = NwpInMemory.all_weather_var_names()
+    group_cols = [
+        col for col in schema_names if col != "valid_time" and col not in all_weather_vars
+    ]
+    continuous_cols = [col for col in schema_names if col in NwpInMemory.continuous_var_names()]
+    categorical_cols = [col for col in schema_names if col in NwpInMemory.categorical_var_names]
+
+    # Build 30-min time grid per group: aggregate min/max valid_time per group,
+    # expand each row into a list of half-hourly datetimes, then explode to rows.
+    time_grid = (
+        nwp_lf.group_by(group_cols)
+        .agg(
+            pl.col("valid_time").min().alias("_start"),
+            pl.col("valid_time").max().alias("_end"),
+        )
+        .with_columns(
+            pl.datetime_ranges(
+                start=pl.col("_start"),
+                end=pl.col("_end"),
+                interval="30m",
+            ).alias("valid_time")
+        )
+        .drop("_start", "_end")
+        .explode("valid_time")
+    )
+
+    # Left-join original NWP onto the grid; new 30-min rows come in as nulls.
+    upsampled = time_grid.join(nwp_lf, on=[*group_cols, "valid_time"], how="left").sort(
+        [*group_cols, "valid_time"]
+    )
+
+    # Fill nulls within each group, never crossing group boundaries.
+    # order_by="valid_time" ensures correct temporal ordering within each group window.
+    if continuous_cols:
+        upsampled = upsampled.with_columns(
+            pl.col(col).interpolate().over(group_cols, order_by="valid_time")
+            for col in continuous_cols
+        )
+    if categorical_cols:
+        upsampled = upsampled.with_columns(
+            pl.col(col).forward_fill().over(group_cols, order_by="valid_time")
+            for col in categorical_cols
+        )
+
+    return upsampled
+
+
+def _process_nwp(nwp_lf: pt.LazyFrame[NwpInMemory]) -> pl.LazyFrame:
+    """Rename 'init_time', upsample to 30-minute resolution, and calculate NWP lead time.
+
+    Expects data already in physical units (NwpInMemory). Callers are responsible for
+    converting NwpOnDisk → NwpInMemory before passing data here; that conversion is lazy
+    and can be done with NwpOnDisk.to_nwp_in_memory().
+    """
+    renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
+    upsampled = _upsample_nwp_to_half_hourly(renamed)
+    return upsampled.with_columns(
         nwp_lead_time_hours=(
-            (pl.col("valid_time") - pl.col("init_time")).dt.total_seconds() / 3600
+            (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600
         ).cast(pl.Float32)
-    ).rename({"init_time": "nwp_init_time"})
+    )
 
 
 def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:

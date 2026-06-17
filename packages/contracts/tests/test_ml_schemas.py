@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
+from typing import get_args
 
 import patito as pt
 import pytest
-from contracts.ml_schemas import AllFeatures, Metrics
+from contracts.ml_schemas import AllFeatures, Metrics, SafeInputBaseColumn, TimeFeature
 
 
 def test_all_features_validation():
@@ -64,6 +65,22 @@ def test_all_features_invalid_time_series_type():
     # We expect validation to fail, either during cast or validate
     with pytest.raises(Exception):
         df.cast().validate()
+
+
+def test_time_feature_names_are_all_features_fields():
+    """Every name in TimeFeature must be a field of AllFeatures.
+
+    Guards against renaming an AllFeatures column without updating the Literal.
+    """
+    assert frozenset(get_args(TimeFeature)) <= frozenset(AllFeatures.model_fields)
+
+
+def test_safe_input_base_column_names_are_all_features_fields():
+    """Every name in SafeInputBaseColumn must be a field of AllFeatures.
+
+    Guards against renaming an AllFeatures column without updating the Literal.
+    """
+    assert frozenset(get_args(SafeInputBaseColumn)) <= frozenset(AllFeatures.model_fields)
 
 
 def test_metrics_validation():
