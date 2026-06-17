@@ -112,7 +112,11 @@ class _NwpBase(pt.Model):
     )
 
     # ClassVars: excluded from Patito/Pydantic model fields so they're not treated as data columns.
-    categorical_var_names: ClassVar[tuple[str, ...]] = ("categorical_precipitation_type_surface",)
+    categorical_var_names: ClassVar[frozenset[str]] = frozenset(
+        {"categorical_precipitation_type_surface"}
+    )
+
+    # Columns that aren't NWP variables:
     _non_var_column_names: ClassVar[frozenset[str]] = frozenset(
         {"nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"}
     )
@@ -125,7 +129,7 @@ class _NwpBase(pt.Model):
     @classmethod
     def continuous_var_names(cls) -> frozenset[str]:
         """Meteorological variable field names suitable for linear interpolation."""
-        return cls.all_weather_var_names() - frozenset(cls.categorical_var_names)
+        return cls.all_weather_var_names() - cls.categorical_var_names
 
 
 _WIND_SPEED_DTYPE = pt.Field(
