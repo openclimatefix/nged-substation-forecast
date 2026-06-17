@@ -27,6 +27,11 @@ class BaseForecaster(ABC):
 
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
+
+    Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
+    Subclasses should call `.collect()` exactly once, as late as possible — typically right
+    before handing data to the underlying model library. Callers must not collect before passing
+    data in; doing so wastes memory and prevents Polars from optimising the full query plan.
     """
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:

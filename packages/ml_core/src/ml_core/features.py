@@ -6,6 +6,13 @@ Architecture/Flow:
     base data (power, weather, metadata), and then executes the instructions via
     `_apply_post_join_features`.
 
+Lazy Evaluation:
+    The entire pipeline is lazy. `engineer_features` returns a `pt.LazyFrame[AllFeatures]` and
+    never calls `.collect()`. Callers should defer `.collect()` as late as possible — ideally only
+    at the model boundary (e.g., inside `BaseForecaster.train` or `BaseForecaster.predict`), so
+    that Polars can optimise the full query plan end-to-end. The only eager operations in this
+    module are `collect_schema()` calls, which inspect the query plan without executing it.
+
 Nullify Leaky Lags Rationale:
     `_nullify_leaky_lags` is called at the end of the pipeline to enforce physical forecasting
     constraints. In a real-world scenario, you cannot use a 24-hour lag if you are forecasting
