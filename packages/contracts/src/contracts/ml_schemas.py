@@ -167,14 +167,98 @@ class AllFeatures(pt.Model):
         return validated_df
 
 
+# Controlled vocabularies for the tall Metrics table.
+# Extend these lists as new metrics or slices are implemented — adding a value is always
+# backwards-compatible (no Delta schema migration needed).
+
+#: Horizon slice labels matching the four forecast ranges from the project report.
+#: ``"all"`` aggregates over all horizons and is always computed.
+HORIZON_SLICES: list[str] = [
+    "all",
+    "intraday",  # 0 – 6 h
+    "day_ahead",  # 6 – 36 h
+    "short_medium_range",  # Day 2 – Day 7
+    "extended_range",  # Day 8 – Day 14
+]
+
+#: Metric names currently implemented.  Add more here as they are implemented:
+#: ensemble:  "crps", "spread_skill_ratio"
+#: quantile:  "pinball_loss", "mean_pinball_loss"
+#: calibration: "picp"
+METRIC_NAMES: list[str] = [
+    "mae",  # mean absolute error (MW)
+    "nmae",  # normalised MAE (dimensionless; normalised by mean |power|)
+    "rmse",  # root mean squared error (MW)
+    "mbe",  # mean bias error (MW; positive = over-prediction)
+]
+
+#: Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
+#: ``"all"`` is used for all scalar metrics that have no extra parameter dimension.
+#: When Pinball Loss is added, extend this with "p10", "p20", …, "p90".
+#: When PICP is added, extend with "p10_p90", "p20_p80", etc.
+METRIC_PARAMS: list[str] = ["all"]
+
+
 class Metrics(pt.Model):
-    """Evaluation metrics for power forecasts."""
+    """Evaluation metrics for power forecasts — tall format.
+
+    One row per ``(time_series_id, power_fcst_model_name, fold_id,
+    horizon_slice, metric_name, metric_param)``.
+
+    ``metric_param`` encodes the extra parameter dimension for metrics that have one,
+    or ``"all"`` for scalar metrics with no extra dimension.  Examples:
+
+    .. code-block:: text
+
+        time_series_id | fold_id | horizon_slice | metric_name      | metric_param | metric_value
+        1              | 1       | all           | mae              | all          | 5.2
+        1              | 1       | day_ahead     | rmse             | all          | 7.1
+        1              | 1       | day_ahead     | pinball_loss     | p10          | 2.1
+        1              | 1       | day_ahead     | pinball_loss     | p50          | 3.4
+        1              | 1       | day_ahead     | mean_pinball_loss | all         | 2.4
+        1              | 1       | day_ahead     | picp             | p10_p90      | 0.78
+
+    The primary key is
+    ``(time_series_id, power_fcst_model_name, fold_id, horizon_slice,
+    metric_name, metric_param)``.
+    """
 
     time_series_id: int = _get_time_series_id_dtype()
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
-    nwp_lead_time_hours: float = pt.Field(
-        dtype=pl.Float32, description="valid_time - nwp_init_time"
+    fold_id: int = pt.Field(dtype=pl.Int8, ge=1, description="CV fold number (1-indexed).")
+    horizon_slice: str = pt.Field(
+        dtype=pl.Enum(HORIZON_SLICES),
+        description=(
+            "'all' aggregates over all forecast horizons.  Other values select "
+            "the time-slice bands from the project report."
+        ),
     )
-    mae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    rmse: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
-    nmae: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
+    metric_name: str = pt.Field(
+        dtype=pl.Enum(METRIC_NAMES),
+        description="The name of the metric being reported.",
+    )
+    metric_param: str = pt.Field(
+        dtype=pl.Enum(METRIC_PARAMS),
+        description=(
+            "Extra parameter dimension for parametric metrics.  "
+            "'all' for scalar metrics (MAE, RMSE, MBE, NMAE).  "
+            "For Pinball Loss: 'p10', 'p50', etc.  "
+            "For PICP: 'p10_p90', 'p20_p80', etc."
+        ),
+    )
+    metric_value: float = pt.Field(dtype=pl.Float32)
+
+
+from .power_schemas import PowerForecast  # noqa: E402  (avoid circular at module level)
+
+
+class CvPowerForecast(PowerForecast):
+    """A ``PowerForecast`` row annotated with its CV fold number.
+
+    Returned by :func:`ml_core.cross_validate.cross_validate` and written to the
+    ``cv_power_forecasts`` Delta table.  Storing the full half-hourly predictions
+    per fold allows metrics to be recomputed later without re-running expensive
+    ML experiments.
+    """
+
+    fold_id: int = pt.Field(dtype=pl.Int8, ge=1, description="CV fold number (1-indexed).")
