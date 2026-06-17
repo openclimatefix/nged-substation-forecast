@@ -207,7 +207,7 @@ class PowerForecast(pt.Model):
         dtype=pl.Categorical,
         description=(
             "Identifier for our ML-based power forecasting model."
-            " This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`."
+            " Specified in ``conf/model/*.yaml`` as ``model_params.power_fcst_model_name``."
         ),
     )
 

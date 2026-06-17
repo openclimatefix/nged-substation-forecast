@@ -210,6 +210,21 @@ def _load_cv_folds(cv_config_path: Path) -> tuple[list[CvFoldConfig], int]:
     return cv_cfg.folds, cv_cfg.min_training_months
 
 
+def _load_model_config(model_config_path: Path) -> tuple[type[BaseForecaster], Any]:
+    """Load and validate a model config YAML, returning (forecaster_class, forecaster_config).
+
+    The YAML must have a top-level ``_target_`` key identifying the ``BaseForecaster``
+    subclass and a ``model_params`` block whose ``_target_`` identifies the matching
+    ``BaseForecasterConfig`` subclass.  ``hydra.utils.instantiate`` constructs and
+    validates the config object via Pydantic — this is the enforcement point for
+    ``conf/model/*.yaml`` files.
+    """
+    raw = OmegaConf.load(model_config_path)
+    forecaster_class = cast(type[BaseForecaster], hydra.utils.get_class(str(raw._target_)))
+    forecaster_config = hydra.utils.instantiate(raw.model_params)
+    return forecaster_class, forecaster_config
+
+
 @asset(deps=["power_time_series_and_metadata", "ecmwf_ens"])
 def cv_power_forecasts(context: AssetExecutionContext) -> None:
     """Run expanding-window cross-validation and persist half-hourly predictions.
@@ -229,11 +244,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     settings = Settings()
 
     # --- Load configs ---
-    model_cfg = OmegaConf.load(PROJECT_ROOT / "conf" / "model" / "xgboost.yaml")
+    forecaster_class, forecaster_config = _load_model_config(
+        PROJECT_ROOT / "conf" / "model" / "xgboost.yaml"
+    )
     folds, min_training_months = _load_cv_folds(PROJECT_ROOT / "conf" / "cv" / "default.yaml")
-
-    forecaster_class = cast(type[BaseForecaster], hydra.utils.get_class(str(model_cfg._target_)))
-    forecaster_config = hydra.utils.instantiate(model_cfg.model_params)
 
     # --- Load data (lazy) ---
     power_lf = pt.LazyFrame.from_existing(
@@ -299,7 +313,7 @@ def cv_metrics(context: AssetExecutionContext) -> None:
        leaderboard can group and filter entries.
     """
     settings = Settings()
-    model_cfg = OmegaConf.load(PROJECT_ROOT / "conf" / "model" / "xgboost.yaml")
+    _, forecaster_config = _load_model_config(PROJECT_ROOT / "conf" / "model" / "xgboost.yaml")
 
     # --- Load data (CV rows only — exclude live production forecasts) ---
     cv_forecasts_df = PowerForecast.validate(
@@ -330,7 +344,7 @@ def cv_metrics(context: AssetExecutionContext) -> None:
 
     # --- Log aggregate metrics to MLflow ---
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    experiment_name = str(model_cfg.model_params.power_fcst_model_name)
+    experiment_name = forecaster_config.power_fcst_model_name
     mlflow.set_experiment(experiment_name)
 
     # Compute mean-across-folds for each (metric_name, metric_param, horizon_slice).
@@ -342,10 +356,10 @@ def cv_metrics(context: AssetExecutionContext) -> None:
         # Tag with experiment dimensions for leaderboard grouping.
         mlflow.set_tags(
             {
-                "task": str(model_cfg.model_params.get("task", "")),
-                "model_family": str(model_cfg.model_params.get("model_family", "")),
-                "weather_source": str(model_cfg.model_params.get("weather_source", "")),
-                "training_strategy": str(model_cfg.model_params.get("training_strategy", "")),
+                "task": forecaster_config.task,
+                "model_family": forecaster_config.model_family,
+                "weather_source": forecaster_config.weather_source,
+                "training_strategy": forecaster_config.training_strategy,
                 "power_fcst_model_name": experiment_name,
             }
         )
