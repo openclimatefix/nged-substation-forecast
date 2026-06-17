@@ -332,6 +332,12 @@ def engineer_features(
 
     processed_nwp = _process_nwp(nwp_lf) if nwp_lf is not None else None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
+    if processed_nwp is not None and weather_lags:
+        if processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty():
+            raise ValueError(
+                "Weather lag features require the NWP control member (ensemble_member == 0) "
+                "to build historical weather, but no such rows were found in the NWP data."
+            )
     historical_weather = (
         _build_historical_weather(processed_nwp)
         if processed_nwp is not None and weather_lags

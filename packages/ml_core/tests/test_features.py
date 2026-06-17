@@ -897,3 +897,33 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
 
     expected = nwp_init_time + timedelta(hours=nwp_publication_delay_hours)
     assert result["power_fcst_init_time"][0] == expected
+
+
+def test_engineer_features_raises_when_no_control_member_for_weather_lag():
+    """Weather lag features require ensemble_member==0; missing control member must raise loudly."""
+    valid_time = datetime(2023, 1, 1, 12, 0)
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"],
+            "valid_time": [valid_time],
+            "ensemble_member": [1],  # no control member
+            "init_time": [nwp_init_time],
+            "temperature_2m": [10.0],
+        }
+    )
+    power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    with pytest.raises(ValueError, match="control member"):
+        engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpOnDisk),
+            selected_features={"temperature_2m_lag_6h"},
+            power_fcst_init_time=datetime(2023, 1, 1, 6, 0),
+            nwp_init_time=nwp_init_time,
+        )
