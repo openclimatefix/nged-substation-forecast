@@ -187,9 +187,13 @@ class PowerForecast(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.Int8)
     ml_flow_experiment_id: int | None = pt.Field(dtype=pl.Int32, allow_missing=True)
 
-    nwp_init_time: datetime = pt.Field(
+    nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The datetime that the underlying weather forecast was initialised.",
+        allow_missing=True,
+        description=(
+            "The datetime that the underlying weather forecast was initialised. "
+            "Null for models that do not use NWP (e.g. persistence baselines)."
+        ),
     )
 
     power_fcst_model_name: str = pt.Field(
