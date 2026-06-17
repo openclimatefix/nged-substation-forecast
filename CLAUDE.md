@@ -97,8 +97,9 @@ These rules are all about making Polars code easy to read.
 
 The project is a new, green-field project. No one else is using this code yet. Which means:
 
-- It's 100% fine to make changes that aren't backwards compatible.
-- Our aim is to make the code as well-organised, and as easy to use as possible.
+- It's 100% fine to make breaking changes, if doing so improves the code. (And as long as we update
+  all the downstream code.)
+- Our aim is to make the code well-organised and easy to use.
 - None of this code is "written in stone" or battle-tested.
 - If you see a design mistake _anywhere_ in the code, then please flag that design mistake to me.
   I'd much rather end up with a project that's well engineered. (That said, if we're working on
