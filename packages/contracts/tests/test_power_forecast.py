@@ -19,6 +19,7 @@ def test_power_forecast_validation():
                 "power_fcst_model_version": [1],
                 "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst": [10.0],
+                "fold_id": ["live"],
             }
         )
         .set_model(PowerForecast)
@@ -44,6 +45,7 @@ def test_power_forecast_validation():
                 "power_fcst_model_version": [1],
                 "power_fcst_init_time": [datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)],
                 "power_fcst": [10.0],
+                "fold_id": ["live"],
             },
             "ensemble_member",
         ),

@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import ClassVar, Final, Self
+from typing import ClassVar, Final, Literal, Self
 
 import patito as pt
 import polars as pl
@@ -179,6 +179,13 @@ class TimeSeriesMetadata(pt.Model):
     )
 
 
+#: Fold identifier for ``PowerForecast.fold_id``.
+#: Each calendar year in the CV protocol gets a string label matching that year.
+#: ``"live"`` denotes a production forecast (no CV fold).
+#: Extend this Literal as new CV epochs are added.
+FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
+
+
 class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts."""
 
@@ -221,5 +228,18 @@ class PowerForecast(pt.Model):
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
             """ Positive values mean "power sent to NGED's grid","""
             """ and negative values mean "power drawn from NGED's grid"."""
+        ),
+    )
+
+    fold_id: FoldId = pt.Field(
+        dtype=pl.Categorical,
+        description=(
+            "Identifies the source of this forecast row.  "
+            "For cross-validation runs, the value is the validation year (e.g. '2022'), "
+            "matching the CV fold whose validation period starts on 1 Jan of that year.  "
+            "'live' means a production forecast with no associated CV fold.  "
+            "All forecasts — CV and live — live in the same Delta table; "
+            "filter on this column to select the population you need.  "
+            "Extend the FoldId Literal in power_schemas.py as new CV epochs are added."
         ),
     )

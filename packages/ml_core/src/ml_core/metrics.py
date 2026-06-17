@@ -6,14 +6,13 @@ from contracts.ml_schemas import (
     HORIZON_SLICES,
     METRIC_NAMES,
     METRIC_PARAMS,
-    CvPowerForecast,
     Metrics,
 )
-from contracts.power_schemas import PowerTimeSeries
+from contracts.power_schemas import PowerForecast, PowerTimeSeries
 
 
 def compute_metrics(
-    cv_forecasts: pt.DataFrame[CvPowerForecast],
+    cv_forecasts: pt.DataFrame[PowerForecast],
     actuals: pt.LazyFrame[PowerTimeSeries],
 ) -> pt.DataFrame[Metrics]:
     """Compute evaluation metrics from CV predictions and observed power.
@@ -34,7 +33,8 @@ def compute_metrics(
     added here later without changing the schema.
 
     Args:
-        cv_forecasts: Full half-hourly predictions from :func:`ml_core.cross_validate.cross_validate`.
+        cv_forecasts: CV predictions from :func:`ml_core.cross_validate.cross_validate`.
+            Must not contain ``fold_id="live"`` rows — pass only CV fold predictions.
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
 
     Returns:
@@ -94,7 +94,7 @@ def compute_metrics(
             horizon_slice=pl.lit("all").cast(pl.Enum(HORIZON_SLICES)),
             metric_param=pl.lit("all").cast(pl.Enum(METRIC_PARAMS)),
             power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
-            fold_id=pl.col("fold_id").cast(pl.Int8),
+            fold_id=pl.col("fold_id").cast(pl.Categorical),
         )
     )
 

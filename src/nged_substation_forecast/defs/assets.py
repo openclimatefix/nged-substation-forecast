@@ -10,8 +10,7 @@ import patito as pt
 import polars as pl
 from contracts.geo_schemas import H3GridWeights
 from contracts.hydra_schemas import CvConfig, CvFoldConfig
-from contracts.ml_schemas import CvPowerForecast
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import PROJECT_ROOT, Settings
 from contracts.weather_schemas import NwpModelId, NwpOnDisk, NwpScalingParams
 from dagster import (
@@ -217,14 +216,15 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
     Loads the model config from ``conf/model/xgboost.yaml`` and the CV fold
     definitions from ``conf/cv/default.yaml``, then calls ``cross_validate()``
-    to produce a ``CvPowerForecast`` DataFrame, which is appended to the
-    ``cv_power_forecasts`` Delta table.
+    to produce a ``PowerForecast`` DataFrame with ``fold_id`` set to the
+    validation year (e.g. ``"2022"``).  Results are appended to the shared
+    ``power_forecasts`` Delta table alongside any live production forecasts.
 
     Only the control NWP ensemble member (member 0) is used.  Full ensemble
     support will be added once the XGBoost iterator-API is implemented.
 
     The downstream ``cv_metrics`` asset can be re-run without re-training by
-    recomputing metrics directly from this table.
+    recomputing metrics directly from the power_forecasts table.
     """
     settings = Settings()
 
@@ -263,10 +263,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         min_training_months=min_training_months,
     )
 
-    # --- Persist to Delta ---
-    settings.cv_power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
+    # --- Persist to the shared power_forecasts Delta table ---
+    settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
     cv_results.write_delta(
-        str(settings.cv_power_forecasts_data_path),
+        str(settings.power_forecasts_data_path),
         mode="append",
         delta_write_options={
             "partition_by": ["power_fcst_model_name", "fold_id"],
@@ -280,7 +280,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "n_folds": cv_results["fold_id"].n_unique(),
             "n_time_series": cv_results["time_series_id"].n_unique(),
             "model_name": forecaster_config.power_fcst_model_name,
-            "path": str(settings.cv_power_forecasts_data_path),
+            "path": str(settings.power_forecasts_data_path),
         }
     )
 
@@ -289,8 +289,9 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 def cv_metrics(context: AssetExecutionContext) -> None:
     """Compute and persist CV metrics, and log aggregate metrics to MLflow.
 
-    Loads the full ``cv_power_forecasts`` Delta table and the raw
-    ``power_time_series`` Delta table, calls ``compute_metrics()``, then:
+    Loads CV rows (``fold_id != 'live'``) from the shared ``power_forecasts``
+    Delta table and the raw ``power_time_series`` Delta table, calls
+    ``compute_metrics()``, then:
 
     1. Writes the tall ``Metrics`` table to ``cv_metrics`` Delta.
     2. Logs per-metric mean-across-folds values to an MLflow run, tagged with
@@ -300,10 +301,11 @@ def cv_metrics(context: AssetExecutionContext) -> None:
     settings = Settings()
     model_cfg = OmegaConf.load(PROJECT_ROOT / "conf" / "model" / "xgboost.yaml")
 
-    # --- Load data ---
-    cv_forecasts_df = CvPowerForecast.validate(
-        pl.scan_delta(str(settings.cv_power_forecasts_data_path))
-        .cast({"power_fcst_model_name": pl.Categorical})
+    # --- Load data (CV rows only — exclude live production forecasts) ---
+    cv_forecasts_df = PowerForecast.validate(
+        pl.scan_delta(str(settings.power_forecasts_data_path))
+        .filter(pl.col("fold_id") != "live")
+        .cast({"power_fcst_model_name": pl.Categorical, "fold_id": pl.Categorical})
         .collect(),
         allow_superfluous_columns=True,
     )

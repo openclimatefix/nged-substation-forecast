@@ -6,7 +6,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.hydra_schemas import CvFoldConfig
-from contracts.ml_schemas import AllFeatures, CvPowerForecast
+from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from ml_core.cross_validate import cross_validate
@@ -38,6 +38,7 @@ class _StubForecaster(BaseForecaster):
             power_fcst_model_name=pl.lit("stub").cast(pl.Categorical),
             power_fcst_model_version=pl.lit(1, dtype=pl.Int16),
             ml_flow_experiment_id=pl.lit(None, dtype=pl.Int32),
+            fold_id=pl.lit("live").cast(pl.Categorical),
         )
         return PowerForecast.validate(result)
 
@@ -104,12 +105,13 @@ def _make_config() -> _StubConfig:
 
 
 def _single_fold() -> CvFoldConfig:
+    # val_start.year must be in FoldId ("2022" is the first valid CV year)
     return CvFoldConfig(
         fold_id=1,
         train_start=date(2020, 1, 1),
-        train_end=date(2020, 12, 31),
-        val_start=date(2021, 1, 1),
-        val_end=date(2021, 12, 31),
+        train_end=date(2021, 12, 31),
+        val_start=date(2022, 1, 1),
+        val_end=date(2022, 12, 31),
     )
 
 
@@ -118,10 +120,10 @@ def _single_fold() -> CvFoldConfig:
 # ---------------------------------------------------------------------------
 
 
-def test_cross_validate_returns_cv_power_forecast():
+def test_cross_validate_returns_power_forecast():
     power_lf = _make_power_lf(
         datetime(2019, 1, 1, tzinfo=timezone.utc),
-        datetime(2021, 12, 31, 23, 30, tzinfo=timezone.utc),
+        datetime(2022, 12, 31, 23, 30, tzinfo=timezone.utc),
     )
     result = cross_validate(
         forecaster_class=_StubForecaster,
@@ -133,8 +135,8 @@ def test_cross_validate_returns_cv_power_forecast():
     )
     assert isinstance(result, pl.DataFrame)
     assert "fold_id" in result.columns
-    assert result["fold_id"].unique().to_list() == [1]
-    # All predicted values are 10.0 (stub constant)
+    # fold_id is the validation year string (val_start.year for this fold = 2022)
+    assert result["fold_id"].unique().to_list() == ["2022"]
     assert (result["power_fcst"] == 10.0).all()
 
 
@@ -142,22 +144,22 @@ def test_cross_validate_creates_fresh_forecaster_per_fold():
     """Two folds → two independent forecaster instances (state does not bleed)."""
     power_lf = _make_power_lf(
         datetime(2019, 1, 1, tzinfo=timezone.utc),
-        datetime(2022, 12, 31, 23, 30, tzinfo=timezone.utc),
+        datetime(2023, 12, 31, 23, 30, tzinfo=timezone.utc),
     )
     folds = [
         CvFoldConfig(
             fold_id=1,
             train_start=date(2019, 1, 1),
-            train_end=date(2020, 12, 31),
-            val_start=date(2021, 1, 1),
-            val_end=date(2021, 12, 31),
+            train_end=date(2021, 12, 31),
+            val_start=date(2022, 1, 1),
+            val_end=date(2022, 12, 31),
         ),
         CvFoldConfig(
             fold_id=2,
             train_start=date(2019, 1, 1),
-            train_end=date(2021, 12, 31),
-            val_start=date(2022, 1, 1),
-            val_end=date(2022, 12, 31),
+            train_end=date(2022, 12, 31),
+            val_start=date(2023, 1, 1),
+            val_end=date(2023, 12, 31),
         ),
     ]
     result = cross_validate(
@@ -168,15 +170,15 @@ def test_cross_validate_creates_fresh_forecaster_per_fold():
         metadata_df=_make_metadata(),
         folds=folds,
     )
-    assert sorted(result["fold_id"].unique().to_list()) == [1, 2]
+    assert sorted(result["fold_id"].unique().to_list()) == ["2022", "2023"]
 
 
 def test_cross_validate_excludes_ineligible_time_series():
     """A time series that starts too late is excluded from the fold."""
     # Power data only starts 3 months before val_start — not enough for min_training_months=6.
     power_lf = _make_power_lf(
-        datetime(2020, 10, 1, tzinfo=timezone.utc),
-        datetime(2021, 12, 31, 23, 30, tzinfo=timezone.utc),
+        datetime(2021, 10, 1, tzinfo=timezone.utc),
+        datetime(2022, 12, 31, 23, 30, tzinfo=timezone.utc),
     )
     with pytest.raises(ValueError, match="No eligible time series"):
         cross_validate(
@@ -190,11 +192,11 @@ def test_cross_validate_excludes_ineligible_time_series():
         )
 
 
-def test_cross_validate_result_is_typed_cv_power_forecast():
-    """The return value validates as CvPowerForecast (not just a plain DataFrame)."""
+def test_cross_validate_result_validates_as_power_forecast():
+    """The return value validates as PowerForecast."""
     power_lf = _make_power_lf(
         datetime(2019, 1, 1, tzinfo=timezone.utc),
-        datetime(2021, 12, 31, 23, 30, tzinfo=timezone.utc),
+        datetime(2022, 12, 31, 23, 30, tzinfo=timezone.utc),
     )
     result = cross_validate(
         forecaster_class=_StubForecaster,
@@ -205,4 +207,4 @@ def test_cross_validate_result_is_typed_cv_power_forecast():
         folds=[_single_fold()],
     )
     # validate() would raise if the schema doesn't match
-    CvPowerForecast.validate(result, allow_superfluous_columns=True)
+    PowerForecast.validate(result, allow_superfluous_columns=True)

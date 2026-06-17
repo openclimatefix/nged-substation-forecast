@@ -93,6 +93,24 @@ These rules are all about making Polars code easy to read.
   like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
   `df.with_columns(pl.col("foo").expression().alias("bar"))`
 
+### Patito + Polars Gotcha: cross-model LazyFrame joins
+
+Patito creates a unique Python subclass for each model (e.g. `PowerTimeSeriesLazyFrame`,
+`PowerForecastLazyFrame`). Polars' `assert_same_type` check inside `.join()` rejects joining
+two differently-typed Patito LazyFrames with a `TypeError`.
+
+Workaround: strip the Patito subclass from the right-hand operand before joining:
+
+```python
+# Strip Patito model annotation so Polars' cross-subclass type check doesn't reject the join
+plain_lf = pl.LazyFrame._from_pyldf(patito_lf._ldf)
+left_patito_lf.join(plain_lf.select(...), on=..., how="inner")
+```
+
+`pl.LazyFrame._from_pyldf` constructs a plain `pl.LazyFrame` from the same underlying Rust
+object — zero-copy, no data movement. The check passes because `type(left_lf)` is a subclass
+of `pl.LazyFrame`, so `isinstance(left_lf, type(plain_lf))` is `True`.
+
 ## This is a young project
 
 The project is a new, green-field project. No one else is using this code yet. Which means:

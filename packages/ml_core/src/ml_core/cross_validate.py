@@ -5,8 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 import patito as pt
 import polars as pl
 from contracts.hydra_schemas import CvFoldConfig
-from contracts.ml_schemas import CvPowerForecast
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
 
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -25,17 +24,16 @@ def cross_validate(
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     folds: list[CvFoldConfig],
     min_training_months: int = 6,
-) -> pt.DataFrame[CvPowerForecast]:
+) -> pt.DataFrame[PowerForecast]:
     """Run expanding-window cross-validation and return all fold predictions.
 
     For each fold a fresh forecaster is trained on the training window and used to
     predict over the validation window.  Only time series with sufficient data are
     included in each fold (see ``min_training_months``).
 
-    The returned ``CvPowerForecast`` DataFrame contains the full half-hourly
-    predictions for every eligible (time_series_id, fold) combination.  These
-    raw predictions are the primary artefact — metrics can always be recomputed
-    from them without re-running the expensive training loop.
+    The returned ``PowerForecast`` DataFrame has ``fold_id`` set to the validation
+    year string (e.g. ``"2022"``).  The full half-hourly predictions are the primary
+    artefact — metrics can always be recomputed from them without re-running training.
 
     Args:
         forecaster_class: The uninitialised ``BaseForecaster`` subclass to use.
@@ -63,9 +61,9 @@ def cross_validate(
             the project's evaluation protocol.
 
     Returns:
-        A validated ``CvPowerForecast`` DataFrame with all fold predictions
-        concatenated.  Includes a ``fold_id`` column for downstream metric
-        computation.
+        A validated ``PowerForecast`` DataFrame with all fold predictions
+        concatenated.  ``fold_id`` is the validation year string (e.g. ``"2022"``)
+        for use in downstream metric computation.
 
     Raises:
         ValueError: If no eligible time series are found for any fold.
@@ -183,7 +181,10 @@ def cross_validate(
         )
 
         fold_forecast = forecaster.predict(val_features_lf)
-        fold_forecast = fold_forecast.with_columns(fold_id=pl.lit(fold.fold_id, dtype=pl.Int8))
+        # Overwrite the "live" default with the validation year for this fold.
+        fold_forecast = fold_forecast.with_columns(
+            fold_id=pl.lit(str(fold.val_start.year)).cast(pl.Categorical)
+        )
         all_fold_forecasts.append(fold_forecast)
 
     if not all_fold_forecasts:
@@ -193,4 +194,4 @@ def cross_validate(
         )
 
     result = pl.concat(all_fold_forecasts)
-    return CvPowerForecast.validate(result, allow_superfluous_columns=True)
+    return PowerForecast.validate(result, allow_superfluous_columns=True)

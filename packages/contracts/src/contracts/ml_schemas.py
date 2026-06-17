@@ -225,7 +225,10 @@ class Metrics(pt.Model):
 
     time_series_id: int = _get_time_series_id_dtype()
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
-    fold_id: int = pt.Field(dtype=pl.Int8, ge=1, description="CV fold number (1-indexed).")
+    fold_id: str = pt.Field(
+        dtype=pl.Categorical,
+        description="CV fold year (e.g. '2022').  Matches ``PowerForecast.fold_id``.",
+    )
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
@@ -247,18 +250,3 @@ class Metrics(pt.Model):
         ),
     )
     metric_value: float = pt.Field(dtype=pl.Float32)
-
-
-from .power_schemas import PowerForecast  # noqa: E402  (avoid circular at module level)
-
-
-class CvPowerForecast(PowerForecast):
-    """A ``PowerForecast`` row annotated with its CV fold number.
-
-    Returned by :func:`ml_core.cross_validate.cross_validate` and written to the
-    ``cv_power_forecasts`` Delta table.  Storing the full half-hourly predictions
-    per fold allows metrics to be recomputed later without re-running expensive
-    ML experiments.
-    """
-
-    fold_id: int = pt.Field(dtype=pl.Int8, ge=1, description="CV fold number (1-indexed).")

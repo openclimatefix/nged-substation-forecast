@@ -131,10 +131,13 @@ class XGBoostForecaster(BaseForecaster):
                 power_fcst_model_name=pl.lit(cfg.power_fcst_model_name),
                 power_fcst_model_version=pl.lit(cfg.power_fcst_model_version, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(cfg.ml_flow_experiment_id, dtype=pl.Int32),
+                fold_id=pl.lit("live"),
             )
             parts.append(part)
 
-        result = pl.concat(parts).cast({"power_fcst_model_name": pl.Categorical})
+        result = pl.concat(parts).cast(
+            {"power_fcst_model_name": pl.Categorical, "fold_id": pl.Categorical}
+        )
         return PowerForecast.validate(result)
 
     def save(self, path: Path) -> None:
