@@ -2,18 +2,19 @@ Today, let's discuss a new feature: Implementing Dagster assets to train and eva
 XGBoost energy forecasting model.
 
 - Let's discuss the design.
-- I'm imagining we'll build two simple Dagster assets: a `train` asset, and a `predict` asset.
-  These assets should be completely agnostic to exactly which ML model they're using. Instead, all
-  they care about is that they read a Hydra config, which specifies which subclass of
-  `BaseForecaster` to instantiate, and the params for that model.
-- We'll also want to use Dagster to orchestrate expanding-window
-  cross-fold validation (e.g. where the first fold trains on 2020 and validates on 2021, then the
-  next fold trains on 2020 and 2021, and validates on 2022, etc.).
-- And we'll implement another Dagster asset that
-  takes a `PowerForecast` Delta table and plots predictions using Altair.
+- I'm imagining we'll build two simple Dagster assets: a `train` asset, and a `predict` asset. (Are
+  they the correct names? Or should Dagster assets be named after the _nouns_ the asset produces?)
+  These assets should be completely agnostic to which ML model they're using. Instead, all Dagster
+  cares about is that it can read a Hydra config, which specifies which subclass of `BaseForecaster`
+  to instantiate, and the params for that ML model.
+- We'll also want to use Dagster to orchestrate expanding-window cross-fold validation (e.g. where
+  the first fold trains on 2020 and validates on 2021, then the next fold trains on 2020 and 2021,
+  and validates on 2022, etc.).
 - In general, I'm imagining that Dagster will be responsible for lazily loading the NWP data and
   power data, and filtering to include only the appropriate time windows, and then passing these
   Polars LazyFrames to the ML model.
+- The code in the Dagster assets themselves should be as minimal as possible. All the "real work"
+  should be implemented in the sub-packages.
 
 What's already in place:
 - packages/xgboost_forecaster/ contains a functional, minimal XGBoostForecaster. It eagerly loads
@@ -24,3 +25,5 @@ What's already in place:
 - throughout this project, we are making 14-day forecasts, at half-hourly resolution, and we
   (almost) always want to produce an ensemble of power forecasts.
 
+What we'll work on next:
+- We'll implement another Dagster asset that takes a `PowerForecast` Delta table and plots predictions using Altair.
