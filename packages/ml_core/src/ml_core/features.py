@@ -481,9 +481,7 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
         col for col in schema_names if col != "valid_time" and col not in all_weather_vars
     ]
     continuous_cols = [col for col in schema_names if col in NwpInMemory.continuous_var_names()]
-    categorical_cols = [
-        col for col in schema_names if col in frozenset(NwpInMemory.categorical_var_names)
-    ]
+    categorical_cols = [col for col in schema_names if col in NwpInMemory.categorical_var_names]
 
     # Build 30-min time grid per group: aggregate min/max valid_time per group,
     # expand each row into a list of half-hourly datetimes, then explode to rows.
