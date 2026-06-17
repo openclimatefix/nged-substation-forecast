@@ -180,7 +180,8 @@ class TimeSeriesMetadata(pt.Model):
 
 
 #: Fold identifier for ``PowerForecast.fold_id``.
-#: Each calendar year in the CV protocol gets a string label matching that year.
+#: Each fold validates on one whole year.
+#: Each validation year in the CV protocol gets a string label matching that year.
 #: ``"live"`` denotes a production forecast (no CV fold).
 #: Extend this Literal as new CV epochs are added.
 FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
@@ -207,7 +208,7 @@ class PowerForecast(pt.Model):
         dtype=pl.Categorical,
         description=(
             "Identifier for our ML-based power forecasting model."
-            " Specified in ``conf/model/*.yaml`` as ``model_params.power_fcst_model_name``."
+            " Specified in the BaseForecaster subclass."
         ),
     )
 
