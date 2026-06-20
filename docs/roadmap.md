@@ -128,6 +128,7 @@ The ML-assets architecture is designed to support this from day one (programmati
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the GNN
 - **Differentiable physics for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively
+- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history (see `docs/temp/dagster_plan.md` §4.8.3)
 
 **Stretch goals**:
 - Forecast *unmetered* solar and wind power at each primary substation

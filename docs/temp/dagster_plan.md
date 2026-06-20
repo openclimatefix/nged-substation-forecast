@@ -620,6 +620,56 @@ re-running any training.
 
 The existing `cv_metrics` Dagster asset is **deleted** and replaced by `metrics`.
 
+### 4.8.3 Evaluating data sources with limited history
+
+We will sometimes want to test a **new input data source whose history is shorter than the
+canonical folds** — the motivating case is adding **ICON-EU NWP** (from Dynamical.org), whose
+history only starts in **early 2026**, well after the 2022–2025 leaderboard folds. Such a source
+**cannot** enter the canonical CV folds (there is no overlapping history), so by construction this
+evaluation lives entirely in `evaluation_scope="ad_hoc"` (§4.8) and **never** feeds the
+leaderboard. Two patterns, answering two different questions:
+
+**1. Controlled ablation (the principled comparison — "does the source add skill?").** Hold
+*everything* constant except the source under test. Because the new source only exists from 2026,
+the shared window must live within 2026:
+
+- Pick a 2026 evaluation window bounded by the new source's availability; split it into
+  train/validation (or an expanding-window split) within that window.
+- **Baseline experiment:** `weather_source = "ecmwf"`, ECMWF-only features.
+- **Treatment experiment:** `weather_source = "ecmwf_icon"`, ECMWF + ICON-EU features.
+- Both train on the **identical rows** and are scored on the **identical rows** (same
+  `time_series_id` population, same `power_fcst_init_time` grid), differing *only* in the feature
+  set. Score both with `evaluation_scope="ad_hoc"` over the same `PopulationFilter`
+  (`valid_time_min`/`valid_time_max` = the 2026 window).
+
+To inherit the leaderboard's same-population guarantee (§4.5.1) for this off-leaderboard window,
+materialise a **frozen ad-hoc eligibility set** for the 2026 window that both experiments read,
+rather than letting each experiment pick its own population. (`trained_time_series_ids` in
+`meta.json` already forces train==predict per model, but does not by itself force the *two*
+experiments to share a population — the frozen set does.)
+
+**2. Confound warning (do NOT read this as the ablation).** The tempting shortcut — take the
+2022–2025 **leaderboard champion**, run it on 2026, and compare against an ICON-EU model on 2026 —
+is **statistically confounded** and must not be read as evidence about the new source. The two
+models differ in **two** variables at once: the feature set *and* the **training window** (the
+champion trained on four full years; the ICON-EU model is forced onto a 2026-only sliver, because
+ICON-EU has no earlier history). A win or loss cannot be attributed to the source rather than to
+the training data. This comparison is legitimate only as a **deployment** question ("which
+forecast is better to ship *today*?"), where the confound is irrelevant because we only care which
+is better now, not why.
+
+**3. Epoch path (the eventual leaderboard-quality answer).** Once the new source has accumulated
+enough history (≈1–2 complete years), promote it via a **new leaderboard epoch** (§6 fold
+promotion): a fold set over source-era complete years (e.g. 2026, 2027, …) in which the new source
+is canonically available, with every experiment re-scored against that fold set for apples-to-apples
+comparison. The 2026 ad-hoc ablation is the **interim** signal obtained *before* enough history
+exists to do this properly; it should never be presented with leaderboard rigour.
+
+Note: this section concerns only *evaluation*. Actually **ingesting** a second NWP source (a second
+downloader, NWP contract/schema changes, source-aware `WeatherFeature` parsing, and a dual-source
+join in `engineer_features()`) is separate, unbuilt engineering work outside this plan's scope; see
+`docs/roadmap.md` (v2.0).
+
 ### 4.9 `live_forecasts` Asset
 
 ```
