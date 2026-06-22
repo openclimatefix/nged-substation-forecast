@@ -20,7 +20,10 @@ The blocks are:
 
 1. **Power forecasts scaled to [−1, +1]** (the [`power_forecast`](delivery-tables.md#table-1-power_forecast)
    table). These **always assume a "normal running arrangement" and perfect health** of generators
-   and substations — i.e. a worst-case network-constraint planning view. "Normal" means:
+   and substations — i.e. a worst-case network-constraint planning view. Producing this
+   topology-normalised signal in the presence of historical switching events is the target of the
+   [differentiable physics switching state-space model](differentiable-physics.md#9-handling-abnormal-running-arrangements-a-switching-state-space-model)
+   (v2 research). "Normal" means:
    - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
      open.
    - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and

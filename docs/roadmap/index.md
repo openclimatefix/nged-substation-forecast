@@ -22,8 +22,9 @@ planned.
   metrics, horizon time-slices, and leaderboard grouping tags.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, CERRA, CM SAF).
-- [Differentiable Physics](differentiable-physics.md) — DP for effective-capacity estimation (v1)
-  and GNN-coupled disaggregation (v2).
+- [Differentiable Physics](differentiable-physics.md) — DP for effective-capacity estimation of
+  metered generators (v1), and GNN-coupled disaggregation, latent-demand recovery and the switching
+  state-space model for abnormal running arrangements (v2).
 
 The timeline below shows the order in which this work is planned.
 
@@ -111,8 +112,8 @@ The ML-assets architecture is designed to support this from day one (programmati
 - Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
 - Populate the `substation_switching` Delta table
 
-**Dynamic effective capacity estimation for generators ([differentiable physics](differentiable-physics.md))**:
-- Implement [differentiable physics (DP)](differentiable-physics.md) models for wind and solar PV generators to estimate effective capacity at each half-hourly timestep (this is **Phase 1** of the DP plan)
+**Dynamic effective capacity estimation for *metered* generators ([differentiable physics](differentiable-physics.md))**:
+- Implement a basic [differentiable physics (DP)](differentiable-physics.md) model for the *metered* wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is **Phase 1** of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is v2 research.
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
     - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
@@ -153,12 +154,13 @@ The ML-assets architecture is designed to support this from day one (programmati
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
 **Research (advanced ML)**:
-- **Graph Neural Networks (GNNs)**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph. Graph edges represent physical connections. This is the approach most likely to capture the fact that switching events transfer *behaviour*, not just a constant amount of power. (This is **Phase 2** of the DP plan — see [Differentiable Physics](differentiable-physics.md#7-coupling-dp-with-a-graph-neural-network-gnn).)
+- **Graph Neural Networks (GNNs)**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph. Graph edges represent physical connections. This is the approach most likely to capture the fact that switching events transfer *behaviour*, not just a constant amount of power. (This is **Phase 2** of the DP plan — see [Differentiable Physics](differentiable-physics.md#8-coupling-dp-with-a-graph-neural-network-gnn).)
+- **Latent-demand recovery & switching state-space model**: disaggregate net substation power into latent demand (under the *normal running arrangement*) plus metered and unmetered DER generation, jointly inferring the abnormal-running-arrangement routing states via a switching state-space model over the network graph (see [Differentiable Physics §9](differentiable-physics.md#9-handling-abnormal-running-arrangements-a-switching-state-space-model)). This supersedes the v1 statistical ARA detector and reconstructs the topology-normalised demand NGED requires.
 - **Pre-trained neural network encoders**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the GNN
-- **[Differentiable physics](differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [Differentiable Physics §7](differentiable-physics.md#7-coupling-dp-with-a-graph-neural-network-gnn))
+- **[Differentiable physics](differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [Differentiable Physics §8](differentiable-physics.md#8-coupling-dp-with-a-graph-neural-network-gnn) and [§10](differentiable-physics.md#10-apparent-power-mva-metering))
 - **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history (see `docs/temp/dagster_plan.md` §4.8.3)
 
 **Stretch goals**:
