@@ -27,6 +27,8 @@ planned.
   state-space model for abnormal running arrangements (v2).
 - [Disaggregation evaluation](disaggregation-evaluation.md) — the multi-pronged evaluation protocol
   for the no-clean-ground-truth disaggregation problem (v2).
+- [Encoders](encoders.md) — shared learned encoder modules (WeatherEncoder, TimeEncoder) and why they
+  pair naturally with differentiable physics (v2).
 
 The timeline below shows the order in which this work is planned.
 

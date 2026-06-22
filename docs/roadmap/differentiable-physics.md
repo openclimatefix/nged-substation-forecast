@@ -454,9 +454,10 @@ Following the report's schematic, the graph uses the following node types:
 
 1. **Substation nodes** — the measured, net blended power flow at a primary substation (the main target constraint).
 2. **Metered load nodes** — demand that NGED meters directly, where such metering exists.
-3. **Gross demand nodes** — the underlying, unmetered consumer load, inferred by the model.
+3. **Gross demand nodes** — the underlying, unmetered consumer load, inferred by the model. Implemented as a `BasisLoadNode`: a shared MLP learns a small set of universal demand-profile shapes (e.g. residential, commercial, light-industrial) as functions of time-of-day, day-of-week, and temperature; each substation carries a local "style vector" of mixing weights that describes its particular customer mix. The universal basis curves are shared across all substations; only the style vector is site-specific, so the model can distinguish a residential suburb from an industrial estate without re-learning basic human demand patterns from scratch at each site.
 4. **Metered PV / Wind nodes** — generators with dedicated, live generation metering.
 5. **Unmetered PV / Wind fleet nodes** — aggregated behind-the-meter (BTM) solar and distributed wind, grouped by location, with no direct metering (each implemented as a `FleetSolarNode`, §6).
+6. **Heat pump nodes** (v2 stretch) — heat pump demand exhibits a distinctive J-curve: as temperatures fall, heating demand rises, but aggregate COP also falls, so electricity draw grows super-linearly with cold. This non-linearity cannot be captured by treating temperature as a plain regression feature — it requires an explicit COP-rolloff function. A `HeatPumpNode` models this: it takes ambient temperature, applies a learned COP curve, and outputs the net electricity demand attributable to heat pumps. Contributes to gross demand at substations with significant residential or commercial heat pump penetration.
 
 Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the effective-capacity estimate stay a clean measure of physical availability — see §3 and Fig. 10.
 
@@ -491,30 +492,72 @@ Model the distribution network as a graph where:
 
 ### Latent routing states
 
-Each reconfigurable edge carries a **latent binary (or categorical) state** at each timestep: is the
-load block on this boundary currently fed from substation A or substation B? Under the normal running
-arrangement, the state is fixed and known from the nominal topology. During an ARA, one or more
-states flip.
+In reality, a switching event does not transfer an entire substation to a neighbour — it reroutes
+a **feeder section**: one of several feeders hanging off the primary, carrying some fraction of the
+total load and its own embedded DER mix. The correct latent variable is therefore a **categorical
+parent-assignment per switchable load block per timestep**: for each block *k*, which substation
+currently feeds it? Under the normal running arrangement each block's parent is fixed and known from
+the nominal topology; during an ARA, one or more assignments flip.
+
+Each substation's total metered power is then the sum of the blocks currently assigned to it:
+
+$$P_A(t) = \sum_{k:\, \text{parent}(k,t) = A} P_{\text{block}\,k}(t)$$
+
+A binary edge-state (is this boundary open or closed?) is the special case where a substation has
+exactly one switchable block. In general there are multiple feeders, so a switching event moves only a
+fraction of the metered power — a partial step, not a whole-node transfer.
 
 ### The conservation law as the inference signal
 
-The key observation is that switching events conserve power across the neighbourhood: when a load
-block transfers from A to B, A's meter reading drops by the block's power and B's rises by the same
-amount — simultaneously, and with the same DER signature travelling with it (the rerouted block
-carries its embedded PV, its temperature-correlated load, etc.). This **cross-node coincidence of
-equal-and-opposite step changes** is the fingerprint of a switching event, and it is a signal that a
-per-node model cannot detect. Graph-level message passing — specifically, passing power residuals
-across reconfigurable edges — makes the inference tractable.
+The key observation is that switching events conserve power across the neighbourhood: when block *k*
+transfers from A to B, A's meter reading drops by block *k*'s power and B's rises by the same
+amount — simultaneously, and with block *k*'s DER signature (its embedded PV, temperature-correlated
+load, etc.) travelling with it. This **cross-node coincidence of equal-and-opposite partial steps**
+at the magnitude of the transferred block is the fingerprint of a switching event, and it is a signal
+that a per-node model cannot detect. Graph-level message passing — specifically, passing power
+residuals across reconfigurable edges — makes the inference tractable.
+
+Because the transferred block typically represents only a fraction of the substation's total load,
+the observed step in each meter reading is **partial**, not a whole-node emptying or filling. This
+makes small events harder to detect by magnitude alone, but it means the block-level formulation
+cannot hallucinate a whole-node transfer that never occurred.
 
 ### The inversion under a routing assignment
 
-Given a proposed routing assignment (a configuration of latent edge states), the forward model is
-applied per node using only the load block assigned to that node under the proposed topology. The
-reconstruction loss is the sum over all nodes of the squared residual between forward-model output
-and observed meter reading. The latent routing states are inferred jointly with the DER parameters by
-minimising this loss — either via gradient-based relaxation (treating the binary states as soft
-assignments during training) or via structured variational inference (e.g. rSLDS / recurrent
-switching linear dynamical systems, which handle the combinatorial posterior over discrete modes).
+Given a proposed set of block-to-parent assignments for each timestep, the forward model computes
+each substation's predicted meter reading as the sum over its currently-assigned blocks'
+DER-adjusted demand. The reconstruction loss is the sum over all substations and time of the squared
+residual between this prediction and the observed meter reading. Block assignments are inferred
+jointly with the DER parameters by minimising this loss — either via gradient-based relaxation
+(treating discrete assignments as soft mixtures during training) or via structured variational
+inference (e.g. rSLDS / recurrent switching linear dynamical systems).
+
+**The block-discovery problem.** The number of switchable blocks per substation and each block's
+baseline demand profile are themselves latent. If NGED can supply feeder-level topology or metering,
+that structure can be used directly. Otherwise the model must discover blocks from the data, adding
+a latent decomposition problem on top of routing inference. Blocks too small to produce detectable
+steps in the meter reading can be folded into a per-node residual term.
+
+### A simpler alternative: soft redistribution
+
+The rSLDS / block-assignment approach above is principled but computationally heavy. A simpler
+alternative — and possibly the right place to start — directly models the observed *soft*
+redistribution rather than inferring discrete block assignments.
+
+Introduce a **RedistributionLayer** sitting after the per-node physics predictions. At each
+timestep, each reconfigurable edge carries a learned *conductance gate* in [0, 1] output by a small
+MLP conditioned on the weak switching labels. Power flows across the edge in proportion to the
+difference in reconstruction residuals between the two nodes:
+
+$$\text{flow}_{A \to B} = g_{AB} \times (\text{residual}_A - \text{residual}_B)$$
+
+Conservation holds by construction: what flows out of A flows into B. An L1 sparsity penalty on the
+gates keeps them near zero except when the weak labels permit activity.
+
+Neither the gate nor the "potential" need to be physically measured — both are internal model
+quantities (the residual is the model's own prediction error; the gate is a learned parameter). The
+advantage over the rSLDS formulation is that the whole system remains end-to-end differentiable,
+at the cost of modelling block structure implicitly rather than explicitly.
 
 ### Output: normal-running-arrangement demand
 
@@ -613,10 +656,10 @@ itself a publishable contribution.
 | Layer | Component | Role |
 |---|---|---|
 | **Graph** | Primary substations as nodes; reconfigurable boundaries as edges | Structural prior on which substations can exchange load |
-| **Latent states** | Binary/categorical edge state per timestep | Models ARA routing; inferred jointly with DER params |
+| **Latent states** | Categorical block-to-parent assignment per timestep | Models ARA routing; each block's power moves with its parent — partial transfers fall out naturally |
 | **Forward model** | Differentiable physics (irradiance → PV, wind speed → wind power, state-space battery) | Converts latent demand + DER params → predicted meter reading |
 | **Reconstruction loss** | Squared residual, summed over nodes and time | Drives joint inversion of latent demand and DER parameters |
-| **Inference** | Soft routing relaxation during training; rSLDS / structured VI for discrete modes | Handles combinatorial posterior over switching configurations |
+| **Inference** | rSLDS / structured VI for discrete block-assignment modes; or soft RedistributionLayer (simpler, fully differentiable alternative — see §9) | Handles combinatorial posterior over switching configurations |
 | **Output** | Latent demand under nominal topology, per substation, per half-hour | Target variable for downstream probabilistic forecasting |
 | **Forecast layer** | XGBoost or neural sequence model on cleaned latent demand | Produces 14-day probabilistic forecasts in NGED-required format |
 
