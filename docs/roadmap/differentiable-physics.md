@@ -1,6 +1,25 @@
 # Differentiable Physics (DP) for NGED
 
-This framework bridges pure machine learning with mechanistic domain knowledge to solve the net-demand disaggregation problem across the National Grid Electricity Distribution (NGED) network.
+> **Status: 🚧 Planned / 🔬 Research.** None of this is implemented yet. Phase 1 (capacity
+> estimation) is targeted at [roadmap v0.6 / v0.7](index.md#v06-v07-switching-events-dynamic-generator-capacity);
+> Phase 2 (full GNN-coupled disaggregation) is [v2 research](index.md#v20-scale-up-future-research).
+> The Python in this document is illustrative sketch code, not the implementation. See the
+> [roadmap index](index.md) for status conventions and where this fits the overall plan.
+
+This framework bridges pure machine learning with mechanistic domain knowledge to solve the net-demand disaggregation problem across the National Grid Electricity Distribution (NGED) network. It is the deep-dive behind two of the "innovative and unique" capabilities highlighted in the Milestone 1 report: estimating the **dynamically changing effective capacity** of generators, and natively handling **apparent-power (MVA) metering** and **unmetered generation**.
+
+### How to read this document
+
+The sections build up from the simplest piece to the full system, roughly in roadmap order:
+
+1. [Why Differentiable Physics?](#1-why-differentiable-physics) — the motivation.
+2. [How DP fits into the roadmap](#2-how-dp-fits-into-the-roadmap) — the v1 → v2 map; read this next for orientation.
+3. [The core building block: `DifferentiableSolarPlant`](#3-the-core-building-block-differentiablesolarplant) — modelling a single metered site.
+4. [Estimating capacity with DP](#4-estimating-capacity-with-dp) — how the capacity parameter is regularised (the v1 deliverable).
+5. [Scaling to aggregate fleets: `FleetSolarNode`](#5-scaling-to-aggregate-fleets-fleetsolarnode) — one node for many rooftops.
+6. [Combining DP with the weather encoder](#6-combining-differentiable-physics-with-the-weather-encoder) — the fuller forecasting architecture.
+7. [Coupling DP with a Graph Neural Network](#7-coupling-dp-with-a-graph-neural-network-gnn) — the full-grid v2 disaggregation engine.
+8. [Long-term vision: GB-wide inverse irradiance mapping](#8-long-term-vision-gb-wide-inverse-irradiance-mapping) — a research aspiration beyond v2.
 
 ---
 
@@ -14,7 +33,26 @@ Pure black-box models (like standard neural networks or XGBoost) require vast am
 
 ---
 
-## 2. Python Sketch: `DifferentiableSolarPlant`
+## 2. How DP fits into the roadmap
+
+To minimise engineering risk, DP is introduced in two sequential phases that line up with the project [roadmap](index.md): capacity estimation in v1, full disaggregation in v2. Read this section before the code below — it tells you which pieces are needed when.
+
+### Phase 1: Dynamic capacity estimation (v1)
+
+Targeted at [roadmap v0.6 / v0.7](index.md#v06-v07-switching-events-dynamic-generator-capacity). DP is deployed purely to estimate the effective capacity of the **metered PV and wind sites**, feeding the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) delivery table.
+
+* **The problem:** A generator's effective capacity drifts over time — turbines fail, inverters drop out, panels soil and degrade (or are cleaned and replaced). A static nameplate value introduces large downstream errors.
+* **The solution:** With the site's coordinates locked and live weather passed through the DP module, any residual between expected and actual power is backpropagated to update the **effective-capacity parameter** ($\mu_{\text{capacity}}$) on a rolling basis. This doubles as a real-time health and availability monitor.
+* **What effective capacity must exclude:** ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability. We identify curtailed periods from NGED's curtailment/ANM feed and model them as a separate gate (§7), so the capacity estimate reflects only the asset's true availability. Folding curtailment into capacity would corrupt exactly the signal NGED needs — and §4 covers how we further stop the capacity parameter from absorbing unexplained noise.
+* **How capacity feeds the forecast:** as described in the roadmap, this is a **two-pass** approach — the first pass estimates effective capacity (here), and the second normalises each generator's time series by its effective capacity before the power-forecast model trains on it. XGBoost continues to do the actual power forecasting in v1; DP is responsible only for *estimating capacity*.
+
+### Phase 2: Full GNN-coupled disaggregation (v2)
+
+Part of [roadmap v2.0](index.md#v20-scale-up-future-research). Once the metered assets are accurately tracked, we unlock the full architecture (§7). The DP modules for the *unmetered* fleets (§5) are bound to the GNN nodes. The network uses the verified metered assets and spatial weather cues to disaggregate the mixed substation signals, cleanly separating true gross demand from hidden behind-the-meter renewable generation. This is also where DP graduates from *estimating capacity* to directly *forecasting power* (including for MVA-metered sites).
+
+---
+
+## 3. The core building block: `DifferentiableSolarPlant`
 
 We model each physical parameter as a learnable Normal distribution $\mathcal{N}(\mu, \sigma^2)$ — a mean-field variational posterior — and train with the reparameterisation trick (`rsample()`) so gradients flow through the sampling step.
 
@@ -23,7 +61,7 @@ Crucially, the training objective is an **ELBO**, not a bare reconstruction loss
 Two physics details the sketch gets right:
 
 - **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
-- **Capacity is a power.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. The AC inverter limit is a separate clip (see §8).
+- **Capacity is a power.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. The AC inverter limit is a separate clip (see §5).
 
 Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°).
 
@@ -118,99 +156,7 @@ class DifferentiableSolarPlant(nn.Module):
 
 ---
 
-## 3. Graph Neural Network (GNN) Integration
-
-The distribution network is fundamentally a topological graph. We couple our Differentiable Physics engine with a spatial GNN so that power balances across the grid are conserved by construction. This mirrors the GNN schematic in the Milestone 1 report (Fig. 10).
-
-### Node definitions
-
-Following the report's schematic, the graph uses the following node types:
-
-1. **Substation nodes** — the measured, net blended power flow at a primary substation (the main target constraint).
-2. **Metered load nodes** — demand that NGED meters directly, where such metering exists.
-3. **Gross demand nodes** — the underlying, unmetered consumer load, inferred by the model.
-4. **Metered PV / Wind nodes** — generators with dedicated, live generation metering.
-5. **Unmetered PV / Wind fleet nodes** — aggregated behind-the-meter (BTM) solar and distributed wind, grouped by location, with no direct metering.
-
-Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the effective-capacity estimate stay a clean measure of physical availability — see §4 and Fig. 10.
-
-### The fusion mechanism
-
-The GNN handles spatial message-passing to capture regional correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too). The GNN's spatial hidden layers feed the parameters/inputs of the **DP modules**, which compute explicit physical generation. A hard Kirchhoff balance node then aggregates the elements:
-
-$$\text{Net substation flow} = \text{Gross demand} - \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) - \gamma_{\text{wind}}\,(\text{Wind}_{\text{metered}} + \text{Wind}_{\text{unmetered}})$$
-
-where the $\gamma$ terms are the per-asset curtailment gates. The error between predicted and measured substation flow produces a gradient that flows back through the graph, optimising the GNN weights and the physical parameter posteriors simultaneously.
-
-### Apparent-power (MVA) metering
-
-Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export — when embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the DP/GNN framework reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
-
-$$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr|$$
-
-(assuming near-unity power factor). The physics grounds the model so that a sunny-day "bounce" is correctly attributed to reverse power flow from generation, not to a spike in demand. This is one of the two capabilities the Milestone 1 report highlights for DP — the other being unmetered disaggregation.
-
----
-
-## 4. Phasing Roadmap
-
-To minimise engineering risk, DP is introduced in two sequential phases that line up with the project [roadmap](../roadmap.md): capacity estimation in v1, full disaggregation in v2.
-
-### Phase 1: Dynamic capacity estimation (v1)
-
-Before attempting full disaggregation, DP is deployed purely to estimate the effective capacity of the **metered PV and wind sites** (roadmap v0.6 / v0.7).
-
-* **The problem:** A generator's effective capacity drifts over time — turbines fail, inverters drop out, panels soil and degrade (or are cleaned and replaced). A static nameplate value introduces large downstream errors.
-* **The solution:** With the site's coordinates locked and live weather passed through the DP module, any residual between expected and actual power is backpropagated to update the **effective-capacity parameter** ($\mu_{\text{capacity}}$) on a rolling basis. This doubles as a real-time health and availability monitor.
-* **What effective capacity must exclude:** ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability. We identify curtailed periods from NGED's curtailment/ANM feed and model them as a separate gate (§3), so the capacity estimate reflects only the asset's true availability. Folding curtailment into capacity would corrupt exactly the signal NGED needs — and §7 covers how we further stop the capacity parameter from absorbing unexplained noise.
-
-### Phase 2: Full GNN-coupled disaggregation (v2)
-
-Once the metered assets are accurately tracked, we unlock the full architecture. The DP modules for the *unmetered* fleets are bound to the GNN nodes. The network uses the verified metered assets and spatial weather cues to disaggregate the mixed substation signals, cleanly separating true gross demand from hidden BTM renewable generation.
-
----
-
-## 5. Long-Term Vision: GB-Wide Inverse Irradiance Mapping
-
-Once the v1 architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the DP modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; the spatial GNN then interpolates between them to fill in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.
-
----
-
-## 6. Combining differentiable physics with weather encoder
-
-```
-+-------------------+
-| Learnt parameters |
-|     per site:     |
-|                   |
-|  • PV tilt        |                   +---------------+
-|  • PV azimuth     |     <=======>     | pvlib-pytorch |----------+
-|  • AC capacity    |                   +-------+-------+          |
-|  • DC capacity    |                           ^                  |
-|  • etc.           |                           |                  v
-+-------------------+                           |           +-------------+
-                                         +------+------+    |  multi-seq  |
-                                         | Irradiance  |    |  alignment  |
-                                         | Temperature |    |  with axial |---> [ p̂ ]
-                                         +------+------+    |  attention  |
-                                                ^           +-------------+
-+--------------+     +-------------------+      |                  ^
-| Weather data |---->|  weather encoder  |------+                  |
-+--------------+     +-------------------+                  +------+------+
-                                                            |   History   |
-                                                            +-------------+
-```
-
-- **NWP bias** is handled by the **weather encoder**: "the weather model says it's cloudy, but historically this specific pressure pattern at this location means it's actually clear" (feature-level correction).
-- **Physical constraints** are handled by the **differentiable physics**: "based on the corrected weather, the geometry of the sun and panel dictates $X$ power" (first-principles baseline).
-- **Systematic / local anomalies** (the "unknown unknowns") are handled by the **retrieval / alignment** module: "on days that looked exactly like this in the past, the physics model consistently over-predicted the evening ramp-down by 5% because of that one tree on the horizon" (residual correction).
-
-`pvlib-pytorch` is a planned Open Climate Fix open-source library — a differentiable, PyTorch-native port of [pvlib](https://pvlib-python.readthedocs.io/) — that we intend to spin out of this project. It would generalise the hand-rolled transposition and panel geometry in §2 and §8 into a reusable, tested component; treat those sketches as the prototype it grows from.
-
-
----
-
-## 7. Estimating capacity with DP
+## 4. Estimating capacity with DP
 
 The capacity parameter must not be free to bounce around at the data's sampling rate, or it will simply soak up whatever noise the rest of the model cannot explain. The right regulariser depends on whether the capacity can physically *fall* as well as rise.
 
@@ -224,11 +170,11 @@ The *installed* capacity of an unmetered fleet behaves differently: it essential
 
 ---
 
-## 8. `FleetSolarNode`
+## 5. Scaling to aggregate fleets: `FleetSolarNode`
 
 A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.
 
-We fix this with a **physics-informed basis expansion** rather than simulating every individual system.
+We fix this with a **physics-informed basis expansion** rather than simulating every individual system. (Aggregate, unmetered fleets behind a primary are a Phase 2 / v2 concern — this node becomes one of the GNN node types in §7.)
 
 ### 1. The basis-function insight
 
@@ -277,7 +223,7 @@ class UniversalFleetNode(nn.Module):
     ) -> torch.Tensor:
         # 1. The four physical basis curves (ideal shapes from geometry + weather).
         #    calc_fixed / calc_tracker would come from pvlib-pytorch (see section 6).
-        #    Azimuth convention matches section 2: south = 0, east = -90, west = +90.
+        #    Azimuth convention matches section 3: south = 0, east = -90, west = +90.
         p_east = self.calc_fixed(sun_vec, weather, azimuth_deg=-90.0)
         p_south = self.calc_fixed(sun_vec, weather, azimuth_deg=0.0)
         p_west = self.calc_fixed(sun_vec, weather, azimuth_deg=90.0)
@@ -294,3 +240,77 @@ class UniversalFleetNode(nn.Module):
         beta = F.softplus(self.raw_clip_sharpness) + 1e-3
         return limit - F.softplus(beta * (limit - p_raw)) / beta
 ```
+
+---
+
+## 6. Combining differentiable physics with the weather encoder
+
+```
++-------------------+
+| Learnt parameters |
+|     per site:     |
+|                   |
+|  • PV tilt        |                   +---------------+
+|  • PV azimuth     |     <=======>     | pvlib-pytorch |----------+
+|  • AC capacity    |                   +-------+-------+          |
+|  • DC capacity    |                           ^                  |
+|  • etc.           |                           |                  v
++-------------------+                           |           +-------------+
+                                         +------+------+    |  multi-seq  |
+                                         | Irradiance  |    |  alignment  |
+                                         | Temperature |    |  with axial |---> [ p̂ ]
+                                         +------+------+    |  attention  |
+                                                ^           +-------------+
++--------------+     +-------------------+      |                  ^
+| Weather data |---->|  weather encoder  |------+                  |
++--------------+     +-------------------+                  +------+------+
+                                                            |   History   |
+                                                            +-------------+
+```
+
+- **NWP bias** is handled by the **weather encoder**: "the weather model says it's cloudy, but historically this specific pressure pattern at this location means it's actually clear" (feature-level correction).
+- **Physical constraints** are handled by the **differentiable physics**: "based on the corrected weather, the geometry of the sun and panel dictates $X$ power" (first-principles baseline).
+- **Systematic / local anomalies** (the "unknown unknowns") are handled by the **retrieval / alignment** module: "on days that looked exactly like this in the past, the physics model consistently over-predicted the evening ramp-down by 5% because of that one tree on the horizon" (residual correction).
+
+`pvlib-pytorch` is a planned Open Climate Fix open-source library — a differentiable, PyTorch-native port of [pvlib](https://pvlib-python.readthedocs.io/) — that we intend to spin out of this project. It would generalise the hand-rolled transposition and panel geometry in §3 and §5 into a reusable, tested component; treat those sketches as the prototype it grows from.
+
+
+---
+
+## 7. Coupling DP with a Graph Neural Network (GNN)
+
+The distribution network is fundamentally a topological graph. We couple our Differentiable Physics engine with a spatial GNN so that power balances across the grid are conserved by construction. This mirrors the GNN schematic in the Milestone 1 report (Fig. 10), and is the v2 mechanism most likely to capture the fact that [switching events](delivery-tables.md#table-5-substation_switching) transfer *behaviour* between substations, not just a constant amount of power.
+
+### Node definitions
+
+Following the report's schematic, the graph uses the following node types:
+
+1. **Substation nodes** — the measured, net blended power flow at a primary substation (the main target constraint).
+2. **Metered load nodes** — demand that NGED meters directly, where such metering exists.
+3. **Gross demand nodes** — the underlying, unmetered consumer load, inferred by the model.
+4. **Metered PV / Wind nodes** — generators with dedicated, live generation metering.
+5. **Unmetered PV / Wind fleet nodes** — aggregated behind-the-meter (BTM) solar and distributed wind, grouped by location, with no direct metering (each implemented as a `FleetSolarNode`, §5).
+
+Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the effective-capacity estimate stay a clean measure of physical availability — see §2 and Fig. 10.
+
+### The fusion mechanism
+
+The GNN handles spatial message-passing to capture regional correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too). The GNN's spatial hidden layers feed the parameters/inputs of the **DP modules**, which compute explicit physical generation. A hard Kirchhoff balance node then aggregates the elements:
+
+$$\text{Net substation flow} = \text{Gross demand} - \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) - \gamma_{\text{wind}}\,(\text{Wind}_{\text{metered}} + \text{Wind}_{\text{unmetered}})$$
+
+where the $\gamma$ terms are the per-asset curtailment gates. The error between predicted and measured substation flow produces a gradient that flows back through the graph, optimising the GNN weights and the physical parameter posteriors simultaneously.
+
+### Apparent-power (MVA) metering
+
+Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export — when embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the DP/GNN framework reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
+
+$$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr|$$
+
+(assuming near-unity power factor). The physics grounds the model so that a sunny-day "bounce" is correctly attributed to reverse power flow from generation, not to a spike in demand. This is one of the two capabilities the Milestone 1 report highlights for DP — the other being unmetered disaggregation.
+
+---
+
+## 8. Long-term vision: GB-wide inverse irradiance mapping
+
+Once the v1 architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the DP modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; the spatial GNN then interpolates between them to fill in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.

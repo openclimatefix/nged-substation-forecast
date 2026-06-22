@@ -668,7 +668,7 @@ exists to do this properly; it should never be presented with leaderboard rigour
 Note: this section concerns only *evaluation*. Actually **ingesting** a second NWP source (a second
 downloader, NWP contract/schema changes, source-aware `WeatherFeature` parsing, and a dual-source
 join in `engineer_features()`) is separate, unbuilt engineering work outside this plan's scope; see
-`docs/roadmap.md` (v2.0).
+`docs/roadmap/index.md` (v2.0).
 
 ### 4.9 `live_forecasts` Asset
 
@@ -1060,7 +1060,7 @@ mistake.
   `cv_power_forecasts` and `live_forecasts` both predict across all 51 members and write 51
   `ensemble_member` rows per `(time_series_id, valid_time)`; the `metrics` asset's probabilistic
   metrics consume that ensemble. (Training-on-control + inference-on-51 matches the Milestone 1
-  report and `docs/roadmap.md` v0.1.)
+  report and `docs/roadmap/index.md` v0.1.)
 
 - **Completing a year (fold promotion):** when the current year finishes (e.g. 2026 completes
   and its NGED data lands), promote it by adding the fold to `conf/cv/default.yaml` and ensuring
@@ -1089,7 +1089,7 @@ mistake.
   design already supports each step (programmatic `register_experiment_job`, MLflow as a
   machine-readable leaderboard, `retire_experiment_job` for cleanup). The one thing to add when
   we get there is a thin Python/CLI surface for "fetch the parent-run aggregate metrics for
-  experiment X" so the agent reads results without scraping the UI. See `docs/roadmap.md`. Not
+  experiment X" so the agent reads results without scraping the UI. See `docs/roadmap/index.md`. Not
   built now.
 
 ---

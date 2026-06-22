@@ -287,7 +287,7 @@ def upsert_metadata(
     Args:
         new_metadata: The new metadata DataFrame.
         metadata_path: The path to the Parquet file where we store our local version of the
-        metadata.
+            metadata.
 
     Returns stats about new metadata
     """

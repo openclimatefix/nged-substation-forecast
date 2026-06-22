@@ -28,4 +28,4 @@ Each forecast is:
 - [Architecture Overview](architecture/overview.md) — technical components and data flow
 - [Code Style](architecture/code-style.md) — code conventions
 - [Guides](guides/create-forecast.md) — how to run forecasts, backtests, and add models
-- [Roadmap](roadmap.md) — planned future work
+- [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the Delta delivery tables, forecast building blocks, metrics & leaderboard, data sources, and differentiable physics

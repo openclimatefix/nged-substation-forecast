@@ -2,6 +2,10 @@
 
 {% include "../../../packages/contracts/README.md" %}
 
-::: contracts.data_schemas
+::: contracts.common
+::: contracts.power_schemas
+::: contracts.weather_schemas
+::: contracts.geo_schemas
+::: contracts.ml_schemas
 ::: contracts.hydra_schemas
 ::: contracts.settings

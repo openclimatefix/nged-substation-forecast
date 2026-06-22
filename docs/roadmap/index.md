@@ -2,6 +2,31 @@
 
 This roadmap outlines the planned order of development toward the v1.0 live forecast release (January 2027) and beyond. It reflects the plan as of the Milestone 1 report (28 May 2026). Technical plans change as we learn more — treat this as a best-estimate, not a guarantee.
 
+> **Status legend** (used throughout these design docs):
+> ✅ **Implemented** — exists in code today ·
+> 🚧 **Planned** — designed, not yet built ·
+> 🔬 **Research** — exploratory / v2.
+
+## Design documents
+
+This folder captures the detailed technical plans from the Milestone 1 report, so they can be
+pointed at when the time comes to implement them. Each doc marks clearly what is implemented vs.
+planned.
+
+- [Delivery tables](delivery-tables.md) — the five Delta Lake tables OCF delivers to NGED
+  (`power_forecast`, `power_forecast_warnings`, `asset_health_history`, `effective_capacity`,
+  `substation_switching`), with full field-level schemas.
+- [Forecast building blocks](forecast-building-blocks.md) — "normal" vs. "prevailing conditions"
+  forecasts, sign conventions, and worked examples.
+- [Metrics & leaderboard](metrics-and-leaderboard.md) — cross-fold validation protocol, evaluation
+  metrics, horizon time-slices, and leaderboard grouping tags.
+- [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
+  weather datasets (ECMWF ENS, CERRA, CM SAF).
+- [Differentiable Physics](differentiable-physics.md) — DP for effective-capacity estimation (v1)
+  and GNN-coupled disaggregation (v2).
+
+The timeline below shows the order in which this work is planned.
+
 ---
 
 ## v0.1 — "Naive" MVP (internal only)
@@ -86,13 +111,19 @@ The ML-assets architecture is designed to support this from day one (programmati
 - Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
 - Populate the `substation_switching` Delta table
 
-**Dynamic effective capacity estimation (differentiable physics)**:
-- Implement differentiable physics (DP) models for wind and solar PV generators to estimate effective capacity at each half-hourly timestep
+**Dynamic effective capacity estimation for generators ([differentiable physics](differentiable-physics.md))**:
+- Implement [differentiable physics (DP)](differentiable-physics.md) models for wind and solar PV generators to estimate effective capacity at each half-hourly timestep (this is **Phase 1** of the DP plan)
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
     - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
     - **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity
 - Populate the `effective_capacity` Delta table
+
+**Dynamic effective capacity estimation for substations**:
+- For now, while we're forecasting substations top-down, just use the 99th percentile per year as
+  the effective capacity. Later, in v2, the system should already capture everything we need to
+  know about substation capacity, as a function of all the things that drive the substation's
+  behaviour.
 
 **"Prevailing conditions" building block**:
 - Produce example Python code for NGED to construct a "prevailing conditions" forecast from OCF's building blocks
@@ -122,12 +153,12 @@ The ML-assets architecture is designed to support this from day one (programmati
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
 **Research (advanced ML)**:
-- **Graph Neural Networks (GNNs)**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph. Graph edges represent physical connections. This is the approach most likely to capture the fact that switching events transfer *behaviour*, not just a constant amount of power.
+- **Graph Neural Networks (GNNs)**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph. Graph edges represent physical connections. This is the approach most likely to capture the fact that switching events transfer *behaviour*, not just a constant amount of power. (This is **Phase 2** of the DP plan — see [Differentiable Physics](differentiable-physics.md#7-coupling-dp-with-a-graph-neural-network-gnn).)
 - **Pre-trained neural network encoders**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the GNN
-- **Differentiable physics for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively
+- **[Differentiable physics](differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [Differentiable Physics §7](differentiable-physics.md#7-coupling-dp-with-a-graph-neural-network-gnn))
 - **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history (see `docs/temp/dagster_plan.md` §4.8.3)
 
 **Stretch goals**:

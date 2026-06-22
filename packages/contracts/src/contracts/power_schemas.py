@@ -229,6 +229,12 @@ class PowerForecast(pt.Model):
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
             """ Positive values mean "power sent to NGED's grid","""
             """ and negative values mean "power drawn from NGED's grid"."""
+            # PLANNED: We intend to change `power_fcst` to a normalised value in the range
+            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), as described in
+            # docs/roadmap/delivery-tables.md and docs/roadmap/forecast-building-blocks.md.
+            # For this very early version we forecast raw MW/MVA because we are not yet
+            # estimating capacity; we will switch to the scaled value once capacity estimation
+            # lands (roadmap v0.6 / v0.7).
         ),
     )
 
