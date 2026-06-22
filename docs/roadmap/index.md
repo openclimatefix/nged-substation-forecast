@@ -25,6 +25,8 @@ planned.
 - [Differentiable Physics](differentiable-physics.md) — DP for effective-capacity estimation of
   metered generators (v1), and GNN-coupled disaggregation, latent-demand recovery and the switching
   state-space model for abnormal running arrangements (v2).
+- [Disaggregation evaluation](disaggregation-evaluation.md) — the multi-pronged evaluation protocol
+  for the no-clean-ground-truth disaggregation problem (v2).
 
 The timeline below shows the order in which this work is planned.
 

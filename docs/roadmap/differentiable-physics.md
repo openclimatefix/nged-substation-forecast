@@ -18,6 +18,7 @@ natively handling **apparent-power (MVA) metering** and **unmetered generation**
 The sections build up from the problem statement to the full system, roughly in roadmap order:
 
 1. [The problem: unobserved demand & abnormal running arrangements](#1-the-problem-unobserved-demand--abnormal-running-arrangements) — what we are actually trying to recover, and why DP.
+   - [DER tractability ranking](#der-tractability-ranking) — which DER types the method works for, and what to do with the hard ones.
 2. [The core idea: inversion through a differentiable forward model](#2-the-core-idea-inversion-through-a-differentiable-forward-model) — the conceptual umbrella over everything below.
 3. [How DP fits into the roadmap](#3-how-dp-fits-into-the-roadmap) — the v1 → v2 map; read this next for orientation.
 4. [The core building block: `DifferentiableSolarPlant`](#4-the-core-building-block-differentiablesolarplant) — modelling a single metered site.
@@ -31,6 +32,7 @@ The sections build up from the problem statement to the full system, roughly in 
 12. [Where this work is novel](#12-where-this-work-is-novel) — the publishable contribution.
 13. [Technical architecture summary](#13-technical-architecture-summary) — the whole system on one page.
 14. [Long-term vision: GB-wide inverse irradiance mapping](#14-long-term-vision-gb-wide-inverse-irradiance-mapping) — a research aspiration beyond v2.
+15. [Evaluating disaggregation: a multi-pronged protocol](disaggregation-evaluation.md) — how to measure progress when there is no single clean ground truth.
 
 ---
 
@@ -80,6 +82,27 @@ for three core reasons:
 * **Interpretability:** Instead of inspecting uninterpretable latent layers, our system updates
   explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
   audit the model's assumptions.
+
+### DER tractability ranking
+
+Disaggregation works best where there is a **common observable exogenous driver** and
+**homogeneous behaviour** across sites — conditions that let errors average out rather than
+compound. The tractability ranking across DER types is:
+
+| DER type | Tractability | Key reason |
+|---|---|---|
+| PV | Excellent | Irradiance-driven; panel behaviour is near-identical across sites; errors average out at fleet level |
+| Wind | Good | Wind-speed-driven via a learnable power curve; more spatial heterogeneity than PV but still exogenous |
+| Heat pumps | Intermediate | Temperature-driven with COP rolloff; heterogeneity partly averages out at substation aggregate level |
+| EVs | Poor | No clean exogenous driver; behaviour is synchronised (school-run, cheap-rate charging), so errors compound rather than cancel; synchronised peaks are exactly what matters to the grid |
+| Batteries | Not tractable | Pure latent control — tariff/market-driven with no physical exogenous signal; two identical batteries sitting next to each other can dispatch in opposite directions simultaneously |
+
+**Practical conclusion for v2 scope**: disaggregation targets PV (primary), wind (secondary), and
+heat pumps (worth attempting at substation-aggregate level). For batteries, the right approach is
+price-driven behavioural-clustering methods — the kind targeted by OCF's NESO "EDGE" project
+proposal (not yet funded as of June 2026) — rather than physics-based disaggregation. For EVs,
+honest publication requires wide uncertainty intervals and a clear caveat that the
+synchronised-peak regime (precisely the regime NGED cares about most) is the hardest case.
 
 ---
 
@@ -533,7 +556,12 @@ standard tools for unsupervised segmentation of multivariate time series into di
 with state transitions conditioned on the continuous latent state.
 
 **Topology and switch-state identification** has been studied, but overwhelmingly using voltage
-measurements — which NGED does not provide at primary substation level.
+measurements. NGED does not currently provide us with voltage at primary substation level. And, we
+have discussed the idea of using voltage with NGED, and there are two deal-breakers for using
+voltage for topology identification: 1. Voltage often changes as a result of tap-changes on
+transformers and, more importantly, 2. Those voltage changes as a result of tap-changes _could_ be
+used to infer topology but ONLY IF we had high-temporal resolution data (on the order of 1 Hz). But
+we only have half-hourly data, which blurs that info.
 
 ---
 
@@ -569,6 +597,15 @@ operates at GSP/DNO-region scale (e.g. Sheffield Solar's PV Live) or at individu
 level at which DER invisibility is operationally critical, and it is the level at which NGED's data
 exists. Systematic, open benchmarking at this resolution does not yet exist.
 
+**6. Real-power-only inference — the "no-voltage" constraint as a novelty claim, not just a
+limitation.** As §11 notes, existing topology and switch-state identification work relies
+overwhelmingly on voltage measurements, which NGED does not provide at primary substation level
+(many primaries lack voltage metering; tap-changers shift voltage independently of load; and
+half-hourly data smooths over voltage transients). This work therefore demonstrates that the
+switching inference problem is solvable from real-power balance alone. Framing this as a
+contrarian design choice — not a regrettable data gap — inverts the standard assumption and is
+itself a publishable contribution.
+
 ---
 
 ## 13. Technical architecture summary
@@ -588,5 +625,7 @@ exists. Systematic, open benchmarking at this resolution does not yet exist.
 ## 14. Long-term vision: GB-wide inverse irradiance mapping
 
 Once the v1 architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the DP modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; the spatial GNN then interpolates between them to fill in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.
+
+See [Evaluating disaggregation: a multi-pronged protocol](disaggregation-evaluation.md).
 </content>
 </invoke>
