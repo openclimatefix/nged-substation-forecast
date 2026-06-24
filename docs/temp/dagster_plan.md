@@ -1122,7 +1122,7 @@ run** to see progress. Do **not** start a phase before the previous one is merge
   read them before coding.
 - One phase = one commit; name the phase in the commit message.
 
-### 7.0.1 Phase 0 — Clear the decks (do this first)
+### 7.0.1 Phase 0 — Clear the decks (do this first) - Completed in PR #182
 
 When this branch started it went a slightly wrong direction (the monolithic single-loop CV,
 §3.1). Delete that code **first**, in its own small PR, so every later phase adds the new design
