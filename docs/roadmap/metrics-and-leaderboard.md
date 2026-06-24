@@ -4,9 +4,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 
 > **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The CV cross-validation assets and the
 > `Metrics` schema exist in code (✅); the interactive leaderboard visualisation and several metrics
-> are 🚧 planned. The detailed asset/MLflow design lives in
-> [`docs/temp/dagster_plan.md`](../temp/dagster_plan.md). See the [roadmap index](index.md) for
-> status conventions.
+> are 🚧 planned. See the [roadmap index](index.md) for status conventions.
 
 ---
 
@@ -55,7 +53,15 @@ Notes:
 > Implementation detail: only **complete-year** folds enter the leaderboard (the "2026 problem"),
 > and data sources with shorter history than the canonical folds (e.g. ICON-EU) are first assessed
 > via a controlled ad-hoc ablation, then promoted to a new leaderboard epoch once they have ~1–2
-> years of history. See [`dagster_plan.md` §4.8.3](../temp/dagster_plan.md).
+> years of history.
+
+> **Bootstrapping note — the initial leaderboard has a single fold.** The canonical five-fold table
+> above is the *target*. It needs NWP back to 2020, but our ECMWF ENS archive currently only reaches
+> back to **2024-04-01** (Dynamical.org are back-filling earlier years, but slowly) and we have not
+> yet ingested CERRA. So, to get a minimal leaderboard running before either lands, we start with a
+> **single fold**: train on **2024-04-01 → 2025-04-01**, validate on **2025-04-01 → 2026-04-01**.
+> This is deliberately an ugly stop-gap; the full expanding-window protocol above switches on once
+> the back-fill and/or CERRA provide pre-2024 weather.
 
 ---
 
@@ -106,7 +112,8 @@ with lead time:
 We will flag each timestep for whether it contains a switching event, and compute metrics separately
 for periods with switching events in the model inputs (or in the forecast's `valid_time`). This
 distinguishes models that perform well *only* on clean periods from models that handle switching
-events in their inputs.
+events in their inputs. The flags come from the detector described in
+[Switching events & latent demand](switching-events.md).
 
 ---
 

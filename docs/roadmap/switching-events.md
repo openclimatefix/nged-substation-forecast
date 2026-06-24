@@ -2,6 +2,15 @@
 
 **Scope.** How to estimate, for each NGED primary substation, its *latent demand under the normal running arrangement* — the demand that would be metered if the network were never reconfigured — given that the network is in fact reconfigured roughly 10% of the time by switching events. This document defines what switching events are, why they are hard, and a staged modelling plan for different versions of the NGED forecasting system (v0.6 → v2.5 → v2.6).
 
+> **Status: 🔬 Research / 🚧 Planned.** None of this is implemented yet. The v0.6 unsupervised
+> statistical detector is the nearest-term piece (it feeds the
+> [`substation_switching`](delivery-tables.md#table-5-substation_switching) table and the
+> training-data mask); the v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is
+> not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
+> [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
+> **canonical** treatment of switching events — it supersedes the earlier "switching state-space
+> model" sketch in [differentiable physics](differentiable-physics.md).
+
 ---
 
 ## Part 1 — What is a switching event?
@@ -81,13 +90,13 @@ The diagram shows why "how much moved?" has no clean answer. The load `·` is sp
 
 ### 1.5 The labels asymmetry (the dominant design constraint)
 
-We have **switching labels (control-room logs) only for the 32-series trial area** (16 primaries plus associated generation/GSP/BSP series). When the system expands to the full ~1,500 substations, **we will have no switching labels.**
+We have **switching labels (control-room logs) only for the 32-series trial area** (16 primaries plus associated generation/GSP/BSP series). When the system expands to the full ~1,161 primary substations, **we will have no switching labels.**
 
 This is the single most important architectural fact in this document. It means:
 
 - **The production model must run fully unsupervised, on power time series alone.** Switching logs cannot be a runtime input, because at scale they do not exist.
 - **The 32-series logs are a one-time gold-standard *test set*, not a crutch.** We use them to *validate* the unsupervised method (measure detection precision/recall, recipient-set accuracy, magnitude error), then throw the method — not the labels — at the full network.
-- **Nothing may be learned only where labels exist and relied upon at scale.** Any per-substation or per-boundary parameter fitted only on the labelled 16 primaries is a parameter we cannot set for the other ~1,484. The 16 labelled primaries are a *yardstick*, not a representative seed. The thing that must generalise is the *method*, not a lookup table fitted to the pilot.
+- **Nothing may be learned only where labels exist and relied upon at scale.** Any per-substation or per-boundary parameter fitted only on the labelled 16 primaries is a parameter we cannot set for the other ~1,145. The 16 labelled primaries are a *yardstick*, not a representative seed. The thing that must generalise is the *method*, not a lookup table fitted to the pilot.
 
 ### 1.6 The target variable
 
@@ -95,31 +104,21 @@ NGED's stated requirement is to forecast each substation **as if it were always 
 
 (Separately, the meter also nets demand against **distributed energy resources** — behind-the-meter solar PV, small wind, batteries. Recovering true demand also means accounting for these. Part 3 introduces explicit DER modelling; the earlier stages fold DERs implicitly into the latent signal.)
 
+### 1.7 Why power alone — there is no voltage to lean on
+
+Classical topology- and switch-state identification leans almost entirely on **voltage** measurements. We cannot. NGED does not meter voltage at primary-substation level, and even where it might, two facts defeat the approach: transformer **tap-changes** move voltage independently of load, and our **half-hourly** sampling blurs the sub-second transients that voltage-based methods rely on. So switching must be inferred from **real-power balance alone** — the conservation fingerprint at the heart of the methods below. Far from a regrettable data gap, this is a deliberate design stance: a method that works from power alone is the only method that can run at scale, where neither voltage nor switching labels exist.
+
 ---
 
-## Part 2 — Concepts from first principles
-
-Two ideas recur below and are worth defining plainly for readers new to them.
-
-### 2.1 Differentiable physics
-
-A **forward model** is a physics-based equation that predicts an observation from underlying causes. For example, solar PV power can be predicted from irradiance, panel capacity, temperature, and inverter limits using well-understood physics. "**Differentiable**" means the model is implemented in a framework (PyTorch) that can compute the *gradient* of its output with respect to its inputs and parameters — i.e. "if I nudge the panel capacity up a little, how much does predicted power change?"
-
-Why this is useful: if you have the *observed* power and a differentiable forward model, you can run the model **backwards**. You start with guessed values for the unknowns (e.g. latent demand, panel capacity), compare the model's prediction to the observation, and use the gradient to iteratively adjust the unknowns until the prediction matches. This is called **inversion**, and it is just gradient-based optimisation — conceptually the same machinery as fitting any model by minimising a loss, except the model in the middle is a physics equation rather than a generic regressor. The payoff is that the recovered parameters are physically meaningful and the model needs far less data than a black box, because physics constrains the solution.
-
-### 2.2 Graphs (the structure — note: we do *not* need a full GNN)
+## Part 2 — The graph structure (and why it is not a GNN)
 
 A **graph** is just **nodes** connected by **edges**. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the *same power moving*.
 
-It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. Concretely, the graph is used as follows in each stage:
+It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise `N × N` problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 3 below.
 
-- **v0.6 (detector):** the edges define, for each substation `i`, the small candidate set of neighbours to search when attributing a detected drop. The node-level balance test ("which subset of `i`'s neighbours show coincident rises summing to `i`'s drop?") is run *only over `i`'s graph neighbours*, which is what keeps the subset search cheap. No learning over the graph — just a lookup of which substations to consider.
+In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
 
-- **v2.5 (mixture model):** the edges define which mixing weights `α_ij(t)` are even allowed to be non-zero — a substation can only receive load from its graph neighbours. The graph is therefore a *sparsity pattern* on the mixing matrix: most `α_ij` are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an `N × N` free-for-all.
-
-- **v2.6 (type-resolved model):** the graph gains **typed nodes**. Each substation is no longer a single node but a small bundle of nodes — `gross_demand`, `metered_PV`, `unmetered_PV`, `metered_wind`, `unmetered_wind` — each carrying its own signal. Edges still connect substations that can exchange load, but routing now happens per node-type (`α^demand_ij`, `α^pv_ij`, `α^wind_ij`), so the graph expresses "when the i→j boundary is active, each *type* of node can move with its own weight." This is how the model represents a switching event that carries proportionally more PV than load. It is still just structure-plus-arithmetic — no message-passing network is trained.
-
-In short: the graph tells us *who can connect to whom* (and, in v2.6, *which typed components sit at each site*); the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
+> **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
 
 
 ---
@@ -153,9 +152,15 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
 
 **Method — three stages, in order:**
 
-1. **Per-series changepoint on the residual.** For each substation, form a cheap expected-power baseline (e.g. existing XGBoost forecast _without_ any lagged features) and take the residual (observed − expected). A switching event is a *sustained level shift* in this residual — not a spike, not a slope. Detect level shifts with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). Detrending first ensures we detect shifts in *behaviour-relative-to-normal*, so weather and time-of-day don't masquerade as events. **Output:** candidate step times and magnitudes per substation.
+1. **Per-series weather/calendar baseline, then detect changepoints on the residual.** For each substation, form an expected-power baseline that is a function of **exogenous, switching-independent covariates only** — temperature, solar irradiance, recent weather, time-of-day, day-of-week, holidays — fitted across a long history (e.g. an XGBoost or GAM regression). Take the residual (observed − expected). A switching event then shows up as a *sustained level shift* in this residual — not a spike, not a slope. Detect level shifts with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). **Output:** candidate step times and magnitudes per substation.
 
-2. **Node-level coincidence / balance attribution.** A level shift at one substation could be many things (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*. Because transfers fan out to 2–3 neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude `Δ` at substation `i` at time `t`, solve a small constrained attribution: *which subset of `i`'s neighbours show coincident rises (≈ `t`) that sum to ≈ `Δ`?* With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
+   **Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." It is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact, manufacturing phantom events and mis-attributing them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*, so there is no step at all and a real event is masked entirely. Weather and clock time are unaffected by network topology, so a baseline built only from them cannot be contaminated by switching state — the residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
+
+   **Two residual-contamination routes to handle:**
+   - *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data.
+   - *Persistent events.* A months-long ARA appears as a residual level shift that *stays* shifted, not a transient. The changepoint detector handles this (it catches the onset step), but the baseline must **not** be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.
+
+2. **Node-level coincidence / balance attribution.** A level shift at one substation could be many things (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*. Because transfers fan out to 2–3 neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude `Δ` at substation `i` at time `t`, solve a small constrained attribution: *which subset of `i`'s neighbours show coincident rises (≈ `t`) that sum to ≈ `Δ`?* With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — it is what keeps the search to a handful of substations rather than all `N`. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
 
    ```
    residuals around time t (observed - expected), one row per substation:
@@ -172,7 +177,20 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
                     (pairwise matching would FAIL: neither j nor k alone equals 9)
    ```
 
-3. **Composition corroboration (post-attribution, per recipient).** Once the donor set is identified, characterise *what* moved on each leg by the diurnal shape of that recipient's step: midday-peaking → PV-heavy; flat/evening-peaking → load-heavy. This is a histogram, not a model. **Order matters:** read composition off each *recipient's* individual step *after* attribution, never off the *source's* lumped step — a source shedding PV-heavy load to one donor and load-heavy load to another shows only a meaningless blend in its own residual.
+3. **Composition corroboration (post-attribution, per recipient).**
+
+   *Aim.* Stages 1–2 tell us *that* a switching event happened, *when*, and *how much net power* moved to each donor. They do **not** tell us *what kind* of power moved. A slice of the network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the *net* (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one might be 8 MW of demand with negligible generation, another might be 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a cheap, qualitative read on that make-up: *was the moved slice demand-dominated, PV-dominated, or wind-dominated?* This is corroboration and enrichment, not detection — it does not change whether we flagged the event, but it characterises it.
+
+   *Why we want it.* Three uses. (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **A free preview of v2.6:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap one. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
+
+   *Mechanism.* The make-up of a slice is exposed by *when, within the day,* its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor `j` picked up some load at event onset, look at the **shape of `j`'s residual step across the hours of the day** (e.g. average the step magnitude by half-hour-of-day over the event's duration):
+   - a step that appears mainly around **midday and vanishes overnight** → the moved slice was **PV-heavy** (PV only generates in daylight, so a slice rich in PV changes `j`'s net power most when the sun is up);
+   - a step that is **roughly flat, or tracks the evening demand peak** → **demand-heavy**;
+   - a step that is **large but uncorrelated with daylight, gusty/variable** → **wind-heavy**.
+
+   This is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching the spirit of v0.5.
+
+   *Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor `j` and a demand-heavy slice to donor `k`. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what `j` got" vs. "what `k` got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**: the transferred-magnitude threshold above which we reliably detect events and below which we cannot. Pair this with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.*
 
@@ -180,9 +198,10 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
 
 **What it delivers.** A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.
 
-**What it misses / cons.**
-- Misses slow/gradual reconfigurations (changepoint assumes abrupt shift).
+**What this approach misses / cons.**
+- Misses slow/gradual reconfigurations (because changepoint detection algos assume abrupt shift).
 - Misses small partial transfers near the noise floor — but these are both the *hardest* and (per the tolerance principle) the *least important* for the forecast, so the failure mode is aligned with priorities. The sensitivity floor makes this limit explicit rather than hidden.
+- **Blind to events that straddle the start of the record.** A switching state already in force before the data begins has no observable onset — it is only detectable if and when it *ends*. This is a structural blind spot, not a fixable one, and belongs in the sensitivity-floor reporting alongside the magnitude threshold.
 - Struggles with temporally overlapping events on one neighbourhood.
 - Composition read-off is qualitative only.
 
@@ -206,6 +225,7 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
 observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
 ```
 
+- **The neighbourhood is the graph:** `neighbours(i)` is exactly `i`'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most `α_ij` are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an `N × N` free-for-all.
 - Under NRA: `α_ii ≈ 1`, `α_ij ≈ 0`.
 - During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple `α_ij(t)` may be active at once for a single source.
 - **Conservation = node-level flow balance:** weight leaving `i` is distributed across a subset of neighbours and must sum to the weight lost at `i` (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
@@ -257,6 +277,8 @@ observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
                     − α^wind_ij(t)·wind_j(t) ]
 ```
 
+Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
+
 **Prior structure.**
 1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, `s_ij(t) ∈ {0,1}`, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when `s_ij(t)=1`. Types switch *together*; the moved slice can still be disproportionately one type.
 2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior `θ_ij` ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and `θ_ij` could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
@@ -278,12 +300,12 @@ observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
 
 ---
 
-## Part 4 — Retired stage: the feeder-block model
+## Part 4 — Considered but rejected: the feeder-block model
 
 An earlier plan included a further stage that modelled the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **This stage is retired**, for two independent and decisive reasons:
 
 1. **The unit does not exist.** NGED have been explicit that the network is meshed and run radially with movable cut points; load is a near-continuous distribution splittable almost anywhere. There is no stable, re-identifiable feeder with a persistent identity or composition to discover and route. The model would be trying to recover units that do not persist.
-2. **It lives in the unlabelled regime.** This stage is precisely what would run at full scale (~1,500 substations), where **no switching labels exist.** Any block model that needed supervision to identify blocks is doomed there twice over.
+2. **It lives in the unlabelled regime.** This stage is precisely what would run at full scale (~1,161 primary substations), where **no switching labels exist.** Any block model that needed supervision to identify blocks is doomed there twice over.
 
 **Possible deferred successor (a research bet, not a planned step).** If within-type shape error in v2.6 ever proves to materially hurt the forecast, the conceptually correct (but much harder) direction is to model **load as distributed along network arcs with movable cut points**, inferring the cut location rather than assuming discrete blocks. This is a genuine spatial-inference research problem and should be explicitly *deferred*, not chased — and only entertained if v2.6 residuals demonstrate the need.
 
@@ -294,7 +316,7 @@ An earlier plan included a further stage that modelled the **actual switchable p
 These apply at every stage and are the things most easily got wrong:
 
 - **Fully unsupervised at runtime.** The production model uses **power time series only**. Switching logs are never a runtime input. They exist for the 32-series trial only, and serve exclusively as a **gold-standard test set**.
-- **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,484 is forbidden as a production dependency. The *method* generalises; a pilot lookup does not.
+- **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a production dependency. The *method* generalises; a pilot lookup does not.
 - **Conservation is node-level flow balance, everywhere.** One source's lost power is absorbed by a *subset* of neighbours whose pickups sum to it. Never implement conservation as independent pairwise equal-and-opposite matches — confirmed 2–3-way fan-out makes that wrong.
 - **Composition is read from recipients, never the source.** Any per-leg composition estimate (v0.6 stage 3) must come from each recipient's individual step *after* attribution; the source's step blends all simultaneous outgoing legs.
 - **Partial transfer is the common case.** Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor; do not assume a clean event/no-event separation.

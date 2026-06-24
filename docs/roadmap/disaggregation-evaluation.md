@@ -23,10 +23,10 @@ Take individually metered sources (customer-metered PV/wind, the metered BESS, e
 a synthetic "substation," disaggregate, score against the held-out components. This gives an exact
 ground truth because you constructed the aggregate.
 
-**Caveat**: a synthetic clean sum lacks switching events, MVA bounce, false zeros, unmetered load,
-and correctly-scaled correlated co-movement. It systematically flatters performance — it measures
-the model on an easier problem than reality. Always report as "performance under idealised
-aggregation," never as real-world skill.
+**Caveat**: a synthetic clean sum lacks [switching events](switching-events.md), MVA bounce, false
+zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically flatters
+performance — it measures the model on an easier problem than reality. Always report as "performance
+under idealised aggregation," never as real-world skill.
 
 ---
 

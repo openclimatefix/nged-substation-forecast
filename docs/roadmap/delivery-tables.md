@@ -152,10 +152,10 @@ capacity):
 - `STALE POWER` — the live power data was delayed
 
 **Self-assembly note:** NGED (or any user) can build their own forecast by multiplying the
-(future) [−1, +1] `power_forecast` by `max_effective_capacity_MW_mean` (→ a "normal" forecast) or by
-`last_effective_capacity_MW_mean` (→ a "prevailing conditions" forecast). See
-[forecast building blocks](forecast-building-blocks.md). *(These derived capacity values come from
-the [`effective_capacity`](#table-4-effective_capacity) table.)*
+(future) [−1, +1] `power_forecast` by a capacity derived from the
+[`effective_capacity`](#table-4-effective_capacity) table's `effective_capacity_MW_mean` column —
+its **maximum** over history (→ a "normal" forecast) or its **most recent** value (→ a
+"prevailing conditions" forecast). See [forecast building blocks](forecast-building-blocks.md).
 
 ---
 
@@ -231,6 +231,7 @@ A single donor can split power across multiple recipients (e.g. donor A loses 1 
 | `switched_power_MW_std` | `float32` | Standard deviation of that estimate. |
 
 > **Known simplification.** Switching events transfer *behaviour*, not a constant amount of power.
-> v1 ignores this. The v2 research into Graph Neural Networks (each substation a node, edges =
-> electrical connections) may capture it. See the [roadmap index](index.md) (v2.0) and
-> [Differentiable Physics §3](differentiable-physics.md).
+> v1 (the v0.6 statistical detector) estimates only the transferred magnitude. Reconstructing the
+> latent demand under the normal running arrangement — and capturing the fact that a transferred
+> slice can carry a different demand/PV/wind mix than its parent — is the job of the v2 mixture
+> models. See [Switching events & latent demand](switching-events.md) (v2.5 / v2.6).

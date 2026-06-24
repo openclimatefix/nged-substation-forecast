@@ -2,8 +2,8 @@
 
 > **Status: 🔬 Research.** Encoders are a v2 research direction. V1 uses raw NWP features directly.
 
-In the full GNN architecture, many components need to transform the same raw inputs — NWP grid
-values, timestamps, substation location — into useful representations. Rather than re-learning these
+In the full graph-structured architecture, many components need to transform the same raw inputs — NWP
+grid values, timestamps, substation location — into useful representations. Rather than re-learning these
 transformations independently inside each node type, **shared encoder modules** learn a single
 compact embedding that every node can use.
 

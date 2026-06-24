@@ -2,8 +2,10 @@
 
 > **Status: 🚧 Planned / 🔬 Research.** None of this is implemented yet. Phase 1 (capacity
 > estimation for *metered* generators) is targeted at [roadmap v0.6 / v0.7](index.md#v06-v07-switching-events-dynamic-generator-capacity);
-> Phase 2 (full GNN-coupled disaggregation, latent-demand recovery and the switching state-space
-> model) is [v2 research](index.md#v20-scale-up-future-research). The Python in this document is
+> Phase 2 (graph-structured disaggregation of net substation power into latent demand and DER
+> generation) is [v2 research](index.md#v20-scale-up-future-research). Abnormal running arrangements
+> and latent-demand recovery under switching are covered in their own canonical doc,
+> [Switching events & latent demand](switching-events.md). The Python in this document is
 > illustrative sketch code, not the implementation. See the [roadmap index](index.md) for status
 > conventions and where this fits the overall plan.
 
@@ -17,7 +19,7 @@ natively handling **apparent-power (MVA) metering** and **unmetered generation**
 
 The sections build up from the problem statement to the full system, roughly in roadmap order:
 
-1. [The problem: unobserved demand & abnormal running arrangements](#1-the-problem-unobserved-demand--abnormal-running-arrangements) — what we are actually trying to recover, and why DP.
+1. [The problem: unobserved demand & abnormal running arrangements](#1-the-problem-unobserved-demand-abnormal-running-arrangements) — what we are actually trying to recover, and why DP.
    - [DER tractability ranking](#der-tractability-ranking) — which DER types the method works for, and what to do with the hard ones.
 2. [The core idea: inversion through a differentiable forward model](#2-the-core-idea-inversion-through-a-differentiable-forward-model) — the conceptual umbrella over everything below.
 3. [How DP fits into the roadmap](#3-how-dp-fits-into-the-roadmap) — the v1 → v2 map; read this next for orientation.
@@ -25,8 +27,8 @@ The sections build up from the problem statement to the full system, roughly in 
 5. [Estimating capacity with DP](#5-estimating-capacity-with-dp) — how the capacity parameter is regularised (the v1 deliverable).
 6. [Scaling to aggregate fleets: `FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode) — one node for many unmetered rooftops.
 7. [Combining DP with the weather encoder](#7-combining-differentiable-physics-with-the-weather-encoder) — the fuller forecasting architecture.
-8. [Coupling DP with a Graph Neural Network](#8-coupling-dp-with-a-graph-neural-network-gnn) — the full-grid v2 disaggregation engine.
-9. [Handling abnormal running arrangements: a switching state-space model](#9-handling-abnormal-running-arrangements-a-switching-state-space-model) — the v2 research approach to topology-normalised demand.
+8. [Scaling to the full grid: a graph-structured DP engine](#8-scaling-to-the-full-grid-a-graph-structured-dp-engine) — the full-grid v2 disaggregation engine.
+9. [Handling abnormal running arrangements](#9-handling-abnormal-running-arrangements) — pointer to the canonical [switching events](switching-events.md) doc.
 10. [Apparent-power (MVA) metering](#10-apparent-power-mva-metering) — reconstructing signed flow from magnitude-only meters.
 11. [What already exists (prior art)](#11-what-already-exists-prior-art) — calibrating the novelty claim.
 12. [Where this work is novel](#12-where-this-work-is-novel) — the publishable contribution.
@@ -206,16 +208,17 @@ down over time as a result of maintenance, faults, and build-out — feeding the
   do the actual power forecasting in v1; DP is responsible only for *estimating capacity* of
   *metered* generators.
 
-### Phase 2: Full GNN-coupled disaggregation (v2)
+### Phase 2: Full graph-structured disaggregation (v2)
 
 Part of [roadmap v2.0](index.md#v20-scale-up-future-research). Once the metered assets are accurately
 tracked, we unlock the full architecture (§8). The DP modules for the *unmetered* fleets (§6) are
-bound to the GNN nodes. The network uses the verified metered assets and spatial weather cues to
+bound to the graph's nodes. The network uses the verified metered assets and spatial weather cues to
 disaggregate the mixed substation signals, cleanly separating true gross demand from hidden
 behind-the-meter renewable generation. This is also where DP graduates from *estimating capacity* to
-directly *forecasting power* (including for MVA-metered sites), where the **latent-demand inversion**
-of §2 is realised in full, and where the **switching state-space model** (§9) tackles abnormal
-running arrangements. The heavier machinery in §9 in particular is firmly v2 research.
+directly *forecasting power* (including for MVA-metered sites), and where the **latent-demand
+inversion** of §2 is realised in full. Abnormal running arrangements — recovering the demand that
+would have been metered under the normal running arrangement — are handled in their own canonical
+doc, [Switching events & latent demand](switching-events.md); see §9.
 
 ---
 
@@ -341,7 +344,7 @@ The *installed* capacity of an unmetered fleet behaves differently: it essential
 
 A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.
 
-We fix this with a **physics-informed basis expansion** rather than simulating every individual system. (Aggregate, unmetered fleets behind a primary are a Phase 2 / v2 concern — this node becomes one of the GNN node types in §8.)
+We fix this with a **physics-informed basis expansion** rather than simulating every individual system. (Aggregate, unmetered fleets behind a primary are a Phase 2 / v2 concern — this node becomes one of the node types in the graph-structured engine of §8.)
 
 ### 1. The basis-function insight
 
@@ -444,9 +447,9 @@ class UniversalFleetNode(nn.Module):
 
 ---
 
-## 8. Coupling DP with a Graph Neural Network (GNN)
+## 8. Scaling to the full grid: a graph-structured DP engine
 
-The distribution network is fundamentally a topological graph. We couple our Differentiable Physics engine with a spatial GNN so that power balances across the grid are conserved by construction. This mirrors the GNN schematic in the Milestone 1 report (Fig. 10), and is the v2 mechanism most likely to capture the fact that [switching events](delivery-tables.md#table-5-substation_switching) transfer *behaviour* between substations, not just a constant amount of power.
+The distribution network is fundamentally a topological graph, and we model it as one — but the graph is a **data structure**, not a trained graph neural network. Each substation is reconstructed as the sum of its own differentiable-physics modules (gross demand, metered/unmetered PV, metered/unmetered wind), whose latent parameters — most importantly each module's capacity — are inferred directly from that substation's metered power and the local weather. The components are separable because each has a distinct exogenous driver and temporal signature (PV tracks irradiance, wind tracks wind speed, demand tracks time-of-week and temperature), so **no message passing is required** to pull them apart. The graph carries the structural prior — which substations can exchange load, which sit near which weather — and a hard Kirchhoff balance closes the books. This mirrors the schematic in the Milestone 1 report (Fig. 10).
 
 ### Node definitions
 
@@ -463,114 +466,45 @@ Each generation node feeds the substation through a **curtailment gate**: a sepa
 
 ### The fusion mechanism
 
-The GNN handles spatial message-passing to capture regional correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too). The GNN's spatial hidden layers feed the parameters/inputs of the **DP modules**, which compute explicit physical generation. A hard Kirchhoff balance node then aggregates the elements:
+Spatial weather correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too) are already supplied by the **gridded NWP** each node consumes — they do not need to be re-learned by message passing. Where cross-site information genuinely helps the under-determined per-site fit, it enters as **hierarchical parameter sharing**, not message passing: the unmetered-fleet and demand nodes share a small set of universal basis shapes (`FleetSolarNode`, §6; `BasisLoadNode` above), with only a per-site *style vector* learned locally. Each node's DP modules compute explicit physical generation, and a hard Kirchhoff balance node then aggregates the elements:
 
 $$\text{Net substation flow} = \text{Gross demand} - \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) - \gamma_{\text{wind}}\,(\text{Wind}_{\text{metered}} + \text{Wind}_{\text{unmetered}})$$
 
-where the $\gamma$ terms are the per-asset curtailment gates. The error between predicted and measured substation flow produces a gradient that flows back through the graph, optimising the GNN weights and the physical parameter posteriors simultaneously.
+where the $\gamma$ terms are the per-asset curtailment gates. The error between predicted and measured substation flow produces a gradient that flows back through the shared and per-site parameters, optimising them and the physical parameter posteriors simultaneously.
+
+A trained, message-passing GNN remains an **optional escalation**, not the baseline: if measured residuals ever show that explicit message passing would recover structure that gridded NWP and hierarchical priors miss, it can be added deliberately at that point. The same graph also underpins switching-event handling, where it is likewise used only as a data structure — see [Switching events & latent demand](switching-events.md), Part 2.
 
 ---
 
-## 9. Handling abnormal running arrangements: a switching state-space model
+## 9. Handling abnormal running arrangements
 
-> **Status: 🔬 v2 research.** This is the heaviest, least-certain part of the plan. The v1 work
-> (v0.6 / v0.7) handles ARAs only by *detecting* them statistically from the power time series and
-> excluding those periods from training data (see [roadmap](index.md#v06-v07-switching-events-dynamic-generator-capacity)).
-> The switching state-space model below *supersedes* that simple detector in v2 and additionally
-> *reconstructs* the demand that would have been metered under the normal running arrangement.
+> **Status: 🔬 v2 research.** Moved to its own canonical doc.
 
-The ARA problem maps cleanly onto the differentiable physics framework via a **switching state-space
-model** layered over the network graph of §8.
+Abnormal running arrangements (ARAs) — where switching events reroute load between substations, so
+the metered signal no longer reflects the normal running arrangement — are covered in their own
+canonical doc: **[Switching events & latent demand](switching-events.md)**.
 
-### The graph structure
+In brief: the v0.6 stage detects switching events with unsupervised statistics on the power series;
+the v2 stages reconstruct the latent demand each substation would have metered under the normal
+running arrangement, using a time-varying **mixture over the neighbourhood graph** (optionally
+type-resolved into demand / PV / wind, each a differentiable-physics module as in §8). Two points
+matter for consistency with the rest of this document:
 
-Model the distribution network as a graph where:
-- **Nodes** are primary substations, each with a metered net-power time series and local weather
-  covariates.
-- **Edges** connect substations that share a normally-open point or a reconfigurable boundary — the
-  set of edges across which load blocks can be transferred.
+- The graph is a **data structure** — who can exchange load with whom — *not* a trained GNN.
+- Conservation is a **node-level flow balance** across a 2–3-way fan-out (a source's loss absorbed
+  by a subset of neighbours whose pickups sum to it), *not* a pairwise equal-and-opposite transfer.
 
-### Latent routing states
-
-In reality, a switching event does not transfer an entire substation to a neighbour — it reroutes
-a **feeder section**: one of several feeders hanging off the primary, carrying some fraction of the
-total load and its own embedded DER mix. The correct latent variable is therefore a **categorical
-parent-assignment per switchable load block per timestep**: for each block *k*, which substation
-currently feeds it? Under the normal running arrangement each block's parent is fixed and known from
-the nominal topology; during an ARA, one or more assignments flip.
-
-Each substation's total metered power is then the sum of the blocks currently assigned to it:
-
-$$P_A(t) = \sum_{k:\, \text{parent}(k,t) = A} P_{\text{block}\,k}(t)$$
-
-A binary edge-state (is this boundary open or closed?) is the special case where a substation has
-exactly one switchable block. In general there are multiple feeders, so a switching event moves only a
-fraction of the metered power — a partial step, not a whole-node transfer.
-
-### The conservation law as the inference signal
-
-The key observation is that switching events conserve power across the neighbourhood: when block *k*
-transfers from A to B, A's meter reading drops by block *k*'s power and B's rises by the same
-amount — simultaneously, and with block *k*'s DER signature (its embedded PV, temperature-correlated
-load, etc.) travelling with it. This **cross-node coincidence of equal-and-opposite partial steps**
-at the magnitude of the transferred block is the fingerprint of a switching event, and it is a signal
-that a per-node model cannot detect. Graph-level message passing — specifically, passing power
-residuals across reconfigurable edges — makes the inference tractable.
-
-Because the transferred block typically represents only a fraction of the substation's total load,
-the observed step in each meter reading is **partial**, not a whole-node emptying or filling. This
-makes small events harder to detect by magnitude alone, but it means the block-level formulation
-cannot hallucinate a whole-node transfer that never occurred.
-
-### The inversion under a routing assignment
-
-Given a proposed set of block-to-parent assignments for each timestep, the forward model computes
-each substation's predicted meter reading as the sum over its currently-assigned blocks'
-DER-adjusted demand. The reconstruction loss is the sum over all substations and time of the squared
-residual between this prediction and the observed meter reading. Block assignments are inferred
-jointly with the DER parameters by minimising this loss — either via gradient-based relaxation
-(treating discrete assignments as soft mixtures during training) or via structured variational
-inference (e.g. rSLDS / recurrent switching linear dynamical systems).
-
-**The block-discovery problem.** The number of switchable blocks per substation and each block's
-baseline demand profile are themselves latent. If NGED can supply feeder-level topology or metering,
-that structure can be used directly. Otherwise the model must discover blocks from the data, adding
-a latent decomposition problem on top of routing inference. Blocks too small to produce detectable
-steps in the meter reading can be folded into a per-node residual term.
-
-### A simpler alternative: soft redistribution
-
-The rSLDS / block-assignment approach above is principled but computationally heavy. A simpler
-alternative — and possibly the right place to start — directly models the observed *soft*
-redistribution rather than inferring discrete block assignments.
-
-Introduce a **RedistributionLayer** sitting after the per-node physics predictions. At each
-timestep, each reconfigurable edge carries a learned *conductance gate* in [0, 1] output by a small
-MLP conditioned on the weak switching labels. Power flows across the edge in proportion to the
-difference in reconstruction residuals between the two nodes:
-
-$$\text{flow}_{A \to B} = g_{AB} \times (\text{residual}_A - \text{residual}_B)$$
-
-Conservation holds by construction: what flows out of A flows into B. An L1 sparsity penalty on the
-gates keeps them near zero except when the weak labels permit activity.
-
-Neither the gate nor the "potential" need to be physically measured — both are internal model
-quantities (the residual is the model's own prediction error; the gate is a learned parameter). The
-advantage over the rSLDS formulation is that the whole system remains end-to-end differentiable,
-at the cost of modelling block structure implicitly rather than explicitly.
-
-### Output: normal-running-arrangement demand
-
-Once the routing states are inferred and the DER parameters are estimated, the model can produce —
-for any timestep, including those during historical ARAs — the latent demand that would have been
-metered under the normal running arrangement. This is precisely the NGED-required target variable
-(§1). Forecasting then operates on this clean, topology-normalised signal.
+An earlier sketch here proposed a discrete "switching state-space model" over per-feeder *load
+blocks*. That formulation is **retired**: NGED's network is meshed and run radially with movable cut
+points, so there is no stable, re-identifiable feeder unit to discover and route (see
+[switching-events.md, Part 4](switching-events.md)). The output — topology-normalised latent demand
+— remains the NGED-required target variable (§1).
 
 ---
 
 ## 10. Apparent-power (MVA) metering
 
-Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export — when embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the DP/GNN framework reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
+Some substations are metered only in apparent power (MVA), which reports the *absolute value* of flow and so cannot distinguish import from export — when embedded generation pushes power back into the grid, an MVA trace "bounces" off zero instead of going negative. Because the DP framework reconstructs signed demand and generation explicitly, it handles this natively: we compare the measured MVA reading against the *magnitude* of the reconstructed net flow,
 
 $$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr|$$
 
@@ -595,8 +529,11 @@ disaggregation using a physics-based irradiance-to-power model as the inversion 
 
 **Switching state-space machinery** exists off the shelf. Recurrent switching linear dynamical
 systems (rSLDS; Linderman, Johnson et al., AISTATS 2017) and explicit-duration variants (RED-SDS) are
-standard tools for unsupervised segmentation of multivariate time series into discrete latent modes,
-with state transitions conditioned on the continuous latent state.
+standard tools for unsupervised segmentation of multivariate time series into discrete latent modes.
+We considered this machinery for ARA handling but did **not** adopt it: it presumes a discrete,
+re-identifiable switching unit (a per-feeder "block") that NGED's meshed, radially-run network with
+movable cut points does not possess (see [switching-events.md, Part 4](switching-events.md)). Our
+chosen formulation is the continuous neighbourhood mixture described there.
 
 **Topology and switch-state identification** has been studied, but overwhelmingly using voltage
 measurements. NGED does not currently provide us with voltage at primary substation level. And, we
@@ -618,10 +555,11 @@ topology itself is a latent variable that flips over timescales of minutes to mo
 addressed in the disaggregation literature. This is not a minor extension; it changes the structure
 of the inference problem fundamentally.
 
-**2. Power conservation as the cross-node inference signal.** Prior GNN disaggregation work uses
-spatial correlation as a soft prior. Here the edges carry a hard physical constraint: the power of a
-rerouted load block is conserved exactly across the network boundary. This is a stronger and more
-principled basis for message passing.
+**2. Power conservation as the cross-node inference signal.** Prior spatial-disaggregation work uses
+spatial correlation as a soft prior. Here the graph edges carry a hard physical constraint: rerouted
+power is conserved across the affected neighbourhood as a **node-level flow balance** (a source's
+loss is absorbed by a subset of neighbours whose pickups sum to it). This is a stronger and more
+principled basis for cross-node inference than learned message passing.
 
 **3. Joint estimation of latent demand, DER parameters, and routing state.** Existing approaches
 treat the topology as known, or the DER parameters as known, or the load as known, and estimate one
@@ -655,11 +593,11 @@ itself a publishable contribution.
 
 | Layer | Component | Role |
 |---|---|---|
-| **Graph** | Primary substations as nodes; reconfigurable boundaries as edges | Structural prior on which substations can exchange load |
-| **Latent states** | Categorical block-to-parent assignment per timestep | Models ARA routing; each block's power moves with its parent — partial transfers fall out naturally |
+| **Graph** | Primary substations as nodes; reconfigurable boundaries as edges (a data structure, not a GNN) | Structural prior on which substations can exchange load |
 | **Forward model** | Differentiable physics (irradiance → PV, wind speed → wind power, state-space battery) | Converts latent demand + DER params → predicted meter reading |
 | **Reconstruction loss** | Squared residual, summed over nodes and time | Drives joint inversion of latent demand and DER parameters |
-| **Inference** | rSLDS / structured VI for discrete block-assignment modes; or soft RedistributionLayer (simpler, fully differentiable alternative — see §9) | Handles combinatorial posterior over switching configurations |
+| **Cross-site coupling** | Hierarchical parameter sharing (shared basis + per-site style vector) + hard Kirchhoff balance | Borrows statistical strength across sites without message passing |
+| **ARA handling** | Time-varying neighbourhood mixture with node-level flow balance — see [switching-events.md](switching-events.md) | Reconstructs latent demand under the normal running arrangement |
 | **Output** | Latent demand under nominal topology, per substation, per half-hour | Target variable for downstream probabilistic forecasting |
 | **Forecast layer** | XGBoost or neural sequence model on cleaned latent demand | Produces 14-day probabilistic forecasts in NGED-required format |
 
@@ -667,8 +605,6 @@ itself a publishable contribution.
 
 ## 14. Long-term vision: GB-wide inverse irradiance mapping
 
-Once the v1 architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the DP modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; the spatial GNN then interpolates between them to fill in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.
+Once the v1 architecture has calibrated, parameter-verified "virtual sensors" across the metered fleet, we can run the inversion trick at scale. Freezing the calibrated asset parameters and running gradient descent *backward* through the DP modules — from measured generation to the weather inputs — recovers a surface-irradiance estimate (and, for wind, a wind-speed estimate) **at each metered site**. These point estimates are sparse virtual observations; a spatial interpolation step (e.g. graph-based or geostatistical) then fills in a denser field across Great Britain. The result would be a half-hourly, physics-validated weather product, independent of the NWP, useful as a cross-check for real-time grid balancing. This is a research aspiration well beyond v2, and the density of the recovered field is fundamentally limited by the spatial coverage of the metered fleet.
 
 See [Evaluating disaggregation: a multi-pronged protocol](disaggregation-evaluation.md).
-</content>
-</invoke>
