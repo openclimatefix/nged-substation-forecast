@@ -198,6 +198,16 @@ METRIC_NAMES: list[str] = [
 #: When PICP is added, extend with "p10_p90", "p20_p80", etc.
 METRIC_PARAMS: list[str] = ["all"]
 
+#: Evaluation scopes that coexist in the one ``forecast_metrics`` table.
+#: - ``"leaderboard"``: CV-fold leaderboard metrics;
+#: - ``"production_monitoring"``: live trailing-window monitoring;
+#: - ``"ad_hoc"``: one-off analyses (no MLflow run).
+EVALUATION_SCOPES: list[str] = ["leaderboard", "production_monitoring", "ad_hoc"]
+
+#: Values for the ``time_series_type`` metric slice: every time-series category plus the
+#: sentinel ``"all"`` for the across-everything aggregate.
+TIME_SERIES_TYPE_SLICES: list[str] = ["all", *LIST_OF_TIME_SERIES_TYPES]
+
 
 class Metrics(pt.Model):
     """Evaluation metrics for power forecasts — tall format.
@@ -250,3 +260,58 @@ class Metrics(pt.Model):
         ),
     )
     metric_value: float = pt.Field(dtype=pl.Float32)
+
+    # The columns below are populated by the ``metrics`` Dagster asset (§4.8). They are
+    # ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
+    # metric rows and have the asset enrich them with scope/window provenance before the
+    # frame is written to the ``forecast_metrics`` Delta table.
+    evaluation_scope: str = pt.Field(
+        dtype=pl.Enum(EVALUATION_SCOPES),
+        allow_missing=True,
+        description=(
+            "Which evaluation produced this row, so leaderboard, live-monitoring, and "
+            "one-off metrics coexist in one table and stay separable."
+        ),
+    )
+    time_series_type: str = pt.Field(
+        dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
+        allow_missing=True,
+        description=(
+            "The time-series category this row aggregates, or the sentinel 'all' for the "
+            "across-everything aggregate."
+        ),
+    )
+    window_start: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description=(
+            "Inclusive start of the valid_time window this row covers. For a CV fold this "
+            "is the fold's val_start; for monitoring it is the trailing-window start."
+        ),
+    )
+    window_end: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description="End of the valid_time window this row covers (fold val_end or window end).",
+    )
+    window_label: str = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description="Human label for the window, e.g. '2025', '24h', '7d', 'full_fold'.",
+    )
+    computed_at: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description=(
+            "When this metric row was written (provenance; orders the append-only "
+            "monitoring series and distinguishes recomputations)."
+        ),
+    )
+    mlflow_run_id: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description=(
+            "Convenience cross-link to the MLflow run this metric row belongs to. "
+            "Null for 'ad_hoc' rows, which have no MLflow run."
+        ),
+    )

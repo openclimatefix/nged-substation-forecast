@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -135,3 +136,32 @@ def test_selected_features_round_trips_through_save_load(tmp_path: Path) -> None
     forecaster.save(tmp_path / "m")
     loaded = XGBoostForecaster.load(tmp_path / "m")
     assert loaded.model_params.selected_features == extra_features
+
+
+def test_predict_stamps_experiment_name() -> None:
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+    result = _trained(df, experiment_name="my_experiment").predict(lf)
+    assert result["experiment_name"].dtype == pl.Categorical
+    assert (result["experiment_name"] == "my_experiment").all()
+
+
+def test_save_records_trained_time_series_ids(tmp_path: Path) -> None:
+    df = _make_df(ts_ids=[10, 20, 30])
+    forecaster = _trained(df)
+    assert forecaster.trained_time_series_ids == [10, 20, 30]
+
+    forecaster.save(tmp_path / "m")
+    meta = json.loads((tmp_path / "m" / "meta.json").read_text())
+    assert meta["trained_time_series_ids"] == [10, 20, 30]
+
+
+def test_random_seed_makes_training_deterministic() -> None:
+    """Two models trained with the same random_seed produce identical predictions."""
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+    sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
+
+    a = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
+    b = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
+    assert a["power_fcst"].to_list() == b["power_fcst"].to_list()

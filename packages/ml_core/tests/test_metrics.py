@@ -49,6 +49,7 @@ def _make_cv_forecasts(
             "power_fcst_model_name": pl.Series(["stub"] * n).cast(pl.Categorical),
             "power_fcst_model_version": pl.Series([1] * n, dtype=pl.Int16),
             "ml_flow_experiment_id": pl.Series([None] * n, dtype=pl.Int32),
+            "experiment_name": pl.Series(["stub_exp"] * n).cast(pl.Categorical),
             "fold_id": pl.Series([fold_id] * n).cast(pl.Categorical),
         }
     )
@@ -118,6 +119,7 @@ def test_compute_metrics_ensemble_averaging():
             "power_fcst_model_name": pl.Series(["stub", "stub"]).cast(pl.Categorical),
             "power_fcst_model_version": pl.Series([1, 1], dtype=pl.Int16),
             "ml_flow_experiment_id": pl.Series([None, None], dtype=pl.Int32),
+            "experiment_name": pl.Series(["stub_exp", "stub_exp"]).cast(pl.Categorical),
             "fold_id": pl.Series(["2022", "2022"]).cast(pl.Categorical),
         }
     )

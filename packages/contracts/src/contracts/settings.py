@@ -76,6 +76,14 @@ class Settings(BaseSettings):
             },
         )
 
+    # The MLflow run whose model artifact the live service serves. Downloaded once into the
+    # local model cache (model_cache_base_path) and reused. Set manually for now; a later
+    # champion_model asset will populate it automatically (§6).
+    production_model_run_id: str | None = Field(
+        default=None,
+        description="MLflow run ID of the model the production service serves.",
+    )
+
     # Paths to the data we manage
     nged_data_path: Path = PROJECT_ROOT / "data" / "NGED"
     nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
@@ -83,6 +91,9 @@ class Settings(BaseSettings):
     forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
     trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
     h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
+    # Root of the local-disk model cache, keyed by MLflow run ID (§4.5). Put this on a
+    # persistent volume so the production cache survives restarts during an MLflow outage.
+    model_cache_base_path: Path = PROJECT_ROOT / "data" / "model_cache"
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

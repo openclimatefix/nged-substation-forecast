@@ -39,6 +39,7 @@ class XGBoostConfig(BaseForecasterConfig):
             "colsample_bytree": self.colsample_bytree,
             "device": self.device,
             "objective": self.objective,
+            "seed": self.random_seed,
         }
 
 
@@ -84,6 +85,15 @@ class XGBoostForecaster(BaseForecaster):
     @property
     def _feature_cols(self) -> list[str]:
         return sorted(self.model_params.selected_features)
+
+    @property
+    def trained_time_series_ids(self) -> list[int]:
+        """The sorted time_series_ids this forecaster has a trained Booster for.
+
+        Read back at predict time to guarantee the train==predict population and to give
+        production its population (§4.5.1). Persisted in ``meta.json`` by ``save()``.
+        """
+        return sorted(self._models.keys())
 
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
         """Fit one Booster per time_series_id found in data."""
@@ -134,12 +144,17 @@ class XGBoostForecaster(BaseForecaster):
                 power_fcst_model_name=pl.lit(self.MODEL_NAME),
                 power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(cfg.ml_flow_experiment_id, dtype=pl.Int32),
+                experiment_name=pl.lit(cfg.experiment_name),
                 fold_id=pl.lit("live"),
             )
             parts.append(part)
 
         result = pl.concat(parts).cast(
-            {"power_fcst_model_name": pl.Categorical, "fold_id": pl.Categorical}
+            {
+                "power_fcst_model_name": pl.Categorical,
+                "experiment_name": pl.Categorical,
+                "fold_id": pl.Categorical,
+            }
         )
         return PowerForecast.validate(result)
 
@@ -149,7 +164,12 @@ class XGBoostForecaster(BaseForecaster):
         for ts_id, booster in self._models.items():
             booster.save_model(str(path / f"{ts_id}.ubj"))
         (path / "meta.json").write_text(
-            json.dumps({"model_params": self.model_params.model_dump(mode="json")})
+            json.dumps(
+                {
+                    "model_params": self.model_params.model_dump(mode="json"),
+                    "trained_time_series_ids": self.trained_time_series_ids,
+                }
+            )
         )
 
     @classmethod

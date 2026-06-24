@@ -188,7 +188,15 @@ FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema for deterministic ensemble forecasts."""
+    """Forecast data schema for deterministic ensemble forecasts.
+
+    Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
+    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY —
+    they exist on this schema and the internal ``power_forecasts`` Delta table to support
+    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast``
+    table delivered to NGED. The delivery step projects them out (the delivered table is
+    essentially the ``fold_id="live"`` rows with these internal columns dropped).
+    """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
     time_series_id: int = _get_time_series_id_dtype()
@@ -209,6 +217,17 @@ class PowerForecast(pt.Model):
         description=(
             "Identifier for our ML-based power forecasting model."
             " Specified in the BaseForecaster subclass."
+        ),
+    )
+
+    experiment_name: str = pt.Field(
+        dtype=pl.Categorical,
+        description=(
+            "Per-experiment key identifying the experiment that produced this forecast."
+            " Distinct from `power_fcst_model_name`, which is the model-family identity"
+            " (`MODEL_NAME`); do not overload that with experiment identity."
+            " Forecasts are partitioned in Delta by (experiment_name, fold_id)."
+            " INTERNAL-ONLY: projected out of the `power_forecast` table delivered to NGED."
         ),
     )
 
