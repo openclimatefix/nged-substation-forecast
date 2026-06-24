@@ -31,7 +31,10 @@ redesign needed to support research at scale and production simultaneously.
 - Run 100s to 1000s of ML experiments, each with full expanding-window CV over the
   canonical **complete-year folds** (currently 2022–2025; see §4.1).
 - All experiments evaluated on **identical canonical CV folds** — scientific fairness
-  for the leaderboard is non-negotiable.
+  for the leaderboard is non-negotiable. (Although note that, because the ECMWF numerical weather
+  predictions available from Dynamical.org only go back to 2024-04-01 for now (although
+  Dynamical.org are back-filling). So, for a minimal MVP, we will only use a single fold: train on
+  12 months of data starting on 2024-04-01; and test on 12 months of data started on 2025-04-01).
 - Per-fold observability: know which folds succeeded or failed for each experiment.
 - Retry individual failed folds from the Dagster UI without re-running others.
 - Kick off a **smoke test** (just the earliest fold, 2022) before committing to a
@@ -298,7 +301,7 @@ The job performs these steps in order:
 2. Set `config.experiment_name = experiment_name` (see §4.7 on experiment_name field).
 3. Call `mlflow.create_experiment(experiment_name, tags={"config": config.model_dump_json(), "description": description})`.
    If the experiment already exists, retrieve its ID (idempotent).
-4a. Create the experiment's **parent run** now, via `get_or_create_parent_run(experiment_id)`
+4. Create the experiment's **parent run** now, via `get_or_create_parent_run(experiment_id)`
    (§4.1.1), and log the resolved config params to it. Also set the **leaderboard grouping
    tags** on the parent run so the leaderboard can group/filter experiments (§4.8):
    `model_family` (= `MODEL_NAME`) and `weather_source` (from the config). The further tags the
@@ -308,15 +311,15 @@ The job performs these steps in order:
    of grouping metrics by `time_series_type`, which is a metric dimension, not a tag — see §4.8.)
    Creating the parent run here — before any fold can run — means the per-fold assets never race
    to create it. (The helper is idempotent, so a re-registration is harmless.)
-4. Based on `run_mode`, determine which fold IDs to add (read from `conf/cv/default.yaml`, never
+5. Based on `run_mode`, determine which fold IDs to add (read from `conf/cv/default.yaml`, never
    hard-coded — §4.1.2):
    - `"smoke_test"` → just the earliest fold, e.g. `["2022"]`
    - `"full_cv"` or `"register_only"` → every canonical fold, currently `["2022", "2023",
      "2024", "2025"]`
-5. Add Dagster partition keys `[f"{experiment_name}__{fid}" for fid in fold_ids]` to the
+6. Add Dagster partition keys `[f"{experiment_name}__{fid}" for fid in fold_ids]` to the
    `cv_experiment_folds` `DynamicPartitionsDefinition`.
    Use `context.instance.add_dynamic_partitions("cv_experiment_folds", keys)`.
-6. Log partition keys and MLflow experiment ID as Dagster output metadata.
+7. Log partition keys and MLflow experiment ID as Dagster output metadata.
 
 After the job completes, the user materialises the new partitions from the Dagster asset
 catalog (selecting `trained_cv_model` + `cv_power_forecasts` for the new experiment).
@@ -530,8 +533,8 @@ scientific-rigor safeguard: a mistyped key like `valid_time_mn` would silently m
 score the wrong population — a typed model makes it a load-time validation error.
 
 **Metrics are computed on the scaled `[−1, +1]` forecast**, *not* on physical MW/MVA. The
-"capacity in MW" of a substation/generator is genuinely ambiguous (see the Milestone 1 report,
-*"Building blocks for normal and prevailing conditions forecasts"*), so a physical-units RMSE
+"capacity in MW" of a substation/generator is genuinely ambiguous (see
+`docs/roadmap/forecast-building-blocks.md`), so a physical-units RMSE
 would not be comparable across series. All experiments are therefore scored in the same scaled
 space — which is also what keeps the leaderboard apples-to-apples.
 
@@ -1119,7 +1122,7 @@ run** to see progress. Do **not** start a phase before the previous one is merge
   read them before coding.
 - One phase = one commit; name the phase in the commit message.
 
-### 7.0.1 Phase 0 — Clear the decks (do this first)
+### 7.0.1 Phase 0 — Clear the decks (do this first) - Completed in PR #182
 
 When this branch started it went a slightly wrong direction (the monolithic single-loop CV,
 §3.1). Delete that code **first**, in its own small PR, so every later phase adds the new design
@@ -1251,6 +1254,13 @@ against a clean baseline instead of diffing against soon-to-be-deleted code.
   `cv_assets.py`/`production_assets.py`/`metric_assets.py` if it has grown long (§5.1).
 - **User can verify:** full `uv run pytest` green, **including the full-stack cross-process
   integration test**.
+- **Docs:** Update `docs/`. Check the docs are still up-to-date with the code. Add docs to
+  (briefly) intro new users to the flow that our new code implements, and the reasoning behind it,
+  and how to run the dagster pipeline. Also make sure the permanent docs (i.e. the docs that live in
+  `docs/` but not in `docs/temp/`) capture any important ideas from `docs/temp/dagster_plan.md`,
+  because `dagster_plan.md` will be deleted once this plan has been implemented in code. In
+  particular, check if the permanent docs describe the aims and main design ideas of the ML R&D and
+  MLops.
 
 ### 7.10 A note on the full-stack integration tests
 
