@@ -51,7 +51,8 @@ running arrangement** (ARA) — a state in which switching events (responding to
 maintenance) reroute a block of load from its normal parent substation to a neighbour. During an
 ARA, the metered signal at both affected substations is structurally different from what it would be
 under normal topology: demand has physically moved. These events are unlabelled; the model must
-infer them from the time series alone.
+infer them from the time series alone. (See the page on [switching events](switching-events.md) for
+more info.)
 
 NGED has stated a clear operational requirement: they want forecasts expressed **as if the network
 is always in its normal running arrangement**. That is, the target variable is not the raw metered
