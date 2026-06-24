@@ -51,8 +51,6 @@ def _make_df(
 def _make_config(**overrides) -> XGBoostConfig:
     defaults: dict = {
         "selected_features": _FEATURES,
-        "power_fcst_model_name": "test_xgboost",
-        "power_fcst_model_version": 1,
         "ml_flow_experiment_id": None,
         "n_estimators": 5,  # tiny for fast tests
     }

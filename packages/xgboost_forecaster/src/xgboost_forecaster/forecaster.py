@@ -16,7 +16,7 @@ from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 class XGBoostConfig(BaseForecasterConfig):
     """Configuration for XGBoostForecaster.
 
-    Inherits the universal fields (selected_features, model identity) from
+    Inherits the universal fields (selected_features, MLflow experiment id) from
     BaseForecasterConfig and adds XGBoost-specific hyperparameters.
     """
 
@@ -71,6 +71,9 @@ class XGBoostForecaster(BaseForecaster):
     Booster plus a ``meta.json`` that stores the full XGBoostConfig so that load() is
     self-contained.
     """
+
+    MODEL_NAME = "xgboost"
+    MODEL_VERSION = 1
 
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers
 
@@ -128,13 +131,16 @@ class XGBoostForecaster(BaseForecaster):
             ).with_columns(
                 pl.col("ensemble_member").cast(pl.Int8),
                 pl.Series("power_fcst", predictions, dtype=pl.Float32),
-                power_fcst_model_name=pl.lit(cfg.power_fcst_model_name),
-                power_fcst_model_version=pl.lit(cfg.power_fcst_model_version, dtype=pl.Int16),
+                power_fcst_model_name=pl.lit(self.MODEL_NAME),
+                power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(cfg.ml_flow_experiment_id, dtype=pl.Int32),
+                fold_id=pl.lit("live"),
             )
             parts.append(part)
 
-        result = pl.concat(parts).cast({"power_fcst_model_name": pl.Categorical})
+        result = pl.concat(parts).cast(
+            {"power_fcst_model_name": pl.Categorical, "fold_id": pl.Categorical}
+        )
         return PowerForecast.validate(result)
 
     def save(self, path: Path) -> None:

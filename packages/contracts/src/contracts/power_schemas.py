@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import ClassVar, Final, Self
+from typing import ClassVar, Final, Literal, Self
 
 import patito as pt
 import polars as pl
@@ -179,6 +179,14 @@ class TimeSeriesMetadata(pt.Model):
     )
 
 
+#: Fold identifier for ``PowerForecast.fold_id``.
+#: Each fold validates on one whole year.
+#: Each validation year in the CV protocol gets a string label matching that year.
+#: ``"live"`` denotes a production forecast (no CV fold).
+#: Extend this Literal as new CV epochs are added.
+FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
+
+
 class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts."""
 
@@ -187,16 +195,20 @@ class PowerForecast(pt.Model):
     ensemble_member: int = pt.Field(dtype=pl.Int8)
     ml_flow_experiment_id: int | None = pt.Field(dtype=pl.Int32, allow_missing=True)
 
-    nwp_init_time: datetime = pt.Field(
+    nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The datetime that the underlying weather forecast was initialised.",
+        allow_missing=True,
+        description=(
+            "The datetime that the underlying weather forecast was initialised. "
+            "Null for models that do not use NWP (e.g. persistence baselines)."
+        ),
     )
 
     power_fcst_model_name: str = pt.Field(
         dtype=pl.Categorical,
         description=(
             "Identifier for our ML-based power forecasting model."
-            " This is manually specified in `hydra_schemas.ModelConfig.power_fcst_model_name`."
+            " Specified in the BaseForecaster subclass."
         ),
     )
 
@@ -217,5 +229,24 @@ class PowerForecast(pt.Model):
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
             """ Positive values mean "power sent to NGED's grid","""
             """ and negative values mean "power drawn from NGED's grid"."""
+            # PLANNED: We intend to change `power_fcst` to a normalised value in the range
+            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), as described in
+            # docs/roadmap/delivery-tables.md and docs/roadmap/forecast-building-blocks.md.
+            # For this very early version we forecast raw MW/MVA because we are not yet
+            # estimating capacity; we will switch to the scaled value once capacity estimation
+            # lands (roadmap v0.6 / v0.7).
+        ),
+    )
+
+    fold_id: FoldId = pt.Field(
+        dtype=pl.Categorical,
+        description=(
+            "Identifies the source of this forecast row.  "
+            "For cross-validation runs, the value is the validation year (e.g. '2022'), "
+            "matching the CV fold whose validation period starts on 1 Jan of that year.  "
+            "'live' means a production forecast with no associated CV fold.  "
+            "All forecasts — CV and live — live in the same Delta table; "
+            "filter on this column to select the population you need.  "
+            "Extend the FoldId Literal in power_schemas.py as new CV epochs are added."
         ),
     )

@@ -1,0 +1,40 @@
+# Expanding-window cross-validation folds shared by all experiments on the leaderboard.
+# All models MUST be evaluated against these exact folds so leaderboard comparisons
+# are apples-to-apples.  Change these only when founding a new leaderboard epoch.
+#
+# Training always starts from 2020-01-01 (earliest available NGED trial data).
+# Each fold adds one calendar year of training data and validates on the next year.
+
+folds:
+  - fold_id: "2022"
+    train_start: "2020-01-01"
+    train_end:   "2021-12-31"
+    val_start:   "2022-01-01"
+    val_end:     "2022-12-31"
+
+  - fold_id: "2023"
+    train_start: "2020-01-01"
+    train_end:   "2022-12-31"
+    val_start:   "2023-01-01"
+    val_end:     "2023-12-31"
+
+  - fold_id: "2024"
+    train_start: "2020-01-01"
+    train_end:   "2023-12-31"
+    val_start:   "2024-01-01"
+    val_end:     "2024-12-31"
+
+  - fold_id: "2025"
+    train_start: "2020-01-01"
+    train_end:   "2024-12-31"
+    val_start:   "2025-01-01"
+    val_end:     "2025-12-31"
+
+  - fold_id: "2026"
+    train_start: "2020-01-01"
+    train_end:   "2025-12-31"
+    val_start:   "2026-01-01"
+    val_end:     "2026-12-31"
+
+# Minimum months of observations before val_start for a time series to be eligible.
+min_training_months: 6

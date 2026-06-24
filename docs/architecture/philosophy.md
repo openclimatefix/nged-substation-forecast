@@ -15,7 +15,7 @@ NGED's network (as of May 2026) consists of:
 
 **Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 EHV, 1 HV), 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
 
-**Version 2** (future): Scale to approximately 2,500 time series (all of NGED's primary substations, BSPs, GSPs, and most customer meters). See [Roadmap](../roadmap.md).
+**Version 2** (future): Scale to approximately 2,500 time series (all of NGED's primary substations, BSPs, GSPs, and most customer meters). See [Roadmap](../roadmap/index.md).
 
 ## Core Objectives
 
@@ -47,7 +47,7 @@ NGED's distribution-level data is considerably messier than transmission-level d
 - **Stuck values**: Some time series go "stuck" for hours or days (standard deviation near zero over a 24-hour window).
 - **Missing data**: Gaps range from a few half-hours to months. Solar farms frequently have no data overnight (expected), but also have unexplained daytime gaps.
 - **Apparent power (MVA) metering**: Some substations only have MVA meters, which report the *absolute value* of power flow — they cannot detect direction. When generation exceeds demand and power flows "backwards", the MVA reading increases rather than going negative. This "bouncing off zero" behaviour looks like a demand increase but is actually reverse power flow.
-- **Switching events**: Power is periodically diverted from one substation to another during maintenance ("abnormal running arrangement"). Each substation spends roughly 2–4 weeks per year in an abnormal arrangement. This severely biases lagged-power features (the single most informative feature for demand forecasting) if not detected and handled.
+- **Switching events**: Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. This severely biases lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is the subject of [switching events & latent demand](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
 
 ## Forecast Delivery
 

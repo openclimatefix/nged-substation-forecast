@@ -3,7 +3,12 @@ from typing import get_args
 
 import patito as pt
 import pytest
-from contracts.ml_schemas import AllFeatures, Metrics, SafeInputBaseColumn, TimeFeature
+from contracts.ml_schemas import (
+    AllFeatures,
+    Metrics,
+    SafeInputBaseColumn,
+    TimeFeature,
+)
 
 
 def test_all_features_validation():
@@ -84,14 +89,16 @@ def test_safe_input_base_column_names_are_all_features_fields():
 
 
 def test_metrics_validation():
-    # Valid
     df = (
         pt.DataFrame(
             {
                 "time_series_id": [123],
                 "power_fcst_model_name": ["model_a"],
-                "nwp_lead_time_hours": [1.0],
-                "mae": [0.5],
+                "fold_id": ["2022"],
+                "horizon_slice": ["all"],
+                "metric_name": ["mae"],
+                "metric_param": ["all"],
+                "metric_value": [5.2],
             }
         )
         .set_model(Metrics)

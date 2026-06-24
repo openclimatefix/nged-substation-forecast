@@ -71,7 +71,9 @@ Two operating modes:
 
 ### ML Model Interface (`packages/ml_core/src/ml_core/base_forecaster.py`)
 
-All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`, `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` with the full `XGBoostConfig`. Model identity fields (`power_fcst_model_name`, `power_fcst_model_version`, `ml_flow_experiment_id`) live in `BaseForecasterConfig` so they travel with the saved model and are stamped onto every `PowerForecast` row at predict time.
+All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`, `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` with the full `XGBoostConfig`.
+
+Identity is split across two levels. **Model-family identity** — `MODEL_NAME` and `MODEL_VERSION` — are class-level constants on each `BaseForecaster` subclass (properties of the implementation; bumping `MODEL_VERSION` is a deliberate code change). **Experiment identity** — `experiment_name` and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with the saved model. Both levels are stamped onto every `PowerForecast` row at predict time: `power_fcst_model_name`/`power_fcst_model_version` from the class, and the dedicated `experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse experiment identity into `power_fcst_model_name`.
 
 ## Code Style
 
@@ -83,7 +85,7 @@ All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatur
 - All function signatures must have complete type hints including return types.
 - Never relax an existing test to make it pass.
 
-## Polars Style
+### Polars Style
 
 These rules are all about making Polars code easy to read.
 
@@ -92,3 +94,34 @@ These rules are all about making Polars code easy to read.
 - When using `.with_columns`, prefer specifying the destination column name as a key word argument
   like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
   `df.with_columns(pl.col("foo").expression().alias("bar"))`
+
+### Patito + Polars Gotcha: cross-model LazyFrame joins
+
+Patito creates a unique Python subclass for each model (e.g. `PowerTimeSeriesLazyFrame`,
+`PowerForecastLazyFrame`). Polars' `assert_same_type` check inside `.join()` rejects joining
+two differently-typed Patito LazyFrames with a `TypeError`.
+
+Workaround: strip the Patito subclass from the right-hand operand before joining:
+
+```python
+# Strip Patito model annotation so Polars' cross-subclass type check doesn't reject the join
+plain_lf = pl.LazyFrame._from_pyldf(patito_lf._ldf)
+left_patito_lf.join(plain_lf.select(...), on=..., how="inner")
+```
+
+`pl.LazyFrame._from_pyldf` constructs a plain `pl.LazyFrame` from the same underlying Rust
+object — zero-copy, no data movement. The check passes because `type(left_lf)` is a subclass
+of `pl.LazyFrame`, so `isinstance(left_lf, type(plain_lf))` is `True`.
+
+## This is a young project
+
+The project is a new, green-field project. No one else is using this code yet. Which means:
+
+- It's 100% fine to make breaking changes, if doing so improves the code. (And as long as we update
+  all the downstream code.)
+- Our aim is to make the code well-organised and easy to use.
+- None of this code is "written in stone" or battle-tested.
+- If you see a design mistake _anywhere_ in the code, then please flag that design mistake to me.
+  I'd much rather end up with a project that's well engineered. (That said, if we're working on
+  feature X, and you spot a mistake in some code that isn't obviously in scope for X, then please
+  discuss the change with me first. Definitely don't make out-of-scope changes with asking me!)

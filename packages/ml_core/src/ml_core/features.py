@@ -174,9 +174,9 @@ class ParsedFeatures:
             should be used to capture behavioral patterns.
 
         Args:
-            selected_features: A set of raw feature name strings requested for engineering. Valid values include all
-            TIME_FEATURES, and all StaticFeatures, and feature names like 'power_lag_24h' and
-            'temperature_2m_rolling_mean_6h'.
+            selected_features: A set of raw feature name strings requested for engineering. Valid
+                values include all TIME_FEATURES, and all StaticFeatures, and feature names like
+                'power_lag_24h' and 'temperature_2m_rolling_mean_6h'.
 
         Returns:
             A ParsedFeatures configuration object containing structured instructions.

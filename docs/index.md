@@ -27,5 +27,4 @@ Each forecast is:
 - [Architecture & Philosophy](architecture/philosophy.md) — design goals and principles
 - [Architecture Overview](architecture/overview.md) — technical components and data flow
 - [Code Style](architecture/code-style.md) — code conventions
-- [Guides](guides/create-forecast.md) — how to run forecasts, backtests, and add models
-- [Roadmap](roadmap.md) — planned future work
+- [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders
