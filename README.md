@@ -65,6 +65,13 @@ Optional: To allow Dagster to remember its state after you shut it down:
 - Open http://localhost:3000 in your browser to see the project.
 - **Run Marimo notebooks**: `uv run marimo edit packages/notebooks/some_notebook.py`
 
+### Documentation
+
+The docs are built with [MkDocs](https://www.mkdocs.org/) (Material theme). The tooling is part of the `dev` dependency group, so `uv sync` installs it.
+
+- **Serve docs locally with live reload**: `uv run mkdocs serve`, then open http://localhost:8000. The site rebuilds automatically as you edit files in `docs/`.
+- **Build the static site**: `uv run mkdocs build` — renders the docs into the `site/` directory.
+
 ---
 
 *Part of the [Open Climate Fix](https://github.com/orgs/openclimatefix/people) community.*
