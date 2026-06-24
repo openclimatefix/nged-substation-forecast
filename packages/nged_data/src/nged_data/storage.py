@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Final, Sequence, TypedDict, cast, overload
+from typing import Final, Sequence, TypedDict, overload
 
 import obstore
 import patito as pt
@@ -222,9 +222,8 @@ def select_new_rows(
         return time_series
 
     # Scan the existing delta table and find the most recent time per time_series_id
-    max_times = cast(
-        pl.DataFrame,  # Cast to pl.DataFrame to keep type checkers happy.
-        pl.scan_delta(delta_path).group_by("time_series_id").agg(max_time=pl.max("time")).collect(),
+    max_times = (
+        pl.scan_delta(delta_path).group_by("time_series_id").agg(max_time=pl.max("time")).collect()
     )
 
     log.info(
@@ -250,8 +249,7 @@ def select_new_rows(
             f" not {time_series.columns=}"
         )
 
-    filtered_df = cast(
-        pl.DataFrame,
+    filtered_df = (
         time_series.lazy()
         .join(max_times.lazy(), on="time_series_id", how="left")
         # If max_time is null for this time_series_id then this is a new time_series_id.
