@@ -1,8 +1,12 @@
-# NGED substation forecast
+# NGED Flexpectation
 
 [![ease of contribution: hard](https://img.shields.io/badge/ease%20of%20contribution:%20hard-bb2629)](https://github.com/openclimatefix#how-easy-is-it-to-get-involved)
 
-To external contributors: Please note that this repo holds the very-early-stage research code for a new project, and there will be a lot of code churn over the next few months. As such, this repo isn't suitable for external contributions at the moment, sorry.
+**NGED Flexpectation** is an NIA-funded project by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for [National Grid Electricity Distribution](https://www.nationalgrid.com/electricity-distribution) (NGED). The forecasts cover NGED's substations and customer meters, with a 14-day horizon at half-hourly resolution, updated every 6 hours. The goal is to help NGED optimise flexibility procurement and manage network congestion.
+
+This repository is the research and production-harness codebase. The system is orchestrated with Dagster, uses XGBoost as the initial forecasting model, and stores all data and forecasts as Delta Lake tables on S3.
+
+To external contributors: this repo is in early-stage development with frequent breaking changes, so it is not suitable for external contributions at the moment.
 
 ---
 
@@ -20,6 +24,29 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 2. **Install dependencies**: `uv sync`
 3. **Install pre-commit hooks**: `uv run pre-commit install`
 
+To run Dagster:
+1. `uv run dg dev`
+2. Open http://localhost:3000 in your browser to see the project.
+
+Optional: To allow Dagster to remember its state after you shut it down:
+1. `mkdir ~/dagster_home/`
+2. Put the following into `~/dagster_home/dagster.yaml`:
+    ```yaml
+    storage:
+      sqlite:
+        base_dir: "dagster_history"
+
+    concurrency:
+      pools:
+        default_limit: 2  # Used to limit concurrency of ecmwf_ens asset.
+
+    python_logs:
+      managed_python_loggers:
+        - nged_data
+      python_log_level: DEBUG
+    ```
+3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
+
 ### Linting & Formatting
 
 - **Check linting**: `uv run ruff check .`
@@ -29,8 +56,6 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 
 ### Testing
 
-- **Run only the fast tests**: `uv run pytest -m "not slow"`
-- **Run only the slow tests**: `uv run pytest -m "slow"`
 - **Run all tests**: `uv run pytest`
 - **Run tests with coverage**: `uv run pytest --cov`
 

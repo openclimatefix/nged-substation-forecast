@@ -1,17 +1,18 @@
 import marimo
+from anywidget import AnyWidget
+from contracts.common import UTC_DATETIME_DTYPE
 
-__generated_with = "0.23.0"
+__generated_with = "0.23.6"
 app = marimo.App(width="full")
 
 with app.setup:
     from typing import cast
 
-    from contracts.settings import Settings
+    from contracts.settings import PROJECT_ROOT, Settings
 
     settings = Settings()
 
     from datetime import datetime
-    from pathlib import Path
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
@@ -20,16 +21,14 @@ with app.setup:
     import patito as pt
     import polars as pl
     import pyarrow
-    from contracts.data_schemas import TimeSeriesMetadata, PowerTimeSeries
+    from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 
-    BASE_PATH = Path("~/dev/python/nged-substation-forecast").expanduser()
-
-    BASE_DELTA_PATH = BASE_PATH / settings.nged_data_path / "delta" / "power_time_series"
+    BASE_DELTA_PATH = PROJECT_ROOT / settings.nged_data_path / "power_time_series.delta"
 
 
 @app.cell
 def _():
-    metadata_path = BASE_PATH / settings.nged_data_path / "parquet" / "time_series_metadata.parquet"
+    metadata_path = PROJECT_ROOT / settings.nged_data_path / "metadata.parquet"
     df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
     return (df,)
 
@@ -85,16 +84,21 @@ def _(arrow_table):
     map = lonboard.Map(layers=[layer])
 
     # Enable reactivity in Marimo:
-    layer_widget = mo.ui.anywidget(layer)
+    layer_widget = mo.ui.anywidget(cast(AnyWidget, layer))
     return layer_widget, map
 
 
 @app.cell
-def _(df, layer_widget, map):
+def _():
     delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
-        pl.col("period_end_time") > pl.lit(datetime(2026, 3, 1)).cast(pl.Datetime("us", "UTC"))
+        # Filter to only show recent data. Altair crashes if you try to show too much data.
+        pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
     )
+    return (delta_df,)
 
+
+@app.cell
+def _(delta_df, df, layer_widget, map):
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
@@ -122,12 +126,12 @@ def _(df, layer_widget, map):
                     .mark_line()
                     .encode(
                         x=alt.X(
-                            "period_end_time:T",
+                            "time:T",
                             axis=alt.Axis(format="%H:%M %b %d"),
                         ),
                         y=alt.Y("power:Q", title=f"Power ({selected_df['units'].item()})"),
                         color=alt.value("teal"),
-                        tooltip=["period_end_time", "power"],
+                        tooltip=["time", "power"],
                     )
                     .properties(
                         title=f"{selected_df['time_series_name'].item()} - {selected_df['substation_type'].item()} - {selected_df['time_series_type'].item()}",

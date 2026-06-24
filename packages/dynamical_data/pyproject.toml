@@ -10,6 +10,7 @@ requires-python = ">=3.14"
 dependencies = [
     "altair>=6.0.0",
     "deltalake>=1.4.2",
+    "dynamical-catalog>=0.5.0",
     "geo",
     "icechunk>=1.1.18",
     "lonboard>=0.14.0",

@@ -1,27 +1,17 @@
 # XGBoost Substation Forecaster
 
-This package implements an XGBoost-based model to forecast power flows at NGED primary substations using numerical weather prediction (NWP) forecasts. It implements the `BaseForecaster` protocol defined in `ml_core`.
+This package implements an XGBoost-based model to forecast power flows at NGED primary substations using numerical weather prediction (NWP) forecasts. It implements the `BaseForecaster` interface defined in `ml_core`.
 
-## Features
+## How it works
 
-- **Unified ML Interface**: Implements the `BaseForecaster` protocol, allowing seamless integration with the Dagster orchestration pipeline.
-- **Multi-NWP Support**: Ingests forecasts from multiple NWP providers simultaneously. Secondary NWP features are prefixed with their model name (e.g., `gfs_temperature_2m`), and all NWPs are joined using a 3-hour availability delay.
-- **Dynamic Seasonal Lags**: Prevents lookahead bias by calculating autoregressive lags dynamically based on the forecast lead time. The model always uses the most recent *available* historical data for a given lead time (e.g., `lag_days = max(1, ceil(lead_time_days / 7)) * 7`).
-- **Rigorous Backtesting**: Supports simulating real-time inference via the `collapse_lead_times` parameter. When enabled, it filters NWP data to keep only the latest available forecast for each valid time, enforcing the 3-hour availability delay.
-- **H3-based Weather Matching**: Automatically matches substation coordinates to H3 resolution 5 cells used in the weather data.
-- **Ensemble Averaging**: Averages weather variables across ensemble members for robust feature engineering.
-- **Temporal Features**: Includes cyclical temporal features (sine/cosine for hour and day of year) and day of week.
-- **Long-Range Horizon Handling**: Supports 14-day (336h) forecasts at 30-minute resolution. The `lead_time_hours` is passed as a feature to the XGBoost model, allowing it to learn the decay in NWP skill over time.
-- **Physical Wind Logic**: Wind speed and direction are interpolated using Cartesian `u` and `v` components instead of circular interpolation. This avoids "phantom high wind" artifacts during rapid direction shifts and ensures physical correctness.
+One `xgb.Booster` is trained per `time_series_id`, so each substation's model can learn its own relationship between weather and power. Features are passed via the `AllFeatures` schema (see `contracts`), which joins NWP variables, power lag/rolling features, and static metadata. Categorical and string columns are encoded as integer codes before being handed to XGBoost; all features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them natively. Ensemble power forecasts are produced by calling `predict()` once per NWP ensemble member — the model itself is deterministic.
 
-## Installation
+## Save format
 
-This package is part of the `uv` workspace. Install all dependencies from the root:
+`XGBoostForecaster.save(path)` writes:
+- `{time_series_id}.ubj` — one XGBoost native binary model per trained substation
+- `meta.json` — the full `XGBoostConfig` serialised via Pydantic, so `load()` is completely self-contained
 
-```bash
-uv sync
-```
+## Configuration
 
-## Usage
-
-This package is intended to be used as part of the Dagster pipeline. The `XGBoostForecaster` class handles the full lifecycle of the model, including training and inference.
+`XGBoostConfig` extends `BaseForecasterConfig` with XGBoost hyperparameters (`n_estimators`, `learning_rate`, `max_depth`, etc.) and the model identity fields (`power_fcst_model_name`, `power_fcst_model_version`, `ml_flow_experiment_id`). Identity fields are stamped onto every row of the `PowerForecast` output so the Delta Lake table is self-describing.

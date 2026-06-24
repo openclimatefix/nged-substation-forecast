@@ -1,16 +1,31 @@
-power_fcst_model_name: "xgboost"
-hyperparameters:
-  learning_rate: 0.05
-  n_estimators: 500
-  max_depth: 6
-features:
-  nwps:
-    - "ecmwf_ens_0_25deg"
-  feature_names:
-    - "time_series_id"
-    - "lead_time_hours"
-    - "nwp_init_hour"
-    - "latest_available_weekly_power_lag"
+# XGBoost forecaster configuration.
+#
+# The top-level _target_ identifies the BaseForecaster subclass to instantiate.
+# model_params._target_ identifies the companion config object.
+# The Dagster asset loads this file with OmegaConf, then does:
+#
+#   forecaster_class = hydra.utils.get_class(cfg._target_)
+#   forecaster_config = hydra.utils.instantiate(cfg.model_params)
+#   results = cross_validate(forecaster_class, forecaster_config, ...)
+
+_target_: xgboost_forecaster.forecaster.XGBoostForecaster
+
+model_params:
+  _target_: xgboost_forecaster.forecaster.XGBoostConfig
+
+  selected_features:
+    - "power_lag_24h"
+    - "power_lag_48h"
+    - "power_lag_168h" # 1 week ago
+    - "power_lag_336h" # 2 weeks ago
+    - "local_time_of_day_sin"
+    - "local_time_of_day_cos"
+    - "local_time_of_year_sin"
+    - "local_time_of_year_cos"
+    - "local_day_of_week_sin"
+    - "local_day_of_week_cos"
+    - "local_day_of_week"
+    - "local_utc_offset"
     - "temperature_2m"
     - "dew_point_temperature_2m"
     - "wind_speed_10m"
@@ -23,14 +38,17 @@ features:
     - "downward_short_wave_radiation_flux_surface"
     - "categorical_precipitation_type_surface"
     - "windchill"
-    - "temperature_2m_lag_7d"
-    - "temperature_2m_lag_14d"
-    - "temperature_2m_6h_ago"
-    - "temp_trend_6h"
-    - "downward_short_wave_radiation_flux_surface_lag_7d"
-    - "downward_short_wave_radiation_flux_surface_lag_14d"
-    - "hour_sin"
-    - "hour_cos"
-    - "day_of_year_sin"
-    - "day_of_year_cos"
-    - "day_of_week"
+
+  # XGBoost hyperparameters
+  n_estimators: 500
+  learning_rate: 0.05
+  max_depth: 6
+  min_child_weight: 1
+  subsample: 0.8
+  colsample_bytree: 0.8
+  device: "cpu"
+  objective: "reg:squarederror"
+
+  # MLflow experiment tags (used for leaderboard grouping)
+  weather_source: "ecmwf_control"
+  training_strategy: "horizon_as_feature"

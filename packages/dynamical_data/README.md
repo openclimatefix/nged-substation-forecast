@@ -12,12 +12,16 @@ We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
 All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.
 
+As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
+level) results in Parquet files ranging between about 205 MB to 240 MB.
+
 The conclusion is to:
 - sort by "init_time", "lead_time", "ensemble_member", "h3_index"
-- compression="zstd", compression_level=14 = 51 MB
+- Compress using: compression="zstd", compression_level=14
+- Minimal size = save as UInt8 = 51 MB
+- But we're worried that UInt8 might lose too much info. So we're scaling to `[0, 2¹²)` and saving a
+  Int16 in Delta Lake, which roughly halves the size from 240 MB for `float32` down to 120 MB.
 
-As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
-level) results in Parquet files ranging between about 205 MB to 220 MB.
 
 ### Test different sort orders:
 (After scaling to `[0, 255]` and saving as `UInt8`, and compressing using zstd with the default level)
@@ -57,12 +61,10 @@ compression="brotli", compression_level=11 = 48 MB, 17.75s!
 
 ```
 Scale to 2¹⁶ - 1, and save as UInt16 = 145 MB
+Scale to 2¹² - 1, and save as UInt16 = 117 MB
 Scale to 2¹⁰ - 1, and save as UInt16 =  79 MB
 Scale to 2⁹  - 1, and save as UInt16 =  62 MB
 Scale to 2⁸  - 1, and save as UInt16 =  51 MB
 Scale to 2⁸  - 1, and save as UInt8  =  51 MB
 ```
 
-## Physical Wind Logic
-
-To ensure physically realistic wind speed and direction, we interpolate the Cartesian `u` and `v` components linearly instead of using circular interpolation on speed and direction. This approach avoids "phantom high wind" artifacts that can occur during rapid direction shifts (e.g., from 359 to 1 degree). Wind speed and direction are reconstructed from the interpolated `u` and `v` components after the interpolation step.

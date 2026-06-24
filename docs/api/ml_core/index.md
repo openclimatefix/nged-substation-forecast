@@ -2,8 +2,7 @@
 
 {% include "../../../packages/ml_core/README.md" %}
 
-::: ml_core.model
-::: ml_core.utils
-::: ml_core.data
 ::: ml_core.features
-::: ml_core.scaling
+::: ml_core.base_forecaster
+::: ml_core.cross_validate
+::: ml_core.metrics

@@ -23,8 +23,9 @@
 
 ## Data Handling
 - **Tabular Data**: Use **Polars** (`import polars as pl`) for dataframes. Pandas is strictly forbidden. Use Polars for all tabular data.
+- **Lazy evaluation**: Use `pl.LazyFrame` throughout the pipeline. **Do not call `.collect()` before the model boundary.** See [Lazy Evaluation Strategy](overview.md#lazy-evaluation-strategy) for the full contract.
 - **Gridded/NWP Data**: Use **Xarray** and **Zarr**.
-- **Data Contracts**: Use **Patito** for defining and validating data schemas.
+- **Data Contracts**: Use **Patito** for defining and validating data schemas. Use Patito type annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Persistence**: Prefer partitioned Parquet files for tabular data.
 
 ## Machine Learning (PyTorch)

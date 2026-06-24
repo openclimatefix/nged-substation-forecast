@@ -24,12 +24,17 @@ nav:
   - Architecture:
       - Philosophy: architecture/philosophy.md
       - Overview: architecture/overview.md
-      - Roadmap: roadmap.md
-  - Guides:
-      - Create a Forecast: guides/create-forecast.md
-      - Add a Dataset: guides/add-dataset.md
-      - Add a Model: guides/add-model.md
-      - Run a Backtest: guides/run-backtest.md
+      - Code Style: architecture/code-style.md
+  - Roadmap:
+      - Overview: roadmap/index.md
+      - Delivery Tables: roadmap/delivery-tables.md
+      - Forecast Building Blocks: roadmap/forecast-building-blocks.md
+      - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
+      - Data Sources: roadmap/data-sources.md
+      - Differentiable Physics: roadmap/differentiable-physics.md
+      - Switching Events: roadmap/switching-events.md
+      - Disaggregation Evaluation: roadmap/disaggregation-evaluation.md
+      - Encoders: roadmap/encoders.md
   - API Reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md
