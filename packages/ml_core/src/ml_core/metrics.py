@@ -33,7 +33,7 @@ def compute_metrics(
     added here later without changing the schema.
 
     Args:
-        cv_forecasts: CV predictions from :func:`ml_core.cross_validate.cross_validate`.
+        cv_forecasts: CV predictions to evaluate.
             Must not contain ``fold_id="live"`` rows — pass only CV fold predictions.
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
 

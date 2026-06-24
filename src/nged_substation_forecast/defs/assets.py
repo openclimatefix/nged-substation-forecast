@@ -1,18 +1,14 @@
 import ast
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Generic, Self, TypeVar, cast
+from typing import Any, Generic, Self, TypeVar
 
-import hydra.utils
-import mlflow
 import patito as pt
 import polars as pl
 from contracts.geo_schemas import H3GridWeights
-from contracts.hydra_schemas import CvConfig, CvFoldConfig
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
-from contracts.settings import PROJECT_ROOT, Settings
-from contracts.weather_schemas import NwpModelId, NwpOnDisk, NwpScalingParams
+from contracts.power_schemas import PowerTimeSeries
+from contracts.settings import Settings
+from contracts.weather_schemas import NwpOnDisk, NwpScalingParams
 from dagster import (
     AssetExecutionContext,
     DailyPartitionsDefinition,
@@ -28,9 +24,6 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
 from dynamical_data.ecmwf_ens.download import download_ecmwf_ens_run
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
-from ml_core.base_forecaster import BaseForecaster
-from ml_core.cross_validate import cross_validate
-from ml_core.metrics import compute_metrics
 from nged_data.read_nged_json import _H3_RESOLUTION
 from nged_data.storage import (
     NoNewData,
@@ -42,7 +35,6 @@ from nged_data.storage import (
     select_new_rows,
     upsert_metadata,
 )
-from omegaconf import OmegaConf
 from pydantic import BaseModel, computed_field, field_validator
 
 
@@ -199,180 +191,6 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
             "n_rows": len(nwp_on_disk),
             "path": str(settings.nwp_data_path),
             "init_time": str(nwp_init_time),
-        }
-    )
-
-
-def _load_cv_folds(cv_config_path: Path) -> tuple[list[CvFoldConfig], int]:
-    """Load CV fold definitions from a Hydra YAML and return (folds, min_training_months)."""
-    raw = OmegaConf.to_container(OmegaConf.load(cv_config_path), resolve=True)
-    cv_cfg = CvConfig.model_validate(raw)
-    return cv_cfg.folds, cv_cfg.min_training_months
-
-
-def _load_model_config(model_config_path: Path) -> tuple[type[BaseForecaster], Any]:
-    """Load and validate a model config YAML, returning (forecaster_class, forecaster_config).
-
-    The YAML must have a top-level ``_target_`` key identifying the ``BaseForecaster``
-    subclass and a ``model_params`` block whose ``_target_`` identifies the matching
-    ``BaseForecasterConfig`` subclass.  ``hydra.utils.instantiate`` constructs and
-    validates the config object via Pydantic — this is the enforcement point for
-    ``conf/model/*.yaml`` files.
-    """
-    raw = OmegaConf.load(model_config_path)
-    forecaster_class = cast(type[BaseForecaster], hydra.utils.get_class(str(raw._target_)))
-    forecaster_config = hydra.utils.instantiate(raw.model_params)
-    return forecaster_class, forecaster_config
-
-
-@asset(deps=["power_time_series_and_metadata", "ecmwf_ens"])
-def cv_power_forecasts(context: AssetExecutionContext) -> None:
-    """Run expanding-window cross-validation and persist half-hourly predictions.
-
-    Loads the model config from ``conf/model/xgboost.yaml`` and the CV fold
-    definitions from ``conf/cv/default.yaml``, then calls ``cross_validate()``
-    to produce a ``PowerForecast`` DataFrame with ``fold_id`` set to the
-    validation year (e.g. ``"2022"``).  Results are appended to the shared
-    ``power_forecasts`` Delta table alongside any live production forecasts.
-
-    Only the control NWP ensemble member (member 0) is used.  Full ensemble
-    support will be added once the XGBoost iterator-API is implemented.
-
-    The downstream ``cv_metrics`` asset can be re-run without re-training by
-    recomputing metrics directly from the power_forecasts table.
-    """
-    settings = Settings()
-
-    # --- Load configs ---
-    forecaster_class, forecaster_config = _load_model_config(
-        PROJECT_ROOT / "conf" / "model" / "xgboost.yaml"
-    )
-    folds, min_training_months = _load_cv_folds(PROJECT_ROOT / "conf" / "cv" / "default.yaml")
-
-    # --- Load data (lazy) ---
-    power_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
-    ).set_model(PowerTimeSeries)
-
-    metadata_df = pt.DataFrame(
-        pl.read_parquet(settings.nged_data_path / "metadata.parquet")
-    ).set_model(TimeSeriesMetadata)
-
-    # Filter to control member and cast nwp_model_id back from String → Enum
-    # (Delta Lake doesn't store Enum; the ecmwf_ens asset casts to String before writing).
-    nwp_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.nwp_data_path))
-        .filter(pl.col("ensemble_member") == 0)
-        .cast({"nwp_model_id": pl.Enum([m.name for m in NwpModelId])})
-    ).set_model(NwpOnDisk)
-
-    # --- Run cross-validation ---
-    cv_results = cross_validate(
-        forecaster_class=forecaster_class,
-        forecaster_config=forecaster_config,
-        power_lf=power_lf,
-        nwp_lf=nwp_lf,
-        metadata_df=metadata_df,
-        folds=folds,
-        min_training_months=min_training_months,
-    )
-
-    # --- Persist to the shared power_forecasts Delta table ---
-    settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
-    cv_results.write_delta(
-        str(settings.power_forecasts_data_path),
-        mode="append",
-        delta_write_options={
-            "partition_by": ["power_fcst_model_name", "fold_id"],
-            "writer_properties": WriterProperties(compression="ZSTD", compression_level=14),
-        },
-    )
-
-    context.add_output_metadata(
-        {
-            "n_rows": cv_results.height,
-            "n_folds": cv_results["fold_id"].n_unique(),
-            "n_time_series": cv_results["time_series_id"].n_unique(),
-            "model_name": forecaster_class.MODEL_NAME,
-            "path": str(settings.power_forecasts_data_path),
-        }
-    )
-
-
-@asset(deps=["cv_power_forecasts"])
-def cv_metrics(context: AssetExecutionContext) -> None:
-    """Compute and persist CV metrics, and log aggregate metrics to MLflow.
-
-    Loads CV rows (``fold_id != 'live'``) from the shared ``power_forecasts``
-    Delta table and the raw ``power_time_series`` Delta table, calls
-    ``compute_metrics()``, then:
-
-    1. Writes the tall ``Metrics`` table to ``cv_metrics`` Delta.
-    2. Logs per-metric mean-across-folds values to an MLflow run, tagged with
-       the model family, weather source, and other experiment dimensions so the
-       leaderboard can group and filter entries.
-    """
-    settings = Settings()
-    forecaster_class, forecaster_config = _load_model_config(
-        PROJECT_ROOT / "conf" / "model" / "xgboost.yaml"
-    )
-
-    # --- Load data (CV rows only — exclude live production forecasts) ---
-    cv_forecasts_df = PowerForecast.validate(
-        pl.scan_delta(str(settings.power_forecasts_data_path))
-        .filter(pl.col("fold_id") != "live")
-        .cast({"power_fcst_model_name": pl.Categorical, "fold_id": pl.Categorical})
-        .collect(),
-        allow_superfluous_columns=True,
-    )
-
-    actuals_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
-    ).set_model(PowerTimeSeries)
-
-    # --- Compute metrics ---
-    metrics_df = compute_metrics(cv_forecasts_df, actuals_lf)
-
-    # --- Persist to Delta ---
-    settings.cv_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
-    metrics_df.write_delta(
-        str(settings.cv_metrics_data_path),
-        mode="append",
-        delta_write_options={
-            "partition_by": ["power_fcst_model_name", "fold_id"],
-            "writer_properties": WriterProperties(compression="ZSTD", compression_level=14),
-        },
-    )
-
-    # --- Log aggregate metrics to MLflow ---
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    experiment_name = forecaster_class.MODEL_NAME
-    mlflow.set_experiment(experiment_name)
-
-    # Compute mean-across-folds for each (metric_name, metric_param, horizon_slice).
-    agg_metrics = metrics_df.group_by(["metric_name", "metric_param", "horizon_slice"]).agg(
-        pl.col("metric_value").mean().alias("mean_across_folds")
-    )
-
-    with mlflow.start_run():
-        # Tag with experiment dimensions for leaderboard grouping.
-        mlflow.set_tags(
-            {
-                "weather_source": forecaster_config.weather_source,
-                "training_strategy": forecaster_config.training_strategy,
-                "power_fcst_model_name": experiment_name,
-            }
-        )
-        for row in agg_metrics.iter_rows(named=True):
-            key = f"{row['metric_name']}/{row['horizon_slice']}/{row['metric_param']}"
-            mlflow.log_metric(key, float(row["mean_across_folds"]))
-
-    context.add_output_metadata(
-        {
-            "n_metric_rows": metrics_df.height,
-            "n_time_series": metrics_df["time_series_id"].n_unique(),
-            "mlflow_experiment": experiment_name,
-            "path": str(settings.cv_metrics_data_path),
         }
     )
 
