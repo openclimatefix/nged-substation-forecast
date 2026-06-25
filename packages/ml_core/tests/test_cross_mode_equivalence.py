@@ -13,11 +13,12 @@ per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mo
 primary key and on every requested feature column. If a future change diverges the two modes,
 this fails.
 
-Scope note: this test exercises the **weather + time** features, which are exactly the columns
-whose values depend on the bulk-vs-single-run NWP join — the part that differs between the two
-code paths. Power-lag features are intentionally excluded: bulk mode sources power lags from the
-NWP-gridded frame while single-run mode sources them from the continuous observed-power series,
-so they are deliberately not identical (the documented cadence subtlety in §5.7).
+Scope note: this test exercises the **weather, time, and power-lag** features. Weather/time
+features depend on the bulk-vs-single-run NWP join; power lags are included because both modes
+now source them from the same dense observed-power series (Phase 1.5 / Option B), so they are
+identical too. The fixture's power series extends back before each NWP window (the pre-window
+history) so that an in-window power lag resolves to a genuine observed value rather than being
+nullified or reaching off the edge of the data.
 """
 
 from datetime import datetime, timedelta
@@ -42,6 +43,7 @@ _FEATURES = {
     "windchill",
     "local_time_of_day_sin",
     "local_time_of_day_cos",
+    "power_lag_3h",
 }
 _COMPARE_COLS = [
     "time_series_id",
@@ -56,6 +58,7 @@ _COMPARE_COLS = [
     "windchill",
     "local_time_of_day_sin",
     "local_time_of_day_cos",
+    "power_lag_3h",
 ]
 _SORT_COLS = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member"]
 
@@ -68,6 +71,15 @@ def _run_valid_times(run_init: datetime) -> list[datetime]:
     """
     start = run_init + timedelta(hours=_DELAY_HOURS)
     return [start + timedelta(minutes=30 * i) for i in range(13)]  # 06:00 .. 12:00 inclusive
+
+
+def _power_observation_times(run_init: datetime) -> list[datetime]:
+    """Half-hourly power observations from each run's init through the end of its NWP window.
+
+    Crucially this includes the pre-window history (init .. init + delay) so that a power lag on
+    an in-window row reaches back to a genuine observed value instead of being nullified.
+    """
+    return [run_init + timedelta(minutes=30 * i) for i in range(25)]  # 00:00 .. 12:00 inclusive
 
 
 def _build_fixtures() -> tuple[
@@ -89,13 +101,16 @@ def _build_fixtures() -> tuple[
                 )
     nwp_df = pl.DataFrame(nwp_rows)
 
-    # Power observations on exactly the union of NWP valid_times across all runs.
-    union_valid_times = sorted({vt for run in _NWP_RUNS for vt in _run_valid_times(run)})
+    # Power observations span each run's full window plus the pre-NWP-window history, so a
+    # power lag on an in-window row resolves to a genuine observed value.
+    power_times = sorted({vt for run in _NWP_RUNS for vt in _power_observation_times(run)})
     power_df = pl.DataFrame(
         {
-            "time_series_id": ["ts1"] * len(union_valid_times),
-            "time": union_valid_times,
-            "power": [100.0 + vt.day * 10 + vt.hour for vt in union_valid_times],
+            "time_series_id": ["ts1"] * len(power_times),
+            "time": power_times,
+            "power": [
+                float(100 + vt.day * 10 + vt.hour * 2 + vt.minute // 30) for vt in power_times
+            ],
         }
     )
 
@@ -137,6 +152,9 @@ def test_bulk_and_single_run_features_are_identical() -> None:
     single_run = pl.concat(single_run_parts)
 
     assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 13
+    # Guard: the power lag must actually resolve to non-null observed values for some rows,
+    # otherwise "identical" would be a vacuous all-null match on both sides.
+    assert bulk["power_lag_3h"].is_not_null().any()
     assert_frame_equal(
         bulk.select(_COMPARE_COLS).sort(_SORT_COLS),
         single_run.select(_COMPARE_COLS).sort(_SORT_COLS),

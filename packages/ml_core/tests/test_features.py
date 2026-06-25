@@ -21,8 +21,8 @@ from ml_core.features import (
 
 
 def test_apply_power_lag_with_source():
-    # Test that _apply_power_lag correctly pulls from source_lf
-    target_df = pl.DataFrame(
+    # Test that _apply_power_lag correctly pulls from observed_power_lf
+    engineered_features_df = pl.DataFrame(
         {
             "time_series_id": ["ts1"],
             "ensemble_member": [0],
@@ -31,7 +31,7 @@ def test_apply_power_lag_with_source():
         }
     )
 
-    source_df = pl.DataFrame(
+    observed_power_df = pl.DataFrame(
         {
             "time_series_id": ["ts1"],
             "ensemble_member": [0],
@@ -41,7 +41,9 @@ def test_apply_power_lag_with_source():
     )
 
     lag_feat = LagFeature.from_str("power_lag_1h")
-    result = _apply_power_lag(target_df.lazy(), source_df.lazy(), lag_feat).collect()
+    result = _apply_power_lag(
+        engineered_features_df.lazy(), observed_power_df.lazy(), lag_feat
+    ).collect()
 
     assert result["power_lag_1h"][0] == 90.0
 
