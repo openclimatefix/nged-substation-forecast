@@ -1199,10 +1199,16 @@ lagged power.
 - **Equivalence test:** drop the power-lag exclusion — add `power_lag_3h` to the compared
   features and extend the fixture's power series with pre-window history so the lag resolves to
   a real observed value.
-- **Out of scope (flagged):** `_apply_rolling_mean_feature` groups power rolling means by
-  `(ts, nwp_init_time, ensemble_member)` and has a related but separate cross-mode concern.
-- **User can verify:** `uv run pytest` green; the equivalence test now asserts power lags match
-  across modes.
+- **Rolling-mean concern (investigated, resolved):** `_apply_rolling_mean_feature` was flagged as
+  a possible parallel. Investigation found no fan-out (it joins back on the full primary key, 1:1)
+  and that weather rolling means are cross-mode-consistent — single-run mode pads each
+  `(ts, nwp_init_time, member)` group with null-weather rows that null-skipping aggregations
+  ignore. This is now locked by the equivalence test, and the null-skipping invariant is
+  documented on the function. A multi-stat weather extension
+  (`rolling_{mean,min,max,std,median,sum}`) is captured as a ready TODO; power rolling remains
+  forbidden (it would follow the Option-B pattern, anchored at `T_init`).
+- **User can verify:** `uv run pytest` green; the equivalence test now asserts power lags **and**
+  the weather rolling mean match across modes.
 
 ### 7.2 Phase 2 — `eligible_time_series` asset
 

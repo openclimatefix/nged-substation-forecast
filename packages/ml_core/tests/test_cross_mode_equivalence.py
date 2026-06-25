@@ -13,12 +13,16 @@ per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mo
 primary key and on every requested feature column. If a future change diverges the two modes,
 this fails.
 
-Scope note: this test exercises the **weather, time, and power-lag** features. Weather/time
-features depend on the bulk-vs-single-run NWP join; power lags are included because both modes
-now source them from the same dense observed-power series (Phase 1.5 / Option B), so they are
-identical too. The fixture's power series extends back before each NWP window (the pre-window
-history) so that an in-window power lag resolves to a genuine observed value rather than being
-nullified or reaching off the edge of the data.
+Scope note: this test exercises the **weather, time, power-lag, and weather-rolling** features.
+Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included because
+both modes now source them from the same dense observed-power series (Phase 1.5 / Option B), so
+they are identical too. A weather rolling mean is included to lock the cross-mode invariant for
+rolling aggregations: single-run mode pads each ``(ts, nwp_init_time, member)`` group with
+out-of-window null-weather rows, which a *null-skipping* aggregation (mean/min/max/std/median/sum)
+ignores — so values match bulk. This test guards against a future switch to a row-count-dependent
+aggregation (``.len()``) that would silently diverge. The fixture's power series extends back
+before each NWP window (the pre-window history) so that an in-window power lag resolves to a
+genuine observed value rather than being nullified or reaching off the edge of the data.
 """
 
 from datetime import datetime, timedelta
@@ -44,6 +48,7 @@ _FEATURES = {
     "local_time_of_day_sin",
     "local_time_of_day_cos",
     "power_lag_3h",
+    "temperature_2m_rolling_mean_3h",
 }
 _COMPARE_COLS = [
     "time_series_id",
@@ -59,6 +64,7 @@ _COMPARE_COLS = [
     "local_time_of_day_sin",
     "local_time_of_day_cos",
     "power_lag_3h",
+    "temperature_2m_rolling_mean_3h",
 ]
 _SORT_COLS = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member"]
 
