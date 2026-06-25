@@ -173,30 +173,30 @@ class AllFeatures(pt.Model):
 
 #: Horizon slice labels matching the four forecast ranges from the project report.
 #: ``"all"`` aggregates over all horizons and is always computed.
-HORIZON_SLICES: list[str] = [
+HORIZON_SLICES: Final[tuple[str, ...]] = (
     "all",
     "intraday",  # 0 – 6 h
     "day_ahead",  # 6 – 36 h
     "short_medium_range",  # Day 2 – Day 7
     "extended_range",  # Day 8 – Day 14
-]
+)
 
 #: Metric names currently implemented.  Add more here as they are implemented:
 #: ensemble:  "crps", "spread_skill_ratio"
 #: quantile:  "pinball_loss", "mean_pinball_loss"
 #: calibration: "picp"
-METRIC_NAMES: list[str] = [
+METRIC_NAMES: Final[tuple[str, ...]] = (
     "mae",  # mean absolute error (MW)
     "nmae",  # normalised MAE (dimensionless; normalised by mean |power|)
     "rmse",  # root mean squared error (MW)
     "mbe",  # mean bias error (MW; positive = over-prediction)
-]
+)
 
 #: Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
 #: ``"all"`` is used for all scalar metrics that have no extra parameter dimension.
 #: When Pinball Loss is added, extend this with "p10", "p20", …, "p90".
 #: When PICP is added, extend with "p10_p90", "p20_p80", etc.
-METRIC_PARAMS: list[str] = ["all"]
+METRIC_PARAMS: Final[tuple[str, ...]] = ("all",)
 
 #: Evaluation scopes that coexist in the one ``forecast_metrics`` table.
 #: - ``"leaderboard"``: CV-fold leaderboard metrics;
