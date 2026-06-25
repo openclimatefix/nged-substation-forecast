@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Sequence
+from typing import Final, Literal, Sequence
 
 import patito as pt
 import polars as pl
@@ -202,11 +202,11 @@ METRIC_PARAMS: list[str] = ["all"]
 #: - ``"leaderboard"``: CV-fold leaderboard metrics;
 #: - ``"production_monitoring"``: live trailing-window monitoring;
 #: - ``"ad_hoc"``: one-off analyses (no MLflow run).
-EVALUATION_SCOPES: list[str] = ["leaderboard", "production_monitoring", "ad_hoc"]
+EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
 
 #: Values for the ``time_series_type`` metric slice: every time-series category plus the
 #: sentinel ``"all"`` for the across-everything aggregate.
-TIME_SERIES_TYPE_SLICES: list[str] = ["all", *LIST_OF_TIME_SERIES_TYPES]
+TIME_SERIES_TYPE_SLICES: Final[tuple[str, ...]] = ("all", *LIST_OF_TIME_SERIES_TYPES)
 
 
 class Metrics(pt.Model):
