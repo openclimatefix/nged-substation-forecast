@@ -66,7 +66,7 @@ class AllFeatures(pt.Model):
     nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
-        description="When the NWP model was initialised.",
+        description="When the NWP run was initialised.",
     )
 
     power: float = pt.Field(dtype=pl.Float32)
