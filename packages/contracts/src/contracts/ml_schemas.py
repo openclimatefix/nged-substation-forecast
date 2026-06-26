@@ -188,16 +188,19 @@ METRIC_NAMES: Final[tuple[str, ...]] = (
 )
 """Metric names currently implemented.
 
-Extend as new metrics are added — ensemble: `"crps"`, `"spread_skill_ratio"`;
-quantile: `"pinball_loss"`, `"mean_pinball_loss"`; calibration: `"picp"`.
+Extend as new metrics are added:
+
+- ensemble: `"crps"`, `"spread_skill_ratio"`;
+- quantile: `"pinball_loss"`, `"mean_pinball_loss"`;
+- calibration: `"picp"`.
 """
 
 METRIC_PARAMS: Final[tuple[str, ...]] = ("all",)
 """Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
 
-`"all"` is used for all scalar metrics with no extra parameter dimension.
-When Pinball Loss is added, extend with `"p10"`, `"p20"`, …, `"p90"`.
-When PICP is added, extend with `"p10_p90"`, `"p20_p80"`, etc.
+- `"all"` is used for all scalar metrics with no extra parameter dimension.
+- When Pinball Loss is added, extend with `"p10"`, `"p20"`, …, `"p90"`.
+- When PICP is added, extend with `"p10_p90"`, `"p20_p80"`, etc.
 """
 
 EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
