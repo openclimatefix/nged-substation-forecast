@@ -1228,6 +1228,13 @@ lagged power.
   experiment + parent run (config params + grouping tags) appear, and the new `__2022…` keys show
   up in the `cv_experiment_folds` partition set.
 
+### 7.3.1 Phase 3.5 - Re-consider CV folds
+
+- Facts to consider:
+    - Dynamical.org currently only provides ECMWF back to 2024-04-01.
+    - Only 22 of the 32 time series for the trial area have data going back to 2020-01-01 (see plot
+      in Milestone 1 report)
+
 ### 7.4 Phase 4 — `trained_cv_model` asset
 
 - Implement §4.6 (read config from MLflow, read eligible set, `engineer_features`, `train`,
