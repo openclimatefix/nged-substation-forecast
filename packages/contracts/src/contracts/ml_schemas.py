@@ -218,7 +218,7 @@ EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitori
 TIME_SERIES_TYPE_SLICES: Final[tuple[str, ...]] = ("all", *LIST_OF_TIME_SERIES_TYPES)
 """Values for the `time_series_type` metric slice.
 
-Every time-series category plus the sentinel `"all"` for the across-everything aggregate.
+Every time_series_type plus the sentinel `"all"` for the across-everything aggregate.
 """
 
 
