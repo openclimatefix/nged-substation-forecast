@@ -81,8 +81,21 @@ Identity is split across two levels. **Model-family identity** — `MODEL_NAME` 
 - **Polars only** — pandas is strictly forbidden. Use `pl.LazyFrame` and only `.collect()` when necessary.
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
+- **Comments must reflect current state only** — never reference previous iterations of the code,
+  deleted files, or temporary implementation plans (e.g. `docs/temp/`).
+- **MkDocs-compatible constant docs** — document module-level constants with a string literal
+  immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
+  ```python
+  MY_CONST: Final[str] = "value"
+  """One-line summary.
+
+  Optional further detail.
+  """
+  ```
 - `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
 - All function signatures must have complete type hints including return types.
+- All consts must be marked with the maximally "constant" type. 
+  e.g. `CONST_SEQ: Final[tuple[str, ...]] = ("a", "b")` or `FOO: Final[str] = "bar"`
 - Never relax an existing test to make it pass.
 
 ### Polars Style
