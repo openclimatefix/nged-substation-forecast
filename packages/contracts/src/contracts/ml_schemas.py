@@ -338,3 +338,22 @@ class Metrics(pt.Model):
             "Null for 'ad_hoc' rows, which have no MLflow run."
         ),
     )
+
+
+class EligibleTimeSeries(pt.Model):
+    """The canonical per-fold population of eligible ``time_series_id``s.
+
+    Written by the ``eligible_time_series`` Dagster asset (one Delta partition per ``fold_id``)
+    and read by ``trained_cv_model`` and ``cv_power_forecasts``. Eligibility is a function of
+    data coverage and the fold dates **only** — never the model or experiment config — so every
+    experiment trains and scores a fold on the identical population, which is what makes
+    leaderboard comparisons apples-to-apples.
+
+    One row per eligible ``(fold_id, time_series_id)``.
+    """
+
+    fold_id: str = pt.Field(
+        dtype=pl.String,
+        description="The CV fold this eligibility row belongs to (e.g. '2022'); the Delta partition key.",
+    )
+    time_series_id: int = _get_time_series_id_dtype()

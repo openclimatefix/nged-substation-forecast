@@ -91,11 +91,28 @@ class Settings(BaseSettings):
         ),
     )
 
+    cv_config_path: Path = Field(
+        default=PROJECT_ROOT / "conf" / "cv" / "default.yaml",
+        description=(
+            "Path to the canonical cross-validation fold definitions. These folds are the"
+            " shared leaderboard evaluation protocol; read them from here, never hard-coded."
+        ),
+    )
+
     # Paths to the data we manage
     nged_data_path: Path = PROJECT_ROOT / "data" / "NGED"
     nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
     power_forecasts_data_path: Path = PROJECT_ROOT / "data" / "power_forecasts"
     forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
+    eligible_time_series_data_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "eligible_time_series",
+        description=(
+            "Delta table of the canonical per-fold eligible time_series_id population, written"
+            " by the eligible_time_series asset (partitioned by fold_id) and read by"
+            " trained_cv_model and cv_power_forecasts so every experiment scores a fold on the"
+            " identical, experiment-independent population."
+        ),
+    )
     trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
     h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
     model_cache_base_path: Path = Field(
