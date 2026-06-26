@@ -38,7 +38,7 @@ class RegisterExperimentConfig(Config):
     config_overrides: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Hydra-style key-value overrides applied on top of the base YAML's model_params,"
+            "Key-value overrides merged onto the base YAML's model_params,"
             " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}."
         ),
     )
@@ -59,21 +59,23 @@ def _resolve_forecaster_config(
 ) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
     """Build the concrete forecaster class + config from a model YAML and overrides.
 
-    Loads the base model YAML, applies the Hydra-style ``config_overrides`` onto its
-    ``model_params``, then instantiates the ``BaseForecasterConfig`` subclass via Hydra. The
-    forecaster class is resolved too, for its ``MODEL_NAME`` (used as the ``model_family`` tag).
+    Loads the base model YAML, merges ``config_overrides`` onto its ``model_params``, then
+    instantiates the ``BaseForecasterConfig`` subclass via Hydra. The forecaster class is resolved
+    too, for its ``MODEL_NAME`` (used as the ``model_family`` tag).
 
     Args:
         base_model_config: Path relative to ``PROJECT_ROOT`` of the base model YAML.
-        config_overrides: Dotted-key overrides applied onto ``model_params``.
+        config_overrides: Overrides merged onto ``model_params`` (whole-value replacement; lists
+            are replaced, not extended).
         experiment_name: Stamped onto the resolved config's ``experiment_name`` field.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple.
     """
-    cfg = OmegaConf.load(PROJECT_ROOT / base_model_config)
-    for key, value in config_overrides.items():
-        OmegaConf.update(cfg.model_params, key, value, merge=False, force_add=True)
+    cfg = OmegaConf.merge(
+        OmegaConf.load(PROJECT_ROOT / base_model_config),
+        {"model_params": config_overrides},
+    )
     forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(cfg._target_))
     forecaster_config: BaseForecasterConfig = hydra.utils.instantiate(cfg.model_params)
     forecaster_config.experiment_name = experiment_name
