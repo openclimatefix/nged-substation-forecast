@@ -116,11 +116,9 @@ class RollingFeature(BaseLookbackFeature):
     # _apply_rolling_mean_feature). All of these are null-skipping, so they preserve the
     # cross-mode invariant documented on that function; a row-count-based agg (.len()) would not.
     #
-    # TODO (separate concern): Implement "Latest Available Rolling Mean anchored to T_init" to
+    # TODO: (separate concern) Implement "Latest Available Rolling Mean anchored to T_init" to
     # allow non-leaky rolling *power* features (e.g. mean of the most recent 24h of observed power,
-    # broadcast to every forecast horizon). This follows the Option-B pattern (source from the
-    # dense observed-power series, anchored at power_fcst_init_time), NOT the nwp_init_time
-    # grouping used for weather. Power rolling stays forbidden until then.
+    # broadcast to every forecast horizon). Power rolling stays forbidden until then.
 
     SUFFIX: ClassVar[str] = "rolling_mean"
 
