@@ -390,16 +390,17 @@ does **not** use `mlflow.pyfunc`, the model registry, or custom flavors (those r
 2. **Consistency with the Milestone 1 report**, which states MLflow stores the trained model
    weights (report p.35).
 
-**Two small helpers** (in the model-store module, §5.2) give one consistent path:
+**Two concrete `BaseForecaster` methods** (§5.2) give one consistent path. They sit on the base
+class and delegate to each subclass's own disk `save`/`load`, so subclasses stay MLflow-free:
 
-- `save_model(forecaster, run_id)` — `forecaster.save(tmp_dir)` (unchanged: `.ubj` per
+- `forecaster.save_to_mlflow(run_id)` — `self.save(tmp_dir)` (unchanged: `.ubj` per
   `time_series_id` + `meta.json`), then `mlflow.log_artifacts(tmp_dir, artifact_path="model")`
   onto the run resolved by tag.
-- `load_model(run_id, ForecasterClass)` — if `{settings.model_cache_base_path}/{run_id}/`
-  exists, `ForecasterClass.load()` straight from that local cache; otherwise
-  `mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="model")` into the cache,
-  then load. The cache key is the **run ID**, which is immutable, so a cached model never goes
-  stale and never needs invalidation.
+- `ForecasterClass.load_from_mlflow(run_id, cache_base_path)` — if
+  `{cache_base_path}/{run_id}/model` exists, `cls.load()` straight from that local cache;
+  otherwise `mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="model")` into the
+  cache, then load. The cache key is the **run ID**, which is immutable, so a cached model never
+  goes stale and never needs invalidation.
 
 **Production resilience (important):** the local cache is what lets the live service keep
 running even if **MLflow is down**. Once the production model is cached on the App Runner box,
@@ -408,8 +409,8 @@ running even if **MLflow is down**. Once the production model is cached on the A
 therefore be on a persistent volume, or pre-seeded into the container image, so a restart during
 an MLflow outage still finds the model.
 
-`trained_cv_model` calls `save_model`; `cv_power_forecasts` and `live_forecasts` call
-`load_model`. Each already resolves its MLflow run by tag (§4.1.1), so this adds no new
+`trained_cv_model` calls `save_to_mlflow`; `cv_power_forecasts` and `live_forecasts` call
+`load_from_mlflow`. Each already resolves its MLflow run by tag (§4.1.1), so this adds no new
 coordination — only an artifact upload/download around code that already runs.
 
 ### 4.5.1 Eligible Time Series (canonical per-fold population)
@@ -464,9 +465,9 @@ Per materialisation:
    get_or_create_experiment(experiment_name)`, `parent_run_id =
    get_or_create_parent_run(experiment_id)`, `fold_run_id =
    get_or_create_fold_run(experiment_id, parent_run_id, fold_id)`.
-8. `save_model(forecaster, fold_run_id)` (§4.5: writes locally, then `log_artifacts` to the run).
-   Open the run with `mlflow.start_run(run_id=fold_run_id)`, log training params, and close it
-   within this process — do **not** pass the handle or run ID to `cv_power_forecasts`
+8. `forecaster.save_to_mlflow(fold_run_id)` (§4.5: writes locally, then `log_artifacts` to the
+   run). Open the run with `mlflow.start_run(run_id=fold_run_id)`, log training params, and close
+   it within this process — do **not** pass the handle or run ID to `cv_power_forecasts`
    (which re-resolves the same run by tag).
 9. Emit Dagster output metadata: n_time_series, train date range, `fold_run_id`.
 
@@ -481,7 +482,8 @@ Per materialisation:
 
 1. Parse `context.partition_key` → `experiment_name`, `fold_id`.
 2. Fetch config from MLflow (same as above).
-3. Resolve `fold_run_id` by tag (§4.1.1), then `load_model(fold_run_id, ForecasterClass)`
+3. Resolve `fold_run_id` by tag (§4.1.1), then
+   `ForecasterClass.load_from_mlflow(fold_run_id, settings.model_cache_base_path)`
    (§4.5: local cache hit, or download artifacts from the fold run on a miss).
 4. Load `power_lf` and `nwp_lf` filtered to `[fold.val_start, fold.val_end]` **and** to the
    model's `trained_time_series_ids` (from `meta.json`, §4.5.1) — so the scored population is
@@ -680,10 +682,11 @@ partitions_def: TimeWindowPartitionsDefinition(cron="0 0,6,12,18 * * *", ...)
 deps: [ecmwf_ens, power_time_series_and_metadata]
 ```
 
-- Loads the production model via `load_model(settings.production_model_run_id, ...)` (§4.5):
-  served from the local cache, so the live service keeps running even if MLflow is down (only a
-  cache miss contacts MLflow). The class is inferred from a `model_class` field stored alongside
-  the saved model (already part of `BaseForecaster.save()`'s `meta.json`).
+- Loads the production model via
+  `ForecasterClass.load_from_mlflow(settings.production_model_run_id, settings.model_cache_base_path)`
+  (§4.5): served from the local cache, so the live service keeps running even if MLflow is down
+  (only a cache miss contacts MLflow). The class is inferred from a `model_class` field stored
+  alongside the saved model (already part of `BaseForecaster.save()`'s `meta.json`).
 - Forecasts **only** the `trained_time_series_ids` recorded in the production model's
   `meta.json` (§4.5.1) — never a series the production model has not seen.
 - Runs **single-run inference** (`engineer_features(power_fcst_init_time=t0, …)`) across **all
@@ -843,9 +846,10 @@ the model is downloaded from that MLflow run into the local cache, then served f
   definitions separate from asset definitions.
 - `packages/ml_core/src/ml_core/_mlflow_runs.py` — the three idempotent run-resolution helpers
   (§5.6). Single concern: resolving MLflow runs by tag.
-- `packages/ml_core/src/ml_core/_model_store.py` — the `save_model` / `load_model` artifact
-  helpers + local cache (§4.5). Single concern: getting model binaries to/from MLflow + disk.
-  (Kept separate from `_mlflow_runs.py` so each module is single-purpose.)
+- The MLflow artifact persistence (`save_to_mlflow` / `load_from_mlflow` + local cache, §4.5)
+  lives as **concrete methods on `BaseForecaster`** (`packages/ml_core/.../base_forecaster.py`),
+  delegating to each subclass's disk `save`/`load`. No separate module: the methods belong with
+  the model interface, and subclasses stay MLflow-free.
 - `packages/ml_core/src/ml_core/_cv_helpers.py` — pure, data-only CV helpers, each
   independently unit-tested (§5.8): `training_window(fold)`, `eligible_time_series_ids(coverage,
   fold, min_training_months)`, `_parse_cv_partition_key`, `flatten_config(config)`, and the
@@ -901,13 +905,13 @@ mlflow.start_run(run_id=...)                        # resume an existing run by 
 mlflow.set_tag("cv_role", ...); mlflow.set_tag("fold_id", ...)
 mlflow.log_params({...})
 mlflow.log_metrics({...})
-mlflow.log_artifacts(local_dir, artifact_path="model")        # save_model (§4.5)
-mlflow.artifacts.download_artifacts(run_id=..., artifact_path="model")  # load_model (§4.5)
+mlflow.log_artifacts(local_dir, artifact_path="model")        # save_to_mlflow (§4.5)
+mlflow.artifacts.download_artifacts(run_id=..., artifact_path="model")  # load_from_mlflow (§4.5)
 ```
 
 All run creation and lookup is funnelled through the §5.6 helpers; assets never call
 `search_runs` / `create_experiment` directly. Artifact upload/download is funnelled through the
-`save_model` / `load_model` helpers (§4.5, §5.2).
+`BaseForecaster.save_to_mlflow` / `load_from_mlflow` methods (§4.5, §5.2).
 
 **Not** in scope: `mlflow.pyfunc`, model registry, registry-based model promotion.
 
@@ -994,7 +998,7 @@ mistake.
   `live` `t0` and the monitoring 24h/7d windows are deterministic and testable.
 - An integration marker (e.g. `@pytest.mark.integration`) so the pure-unit suite stays fast.
 
-**Unit tests (pure, no I/O) — in `_cv_helpers.py` / `_model_store` / forecasters:**
+**Unit tests (pure, no I/O) — in `_cv_helpers.py` / forecasters:**
 - `training_window(fold)` — **inclusive end-of-day** `[train_start 00:00:00, train_end
   23:59:59]`; explicitly covers the `train_end` bug fix and the train/val boundary (§5.1).
 - `eligible_time_series_ids(coverage, fold, min_training_months)` — migrate
@@ -1016,8 +1020,9 @@ mistake.
 **Component/integration tests (file-based MLflow + temp Delta):**
 - `_mlflow_runs` get-or-create **idempotency**: calling twice returns the *same* run id;
   parent/fold runs resolve by tag.
-- `_model_store`: `save_model` → `load_model` round-trip; **cache hit vs miss** (download once,
-  then served from local cache; survives a simulated MLflow outage when cached).
+- `BaseForecaster` MLflow persistence: `save_to_mlflow` → `load_from_mlflow` round-trip; **cache
+  hit vs miss** (download once, then served from local cache; survives a simulated MLflow outage
+  when cached).
 - `register_experiment_job`: creates the experiment + parent run + grouping tags + the right
   partition keys (from `conf/cv/default.yaml`); idempotent on re-registration.
 - `retire_experiment_job`: **refuses** to delete when results are absent; deletes only when both
@@ -1219,26 +1224,55 @@ lagged power.
 
 ### 7.3 Phase 3 — MLflow run resolution, model store, `register_experiment_job`
 
-- `_mlflow_runs.py` (§5.6), `_model_store.py` (§4.5), `register_experiment_job` /
-  `RegisterExperimentConfig`, and the `cv_experiment_folds` `DynamicPartitionsDefinition` (§4.3).
-- Tests: get-or-create **idempotency** against a file-based MLflow; `save_model`/`load_model`
-  round-trip + cache hit/miss; register job creates experiment + parent run + grouping tags + the
-  right partition keys (§5.8).
+- `_mlflow_runs.py` (§5.6), the `BaseForecaster.save_to_mlflow` / `load_from_mlflow` methods
+  (§4.5), `register_experiment_job` / `RegisterExperimentConfig`, and the `cv_experiment_folds`
+  `DynamicPartitionsDefinition` (§4.3).
+- Tests: get-or-create **idempotency** against a file-based MLflow;
+  `save_to_mlflow`/`load_from_mlflow` round-trip + cache hit/miss; register job creates experiment
+  + parent run + grouping tags + the right partition keys (§5.8).
 - **User can verify:** run `register_experiment_job` from the Dagster UI/CLI; see the MLflow
   experiment + parent run (config params + grouping tags) appear, and the new `__2022…` keys show
   up in the `cv_experiment_folds` partition set.
 
+### 7.3.1 Phase 3.5 - Re-consider CV folds
+
+- The design currently specifies that we should use yearly CV folds, with expanding training
+  horizons. The validation years will be 2022, 2023, 2024, and 2025. But I'm worried we may not have
+  enough data for this approach. At least, not yet.
+- Facts to consider:
+    - Dynamical.org currently only provides ECMWF back to 2024-04-01. Dynamical.org are actively
+      backfilling. But the backfill will take months.
+    - Later in the project, we have to ingest CERRA (a European re-analysis) dataset anyway. So we
+      could ingest CERRA soon, and use CERRA to train on times before 2024-04-01. But then we
+      wouldn't be training on a weather _forecast_, so the validation results for 2022, 2023, and
+      2024 would be misleading.
+    - Only 22 of the 32 time series for the trial area have data going back to 2020-01-01 (see plot
+      in Milestone 1 report)
+- Some options I can think of:
+    - **A: Current plan: Just use a single fold for now:** Continue with the current plan. Only use ECMWF ENS. For now, we'll only be able to use a
+      "temporary fold" that trains on the 12 months from 2024-04-01, and tests on the 12 months from
+      2025-04-01. That feels fine for a MVP. The main issue is that it only gives us one fold.
+    - **B: Monthly CV:** Similar to option A, but we "buy" the ability to have multiple folds by
+      expanding the training window by **1 month** per fold. e.g.:
+         - fold 1: train on 12 months from 2024-04-01. Test on 12 months from 2025-04-01.
+         - fold 2: train on 13 months from 2024-04-01. Test on 12 months from 2025-05-01.
+         - fold 3: train on 14 months from 2024-04-01. Test on 12 months from 2025-06-01.
+    - **C: Stick with yearly folds. Use CERRA for folds before 2024-04-01.***
+- Later in the project, when we're really optimising for performance, we will want to try
+  "pre-training" on weather re-analysis datasets, so we can make full use of the long power time
+  series we have for some (but not all) assets.
+
 ### 7.4 Phase 4 — `trained_cv_model` asset
 
 - Implement §4.6 (read config from MLflow, read eligible set, `engineer_features`, `train`,
-  `save_model`, log training params to the fold run).
+  `save_to_mlflow`, log training params to the fold run).
 - Tests: integration test materialising one fold (uses Phases 2 + 3).
 - **User can verify:** register a `smoke_test` experiment, materialise `trained_cv_model` for the
   `__2022` partition; see the model artifact + fold run with training params in MLflow.
 
 ### 7.5 Phase 5 — `cv_power_forecasts` asset
 
-- Implement §4.7 (`load_model`, predict on **all 51 members** for the model's
+- Implement §4.7 (`load_from_mlflow`, predict on **all 51 members** for the model's
   `trained_time_series_ids`, **idempotent partition overwrite** into `power_forecasts`, log
   prediction metrics to the fold run). **Delete the old monolithic `cv_power_forecasts`.**
 - Tests: materialise predict for the smoke-test fold; **idempotency** (materialise twice →
@@ -1262,8 +1296,8 @@ lagged power.
 
 ### 7.7 Phase 7 — `live_forecasts` asset
 
-- Implement §4.9 (`load_model` from cache by `production_model_run_id`, single-run inference on 51
-  members in `live`/`replay`, forecast only `trained_time_series_ids`, idempotent overwrite,
+- Implement §4.9 (`load_from_mlflow` from cache by `production_model_run_id`, single-run inference
+  on 51 members in `live`/`replay`, forecast only `trained_time_series_ids`, idempotent overwrite,
   `fold_id="live"`).
 - Tests: `live` vs `replay` select different NWP runs; trained-IDs-only; 51 members; idempotency.
 - **User can verify:** set `production_model_run_id` to a model from Phase 4, materialise

@@ -30,11 +30,10 @@ folds:
     val_start:   "2025-01-01"
     val_end:     "2025-12-31"
 
-  - fold_id: "2026"
-    train_start: "2020-01-01"
-    train_end:   "2025-12-31"
-    val_start:   "2026-01-01"
-    val_end:     "2026-12-31"
+# Complete years only: a fold may only validate once its year has finished and the NGED data has
+# landed, otherwise it would validate on partial data and corrupt the mean-across-folds
+# leaderboard. Add "2026" here once 2026 is over. (FoldId in power_schemas.py still lists "2026"
+# as a valid future value.)
 
 # Minimum months of observations before val_start for a time series to be eligible.
 min_training_months: 6

@@ -1,11 +1,16 @@
+import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import ClassVar, Self
+from typing import ClassVar, Final, Self
 
+import mlflow
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from pydantic import BaseModel
+
+_MLFLOW_ARTIFACT_PATH: Final[str] = "model"
+"""Sub-path under an MLflow run's artifact root where the model directory is stored."""
 
 
 class BaseForecasterConfig(BaseModel):
@@ -54,6 +59,11 @@ class BaseForecaster(ABC):
     Subclasses should call `.collect()` exactly once, as late as possible — typically right
     before handing data to the underlying model library. Callers must not collect before passing
     data in; doing so wastes memory and prevents Polars from optimising the full query plan.
+
+    Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
+    format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
+    methods, shared by all subclasses, wrap that disk format with MLflow's artifact store and a
+    local-disk cache, so the same trained model can be shared across machines and served offline.
     """
 
     MODEL_NAME: ClassVar[str]
@@ -72,6 +82,50 @@ class BaseForecaster(ABC):
     def load(cls, path: Path) -> Self:
         """Reconstruct a trained instance from a previously saved directory."""
         pass
+
+    def save_to_mlflow(self, run_id: str) -> None:
+        """Upload this trained model's artifacts to the given MLflow run.
+
+        Writes the model to a temporary directory via ``save`` (the subclass's own format), then
+        uploads that directory to the run's artifact store under ``model/``. The caller is
+        responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+
+        Args:
+            run_id: The MLflow run to attach the artifacts to.
+        """
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self.save(Path(tmp_dir))
+            with mlflow.start_run(run_id=run_id):
+                mlflow.log_artifacts(tmp_dir, artifact_path=_MLFLOW_ARTIFACT_PATH)
+
+    @classmethod
+    def load_from_mlflow(cls, run_id: str, cache_base_path: Path) -> Self:
+        """Load a trained model for ``run_id``, serving from the local cache when possible.
+
+        On a cache hit (``{cache_base_path}/{run_id}/model`` already exists) the model is loaded
+        straight from disk and MLflow is never contacted — this is what lets the live service keep
+        serving during an MLflow outage. On a cache miss the artifacts are downloaded from the run
+        into the cache, then loaded. The cache key is the immutable run ID, so a cached model never
+        goes stale. The caller sets the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+
+        Args:
+            run_id: The MLflow run the model was saved under.
+            cache_base_path: Root of the local cache; the model lives at
+                ``{cache_base_path}/{run_id}``.
+
+        Returns:
+            The reconstructed, trained forecaster.
+        """
+        run_cache_dir = cache_base_path / run_id
+        model_dir = run_cache_dir / _MLFLOW_ARTIFACT_PATH
+        if not model_dir.exists():
+            run_cache_dir.mkdir(parents=True, exist_ok=True)
+            mlflow.artifacts.download_artifacts(
+                run_id=run_id,
+                artifact_path=_MLFLOW_ARTIFACT_PATH,
+                dst_path=str(run_cache_dir),
+            )
+        return cls.load(model_dir)
 
     @abstractmethod
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
