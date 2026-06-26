@@ -2,38 +2,21 @@
 # All models MUST be evaluated against these exact folds so leaderboard comparisons
 # are apples-to-apples.  Change these only when founding a new leaderboard epoch.
 #
-# Training always starts from 2020-01-01 (earliest available NGED trial data).
-# Each fold adds one calendar year of training data and validates on the next year.
+# Current state: a single MVP fold. Honest forecast-skill validation needs real forecast NWP
+# (ECMWF ENS) for both training and validation, and our ECMWF ENS archive only reaches back to
+# 2024-04-01 (Dynamical.org are backfilling earlier years, but slowly). So we train on the longest
+# honest window we have and validate on the following 12 months.
+#
+# Once Dynamical.org has backfilled ECMWF ENS to earlier years, we will move to the target
+# multiple-yearly-fold protocol (expanding training window, one validation year per fold) via a new
+# leaderboard epoch.  See docs/ml_experimentation/cross-validation-folds.md.
 
 folds:
-  - fold_id: "2022"
-    train_start: "2020-01-01"
-    train_end:   "2021-12-31"
-    val_start:   "2022-01-01"
-    val_end:     "2022-12-31"
-
-  - fold_id: "2023"
-    train_start: "2020-01-01"
-    train_end:   "2022-12-31"
-    val_start:   "2023-01-01"
-    val_end:     "2023-12-31"
-
-  - fold_id: "2024"
-    train_start: "2020-01-01"
-    train_end:   "2023-12-31"
-    val_start:   "2024-01-01"
-    val_end:     "2024-12-31"
-
-  - fold_id: "2025"
-    train_start: "2020-01-01"
-    train_end:   "2024-12-31"
-    val_start:   "2025-01-01"
-    val_end:     "2025-12-31"
-
-# Complete years only: a fold may only validate once its year has finished and the NGED data has
-# landed, otherwise it would validate on partial data and corrupt the mean-across-folds
-# leaderboard. Add "2026" here once 2026 is over. (FoldId in power_schemas.py still lists "2026"
-# as a valid future value.)
+  - fold_id: "mid_2025_to_mid_2026"
+    train_start: "2024-04-01"
+    train_end:   "2025-06-30"
+    val_start:   "2025-07-01"
+    val_end:     "2026-06-30"
 
 # Minimum months of observations before val_start for a time series to be eligible.
 min_training_months: 6

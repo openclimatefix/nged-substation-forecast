@@ -1,7 +1,6 @@
 from datetime import date
 
 import pytest
-from pydantic import ValidationError
 from contracts.hydra_schemas import (
     CvConfig,
     CvFoldConfig,
@@ -41,19 +40,6 @@ def test_cv_fold_config_valid():
     )
     assert fold.fold_id == "2022"
     assert fold.val_end == date(2022, 12, 31)
-
-
-def test_cv_fold_config_invalid_fold_id():
-    with pytest.raises(ValidationError):
-        CvFoldConfig.model_validate(
-            {
-                "fold_id": "9999",  # not in FoldId Literal
-                "train_start": date(2020, 1, 1),
-                "train_end": date(2021, 12, 31),
-                "val_start": date(2022, 1, 1),
-                "val_end": date(2022, 12, 31),
-            }
-        )
 
 
 def test_cv_config_valid():
@@ -112,6 +98,6 @@ def test_cv_config_get_fold_unknown_raises():
 def test_load_cv_config_reads_canonical_yaml():
     """The canonical conf/cv/default.yaml loads, validates, and coerces dates."""
     config = load_cv_config(PROJECT_ROOT / "conf" / "cv" / "default.yaml")
-    assert config.fold_ids[0] == "2022"
+    assert config.fold_ids[0] == "mid_2025_to_mid_2026"
     assert config.min_training_months == 6
-    assert config.get_fold("2022").train_start == date(2020, 1, 1)
+    assert config.get_fold("mid_2025_to_mid_2026").train_start == date(2024, 4, 1)

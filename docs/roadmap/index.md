@@ -7,11 +7,19 @@ This roadmap outlines the planned order of development toward the v1.0 live fore
 > 🚧 **Planned** — designed, not yet built ·
 > 🔬 **Research** — exploratory / v2.
 
+## How this folder is organised
+
+`docs/roadmap/` contains **only design for work that is not yet implemented**. It is a
+forward-looking backlog, never a mirror of the code. When a feature ships, its documentation
+**moves out** of `roadmap/` to its permanent home — `architecture/` for system design,
+[`ml_experimentation/`](../ml_experimentation/index.md) for ML methodology, and so on — and the
+roadmap entry shrinks to a one-line pointer. This keeps the roadmap from going stale and gives
+each implemented feature a single, durable home.
+
 ## Design documents
 
 This folder captures the detailed technical plans from the Milestone 1 report, so they can be
-pointed at when the time comes to implement them. Each doc marks clearly what is implemented vs.
-planned.
+pointed at when the time comes to implement them.
 
 - [Delivery tables](delivery-tables.md) — the five Delta Lake tables OCF delivers to NGED
   (`power_forecast`, `power_forecast_warnings`, `asset_health_history`, `effective_capacity`,

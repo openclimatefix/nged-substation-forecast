@@ -28,6 +28,9 @@ nav:
       - Philosophy: architecture/philosophy.md
       - Overview: architecture/overview.md
       - Code Style: architecture/code-style.md
+  - ML Experimentation:
+      - Overview: ml_experimentation/index.md
+      - Cross-validation folds: ml_experimentation/cross-validation-folds.md
   - Roadmap:
       - Overview: roadmap/index.md
       - Delivery Tables: roadmap/delivery-tables.md
