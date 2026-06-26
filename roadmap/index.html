@@ -1,0 +1,1572 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../ml_experimentation/cross-validation-folds/">
+      
+      
+        <link rel="next" href="delivery-tables/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Overview - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Overview
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-this-folder-is-organised" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How this folder is organised
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v01-naive-mvp-internal-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1 — "Naive" MVP (internal only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v02-code-quality-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.2 — Code Quality &amp; Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v03-leaderboard-performance-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.3 — Leaderboard / Performance Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v04-improved-automatic-data-cleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.4 — Improved Automatic Data Cleaning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v05-xgboost-upgrades-quick-wins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.5 — XGBoost Upgrades ("Quick Wins")
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v06-v07-switching-events-dynamic-generator-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.6 &amp; v0.7 — Switching Events &amp; Dynamic Generator Capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v10-stable-live-service-for-ngeds-trial-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0 — Stable Live Service for NGED's Trial Area
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v20-scale-up-future-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.0 — Scale-Up (Future Research)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-this-folder-is-organised" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How this folder is organised
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Design documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v01-naive-mvp-internal-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1 — "Naive" MVP (internal only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v02-code-quality-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.2 — Code Quality &amp; Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v03-leaderboard-performance-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.3 — Leaderboard / Performance Analysis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v04-improved-automatic-data-cleaning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.4 — Improved Automatic Data Cleaning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v05-xgboost-upgrades-quick-wins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.5 — XGBoost Upgrades ("Quick Wins")
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v06-v07-switching-events-dynamic-generator-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.6 &amp; v0.7 — Switching Events &amp; Dynamic Generator Capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v10-stable-live-service-for-ngeds-trial-area" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0 — Stable Live Service for NGED's Trial Area
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v20-scale-up-future-research" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.0 — Scale-Up (Future Research)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="roadmap">Roadmap</h1>
+<p>This roadmap outlines the planned order of development toward the v1.0 live forecast release (January 2027) and beyond. It reflects the plan as of the Milestone 1 report (28 May 2026). Technical plans change as we learn more — treat this as a best-estimate, not a guarantee.</p>
+<blockquote>
+<p><strong>Status legend</strong> (used throughout these design docs):
+✅ <strong>Implemented</strong> — exists in code today ·
+🚧 <strong>Planned</strong> — designed, not yet built ·
+🔬 <strong>Research</strong> — exploratory / v2.</p>
+</blockquote>
+<h2 id="how-this-folder-is-organised">How this folder is organised</h2>
+<p><code>docs/roadmap/</code> contains <strong>only design for work that is not yet implemented</strong>. It is a
+forward-looking backlog, never a mirror of the code. When a feature ships, its documentation
+<strong>moves out</strong> of <code>roadmap/</code> to its permanent home — <code>architecture/</code> for system design,
+<a href="../ml_experimentation/"><code>ml_experimentation/</code></a> for ML methodology, and so on — and the
+roadmap entry shrinks to a one-line pointer. This keeps the roadmap from going stale and gives
+each implemented feature a single, durable home.</p>
+<h2 id="design-documents">Design documents</h2>
+<p>This folder captures the detailed technical plans from the Milestone 1 report, so they can be
+pointed at when the time comes to implement them.</p>
+<ul>
+<li><a href="delivery-tables/">Delivery tables</a> — the five Delta Lake tables OCF delivers to NGED
+  (<code>power_forecast</code>, <code>power_forecast_warnings</code>, <code>asset_health_history</code>, <code>effective_capacity</code>,
+  <code>substation_switching</code>), with full field-level schemas.</li>
+<li><a href="forecast-building-blocks/">Forecast building blocks</a> — "normal" vs. "prevailing conditions"
+  forecasts, sign conventions, and worked examples.</li>
+<li><a href="metrics-and-leaderboard/">Metrics &amp; leaderboard</a> — cross-fold validation protocol, evaluation
+  metrics, horizon time-slices, and leaderboard grouping tags.</li>
+<li><a href="data-sources/">Data sources</a> — NGED power data + supporting files, network topology, and the
+  weather datasets (ECMWF ENS, CERRA, CM SAF).</li>
+<li><a href="differentiable-physics/">Differentiable Physics</a> — DP for effective-capacity estimation of
+  metered generators (v1), and graph-structured disaggregation of net substation power into latent
+  demand and DER generation (v2).</li>
+<li><a href="switching-events/">Switching events</a> — the canonical treatment of switching events and
+  estimating latent demand under the normal running arrangement: the v0.6 unsupervised statistical
+  detector and the v2 mixture models (the graph is a data structure, not a GNN).</li>
+<li><a href="disaggregation-evaluation/">Disaggregation evaluation</a> — the multi-pronged evaluation protocol
+  for the no-clean-ground-truth disaggregation problem (v2).</li>
+<li><a href="encoders/">Encoders</a> — shared learned encoder modules (WeatherEncoder, TimeEncoder) and why they
+  pair naturally with differentiable physics (v2).</li>
+</ul>
+<p>The timeline below shows the order in which this work is planned.</p>
+<hr />
+<h2 id="v01-naive-mvp-internal-only">v0.1 — "Naive" MVP (internal only)</h2>
+<p><strong>Goal</strong>: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a baseline. Intentionally does not detect switching events or estimate effective capacity — hence "naive" (assumes the grid is always in perfect health).</p>
+<p><strong>Data engineering</strong>:
+- Download ECMWF ENS NWP from Dynamical.org; convert to Delta Lake with H3 spatial indexes on S3 ✓
+- Download NGED data from S3; convert to Delta Lake with H3 spatial indexes ✓
+- Automatic data cleaning:
+    - Remove isolated zeros in non-zero time series
+    - Remove values more than N standard deviations from the mean
+    - Remove "stuck" values (std dev near zero over a 24-hour rolling window)
+    - Drop first ~2 months of each time series (poor quality during meter ramp-up)</p>
+<p><strong>Software engineering</strong>:
+- Universal model interface (<code>BaseForecaster</code>) for all ML models ✓
+- Orchestrate everything with Dagster: data ingestion, model training, inference, backtesting ✓</p>
+<p><strong>ML model</strong>:
+- Separate XGBoost model per <code>time_series_id</code> ✓
+- Train on the ECMWF control ensemble member; run inference on all 51 members ✓
+- Features: ECMWF ENS NWP variables, derived weather features (e.g. wind chill), lagged power (7 and 14 days ago), datetime features (<code>hour_of_day</code>, <code>day_of_week</code>, <code>day_of_month</code>, <code>day_of_year</code>, <code>is_weekend</code>, <code>is_bank_holiday</code>, <code>is_christmas</code>, <code>is_easter</code>, <code>utc_offset</code>, <code>forecast_horizon</code>)
+- Output: ensemble of 51 half-hourly power forecasts per <code>time_series_id</code>, scaled to [−1, +1], on a 14-day horizon
+- Static capacity estimate: 99th percentile of observed power as a simple proxy</p>
+<p><strong>Outputs</strong> (Delta tables on S3):
+- <code>power_forecast</code>
+- <code>power_forecast_warnings</code>
+- <code>asset_health_history</code></p>
+<hr />
+<h2 id="v02-code-quality-documentation">v0.2 — Code Quality &amp; Documentation</h2>
+<ul>
+<li>More unit tests</li>
+<li>CI on GitHub</li>
+<li>Improve documentation</li>
+<li>Verify daylight savings time handling is correct</li>
+</ul>
+<hr />
+<h2 id="v03-leaderboard-performance-analysis">v0.3 — Leaderboard / Performance Analysis</h2>
+<ul>
+<li>Implement the ML energy forecasting "leaderboard" (cross-fold validation metrics in MLflow), ready for systematic ML experimentation ✓ (CV assets added)</li>
+<li>Metrics: normalised MBE, normalised MAE, RMSE, Pinball loss, PICP, CRPS, Spread-Skill Ratio</li>
+<li>Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range (Day 8–14), peak events (top 5%)</li>
+</ul>
+<hr />
+<h2 id="v04-improved-automatic-data-cleaning">v0.4 — Improved Automatic Data Cleaning</h2>
+<ul>
+<li>More sophisticated automatic cleaning of NGED's power data (building on the basic cleaning in v0.1)</li>
+</ul>
+<hr />
+<h2 id="v05-xgboost-upgrades-quick-wins">v0.5 — XGBoost Upgrades ("Quick Wins")</h2>
+<p>Establish a strong XGBoost baseline before investing in capacity estimation and switching event detection.</p>
+<p>Ideas to test (informed by literature review):</p>
+<ul>
+<li>Train a "global" XGBoost model across each category of time series (e.g. one model for all MW primary substations, one for all MVA primaries, one per generator type) instead of one model per <code>time_series_id</code></li>
+<li>Train separate XGBoost models per forecast horizon window (e.g. 0–2 days, 2–7 days, 7–14 days)</li>
+<li>Train on all 51 NWP ensemble members (may require XGBoost's iterator API to handle data that doesn't fit in RAM)</li>
+<li>Pre-train XGBoost on CERRA reanalysis (which covers 2020–2024, before our ECMWF dataset starts), then fine-tune on ECMWF ENS</li>
+</ul>
+<p><strong>Automated experimentation ("auto-research")</strong>:</p>
+<p>Once the leaderboard (v0.3) is stable, we plan to drive hyperparameter and feature search with an LLM agent in the style of Karpathy's "auto-research": the agent programmatically registers experiments, materialises them, reads the MLflow leaderboard, and iterates — with no human in the loop and no Dagster UI in the path. (This may have to wait until v2).</p>
+<p>The ML-assets architecture is designed to support this from day one (programmatic experiment registration, MLflow as a machine-readable leaderboard, a manual retirement job to prune the experiment catalogue). The one piece to add when we start is a thin Python/CLI surface for "fetch the aggregate leaderboard metrics for experiment X" so the agent reads results without scraping the UI.</p>
+<hr />
+<h2 id="v06-v07-switching-events-dynamic-generator-capacity">v0.6 &amp; v0.7 — Switching Events &amp; Dynamic Generator Capacity</h2>
+<p><em>Internal only for first month, then shared with NGED.</em></p>
+<p><strong>Switching events</strong>:
+- Detect "abnormal running arrangement" events from the power time series alone, using statistical methods
+- Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
+- Populate the <code>substation_switching</code> Delta table</p>
+<p><strong>Dynamic effective capacity estimation for <em>metered</em> generators (<a href="differentiable-physics/">differentiable physics</a>)</strong>:
+- Implement a basic <a href="differentiable-physics/">differentiable physics (DP)</a> model for the <em>metered</em> wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is <strong>Phase 1</strong> of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly <strong>not</strong> in scope here — that is v2 research.
+- Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
+- Ingest additional weather datasets needed for capacity estimation:
+    - <strong>CERRA</strong> (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
+    - <strong>CM SAF</strong> (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity
+- Populate the <code>effective_capacity</code> Delta table</p>
+<p><strong>Dynamic effective capacity estimation for substations</strong>:
+- For now, while we're forecasting substations top-down, just use the 99th percentile per year as
+  the effective capacity. Later, in v2, the system should already capture everything we need to
+  know about substation capacity, as a function of all the things that drive the substation's
+  behaviour.</p>
+<p><strong>"Prevailing conditions" building block</strong>:
+- Produce example Python code for NGED to construct a "prevailing conditions" forecast from OCF's building blocks</p>
+<hr />
+<h2 id="v10-stable-live-service-for-ngeds-trial-area">v1.0 — Stable Live Service for NGED's Trial Area</h2>
+<p><strong>Target: January 2027</strong></p>
+<ul>
+<li>All features listed above (v0.1–v0.7), plus fixes discovered during live running</li>
+<li>32 time series in the NGED trial area: 16 primary substations, 6 solar PV farms, 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, 1 reciprocating gas generator</li>
+<li>Five Delta Lake output tables delivered to NGED every 6 hours:<ol>
+<li><code>power_forecast</code> — [−1, +1] ensemble power forecasts</li>
+<li><code>power_forecast_warnings</code> — per-<code>time_series_id</code> warnings (HEALTHY, MISSING VALUE, STUCK TIMESERIES, INVALID TIMESERIES VALUE, GENERATOR OR CIRCUIT FAULT, GENERATOR REDUCED CAPACITY, SUBSTATION ABNORMAL RUNNING ARRANGEMENT, STALE NWP, STALE POWER)</li>
+<li><code>asset_health_history</code> — complete historical record of each time series's health state</li>
+<li><code>effective_capacity</code> — half-hourly probabilistic generator capacity estimates (mean + std)</li>
+<li><code>substation_switching</code> — estimated power diverted between substation pairs (mean + std)</li>
+</ol>
+</li>
+</ul>
+<hr />
+<h2 id="v20-scale-up-future-research">v2.0 — Scale-Up (Future Research)</h2>
+<p><strong>Required</strong>:
+- Scale to approximately 2,500 time series: all of NGED's primary substations (1,161), BSPs (271), GSPs (52), and most customer meters (~1,000)
+- Estimate the installed capacity of <em>unmetered</em> solar PV and wind on each primary substation (by disaggregating net primary substation power flows)
+- Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs</p>
+<p><strong>Research (advanced ML)</strong>:
+- <strong>Graph-structured disaggregation</strong>: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a <strong>data structure</strong> — a structural prior on who can exchange load and which sites share weather — <em>not</em> a trained graph neural network: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing rather than message passing. A trained GNN remains an optional, residual-driven escalation. (This is <strong>Phase 2</strong> of the DP plan — see <a href="differentiable-physics/#8-scaling-to-the-full-grid-a-graph-structured-dp-engine">Differentiable Physics §8</a> and <a href="switching-events/">Switching events, Part 2</a>.)
+- <strong>Latent-demand recovery under switching</strong>: reconstruct the demand each substation would have metered under the <em>normal running arrangement</em>, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See <a href="switching-events/">Switching events &amp; latent demand</a>.
+- <strong>Pre-trained neural network encoders</strong>: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
+- <strong>Multi-sequence alignment</strong> with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
+- <strong>CRPS training objective</strong>: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
+- <strong>JEPA</strong> (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
+- <strong><a href="differentiable-physics/">Differentiable physics</a> for power forecasting</strong> (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see <a href="differentiable-physics/#8-scaling-to-the-full-grid-a-graph-structured-dp-engine">Differentiable Physics §8</a> and <a href="differentiable-physics/#10-apparent-power-mva-metering">§10</a>)
+- <strong>Additional NWP sources (far from certain that we'll get round to this)</strong>: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history</p>
+<p><strong>Stretch goals</strong>:
+- Forecast <em>unmetered</em> solar and wind power at each primary substation
+- Disaggregate additional DERs (price-sensitive assets like batteries) from substation power flow
+- Estimate cost savings (£) attributable to each forecasting approach in the leaderboard
+- Build a REST API on top of the Delta Lake delivery mechanism</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

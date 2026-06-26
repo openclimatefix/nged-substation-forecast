@@ -1,0 +1,3138 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Dagster ML Assets: Design Plan - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#dagster-ml-assets-design-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Dagster ML Assets: Design Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Philosophy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#functional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operational" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Operational
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-designs-considered-and-rejected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Designs Considered and Rejected
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Designs Considered and Rejected">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-single-cv_power_forecasts-asset-current-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Single cv_power_forecasts Asset (current code)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-dagster-dynamicout-job-no-assets-for-cv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Dagster DynamicOut Job (no assets for CV)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-dagster-assets-with-staticpartitionsdefinition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Dagster Assets with StaticPartitionsDefinition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-one-yaml-config-file-per-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 One YAML Config File Per Experiment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-mlflow-pyfunc-model-registry-for-model-saving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 MLflow Pyfunc / Model Registry for Model Saving
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-mlflow-experiment-id-integer-as-dagster-partition-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 MLflow Experiment ID (Integer) as Dagster Partition Key
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-final-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Final Design
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Final Design">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-key-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Key Concepts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#411-mlflow-run-model-and-cross-process-run-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.1 MLflow Run Model and Cross-Process Run Resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#412-complete-validation-windows-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1.2 Complete Validation Windows Only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-dagster-asset-graph" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Dagster Asset Graph
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-experiment-registration-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Experiment Registration Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#431-experiment-retirement-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3.1 Experiment Retirement Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-config-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Config Storage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-model-artifact-storage-mlflow-artifacts-local-disk-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Model Artifact Storage (MLflow artifacts + local-disk cache)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#451-eligible-time-series-canonical-per-fold-population" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5.1 Eligible Time Series (canonical per-fold population)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-trained_cv_model-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 trained_cv_model Asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#47-cv_power_forecasts-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.7 cv_power_forecasts Asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#48-metrics-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8 metrics Asset
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4.8 metrics Asset">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#481-scheduled-live-service-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8.1 Scheduled live-service monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#482-two-metric-stores-one-division-of-labour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8.2 Two metric stores, one division of labour
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#483-evaluating-data-sources-with-limited-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.8.3 Evaluating data sources with limited history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#49-live_forecasts-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.9 live_forecasts Asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Implementation Notes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Implementation Notes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-required-changes-to-existing-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Required Changes to Existing Code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5.1 Required Changes to Existing Code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#packagesml_coresrcml_corecross_validatepy-the-train_end-bug" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/ml_core/src/ml_core/cross_validate.py (the train_end bug)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagescontractssrccontractspower_schemaspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/contracts/src/contracts/power_schemas.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagescontractssrccontractsml_schemaspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/contracts/src/contracts/ml_schemas.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagesml_coresrcml_corebase_forecasterpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/ml_core/src/ml_core/base_forecaster.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagesml_coresrcml_corecross_validatepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/ml_core/src/ml_core/cross_validate.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagesml_coresrcml_coremetricspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/ml_core/src/ml_core/metrics.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packagescontractssrccontractssettingspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        packages/contracts/src/contracts/settings.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#srcnged_substation_forecastdefsassetspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        src/nged_substation_forecast/defs/assets.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-new-files-to-create" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 New Files to Create
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-what-stays-the-same" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 What Stays the Same
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-partition-key-parsing-convention" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Partition Key Parsing Convention
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-mlflow-minimal-integration-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 MLflow Minimal Integration Scope
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-mlflow-run-resolution-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 MLflow Run-Resolution Helpers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-cross-mode-feature-equivalence-test-the-no-skew-guarantee" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Cross-Mode Feature Equivalence Test (the no-skew guarantee)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-testing-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 Testing Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-known-limitations-and-future-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Known Limitations and Future Work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-implementation-sequence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Implementation Sequence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Implementation Sequence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#70-ground-rules-for-the-implementation-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.0 Ground rules for the implementation agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#701-phase-0-clear-the-decks-do-this-first-completed-in-pr-182" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.0.1 Phase 0 — Clear the decks (do this first) - Completed in PR #182
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#71-phase-1-contracts-settings-pure-helpers-equivalence-test-foundation-completed-in-pr-183" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Phase 1 — Contracts, settings, pure helpers, equivalence test (foundation) - Completed in PR #183
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#715-phase-15-unify-power-lag-source-option-b-completed-in-pr-183" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1.5 Phase 1.5 — Unify power-lag source (Option B) - Completed in PR #183
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-phase-2-eligible_time_series-asset-completed-in-pr-184" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Phase 2 — eligible_time_series asset - Completed in PR #184
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-phase-3-mlflow-run-resolution-model-store-register_experiment_job-completed-in-pr-185" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Phase 3 — MLflow run resolution, model store, register_experiment_job - Completed in PR #185
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#731-phase-35-re-consider-cv-folds-completed-in-pr-186" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3.1 Phase 3.5 - Re-consider CV folds — Completed in PR #186
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-phase-4-trained_cv_model-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Phase 4 — trained_cv_model asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-phase-5-cv_power_forecasts-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Phase 5 — cv_power_forecasts asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#76-phase-6-metrics-asset-leaderboard-ad_hoc-full-cv-loop-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.6 Phase 6 — metrics asset (leaderboard + ad_hoc) → full CV loop works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#77-phase-7-live_forecasts-asset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.7 Phase 7 — live_forecasts asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#78-phase-8-production_monitoring-scope-monitoring_sensor-retire_experiment_job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.8 Phase 8 — production_monitoring scope, monitoring_sensor, retire_experiment_job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#79-phase-9-remaining-rigor-tests-and-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.9 Phase 9 — Remaining rigor tests and cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#710-a-note-on-the-full-stack-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.10 A note on the full-stack integration tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="dagster-ml-assets-design-plan">Dagster ML Assets: Design Plan</h1>
+<p>This document specifies the architecture for the Dagster-based ML experimentation and
+production inference pipeline.  It is written to brief a fresh implementation session;
+it includes the requirements, rejected alternatives with reasons, and the final design
+with enough detail to implement without ambiguity.</p>
+<hr />
+<h2 id="1-context">1. Context</h2>
+<p>The NGED Flexpectation project forecasts half-hourly power for ~32 time series
+(V1 trial) scaling to ~2,500 (V2). In the V1 trial, 16 of those time series are primary substations,
+2 are bulk supply points, 2 are GSPs, and the rest are customer meters, mostly single-site solar PV.
+The platform has two distinct modes:</p>
+<ul>
+<li><strong>Research mode:</strong> run thousands of ML experiments with full
+  expanding-window cross-validation; compare results on a leaderboard.</li>
+<li><strong>Production mode:</strong> run inference every 6 hours to generate 14-day probabilistic
+  forecasts across all substations.</li>
+</ul>
+<p>The current branch (<code>dagster-ML-assets</code>) added a single <code>cv_power_forecasts</code> Dagster
+asset that trains and predicts inside one Python loop.  This document describes the
+redesign needed to support research at scale and production simultaneously.</p>
+<hr />
+<h2 id="2-requirements">2. Requirements</h2>
+<h3 id="functional">Functional</h3>
+<ul>
+<li>Run 100s to 1000s of ML experiments, each with full expanding-window CV over the
+  canonical folds (see §4.1). The canonical fold set is currently a <strong>single MVP fold</strong>
+  (<code>mid_2025_to_mid_2026</code>); the multiple-yearly-fold protocol is the target once ECMWF ENS is
+  backfilled (see §7.3.1 and docs/ml_experimentation/cross-validation-folds.md).</li>
+<li>All experiments evaluated on <strong>identical canonical CV folds</strong> — scientific fairness
+  for the leaderboard is non-negotiable. (We use a single fold for now because the ECMWF numerical
+  weather predictions available from Dynamical.org only go back to 2024-04-01; Dynamical.org are
+  back-filling earlier years, and we move to multiple yearly folds once they do.)</li>
+<li>Per-fold observability: know which folds succeeded or failed for each experiment.</li>
+<li>Retry individual failed folds from the Dagster UI without re-running others.</li>
+<li>Kick off a <strong>smoke test</strong> (just the earliest fold) before committing to a
+  full CV run, so bad configs fail fast and cheaply.</li>
+<li>Run production inference every 6 hours; track which runs failed and rerun them.
+  Although the production inference will happen on one machine (with its own Dagster
+  instance, probably in a Docker container running on AWS App Runner). ML R&amp;D will happen on the
+  personal workstations of the two ML researchers working on this project. But the production system
+  and the ML R&amp;D systems must run the exact same code.</li>
+<li><strong>Rerunnable metrics:</strong> the researcher will add new metrics rapidly; recomputing
+  metrics from the already-saved <code>PowerForecast</code> Delta table must not require
+  retraining models. So the output from each inference run for each fold must be saved to disk in
+  the <code>power_forecasts</code> Delta Table.</li>
+<li><strong>Arbitrary-period evaluation:</strong> compute metrics over any slice of forecasts (e.g. the last
+  month of live production) <em>without</em> those results entering the leaderboard (see §4.8).</li>
+<li><strong>Production forecast-time semantics:</strong> a scheduled <strong>live</strong> run uses
+  <code>power_fcst_init_time = now</code> and the freshest NWP actually present in Delta, applying <strong>no</strong>
+  modelled publication delay — so we always exploit the latest available NWP even if the
+  provider speeds up. A <strong>replay</strong> of a past slot (e.g. re-running a failed run the next day)
+  reconstructs historical NWP availability by applying <code>nwp_publication_delay_hours</code> (see §4.9).</li>
+<li>Zero training-serving skew: CV (bulk mode) and production (single-run mode) call the <em>same</em>
+  <code>engineer_features()</code>; a cross-mode equivalence test guarantees identical features for
+  matching <code>(nwp_init_time, power_fcst_init_time, valid_time)</code> keys (see §4.9 and §5.7).</li>
+</ul>
+<h3 id="operational">Operational</h3>
+<ul>
+<li>1–2 researchers, but experiments can run in parallel on different machines, all
+  writing to the same S3 buckets and MLflow tracking server.</li>
+<li>Support automated hyperparameter sweeps (programmatically created experiments).</li>
+<li>"One-click" experiment management from the Dagster UI.</li>
+<li>Also fully scriptable from the CLI (for LLM-driven experimentation).</li>
+</ul>
+<hr />
+<h2 id="3-designs-considered-and-rejected">3. Designs Considered and Rejected</h2>
+<h3 id="31-single-cv_power_forecasts-asset-current-code">3.1 Single <code>cv_power_forecasts</code> Asset (current code)</h3>
+<p>All folds are trained and predicted inside a single Python <code>for</code> loop within one
+Dagster asset.</p>
+<p><strong>Rejected because:</strong>
+- No per-fold observability or retry; the whole asset re-runs on any failure.
+- No production inference path.
+- No experiment isolation: a second researcher's run overwrites the asset's
+  materialisation history.
+- <code>cv_power_forecasts</code> asset is too long (&gt;200 lines) mixing orchestration and ML logic.
+- The <code>cross_validate.py</code> <code>train_end_dt</code> is computed as <code>val_start_dt</code>, silently
+  ignoring <code>CvFoldConfig.train_end</code> (a latent bug).</p>
+<h3 id="32-dagster-dynamicout-job-no-assets-for-cv">3.2 Dagster DynamicOut Job (no assets for CV)</h3>
+<p>Use a Dagster <em>job</em> with <code>DynamicOut</code> ops: one generator op yields a <code>DynamicOutput</code>
+per fold, downstream ops run in parallel, a collect op gathers results.</p>
+<p><strong>Rejected because:</strong>
+- Job run history is the only record of what ran — there is no stable, addressable
+  artifact per fold in the asset catalog.
+- Difficult to materialise "just fold 2023 for experiment X" from the UI; you have
+  to find the right job run and retry the right step.
+- Trained model artifacts (saved to disk) are not tracked as assets; harder to link
+  lineage between training and prediction.</p>
+<h3 id="33-dagster-assets-with-staticpartitionsdefinition">3.3 Dagster Assets with <code>StaticPartitionsDefinition</code></h3>
+<p>Define CV folds as static partitions (e.g. <code>["2022", "2023", "2024", "2025", "2026"]</code>)
+on the <code>trained_cv_model</code> and <code>cv_power_forecasts</code> assets.</p>
+<p><strong>Rejected because:</strong>
+- Partition keys are shared across all experiments.  Two experiments running in
+  parallel would appear to materialise the same partition, confusing Dagster's
+  history and potentially overwriting results.
+- Static partition keys must be enumerated upfront — incompatible with dynamically
+  created experiments (especially automated hyperparameter sweeps).</p>
+<h3 id="34-one-yaml-config-file-per-experiment">3.4 One YAML Config File Per Experiment</h3>
+<p>Store each experiment's config as <code>conf/experiments/{experiment_name}.yaml</code> committed
+to git.</p>
+<p><strong>Rejected because:</strong>
+- Thousands of tiny YAML files would clutter the repo.
+- Automated sweeps would require committing files programmatically, which breaks the
+  git workflow.
+- MLflow is a better canonical config store: it already stores params, metrics, and
+  artifacts per run and is designed for exactly this use case.</p>
+<h3 id="35-mlflow-pyfunc-model-registry-for-model-saving">3.5 MLflow Pyfunc / Model Registry for Model Saving</h3>
+<p>Use MLflow's <strong>model registry</strong> and <strong><code>pyfunc</code></strong> format to save and load trained models.</p>
+<p><strong>Rejected because:</strong>
+- Adds significant complexity (environment snapshotting, custom loaders per model
+  family, schema enforcement at the MLflow boundary).
+- <code>BaseForecaster.save()</code> / <code>BaseForecaster.load()</code> are simple and sufficient.</p>
+<p><strong>What we adopt instead (§4.5):</strong> the <em>minimal</em> MLflow artifact integration —
+<code>mlflow.log_artifacts</code> / <code>download_artifacts</code> wrapped around <code>BaseForecaster.save/load</code>, plus a
+local-disk cache. This gives cross-machine model sharing and report-consistency without any of
+the registry/<code>pyfunc</code> machinery above. (The registry-based champion-model promotion flow remains
+deferred — see §6.)</p>
+<h3 id="36-mlflow-experiment-id-integer-as-dagster-partition-key">3.6 MLflow Experiment ID (Integer) as Dagster Partition Key</h3>
+<p>Use the auto-generated MLflow integer experiment ID as the partition key prefix:
+e.g. <code>"42__2022"</code>.</p>
+<p><strong>Rejected because:</strong>
+- Not human-readable in the Dagster UI partition grid.
+- You would need to cross-reference MLflow to understand what partition <code>42__2022</code>
+  represents.  With hundreds of experiments this becomes painful.</p>
+<hr />
+<h2 id="4-final-design">4. Final Design</h2>
+<h3 id="41-key-concepts">4.1 Key Concepts</h3>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Experiment</strong></td>
+<td>One specific combination of model class + config (features, hyperparameters). Identified by a human-readable <code>experiment_name</code> string. Stamped onto every forecast row in a dedicated <code>experiment_name</code> column (see §4.7, §5.1) — <strong>not</strong> overloaded onto <code>power_fcst_model_name</code>, which keeps its meaning as the model <em>family</em> (<code>MODEL_NAME</code>).</td>
+</tr>
+<tr>
+<td><strong>CV Fold</strong></td>
+<td>One expanding-window training/validation window, identified by a short label (<code>fold_id</code>). The canonical fold set is currently a <strong>single MVP fold</strong> (<code>"mid_2025_to_mid_2026"</code>); the target multiple-yearly-fold protocol switches on once ECMWF ENS is backfilled (§7.3.1, docs/ml_experimentation/cross-validation-folds.md). Validation windows must be <strong>complete</strong> before they enter the leaderboard (a partial window cannot be fairly compared; see §4.1.2). Date ranges live in <code>conf/cv/default.yaml</code> and are immutable per leaderboard epoch.</td>
+</tr>
+<tr>
+<td><strong>Dagster partition key</strong></td>
+<td><code>"{experiment_name}__{fold_id}"</code>, e.g. <code>"xgboost_with_solar__mid_2025_to_mid_2026"</code>. Encodes both the experiment and the fold; unique by construction (MLflow enforces unique experiment names).</td>
+</tr>
+<tr>
+<td><strong>MLflow experiment</strong></td>
+<td>One per <code>experiment_name</code>. Stores the resolved config as experiment tags. Holds all runs for that experiment.</td>
+</tr>
+<tr>
+<td><strong>MLflow parent run</strong></td>
+<td>One per experiment. Holds the resolved config params and the aggregate (mean-across-folds) metrics — the row the leaderboard sorts on. Tagged <code>cv_role="parent"</code>.</td>
+</tr>
+<tr>
+<td><strong>MLflow fold (child) run</strong></td>
+<td>One per fold, nested under the parent run. Holds per-fold training params and per-fold metrics. Tagged <code>cv_role="fold"</code>, <code>fold_id="mid_2025_to_mid_2026"</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="411-mlflow-run-model-and-cross-process-run-resolution">4.1.1 MLflow Run Model and Cross-Process Run Resolution</h3>
+<p>You do <strong>not</strong> need a separate MLflow experiment per fold. MLflow's <em>run</em> is exactly the
+"multiple folds belong to one experiment" concept. The structure is:</p>
+<pre><code>Experiment  &quot;xgboost_with_solar&quot;  (experiment_id = 42)
+└── Parent run  &quot;cv_summary&quot;               tags: cv_role=parent   ← aggregate metrics (leaderboard row)
+    └── Child run  &quot;mid_2025_to_mid_2026&quot;  tags: cv_role=fold, fold_id=mid_2025_to_mid_2026
+                                           ↑ per-fold params + metrics (one child per canonical fold)
+</code></pre>
+<p><strong>The coordination problem:</strong> <code>trained_cv_model</code>, <code>cv_power_forecasts</code>, and <code>metrics</code> are
+separate Dagster assets running in <strong>separate processes</strong> (and, for retries, at separate
+times). The run handle returned by <code>mlflow.start_run()</code> cannot be passed between them, and a
+run cannot be left "open" across process boundaries. So the assets must <strong>discover and resume
+runs by tag</strong>, never by passing a live handle or a run ID through Dagster metadata.</p>
+<p><strong>The convention that makes this work</strong> — three idempotent get-or-create helpers, used by all
+three assets so they share one consistent run-resolution path (see §5.6):</p>
+<ul>
+<li><code>get_or_create_experiment(experiment_name) -&gt; experiment_id</code>
+  Wraps <code>mlflow.get_experiment_by_name</code>; creates it if absent.</li>
+<li><code>get_or_create_parent_run(experiment_id) -&gt; run_id</code>
+  <code>search_runs(experiment_id, filter="tags.cv_role = 'parent'")</code>; create with
+  <code>run_name="cv_summary"</code>, tag <code>cv_role=parent</code> if none exists.</li>
+<li><code>get_or_create_fold_run(experiment_id, parent_run_id, fold_id) -&gt; run_id</code>
+  <code>search_runs(experiment_id, filter="tags.cv_role = 'fold' and tags.fold_id = '{fold_id}'")</code>;
+  create nested under the parent (<code>nested=True</code>, <code>run_name=fold_id</code>, tags
+  <code>cv_role=fold, fold_id={fold_id}</code>) if none exists.</li>
+</ul>
+<p>Each asset opens the run it needs by <strong>run ID</strong> (<code>mlflow.start_run(run_id=...)</code>), logs, and
+closes it within its own process. Because lookup is by tag, re-running any single fold (or
+re-running <code>metrics</code>) resumes the <em>same</em> run rather than creating a duplicate — which is the
+behaviour we want for Dagster retries.</p>
+<p><strong>Concurrency note:</strong> two parallel processes could both find "no parent run" and each create
+one, yielding duplicate parent runs. In practice the parent run is created once by
+<code>register_experiment_job</code> (§4.3, step 4a) — before any fold can run — so the get-or-create in
+the assets is only a self-healing fallback. Fold child runs are created per-partition and
+never collide, because each fold is a distinct Dagster partition that Dagster will not run
+concurrently with itself.</p>
+<h3 id="412-complete-validation-windows-only">4.1.2 Complete Validation Windows Only</h3>
+<p>Fold eligibility requires a time series to have observations through the fold's <code>val_end</code>. A fold
+whose validation window has not yet finished would silently validate on zero (or partial) data and
+corrupt the "mean-across-folds" leaderboard number. Therefore:</p>
+<ul>
+<li><code>conf/cv/default.yaml</code> contains <strong>only folds whose validation window is complete</strong> by the time
+  the experiment runs. The current MVP fold validates <code>2025-07-01 → 2026-06-30</code>; this code is not
+  expected to train until after that window has closed. When the multiple-yearly-fold protocol
+  switches on, each yearly fold is added only once its validation year has finished and the NGED
+  data has landed.</li>
+<li><code>fold_id</code> is a plain <code>str</code> (<code>contracts.power_schemas.FoldId</code>) whose canonical values come from
+  the YAML, so adding a fold is a config edit, not a schema change.</li>
+<li>Mid-window performance on an as-yet-incomplete window is obtained through <strong>arbitrary-period
+  evaluation</strong> (§4.8, <code>evaluation_scope="ad_hoc"</code>), which never feeds the leaderboard.</li>
+</ul>
+<h3 id="42-dagster-asset-graph">4.2 Dagster Asset Graph</h3>
+<pre><code>──────────────────────────────────────────────────────────────
+ DATA LAYER  (existing assets, unchanged)
+──────────────────────────────────────────────────────────────
+ power_time_series_and_metadata   unpartitioned asset
+ ecmwf_ens                        daily-partitioned asset
+
+──────────────────────────────────────────────────────────────
+ EXPERIMENT REGISTRATION + RETIREMENT  (new Dagster jobs)
+──────────────────────────────────────────────────────────────
+ register_experiment_job           RunConfig → creates MLflow experiment + parent run,
+                                   adds partition keys to DynamicPartitionsDefinition
+ retire_experiment_job             RunConfig → verifies results landed in MLflow + Delta,
+                                   then deletes that experiment's dynamic partition keys
+                                   (manual; see §4.3.1)
+
+──────────────────────────────────────────────────────────────
+ CV LAYER
+──────────────────────────────────────────────────────────────
+ eligible_time_series              fold-partitioned (by fold year), EXPERIMENT-INDEPENDENT;
+                                   canonical per-fold population, frozen per leaderboard epoch
+   └── deps: [power_time_series_and_metadata]
+ trained_cv_model                  (key = &quot;name__fold&quot;) trains on the eligible set, saves
+                                   model (+ trained_time_series_ids in meta.json) to MLflow
+   └── deps: [power_time_series_and_metadata, ecmwf_ens, eligible_time_series]
+ cv_power_forecasts                (key = &quot;name__fold&quot;) loads model, predicts on all 51
+                                   members for the model's trained IDs, overwrites Delta partition
+   └── deps: [trained_cv_model]
+
+──────────────────────────────────────────────────────────────
+ METRICS LAYER  (unpartitioned, rerunnable at any time)
+──────────────────────────────────────────────────────────────
+ metrics                           reads power_forecasts Delta, writes forecast_metrics
+                                   Delta; RunConfig (population_filter + evaluation_scope);
+                                   scope gates MLflow: leaderboard → golden experiments,
+                                   production_monitoring → monitoring experiment, ad_hoc → none
+ monitoring_sensor                 on each power_time_series_and_metadata update (~6h),
+                                   runs metrics(scope=production_monitoring) over last 24h &amp; 7d
+
+──────────────────────────────────────────────────────────────
+ PRODUCTION LAYER  (6-hourly time-window partitioned)
+──────────────────────────────────────────────────────────────
+ live_forecasts                    loads model from local cache (production_model_run_id);
+                                   single-run inference on 51 members (availability_mode =
+                                   live | replay) for the model's trained IDs; idempotent
+                                   overwrite into power_forecasts Delta; logs nothing to MLflow
+   └── deps: [ecmwf_ens, power_time_series_and_metadata]
+</code></pre>
+<h3 id="43-experiment-registration-flow">4.3 Experiment Registration Flow</h3>
+<p><code>register_experiment_job</code> is a Dagster job (not an asset) launched manually from the
+Dagster UI or CLI.  Its <code>RunConfig</code> has the following fields:</p>
+<pre><code class="language-python">class RegisterExperimentConfig(Config):
+    experiment_name: str         # human-readable, unique; becomes MLflow experiment name
+                                 # and partition key prefix.  For sweeps, generate
+                                 # programmatically, e.g. &quot;xgboost_lr0p01_depth3&quot;.
+    base_model_config: str       # path relative to PROJECT_ROOT, e.g.
+                                 # &quot;conf/model/xgboost.yaml&quot;
+    config_overrides: dict       # Hydra-style key-value overrides applied on top of
+                                 # the base YAML, e.g. {&quot;selected_features&quot;: [&quot;lag_1h&quot;]}
+    run_mode: Literal[&quot;smoke_test&quot;, &quot;full_cv&quot;, &quot;register_only&quot;]
+                                 # smoke_test: adds only the earliest fold
+                                 # full_cv:    adds one partition key per canonical fold in
+                                 #             conf/cv/default.yaml (currently the single
+                                 #             __mid_2025_to_mid_2026 fold)
+                                 # register_only: adds all keys but triggers nothing
+    description: str = &quot;&quot;        # stored as an MLflow experiment tag
+</code></pre>
+<p>The job performs these steps in order:</p>
+<ol>
+<li>Resolve full config: load <code>base_model_config</code> YAML, apply <code>config_overrides</code>, build
+   the concrete <code>BaseForecasterConfig</code> subclass via <code>hydra.utils.instantiate</code>.</li>
+<li>Set <code>config.experiment_name = experiment_name</code> (see §4.7 on experiment_name field).</li>
+<li>Call <code>mlflow.create_experiment(experiment_name, tags={"config": config.model_dump_json(), "description": description})</code>.
+   If the experiment already exists, retrieve its ID (idempotent).</li>
+<li>Create the experiment's <strong>parent run</strong> now, via <code>get_or_create_parent_run(experiment_id)</code>
+   (§4.1.1), and log the resolved config params to it. Also set the <strong>leaderboard grouping
+   tags</strong> on the parent run so the leaderboard can group/filter experiments (§4.8):
+   <code>model_family</code> (= <code>MODEL_NAME</code>) and <code>weather_source</code> (from the config). The further tags the
+   Milestone 1 report anticipates — <code>training_strategy</code>, <code>generator_capacity_estimation</code>,
+   <code>switching_event_detection</code>, <code>pre_training</code> — are <strong>deferred</strong> (not implemented for several
+   months); add them when those capabilities land. (<code>task</code> from the report is dropped in favour
+   of grouping metrics by <code>time_series_type</code>, which is a metric dimension, not a tag — see §4.8.)
+   Creating the parent run here — before any fold can run — means the per-fold assets never race
+   to create it. (The helper is idempotent, so a re-registration is harmless.)</li>
+<li>Based on <code>run_mode</code>, determine which fold IDs to add (read from <code>conf/cv/default.yaml</code>, never
+   hard-coded — §4.1.2):</li>
+<li><code>"smoke_test"</code> → just the earliest fold, e.g. <code>["mid_2025_to_mid_2026"]</code></li>
+<li><code>"full_cv"</code> or <code>"register_only"</code> → every canonical fold, currently
+     <code>["mid_2025_to_mid_2026"]</code></li>
+<li>Add Dagster partition keys <code>[f"{experiment_name}__{fid}" for fid in fold_ids]</code> to the
+   <code>cv_experiment_folds</code> <code>DynamicPartitionsDefinition</code>.
+   Use <code>context.instance.add_dynamic_partitions("cv_experiment_folds", keys)</code>.</li>
+<li>Log partition keys and MLflow experiment ID as Dagster output metadata.</li>
+</ol>
+<p>After the job completes, the user materialises the new partitions from the Dagster asset
+catalog (selecting <code>trained_cv_model</code> + <code>cv_power_forecasts</code> for the new experiment).
+For a smoke test, only the earliest fold's partition exists, so only one fold runs. (With the
+current single-fold config, <code>smoke_test</code> and <code>full_cv</code> add the same one partition.)</p>
+<p>The <code>register_experiment_job</code> uses <code>context.instance.add_dynamic_partitions()</code> which requires Dagster's instance object inside an op. Make sure to use <code>OpExecutionContext</code> (not <code>AssetExecutionContext</code>) for that job's ops, since it's a job not an asset.</p>
+<h3 id="431-experiment-retirement-flow">4.3.1 Experiment Retirement Flow</h3>
+<p>With 1000s of experiments × multiple folds, the <code>cv_experiment_folds</code>
+<code>DynamicPartitionsDefinition</code> would grow without bound and degrade the Dagster UI and run
+storage. Partition keys are therefore retired by a <strong>manually triggered</strong> Dagster job
+(deliberate and auditable — never automatic, so we cannot accidentally drop partitions whose
+results never persisted).</p>
+<p><code>retire_experiment_job</code> has a <code>RunConfig</code> with a single field <code>experiment_name: str</code> and:</p>
+<ol>
+<li>Verifies the experiment's results are safely persisted <strong>before</strong> deleting anything:</li>
+<li>the MLflow parent run exists and carries aggregate metrics, <strong>and</strong></li>
+<li>the <code>power_forecasts</code> Delta table contains rows for this <code>experiment_name</code>.
+   If either check fails, the job raises and deletes nothing.</li>
+<li>Deletes the experiment's dynamic partition keys via
+   <code>context.instance.delete_dynamic_partition("cv_experiment_folds", key)</code> for each
+   <code>f"{experiment_name}__{fid}"</code>.</li>
+<li>Logs the deleted keys as output metadata.</li>
+</ol>
+<p>Retiring partitions does <strong>not</strong> delete the MLflow runs or the Delta forecasts — those remain
+the permanent record. Retirement only prunes Dagster's execution ledger. Like
+<code>register_experiment_job</code>, its ops use <code>OpExecutionContext</code>.</p>
+<h3 id="44-config-storage">4.4 Config Storage</h3>
+<ul>
+<li><strong>Git</strong> stores <code>conf/model/{model_class}.yaml</code> — the default config for a model
+  family.  This file is what you edit when writing new model code.</li>
+<li><strong>MLflow</strong> is the canonical store for the resolved, fully-specified config, in two
+  complementary forms:</li>
+<li><strong>Flattened params on the parent run.</strong> <code>register_experiment_job</code> flattens the resolved
+    config dict and logs each leaf as an individual MLflow <strong>param</strong> on the experiment's parent
+    run (e.g. <code>n_estimators=500</code>, <code>max_depth=6</code>). This is what populates MLflow's compare/sort
+    columns and lets you "grab the full resolved params for any experiment" — the primary
+    requirement. Logging params (rather than stuffing the whole JSON into one experiment tag)
+    also sidesteps the MLflow <strong>tag-value length limit</strong>, which a large config could otherwise
+    exceed.</li>
+<li><strong>A round-trippable <code>config</code> tag for deserialisation.</strong> The experiment also carries the
+    config as a JSON tag so assets can reconstruct the exact <code>BaseForecasterConfig</code> subclass.
+    One genuinely long field — <code>selected_features</code> — is the only realistic candidate to bump
+    the per-value length limit; if it does, log it as its own JSON-string param/tag rather than
+    inline.</li>
+<li><strong>Assets</strong> fetch config at runtime by calling
+  <code>mlflow.get_experiment_by_name(experiment_name)</code> and deserialising the <code>"config"</code> tag
+  back into the appropriate <code>BaseForecasterConfig</code> subclass.</li>
+</ul>
+<p>This means: no per-experiment YAML files, full reproducibility (config is immutable once
+registered), config is both human-queryable (params) and machine-reconstructable (tag), and it
+travels with the MLflow experiment even if the YAML in git is later modified.</p>
+<h3 id="45-model-artifact-storage-mlflow-artifacts-local-disk-cache">4.5 Model Artifact Storage (MLflow artifacts + local-disk cache)</h3>
+<p>Trained model binaries live in <strong>MLflow's S3-backed artifact store</strong>, with a <strong>local-disk
+cache</strong> keyed by run ID. This is the <em>minimal</em> MLflow integration — <code>log_artifacts</code> /
+<code>download_artifacts</code> wrapped around the existing <code>BaseForecaster.save/load</code>. It deliberately
+does <strong>not</strong> use <code>mlflow.pyfunc</code>, the model registry, or custom flavors (those remain rejected;
+§3.5). Two reasons drove the move off pure local disk:</p>
+<ol>
+<li><strong>Cross-machine sharing.</strong> Experiments run on multiple researcher workstations and production
+   runs on a separate App Runner box, all "running the exact same code". A model trained on one
+   machine must be loadable on another — only a shared (S3-backed) store delivers that.</li>
+<li><strong>Consistency with the Milestone 1 report</strong>, which states MLflow stores the trained model
+   weights (report p.35).</li>
+</ol>
+<p><strong>Two concrete <code>BaseForecaster</code> methods</strong> (§5.2) give one consistent path. They sit on the base
+class and delegate to each subclass's own disk <code>save</code>/<code>load</code>, so subclasses stay MLflow-free:</p>
+<ul>
+<li><code>forecaster.save_to_mlflow(run_id)</code> — <code>self.save(tmp_dir)</code> (unchanged: <code>.ubj</code> per
+  <code>time_series_id</code> + <code>meta.json</code>), then <code>mlflow.log_artifacts(tmp_dir, artifact_path="model")</code>
+  onto the run resolved by tag.</li>
+<li><code>ForecasterClass.load_from_mlflow(run_id, cache_base_path)</code> — if
+  <code>{cache_base_path}/{run_id}/model</code> exists, <code>cls.load()</code> straight from that local cache;
+  otherwise <code>mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path="model")</code> into the
+  cache, then load. The cache key is the <strong>run ID</strong>, which is immutable, so a cached model never
+  goes stale and never needs invalidation.</li>
+</ul>
+<p><strong>Production resilience (important):</strong> the local cache is what lets the live service keep
+running even if <strong>MLflow is down</strong>. Once the production model is cached on the App Runner box,
+<code>live_forecasts</code> loads it from disk and never contacts MLflow on the hot path; only a cache miss
+(first use after a model promotion, or a fresh container) needs MLflow. The cache should
+therefore be on a persistent volume, or pre-seeded into the container image, so a restart during
+an MLflow outage still finds the model.</p>
+<p><code>trained_cv_model</code> calls <code>save_to_mlflow</code>; <code>cv_power_forecasts</code> and <code>live_forecasts</code> call
+<code>load_from_mlflow</code>. Each already resolves its MLflow run by tag (§4.1.1), so this adds no new
+coordination — only an artifact upload/download around code that already runs.</p>
+<h3 id="451-eligible-time-series-canonical-per-fold-population">4.5.1 Eligible Time Series (canonical per-fold population)</h3>
+<p>Eligibility — which <code>time_series_id</code>s take part in a fold — is <strong>load-bearing for leaderboard
+fairness</strong> and must satisfy two invariants:</p>
+<ol>
+<li><strong>Experiment-independent.</strong> Eligibility depends <em>only</em> on data availability and the fold
+   dates, <strong>never</strong> on the model or config. Otherwise two experiments would be scored on
+   different populations and the leaderboard would no longer be apples-to-apples.</li>
+<li><strong>Train and predict use the identical set.</strong> The set a model is trained on must equal the
+   set it predicts/scores on — even if power data changes between the train run and the predict
+   run.</li>
+</ol>
+<p>Two mechanisms enforce these:</p>
+<ul>
+<li><strong><code>eligible_time_series</code> asset</strong> (fold-partitioned by the canonical fold years from
+  <code>conf/cv/default.yaml</code>; <strong>not</strong> keyed by experiment). It computes the eligible IDs for each
+  fold (first obs ≥ <code>min_training_months</code> before <code>val_start</code>; last obs ≥ <code>val_end</code>) via a pure,
+  data-only function and <strong>persists</strong> the list (small Delta/parquet). It is <strong>frozen per
+  leaderboard epoch</strong>, so every experiment — whenever it runs — reads the <em>same</em> per-fold
+  population. <code>trained_cv_model</code> and <code>cv_power_forecasts</code> both read this asset rather than each
+  recomputing from live data (which could drift). This makes invariant (1) structural and dedups
+  the computation across the thousands of experiments.</li>
+<li><strong><code>trained_time_series_ids</code> in the model's <code>meta.json</code>.</strong> <code>BaseForecaster.save()</code> records the
+  exact set the model was trained on. <code>predict()</code> (or the calling asset) filters its input to
+  that set, guaranteeing invariant (2) regardless of later data changes, and — crucially —
+  giving <strong>production</strong> its population for free: <code>live_forecasts</code> forecasts <em>only</em> the
+  <code>time_series_id</code>s the production model was trained on (read from the loaded model's
+  <code>meta.json</code>), never a series the model has never seen.</li>
+</ul>
+<h3 id="46-trained_cv_model-asset">4.6 <code>trained_cv_model</code> Asset</h3>
+<pre><code>partitions_def: cv_experiment_folds (DynamicPartitionsDefinition)
+deps: [power_time_series_and_metadata, ecmwf_ens, eligible_time_series]
+</code></pre>
+<p>Per materialisation:</p>
+<ol>
+<li>Parse <code>context.partition_key</code> → <code>experiment_name</code>, <code>fold_id</code>.</li>
+<li>Fetch resolved config from MLflow experiment tags; instantiate
+   <code>BaseForecasterConfig</code> subclass.</li>
+<li>Fetch <code>CvFoldConfig</code> for <code>fold_id</code> from <code>conf/cv/default.yaml</code>.</li>
+<li>Load <code>power_lf</code> and <code>nwp_lf</code> (lazy), filtered to
+   <code>[fold.train_start, fold.train_end]</code> (inclusive on both ends — see §5.1 bug fix).</li>
+<li>Read the eligible <code>time_series_id</code>s for this <code>fold_id</code> from the <code>eligible_time_series</code>
+   asset (§4.5.1) — do not recompute — and filter to them.</li>
+<li>Call <code>engineer_features()</code>, then <code>forecaster.train()</code>. <code>save()</code> records these IDs as
+   <code>trained_time_series_ids</code> in <code>meta.json</code> (§4.5.1).</li>
+<li>Resolve the fold's MLflow run by tag (§4.1.1): <code>experiment_id =
+   get_or_create_experiment(experiment_name)</code>, <code>parent_run_id =
+   get_or_create_parent_run(experiment_id)</code>, <code>fold_run_id =
+   get_or_create_fold_run(experiment_id, parent_run_id, fold_id)</code>.</li>
+<li><code>forecaster.save_to_mlflow(fold_run_id)</code> (§4.5: writes locally, then <code>log_artifacts</code> to the
+   run). Open the run with <code>mlflow.start_run(run_id=fold_run_id)</code>, log training params, and close
+   it within this process — do <strong>not</strong> pass the handle or run ID to <code>cv_power_forecasts</code>
+   (which re-resolves the same run by tag).</li>
+<li>Emit Dagster output metadata: n_time_series, train date range, <code>fold_run_id</code>.</li>
+</ol>
+<h3 id="47-cv_power_forecasts-asset">4.7 <code>cv_power_forecasts</code> Asset</h3>
+<pre><code>partitions_def: cv_experiment_folds (same DynamicPartitionsDefinition)
+deps: [trained_cv_model]
+</code></pre>
+<p>Per materialisation:</p>
+<ol>
+<li>Parse <code>context.partition_key</code> → <code>experiment_name</code>, <code>fold_id</code>.</li>
+<li>Fetch config from MLflow (same as above).</li>
+<li>Resolve <code>fold_run_id</code> by tag (§4.1.1), then
+   <code>ForecasterClass.load_from_mlflow(fold_run_id, settings.model_cache_base_path)</code>
+   (§4.5: local cache hit, or download artifacts from the fold run on a miss).</li>
+<li>Load <code>power_lf</code> and <code>nwp_lf</code> filtered to <code>[fold.val_start, fold.val_end]</code> <strong>and</strong> to the
+   model's <code>trained_time_series_ids</code> (from <code>meta.json</code>, §4.5.1) — so the scored population is
+   exactly the trained population, even if power coverage changed since training.</li>
+<li>Call <code>engineer_features()</code>, then <code>forecaster.predict()</code> (across all 51 NWP ensemble members
+   — §6).</li>
+<li>Overwrite <code>fold_id</code> column with the string <code>fold_id</code> (the fold's label, e.g. <code>"mid_2025_to_mid_2026"</code>).
+   <code>predict()</code> stamps each row's identity columns: <code>power_fcst_model_name</code>/<code>power_fcst_model_version</code>
+   carry the model <strong>family</strong> identity (<code>MODEL_NAME</code>/<code>MODEL_VERSION</code> class constants), while the
+   dedicated <code>experiment_name</code> column carries the experiment (from
+   <code>BaseForecasterConfig.experiment_name</code> — see §5.1).</li>
+<li>Write to <code>power_forecasts</code> Delta, partitioned by <code>(experiment_name, fold_id)</code>, with an
+   <strong>idempotent partition overwrite</strong> (<code>delta replaceWhere experiment_name=… AND fold_id=…</code>) —
+   <strong>not</strong> an append. This is essential: re-running/retrying a fold (a core requirement) with an
+   append would <strong>duplicate</strong> every row for that partition and silently double-count in metrics.
+   Overwrite makes a fold re-materialisation idempotent. Partitioning by <code>experiment_name</code>
+   (not <code>power_fcst_model_name</code>) also gives each experiment its own directory, so parallel
+   experiments never touch each other's partitions (see §6).</li>
+<li>Resume the <strong>same</strong> fold child run that <code>trained_cv_model</code> used, by tag (§4.1.1) — not by
+   any run ID handed over from the training asset. Resolve it with <code>get_or_create_fold_run(
+   experiment_id, parent_run_id, fold_id)</code> (idempotent: returns the existing fold run), open it
+   with <code>mlflow.start_run(run_id=fold_run_id)</code>, log prediction metrics, and close it.</li>
+<li>Emit Dagster metadata: n_rows, n_time_series, fold date range.</li>
+</ol>
+<h3 id="48-metrics-asset">4.8 <code>metrics</code> Asset</h3>
+<pre><code>partitions_def: none (unpartitioned)
+deps: soft dependency on power_forecasts Delta table
+</code></pre>
+<p>Its <code>RunConfig</code> has two fields that together decide <strong>what to score</strong> and <strong>where the results
+go</strong>:</p>
+<pre><code class="language-python">class PopulationFilter(Config):          # typed, NOT a free dict — a typo in a key must be a
+    experiment_name: str | None = None   # validation error, not a silently-wrong population
+    fold_id: str | None = None
+    valid_time_min: datetime | None = None
+    valid_time_max: datetime | None = None
+
+class MetricsConfig(Config):
+    population_filter: PopulationFilter = PopulationFilter()
+    evaluation_scope: Literal[&quot;leaderboard&quot;, &quot;production_monitoring&quot;, &quot;ad_hoc&quot;] = &quot;leaderboard&quot;
+</code></pre>
+<p>A <strong>typed</strong> <code>PopulationFilter</code> (rather than a free <code>dict</code>) is both a software-engineering and a
+scientific-rigor safeguard: a mistyped key like <code>valid_time_mn</code> would silently match nothing and
+score the wrong population — a typed model makes it a load-time validation error.</p>
+<p><strong>Metrics are computed on the scaled <code>[−1, +1]</code> forecast</strong>, <em>not</em> on physical MW/MVA. The
+"capacity in MW" of a substation/generator is genuinely ambiguous (see
+<code>docs/roadmap/forecast-building-blocks.md</code>), so a physical-units RMSE
+would not be comparable across series. All experiments are therefore scored in the same scaled
+space — which is also what keeps the leaderboard apples-to-apples.</p>
+<ul>
+<li>Reads from the <code>power_forecasts</code> Delta table, <strong>filtered</strong> by <code>population_filter</code>.
+  <strong>Incremental by default:</strong> a leaderboard run normally scores just the experiment(s) just
+  materialised (passed via <code>population_filter</code>), not the entire table — a full recompute across
+  every experiment ever run is opt-in (empty filter), because that cost grows without bound.</li>
+<li>Joins to observed power and calls the existing <code>compute_metrics()</code> from <code>ml_core.metrics</code>.</li>
+<li><strong>Aggregation dimensions:</strong> whenever metrics are aggregated across <code>time_series_id</code>s, compute
+  them <strong>once per <code>time_series_type</code></strong> (primary substation, GSP, BSP, solar PV, wind, BESS, …)
+  <strong>and</strong> once across <strong>all</strong> <code>time_series_id</code>s. Each <code>forecast_metrics</code> row therefore carries a
+  <code>time_series_type</code> column whose value is either a specific type or the sentinel <code>"all"</code>
+  (§5.1). This replaces the report's "one leaderboard per <em>task</em>" with one table that the
+  leaderboard filters by <code>time_series_type</code> — and lets a single experiment (which spans many
+  types) be scored per type without separate experiments. (<code>time_series_type</code> comes from
+  <code>TimeSeriesMetadata</code>, joined in at metric time.)</li>
+<li>Writes to the <code>forecast_metrics</code> Delta table (replaces current <code>cv_metrics.delta</code>),
+  partitioned by <code>(experiment_name, fold_id)</code>. Every row carries <code>evaluation_scope</code>,
+  <code>time_series_type</code>, the evaluation-window columns (<code>window_start</code>/<code>window_end</code>/<code>window_label</code>/
+  <code>computed_at</code>), and an optional <code>mlflow_run_id</code> link (§5.1). The window columns describe the
+  <code>valid_time</code> window each row covers <strong>uniformly</strong> for CV and monitoring — a CV fold row's
+  window is just <code>[val_start, val_end]</code>; a monitoring row's is the trailing 24h/7d window — so
+  the table is self-describing and never needs a join to MLflow to interpret a row. This keeps
+  <code>fold_id</code> low-cardinality (<code>"live"</code> for all production-monitoring rows) so "find all live
+  metrics" stays a trivial filter, while full window expressiveness lives in dedicated columns.</li>
+<li><strong>Scope decides where results go.</strong> All three scopes write to <code>forecast_metrics</code> Delta
+  (tagged with the scope); they differ only in MLflow logging:</li>
+<li><code>evaluation_scope="leaderboard"</code> (canonical complete-window folds only) → the <strong>golden
+    leaderboard</strong> experiments. Logs <strong>per-fold</strong> metrics to each fold child run and
+    <strong>aggregate</strong> (mean-across-folds) metrics to the experiment's <strong>parent run</strong>, both resumed
+    by tag (§4.1.1) — <code>experiment_id = get_or_create_experiment(...)</code>, <code>parent_run_id =
+    get_or_create_parent_run(...)</code>, fold runs via <code>get_or_create_fold_run(...)</code>. Aggregates are
+    logged <strong>per <code>time_series_type</code> and for <code>"all"</code></strong> (e.g. metric keys <code>rmse__solar_pv</code>,
+    <code>rmse__all</code>), so the parent run carries every per-type leaderboard number plus the overall.
+    The <code>"all"</code> aggregate is the default row the leaderboard sorts on. Lookup-by-tag means
+    re-runs update existing runs in place.</li>
+<li><code>evaluation_scope="production_monitoring"</code> → a <strong>dedicated <code>production_monitoring</code> MLflow
+    experiment</strong>, kept entirely separate from the golden leaderboard. Used for the scheduled
+    live-service metrics (§4.8.1). Metrics are logged as a <strong>time series</strong> (one point per
+    monitoring run, via MLflow's metric timestamp/step) so MLflow charts live performance over
+    time — e.g. trailing-24h and trailing-7d RMSE per <code>time_series_type</code>. The monitoring runs
+    are resolved by tag (one persistent run per <code>(window, …)</code>), mirroring §4.1.1.</li>
+<li><code>evaluation_scope="ad_hoc"</code> → <strong>no MLflow at all</strong>, Delta only. For one-off analysis (e.g.
+    scoring an as-yet-incomplete validation window §4.1.2, or a researcher's manual slice).</li>
+</ul>
+<p>Note on actuals: evaluating "the last 24h / 7d / month of production" scores forecasts whose
+<code>valid_time</code> has already passed and now has observed power — not freshly issued forward
+forecasts. This is satisfied naturally as power observations accumulate.</p>
+<h4 id="481-scheduled-live-service-monitoring">4.8.1 Scheduled live-service monitoring</h4>
+<p>Whenever new power observations land — i.e. every 6 hours, after
+<code>power_time_series_and_metadata</code> updates — a <strong>sensor</strong> (preferred, so it fires on the actual
+data update) or a 6-hourly <strong>schedule</strong> materialises the <code>metrics</code> asset with
+<code>evaluation_scope="production_monitoring"</code> over <code>fold_id="live"</code>, for two trailing windows:
+<strong>last 24 hours</strong> and <strong>last 7 days</strong> (by <code>valid_time</code>). Each window writes a row to
+<code>forecast_metrics</code> Delta with <code>window_label</code> (<code>"24h"</code>/<code>"7d"</code>), <code>window_start</code>/<code>window_end</code> set
+to the trailing bounds, and <code>computed_at</code> = now (§5.1) — these are append-only, so successive
+runs accumulate the sliding-window history. The same numbers are logged to the
+<code>production_monitoring</code> MLflow experiment as time-series points (per window, per
+<code>time_series_type</code>), and <code>mlflow_run_id</code> on the Delta rows links the two. This never touches the
+golden leaderboard. <code>live_forecasts</code> itself logs <strong>nothing</strong> to MLflow (§4.9) — only this
+monitoring step does.</p>
+<h4 id="482-two-metric-stores-one-division-of-labour">4.8.2 Two metric stores, one division of labour</h4>
+<p>Metrics live in <strong>both</strong> MLflow and the <code>forecast_metrics</code> Delta table, deliberately, because
+they answer different questions:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>MLflow</strong></th>
+<th><strong><code>forecast_metrics</code> Delta</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Granularity</td>
+<td>Coarse: per-<code>time_series_type</code> + <code>"all"</code> aggregates</td>
+<td>Full cube: per <code>time_series_id</code> × time-slice × peak-events × fold × type × scope</td>
+</tr>
+<tr>
+<td>Volume</td>
+<td>tens of scalars per run</td>
+<td>thousands of rows per experiment (grows hard at V2's ~2,500 series)</td>
+</tr>
+<tr>
+<td>Consumers</td>
+<td>leaderboard UI, sorting/grouping, the auto-researcher; live trend charts</td>
+<td>marimo dashboard, drill-down analysis, live monitoring queries</td>
+</tr>
+<tr>
+<td>Shape</td>
+<td>key→value metric store (poor for multi-dimensional slicing)</td>
+<td>queryable table (Polars/SQL)</td>
+</tr>
+</tbody>
+</table>
+<p>So MLflow is <strong>the leaderboard + the live trend view</strong> (curated aggregates); the Delta table is
+<strong>the queryable analysis cube</strong> (granular, dashboard-feeding, home to all <code>ad_hoc</code>/monitoring
+rows). The aggregates are intentionally duplicated (MLflow for the UI, Delta for querying); the
+fine-grained per-series/per-slice metrics live only in Delta. <code>forecast_metrics</code> is
+<strong>internal-only</strong> — it is not one of the tables delivered to NGED (report p.35).</p>
+<p>Because this asset reads from Delta and writes to Delta with no model dependency, it
+can be re-run at any time as new metrics are added to <code>compute_metrics()</code> without
+re-running any training.</p>
+<p>The existing <code>cv_metrics</code> Dagster asset is <strong>deleted</strong> and replaced by <code>metrics</code>.</p>
+<h3 id="483-evaluating-data-sources-with-limited-history">4.8.3 Evaluating data sources with limited history</h3>
+<p>We will sometimes want to test a <strong>new input data source whose history is shorter than the
+canonical folds</strong> — the motivating case is adding <strong>ICON-EU NWP</strong> (from Dynamical.org), whose
+history starts later than the canonical leaderboard folds. Such a source
+<strong>cannot</strong> enter the canonical CV folds (there is no overlapping history), so by construction this
+evaluation lives entirely in <code>evaluation_scope="ad_hoc"</code> (§4.8) and <strong>never</strong> feeds the
+leaderboard. Two patterns, answering two different questions:</p>
+<p><strong>1. Controlled ablation (the principled comparison — "does the source add skill?").</strong> Hold
+<em>everything</em> constant except the source under test. Because the new source only exists from 2026,
+the shared window must live within 2026:</p>
+<ul>
+<li>Pick a 2026 evaluation window bounded by the new source's availability; split it into
+  train/validation (or an expanding-window split) within that window.</li>
+<li><strong>Baseline experiment:</strong> <code>weather_source = "ecmwf"</code>, ECMWF-only features.</li>
+<li><strong>Treatment experiment:</strong> <code>weather_source = "ecmwf_icon"</code>, ECMWF + ICON-EU features.</li>
+<li>Both train on the <strong>identical rows</strong> and are scored on the <strong>identical rows</strong> (same
+  <code>time_series_id</code> population, same <code>power_fcst_init_time</code> grid), differing <em>only</em> in the feature
+  set. Score both with <code>evaluation_scope="ad_hoc"</code> over the same <code>PopulationFilter</code>
+  (<code>valid_time_min</code>/<code>valid_time_max</code> = the 2026 window).</li>
+</ul>
+<p>To inherit the leaderboard's same-population guarantee (§4.5.1) for this off-leaderboard window,
+materialise a <strong>frozen ad-hoc eligibility set</strong> for the 2026 window that both experiments read,
+rather than letting each experiment pick its own population. (<code>trained_time_series_ids</code> in
+<code>meta.json</code> already forces train==predict per model, but does not by itself force the <em>two</em>
+experiments to share a population — the frozen set does.)</p>
+<p><strong>2. Confound warning (do NOT read this as the ablation).</strong> The tempting shortcut — take the
+canonical <strong>leaderboard champion</strong>, run it on 2026, and compare against an ICON-EU model on 2026 —
+is <strong>statistically confounded</strong> and must not be read as evidence about the new source. The two
+models differ in <strong>two</strong> variables at once: the feature set <em>and</em> the <strong>training window</strong> (the
+champion trained on four full years; the ICON-EU model is forced onto a 2026-only sliver, because
+ICON-EU has no earlier history). A win or loss cannot be attributed to the source rather than to
+the training data. This comparison is legitimate only as a <strong>deployment</strong> question ("which
+forecast is better to ship <em>today</em>?"), where the confound is irrelevant because we only care which
+is better now, not why.</p>
+<p><strong>3. Epoch path (the eventual leaderboard-quality answer).</strong> Once the new source has accumulated
+enough history (≈1–2 complete years), promote it via a <strong>new leaderboard epoch</strong> (§6 fold
+promotion): a fold set over source-era complete years (e.g. 2026, 2027, …) in which the new source
+is canonically available, with every experiment re-scored against that fold set for apples-to-apples
+comparison. The 2026 ad-hoc ablation is the <strong>interim</strong> signal obtained <em>before</em> enough history
+exists to do this properly; it should never be presented with leaderboard rigour.</p>
+<p>Note: this section concerns only <em>evaluation</em>. Actually <strong>ingesting</strong> a second NWP source (a second
+downloader, NWP contract/schema changes, source-aware <code>WeatherFeature</code> parsing, and a dual-source
+join in <code>engineer_features()</code>) is separate, unbuilt engineering work outside this plan's scope; see
+<code>docs/roadmap/index.md</code> (v2.0).</p>
+<h3 id="49-live_forecasts-asset">4.9 <code>live_forecasts</code> Asset</h3>
+<pre><code>partitions_def: TimeWindowPartitionsDefinition(cron=&quot;0 0,6,12,18 * * *&quot;, ...)
+deps: [ecmwf_ens, power_time_series_and_metadata]
+</code></pre>
+<ul>
+<li>Loads the production model via
+  <code>ForecasterClass.load_from_mlflow(settings.production_model_run_id, settings.model_cache_base_path)</code>
+  (§4.5): served from the local cache, so the live service keeps running even if MLflow is down
+  (only a cache miss contacts MLflow). The class is inferred from a <code>model_class</code> field stored
+  alongside the saved model (already part of <code>BaseForecaster.save()</code>'s <code>meta.json</code>).</li>
+<li>Forecasts <strong>only</strong> the <code>trained_time_series_ids</code> recorded in the production model's
+  <code>meta.json</code> (§4.5.1) — never a series the production model has not seen.</li>
+<li>Runs <strong>single-run inference</strong> (<code>engineer_features(power_fcst_init_time=t0, …)</code>) across <strong>all
+  51 NWP ensemble members</strong> (§6), where <code>t0</code> is the partition's scheduled time. This is
+  deliberately <em>not</em> bulk mode: production forecasts one explicit <code>power_fcst_init_time</code>, not
+  one-per-NWP-run.</li>
+<li><strong>Forecast-time / NWP-availability semantics</strong> are controlled by a <code>RunConfig</code> field
+  <code>availability_mode: Literal["live", "replay"]</code> (default <code>"live"</code>):</li>
+<li><strong><code>"live"</code></strong> — the scheduled production path. <code>t0 = now</code>; join the <strong>freshest NWP run
+    actually present</strong> in Delta with <code>nwp_init_time &lt;= t0</code>. <strong>No</strong> modelled publication delay is
+    applied: reality already constrains the table to runs that have genuinely been published, so
+    if the provider speeds up we automatically use the fresher data.</li>
+<li><strong><code>"replay"</code></strong> — re-running a <em>past</em> slot (e.g. yesterday's failed run, today). <code>t0 = the
+    historical partition time</code>; join the freshest NWP run with <code>nwp_init_time &lt;= t0 −
+    nwp_publication_delay_hours</code>. The delay is applied here to reconstruct what NWP was actually
+    <em>available</em> at the historical <code>t0</code> — without it we would leak NWP runs that only landed
+    afterwards (lookahead / training-serving skew).</li>
+<li>Loads the NWP needed for that decision via <code>TimeWindowPartitionMapping</code> against the
+  daily-partitioned <code>ecmwf_ens</code>.</li>
+<li>Calls <code>forecaster.predict()</code>, stamps <code>fold_id = "live"</code>, and writes to the shared
+  <code>power_forecasts</code> Delta table with an <strong>idempotent overwrite</strong> of this run's
+  <code>power_fcst_init_time</code> rows (<code>replaceWhere</code>), so re-running a 6-hourly partition (or a replay)
+  does not duplicate rows.</li>
+<li><strong>Logs nothing to MLflow.</strong> A 6-hourly forecast run is not an experiment; live performance is
+  tracked separately by the scheduled monitoring step (§4.8.1), which logs trailing-window
+  metrics to the <code>production_monitoring</code> experiment — never to the golden leaderboard.</li>
+</ul>
+<p>The scheduled production sensor/schedule always materialises the current partition with the
+default <code>availability_mode="live"</code>; a manual backfill of past partitions is launched with
+<code>availability_mode="replay"</code>. (An automatic rule — "treat the partition as <code>live</code> iff its time
+is within <code>nwp_publication_delay_hours</code> of now, else <code>replay</code>" — is a reasonable future
+convenience, but the explicit flag is the source of truth.)</p>
+<p><code>settings.production_model_run_id</code> is a <code>str</code> field in <code>Settings</code>, set via <code>.env</code>.
+Promoting a new model to production = updating this run ID and restarting Dagster; on first use
+the model is downloaded from that MLflow run into the local cache, then served from disk.
+(A richer MLflow-based champion-model promotion flow is deferred to Phase 2.)</p>
+<hr />
+<h2 id="5-implementation-notes">5. Implementation Notes</h2>
+<h3 id="51-required-changes-to-existing-code">5.1 Required Changes to Existing Code</h3>
+<h4 id="packagesml_coresrcml_corecross_validatepy-the-train_end-bug"><code>packages/ml_core/src/ml_core/cross_validate.py</code> (the <code>train_end</code> bug)</h4>
+<ul>
+<li><strong>Fix the <code>train_end</code> bug while porting CV logic into the new assets.</strong> In
+  <code>cross_validate.py:106</code>, <code>train_end_dt</code> is computed as <code>val_start_dt</code>, silently ignoring
+  <code>CvFoldConfig.train_end</code>. With the current YAML this happens to produce the right window
+  (each <code>train_end</code> is exactly the day before <code>val_start</code>), so it is a <strong>latent</strong> bug: the
+  moment a fold leaves a gap/embargo between <code>train_end</code> and <code>val_start</code>, training would wrongly
+  run right up to <code>val_start</code>.</li>
+<li>The <code>trained_cv_model</code> asset (§4.6) must honour <code>fold.train_end</code> directly, using <strong>inclusive
+  end-of-day</strong> semantics that mirror <code>val_end</code>: training window =
+  <code>[train_start 00:00:00, train_end 23:59:59]</code>. No YAML changes needed.</li>
+</ul>
+<h4 id="packagescontractssrccontractspower_schemaspy"><code>packages/contracts/src/contracts/power_schemas.py</code></h4>
+<ul>
+<li><strong>Add a dedicated <code>experiment_name</code> column to <code>PowerForecast</code></strong> (Categorical). This is the
+  per-experiment key; do <strong>not</strong> overload <code>power_fcst_model_name</code> (which stays the model family
+  identity from <code>MODEL_NAME</code>). Forecasts are partitioned in Delta by <code>(experiment_name, fold_id)</code>.</li>
+<li><code>FoldId</code> is a plain <code>str</code> (<code>"live"</code> is the reserved production sentinel); canonical fold labels
+  come from <code>conf/cv/default.yaml</code>, so adding a fold or epoch is a config edit, not a schema change
+  (§4.1.2).</li>
+<li><code>PowerForecast.fold_id</code> is unchanged.</li>
+<li><strong>Internal vs delivered schema (Milestone 1 report Table 1, p.28):</strong> the columns
+  <code>experiment_name</code>, <code>fold_id</code>, and <code>ml_flow_experiment_id</code> are <strong>internal-only</strong> — they exist
+  on <code>PowerForecast</code> / the internal <code>power_forecasts</code> Delta table to support CV and the
+  leaderboard, but they are <strong>not</strong> part of the <code>power_forecast</code> table delivered to NGED. The
+  delivery step <strong>projects them out</strong> (the delivered table is essentially the <code>fold_id="live"</code>
+  rows with internal columns dropped). When we touch Python, record this in the <code>PowerForecast</code>
+  docstring; for now it lives here.</li>
+</ul>
+<h4 id="packagescontractssrccontractsml_schemaspy"><code>packages/contracts/src/contracts/ml_schemas.py</code></h4>
+<ul>
+<li><strong>Add an <code>evaluation_scope</code> column to the <code>Metrics</code> schema</strong> (<code>Literal["leaderboard",
+  "production_monitoring", "ad_hoc"]</code>), so leaderboard, live-monitoring, and one-off metrics
+  coexist in one <code>forecast_metrics</code> table and are separable (§4.8).</li>
+<li><strong>Add a <code>time_series_type</code> column to the <code>Metrics</code> schema</strong> (the time-series category, or the
+  sentinel <code>"all"</code> for the across-everything aggregate), so per-type and overall metrics coexist
+  in one table (§4.8).</li>
+<li><strong>Add evaluation-window columns to the <code>Metrics</code> schema</strong> describing the <code>valid_time</code> window
+  each row covers — uniform across CV and monitoring (§4.8):</li>
+<li><code>window_start: datetime</code>, <code>window_end: datetime</code> — the window bounds. For a CV fold these
+    are the fold's <code>val_start</code>/<code>val_end</code>; for monitoring they are the trailing-window bounds.</li>
+<li><code>window_label: str</code> — human label (<code>"2025"</code>, <code>"24h"</code>, <code>"7d"</code>, <code>"full_fold"</code>), cheap and
+    readable.</li>
+<li><code>computed_at: datetime</code> — when the metric row was written (provenance; also what orders the
+    append-only monitoring time series and distinguishes recomputations).
+  These compress to almost nothing in Parquet (constant within a write batch → RLE), and keep
+  the table self-describing without a cross-system join.</li>
+<li><strong>Add an <code>mlflow_run_id: str | None</code> column</strong> as a convenience cross-link from a Delta metric
+  row to its MLflow run (and back). <code>null</code> for <code>ad_hoc</code> rows (which have no MLflow run). It is a
+  <em>link</em>, not the home, of the window metadata.</li>
+<li><code>AllFeatures</code> is unchanged.</li>
+</ul>
+<h4 id="packagesml_coresrcml_corebase_forecasterpy"><code>packages/ml_core/src/ml_core/base_forecaster.py</code></h4>
+<ul>
+<li><strong>Add <code>experiment_name: str = ""</code> to <code>BaseForecasterConfig</code>.</strong> Note the config already carries
+  <code>ml_flow_experiment_id</code>, <code>weather_source</code>, and <code>training_strategy</code>; <code>experiment_name</code> joins
+  them. It is set to the MLflow experiment name at registration and stored in the saved config.</li>
+<li><strong>Add <code>random_seed: int = 0</code> to <code>BaseForecasterConfig</code></strong> and thread it into each model's
+  training (e.g. XGBoost <code>seed</code>). Reproducibility: re-training a fold must produce the <em>same</em>
+  model, so retries and the leaderboard are stable.</li>
+<li><strong>Record <code>trained_time_series_ids</code> in <code>meta.json</code></strong> (<code>BaseForecaster.save()</code>): the exact set
+  the model was trained on, read back at predict time to guarantee the train==predict population
+  and to give production its population (§4.5.1).</li>
+<li>Each subclass's <code>predict()</code> stamps <strong>two distinct identities</strong> onto every <code>PowerForecast</code> row:
+  model family (<code>power_fcst_model_name = MODEL_NAME</code>, <code>power_fcst_model_version = MODEL_VERSION</code>,
+  both class constants) and experiment (<code>experiment_name = self.model_params.experiment_name</code>,
+  plus <code>ml_flow_experiment_id</code>). Do <strong>not</strong> collapse experiment identity into
+  <code>power_fcst_model_name</code>.</li>
+<li>No changes to the abstract interface (<code>train</code>, <code>predict</code>, <code>save</code>, <code>load</code>).</li>
+</ul>
+<h4 id="packagesml_coresrcml_corecross_validatepy"><code>packages/ml_core/src/ml_core/cross_validate.py</code></h4>
+<ul>
+<li><strong>Deleted wholesale in Phase 0</strong> (§7.0.1) — it embodies the rejected single-loop CV (§3.1) and
+  carries the <code>train_end</code> bug, so it is not salvaged.</li>
+<li>Its orchestration moves into the <code>trained_cv_model</code> / <code>cv_power_forecasts</code> assets; its reusable
+  logic is <strong>re-written fresh and correct</strong> in <code>ml_core/_cv_helpers.py</code> as pure functions
+  (<code>_date_to_utc_datetime</code>, <code>training_window</code>, <code>eligible_time_series_ids</code>) in Phase 1 — <strong>never
+  inlined into asset bodies</strong>, so they stay unit-testable (§5.8). The intent of the deleted
+  <code>test_cross_validate_excludes_ineligible_time_series</code> returns as a new unit test on
+  <code>eligible_time_series_ids</code>.</li>
+</ul>
+<h4 id="packagesml_coresrcml_coremetricspy"><code>packages/ml_core/src/ml_core/metrics.py</code></h4>
+<ul>
+<li>No changes needed.  <code>compute_metrics()</code> remains a standalone Python function,
+  called by the <code>metrics</code> Dagster asset.</li>
+</ul>
+<h4 id="packagescontractssrccontractssettingspy"><code>packages/contracts/src/contracts/settings.py</code></h4>
+<ul>
+<li>Add <code>production_model_run_id: str | None = None</code> field — the MLflow run whose model artifact
+  the live service serves (downloaded once into the local cache; §4.5, §4.9).</li>
+<li>Add <code>model_cache_base_path: Path</code> field — root of the local-disk model cache, keyed by run ID
+  (§4.5). Put it on a persistent volume so the production cache survives restarts during an
+  MLflow outage.</li>
+<li>Add <code>forecast_metrics_data_path</code> (the <code>forecast_metrics.delta</code> table). The old
+  <code>cv_metrics_data_path</code> is removed in Phase 0 (§7.0.1) along with the <code>cv_metrics</code> asset, so this
+  is a fresh add, not a rename.</li>
+<li><code>trained_ml_model_params_base_path</code> already exists — it can serve as the model cache root, or
+  be superseded by <code>model_cache_base_path</code>.</li>
+</ul>
+<h4 id="srcnged_substation_forecastdefsassetspy"><code>src/nged_substation_forecast/defs/assets.py</code></h4>
+<ul>
+<li><strong>Delete</strong> <code>cv_power_forecasts</code> asset (the current monolithic one).</li>
+<li><strong>Delete</strong> <code>cv_metrics</code> asset.</li>
+<li><strong>Add</strong> <code>cv_experiment_folds = DynamicPartitionsDefinition(name="cv_experiment_folds")</code>.</li>
+<li><strong>Add</strong> <code>eligible_time_series</code> asset (fold-partitioned, experiment-independent; §4.5.1).</li>
+<li><strong>Add</strong> <code>trained_cv_model</code> asset (§4.6).</li>
+<li><strong>Add</strong> <code>cv_power_forecasts</code> asset — same name, new implementation (§4.7).</li>
+<li><strong>Add</strong> <code>metrics</code> asset (§4.8).</li>
+<li><strong>Add</strong> <code>live_forecasts</code> asset (§4.9).</li>
+<li><strong>Add</strong> <code>monitoring_sensor</code> — fires on each <code>power_time_series_and_metadata</code> update, runs
+  <code>metrics(scope="production_monitoring")</code> over the trailing 24h/7d (§4.8.1).</li>
+<li><strong>Every asset is a thin orchestration shell</strong> delegating to small, separately-unit-tested
+  pure functions (§5.4, §5.8); none should mix orchestration with ML logic (the §3.1 mistake).</li>
+<li>Consider splitting into multiple files once this gets long:
+  <code>defs/cv_assets.py</code>, <code>defs/production_assets.py</code>, <code>defs/metric_assets.py</code>.</li>
+</ul>
+<h3 id="52-new-files-to-create">5.2 New Files to Create</h3>
+<ul>
+<li><code>src/nged_substation_forecast/defs/jobs.py</code> — <code>register_experiment_job</code> /
+  <code>RegisterExperimentConfig</code> (§4.3) and <code>retire_experiment_job</code> (§4.3.1). This keeps job
+  definitions separate from asset definitions.</li>
+<li><code>packages/ml_core/src/ml_core/_mlflow_runs.py</code> — the three idempotent run-resolution helpers
+  (§5.6). Single concern: resolving MLflow runs by tag.</li>
+<li>The MLflow artifact persistence (<code>save_to_mlflow</code> / <code>load_from_mlflow</code> + local cache, §4.5)
+  lives as <strong>concrete methods on <code>BaseForecaster</code></strong> (<code>packages/ml_core/.../base_forecaster.py</code>),
+  delegating to each subclass's disk <code>save</code>/<code>load</code>. No separate module: the methods belong with
+  the model interface, and subclasses stay MLflow-free.</li>
+<li><code>packages/ml_core/src/ml_core/_cv_helpers.py</code> — pure, data-only CV helpers, each
+  independently unit-tested (§5.8): <code>training_window(fold)</code>, <code>eligible_time_series_ids(coverage,
+  fold, min_training_months)</code>, <code>_parse_cv_partition_key</code>, <code>flatten_config(config)</code>, and the
+  monitoring window-bounds calculation. Asset bodies stay thin by delegating here.</li>
+<li>A shared inference helper (e.g. <code>predict_and_stamp()</code> in <code>ml_core</code>) factoring the common
+  tail used by both <code>cv_power_forecasts</code> and <code>live_forecasts</code> — <code>forecaster.predict()</code> →
+  stamp identity/fold columns → return <code>PowerForecast</code>. The two assets differ only in how they
+  <em>call</em> <code>engineer_features()</code> (bulk vs single-run; see §5.7), not in the predict/stamp logic.</li>
+</ul>
+<h3 id="53-what-stays-the-same">5.3 What Stays the Same</h3>
+<p>The following are correct and require no changes:</p>
+<ul>
+<li><code>packages/ml_core/src/ml_core/features.py</code> — <code>engineer_features()</code> and all feature
+  classes. (Both operating modes already exist; §5.7 only <em>adds a test</em>, no code change.)</li>
+<li><code>packages/xgboost_forecaster/</code> — <code>XGBoostForecaster</code> and <code>XGBoostConfig</code> (except
+  that <code>XGBoostConfig</code> inherits the new <code>experiment_name</code> field from
+  <code>BaseForecasterConfig</code>, and <code>predict()</code> stamps the new <code>experiment_name</code> column — §5.1).</li>
+<li><code>packages/contracts/src/contracts/ml_schemas.py</code> — <code>AllFeatures</code> is unchanged; the <code>Metrics</code>
+  schema gains <code>evaluation_scope</code> and <code>time_series_type</code> columns (§5.1).</li>
+<li><code>conf/cv/default.yaml</code> — canonical fold definitions; immutable per leaderboard epoch.
+  Currently holds the single MVP fold <code>mid_2025_to_mid_2026</code> (§4.1.2).</li>
+<li><code>conf/model/xgboost.yaml</code> — default XGBoost config.</li>
+<li>All NWP, geo, and NGED data assets.</li>
+</ul>
+<h3 id="54-partition-key-parsing-convention">5.4 Partition Key Parsing Convention</h3>
+<p>Both CV assets will need to parse <code>context.partition_key</code>.  Use a shared helper:</p>
+<pre><code class="language-python">def _parse_cv_partition_key(partition_key: str) -&gt; tuple[str, str]:
+    &quot;&quot;&quot;Return (experiment_name, fold_id) from a CV partition key.
+
+    Partition key format: &quot;{experiment_name}__{fold_id}&quot;
+    The separator is double-underscore to reduce collision risk with
+    experiment names that contain single underscores.
+    &quot;&quot;&quot;
+    experiment_name, fold_id = partition_key.rsplit(&quot;__&quot;, maxsplit=1)
+    return experiment_name, fold_id
+</code></pre>
+<h3 id="55-mlflow-minimal-integration-scope">5.5 MLflow Minimal Integration Scope</h3>
+<p>Only the following MLflow calls are in scope for this implementation:</p>
+<pre><code class="language-python">mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+mlflow.create_experiment(name, tags={...})         # in register_experiment_job
+mlflow.get_experiment_by_name(name)                # in the get_or_create helpers (§5.6)
+mlflow.search_runs(experiment_ids=[...], filter_string=&quot;tags.cv_role = '...'&quot;)  # run lookup by tag
+mlflow.start_run(experiment_id=..., run_name=..., nested=True, tags={...})      # create a run
+mlflow.start_run(run_id=...)                        # resume an existing run by ID
+mlflow.set_tag(&quot;cv_role&quot;, ...); mlflow.set_tag(&quot;fold_id&quot;, ...)
+mlflow.log_params({...})
+mlflow.log_metrics({...})
+mlflow.log_artifacts(local_dir, artifact_path=&quot;model&quot;)        # save_to_mlflow (§4.5)
+mlflow.artifacts.download_artifacts(run_id=..., artifact_path=&quot;model&quot;)  # load_from_mlflow (§4.5)
+</code></pre>
+<p>All run creation and lookup is funnelled through the §5.6 helpers; assets never call
+<code>search_runs</code> / <code>create_experiment</code> directly. Artifact upload/download is funnelled through the
+<code>BaseForecaster.save_to_mlflow</code> / <code>load_from_mlflow</code> methods (§4.5, §5.2).</p>
+<p><strong>Not</strong> in scope: <code>mlflow.pyfunc</code>, model registry, registry-based model promotion.</p>
+<h3 id="56-mlflow-run-resolution-helpers">5.6 MLflow Run-Resolution Helpers</h3>
+<p>Create <code>packages/ml_core/src/ml_core/_mlflow_runs.py</code> (or a small module under the Dagster
+app — wherever both the job and the assets can import it). It houses the three idempotent
+get-or-create functions from §4.1.1 so there is exactly <strong>one</strong> run-resolution path shared by
+<code>register_experiment_job</code>, <code>trained_cv_model</code>, <code>cv_power_forecasts</code>, and <code>metrics</code>:</p>
+<pre><code class="language-python">def get_or_create_experiment(experiment_name: str) -&gt; str: ...
+def get_or_create_parent_run(experiment_id: str) -&gt; str: ...       # tag cv_role=parent
+def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str) -&gt; str: ...
+                                                                   # tags cv_role=fold, fold_id=...
+</code></pre>
+<p>Each returns an ID (never an open run handle). Callers wrap the returned ID in
+<code>with mlflow.start_run(run_id=...)</code> to log and close within their own process. Lookup is by
+tag, making every helper safe to call from any asset and safe under Dagster retries.</p>
+<p><strong>Use <code>MlflowClient.search_runs</code>, not <code>mlflow.search_runs</code>.</strong> The top-level
+<code>mlflow.search_runs(...)</code> returns a <strong>pandas</strong> <code>DataFrame</code> by default, which violates this
+repo's Polars-only rule. The helpers use the lower-level client API, which returns a list of
+<code>Run</code> objects (no pandas):</p>
+<pre><code class="language-python">from mlflow.tracking import MlflowClient
+
+client = MlflowClient()  # honours the tracking URI set via mlflow.set_tracking_uri(...)
+runs = client.search_runs(
+    experiment_ids=[experiment_id],
+    filter_string=&quot;tags.cv_role = 'fold' and tags.fold_id = 'mid_2025_to_mid_2026'&quot;,
+    max_results=1,
+)
+fold_run_id = runs[0].info.run_id if runs else _create_fold_run(...)
+</code></pre>
+<h3 id="57-cross-mode-feature-equivalence-test-the-no-skew-guarantee">5.7 Cross-Mode Feature Equivalence Test (the no-skew guarantee)</h3>
+<p>The "zero training-serving skew" requirement is met by both CV and production calling the
+<em>same</em> <code>engineer_features()</code>, differing only in operating mode:</p>
+<ul>
+<li><strong>CV / backtest</strong> → bulk mode (<code>power_fcst_init_time=None</code>): vectorised over the whole
+  validation window, one forecast per NWP run, <code>power_fcst_init_time = nwp_init_time +
+  nwp_publication_delay_hours</code> per row. No Python loop over NWP runs.</li>
+<li><strong>Production</strong> → single-run mode (explicit <code>power_fcst_init_time</code>), per §4.9.</li>
+</ul>
+<p>Because these are two code paths through one function, add a <strong>regression test</strong> asserting they
+produce <strong>identical</strong> <code>AllFeatures</code> rows for the same keys. Concretely: take a fixture spanning
+several <strong>daily</strong> NWP runs (real ECMWF ENS is issued <strong>once per day, at 00 UTC</strong> — not 6-hourly);
+run bulk mode; then for each <code>nwp_init_time</code> run single-run <strong>replay</strong> mode with
+<code>power_fcst_init_time = nwp_init_time + nwp_publication_delay_hours</code>; assert the rows match
+exactly on <code>(time_series_id, power_fcst_init_time, valid_time, ensemble_member)</code> and on every
+feature column. This test is the enforceable form of the no-skew requirement — if a future
+change diverges the two modes, it fails.</p>
+<p><strong>Cadence mismatch (a known scientific subtlety).</strong> We receive <strong>one</strong> NWP run per day (00 UTC)
+but new NGED power data <strong>every 6 hours</strong>, and production issues a forecast every 6 hours. So
+3 of the 4 daily production runs reuse the <em>same</em> (older) NWP run with <strong>fresher power lags</strong> —
+the 6-hourly cadence buys fresher power, not fresher weather. Two consequences worth recording:
+(a) bulk mode derives <code>power_fcst_init_time = nwp_init_time + delay</code>, i.e. <strong>one</strong> forecast per
+NWP run (once daily), so CV currently backtests only the once-daily forecast and <strong>under-samples
+the intraday production runs</strong>; and (b) at the 06/12/18 production runs the NWP is 6/12/18 h old,
+a <code>power_fcst_init_time − nwp_init_time</code> regime the model rarely sees in training (where it is
+always ≈ <code>delay</code>). For v1 this is acceptable (the daily forecast is the representative case), but
+making bulk mode emit forecasts at the full 6-hourly <code>power_fcst_init_time</code> grid per NWP run is a
+candidate future refinement (see §6).</p>
+<h3 id="58-testing-strategy">5.8 Testing Strategy</h3>
+<p><strong>Principle:</strong> every asset/job is a <em>thin orchestration shell</em> over small, single-purpose pure
+functions. The pure functions carry the logic and get fast unit tests; the shells get a few
+slower integration tests that exercise the real wiring (Dagster + MLflow + Delta). This is also
+what keeps functions short (§5.2) and avoids the §3.1 "long asset mixing orchestration and ML"
+mistake.</p>
+<p><strong>Test infrastructure (shared fixtures):</strong>
+- A <strong>file-based MLflow</strong> tracking URI in a <code>tmp_path</code> (<code>mlflow.set_tracking_uri("file://…")</code>) —
+  no server needed; the helpers already honour an injected URI.
+- <strong>Temp Delta</strong> directories for <code>power_forecasts</code> / <code>forecast_metrics</code>.
+- <strong>Tiny synthetic</strong> power + NWP fixtures (a handful of <code>time_series_id</code>s, a few daily NWP runs).
+- An <strong>injected clock</strong>: <code>now</code> is passed in (not read from <code>datetime.now()</code> inside assets), so
+  <code>live</code> <code>t0</code> and the monitoring 24h/7d windows are deterministic and testable.
+- An integration marker (e.g. <code>@pytest.mark.integration</code>) so the pure-unit suite stays fast.</p>
+<p><strong>Unit tests (pure, no I/O) — in <code>_cv_helpers.py</code> / forecasters:</strong>
+- <code>training_window(fold)</code> — <strong>inclusive end-of-day</strong> <code>[train_start 00:00:00, train_end
+  23:59:59]</code>; explicitly covers the <code>train_end</code> bug fix and the train/val boundary (§5.1).
+- <code>eligible_time_series_ids(coverage, fold, min_training_months)</code> — migrate
+  <code>test_cross_validate_excludes_ineligible_time_series</code>; assert it is a function of <strong>data only</strong>
+  (same result for any model/config).
+- <code>_parse_cv_partition_key</code> — round-trips, <strong>including experiment names containing <code>__</code></strong>.
+- <code>flatten_config(config)</code> — nested config → flat MLflow params.
+- monitoring <strong>window-bounds</strong> — given an injected <code>now</code>, returns the right 24h/7d
+  <code>[window_start, window_end]</code>.
+- <code>predict_and_stamp(...)</code> — stamps <code>power_fcst_model_name</code>/<code>_version</code>/<code>experiment_name</code>/
+  <code>fold_id</code> correctly.
+- <strong>Already covered, keep:</strong> feature-level no-lookahead (<code>test_nullify_leaky_lags</code>,
+  <code>test_engineer_features_weather_lag_leakage_prevention</code>,
+  <code>test_engineer_features_power_lag_nullification_end_to_end</code>,
+  <code>test_parsed_features_forbids_power_target_leakage</code>, bulk-mode derivation);
+  <code>compute_metrics</code> correctness; <code>XGBoostForecaster</code> save/load round-trip and "raises for unseen
+  ts_id".</p>
+<p><strong>Component/integration tests (file-based MLflow + temp Delta):</strong>
+- <code>_mlflow_runs</code> get-or-create <strong>idempotency</strong>: calling twice returns the <em>same</em> run id;
+  parent/fold runs resolve by tag.
+- <code>BaseForecaster</code> MLflow persistence: <code>save_to_mlflow</code> → <code>load_from_mlflow</code> round-trip; <strong>cache
+  hit vs miss</strong> (download once, then served from local cache; survives a simulated MLflow outage
+  when cached).
+- <code>register_experiment_job</code>: creates the experiment + parent run + grouping tags + the right
+  partition keys (from <code>conf/cv/default.yaml</code>); idempotent on re-registration.
+- <code>retire_experiment_job</code>: <strong>refuses</strong> to delete when results are absent; deletes only when both
+  MLflow + Delta results exist.</p>
+<p><strong>End-to-end integration tests (Dagster in-process <code>materialize([...])</code>):</strong>
+- One-fold CV: <code>eligible_time_series</code> → <code>trained_cv_model</code> → <code>cv_power_forecasts</code> →
+  <code>metrics(leaderboard)</code>. Assert forecasts land in Delta, and metrics land in Delta <strong>and</strong> on
+  the MLflow parent/fold runs.
+- <strong>Idempotency</strong> (guards §4.7/§4.9): materialise a fold <strong>twice</strong>; assert <code>power_forecasts</code> row
+  count is unchanged (overwrite, not append).
+- <code>live_forecasts</code> in <strong><code>live</code> and <code>replay</code></strong>: assert the two modes select different NWP runs
+  (replay applies <code>nwp_publication_delay_hours</code>), that only <code>trained_time_series_ids</code> are
+  forecast, and that all <strong>51 ensemble members</strong> are present.
+- Monitoring: <code>metrics(production_monitoring)</code> writes trailing-window rows (with
+  <code>window_label</code>/<code>window_start</code>/<code>window_end</code>/<code>computed_at</code>) to Delta and the
+  <code>production_monitoring</code> MLflow experiment, and <strong>never</strong> touches a leaderboard run.</p>
+<p><strong>Scientific-rigor tests (the "not cheating" guardrails):</strong>
+- <strong>Cross-mode equivalence</strong> (§5.7) — bulk == single-run features for matching keys (daily NWP).
+- <strong>CV-windowing no-lookahead</strong> (new, complements the feature-level tests): no <em>training</em> row has
+  <code>valid_time ≥ val_start</code> for its fold.
+- <strong>Leaderboard fairness:</strong> two different experiments over the same fold are scored on the
+  <strong>identical</strong> <code>(time_series_id, fold)</code> population (because <code>eligible_time_series</code> is
+  experiment-independent).
+- <strong>Determinism:</strong> training a fold twice with a fixed <code>random_seed</code> yields identical predictions
+  (underpins idempotent retries and a stable leaderboard).</p>
+<hr />
+<h2 id="6-known-limitations-and-future-work">6. Known Limitations and Future Work</h2>
+<ul>
+<li>
+<p><strong>Champion model promotion:</strong> currently <code>settings.production_model_run_id</code> is set
+  manually.  A later (post-v1) phase will add a <code>champion_model</code> Dagster asset that queries
+  MLflow for the experiment/run tagged <code>"Production"</code> and writes the run ID to a well-known
+  location, removing the need for manual <code>.env</code> edits.</p>
+</li>
+<li>
+<p><strong>Ensemble NWP — train on control, infer on all 51 members (CV <em>and</em> production).</strong> Training
+  uses only the control member (member 0) for now — training on all 51 would need XGBoost's
+  iterator API for out-of-core data, which is deferred. But <strong>inference must run on all 51 NWP
+  ensemble members</strong> in both CV and production, because the probabilistic leaderboard metrics
+  (PICP, CRPS, Spread-Skill Ratio) are meaningless on a single-member "ensemble". So
+  <code>cv_power_forecasts</code> and <code>live_forecasts</code> both predict across all 51 members and write 51
+  <code>ensemble_member</code> rows per <code>(time_series_id, valid_time)</code>; the <code>metrics</code> asset's probabilistic
+  metrics consume that ensemble. (Training-on-control + inference-on-51 matches the Milestone 1
+  report and <code>docs/roadmap/index.md</code> v0.1.)</p>
+</li>
+<li>
+<p><strong>Adding a fold (fold promotion):</strong> when a new validation window completes and its NGED data
+  lands (and, for the move to the yearly protocol, once ECMWF ENS is backfilled), promote it by
+  adding the fold to <code>conf/cv/default.yaml</code>. No schema change is needed — <code>FoldId</code> is a plain <code>str</code>
+  (§4.1.2). Promotion starts a <em>new leaderboard epoch</em> (every experiment must be re-scored against
+  the new fold set for apples-to-apples comparison).</p>
+</li>
+<li>
+<p><strong>Concurrent Delta writes:</strong> parallel experiments are safe because they write to different
+  <code>experiment_name</code> partition directories, and re-runs are safe because each write is an
+  idempotent partition overwrite (§4.7, §4.9) rather than an append — so retries can no longer
+  duplicate rows. The only residual risk is two processes overwriting the <em>exact same</em>
+  partition simultaneously (the same fold of the same experiment launched twice at once), which
+  delta-rs may surface as a transaction-log conflict; Dagster's per-partition run concurrency
+  normally prevents this, and a retry resolves it if it occurs.</p>
+</li>
+<li>
+<p><strong>Intraday forecast cadence in CV (under-sampling):</strong> NWP arrives once daily (00 UTC) but
+  production forecasts every 6 hours, reusing the day's NWP with fresher power lags. Bulk-mode CV
+  derives one <code>power_fcst_init_time</code> per NWP run, so it backtests only the once-daily forecast
+  and does not score the 06/12/18 intraday runs (§5.7). A future refinement is to have bulk mode
+  emit forecasts at the full 6-hourly <code>power_fcst_init_time</code> grid per NWP run, so CV mirrors the
+  production cadence exactly. For v1 the once-daily forecast is treated as representative.</p>
+</li>
+<li>
+<p><strong>Automated "auto-research" loop (future):</strong> in a few months we plan to drive experimentation
+  with an LLM agent (Karpathy-style auto-research): propose config → register → materialise →
+  read leaderboard → iterate, with <strong>no human in the loop and no Dagster UI in the path</strong>. The
+  design already supports each step (programmatic <code>register_experiment_job</code>, MLflow as a
+  machine-readable leaderboard, <code>retire_experiment_job</code> for cleanup). The one thing to add when
+  we get there is a thin Python/CLI surface for "fetch the parent-run aggregate metrics for
+  experiment X" so the agent reads results without scraping the UI. See <code>docs/roadmap/index.md</code>. Not
+  built now.</p>
+</li>
+</ul>
+<hr />
+<h2 id="7-implementation-sequence">7. Implementation Sequence</h2>
+<p>This is a large change. Implement it in the <strong>ordered phases</strong> below. Each phase is sized to be a
+single focused work session (and a single commit/PR on the <code>dagster-ML-assets</code> branch), and each
+phase ends with a <strong>green tree</strong> and, wherever possible, <strong>something the user can materialise /
+run</strong> to see progress. Do <strong>not</strong> start a phase before the previous one is merged and green.</p>
+<h3 id="70-ground-rules-for-the-implementation-agent">7.0 Ground rules for the implementation agent</h3>
+<ul>
+<li><strong>Follow <code>CLAUDE.md</code></strong>: Python 3.14+, <strong>Polars only (pandas forbidden — in particular do not let
+  <code>mlflow.search_runs</code> return a pandas frame; use <code>MlflowClient.search_runs</code>, §5.6)</strong>, Patito for
+  all schemas, ruff (100 cols, double quotes, Google docstrings), full type hints.</li>
+<li><strong>Definition of done for every phase:</strong> <code>uv run ruff check . &amp;&amp; uv run ruff format --check . &amp;&amp;
+  uv run ty check &amp;&amp; uv run pytest</code> all pass. Never relax an existing test to make it pass — if a
+  test must change because the contract changed, change it deliberately and call it out.</li>
+<li><strong>Thin shells over pure helpers</strong> (§5.2, §5.8): asset/job bodies orchestrate; logic lives in
+  pure, separately-unit-tested functions. If an asset body grows past ~40 lines, extract.</li>
+<li><strong>Keep the tree green by coexistence:</strong> the <em>old</em> <code>cv_power_forecasts</code> / <code>cv_metrics</code> assets and
+  <code>cross_validate()</code> keep working until the phase that introduces their replacement deletes them
+  (noted per phase). Where a pure helper is extracted early, have the old code <em>call</em> it so there
+  is one implementation, not two.</li>
+<li><strong>The §-references are the spec.</strong> Each phase points at the sections that define the behaviour;
+  read them before coding.</li>
+<li>One phase = one commit; name the phase in the commit message.</li>
+</ul>
+<h3 id="701-phase-0-clear-the-decks-do-this-first-completed-in-pr-182">7.0.1 Phase 0 — Clear the decks (do this first) - Completed in PR #182</h3>
+<p>When this branch started it went a slightly wrong direction (the monolithic single-loop CV,
+§3.1). Delete that code <strong>first</strong>, in its own small PR, so every later phase adds the new design
+against a clean baseline instead of diffing against soon-to-be-deleted code.</p>
+<ul>
+<li><strong>Delete</strong> <code>packages/ml_core/src/ml_core/cross_validate.py</code> (the rejected single-<code>for</code>-loop
+  <code>cross_validate()</code>, §3.1) and <code>packages/ml_core/tests/test_cross_validate.py</code>.</li>
+<li><strong>Delete</strong> the <code>cv_power_forecasts</code> and <code>cv_metrics</code> assets <strong>and</strong> the
+  <code>from ml_core.cross_validate import cross_validate</code> import in
+  <code>src/nged_substation_forecast/defs/assets.py</code>. <strong>Keep</strong> the data-layer assets
+  (<code>power_time_series_and_metadata</code>, <code>ecmwf_ens</code>, <code>h3_grid_weights</code>).</li>
+<li><strong>Fix</strong> the stale docstring in <code>ml_core/metrics.py</code> that points at
+  <code>ml_core.cross_validate.cross_validate</code> (the only remaining reference once the import is gone).</li>
+<li><strong>Remove</strong> the now-orphaned <code>cv_metrics_data_path</code> field from <code>settings.py</code> — its only consumer
+  (the deleted <code>cv_metrics</code> asset) is gone. (<code>forecast_metrics_data_path</code> is added later, in
+  Phase 1, §5.1.)</li>
+<li><strong>(Optional hygiene)</strong> delete superseded planning docs under <code>docs/temp/</code> (e.g.
+  <code>detailed_plan_for_Dagster_ML_assets.md</code>); keep this <code>dagster_plan.md</code>.</li>
+<li><strong>Do NOT delete</strong> — the new design builds on these: <code>conf/cv/default.yaml</code>,
+  <code>conf/model/xgboost.yaml</code>, <code>hydra_schemas.CvFoldConfig</code>, the <code>ml_schemas</code> <code>Metrics</code> schema,
+  <code>metrics.compute_metrics</code> (+ <code>test_metrics</code>), and the <code>power_schemas</code> / <code>base_forecaster</code> /
+  <code>xgboost_forecaster</code> changes already on the branch.</li>
+<li>The eligibility and train/val-window logic in the deleted <code>cross_validate.py</code> is <strong>re-created
+  fresh and correct</strong> in <code>_cv_helpers.py</code> in Phase 1 (the deleted version carried the <code>train_end</code>
+  bug, so re-deriving is better than salvaging); the intent of
+  <code>test_cross_validate_excludes_ineligible_time_series</code> returns as a new unit test there.</li>
+<li><strong>User can verify:</strong> <code>uv run pytest</code> is green (and smaller); <code>uv run dg dev</code> loads with the
+  monolithic CV assets gone and the data-layer assets intact.</li>
+</ul>
+<h3 id="71-phase-1-contracts-settings-pure-helpers-equivalence-test-foundation-completed-in-pr-183">7.1 Phase 1 — Contracts, settings, pure helpers, equivalence test (foundation) - Completed in PR #183</h3>
+<p><em>No new Dagster asset yet — this is the typed foundation everything else builds on.</em></p>
+<ul>
+<li><strong>Contracts</strong> (§5.1): <code>PowerForecast.experiment_name</code>; <code>Metrics</code> schema gains
+  <code>evaluation_scope</code>, <code>time_series_type</code>, <code>window_start/window_end/window_label/computed_at</code>,
+  <code>mlflow_run_id</code>; <code>BaseForecasterConfig.experiment_name</code> + <code>random_seed</code>. Update affected
+  contract tests (<code>test_power_forecast</code>, <code>test_ml_schemas</code>, <code>test_settings</code>).</li>
+<li><strong>Settings</strong> (§5.1): add <code>production_model_run_id</code>, <code>model_cache_base_path</code>, and
+  <code>forecast_metrics_data_path</code> (the old <code>cv_metrics_data_path</code> was removed in Phase 0).</li>
+<li><strong><code>base_forecaster</code> / <code>xgboost_forecaster</code></strong> (§5.1): <code>predict()</code> stamps <code>experiment_name</code>;
+  <code>save()</code> records <code>trained_time_series_ids</code> in <code>meta.json</code>; thread <code>random_seed</code> into training.
+  Update <code>test_forecaster</code>.</li>
+<li><strong><code>_cv_helpers.py</code></strong> (§5.2): write fresh (the old <code>cross_validate.py</code> was removed in Phase 0)
+  <code>training_window(fold)</code> (the <code>train_end</code> <strong>inclusive end-of-day</strong> fix, §5.1),
+  <code>eligible_time_series_ids(...)</code>, <code>_parse_cv_partition_key</code>, <code>flatten_config</code>. Unit tests per
+  §5.8, including a new eligibility test that re-establishes the intent of the deleted
+  <code>test_cross_validate_excludes_ineligible_time_series</code>.</li>
+<li><strong>Cross-mode equivalence test</strong> (§5.7) — needs only the existing <code>engineer_features</code>, so land it
+  now as an early rigor win.</li>
+<li><strong>User can verify:</strong> <code>uv run pytest</code> green; the new helper + equivalence tests demonstrate the
+  <code>train_end</code> fix and the no-skew guarantee.</li>
+</ul>
+<h3 id="715-phase-15-unify-power-lag-source-option-b-completed-in-pr-183">7.1.5 Phase 1.5 — Unify power-lag source (Option B) - Completed in PR #183</h3>
+<p><em>Small standalone change; must land before Phase 5 (backtesting), where the bug below surfaces.</em></p>
+<p>Phase 1's equivalence test had to <strong>exclude power lags</strong> because the two modes sourced them
+differently: bulk mode self-joined the NWP-gridded frame (<code>_apply_power_lag(engineered_lf,
+engineered_lf, ...)</code>) while single-run mode effectively read from the dense observed-power
+series. That divergence is a <strong>training/serving skew</strong> on power lags, and the self-join also
+hides a <strong>fan-out duplication bug</strong>: real ECMWF runs overlap, so a <code>valid_time</code> appears under
+many <code>nwp_init_time</code>s, replicating <code>(time_series_id, valid_time)</code> rows and double-counting
+lagged power.</p>
+<ul>
+<li><strong>Fix:</strong> source power lags from the dense observed-power series (<code>power_lf</code>, one row per
+  <code>(time_series_id, valid_time)</code>) in <strong>both</strong> modes. Thread <code>observed_power_lf</code> through
+  <code>_apply_post_join_features</code> into <code>_apply_power_lag</code>. The lookup frame carries no
+  <code>ensemble_member</code>, so <code>id_keys</code> collapses to <code>["time_series_id"]</code> — correct, since power
+  observations don't vary by ensemble member, and fan-out-safe.</li>
+<li><strong>Naming:</strong> the now-meaningful second parameter motivates clearer helper signatures —
+  <code>_apply_power_lag(engineered_features_lf, observed_power_lf, ...)</code> and
+  <code>_apply_weather_lag(engineered_features_lf, nwp_lf, ...)</code>, each with an <code>Args:</code> docstring
+  (replaces the weak <code>target_lf</code> / <code>source_lf</code>).</li>
+<li><strong>Equivalence test:</strong> drop the power-lag exclusion — add <code>power_lag_3h</code> to the compared
+  features and extend the fixture's power series with pre-window history so the lag resolves to
+  a real observed value.</li>
+<li><strong>Rolling-mean concern (investigated, resolved):</strong> <code>_apply_rolling_mean_feature</code> was flagged as
+  a possible parallel. Investigation found no fan-out (it joins back on the full primary key, 1:1)
+  and that weather rolling means are cross-mode-consistent — single-run mode pads each
+  <code>(ts, nwp_init_time, member)</code> group with null-weather rows that null-skipping aggregations
+  ignore. This is now locked by the equivalence test, and the null-skipping invariant is
+  documented on the function. A multi-stat weather extension
+  (<code>rolling_{mean,min,max,std,median,sum}</code>) is captured as a ready TODO; power rolling remains
+  forbidden (it would follow the Option-B pattern, anchored at <code>T_init</code>).</li>
+<li><strong>User can verify:</strong> <code>uv run pytest</code> green; the equivalence test now asserts power lags <strong>and</strong>
+  the weather rolling mean match across modes.</li>
+</ul>
+<h3 id="72-phase-2-eligible_time_series-asset-completed-in-pr-184">7.2 Phase 2 — <code>eligible_time_series</code> asset - Completed in PR #184</h3>
+<ul>
+<li>Implement the fold-partitioned, experiment-independent asset (§4.5.1) over <code>_cv_helpers</code>.</li>
+<li>Tests: unit (from Phase 1) + an integration test materialising it on synthetic data.</li>
+<li><strong>User can verify:</strong> materialise <code>eligible_time_series</code> in the Dagster UI and inspect the
+  per-fold eligible <code>time_series_id</code> lists. <em>(First tangible Dagster deliverable.)</em></li>
+</ul>
+<h3 id="73-phase-3-mlflow-run-resolution-model-store-register_experiment_job-completed-in-pr-185">7.3 Phase 3 — MLflow run resolution, model store, <code>register_experiment_job</code> - Completed in PR #185</h3>
+<ul>
+<li><code>_mlflow_runs.py</code> (§5.6), the <code>BaseForecaster.save_to_mlflow</code> / <code>load_from_mlflow</code> methods
+  (§4.5), <code>register_experiment_job</code> / <code>RegisterExperimentConfig</code>, and the <code>cv_experiment_folds</code>
+  <code>DynamicPartitionsDefinition</code> (§4.3).</li>
+<li>Tests: get-or-create <strong>idempotency</strong> against a file-based MLflow;
+  <code>save_to_mlflow</code>/<code>load_from_mlflow</code> round-trip + cache hit/miss; register job creates experiment</li>
+<li>parent run + grouping tags + the right partition keys (§5.8).</li>
+<li><strong>User can verify:</strong> run <code>register_experiment_job</code> from the Dagster UI/CLI; see the MLflow
+  experiment + parent run (config params + grouping tags) appear, and the new
+  <code>__mid_2025_to_mid_2026</code> key shows up in the <code>cv_experiment_folds</code> partition set.</li>
+</ul>
+<h3 id="731-phase-35-re-consider-cv-folds-completed-in-pr-186">7.3.1 Phase 3.5 - Re-consider CV folds — Completed in PR #186</h3>
+<p><strong>Decision:</strong> use a <strong>single MVP fold</strong> for now (ECMWF ENS only), because honest forecast-skill
+validation needs real forecast NWP for both training and validation, and our ECMWF ENS archive
+only reaches back to 2024-04-01.</p>
+<ul>
+<li>Fold <code>mid_2025_to_mid_2026</code>: train <code>2024-04-01 → 2025-06-30</code> (15 months, maximising training
+  data), validate <code>2025-07-01 → 2026-06-30</code> (12 months, seasonally complete). This code won't be
+  ready to train until after 2026-06-30, by which point the validation window has closed.</li>
+<li><strong>The plan is to move to the target multiple-yearly-fold protocol</strong> (expanding training window,
+  one validation year per fold — the original §4.1 design) <strong>once Dynamical.org has backfilled
+  ECMWF ENS</strong> to the earlier years.</li>
+<li><code>FoldId</code> becomes a plain <code>str</code> (<code>"live"</code> stays the production sentinel) so fold identity is fully
+  config-driven; switching fold sets is then a <code>conf/cv/default.yaml</code> edit, not a schema change.</li>
+<li>Alternatives considered and why they were not chosen (monthly expanding CV — redundant,
+  correlated folds; quarterly non-overlapping walk-forward — the sound multi-fold option, deferred;
+  CERRA for pre-2024 validation — reanalysis ≠ forecast, reserved for pre-training) are recorded in
+  <strong>docs/ml_experimentation/cross-validation-folds.md</strong>.</li>
+<li>Implementation: rewrite <code>conf/cv/default.yaml</code> to the single fold; relax <code>FoldId</code> to <code>str</code>;
+  update the affected schema/asset docstrings and tests. No fold-<em>mechanics</em> code changes (the
+  windowing in <code>ml_core._cv_helpers</code> is already generic over arbitrary train/val dates).</li>
+</ul>
+<h3 id="74-phase-4-trained_cv_model-asset">7.4 Phase 4 — <code>trained_cv_model</code> asset</h3>
+<ul>
+<li>Implement §4.6 (read config from MLflow, read eligible set, <code>engineer_features</code>, <code>train</code>,
+  <code>save_to_mlflow</code>, log training params to the fold run).</li>
+<li>Tests: integration test materialising one fold (uses Phases 2 + 3).</li>
+<li><strong>User can verify:</strong> register a <code>smoke_test</code> experiment, materialise <code>trained_cv_model</code> for the
+  <code>__mid_2025_to_mid_2026</code> partition; see the model artifact + fold run with training params in
+  MLflow.</li>
+</ul>
+<h3 id="75-phase-5-cv_power_forecasts-asset">7.5 Phase 5 — <code>cv_power_forecasts</code> asset</h3>
+<ul>
+<li>Implement §4.7 (<code>load_from_mlflow</code>, predict on <strong>all 51 members</strong> for the model's
+  <code>trained_time_series_ids</code>, <strong>idempotent partition overwrite</strong> into <code>power_forecasts</code>, log
+  prediction metrics to the fold run). <strong>Delete the old monolithic <code>cv_power_forecasts</code>.</strong></li>
+<li>Tests: materialise predict for the smoke-test fold; <strong>idempotency</strong> (materialise twice →
+  <code>power_forecasts</code> row count unchanged); assert 51 ensemble members present.</li>
+<li><strong>User can verify:</strong> materialise <code>cv_power_forecasts</code> for <code>__mid_2025_to_mid_2026</code>, query the
+  <code>power_forecasts</code> Delta table; re-materialise and confirm no duplicate rows.</li>
+</ul>
+<h3 id="76-phase-6-metrics-asset-leaderboard-ad_hoc-full-cv-loop-works">7.6 Phase 6 — <code>metrics</code> asset (leaderboard + ad_hoc) → full CV loop works</h3>
+<ul>
+<li>Implement §4.8 for the <code>leaderboard</code> and <code>ad_hoc</code> scopes (typed <code>PopulationFilter</code>, join
+  actuals, <code>compute_metrics</code>, per-<code>time_series_type</code> + <code>"all"</code> aggregation, write
+  <code>forecast_metrics</code> with window columns, log leaderboard aggregates to parent/fold runs).
+  <strong>Delete the old <code>cv_metrics</code> asset.</strong></li>
+<li><strong>Full-stack integration test (§5.8, §7.10):</strong> add the <strong>cross-process</strong> full-stack test here —
+  a real <code>mlflow server</code> subprocess + a real <code>DagsterInstance</code> running
+  <code>register → trained_cv_model → cv_power_forecasts → metrics</code>, so the <strong>by-tag cross-process run
+  resolution (§4.1.1)</strong> and the <strong>artifact round-trip (§4.5)</strong> are exercised for real.</li>
+<li><strong>User can verify:</strong> the <strong>entire CV leaderboard loop works for one experiment</strong> — after
+  materialising the smoke-test fold + <code>metrics</code>, the MLflow parent run shows the aggregate
+  leaderboard metrics and <code>forecast_metrics</code> holds the per-type/overall rows. <em>(Milestone.)</em></li>
+</ul>
+<h3 id="77-phase-7-live_forecasts-asset">7.7 Phase 7 — <code>live_forecasts</code> asset</h3>
+<ul>
+<li>Implement §4.9 (<code>load_from_mlflow</code> from cache by <code>production_model_run_id</code>, single-run inference
+  on 51 members in <code>live</code>/<code>replay</code>, forecast only <code>trained_time_series_ids</code>, idempotent overwrite,
+  <code>fold_id="live"</code>).</li>
+<li>Tests: <code>live</code> vs <code>replay</code> select different NWP runs; trained-IDs-only; 51 members; idempotency.</li>
+<li><strong>User can verify:</strong> set <code>production_model_run_id</code> to a model from Phase 4, materialise
+  <code>live_forecasts</code> for the current partition, see live forecasts in <code>power_forecasts</code>.</li>
+</ul>
+<h3 id="78-phase-8-production_monitoring-scope-monitoring_sensor-retire_experiment_job">7.8 Phase 8 — <code>production_monitoring</code> scope, <code>monitoring_sensor</code>, <code>retire_experiment_job</code></h3>
+<ul>
+<li>Add the <code>production_monitoring</code> scope to <code>metrics</code> (time-series logging to the dedicated
+  experiment + trailing 24h/7d window columns; §4.8.1), the <code>monitoring_sensor</code> (§4.8.1), and
+  <code>retire_experiment_job</code> (§4.3.1).</li>
+<li>Tests: sensor fires on a power update and runs <code>metrics(production_monitoring)</code>; monitoring rows
+  land in Delta + the <code>production_monitoring</code> experiment and <strong>never</strong> on the leaderboard; retire
+  job refuses to delete when results are absent and deletes when present.</li>
+<li><strong>User can verify:</strong> trigger a power update (or the sensor), see trailing-24h/7d metrics in the
+  <code>production_monitoring</code> MLflow experiment + <code>forecast_metrics</code>; run <code>retire_experiment_job</code> on a
+  throwaway experiment and watch its partitions disappear (MLflow/Delta records retained).</li>
+</ul>
+<h3 id="79-phase-9-remaining-rigor-tests-and-cleanup">7.9 Phase 9 — Remaining rigor tests and cleanup</h3>
+<ul>
+<li>Add the remaining rigor tests (§5.8): CV-windowing no-lookahead, leaderboard fairness,
+  determinism. (<code>cross_validate()</code> was already removed in Phase 0.) Remove any remaining dead
+  code/imports; split <code>defs/assets.py</code> into
+  <code>cv_assets.py</code>/<code>production_assets.py</code>/<code>metric_assets.py</code> if it has grown long (§5.1).</li>
+<li><strong>User can verify:</strong> full <code>uv run pytest</code> green, <strong>including the full-stack cross-process
+  integration test</strong>.</li>
+<li><strong>Docs:</strong> Update <code>docs/</code>. Check the docs are still up-to-date with the code. Add docs to
+  (briefly) intro new users to the flow that our new code implements, and the reasoning behind it,
+  and how to run the dagster pipeline. Also make sure the permanent docs (i.e. the docs that live in
+  <code>docs/</code> but not in <code>docs/temp/</code>) capture any important ideas from <code>docs/temp/dagster_plan.md</code>,
+  because <code>dagster_plan.md</code> will be deleted once this plan has been implemented in code. In
+  particular, check if the permanent docs describe the aims and main design ideas of the ML R&amp;D and
+  MLops.</li>
+</ul>
+<h3 id="710-a-note-on-the-full-stack-integration-tests">7.10 A note on the full-stack integration tests</h3>
+<p>§5.8's default integration tier uses a <strong>file-based MLflow</strong> URI + <strong>in-process Dagster
+<code>materialize</code></strong> — fast, and right for most wiring. But <strong>at least one</strong> test (added in Phase 6,
+re-run in Phase 9) must spin up the <strong>full stack</strong>: a real <strong><code>mlflow server</code></strong> subprocess (its own
+backend store + artifact root) and a real <strong><code>DagsterInstance</code></strong> running the assets in <strong>separate
+processes</strong>. Only that configuration proves the two things this design most depends on: the
+<strong>cross-process, resume-by-tag run model (§4.1.1)</strong> and the <strong>artifact upload/download +
+local-cache</strong> path (§4.5). Keep it behind the <code>@pytest.mark.integration</code> marker so the fast unit
+suite is unaffected.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
