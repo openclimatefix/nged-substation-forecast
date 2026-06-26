@@ -103,3 +103,6 @@ filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
 ]
 norecursedirs = [".venv", "venv", ".git", "__pycache__"]
+markers = [
+    "integration: tests that exercise real wiring (Dagster + file-based MLflow + temp Delta)",
+]

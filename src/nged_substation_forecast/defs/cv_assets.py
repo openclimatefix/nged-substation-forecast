@@ -5,11 +5,18 @@ thin orchestration shell delegating its logic to the pure helpers in ``ml_core._
 the logic stays fast to unit-test and the assets stay readable.
 """
 
+from typing import Final
+
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, StaticPartitionsDefinition, asset
+from dagster import (
+    AssetExecutionContext,
+    DynamicPartitionsDefinition,
+    StaticPartitionsDefinition,
+    asset,
+)
 from deltalake import write_deltalake
 from ml_core._cv_helpers import eligible_time_series_ids
 
@@ -22,6 +29,21 @@ _cv_config = load_cv_config(Settings.model_fields["cv_config_path"].default)
 
 cv_fold_partitions = StaticPartitionsDefinition(_cv_config.fold_ids)
 """One partition per canonical CV fold (by fold year, e.g. "2022"). Experiment-independent."""
+
+CV_EXPERIMENT_FOLDS_NAME: Final[str] = "cv_experiment_folds"
+"""Name of the dynamic partition set keyed by ``"{experiment_name}__{fold_id}"``.
+
+A named constant so callers (``register_experiment_job``) pass a definite ``str`` to
+``instance.add_dynamic_partitions`` / ``get_dynamic_partitions``.
+"""
+
+cv_experiment_folds = DynamicPartitionsDefinition(name=CV_EXPERIMENT_FOLDS_NAME)
+"""One partition per (experiment, fold); key format ``"{experiment_name}__{fold_id}"``.
+
+Keys are added by ``register_experiment_job`` and consumed by the per-fold CV assets
+(``trained_cv_model`` / ``cv_power_forecasts``). Dynamic (not static) because experiments are
+registered at runtime and there can be thousands of them.
+"""
 
 
 @asset(
