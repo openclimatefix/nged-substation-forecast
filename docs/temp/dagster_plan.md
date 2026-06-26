@@ -1210,7 +1210,7 @@ lagged power.
 - **User can verify:** `uv run pytest` green; the equivalence test now asserts power lags **and**
   the weather rolling mean match across modes.
 
-### 7.2 Phase 2 — `eligible_time_series` asset - Completed
+### 7.2 Phase 2 — `eligible_time_series` asset - Completed in PR #184
 
 - Implement the fold-partitioned, experiment-independent asset (§4.5.1) over `_cv_helpers`.
 - Tests: unit (from Phase 1) + an integration test materialising it on synthetic data.
