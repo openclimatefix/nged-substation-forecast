@@ -5,10 +5,10 @@ from datetime import date, datetime, timezone
 import polars as pl
 from contracts.hydra_schemas import CvFoldConfig
 from ml_core._cv_helpers import (
-    _parse_cv_partition_key,
     _subtract_months,
     eligible_time_series_ids,
     flatten_config,
+    parse_cv_partition_key,
     training_window,
 )
 from pydantic import BaseModel
@@ -143,16 +143,16 @@ def test_eligible_time_series_ids_respects_min_training_months() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _parse_cv_partition_key — round trips, including names containing "__"
+# parse_cv_partition_key — round trips, including names containing "__"
 # ---------------------------------------------------------------------------
 
 
 def test_parse_cv_partition_key_simple() -> None:
-    assert _parse_cv_partition_key("baseline__2022") == ("baseline", "2022")
+    assert parse_cv_partition_key("baseline__2022") == ("baseline", "2022")
 
 
 def test_parse_cv_partition_key_experiment_name_with_double_underscore() -> None:
-    assert _parse_cv_partition_key("my__weird__exp__2022") == ("my__weird__exp", "2022")
+    assert parse_cv_partition_key("my__weird__exp__2022") == ("my__weird__exp", "2022")
 
 
 # ---------------------------------------------------------------------------

@@ -82,6 +82,16 @@ def _resolve_forecaster_config(
     return forecaster_cls, forecaster_config
 
 
+def _class_target(obj: type | object) -> str:
+    """Return the fully-qualified import path of a class (or an instance's class).
+
+    Used to stamp the forecaster and config class identity onto the MLflow experiment so assets
+    can reconstruct them later via ``hydra.utils.get_class`` (see ``load_experiment_forecaster``).
+    """
+    cls = obj if isinstance(obj, type) else type(obj)
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
 def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
     """Return the fold ids a run mode expands to (read from the CV config, never hard-coded).
 
@@ -113,6 +123,11 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     client = MlflowClient()
     client.set_experiment_tag(experiment_id, "config", forecaster_config.model_dump_json())
     client.set_experiment_tag(experiment_id, "description", config.description)
+    # Stamp class identity so assets can reconstruct the exact forecaster + config subclass from
+    # MLflow alone (the config JSON above carries no class identifier). See
+    # load_experiment_forecaster.
+    client.set_experiment_tag(experiment_id, "forecaster_target", _class_target(forecaster_cls))
+    client.set_experiment_tag(experiment_id, "config_target", _class_target(forecaster_config))
 
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
