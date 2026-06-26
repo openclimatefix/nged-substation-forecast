@@ -62,11 +62,14 @@ class AllFeatures(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description="When OCF's power forecast model was initialised. This might be called 't0' in other projects.",
     )
+    """When OCF's power forecast model was initialised (`t0` in some OCF projects)."""
+
     nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
         description="When the NWP model was initialised",
     )
+    """When the NWP model was initialised."""
 
     power: float = pt.Field(dtype=pl.Float32)
     nwp_lead_time_hours: float | None = pt.Field(dtype=pl.Float32, allow_missing=True)
@@ -235,11 +238,17 @@ class Metrics(pt.Model):
     """
 
     time_series_id: int = _get_time_series_id_dtype()
+    """NGED-provided primary key identifying the substation or asset."""
+
     power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
+    """Identifier for the ML-based power forecasting model family."""
+
     fold_id: str = pt.Field(
         dtype=pl.Categorical,
         description="CV fold year (e.g. '2022').  Matches ``PowerForecast.fold_id``.",
     )
+    """CV fold year (e.g. `'2022'`), or `'live'` for production forecasts. Matches `PowerForecast.fold_id`."""
+
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
@@ -247,10 +256,14 @@ class Metrics(pt.Model):
             "the time-slice bands from the project report."
         ),
     )
+    """`'all'` or one of the project-report forecast-range bands (intraday / day_ahead / …)."""
+
     metric_name: str = pt.Field(
         dtype=pl.Enum(METRIC_NAMES),
         description="The name of the metric being reported.",
     )
+    """The name of the metric (e.g. `'mae'`, `'rmse'`)."""
+
     metric_param: str = pt.Field(
         dtype=pl.Enum(METRIC_PARAMS),
         description=(
@@ -260,7 +273,10 @@ class Metrics(pt.Model):
             "For PICP: 'p10_p90', 'p20_p80', etc."
         ),
     )
+    """`'all'` for scalar metrics; quantile/interval label for parametric metrics (e.g. `'p10'`)."""
+
     metric_value: float = pt.Field(dtype=pl.Float32)
+    """The computed metric value."""
 
     # The columns below are populated by the ``metrics`` Dagster asset (§4.8). They are
     # ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
@@ -274,6 +290,8 @@ class Metrics(pt.Model):
             "one-off metrics coexist in one table and stay separable."
         ),
     )
+    """Which evaluation produced this row (`'leaderboard'`, `'production_monitoring'`, or `'ad_hoc'`)."""
+
     time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
         allow_missing=True,
@@ -282,6 +300,8 @@ class Metrics(pt.Model):
             "across-everything aggregate."
         ),
     )
+    """Time-series category this row aggregates, or `'all'` for the across-everything aggregate."""
+
     window_start: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
@@ -290,16 +310,22 @@ class Metrics(pt.Model):
             "is the fold's val_start; for monitoring it is the trailing-window start."
         ),
     )
+    """Inclusive start of the `valid_time` window (fold `val_start` or trailing-window start)."""
+
     window_end: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
         description="End of the valid_time window this row covers (fold val_end or window end).",
     )
+    """End of the `valid_time` window (fold `val_end` or trailing-window end)."""
+
     window_label: str = pt.Field(
         dtype=pl.String,
         allow_missing=True,
         description="Human label for the window, e.g. '2025', '24h', '7d', 'full_fold'.",
     )
+    """Human-readable label for the window (e.g. `'2025'`, `'7d'`, `'full_fold'`)."""
+
     computed_at: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
@@ -308,6 +334,8 @@ class Metrics(pt.Model):
             "monitoring series and distinguishes recomputations)."
         ),
     )
+    """When this metric row was written; orders the append-only monitoring series."""
+
     mlflow_run_id: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
@@ -316,3 +344,4 @@ class Metrics(pt.Model):
             "Null for 'ad_hoc' rows, which have no MLflow run."
         ),
     )
+    """MLflow run that produced this row; null for `'ad_hoc'` rows."""

@@ -11,12 +11,17 @@ class H3GridWeights(pt.Model):
     """
 
     h3_index: int = pt.Field(dtype=pl.UInt64)
+    """H3 cell index."""
+
     nwp_lat: float = pt.Field(
         dtype=pl.Float32, ge=-90, le=90, description="The latitude of the NWP grid box."
     )
+    """Latitude of the NWP grid box centre (decimal degrees)."""
+
     nwp_lon: float = pt.Field(
         dtype=pl.Float32, ge=-180, le=180, description="The longitude of the NWP grid box."
     )
+    """Longitude of the NWP grid box centre (decimal degrees)."""
 
     proportion: float = pt.Field(
         dtype=pl.Float32,
@@ -24,3 +29,4 @@ class H3GridWeights(pt.Model):
         le=1,
         description="The proportion of this H3 hexagon that falls into this NWP grid box.",
     )
+    """Fraction of the H3 hexagon that overlaps this NWP grid box (0–1)."""
