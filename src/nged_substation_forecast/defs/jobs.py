@@ -4,9 +4,6 @@ These are jobs (not assets) because they manage MLflow state and the ``cv_experi
 dynamic partition set rather than producing a data artifact. Their ops use ``OpExecutionContext``
 (not ``AssetExecutionContext``) because they call ``context.instance.add_dynamic_partitions``,
 which needs the Dagster instance.
-
-Currently houses ``register_experiment_job`` (§4.3). ``retire_experiment_job`` (§4.3.1) is added
-in a later phase.
 """
 
 from typing import Any, Literal, cast
@@ -145,5 +142,5 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
 @job
 def register_experiment_job() -> None:
-    """Register a new experiment: create its MLflow records and CV partition keys (§4.3)."""
+    """Register a new experiment: create its MLflow records and CV partition keys."""
     register_experiment()

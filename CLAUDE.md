@@ -82,7 +82,8 @@ Identity is split across two levels. **Model-family identity** — `MODEL_NAME` 
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
 - **Comments must reflect current state only** — never reference previous iterations of the code,
-  deleted files, or temporary implementation plans (e.g. `docs/temp/`).
+  deleted files, or temporary implementation plans (stored in `docs/temp/`). In code, never refer to sections 
+  (e.g. "§4.3.1") of temporary implementation plans (stored in `docs/temp/`).
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
   ```python
