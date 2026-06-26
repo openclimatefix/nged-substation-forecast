@@ -134,7 +134,7 @@ class TimeSeriesMetadata(pt.Model):
 
     licence_area: str = pt.Field(
         dtype=pl.Enum(["EMids"]),
-        description="NGED licence area (currently always ‘EMids’).",
+        description="NGED licence area (for the trail area, this is always ‘EMids’).",
     )
 
     substation_number: int = pt.Field(
@@ -146,7 +146,7 @@ class TimeSeriesMetadata(pt.Model):
 
     substation_type: str = pt.Field(
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
-        description="Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary.",
+        description="Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary. HV = high voltage. EHV = extra high voltage.",
     )
 
     latitude: float = pt.Field(
@@ -214,8 +214,7 @@ class PowerForecast(pt.Model):
     ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY —
     they exist on this schema and the internal ``power_forecasts`` Delta table to support
     cross-validation and the leaderboard, but they are NOT part of the ``power_forecast``
-    table delivered to NGED. The delivery step projects them out (the delivered table is
-    essentially the ``fold_id="live"`` rows with these internal columns dropped).
+    table delivered to NGED.
     """
 
     valid_time: datetime = pt.Field(
@@ -225,7 +224,9 @@ class PowerForecast(pt.Model):
 
     time_series_id: int = _get_time_series_id_dtype()
 
-    ensemble_member: int = pt.Field(dtype=pl.Int8, description="Ensemble member index (0-based).")
+    ensemble_member: int = pt.Field(
+        dtype=pl.Int8, description="Ensemble member index. 0 is the control NWP ensemble member."
+    )
 
     ml_flow_experiment_id: int | None = pt.Field(
         dtype=pl.Int32,
