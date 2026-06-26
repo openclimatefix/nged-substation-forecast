@@ -13,12 +13,13 @@ invalidation.
 
 import tempfile
 from pathlib import Path
+from typing import Final
 
 import mlflow
 
 from ml_core.base_forecaster import BaseForecaster
 
-_ARTIFACT_PATH: str = "model"
+_ARTIFACT_PATH: Final[str] = "model"
 """Sub-path under an MLflow run's artifact root where the model directory is stored."""
 
 
