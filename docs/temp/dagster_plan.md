@@ -1258,7 +1258,7 @@ only reaches back to 2024-04-01.
   update the affected schema/asset docstrings and tests. No fold-*mechanics* code changes (the
   windowing in `ml_core._cv_helpers` is already generic over arbitrary train/val dates).
 
-### 7.4 Phase 4 — `trained_cv_model` asset
+### 7.4 Phase 4 — `trained_cv_model` asset - in progress
 
 - Implement §4.6 (read config from MLflow, read eligible set, `engineer_features`, `train`,
   `save_to_mlflow`, log training params to the fold run).
@@ -1267,11 +1267,27 @@ only reaches back to 2024-04-01.
   `__mid_2025_to_mid_2026` partition; see the model artifact + fold run with training params in
   MLflow.
 
+### 7.4.1 Phase 4.1 - Document the Dagster workflow implemented so far
+
+- Document (probably in `docs/ml_experimentation/`) the Dagster flow we have implemented so far.
+  Structure it as a sequence of simple steps, like a food recipe, for running the steps all the way
+  up to `trained_cv_model`. Explain why `trained_cv_model` loads the config from MLflow, not from
+  YAML.
+
 ### 7.5 Phase 5 — `cv_power_forecasts` asset
 
 - Implement §4.7 (`load_from_mlflow`, predict on **all 51 members** for the model's
   `trained_time_series_ids`, **idempotent partition overwrite** into `power_forecasts`, log
   prediction metrics to the fold run). **Delete the old monolithic `cv_power_forecasts`.**
+- **Promote `trained_time_series_ids` to the `BaseForecaster` interface.** It is XGBoost-specific
+  today; Phase 5 is the first model-agnostic consumer (`load_from_mlflow` returns a
+  `BaseForecaster`, and predict must filter to the trained population), so without promotion the
+  asset would have to downcast to `XGBoostForecaster` — defeating the abstraction. Define it on
+  the base as **"the population this model will serve `predict`/score for"** (not "the per-series
+  Boosters it holds"), so it stays honest for planned **multi-series Boosters** (one Booster for
+  all solar sites, another for all primary substations, …), where a single Booster spans many
+  `time_series_id`s. This is the model-agnostic encoding of the §4.5.1 train==predict population
+  invariant. (Designed against this real second consumer rather than speculatively in Phase 4.)
 - Tests: materialise predict for the smoke-test fold; **idempotency** (materialise twice →
   `power_forecasts` row count unchanged); assert 51 ensemble members present.
 - **User can verify:** materialise `cv_power_forecasts` for `__mid_2025_to_mid_2026`, query the

@@ -91,7 +91,7 @@ def eligible_time_series_ids(
     return sorted(eligible["time_series_id"].to_list())
 
 
-def _parse_cv_partition_key(partition_key: str) -> tuple[str, str]:
+def parse_cv_partition_key(partition_key: str) -> tuple[str, str]:
     """Return ``(experiment_name, fold_id)`` from a CV partition key.
 
     Partition key format: ``"{experiment_name}__{fold_id}"``. The separator is a

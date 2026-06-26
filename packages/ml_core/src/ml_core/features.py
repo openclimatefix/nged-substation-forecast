@@ -286,8 +286,11 @@ def engineer_features(
         selected_features: Set of features to engineer.
         power_time_series: Input power time series.
         time_series_metadata: Metadata for the time series.
-        nwp: NWP weather forecast data in physical units (NwpInMemory). Callers loading
-            from Delta Lake should convert with NwpOnDisk.to_nwp_in_memory() first, which
+        nwp: NWP weather forecast data in physical units (NwpInMemory), already mapped to
+            **per-time-series** rows — it is joined on `time_series_id`, so it must carry a
+            `time_series_id` column rather than the raw `h3_index` spatial key. Callers attach
+            `time_series_id` first (e.g. a `FeatureEngineer`'s nearest-cell h3 join). Callers
+            loading from Delta Lake should convert with NwpOnDisk.to_nwp_in_memory() first, which
             is lazy and does not trigger a collect.
         power_fcst_init_time: Controls the operating mode of the function.
 
