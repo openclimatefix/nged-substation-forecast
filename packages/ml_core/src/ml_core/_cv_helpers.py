@@ -2,21 +2,21 @@
 
 Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster imports) so it
 can be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
-This module is written fresh, replacing the reusable logic of the deleted single-loop
-``cross_validate.py`` and correcting its latent ``train_end`` bug.
 """
 
 import calendar
 from datetime import date, datetime, time, timezone
-from typing import Any
+from typing import Any, Final
 
 import polars as pl
 from contracts.hydra_schemas import CvFoldConfig
 from pydantic import BaseModel
 
-#: Separator between experiment name and fold id in a CV partition key. A double-underscore
-#: reduces collision risk with experiment names that contain single underscores.
-CV_PARTITION_KEY_SEPARATOR = "__"
+CV_PARTITION_KEY_SEPARATOR: Final[str] = "__"
+"""Separator between experiment name and fold id in a CV partition key.
+
+A double-underscore reduces collision risk with experiment names that contain single underscores.
+"""
 
 
 def _date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
@@ -48,9 +48,7 @@ def training_window(fold: CvFoldConfig) -> tuple[datetime, datetime]:
     """Return the ``[start, end]`` training window for a fold, in UTC.
 
     Uses **inclusive end-of-day** semantics that mirror ``val_end``: the window is
-    ``[train_start 00:00:00, train_end 23:59:59]``. This honours ``fold.train_end`` directly
-    rather than collapsing it onto ``val_start`` — the latent ``train_end`` bug carried by the
-    deleted single-loop ``cross_validate.py``. When a fold leaves a gap/embargo between
+    ``[train_start 00:00:00, train_end 23:59:59]``. When a fold leaves a gap/embargo between
     ``train_end`` and ``val_start``, training correctly stops at ``train_end``, not at
     ``val_start``.
     """

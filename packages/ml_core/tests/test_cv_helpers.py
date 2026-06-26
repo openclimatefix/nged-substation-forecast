@@ -21,7 +21,7 @@ def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second
 
 
 # ---------------------------------------------------------------------------
-# training_window — inclusive end-of-day + the train_end bug fix
+# training_window
 # ---------------------------------------------------------------------------
 
 
@@ -39,11 +39,7 @@ def test_training_window_inclusive_end_of_day() -> None:
 
 
 def test_training_window_honours_train_end_when_gap_before_val_start() -> None:
-    """The fix for the latent train_end bug: a gap/embargo before val_start is respected.
-
-    The deleted single-loop CV computed train_end as val_start, which would have wrongly
-    trained right up to val_start. training_window must stop at train_end.
-    """
+    """A gap/embargo between train_end and val_start is respected: training stops at train_end."""
     fold = CvFoldConfig(
         fold_id="2024",
         train_start=date(2020, 1, 1),
@@ -76,7 +72,7 @@ def test_subtract_months_clamps_day_of_month() -> None:
 
 
 # ---------------------------------------------------------------------------
-# eligible_time_series_ids — re-establishes the deleted exclusion test's intent
+# eligible_time_series_ids
 # ---------------------------------------------------------------------------
 
 
