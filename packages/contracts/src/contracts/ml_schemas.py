@@ -257,8 +257,7 @@ class Metrics(pt.Model):
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
-            "'all' aggregates over all forecast horizons.  Other values select "
-            "the time-slice bands from the project report."
+            "'all' aggregates over all forecast horizons.  Other values select the HORIZON_SLICES bands."
         ),
     )
 
@@ -279,10 +278,6 @@ class Metrics(pt.Model):
 
     metric_value: float = pt.Field(dtype=pl.Float32, description="The computed metric value.")
 
-    # The columns below are populated by the ``metrics`` Dagster asset (§4.8). They are
-    # ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
-    # metric rows and have the asset enrich them with scope/window provenance before the
-    # frame is written to the ``forecast_metrics`` Delta table.
     evaluation_scope: str = pt.Field(
         dtype=pl.Enum(EVALUATION_SCOPES),
         allow_missing=True,
@@ -291,6 +286,10 @@ class Metrics(pt.Model):
             "one-off metrics coexist in one table and stay separable."
         ),
     )
+    """The columns from `evaluation_scope` and below are populated by the ``metrics`` Dagster asset.
+    They are ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
+    metric rows and have the asset enrich them with scope/window provenance before the frame is
+    written to the ``forecast_metrics`` Delta table."""
 
     time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
