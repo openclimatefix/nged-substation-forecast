@@ -1152,7 +1152,7 @@ against a clean baseline instead of diffing against soon-to-be-deleted code.
 - **User can verify:** `uv run pytest` is green (and smaller); `uv run dg dev` loads with the
   monolithic CV assets gone and the data-layer assets intact.
 
-### 7.1 Phase 1 — Contracts, settings, pure helpers, equivalence test (foundation)
+### 7.1 Phase 1 — Contracts, settings, pure helpers, equivalence test (foundation) - Completed in PR #183
 
 *No new Dagster asset yet — this is the typed foundation everything else builds on.*
 
@@ -1175,7 +1175,7 @@ against a clean baseline instead of diffing against soon-to-be-deleted code.
 - **User can verify:** `uv run pytest` green; the new helper + equivalence tests demonstrate the
   `train_end` fix and the no-skew guarantee.
 
-### 7.1.5 Phase 1.5 — Unify power-lag source (Option B)
+### 7.1.5 Phase 1.5 — Unify power-lag source (Option B) - Completed in PR #183
 
 *Small standalone change; must land before Phase 5 (backtesting), where the bug below surfaces.*
 
@@ -1210,7 +1210,7 @@ lagged power.
 - **User can verify:** `uv run pytest` green; the equivalence test now asserts power lags **and**
   the weather rolling mean match across modes.
 
-### 7.2 Phase 2 — `eligible_time_series` asset
+### 7.2 Phase 2 — `eligible_time_series` asset - Completed in PR #184
 
 - Implement the fold-partitioned, experiment-independent asset (§4.5.1) over `_cv_helpers`.
 - Tests: unit (from Phase 1) + an integration test materialising it on synthetic data.

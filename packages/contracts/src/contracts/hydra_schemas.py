@@ -1,7 +1,9 @@
 """Hydra configuration schemas for the NGED substation forecast project."""
 
 from datetime import date
+from pathlib import Path
 
+from omegaconf import OmegaConf
 from pydantic import BaseModel, Field
 
 from contracts.power_schemas import FoldId
@@ -31,3 +33,43 @@ class CvConfig(BaseModel):
 
     folds: list[CvFoldConfig]
     min_training_months: int = Field(default=6, ge=1)
+
+    @property
+    def fold_ids(self) -> list[str]:
+        """The fold ids in declaration order (e.g. ``["2022", "2023", ...]``).
+
+        Used to build the ``cv_experiment_folds`` partitions and to expand experiment
+        registration into per-fold partition keys — always read from config, never hard-coded.
+        """
+        return [fold.fold_id for fold in self.folds]
+
+    def get_fold(self, fold_id: str) -> CvFoldConfig:
+        """Return the fold with the given ``fold_id``.
+
+        Args:
+            fold_id: The fold identifier to look up (e.g. ``"2022"``).
+
+        Raises:
+            KeyError: If no fold with that id exists in the config.
+        """
+        for fold in self.folds:
+            if fold.fold_id == fold_id:
+                return fold
+        raise KeyError(f"No fold with fold_id={fold_id!r}; available folds: {self.fold_ids}")
+
+
+def load_cv_config(path: Path) -> CvConfig:
+    """Load and validate the cross-validation config from a YAML file.
+
+    The CV folds are the leaderboard's evaluation protocol and must be read from
+    ``conf/cv/default.yaml`` (never hard-coded) so every experiment and asset shares one
+    canonical definition.
+
+    Args:
+        path: Path to the CV config YAML (e.g. ``conf/cv/default.yaml``).
+
+    Returns:
+        The validated ``CvConfig``.
+    """
+    raw = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
+    return CvConfig.model_validate(raw)
