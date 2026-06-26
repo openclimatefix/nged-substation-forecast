@@ -1230,10 +1230,31 @@ lagged power.
 
 ### 7.3.1 Phase 3.5 - Re-consider CV folds
 
+- The design currently specifies that we should use yearly CV folds, with expanding training
+  horizons. The validation years will be 2022, 2023, 2024, and 2025. But I'm worried we may not have
+  enough data for this approach. At least, not yet.
 - Facts to consider:
-    - Dynamical.org currently only provides ECMWF back to 2024-04-01.
+    - Dynamical.org currently only provides ECMWF back to 2024-04-01. Dynamical.org are actively
+      backfilling. But the backfill will take months.
+    - Later in the project, we have to ingest CERRA (a European re-analysis) dataset anyway. So we
+      could ingest CERRA soon, and use CERRA to train on times before 2024-04-01. But then we
+      wouldn't be training on a weather _forecast_, so the validation results for 2022, 2023, and
+      2024 would be misleading.
     - Only 22 of the 32 time series for the trial area have data going back to 2020-01-01 (see plot
       in Milestone 1 report)
+- Some options I can think of:
+    - **A: Current plan: Just use a single fold for now:** Continue with the current plan. Only use ECMWF ENS. For now, we'll only be able to use a
+      "temporary fold" that trains on the 12 months from 2024-04-01, and tests on the 12 months from
+      2025-04-01. That feels fine for a MVP. The main issue is that it only gives us one fold.
+    - **B: Monthly CV:** Similar to option A, but we "buy" the ability to have multiple folds by
+      expanding the training window by **1 month** per fold. e.g.:
+         - fold 1: train on 12 months from 2024-04-01. Test on 12 months from 2025-04-01.
+         - fold 2: train on 13 months from 2024-04-01. Test on 12 months from 2025-05-01.
+         - fold 3: train on 14 months from 2024-04-01. Test on 12 months from 2025-06-01.
+    - **C: Stick with yearly folds. Use CERRA for folds before 2024-04-01.***
+- Later in the project, when we're really optimising for performance, we will want to try
+  "pre-training" on weather re-analysis datasets, so we can make full use of the long power time
+  series we have for some (but not all) assets.
 
 ### 7.4 Phase 4 — `trained_cv_model` asset
 
