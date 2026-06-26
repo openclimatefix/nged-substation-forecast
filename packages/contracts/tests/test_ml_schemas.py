@@ -89,6 +89,7 @@ def test_safe_input_base_column_names_are_all_features_fields():
 
 
 def test_metrics_validation():
+    """The core metric columns validate on their own (the window/scope columns are optional)."""
     df = (
         pt.DataFrame(
             {
@@ -99,6 +100,33 @@ def test_metrics_validation():
                 "metric_name": ["mae"],
                 "metric_param": ["all"],
                 "metric_value": [5.2],
+            }
+        )
+        .set_model(Metrics)
+        .cast()
+    )
+    df.validate()
+
+
+def test_metrics_validation_with_scope_and_window_columns():
+    """A full leaderboard row including the scope/window provenance columns validates."""
+    df = (
+        pt.DataFrame(
+            {
+                "time_series_id": [123],
+                "power_fcst_model_name": ["model_a"],
+                "fold_id": ["2022"],
+                "horizon_slice": ["all"],
+                "metric_name": ["mae"],
+                "metric_param": ["all"],
+                "metric_value": [5.2],
+                "evaluation_scope": ["leaderboard"],
+                "time_series_type": ["all"],
+                "window_start": [datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc)],
+                "window_end": [datetime(2022, 12, 31, 23, 59, 59, tzinfo=timezone.utc)],
+                "window_label": ["2022"],
+                "computed_at": [datetime(2026, 6, 24, 12, 0, tzinfo=timezone.utc)],
+                "mlflow_run_id": ["abc123"],
             }
         )
         .set_model(Metrics)

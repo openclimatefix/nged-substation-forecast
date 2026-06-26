@@ -1175,6 +1175,41 @@ against a clean baseline instead of diffing against soon-to-be-deleted code.
 - **User can verify:** `uv run pytest` green; the new helper + equivalence tests demonstrate the
   `train_end` fix and the no-skew guarantee.
 
+### 7.1.5 Phase 1.5 — Unify power-lag source (Option B)
+
+*Small standalone change; must land before Phase 5 (backtesting), where the bug below surfaces.*
+
+Phase 1's equivalence test had to **exclude power lags** because the two modes sourced them
+differently: bulk mode self-joined the NWP-gridded frame (`_apply_power_lag(engineered_lf,
+engineered_lf, ...)`) while single-run mode effectively read from the dense observed-power
+series. That divergence is a **training/serving skew** on power lags, and the self-join also
+hides a **fan-out duplication bug**: real ECMWF runs overlap, so a `valid_time` appears under
+many `nwp_init_time`s, replicating `(time_series_id, valid_time)` rows and double-counting
+lagged power.
+
+- **Fix:** source power lags from the dense observed-power series (`power_lf`, one row per
+  `(time_series_id, valid_time)`) in **both** modes. Thread `observed_power_lf` through
+  `_apply_post_join_features` into `_apply_power_lag`. The lookup frame carries no
+  `ensemble_member`, so `id_keys` collapses to `["time_series_id"]` — correct, since power
+  observations don't vary by ensemble member, and fan-out-safe.
+- **Naming:** the now-meaningful second parameter motivates clearer helper signatures —
+  `_apply_power_lag(engineered_features_lf, observed_power_lf, ...)` and
+  `_apply_weather_lag(engineered_features_lf, nwp_lf, ...)`, each with an `Args:` docstring
+  (replaces the weak `target_lf` / `source_lf`).
+- **Equivalence test:** drop the power-lag exclusion — add `power_lag_3h` to the compared
+  features and extend the fixture's power series with pre-window history so the lag resolves to
+  a real observed value.
+- **Rolling-mean concern (investigated, resolved):** `_apply_rolling_mean_feature` was flagged as
+  a possible parallel. Investigation found no fan-out (it joins back on the full primary key, 1:1)
+  and that weather rolling means are cross-mode-consistent — single-run mode pads each
+  `(ts, nwp_init_time, member)` group with null-weather rows that null-skipping aggregations
+  ignore. This is now locked by the equivalence test, and the null-skipping invariant is
+  documented on the function. A multi-stat weather extension
+  (`rolling_{mean,min,max,std,median,sum}`) is captured as a ready TODO; power rolling remains
+  forbidden (it would follow the Option-B pattern, anchored at `T_init`).
+- **User can verify:** `uv run pytest` green; the equivalence test now asserts power lags **and**
+  the weather rolling mean match across modes.
+
 ### 7.2 Phase 2 — `eligible_time_series` asset
 
 - Implement the fold-partitioned, experiment-independent asset (§4.5.1) over `_cv_helpers`.

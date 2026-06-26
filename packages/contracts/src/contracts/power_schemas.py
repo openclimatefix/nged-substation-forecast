@@ -12,21 +12,17 @@ from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 
 class PowerTimeSeries(pt.Model):
     time_series_id: int = _get_time_series_id_dtype()
+
     time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description=(
-            "The end time of the 30-minute period."
-            " Note that all the NGED JSON time series data is already 30-minutely."
-        ),
+        description="End time of the 30-minute observation period (all NGED data is already half-hourly).",
     )
+
     power: float = pt.Field(
         dtype=pl.Float32,
         ge=-1000,
         le=1000,
-        description=(
-            "The average power in MW or MVA over the previous 30-minute period."
-            " The unit is defined in the TimeSeriesMetadata for this time_series_id"
-        ),
+        description="Average power (MW or MVA) over the preceding 30-minute period. Unit defined in TimeSeriesMetadata.",
     )
 
     @classmethod
@@ -75,14 +71,11 @@ class PowerTimeSeries(pt.Model):
 
 
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
-    "BESS",  # Battery energy storage system. Present in trial area
-    "Biofuel",  # Present in trial area
+    "BESS",
+    "Biofuel",
     "CHP",
     "Data Centre",
-    # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
-    # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
-    # "Disaggregated Demand" indicates that NGED have already removed metered generation connected to that primary.
-    "Disaggregated Demand",  # Present in trial area.
+    "Disaggregated Demand",
     "Energy from Waste",
     "EV Charging",
     "Geothermal",
@@ -92,108 +85,154 @@ LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
     "Mixed (Demand)",
     "Mixed (Generation)",
     "Other (Demand)",
-    "Other (Generation)",  # Present in trial area
+    "Other (Generation)",
     "Other (Storage)",
     "Peaking Plant",
-    "PV",  # Present in trial area
+    "PV",
     "Rail",
-    "Raw Flow",  # Present in trial area. Used for BSP and GSP substations.
+    "Raw Flow",
     "Synchronous Condenser",
-    "Wind",  # Present in trial area
+    "Wind",
 )
+"""All time-series type values used in NGED data.
+
+Types present in the V1 trial area: BESS, Biofuel, Disaggregated Demand, Other (Generation), PV,
+Raw Flow, Wind.
+
+Notes:
+
+- BESS: Battery energy storage system.
+- Disaggregated Demand: In the trial area, exclusively associated with "Primary" substations. All
+  "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
+  Indicates that NGED have already removed metered generation connected to that primary.
+- Raw Flow: Used for BSP and GSP substations.
+"""
 
 
 class TimeSeriesMetadata(pt.Model):
     time_series_id: int = _get_time_series_id_dtype(unique=True)
+
     time_series_name: str = pt.Field(
         dtype=pl.String,
+        description="Human-readable name for the substation or asset.",
         examples=[
             "ALFORD 33 11kV S STN",
             "BAMBERS FARM WIND GENERATION MABLETHORPE 33kV S ST",
             "Leverton Solar Park",
         ],
     )
-    time_series_type: str = pt.Field(dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES))
-    units: str = pt.Field(dtype=pl.Enum(["MW", "MVA"]))
-    licence_area: str = pt.Field(dtype=pl.Enum(["EMids"]))
+
+    time_series_type: str = pt.Field(
+        dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES),
+        description="Asset category (e.g. ‘PV’, ‘Wind’, ‘Disaggregated Demand’). See LIST_OF_TIME_SERIES_TYPES.",
+    )
+
+    units: str = pt.Field(
+        dtype=pl.Enum(["MW", "MVA"]),
+        description="Power unit for this time series: ‘MW’ (active power) or ‘MVA’ (apparent power).",
+    )
+
+    licence_area: str = pt.Field(
+        dtype=pl.Enum(["EMids"]),
+        description="NGED licence area (for the trail area, this is always ‘EMids’).",
+    )
+
     substation_number: int = pt.Field(
         dtype=pl.Int32,
         gt=0,
         lt=1_000_000,
-        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number.",
+        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number (not one per physical substation).",
     )
+
     substation_type: str = pt.Field(
-        dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])
+        dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
+        description="Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary. HV = high voltage. EHV = extra high voltage.",
     )
+
     latitude: float = pt.Field(
         dtype=pl.Float32,
         ge=49,
         le=61,  # UK latitude range
-        description=(
-            "For customer time series, the latitude and longitude give the location of the"
-            " _substation_, not the customer's site."
-        ),
+        description="Latitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
     )
+
     longitude: float = pt.Field(
         dtype=pl.Float32,
         ge=-9,
         le=2,  # UK longitude range
-        description=(
-            "For customer time series, the latitude and longitude give the location of the"
-            " _substation_, not the customer's site."
-        ),
+        description="Longitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
     )
+
     information: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
-        description="Always None in the trial area",
+        description="Free-text NGED notes field; always null in the V1 trial area.",
     )
+
     area_wkt: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
-            "In the trial, the only time series to have area_wkt are the Primary substations."
-            " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
-            " If/when NGED publish polygons for customer sites, the area, where present, refers to the"
-            " area covered by the generator itself."
+            "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
+            " NGED don’t have polygons for customer sites (though they hope to add that in future)."
+            " For customer sites, where present, refers to the area covered by the generator itself."
         ),
     )
+
     area_center_lat: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description=(
-            "For customer sites, the area, where present, refers to the area covered by the generator itself."
-        ),
+        description="Centroid latitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
     )
+
     area_center_lon: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description=(
-            "For customer sites, the area, where present, refers to the area covered by the generator itself."
-        ),
+        description="Centroid longitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
     )
+
     h3_res_5: int = pt.Field(
         dtype=pl.UInt64,
         description="H3 discrete spatial index at resolution 5.",
     )
 
 
-#: Fold identifier for ``PowerForecast.fold_id``.
-#: Each fold validates on one whole year.
-#: Each validation year in the CV protocol gets a string label matching that year.
-#: ``"live"`` denotes a production forecast (no CV fold).
-#: Extend this Literal as new CV epochs are added.
 FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
+"""Fold identifier for ``PowerForecast.fold_id``.
+
+Each fold validates on one whole year. Each validation year in the CV protocol gets a string label
+matching that year. ``"live"`` denotes a production forecast (no CV fold). Extend this Literal as
+new CV epochs are added.
+"""
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema for deterministic ensemble forecasts."""
+    """Forecast data schema for deterministic ensemble forecasts.
 
-    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
+    Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
+    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY —
+    they exist on this schema and the internal ``power_forecasts`` Delta table to support
+    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast``
+    table delivered to NGED.
+    """
+
+    valid_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description="The target time this forecast is valid for.",
+    )
+
     time_series_id: int = _get_time_series_id_dtype()
-    ensemble_member: int = pt.Field(dtype=pl.Int8)
-    ml_flow_experiment_id: int | None = pt.Field(dtype=pl.Int32, allow_missing=True)
+
+    ensemble_member: int = pt.Field(
+        dtype=pl.Int8, description="Ensemble member index. 0 is the control NWP ensemble member."
+    )
+
+    ml_flow_experiment_id: int | None = pt.Field(
+        dtype=pl.Int32,
+        allow_missing=True,
+        description="MLflow experiment ID; links to the MLflow experiment that produced this forecast.",
+    )
 
     nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
@@ -206,20 +245,28 @@ class PowerForecast(pt.Model):
 
     power_fcst_model_name: str = pt.Field(
         dtype=pl.Categorical,
+        description="Identifier for our ML-based power forecasting model. Model-family identity set by the BaseForecaster subclass (MODEL_NAME).",
+    )
+
+    experiment_name: str = pt.Field(
+        dtype=pl.Categorical,
         description=(
-            "Identifier for our ML-based power forecasting model."
-            " Specified in the BaseForecaster subclass."
+            "Per-experiment key identifying the experiment that produced this forecast."
+            " Distinct from `power_fcst_model_name`, which is the model-family identity"
+            " (`MODEL_NAME`); do not overload that with experiment identity."
+            " Forecasts are partitioned in Delta by (experiment_name, fold_id)."
+            " INTERNAL-ONLY: projected out of the `power_forecast` table delivered to NGED."
         ),
     )
 
-    power_fcst_model_version: int = pt.Field(dtype=pl.Int16)
+    power_fcst_model_version: int = pt.Field(
+        dtype=pl.Int16,
+        description="Model version integer, bumped with each breaking change to the model implementation.",
+    )
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description=(
-            "The datetime that the power forecast was initialised."
-            " This might be called `t0` in some other OCF projects."
-        ),
+        description="The datetime that the power forecast was initialised. This might be called `t0` in some other OCF projects.",
     )
 
     power_fcst: float = pt.Field(

@@ -20,6 +20,12 @@ class BaseForecasterConfig(BaseModel):
     ``hydra.utils.instantiate(model_cfg.model_params)`` validates them at load time — they
     are present in every ``conf/model/*.yaml`` file under ``model_params``.
 
+    ``experiment_name`` is the per-experiment key (set to the MLflow experiment name at
+    registration and stored in the saved config); it is stamped onto every ``PowerForecast``
+    row, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is threaded into each
+    model's training so that re-training a fold reproduces the same model — keeping retries
+    and the leaderboard stable.
+
     Model identity (name and version) lives on the ``BaseForecaster`` class itself as
     ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not
     the experiment config.
@@ -27,8 +33,10 @@ class BaseForecasterConfig(BaseModel):
 
     selected_features: set[str]
     ml_flow_experiment_id: int | None = None
+    experiment_name: str = ""
     weather_source: str = ""
     training_strategy: str = ""
+    random_seed: int = 0
 
 
 class BaseForecaster(ABC):

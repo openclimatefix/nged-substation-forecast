@@ -45,26 +45,31 @@ class DataQualitySettings(BaseSettings):
 class Settings(BaseSettings):
     """Configuration settings for the NGED substation forecast project."""
 
-    # MLflow Tracking URI
-    # We centralize the MLflow tracking URI here to allow for environment-specific
-    # configuration (e.g., local SQLite for development, remote server for production).
-    # The application entrypoint should read this setting and set the MLFLOW_TRACKING_URI
-    # environment variable accordingly, which MLflow will automatically pick up.
     mlflow_tracking_uri: str = Field(
         default="sqlite:///mlflow.db",
-        description="MLflow tracking URI.",
+        description=(
+            "MLflow tracking URI. Centralized here for environment-specific configuration"
+            " (e.g., local SQLite for development, remote server for production)."
+            " The application entrypoint should read this setting and set the"
+            " MLFLOW_TRACKING_URI environment variable accordingly, which MLflow will"
+            " automatically pick up."
+        ),
     )
 
-    # Data Quality Settings
     data_quality: DataQualitySettings = Field(
         default_factory=DataQualitySettings,
         description="Configurable thresholds for data quality checks.",
     )
 
-    # NGED source bucket. These fields are typically stored in the .env file.
-    nged_s3_bucket_url: str = Field(...)
-    nged_s3_bucket_access_key: str = Field(...)
-    nged_s3_bucket_secret: str = Field(...)
+    nged_s3_bucket_url: str = Field(
+        ..., description="NGED S3 bucket URL. Typically stored in the .env file."
+    )
+    nged_s3_bucket_access_key: str = Field(
+        ..., description="Access key for the NGED S3 bucket. Typically stored in the .env file."
+    )
+    nged_s3_bucket_secret: str = Field(
+        ..., description="Secret key for the NGED S3 bucket. Typically stored in the .env file."
+    )
 
     def get_nged_s3_store(self) -> obstore.store.S3Store:
         """Returns an initialized obstore.store.S3Store instance for the NGED bucket."""
@@ -76,6 +81,16 @@ class Settings(BaseSettings):
             },
         )
 
+    production_model_run_id: str | None = Field(
+        default=None,
+        description=(
+            "MLflow run ID of the model the production service serves."
+            " Downloaded once into the local model cache (model_cache_base_path) and reused."
+            " Set manually for now; a later champion_model asset will populate it"
+            " automatically."
+        ),
+    )
+
     # Paths to the data we manage
     nged_data_path: Path = PROJECT_ROOT / "data" / "NGED"
     nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
@@ -83,6 +98,14 @@ class Settings(BaseSettings):
     forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
     trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
     h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
+    model_cache_base_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "model_cache",
+        description=(
+            "Root of the local-disk model cache, keyed by MLflow run ID."
+            " Put this on a persistent volume so the production cache survives restarts"
+            " during an MLflow outage."
+        ),
+    )
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

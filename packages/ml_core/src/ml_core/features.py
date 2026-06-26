@@ -111,9 +111,14 @@ class RollingFeature(BaseLookbackFeature):
     Note that computing the rolling mean of 'power' is currently forbidden to prevent lookahead
     bias."""
 
-    # TODO: Implement "Latest Available Rolling Mean anchored to T_init" to allow non-leaky
-    # rolling power features. Maybe also give the model other stats about recent observed
-    # power over some time window, like min, max, std, mean.
+    # TODO: Generalise to support more weather summary stats over the rolling window, i.e.
+    # rolling_{mean,min,max,std,median,sum} (add an `agg` field here + dispatch in
+    # _apply_rolling_mean_feature). All of these are null-skipping, so they preserve the
+    # cross-mode invariant documented on that function; a row-count-based agg (.len()) would not.
+    #
+    # TODO: (separate concern) Implement "Latest Available Rolling Mean anchored to T_init" to
+    # allow non-leaky rolling *power* features (e.g. mean of the most recent 24h of observed power,
+    # broadcast to every forecast horizon). Power rolling stays forbidden until then.
 
     SUFFIX: ClassVar[str] = "rolling_mean"
 
@@ -364,6 +369,7 @@ def engineer_features(
     engineered_lf = _apply_post_join_features(
         raw_data,
         parsed_features,
+        observed_power_lf=power_lf,
         processed_nwp=processed_nwp,
         historical_weather=historical_weather,
     )
@@ -557,10 +563,24 @@ def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:
 def _apply_post_join_features(
     raw_data: pl.LazyFrame,
     parsed_features: ParsedFeatures,
+    observed_power_lf: pl.LazyFrame,
     processed_nwp: pl.LazyFrame | None = None,
     historical_weather: pl.LazyFrame | None = None,
 ) -> pl.LazyFrame:
-    """Applies requested features dynamically based on parsed feature configurations."""
+    """Applies requested features dynamically based on parsed feature configurations.
+
+    Args:
+        raw_data: The power-with-metadata frame already joined to NWP, one row per forecast
+            instance, that feature columns are accumulated onto.
+        parsed_features: The requested features, parsed into typed objects.
+        observed_power_lf: The dense observed-power series (one row per
+            ``(time_series_id, valid_time)``), used as the lookup source for power lags. Sourcing
+            from this mode-independent frame — rather than self-joining the NWP-gridded
+            ``raw_data`` — keeps power lags identical across bulk and single-run modes and avoids
+            fan-out when overlapping NWP runs replicate a ``valid_time``.
+        processed_nwp: The processed NWP frame, required for weather lag features.
+        historical_weather: The freshest-run weather frame, required for weather lag features.
+    """
     engineered_lf = raw_data
 
     if parsed_features.time_features:
@@ -572,7 +592,7 @@ def _apply_post_join_features(
 
     for lag_feat in parsed_features.lags:
         if lag_feat.base_col == "power":
-            engineered_lf = _apply_power_lag(engineered_lf, engineered_lf, lag_feat)
+            engineered_lf = _apply_power_lag(engineered_lf, observed_power_lf, lag_feat)
         else:
             if processed_nwp is None:
                 raise ValueError(
@@ -596,19 +616,31 @@ def _apply_post_join_features(
 
 
 def _apply_power_lag(
-    target_lf: pl.LazyFrame,
-    source_lf: pl.LazyFrame,
+    engineered_features_lf: pl.LazyFrame,
+    observed_power_lf: pl.LazyFrame,
     lag_feature: LagFeature,
 ) -> pl.LazyFrame:
-    """Applies a power lag using a time-aware lazy self-join on valid_time - lag_hours."""
-    lf_with_target_time = target_lf.with_columns(
+    """Applies a power lag using a time-aware lazy join on ``valid_time - lag_hours``.
+
+    Args:
+        engineered_features_lf: The in-progress feature frame this helper attaches one lag
+            column to (each row a forecast instance keyed by
+            ``time_series_id, valid_time, nwp_init_time, ensemble_member``).
+        observed_power_lf: The lookup frame the lagged power is read from, keyed on
+            ``valid_time``. This is the dense observed-power series (one row per
+            ``(time_series_id, valid_time)``); it carries no ``ensemble_member`` because power
+            observations don't vary by ensemble member, so each forecast-instance row joins to
+            the single observed value for its lagged time.
+        lag_feature: The lag to apply (its ``hours`` and output column name).
+    """
+    lf_with_target_time = engineered_features_lf.with_columns(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
     )
 
-    has_ensemble = "ensemble_member" in source_lf.collect_schema().names()
+    has_ensemble = "ensemble_member" in observed_power_lf.collect_schema().names()
     id_keys = ["time_series_id", "ensemble_member"] if has_ensemble else ["time_series_id"]
 
-    right_lf = source_lf.select(
+    right_lf = observed_power_lf.select(
         *id_keys,
         pl.col("valid_time"),
         pl.col("power").alias(lag_feature.string_repr),
@@ -623,8 +655,8 @@ def _apply_power_lag(
 
 
 def _apply_weather_lag(
-    target_lf: pl.LazyFrame,
-    source_lf: pl.LazyFrame,
+    engineered_features_lf: pl.LazyFrame,
+    nwp_lf: pl.LazyFrame,
     lag_feature: LagFeature,
     historical_weather_lf: pl.LazyFrame,
 ) -> pl.LazyFrame:
@@ -634,15 +666,24 @@ def _apply_weather_lag(
       NWP run (nwp_init_time) and ensemble member as the weather used for valid_time.
     - If target_time <= power_fcst_init_time (in the past), uses the freshest NWP run
       (control member, ensemble 0) for that target time.
+
+    Args:
+        engineered_features_lf: The in-progress feature frame this helper attaches one lag
+            column to (each row a forecast instance keyed by
+            ``time_series_id, valid_time, nwp_init_time, ensemble_member``).
+        nwp_lf: The processed NWP frame the same-run lagged weather is read from, keyed on
+            ``(time_series_id, nwp_init_time, ensemble_member, valid_time)``.
+        lag_feature: The lag to apply (its ``hours`` and output column name).
+        historical_weather_lf: The freshest-run weather frame used for past target times.
     """
     base_col = lag_feature.base_col
 
-    lf_with_target_time = target_lf.with_columns(
+    lf_with_target_time = engineered_features_lf.with_columns(
         target_time=pl.col("valid_time") - pl.duration(hours=lag_feature.hours)
     )
 
     # Join 1: Same-Run Join (for target_time > power_fcst_init_time)
-    right_same_lf = source_lf.select(
+    right_same_lf = nwp_lf.select(
         "time_series_id",
         "nwp_init_time",
         "ensemble_member",
@@ -718,6 +759,13 @@ def _apply_rolling_mean_feature(
 
     Grouping by nwp_init_time prevents the rolling window from mixing values across different
     NWP runs, which would contaminate the feature with data from other forecast initializations.
+
+    Cross-mode invariant: the rolling aggregation MUST be null-skipping over the value column
+    (mean/min/max/std/median/sum) and MUST NOT be row-count-dependent (e.g. ``.len()``). Single-run
+    mode stamps a constant nwp_init_time, so each group is padded with out-of-window rows whose
+    weather is null; a null-skipping aggregation ignores them (so values match bulk mode), but a
+    row count would not — silently skewing the feature between training and serving. This is locked
+    by test_cross_mode_equivalence.py.
     """
     rolled = lf.rolling(
         index_column="valid_time",

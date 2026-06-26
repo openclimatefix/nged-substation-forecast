@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Sequence
+from typing import Final, Literal, Sequence
 
 import patito as pt
 import polars as pl
@@ -60,12 +60,13 @@ class AllFeatures(pt.Model):
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="When OCF's power forecast model was initialised. This might be called 't0' in other projects.",
+        description="When OCF's power forecast model was initialised. This might be called `t0` in other OCF projects.",
     )
+
     nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
         allow_missing=True,
-        description="When the NWP model was initialised",
+        description="When the NWP run was initialised.",
     )
 
     power: float = pt.Field(dtype=pl.Float32)
@@ -167,79 +168,104 @@ class AllFeatures(pt.Model):
         return validated_df
 
 
-# Controlled vocabularies for the tall Metrics table.
-# Extend these lists as new metrics or slices are implemented — adding a value is always
-# backwards-compatible (no Delta schema migration needed).
-
-#: Horizon slice labels matching the four forecast ranges from the project report.
-#: ``"all"`` aggregates over all horizons and is always computed.
-HORIZON_SLICES: list[str] = [
+HORIZON_SLICES: Final[tuple[str, ...]] = (
     "all",
-    "intraday",  # 0 – 6 h
-    "day_ahead",  # 6 – 36 h
-    "short_medium_range",  # Day 2 – Day 7
-    "extended_range",  # Day 8 – Day 14
-]
+    "intraday",
+    "day_ahead",
+    "short_medium_range",
+    "extended_range",
+)
+"""Horizon slice labels matching the four forecast ranges from the project report.
 
-#: Metric names currently implemented.  Add more here as they are implemented:
-#: ensemble:  "crps", "spread_skill_ratio"
-#: quantile:  "pinball_loss", "mean_pinball_loss"
-#: calibration: "picp"
-METRIC_NAMES: list[str] = [
-    "mae",  # mean absolute error (MW)
-    "nmae",  # normalised MAE (dimensionless; normalised by mean |power|)
-    "rmse",  # root mean squared error (MW)
-    "mbe",  # mean bias error (MW; positive = over-prediction)
-]
+- `"all"`: aggregates over all horizons and is always computed
+- `"intraday"`: 0 – 6 h
+- `"day_ahead"`: 6 – 36 h
+- `"short_medium_range"`: Day 2 – Day 7
+- `"extended_range"`: Day 8 – Day 14
+"""
 
-#: Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
-#: ``"all"`` is used for all scalar metrics that have no extra parameter dimension.
-#: When Pinball Loss is added, extend this with "p10", "p20", …, "p90".
-#: When PICP is added, extend with "p10_p90", "p20_p80", etc.
-METRIC_PARAMS: list[str] = ["all"]
+METRIC_NAMES: Final[tuple[str, ...]] = ("mae", "nmae", "rmse", "mbe")
+"""Metric names currently implemented.
+
+- `"mae"`: mean absolute error (MW)
+- `"nmae"`: normalised MAE (dimensionless; normalised by mean |power|)
+- `"rmse"`: root mean squared error (MW)
+- `"mbe"`: mean bias error (MW; positive = over-prediction)
+
+Extend as new metrics are added:
+
+- ensemble: `"crps"`, `"spread_skill_ratio"`;
+- quantile: `"pinball_loss"`, `"mean_pinball_loss"`;
+- calibration: `"picp"`.
+"""
+
+METRIC_PARAMS: Final[tuple[str, ...]] = ("all",)
+"""Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
+
+- `"all"` is used for all scalar metrics with no extra parameter dimension.
+- When Pinball Loss is added, extend with `"p10"`, `"p20"`, …, `"p90"`.
+- When PICP is added, extend with `"p10_p90"`, `"p20_p80"`, etc.
+"""
+
+EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
+"""Evaluation scopes that coexist in the `forecast_metrics` table.
+
+- `"leaderboard"`: CV-fold leaderboard metrics
+- `"production_monitoring"`: live trailing-window monitoring
+- `"ad_hoc"`: one-off analyses (no MLflow run)
+"""
+
+TIME_SERIES_TYPE_SLICES: Final[tuple[str, ...]] = ("all", *LIST_OF_TIME_SERIES_TYPES)
+"""Values for the `time_series_type` metric slice.
+
+Every time_series_type plus the sentinel `"all"` for the across-everything aggregate.
+"""
 
 
 class Metrics(pt.Model):
     """Evaluation metrics for power forecasts — tall format.
 
-    One row per ``(time_series_id, power_fcst_model_name, fold_id,
-    horizon_slice, metric_name, metric_param)``.
+    One row per `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name,
+    metric_param)`. `metric_param` encodes the extra parameter dimension for metrics that have
+    one, or `"all"` for scalar metrics with no extra dimension. Examples:
 
-    ``metric_param`` encodes the extra parameter dimension for metrics that have one,
-    or ``"all"`` for scalar metrics with no extra dimension.  Examples:
+    | time_series_id | fold_id | horizon_slice | metric_name       | metric_param | metric_value |
+    |----------------|---------|---------------|-------------------|--------------|--------------|
+    | 1              | 1       | all           | mae               | all          | 5.2          |
+    | 1              | 1       | day_ahead     | rmse              | all          | 7.1          |
+    | 1              | 1       | day_ahead     | pinball_loss      | p10          | 2.1          |
+    | 1              | 1       | day_ahead     | pinball_loss      | p50          | 3.4          |
+    | 1              | 1       | day_ahead     | mean_pinball_loss | all          | 2.4          |
+    | 1              | 1       | day_ahead     | picp              | p10_p90      | 0.78         |
 
-    .. code-block:: text
-
-        time_series_id | fold_id | horizon_slice | metric_name      | metric_param | metric_value
-        1              | 1       | all           | mae              | all          | 5.2
-        1              | 1       | day_ahead     | rmse             | all          | 7.1
-        1              | 1       | day_ahead     | pinball_loss     | p10          | 2.1
-        1              | 1       | day_ahead     | pinball_loss     | p50          | 3.4
-        1              | 1       | day_ahead     | mean_pinball_loss | all         | 2.4
-        1              | 1       | day_ahead     | picp             | p10_p90      | 0.78
-
-    The primary key is
-    ``(time_series_id, power_fcst_model_name, fold_id, horizon_slice,
-    metric_name, metric_param)``.
+    Primary key: `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name,
+    metric_param)`.
     """
 
     time_series_id: int = _get_time_series_id_dtype()
-    power_fcst_model_name: str = pt.Field(dtype=pl.Categorical)
+
+    power_fcst_model_name: str = pt.Field(
+        dtype=pl.Categorical,
+        description="Identifier for the ML-based power forecasting model family.",
+    )
+
     fold_id: str = pt.Field(
         dtype=pl.Categorical,
-        description="CV fold year (e.g. '2022').  Matches ``PowerForecast.fold_id``.",
+        description="CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches PowerForecast.fold_id.",
     )
+
     horizon_slice: str = pt.Field(
         dtype=pl.Enum(HORIZON_SLICES),
         description=(
-            "'all' aggregates over all forecast horizons.  Other values select "
-            "the time-slice bands from the project report."
+            "'all' aggregates over all forecast horizons.  Other values select the HORIZON_SLICES bands."
         ),
     )
+
     metric_name: str = pt.Field(
         dtype=pl.Enum(METRIC_NAMES),
-        description="The name of the metric being reported.",
+        description="The name of the metric (e.g. 'mae', 'rmse').",
     )
+
     metric_param: str = pt.Field(
         dtype=pl.Enum(METRIC_PARAMS),
         description=(
@@ -249,4 +275,66 @@ class Metrics(pt.Model):
             "For PICP: 'p10_p90', 'p20_p80', etc."
         ),
     )
-    metric_value: float = pt.Field(dtype=pl.Float32)
+
+    metric_value: float = pt.Field(dtype=pl.Float32, description="The computed metric value.")
+
+    evaluation_scope: str = pt.Field(
+        dtype=pl.Enum(EVALUATION_SCOPES),
+        allow_missing=True,
+        description=(
+            "Which evaluation produced this row, so leaderboard, live-monitoring, and "
+            "one-off metrics coexist in one table and stay separable."
+        ),
+    )
+    """The columns from `evaluation_scope` and below are populated by the ``metrics`` Dagster asset.
+    They are ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
+    metric rows and have the asset enrich them with scope/window provenance before the frame is
+    written to the ``forecast_metrics`` Delta table."""
+
+    time_series_type: str = pt.Field(
+        dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
+        allow_missing=True,
+        description=(
+            "The time-series category this row aggregates, or the sentinel 'all' for the "
+            "across-everything aggregate."
+        ),
+    )
+
+    window_start: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description=(
+            "Inclusive start of the valid_time window this row covers. For a CV fold this "
+            "is the fold's val_start; for monitoring it is the trailing-window start."
+        ),
+    )
+
+    window_end: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description="End of the valid_time window this row covers (fold val_end or window end).",
+    )
+
+    window_label: str = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description="Human label for the window, e.g. '2025', '24h', '7d', 'full_fold'.",
+    )
+
+    computed_at: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        allow_missing=True,
+        description=(
+            "When this metric row was written (provenance; orders the append-only "
+            "monitoring series and distinguishes recomputations)."
+        ),
+    )
+
+    mlflow_run_id: str | None = pt.Field(
+        dtype=pl.String,
+        allow_missing=True,
+        description=(
+            "Convenience cross-link to the MLflow run this metric row belongs to. "
+            "Null for 'ad_hoc' rows, which have no MLflow run."
+        ),
+    )
