@@ -52,19 +52,21 @@ class NwpMetaData(pt.Model):
 
     nwp_model_id: str = pt.Field(
         dtype=NWP_MODEL_ID_DTYPE,
-        description="The primary key for joining with NWP data.",
+        description="Primary key for joining with NWP data (e.g. 'ECMWF_ENS_0_25_degree').",
         unique=True,
     )
-    """Primary key for joining with NWP data (e.g. `'ECMWF_ENS_0_25_degree'`)."""
 
-    provider: str = pt.Field(dtype=pl.Enum(["ECMWF"]))
-    """NWP data provider (currently always `'ECMWF'`)."""
+    provider: str = pt.Field(
+        dtype=pl.Enum(["ECMWF"]),
+        description="NWP data provider (currently always 'ECMWF').",
+    )
 
-    h3_resolution: int = pt.Field(dtype=pl.Int8)
-    """H3 spatial resolution used for this NWP model's grid."""
+    h3_resolution: int = pt.Field(
+        dtype=pl.Int8,
+        description="H3 spatial resolution used for this NWP model's grid.",
+    )
 
-    is_ensemble: bool
-    """Whether this NWP model produces ensemble forecasts."""
+    is_ensemble: bool = pt.Field(description="Whether this NWP model produces ensemble forecasts.")
 
     @classmethod
     def load(cls, csv_path: Path = _NWP_METADATA_CSV_PATH) -> pt.DataFrame[Self]:
@@ -74,20 +76,18 @@ class NwpMetaData(pt.Model):
         return pt.DataFrame(df).set_model(cls).cast().validate()
 
 
-_NULL_FOR_LEAD_TIME_0 = "Note that this variable is all-null for lead time 0. "
-
-
 class _NwpBase(pt.Model):
     """Weather data schema for NWP forecasts, using"""
 
     nwp_model_id: str = pt.Field(
         dtype=NWP_MODEL_ID_DTYPE,
-        description="The primary key for joining with NwpMetaData.",
+        description="The primary key for joining with NwpMetaData (e.g. 'ECMWF_ENS_0_25_degree').",
     )
-    """Primary key for joining with `NwpMetaData` (e.g. `'ECMWF_ENS_0_25_degree'`)."""
 
-    init_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    """When the NWP model run was initialised."""
+    init_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description="When the NWP model run was initialised.",
+    )
 
     valid_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
@@ -101,16 +101,16 @@ class _NwpBase(pt.Model):
             "ECMWF's raw cumulative fields before we receive them."
         ),
     )
-    """Target time. Most variables are instantaneous; precipitation/radiation are period-ending rates (Dynamical de-accumulates them)."""
 
-    ensemble_member: int = pt.Field(dtype=pl.UInt8)
-    """Ensemble member index (0-based)."""
+    ensemble_member: int = pt.Field(
+        dtype=pl.UInt8,
+        description="Ensemble member index (0-based).",
+    )
 
     h3_index: int = pt.Field(
         dtype=pl.UInt64,
-        description="The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
+        description="H3 cell index. The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
     )
-    """H3 cell index; resolution is stored in `NwpMetaData.h3_resolution`."""
 
     # Categorical variables
     categorical_precipitation_type_surface: int | None = pt.Field(
@@ -126,7 +126,6 @@ class _NwpBase(pt.Model):
             " 15-191=Reserved; 192-254=Reserved for local use; 255=Missing"
         ),
     )
-    """ECMWF `ptype`: 0=None, 1=Rain, 2=Thunderstorm, 5=Snow, 10=Hail, etc. Null before 2024-11-14."""
 
     # ClassVars: excluded from Patito/Pydantic model fields so they're not treated as data columns.
     categorical_var_names: ClassVar[frozenset[str]] = frozenset(
@@ -149,69 +148,74 @@ class _NwpBase(pt.Model):
         return cls.all_weather_var_names() - cls.categorical_var_names
 
 
-_WIND_SPEED_DTYPE = pt.Field(
-    dtype=pl.Float32,
-    description="Meters per second",
-    ge=0,
-    le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
-)
-_WIND_DIRECTION_DTYPE = pt.Field(
-    dtype=pl.Float32,
-    description="The angle where the wind is coming *from*. Degrees. 0° is North; 90° is East",
-    ge=0,
-    le=360,
-)
-
-
 class NwpInMemory(_NwpBase):
     """Variables stored as Float32 in memory.
 
     NWP data is first converted to NwpInMemory when ingested from Dynamical.
     """
 
-    temperature_2m: float = pt.Field(dtype=pl.Float32, description="Degrees C", ge=-100, le=100)
-    """Air temperature at 2 m above ground (°C)."""
+    temperature_2m: float = pt.Field(
+        dtype=pl.Float32,
+        description="Air temperature at 2 m above ground. Unit: degrees C.",
+        ge=-100,
+        le=100,
+    )
 
     dew_point_temperature_2m: float = pt.Field(
-        dtype=pl.Float32, description="Degrees C", ge=-100, le=100
+        dtype=pl.Float32,
+        description="Dew-point temperature at 2 m. Unit: degrees C.",
+        ge=-100,
+        le=100,
     )
-    """Dew-point temperature at 2 m (°C)."""
 
-    wind_speed_10m: float = _WIND_SPEED_DTYPE
-    """Wind speed at 10 m (m/s)."""
+    wind_speed_10m: float = pt.Field(
+        dtype=pl.Float32,
+        description="Wind speed at 10 m. Unit: meters per second.",
+        ge=0,
+        le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+    )
 
-    wind_direction_10m: float = _WIND_DIRECTION_DTYPE
-    """Wind direction at 10 m — degrees the wind is coming *from* (0° = N, 90° = E)."""
+    wind_direction_10m: float = pt.Field(
+        dtype=pl.Float32,
+        description="Wind direction at 10 m. The angle where the wind is coming from. Degrees. 0° is North; 90° is East.",
+        ge=0,
+        le=360,
+    )
 
-    wind_speed_100m: float = _WIND_SPEED_DTYPE
-    """Wind speed at 100 m (m/s)."""
+    wind_speed_100m: float = pt.Field(
+        dtype=pl.Float32,
+        description="Wind speed at 100 m. Unit: meters per second.",
+        ge=0,
+        le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+    )
 
-    wind_direction_100m: float = _WIND_DIRECTION_DTYPE
-    """Wind direction at 100 m — degrees the wind is coming *from* (0° = N, 90° = E)."""
+    wind_direction_100m: float = pt.Field(
+        dtype=pl.Float32,
+        description="Wind direction at 100 m. The angle where the wind is coming from. Degrees. 0° is North; 90° is East.",
+        ge=0,
+        le=360,
+    )
 
     pressure_surface: float = pt.Field(
         dtype=pl.Float32,
-        description="Pa",
+        description="Surface pressure. Unit: Pa.",
         ge=0,
         le=200_000,  # Max in 2 years of ECMWF ENS = 105_760
     )
-    """Surface pressure (Pa)."""
 
     pressure_reduced_to_mean_sea_level: float = pt.Field(
         dtype=pl.Float32,
-        description="Pa",
+        description="Mean sea-level pressure. Unit: Pa.",
         ge=0,
         le=200_000,  # Max in 2 years of ECMWF ENS = 105_727
     )
-    """Mean sea-level pressure (Pa)."""
 
     geopotential_height_500hpa: float = pt.Field(
         dtype=pl.Float32,
-        description="m",
+        description="Geopotential height of the 500 hPa pressure surface. Unit: m.",
         ge=0,
         le=10_000,  # Max in 2 years of ECMWF ENS = 6_030
     )
-    """Geopotential height of the 500 hPa pressure surface (m)."""
 
     # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
     # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
@@ -219,27 +223,24 @@ class NwpInMemory(_NwpBase):
     # values before we receive them. So these are true _rates_.
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        description="Downward long-wave radiation flux at surface. Note that this variable is all-null for lead time 0. Unit: W m-2.",
         ge=0,
         le=1500,  # Max in 2 years of ECMWF ENS = 445
     )
-    """Downward long-wave radiation flux at surface (W m⁻²); null at lead time 0."""
 
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description=_NULL_FOR_LEAD_TIME_0 + "Unit: W m-2",
+        description="Downward short-wave (solar) radiation flux at surface. Note that this variable is all-null for lead time 0. Unit: W m-2.",
         ge=0,
         le=1500,  # Max in 2 years of ECMWF ENS = 892
     )
-    """Downward short-wave (solar) radiation flux at surface (W m⁻²); null at lead time 0."""
 
     precipitation_surface: float | None = pt.Field(
         dtype=pl.Float32,
-        description=_NULL_FOR_LEAD_TIME_0 + "Unit: kg m-2 s-1",
+        description="Total precipitation rate at surface, de-accumulated by Dynamical. Note that this variable is all-null for lead time 0. Unit: kg m-2 s-1.",
         ge=0,
         le=0.01,  # Max in 2 years of ECMWF ENS = 0.006
     )
-    """Total precipitation rate at surface (kg m⁻² s⁻¹, de-accumulated by Dynamical); null at lead time 0."""
 
     @classmethod
     def validate(

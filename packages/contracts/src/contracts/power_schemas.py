@@ -12,27 +12,18 @@ from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 
 class PowerTimeSeries(pt.Model):
     time_series_id: int = _get_time_series_id_dtype()
-    """NGED-provided primary key identifying the substation or asset."""
 
     time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description=(
-            "The end time of the 30-minute period."
-            " Note that all the NGED JSON time series data is already 30-minutely."
-        ),
+        description="End time of the 30-minute observation period (all NGED data is already half-hourly).",
     )
-    """End time of the 30-minute observation period (all NGED data is already half-hourly)."""
 
     power: float = pt.Field(
         dtype=pl.Float32,
         ge=-1000,
         le=1000,
-        description=(
-            "The average power in MW or MVA over the previous 30-minute period."
-            " The unit is defined in the TimeSeriesMetadata for this time_series_id"
-        ),
+        description="Average power (MW or MVA) over the preceding 30-minute period. Unit defined in TimeSeriesMetadata.",
     )
-    """Average power (MW or MVA) over the preceding 30-minute period. Unit defined in `TimeSeriesMetadata`."""
 
     @classmethod
     def validate(  # ty: ignore[invalid-method-override]
@@ -110,105 +101,91 @@ LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
 
 class TimeSeriesMetadata(pt.Model):
     time_series_id: int = _get_time_series_id_dtype(unique=True)
-    """NGED-provided primary key identifying the substation or asset (unique within this table)."""
 
     time_series_name: str = pt.Field(
         dtype=pl.String,
+        description="Human-readable name for the substation or asset.",
         examples=[
             "ALFORD 33 11kV S STN",
             "BAMBERS FARM WIND GENERATION MABLETHORPE 33kV S ST",
             "Leverton Solar Park",
         ],
     )
-    """Human-readable name for the substation or asset."""
 
-    time_series_type: str = pt.Field(dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES))
-    """Asset category (e.g. `’PV’`, `’Wind’`, `’Disaggregated Demand’`). See `LIST_OF_TIME_SERIES_TYPES`."""
+    time_series_type: str = pt.Field(
+        dtype=pl.Enum(LIST_OF_TIME_SERIES_TYPES),
+        description="Asset category (e.g. ‘PV’, ‘Wind’, ‘Disaggregated Demand’). See LIST_OF_TIME_SERIES_TYPES.",
+    )
 
-    units: str = pt.Field(dtype=pl.Enum(["MW", "MVA"]))
-    """Power unit for this time series: `’MW’` (active power) or `’MVA’` (apparent power)."""
+    units: str = pt.Field(
+        dtype=pl.Enum(["MW", "MVA"]),
+        description="Power unit for this time series: ‘MW’ (active power) or ‘MVA’ (apparent power).",
+    )
 
-    licence_area: str = pt.Field(dtype=pl.Enum(["EMids"]))
-    """NGED licence area (currently always `’EMids’`)."""
+    licence_area: str = pt.Field(
+        dtype=pl.Enum(["EMids"]),
+        description="NGED licence area (currently always ‘EMids’).",
+    )
 
     substation_number: int = pt.Field(
         dtype=pl.Int32,
         gt=0,
         lt=1_000_000,
-        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number.",
+        description="Perhaps surprisingly, each customer meter in the NGED trial area has its own substation_number (not one per physical substation).",
     )
-    """Each customer meter has its own substation_number (not one per physical substation)."""
 
     substation_type: str = pt.Field(
-        dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])
+        dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
+        description="Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary.",
     )
-    """Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary."""
 
     latitude: float = pt.Field(
         dtype=pl.Float32,
         ge=49,
         le=61,  # UK latitude range
-        description=(
-            "For customer time series, the latitude and longitude give the location of the"
-            " _substation_, not the customer’s site."
-        ),
+        description="Latitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
     )
-    """Latitude of the substation (not the customer site) in decimal degrees."""
 
     longitude: float = pt.Field(
         dtype=pl.Float32,
         ge=-9,
         le=2,  # UK longitude range
-        description=(
-            "For customer time series, the latitude and longitude give the location of the"
-            " _substation_, not the customer’s site."
-        ),
+        description="Longitude in decimal degrees. For customer time series, gives the location of the substation, not the customer's site.",
     )
-    """Longitude of the substation (not the customer site) in decimal degrees."""
 
     information: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
-        description="Always None in the trial area",
+        description="Free-text NGED notes field; always null in the V1 trial area.",
     )
-    """Free-text NGED notes field; always null in the V1 trial area."""
 
     area_wkt: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
         # Maps to the nested Area.WKT field in the JSON data.
         description=(
-            "In the trial, the only time series to have area_wkt are the Primary substations."
-            " NGED don’t have polygons for the customer sites, though NGED hope to add that in the future."
-            " If/when NGED publish polygons for customer sites, the area, where present, refers to the"
-            " area covered by the generator itself."
+            "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
+            " NGED don’t have polygons for customer sites (though they hope to add that in future)."
+            " For customer sites, where present, refers to the area covered by the generator itself."
         ),
     )
-    """WKT polygon for the asset’s area; only Primary substations have this in the trial."""
 
     area_center_lat: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description=(
-            "For customer sites, the area, where present, refers to the area covered by the generator itself."
-        ),
+        description="Centroid latitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
     )
-    """Centroid latitude of the area polygon (generator footprint for customer sites)."""
 
     area_center_lon: float | None = pt.Field(
         dtype=pl.Float32,
         allow_missing=True,
-        description=(
-            "For customer sites, the area, where present, refers to the area covered by the generator itself."
-        ),
+        description="Centroid longitude of the area polygon. For customer sites, the area, where present, refers to the area covered by the generator itself.",
     )
-    """Centroid longitude of the area polygon (generator footprint for customer sites)."""
 
     h3_res_5: int = pt.Field(
         dtype=pl.UInt64,
         description="H3 discrete spatial index at resolution 5.",
     )
-    """H3 discrete spatial index at resolution 5."""
 
 
 #: Fold identifier for ``PowerForecast.fold_id``.
@@ -230,17 +207,20 @@ class PowerForecast(pt.Model):
     essentially the ``fold_id="live"`` rows with these internal columns dropped).
     """
 
-    valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
-    """The target time this forecast is valid for."""
+    valid_time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description="The target time this forecast is valid for.",
+    )
 
     time_series_id: int = _get_time_series_id_dtype()
-    """NGED-provided primary key identifying the substation or asset."""
 
-    ensemble_member: int = pt.Field(dtype=pl.Int8)
-    """Ensemble member index (0-based)."""
+    ensemble_member: int = pt.Field(dtype=pl.Int8, description="Ensemble member index (0-based).")
 
-    ml_flow_experiment_id: int | None = pt.Field(dtype=pl.Int32, allow_missing=True)
-    """MLflow experiment ID; links to the MLflow experiment that produced this forecast."""
+    ml_flow_experiment_id: int | None = pt.Field(
+        dtype=pl.Int32,
+        allow_missing=True,
+        description="MLflow experiment ID; links to the MLflow experiment that produced this forecast.",
+    )
 
     nwp_init_time: datetime | None = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
@@ -250,16 +230,11 @@ class PowerForecast(pt.Model):
             "Null for models that do not use NWP (e.g. persistence baselines)."
         ),
     )
-    """NWP model init time; null for non-NWP models (e.g. persistence baselines)."""
 
     power_fcst_model_name: str = pt.Field(
         dtype=pl.Categorical,
-        description=(
-            "Identifier for our ML-based power forecasting model."
-            " Specified in the BaseForecaster subclass."
-        ),
+        description="Identifier for our ML-based power forecasting model. Model-family identity set by the BaseForecaster subclass (MODEL_NAME).",
     )
-    """Model-family identifier set by the `BaseForecaster` subclass (`MODEL_NAME`)."""
 
     experiment_name: str = pt.Field(
         dtype=pl.Categorical,
@@ -271,19 +246,16 @@ class PowerForecast(pt.Model):
             " INTERNAL-ONLY: projected out of the `power_forecast` table delivered to NGED."
         ),
     )
-    """Per-experiment key (distinct from `power_fcst_model_name`); internal-only, not delivered to NGED."""
 
-    power_fcst_model_version: int = pt.Field(dtype=pl.Int16)
-    """Model version integer, bumped with each breaking change to the model implementation."""
+    power_fcst_model_version: int = pt.Field(
+        dtype=pl.Int16,
+        description="Model version integer, bumped with each breaking change to the model implementation.",
+    )
 
     power_fcst_init_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description=(
-            "The datetime that the power forecast was initialised."
-            " This might be called `t0` in some other OCF projects."
-        ),
+        description="The datetime that the power forecast was initialised. This might be called `t0` in some other OCF projects.",
     )
-    """When the power forecast was initialised (`t0` in some OCF projects)."""
 
     power_fcst: float = pt.Field(
         dtype=pl.Float32,
@@ -300,7 +272,6 @@ class PowerForecast(pt.Model):
             # lands (roadmap v0.6 / v0.7).
         ),
     )
-    """Forecast power in MW or MVA (unit per `TimeSeriesMetadata`); positive = export to grid."""
 
     fold_id: FoldId = pt.Field(
         dtype=pl.Categorical,
@@ -314,4 +285,3 @@ class PowerForecast(pt.Model):
             "Extend the FoldId Literal in power_schemas.py as new CV epochs are added."
         ),
     )
-    """CV validation year (e.g. `'2022'`) or `'live'` for production; all forecasts share one Delta table."""
