@@ -71,14 +71,11 @@ class PowerTimeSeries(pt.Model):
 
 
 LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
-    "BESS",  # Battery energy storage system. Present in trial area
-    "Biofuel",  # Present in trial area
+    "BESS",
+    "Biofuel",
     "CHP",
     "Data Centre",
-    # In the trial area, "Disaggregated Demand" is exclusively associated with "Primary" substations,
-    # and all "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
-    # "Disaggregated Demand" indicates that NGED have already removed metered generation connected to that primary.
-    "Disaggregated Demand",  # Present in trial area.
+    "Disaggregated Demand",
     "Energy from Waste",
     "EV Charging",
     "Geothermal",
@@ -88,15 +85,28 @@ LIST_OF_TIME_SERIES_TYPES: Final[tuple[str, ...]] = (
     "Mixed (Demand)",
     "Mixed (Generation)",
     "Other (Demand)",
-    "Other (Generation)",  # Present in trial area
+    "Other (Generation)",
     "Other (Storage)",
     "Peaking Plant",
-    "PV",  # Present in trial area
+    "PV",
     "Rail",
-    "Raw Flow",  # Present in trial area. Used for BSP and GSP substations.
+    "Raw Flow",
     "Synchronous Condenser",
-    "Wind",  # Present in trial area
+    "Wind",
 )
+"""All time-series type values used in NGED data.
+
+Types present in the V1 trial area: BESS, Biofuel, Disaggregated Demand, Other (Generation), PV,
+Raw Flow, Wind.
+
+Notes:
+
+- BESS: Battery energy storage system.
+- Disaggregated Demand: In the trial area, exclusively associated with "Primary" substations. All
+  "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
+  Indicates that NGED have already removed metered generation connected to that primary.
+- Raw Flow: Used for BSP and GSP substations.
+"""
 
 
 class TimeSeriesMetadata(pt.Model):
@@ -188,12 +198,13 @@ class TimeSeriesMetadata(pt.Model):
     )
 
 
-#: Fold identifier for ``PowerForecast.fold_id``.
-#: Each fold validates on one whole year.
-#: Each validation year in the CV protocol gets a string label matching that year.
-#: ``"live"`` denotes a production forecast (no CV fold).
-#: Extend this Literal as new CV epochs are added.
 FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
+"""Fold identifier for ``PowerForecast.fold_id``.
+
+Each fold validates on one whole year. Each validation year in the CV protocol gets a string label
+matching that year. ``"live"`` denotes a production forecast (no CV fold). Extend this Literal as
+new CV epochs are added.
+"""
 
 
 class PowerForecast(pt.Model):

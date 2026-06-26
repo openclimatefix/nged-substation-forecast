@@ -170,23 +170,27 @@ class AllFeatures(pt.Model):
 
 HORIZON_SLICES: Final[tuple[str, ...]] = (
     "all",
-    "intraday",  # 0 – 6 h
-    "day_ahead",  # 6 – 36 h
-    "short_medium_range",  # Day 2 – Day 7
-    "extended_range",  # Day 8 – Day 14
+    "intraday",
+    "day_ahead",
+    "short_medium_range",
+    "extended_range",
 )
 """Horizon slice labels matching the four forecast ranges from the project report.
 
-`"all"` aggregates over all horizons and is always computed.
+- `"all"`: aggregates over all horizons and is always computed
+- `"intraday"`: 0 – 6 h
+- `"day_ahead"`: 6 – 36 h
+- `"short_medium_range"`: Day 2 – Day 7
+- `"extended_range"`: Day 8 – Day 14
 """
 
-METRIC_NAMES: Final[tuple[str, ...]] = (
-    "mae",  # mean absolute error (MW)
-    "nmae",  # normalised MAE (dimensionless; normalised by mean |power|)
-    "rmse",  # root mean squared error (MW)
-    "mbe",  # mean bias error (MW; positive = over-prediction)
-)
+METRIC_NAMES: Final[tuple[str, ...]] = ("mae", "nmae", "rmse", "mbe")
 """Metric names currently implemented.
+
+- `"mae"`: mean absolute error (MW)
+- `"nmae"`: normalised MAE (dimensionless; normalised by mean |power|)
+- `"rmse"`: root mean squared error (MW)
+- `"mbe"`: mean bias error (MW; positive = over-prediction)
 
 Extend as new metrics are added:
 
