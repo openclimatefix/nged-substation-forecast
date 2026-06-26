@@ -1224,7 +1224,7 @@ lagged power.
 - **User can verify:** materialise `eligible_time_series` in the Dagster UI and inspect the
   per-fold eligible `time_series_id` lists. *(First tangible Dagster deliverable.)*
 
-### 7.3 Phase 3 — MLflow run resolution, model store, `register_experiment_job`
+### 7.3 Phase 3 — MLflow run resolution, model store, `register_experiment_job` - Completed in PR #185
 
 - `_mlflow_runs.py` (§5.6), the `BaseForecaster.save_to_mlflow` / `load_from_mlflow` methods
   (§4.5), `register_experiment_job` / `RegisterExperimentConfig`, and the `cv_experiment_folds`
@@ -1236,7 +1236,7 @@ lagged power.
   experiment + parent run (config params + grouping tags) appear, and the new
   `__mid_2025_to_mid_2026` key shows up in the `cv_experiment_folds` partition set.
 
-### 7.3.1 Phase 3.5 - Re-consider CV folds — Decided
+### 7.3.1 Phase 3.5 - Re-consider CV folds — Completed in PR #186
 
 **Decision:** use a **single MVP fold** for now (ECMWF ENS only), because honest forecast-skill
 validation needs real forecast NWP for both training and validation, and our ECMWF ENS archive
