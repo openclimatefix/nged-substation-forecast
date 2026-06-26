@@ -1,9 +1,9 @@
 """Pure, data-only helpers for the cross-validation Dagster assets.
 
 Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster imports) so it
-can be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here
-(§5.2). This module is written fresh in Phase 1: it replaces the reusable logic of the deleted
-single-loop ``cross_validate.py`` (§7.0.1), correcting the latent ``train_end`` bug (§5.1).
+can be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
+This module is written fresh, replacing the reusable logic of the deleted single-loop
+``cross_validate.py`` and correcting its latent ``train_end`` bug.
 """
 
 import calendar
@@ -15,7 +15,7 @@ from contracts.hydra_schemas import CvFoldConfig
 from pydantic import BaseModel
 
 #: Separator between experiment name and fold id in a CV partition key. A double-underscore
-#: reduces collision risk with experiment names that contain single underscores (§5.4).
+#: reduces collision risk with experiment names that contain single underscores.
 CV_PARTITION_KEY_SEPARATOR = "__"
 
 
@@ -50,8 +50,9 @@ def training_window(fold: CvFoldConfig) -> tuple[datetime, datetime]:
     Uses **inclusive end-of-day** semantics that mirror ``val_end``: the window is
     ``[train_start 00:00:00, train_end 23:59:59]``. This honours ``fold.train_end`` directly
     rather than collapsing it onto ``val_start`` — the latent ``train_end`` bug carried by the
-    deleted single-loop CV (§5.1). When a fold leaves a gap/embargo between ``train_end`` and
-    ``val_start``, training correctly stops at ``train_end``, not at ``val_start``.
+    deleted single-loop ``cross_validate.py``. When a fold leaves a gap/embargo between
+    ``train_end`` and ``val_start``, training correctly stops at ``train_end``, not at
+    ``val_start``.
     """
     return (
         _date_to_utc_datetime(fold.train_start),
@@ -71,7 +72,7 @@ def eligible_time_series_ids(
 
     Eligibility is a function of the **data only** — it does not depend on any model or
     experiment config — so every experiment evaluates a fold on the identical population,
-    which is what makes leaderboard comparisons fair (§5.8).
+    which is what makes leaderboard comparisons fair.
 
     Args:
         coverage: One row per time series with the columns ``time_series_id``, ``first_time``,
@@ -97,7 +98,7 @@ def _parse_cv_partition_key(partition_key: str) -> tuple[str, str]:
 
     Partition key format: ``"{experiment_name}__{fold_id}"``. The separator is a
     double-underscore to reduce collision risk with experiment names that contain single
-    underscores (§5.4). Splitting from the right keeps ``__`` inside the experiment name intact.
+    underscores. Splitting from the right keeps ``__`` inside the experiment name intact.
     """
     experiment_name, fold_id = partition_key.rsplit(CV_PARTITION_KEY_SEPARATOR, maxsplit=1)
     return experiment_name, fold_id

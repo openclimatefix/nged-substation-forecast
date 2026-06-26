@@ -87,7 +87,7 @@ class Settings(BaseSettings):
             "MLflow run ID of the model the production service serves."
             " Downloaded once into the local model cache (model_cache_base_path) and reused."
             " Set manually for now; a later champion_model asset will populate it"
-            " automatically (§6)."
+            " automatically."
         ),
     )
 
@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     model_cache_base_path: Path = Field(
         default=PROJECT_ROOT / "data" / "model_cache",
         description=(
-            "Root of the local-disk model cache, keyed by MLflow run ID (§4.5)."
+            "Root of the local-disk model cache, keyed by MLflow run ID."
             " Put this on a persistent volume so the production cache survives restarts"
             " during an MLflow outage."
         ),

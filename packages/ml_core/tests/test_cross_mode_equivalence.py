@@ -1,4 +1,4 @@
-"""Cross-mode feature equivalence — the enforceable no-skew guarantee (§5.7).
+"""Cross-mode feature equivalence — the enforceable no-skew guarantee.
 
 The "zero training-serving skew" requirement is met by both CV/backtest and production calling
 the *same* ``engineer_features()``, differing only in operating mode:

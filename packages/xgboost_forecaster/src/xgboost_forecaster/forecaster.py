@@ -91,7 +91,7 @@ class XGBoostForecaster(BaseForecaster):
         """The sorted time_series_ids this forecaster has a trained Booster for.
 
         Read back at predict time to guarantee the train==predict population and to give
-        production its population (§4.5.1). Persisted in ``meta.json`` by ``save()``.
+        production its population. Persisted in ``meta.json`` by ``save()``.
         """
         return sorted(self._models.keys())
 
