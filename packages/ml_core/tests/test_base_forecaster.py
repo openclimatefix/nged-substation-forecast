@@ -1,7 +1,7 @@
-"""Round-trip and cache tests for the model-store helpers, against file-based MLflow.
+"""Tests for ``BaseForecaster``'s MLflow persistence, against file-based MLflow.
 
-Uses a tiny fake ``BaseForecaster`` (rather than a concrete model) so the test stays focused on
-the store's behaviour — artifact upload/download and the local cache — and free of any
+Uses a tiny fake ``BaseForecaster`` (rather than a concrete model) so the tests stay focused on
+the shared behaviour — artifact upload/download and the local cache — and free of any
 model-library dependency.
 """
 
@@ -13,7 +13,6 @@ import patito as pt
 import pytest
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
-from ml_core._model_store import load_model, save_model
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
 pytestmark = pytest.mark.integration
@@ -51,19 +50,18 @@ def saved_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """A file-based MLflow run id with a saved _FakeForecaster (payload 'hello-model')."""
     monkeypatch.setenv("MLFLOW_ALLOW_FILE_STORE", "true")
     mlflow.set_tracking_uri(f"file://{tmp_path / 'mlruns'}")
-    experiment_id = mlflow.create_experiment("model_store_test")
+    experiment_id = mlflow.create_experiment("base_forecaster_test")
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
     forecaster = _FakeForecaster(
         BaseForecasterConfig(selected_features=set()), payload="hello-model"
     )
-    save_model(forecaster, run_id)
+    forecaster.save_to_mlflow(run_id)
     return run_id
 
 
 def test_save_load_round_trip(saved_run: str, tmp_path: Path) -> None:
-    loaded = load_model(saved_run, _FakeForecaster, cache_base_path=tmp_path / "cache")
-    assert isinstance(loaded, _FakeForecaster)
+    loaded = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=tmp_path / "cache")
     assert loaded.payload == "hello-model"
 
 
@@ -73,8 +71,7 @@ def test_cache_hit_does_not_contact_mlflow(
     cache = tmp_path / "cache"
 
     # First load is a cache miss → downloads from MLflow into the cache.
-    first = load_model(saved_run, _FakeForecaster, cache_base_path=cache)
-    assert isinstance(first, _FakeForecaster)
+    first = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
     assert first.payload == "hello-model"
     assert (cache / saved_run / "model" / "payload.txt").exists()
 
@@ -84,6 +81,5 @@ def test_cache_hit_does_not_contact_mlflow(
 
     monkeypatch.setattr(mlflow.artifacts, "download_artifacts", _boom)
 
-    second = load_model(saved_run, _FakeForecaster, cache_base_path=cache)
-    assert isinstance(second, _FakeForecaster)
+    second = _FakeForecaster.load_from_mlflow(saved_run, cache_base_path=cache)
     assert second.payload == "hello-model"
