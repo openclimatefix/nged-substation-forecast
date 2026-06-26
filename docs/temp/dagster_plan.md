@@ -1258,7 +1258,7 @@ only reaches back to 2024-04-01.
   update the affected schema/asset docstrings and tests. No fold-*mechanics* code changes (the
   windowing in `ml_core._cv_helpers` is already generic over arbitrary train/val dates).
 
-### 7.4 Phase 4 — `trained_cv_model` asset
+### 7.4 Phase 4 — `trained_cv_model` asset - in progress
 
 - Implement §4.6 (read config from MLflow, read eligible set, `engineer_features`, `train`,
   `save_to_mlflow`, log training params to the fold run).
@@ -1266,6 +1266,13 @@ only reaches back to 2024-04-01.
 - **User can verify:** register a `smoke_test` experiment, materialise `trained_cv_model` for the
   `__mid_2025_to_mid_2026` partition; see the model artifact + fold run with training params in
   MLflow.
+
+### 7.4.1 Phase 4.1 - Document the Dagster workflow implemented so far
+
+- Document (probably in `docs/ml_experimentation/`) the Dagster flow we have implemented so far.
+  Structure it as a sequence of simple steps, like a food recipe, for running the steps all the way
+  up to `trained_cv_model`. Explain why `trained_cv_model` loads the config from MLflow, not from
+  YAML.
 
 ### 7.5 Phase 5 — `cv_power_forecasts` asset
 
