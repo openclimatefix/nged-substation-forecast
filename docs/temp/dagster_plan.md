@@ -29,15 +29,16 @@ redesign needed to support research at scale and production simultaneously.
 
 ### Functional
 - Run 100s to 1000s of ML experiments, each with full expanding-window CV over the
-  canonical **complete-year folds** (currently 2022–2025; see §4.1).
+  canonical folds (see §4.1). The canonical fold set is currently a **single MVP fold**
+  (`mid_2025_to_mid_2026`); the multiple-yearly-fold protocol is the target once ECMWF ENS is
+  backfilled (see §7.3.1 and docs/ml_experimentation/cross-validation-folds.md).
 - All experiments evaluated on **identical canonical CV folds** — scientific fairness
-  for the leaderboard is non-negotiable. (Although note that, because the ECMWF numerical weather
-  predictions available from Dynamical.org only go back to 2024-04-01 for now (although
-  Dynamical.org are back-filling). So, for a minimal MVP, we will only use a single fold: train on
-  12 months of data starting on 2024-04-01; and test on 12 months of data started on 2025-04-01).
+  for the leaderboard is non-negotiable. (We use a single fold for now because the ECMWF numerical
+  weather predictions available from Dynamical.org only go back to 2024-04-01; Dynamical.org are
+  back-filling earlier years, and we move to multiple yearly folds once they do.)
 - Per-fold observability: know which folds succeeded or failed for each experiment.
 - Retry individual failed folds from the Dagster UI without re-running others.
-- Kick off a **smoke test** (just the earliest fold, 2022) before committing to a
+- Kick off a **smoke test** (just the earliest fold) before committing to a
   full CV run, so bad configs fail fast and cheaply.
 - Run production inference every 6 hours; track which runs failed and rerun them.
   Although the production inference will happen on one machine (with its own Dagster
@@ -155,11 +156,11 @@ e.g. `"42__2022"`.
 | Concept | Definition |
 |---|---|
 | **Experiment** | One specific combination of model class + config (features, hyperparameters). Identified by a human-readable `experiment_name` string. Stamped onto every forecast row in a dedicated `experiment_name` column (see §4.7, §5.1) — **not** overloaded onto `power_fcst_model_name`, which keeps its meaning as the model *family* (`MODEL_NAME`). |
-| **CV Fold** | One expanding-window training/validation window, identified by its validation calendar year. The canonical leaderboard folds are **complete years only**: currently `"2022"`–`"2025"`. `"2026"` is **excluded until the year completes** (a partial year cannot be fairly compared; see §4.1.2). Date ranges live in `conf/cv/default.yaml` and are immutable per leaderboard epoch. |
-| **Dagster partition key** | `"{experiment_name}__{fold_id}"`, e.g. `"xgboost_with_solar__2022"`. Encodes both the experiment and the fold; unique by construction (MLflow enforces unique experiment names). |
+| **CV Fold** | One expanding-window training/validation window, identified by a short label (`fold_id`). The canonical fold set is currently a **single MVP fold** (`"mid_2025_to_mid_2026"`); the target multiple-yearly-fold protocol switches on once ECMWF ENS is backfilled (§7.3.1, docs/ml_experimentation/cross-validation-folds.md). Validation windows must be **complete** before they enter the leaderboard (a partial window cannot be fairly compared; see §4.1.2). Date ranges live in `conf/cv/default.yaml` and are immutable per leaderboard epoch. |
+| **Dagster partition key** | `"{experiment_name}__{fold_id}"`, e.g. `"xgboost_with_solar__mid_2025_to_mid_2026"`. Encodes both the experiment and the fold; unique by construction (MLflow enforces unique experiment names). |
 | **MLflow experiment** | One per `experiment_name`. Stores the resolved config as experiment tags. Holds all runs for that experiment. |
 | **MLflow parent run** | One per experiment. Holds the resolved config params and the aggregate (mean-across-folds) metrics — the row the leaderboard sorts on. Tagged `cv_role="parent"`. |
-| **MLflow fold (child) run** | One per fold, nested under the parent run. Holds per-fold training params and per-fold metrics. Tagged `cv_role="fold"`, `fold_id="2022"`. |
+| **MLflow fold (child) run** | One per fold, nested under the parent run. Holds per-fold training params and per-fold metrics. Tagged `cv_role="fold"`, `fold_id="mid_2025_to_mid_2026"`. |
 
 ### 4.1.1 MLflow Run Model and Cross-Process Run Resolution
 
@@ -168,12 +169,9 @@ You do **not** need a separate MLflow experiment per fold. MLflow's *run* is exa
 
 ```
 Experiment  "xgboost_with_solar"  (experiment_id = 42)
-└── Parent run  "cv_summary"      tags: cv_role=parent      ← aggregate metrics (leaderboard row)
-    ├── Child run  "2022"         tags: cv_role=fold, fold_id=2022   ← per-fold params + metrics
-    ├── Child run  "2023"         tags: cv_role=fold, fold_id=2023
-    ├── Child run  "2024"
-    ├── Child run  "2025"
-    └── Child run  "2026"
+└── Parent run  "cv_summary"               tags: cv_role=parent   ← aggregate metrics (leaderboard row)
+    └── Child run  "mid_2025_to_mid_2026"  tags: cv_role=fold, fold_id=mid_2025_to_mid_2026
+                                           ↑ per-fold params + metrics (one child per canonical fold)
 ```
 
 **The coordination problem:** `trained_cv_model`, `cv_power_forecasts`, and `metrics` are
@@ -207,18 +205,20 @@ the assets is only a self-healing fallback. Fold child runs are created per-part
 never collide, because each fold is a distinct Dagster partition that Dagster will not run
 concurrently with itself.
 
-### 4.1.2 Complete-Year Folds Only (the 2026 problem)
+### 4.1.2 Complete Validation Windows Only
 
-Fold eligibility requires a time series to have observations through the fold's `val_end`
-(31 Dec). For the **current** year that is impossible — the year hasn't finished — so the
-current-year fold would silently validate on zero (or partial) data and corrupt the
-"mean-across-folds" leaderboard number. Therefore:
+Fold eligibility requires a time series to have observations through the fold's `val_end`. A fold
+whose validation window has not yet finished would silently validate on zero (or partial) data and
+corrupt the "mean-across-folds" leaderboard number. Therefore:
 
-- `conf/cv/default.yaml` contains **complete years only**. As of this writing that is
-  `"2022"`–`"2025"`; `"2026"` is added only once 2026 has finished and its NGED data has landed.
-- The `FoldId` `Literal` may still *list* `"2026"` (it is a valid future value), but it is not a
-  canonical leaderboard fold until promoted in the YAML.
-- Mid-year performance on the current (incomplete) year is obtained through **arbitrary-period
+- `conf/cv/default.yaml` contains **only folds whose validation window is complete** by the time
+  the experiment runs. The current MVP fold validates `2025-07-01 → 2026-06-30`; this code is not
+  expected to train until after that window has closed. When the multiple-yearly-fold protocol
+  switches on, each yearly fold is added only once its validation year has finished and the NGED
+  data has landed.
+- `fold_id` is a plain `str` (`contracts.power_schemas.FoldId`) whose canonical values come from
+  the YAML, so adding a fold is a config edit, not a schema change.
+- Mid-window performance on an as-yet-incomplete window is obtained through **arbitrary-period
   evaluation** (§4.8, `evaluation_scope="ad_hoc"`), which never feeds the leaderboard.
 
 ### 4.2 Dagster Asset Graph
@@ -287,9 +287,10 @@ class RegisterExperimentConfig(Config):
     config_overrides: dict       # Hydra-style key-value overrides applied on top of
                                  # the base YAML, e.g. {"selected_features": ["lag_1h"]}
     run_mode: Literal["smoke_test", "full_cv", "register_only"]
-                                 # smoke_test: adds only the earliest fold (__2022)
+                                 # smoke_test: adds only the earliest fold
                                  # full_cv:    adds one partition key per canonical fold in
-                                 #             conf/cv/default.yaml (currently __2022...__2025)
+                                 #             conf/cv/default.yaml (currently the single
+                                 #             __mid_2025_to_mid_2026 fold)
                                  # register_only: adds all keys but triggers nothing
     description: str = ""        # stored as an MLflow experiment tag
 ```
@@ -313,9 +314,9 @@ The job performs these steps in order:
    to create it. (The helper is idempotent, so a re-registration is harmless.)
 5. Based on `run_mode`, determine which fold IDs to add (read from `conf/cv/default.yaml`, never
    hard-coded — §4.1.2):
-   - `"smoke_test"` → just the earliest fold, e.g. `["2022"]`
-   - `"full_cv"` or `"register_only"` → every canonical fold, currently `["2022", "2023",
-     "2024", "2025"]`
+   - `"smoke_test"` → just the earliest fold, e.g. `["mid_2025_to_mid_2026"]`
+   - `"full_cv"` or `"register_only"` → every canonical fold, currently
+     `["mid_2025_to_mid_2026"]`
 6. Add Dagster partition keys `[f"{experiment_name}__{fid}" for fid in fold_ids]` to the
    `cv_experiment_folds` `DynamicPartitionsDefinition`.
    Use `context.instance.add_dynamic_partitions("cv_experiment_folds", keys)`.
@@ -323,7 +324,8 @@ The job performs these steps in order:
 
 After the job completes, the user materialises the new partitions from the Dagster asset
 catalog (selecting `trained_cv_model` + `cv_power_forecasts` for the new experiment).
-For a smoke test, only the `__2022` partition exists, so only one fold runs.
+For a smoke test, only the earliest fold's partition exists, so only one fold runs. (With the
+current single-fold config, `smoke_test` and `full_cv` add the same one partition.)
 
 The `register_experiment_job` uses `context.instance.add_dynamic_partitions()` which requires Dagster's instance object inside an op. Make sure to use `OpExecutionContext` (not `AssetExecutionContext`) for that job's ops, since it's a job not an asset.
 
@@ -490,7 +492,7 @@ Per materialisation:
    exactly the trained population, even if power coverage changed since training.
 5. Call `engineer_features()`, then `forecaster.predict()` (across all 51 NWP ensemble members
    — §6).
-6. Overwrite `fold_id` column with the string `fold_id` (year string, e.g. `"2022"`).
+6. Overwrite `fold_id` column with the string `fold_id` (the fold's label, e.g. `"mid_2025_to_mid_2026"`).
    `predict()` stamps each row's identity columns: `power_fcst_model_name`/`power_fcst_model_version`
    carry the model **family** identity (`MODEL_NAME`/`MODEL_VERSION` class constants), while the
    dedicated `experiment_name` column carries the experiment (from
@@ -564,7 +566,7 @@ space — which is also what keeps the leaderboard apples-to-apples.
   metrics" stays a trivial filter, while full window expressiveness lives in dedicated columns.
 - **Scope decides where results go.** All three scopes write to `forecast_metrics` Delta
   (tagged with the scope); they differ only in MLflow logging:
-  - `evaluation_scope="leaderboard"` (canonical complete-year folds only) → the **golden
+  - `evaluation_scope="leaderboard"` (canonical complete-window folds only) → the **golden
     leaderboard** experiments. Logs **per-fold** metrics to each fold child run and
     **aggregate** (mean-across-folds) metrics to the experiment's **parent run**, both resumed
     by tag (§4.1.1) — `experiment_id = get_or_create_experiment(...)`, `parent_run_id =
@@ -580,7 +582,7 @@ space — which is also what keeps the leaderboard apples-to-apples.
     time — e.g. trailing-24h and trailing-7d RMSE per `time_series_type`. The monitoring runs
     are resolved by tag (one persistent run per `(window, …)`), mirroring §4.1.1.
   - `evaluation_scope="ad_hoc"` → **no MLflow at all**, Delta only. For one-off analysis (e.g.
-    scoring the current incomplete year §4.1.2, or a researcher's manual slice).
+    scoring an as-yet-incomplete validation window §4.1.2, or a researcher's manual slice).
 
 Note on actuals: evaluating "the last 24h / 7d / month of production" scores forecasts whose
 `valid_time` has already passed and now has observed power — not freshly issued forward
@@ -629,7 +631,7 @@ The existing `cv_metrics` Dagster asset is **deleted** and replaced by `metrics`
 
 We will sometimes want to test a **new input data source whose history is shorter than the
 canonical folds** — the motivating case is adding **ICON-EU NWP** (from Dynamical.org), whose
-history only starts in **early 2026**, well after the 2022–2025 leaderboard folds. Such a source
+history starts later than the canonical leaderboard folds. Such a source
 **cannot** enter the canonical CV folds (there is no overlapping history), so by construction this
 evaluation lives entirely in `evaluation_scope="ad_hoc"` (§4.8) and **never** feeds the
 leaderboard. Two patterns, answering two different questions:
@@ -654,7 +656,7 @@ rather than letting each experiment pick its own population. (`trained_time_seri
 experiments to share a population — the frozen set does.)
 
 **2. Confound warning (do NOT read this as the ablation).** The tempting shortcut — take the
-2022–2025 **leaderboard champion**, run it on 2026, and compare against an ICON-EU model on 2026 —
+canonical **leaderboard champion**, run it on 2026, and compare against an ICON-EU model on 2026 —
 is **statistically confounded** and must not be read as evidence about the new source. The two
 models differ in **two** variables at once: the feature set *and* the **training window** (the
 champion trained on four full years; the ICON-EU model is forced onto a 2026-only sliver, because
@@ -746,9 +748,9 @@ the model is downloaded from that MLflow run into the local cache, then served f
 - **Add a dedicated `experiment_name` column to `PowerForecast`** (Categorical). This is the
   per-experiment key; do **not** overload `power_fcst_model_name` (which stays the model family
   identity from `MODEL_NAME`). Forecasts are partitioned in Delta by `(experiment_name, fold_id)`.
-- `FoldId` is a `Literal["live", "2022", …]`; it may list `"2026"` as a valid value, but `"2026"`
-  is not a canonical leaderboard fold until 2026 completes and is promoted in
-  `conf/cv/default.yaml` (§4.1.2). Extend the `Literal` when new CV epochs are added.
+- `FoldId` is a plain `str` (`"live"` is the reserved production sentinel); canonical fold labels
+  come from `conf/cv/default.yaml`, so adding a fold or epoch is a config edit, not a schema change
+  (§4.1.2).
 - `PowerForecast.fold_id` is unchanged.
 - **Internal vs delivered schema (Milestone 1 report Table 1, p.28):** the columns
   `experiment_name`, `fold_id`, and `ml_flow_experiment_id` are **internal-only** — they exist
@@ -871,7 +873,7 @@ The following are correct and require no changes:
 - `packages/contracts/src/contracts/ml_schemas.py` — `AllFeatures` is unchanged; the `Metrics`
   schema gains `evaluation_scope` and `time_series_type` columns (§5.1).
 - `conf/cv/default.yaml` — canonical fold definitions; immutable per leaderboard epoch.
-  Currently holds complete years 2022–2025 (§4.1.2).
+  Currently holds the single MVP fold `mid_2025_to_mid_2026` (§4.1.2).
 - `conf/model/xgboost.yaml` — default XGBoost config.
 - All NWP, geo, and NGED data assets.
 
@@ -944,7 +946,7 @@ from mlflow.tracking import MlflowClient
 client = MlflowClient()  # honours the tracking URI set via mlflow.set_tracking_uri(...)
 runs = client.search_runs(
     experiment_ids=[experiment_id],
-    filter_string="tags.cv_role = 'fold' and tags.fold_id = '2022'",
+    filter_string="tags.cv_role = 'fold' and tags.fold_id = 'mid_2025_to_mid_2026'",
     max_results=1,
 )
 fold_run_id = runs[0].info.run_id if runs else _create_fold_run(...)
@@ -1070,11 +1072,11 @@ mistake.
   metrics consume that ensemble. (Training-on-control + inference-on-51 matches the Milestone 1
   report and `docs/roadmap/index.md` v0.1.)
 
-- **Completing a year (fold promotion):** when the current year finishes (e.g. 2026 completes
-  and its NGED data lands), promote it by adding the fold to `conf/cv/default.yaml` and ensuring
-  the `FoldId` `Literal` in `contracts/power_schemas.py` lists it (§4.1.2). Promotion starts a
-  *new leaderboard epoch* (every experiment must be re-scored against the new fold set for
-  apples-to-apples comparison).
+- **Adding a fold (fold promotion):** when a new validation window completes and its NGED data
+  lands (and, for the move to the yearly protocol, once ECMWF ENS is backfilled), promote it by
+  adding the fold to `conf/cv/default.yaml`. No schema change is needed — `FoldId` is a plain `str`
+  (§4.1.2). Promotion starts a *new leaderboard epoch* (every experiment must be re-scored against
+  the new fold set for apples-to-apples comparison).
 
 - **Concurrent Delta writes:** parallel experiments are safe because they write to different
   `experiment_name` partition directories, and re-runs are safe because each write is an
@@ -1222,7 +1224,7 @@ lagged power.
 - **User can verify:** materialise `eligible_time_series` in the Dagster UI and inspect the
   per-fold eligible `time_series_id` lists. *(First tangible Dagster deliverable.)*
 
-### 7.3 Phase 3 — MLflow run resolution, model store, `register_experiment_job`
+### 7.3 Phase 3 — MLflow run resolution, model store, `register_experiment_job` - Completed in PR #185
 
 - `_mlflow_runs.py` (§5.6), the `BaseForecaster.save_to_mlflow` / `load_from_mlflow` methods
   (§4.5), `register_experiment_job` / `RegisterExperimentConfig`, and the `cv_experiment_folds`
@@ -1231,36 +1233,30 @@ lagged power.
   `save_to_mlflow`/`load_from_mlflow` round-trip + cache hit/miss; register job creates experiment
   + parent run + grouping tags + the right partition keys (§5.8).
 - **User can verify:** run `register_experiment_job` from the Dagster UI/CLI; see the MLflow
-  experiment + parent run (config params + grouping tags) appear, and the new `__2022…` keys show
-  up in the `cv_experiment_folds` partition set.
+  experiment + parent run (config params + grouping tags) appear, and the new
+  `__mid_2025_to_mid_2026` key shows up in the `cv_experiment_folds` partition set.
 
-### 7.3.1 Phase 3.5 - Re-consider CV folds
+### 7.3.1 Phase 3.5 - Re-consider CV folds — Completed in PR #186
 
-- The design currently specifies that we should use yearly CV folds, with expanding training
-  horizons. The validation years will be 2022, 2023, 2024, and 2025. But I'm worried we may not have
-  enough data for this approach. At least, not yet.
-- Facts to consider:
-    - Dynamical.org currently only provides ECMWF back to 2024-04-01. Dynamical.org are actively
-      backfilling. But the backfill will take months.
-    - Later in the project, we have to ingest CERRA (a European re-analysis) dataset anyway. So we
-      could ingest CERRA soon, and use CERRA to train on times before 2024-04-01. But then we
-      wouldn't be training on a weather _forecast_, so the validation results for 2022, 2023, and
-      2024 would be misleading.
-    - Only 22 of the 32 time series for the trial area have data going back to 2020-01-01 (see plot
-      in Milestone 1 report)
-- Some options I can think of:
-    - **A: Current plan: Just use a single fold for now:** Continue with the current plan. Only use ECMWF ENS. For now, we'll only be able to use a
-      "temporary fold" that trains on the 12 months from 2024-04-01, and tests on the 12 months from
-      2025-04-01. That feels fine for a MVP. The main issue is that it only gives us one fold.
-    - **B: Monthly CV:** Similar to option A, but we "buy" the ability to have multiple folds by
-      expanding the training window by **1 month** per fold. e.g.:
-         - fold 1: train on 12 months from 2024-04-01. Test on 12 months from 2025-04-01.
-         - fold 2: train on 13 months from 2024-04-01. Test on 12 months from 2025-05-01.
-         - fold 3: train on 14 months from 2024-04-01. Test on 12 months from 2025-06-01.
-    - **C: Stick with yearly folds. Use CERRA for folds before 2024-04-01.***
-- Later in the project, when we're really optimising for performance, we will want to try
-  "pre-training" on weather re-analysis datasets, so we can make full use of the long power time
-  series we have for some (but not all) assets.
+**Decision:** use a **single MVP fold** for now (ECMWF ENS only), because honest forecast-skill
+validation needs real forecast NWP for both training and validation, and our ECMWF ENS archive
+only reaches back to 2024-04-01.
+
+- Fold `mid_2025_to_mid_2026`: train `2024-04-01 → 2025-06-30` (15 months, maximising training
+  data), validate `2025-07-01 → 2026-06-30` (12 months, seasonally complete). This code won't be
+  ready to train until after 2026-06-30, by which point the validation window has closed.
+- **The plan is to move to the target multiple-yearly-fold protocol** (expanding training window,
+  one validation year per fold — the original §4.1 design) **once Dynamical.org has backfilled
+  ECMWF ENS** to the earlier years.
+- `FoldId` becomes a plain `str` (`"live"` stays the production sentinel) so fold identity is fully
+  config-driven; switching fold sets is then a `conf/cv/default.yaml` edit, not a schema change.
+- Alternatives considered and why they were not chosen (monthly expanding CV — redundant,
+  correlated folds; quarterly non-overlapping walk-forward — the sound multi-fold option, deferred;
+  CERRA for pre-2024 validation — reanalysis ≠ forecast, reserved for pre-training) are recorded in
+  **docs/ml_experimentation/cross-validation-folds.md**.
+- Implementation: rewrite `conf/cv/default.yaml` to the single fold; relax `FoldId` to `str`;
+  update the affected schema/asset docstrings and tests. No fold-*mechanics* code changes (the
+  windowing in `ml_core._cv_helpers` is already generic over arbitrary train/val dates).
 
 ### 7.4 Phase 4 — `trained_cv_model` asset
 
@@ -1268,7 +1264,8 @@ lagged power.
   `save_to_mlflow`, log training params to the fold run).
 - Tests: integration test materialising one fold (uses Phases 2 + 3).
 - **User can verify:** register a `smoke_test` experiment, materialise `trained_cv_model` for the
-  `__2022` partition; see the model artifact + fold run with training params in MLflow.
+  `__mid_2025_to_mid_2026` partition; see the model artifact + fold run with training params in
+  MLflow.
 
 ### 7.5 Phase 5 — `cv_power_forecasts` asset
 
@@ -1277,8 +1274,8 @@ lagged power.
   prediction metrics to the fold run). **Delete the old monolithic `cv_power_forecasts`.**
 - Tests: materialise predict for the smoke-test fold; **idempotency** (materialise twice →
   `power_forecasts` row count unchanged); assert 51 ensemble members present.
-- **User can verify:** materialise `cv_power_forecasts` for `__2022`, query the `power_forecasts`
-  Delta table; re-materialise and confirm no duplicate rows.
+- **User can verify:** materialise `cv_power_forecasts` for `__mid_2025_to_mid_2026`, query the
+  `power_forecasts` Delta table; re-materialise and confirm no duplicate rows.
 
 ### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works
 

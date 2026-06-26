@@ -2,9 +2,10 @@
 
 How OCF measures the skill of its forecasts and compares forecasting approaches.
 
-> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The CV cross-validation assets and the
-> `Metrics` schema exist in code (✅); the interactive leaderboard visualisation and several metrics
-> are 🚧 planned. See the [roadmap index](index.md) for status conventions.
+> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema exists in code
+> (✅); the interactive leaderboard visualisation and several metrics are 🚧 planned. The
+> implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has moved
+> out of the roadmap. See the [roadmap index](index.md) for status conventions.
 
 ---
 
@@ -24,44 +25,13 @@ database. The leaderboard will be displayed as an interactive table (inspiration
 
 ---
 
-## Cross-fold validation: expanding training window ✅
+## Cross-fold validation
 
-We use **expanding-window** cross-fold validation: the training period grows each fold while the
-validation window stays the same length and strictly *after* training. This mimics production
-(never train on the future) and lets us measure seasonal variation by validating across a whole
-year per fold.
-
-| Fold | Train | Validate |
-|---|---|---|
-| 1 | 2020 → 2021 | 2022 |
-| 2 | 2020 → 2022 | 2023 |
-| 3 | 2020 → 2023 | 2024 |
-| 4 | 2020 → 2024 | 2025 |
-| 5 | 2020 → 2025 | 2026 *(excluded from the leaderboard until 2026 is complete)* |
-
-Notes:
-
-- We train/evaluate across all time series in a category, **provided** each series has valid data
-  for the whole validation period and ≥ 6 months of training data. (E.g. time series ID 24 only has
-  data from early 2024, so it is excluded from folds 1–3.)
-- Full half-hourly predictions are saved as Delta tables per fold, per time series, per experiment —
-  so we can refine how we measure performance **without re-running** past experiments.
-- **Expanding vs. sliding window**: we chose expanding to maximise data for data-hungry models
-  (neural nets). The trade-off: it confounds "algorithmic improvement" with "more data", so we don't
-  compare fold 5 against fold 1 directly — we aggregate folds into a single leaderboard figure.
-
-> Implementation detail: only **complete-year** folds enter the leaderboard (the "2026 problem"),
-> and data sources with shorter history than the canonical folds (e.g. ICON-EU) are first assessed
-> via a controlled ad-hoc ablation, then promoted to a new leaderboard epoch once they have ~1–2
-> years of history.
-
-> **Bootstrapping note — the initial leaderboard has a single fold.** The canonical five-fold table
-> above is the *target*. It needs NWP back to 2020, but our ECMWF ENS archive currently only reaches
-> back to **2024-04-01** (Dynamical.org are back-filling earlier years, but slowly) and we have not
-> yet ingested CERRA. So, to get a minimal leaderboard running before either lands, we start with a
-> **single fold**: train on **2024-04-01 → 2025-04-01**, validate on **2025-04-01 → 2026-04-01**.
-> This is deliberately an ugly stop-gap; the full expanding-window protocol above switches on once
-> the back-fill and/or CERRA provide pre-2024 weather.
+The cross-validation protocol is **implemented**, so it has moved to its permanent home:
+[ML Experimentation → Cross-validation folds](../ml_experimentation/cross-validation-folds.md).
+That page covers the expanding-window protocol, the current single MVP fold (and why the available
+weather data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
+alternatives we considered.
 
 ---
 

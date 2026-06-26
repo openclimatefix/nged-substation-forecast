@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import ClassVar, Final, Literal, Self
+from typing import ClassVar, Final, Self
 
 import patito as pt
 import polars as pl
@@ -198,12 +198,12 @@ class TimeSeriesMetadata(pt.Model):
     )
 
 
-FoldId = Literal["live", "2022", "2023", "2024", "2025", "2026"]
+FoldId = str
 """Fold identifier for ``PowerForecast.fold_id``.
 
-Each fold validates on one whole year. Each validation year in the CV protocol gets a string label
-matching that year. ``"live"`` denotes a production forecast (no CV fold). Extend this Literal as
-new CV epochs are added.
+A CV fold's id is a short label defined in ``conf/cv/default.yaml`` (e.g.
+``"mid_2025_to_mid_2026"``); fold identity is config-driven, never hard-coded here. ``"live"`` is
+the reserved sentinel for a production forecast that belongs to no CV fold.
 """
 
 
@@ -289,11 +289,10 @@ class PowerForecast(pt.Model):
         dtype=pl.Categorical,
         description=(
             "Identifies the source of this forecast row.  "
-            "For cross-validation runs, the value is the validation year (e.g. '2022'), "
-            "matching the CV fold whose validation period starts on 1 Jan of that year.  "
+            "For cross-validation runs, the value is the fold's label from conf/cv/default.yaml "
+            "(e.g. 'mid_2025_to_mid_2026').  "
             "'live' means a production forecast with no associated CV fold.  "
             "All forecasts — CV and live — live in the same Delta table; "
-            "filter on this column to select the population you need.  "
-            "Extend the FoldId Literal in power_schemas.py as new CV epochs are added."
+            "filter on this column to select the population you need."
         ),
     )

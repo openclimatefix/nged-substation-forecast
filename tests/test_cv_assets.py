@@ -1,17 +1,24 @@
 """Integration tests for the CV Dagster assets.
 
 These materialise ``eligible_time_series`` in-process against synthetic power data written to a
-temporary Delta table, exercising the real asset wiring (Dagster + Delta). The pure eligibility
-logic itself is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
+temporary Delta table, exercising the real asset wiring (Dagster + Delta) for the single canonical
+fold in ``conf/cv/default.yaml``. The pure, fold-specific eligibility logic is unit-tested in
+``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
 from datetime import datetime, timezone
 
 import polars as pl
 import pytest
+from contracts.ml_schemas import EligibleTimeSeries
 from dagster import materialize
+from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import eligible_time_series
+
+# The single canonical fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
+# validate 2025-07-01..2026-06-30, min_training_months=6.
+FOLD_ID = "mid_2025_to_mid_2026"
 
 
 def _utc(year: int, month: int, day: int) -> datetime:
@@ -22,17 +29,18 @@ def _write_synthetic_power(power_delta_path: str) -> None:
     """Write a tiny synthetic power Delta with hand-picked coverage per time series.
 
     Only the per-series min/max observation times matter for eligibility, so two rows per series
-    (first + last) suffice. Coverage is chosen so the eligible set differs between folds 2022 and
-    2023 (min_training_months=6):
+    (first + last) suffice. Coverage is chosen so eligibility differs across series for the
+    canonical fold (val_start 2025-07-01, val_end 2026-06-30, min_training_months=6 ⇒ first obs
+    must be ≤ 2025-01-01 and last obs ≥ 2026-06-30):
 
-    - ts1: 2021-01-01 .. 2024-01-01 -> eligible for both 2022 and 2023.
-    - ts2: 2021-01-01 .. 2023-06-01 -> eligible 2022 (reaches val_end), not 2023 (stops mid-year).
-    - ts3: 2021-01-01 .. 2022-06-01 -> eligible for neither (stops before 2022 val_end).
+    - ts1: 2024-06-01 .. 2026-07-01 -> eligible (enough history, reaches val_end).
+    - ts2: 2024-06-01 .. 2026-03-01 -> not eligible (stops before val_end).
+    - ts3: 2025-03-01 .. 2026-07-01 -> not eligible (< 6 months history before val_start).
     """
     coverage = {
-        1: (_utc(2021, 1, 1), _utc(2024, 1, 1)),
-        2: (_utc(2021, 1, 1), _utc(2023, 6, 1)),
-        3: (_utc(2021, 1, 1), _utc(2022, 6, 1)),
+        1: (_utc(2024, 6, 1), _utc(2026, 7, 1)),
+        2: (_utc(2024, 6, 1), _utc(2026, 3, 1)),
+        3: (_utc(2025, 3, 1), _utc(2026, 7, 1)),
     }
     rows = [
         {"time_series_id": ts, "time": t, "power": 1.0}
@@ -78,25 +86,42 @@ def _read_eligible(eligible_path: str, fold_id: str) -> list[int]:
 
 
 def test_eligible_time_series_materialises_per_fold_population(cv_paths) -> None:
-    assert materialize([eligible_time_series], partition_key="2022").success
-    assert _read_eligible(cv_paths["eligible"], "2022") == [1, 2]
-
-
-def test_eligible_time_series_differs_between_folds(cv_paths) -> None:
-    """The eligible population is fold-specific: a later val_end excludes shorter series."""
-    assert materialize([eligible_time_series], partition_key="2022").success
-    assert materialize([eligible_time_series], partition_key="2023").success
-
-    # Both fold partitions coexist (writing 2023 must not clobber 2022).
-    assert _read_eligible(cv_paths["eligible"], "2022") == [1, 2]
-    assert _read_eligible(cv_paths["eligible"], "2023") == [1]
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
 
 
 def test_eligible_time_series_is_idempotent(cv_paths) -> None:
     """Re-materialising a fold overwrites its partition rather than appending duplicates."""
-    assert materialize([eligible_time_series], partition_key="2022").success
-    assert materialize([eligible_time_series], partition_key="2022").success
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
 
-    fold_rows = pl.read_delta(cv_paths["eligible"]).filter(pl.col("fold_id") == "2022")
-    assert len(fold_rows) == 2  # not 4
-    assert sorted(fold_rows["time_series_id"].to_list()) == [1, 2]
+    fold_rows = pl.read_delta(cv_paths["eligible"]).filter(pl.col("fold_id") == FOLD_ID)
+    assert len(fold_rows) == 1  # not 2
+    assert fold_rows["time_series_id"].to_list() == [1]
+
+
+def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths) -> None:
+    """The partition overwrite touches only its own fold, leaving sibling folds intact.
+
+    Pre-seed the eligible table with a row for an unrelated fold (e.g. a prior leaderboard epoch),
+    then materialise the canonical fold and assert the sibling partition survives.
+    """
+    seeded = EligibleTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "fold_id": pl.Series(["prior_epoch"], dtype=pl.String),
+                "time_series_id": pl.Series([99], dtype=pl.Int32),
+            }
+        )
+    )
+    write_deltalake(
+        table_or_uri=cv_paths["eligible"],
+        data=seeded.to_arrow(),
+        mode="overwrite",
+        partition_by=["fold_id"],
+    )
+
+    assert materialize([eligible_time_series], partition_key=FOLD_ID).success
+
+    assert _read_eligible(cv_paths["eligible"], "prior_epoch") == [99]
+    assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]

@@ -354,6 +354,6 @@ class EligibleTimeSeries(pt.Model):
 
     fold_id: str = pt.Field(
         dtype=pl.String,
-        description="The CV fold this eligibility row belongs to (e.g. '2022'); the Delta partition key.",
+        description="The CV fold this eligibility row belongs to (e.g. 'mid_2025_to_mid_2026'); the Delta partition key.",
     )
     time_series_id: int = _get_time_series_id_dtype()

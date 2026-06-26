@@ -74,19 +74,17 @@ def test_smoke_test_registers_experiment_and_earliest_fold(mlflow_env: None) -> 
     # Resolved config is logged as flattened params (e.g. an XGBoost hyperparameter).
     assert "n_estimators" in parent.data.params
 
-    assert _partition_keys(instance) == ["exp_smoke__2022"]
+    # conf/cv/default.yaml currently holds a single canonical fold.
+    assert _partition_keys(instance) == ["exp_smoke__mid_2025_to_mid_2026"]
 
 
 def test_full_cv_registers_every_canonical_fold(mlflow_env: None) -> None:
     instance = DagsterInstance.ephemeral()
     _run(instance, "exp_full", run_mode="full_cv")
 
-    assert _partition_keys(instance) == [
-        "exp_full__2022",
-        "exp_full__2023",
-        "exp_full__2024",
-        "exp_full__2025",
-    ]
+    # conf/cv/default.yaml currently holds a single canonical fold; the smoke-test-vs-full-CV
+    # fold-selection distinction is unit-tested in tests/test_jobs.py against a multi-fold config.
+    assert _partition_keys(instance) == ["exp_full__mid_2025_to_mid_2026"]
 
 
 def test_re_registration_is_idempotent(mlflow_env: None) -> None:
@@ -98,9 +96,4 @@ def test_re_registration_is_idempotent(mlflow_env: None) -> None:
     experiment = mlflow.get_experiment_by_name("exp_idem")
     assert experiment is not None
     _parent_run(experiment.experiment_id)  # asserts exactly one parent run
-    assert _partition_keys(instance) == [
-        "exp_idem__2022",
-        "exp_idem__2023",
-        "exp_idem__2024",
-        "exp_idem__2025",
-    ]
+    assert _partition_keys(instance) == ["exp_idem__mid_2025_to_mid_2026"]
