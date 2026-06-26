@@ -1279,6 +1279,15 @@ only reaches back to 2024-04-01.
 - Implement §4.7 (`load_from_mlflow`, predict on **all 51 members** for the model's
   `trained_time_series_ids`, **idempotent partition overwrite** into `power_forecasts`, log
   prediction metrics to the fold run). **Delete the old monolithic `cv_power_forecasts`.**
+- **Promote `trained_time_series_ids` to the `BaseForecaster` interface.** It is XGBoost-specific
+  today; Phase 5 is the first model-agnostic consumer (`load_from_mlflow` returns a
+  `BaseForecaster`, and predict must filter to the trained population), so without promotion the
+  asset would have to downcast to `XGBoostForecaster` — defeating the abstraction. Define it on
+  the base as **"the population this model will serve `predict`/score for"** (not "the per-series
+  Boosters it holds"), so it stays honest for planned **multi-series Boosters** (one Booster for
+  all solar sites, another for all primary substations, …), where a single Booster spans many
+  `time_series_id`s. This is the model-agnostic encoding of the §4.5.1 train==predict population
+  invariant. (Designed against this real second consumer rather than speculatively in Phase 4.)
 - Tests: materialise predict for the smoke-test fold; **idempotency** (materialise twice →
   `power_forecasts` row count unchanged); assert 51 ensemble members present.
 - **User can verify:** materialise `cv_power_forecasts` for `__mid_2025_to_mid_2026`, query the
