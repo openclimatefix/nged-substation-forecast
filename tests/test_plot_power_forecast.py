@@ -1,8 +1,7 @@
-"""Tests for the ``plot_power_forecast`` asset and its pure chart builder.
+"""Tests for the ``plot_power_forecast_job`` and its pure chart builder.
 
-The chart builder and config bounds are exercised as fast unit tests; the asset itself is run
-end-to-end against temp Delta/parquet sources via ``materialize`` to confirm an HTML file lands on
-disk.
+The chart builder and config bounds are exercised as fast unit tests; the job itself is run
+end-to-end against temp Delta/parquet sources to confirm an HTML file lands on disk.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -11,13 +10,13 @@ from pathlib import Path
 import polars as pl
 import pytest
 from altair import VConcatChart
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import RunConfig
 from pydantic import ValidationError
 
-from nged_substation_forecast.defs.plot_assets import (
+from nged_substation_forecast.defs.plot_jobs import (
     PlotPowerForecastConfig,
     build_forecast_chart,
-    plot_power_forecast,
+    plot_power_forecast_job,
 )
 
 EXPERIMENT_NAME = "exp_plot"
@@ -124,9 +123,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.mark.integration
 def test_plot_power_forecast_writes_html(env: Path) -> None:
-    result = materialize(
-        [plot_power_forecast],
-        instance=DagsterInstance.ephemeral(),
+    result = plot_power_forecast_job.execute_in_process(
         run_config=RunConfig(
             ops={
                 "plot_power_forecast": PlotPowerForecastConfig(

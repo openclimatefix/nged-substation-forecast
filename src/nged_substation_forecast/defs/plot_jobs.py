@@ -1,10 +1,11 @@
-"""Ad-hoc visualisation assets for inspecting forecasts.
+"""Manually launched visualisation jobs for inspecting forecasts.
 
-``plot_power_forecast`` is an unpartitioned, config-driven asset: rather than producing a data
-artifact for the pipeline it renders an interactive HTML plot of forecasts that already exist in
-the ``power_forecasts`` Delta table, so a human can eyeball one forecast. It reads the Delta/parquet
-sources directly (no ``deps`` into the partitioned CV graph) and delegates chart construction to the
-pure, unit-testable :func:`build_forecast_chart`.
+``plot_power_forecast_job`` renders an interactive HTML plot of forecasts that already exist in the
+``power_forecasts`` Delta table, so a human can eyeball one forecast. It is a job (not an asset)
+because the plot is a throwaway artifact for human eyes — keyed by ``(init time, time_series_ids)``,
+with no lineage and no durable catalog identity — rather than a tracked data object. Its op reads
+the Delta/parquet sources directly and delegates chart construction to the pure, unit-testable
+:func:`build_forecast_chart`.
 """
 
 import warnings
@@ -15,7 +16,7 @@ from typing import Final
 import altair as alt
 import polars as pl
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, Config, MetadataValue, asset
+from dagster import Config, MetadataValue, OpExecutionContext, job, op
 from pydantic import Field
 
 FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
@@ -29,10 +30,10 @@ _PANEL_HEIGHT: Final[int] = 250
 
 
 class PlotPowerForecastConfig(Config):
-    """Run config for ``plot_power_forecast``.
+    """Run config for ``plot_power_forecast_job``.
 
     The defaults point at the smoke-test forecasts currently materialised in the
-    ``power_forecasts`` Delta table, so the asset is runnable with no config edits.
+    ``power_forecasts`` Delta table, so the job is runnable with no config edits.
     """
 
     experiment_name: str = Field(
@@ -143,15 +144,14 @@ def build_forecast_chart(
         return alt.vconcat(*panels).resolve_scale(y="independent")
 
 
-@asset
-def plot_power_forecast(context: AssetExecutionContext, config: PlotPowerForecastConfig) -> None:
+@op
+def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastConfig) -> None:
     """Render an interactive HTML plot of one forecast for 1–4 ``time_series_id``s.
 
     Reads the ``power_forecasts`` Delta table for ``(experiment_name, fold_id)`` at the chosen
     ``power_fcst_init_time``, the observed power over the 14-day horizon, and the series metadata,
-    then writes an interactive Altair HTML file to ``settings.plots_data_path``. The asset is
-    unpartitioned and reads Delta directly (no ``deps``), so it plots whatever forecasts already
-    exist on disk.
+    then writes an interactive Altair HTML file to ``settings.plots_data_path``. Reads Delta
+    directly, so it plots whatever forecasts already exist on disk.
     """
     settings = Settings()
     init_time = datetime.fromisoformat(config.power_fcst_init_time)
@@ -213,3 +213,9 @@ def plot_power_forecast(context: AssetExecutionContext, config: PlotPowerForecas
             "n_ground_truth_rows": ground_truth.height,
         }
     )
+
+
+@job
+def plot_power_forecast_job() -> None:
+    """Render an interactive HTML plot of one forecast for 1–4 ``time_series_id``s."""
+    plot_power_forecast()
