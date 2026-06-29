@@ -233,7 +233,7 @@ Crucially, the training objective is an **ELBO**, not a bare reconstruction loss
 Three physics details the sketch gets right:
 
 - **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
-- **Capacity is a power.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. The AC inverter limit is a separate clip (see §6).
+- **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike the soft aggregate clip for fleets in §6.
 - **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
 
 Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°).
@@ -263,25 +263,29 @@ class DifferentiableSolarPlant(nn.Module):
     Azimuth convention: measured from due south, east negative, west positive.
     """
 
-    def __init__(self, prior_tilt: float, prior_azimuth: float, prior_dc_capacity: float) -> None:
+    def __init__(self, prior_tilt: float, prior_azimuth: float, prior_dc_capacity: float, prior_ac_capacity: float) -> None:
         super().__init__()
-        # Variational posteriors. tilt/azimuth are in radians; capacity lives in
-        # log-space so it stays strictly positive without a gradient-breaking clamp.
+        # Variational posteriors. tilt/azimuth are in radians; capacities live in
+        # log-space so they stay strictly positive without a gradient-breaking clamp.
         self.tilt_mu = nn.Parameter(torch.tensor(prior_tilt))
         self.tilt_log_std = nn.Parameter(torch.tensor(-2.0))  # exp(-2) ~ 0.13 rad initially
 
         self.azimuth_mu = nn.Parameter(torch.tensor(prior_azimuth))
         self.azimuth_log_std = nn.Parameter(torch.tensor(-2.0))
 
-        self.log_capacity_mu = nn.Parameter(torch.log(torch.tensor(prior_dc_capacity)))
-        self.log_capacity_log_std = nn.Parameter(torch.tensor(-2.0))
+        self.log_dc_capacity_mu = nn.Parameter(torch.log(torch.tensor(prior_dc_capacity)))
+        self.log_dc_capacity_log_std = nn.Parameter(torch.tensor(-2.0))
+
+        self.log_ac_capacity_mu = nn.Parameter(torch.log(torch.tensor(prior_ac_capacity)))
+        self.log_ac_capacity_log_std = nn.Parameter(torch.tensor(-2.0))
 
         # Fixed priors. Weakly-informative: "panels point roughly south at a UK roof pitch,
         # with a capacity near nameplate". These also keep the posterior spreads from collapsing.
         self.priors = {
             "tilt": dist.Normal(torch.tensor(prior_tilt), torch.tensor(0.3)),
             "azimuth": dist.Normal(torch.tensor(prior_azimuth), torch.tensor(0.5)),
-            "log_capacity": dist.Normal(torch.log(torch.tensor(prior_dc_capacity)), torch.tensor(0.5)),
+            "log_dc_capacity": dist.Normal(torch.log(torch.tensor(prior_dc_capacity)), torch.tensor(0.5)),
+            "log_ac_capacity": dist.Normal(torch.log(torch.tensor(prior_ac_capacity)), torch.tensor(0.3)),
         }
 
     def posteriors(self) -> dict[str, dist.Normal]:
@@ -289,7 +293,8 @@ class DifferentiableSolarPlant(nn.Module):
         return {
             "tilt": dist.Normal(self.tilt_mu, self.tilt_log_std.exp()),
             "azimuth": dist.Normal(self.azimuth_mu, self.azimuth_log_std.exp()),
-            "log_capacity": dist.Normal(self.log_capacity_mu, self.log_capacity_log_std.exp()),
+            "log_dc_capacity": dist.Normal(self.log_dc_capacity_mu, self.log_dc_capacity_log_std.exp()),
+            "log_ac_capacity": dist.Normal(self.log_ac_capacity_mu, self.log_ac_capacity_log_std.exp()),
         }
 
     def kl_divergence(self) -> torch.Tensor:
@@ -312,7 +317,7 @@ class DifferentiableSolarPlant(nn.Module):
         # Reparameterised samples (one per forward pass).
         tilt = q["tilt"].rsample().clamp(0.0, torch.pi / 2)
         azimuth = q["azimuth"].rsample()
-        dc_capacity = q["log_capacity"].rsample().exp()  # strictly positive by construction
+        dc_capacity = q["log_dc_capacity"].rsample().exp()  # strictly positive by construction
 
         # Angle of incidence on the tilted plane.
         cos_aoi = (
@@ -329,7 +334,9 @@ class DifferentiableSolarPlant(nn.Module):
         # DC power: capacity is the nameplate at the reference irradiance, derated for cell temperature.
         cell_temp = air_temp + NOCT_TEMP_RISE * poa
         temp_derate = 1.0 + TEMP_COEFF_POWER * (cell_temp - STC_CELL_TEMP)
-        return dc_capacity * poa / STC_IRRADIANCE * temp_derate
+        dc_power = dc_capacity * poa / STC_IRRADIANCE * temp_derate
+        ac_capacity = q["log_ac_capacity"].rsample().exp()
+        return torch.minimum(dc_power, ac_capacity)
 
 ```
 
