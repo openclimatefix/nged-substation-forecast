@@ -133,6 +133,7 @@ def _load_engineering_inputs(
     time_series_ids: list[int],
     window_start: datetime,
     window_end: datetime,
+    ensemble_members: list[int] | None = None,
 ) -> tuple[
     pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[NwpInMemory]
 ]:
@@ -141,8 +142,15 @@ def _load_engineering_inputs(
     Shared by ``trained_cv_model`` (training window + eligible population) and
     ``cv_power_forecasts`` (validation window + trained population). Power and NWP are filtered to
     the inclusive ``[window_start, window_end]`` window; all three inputs are filtered to
-    ``time_series_ids``. NWP is **not** filtered to the control member, so every ensemble member is
-    carried through to feature engineering.
+    ``time_series_ids``.
+
+    Args:
+        ensemble_members: If provided, NWP is filtered to these ``ensemble_member`` indices (the
+            predicate pushes down to the Delta scan, so unwanted members never enter memory). If
+            ``None`` (the default), every ensemble member is carried through. Training restricts to
+            the control member (``[0]``) to avoid fanning every forecast row out across all ~51
+            members against the same power target; prediction passes ``None`` because the
+            probabilistic leaderboard metrics need the full ensemble.
     """
     power_lf = pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta")).filter(
         pl.col("time_series_id").is_in(time_series_ids),
@@ -154,6 +162,8 @@ def _load_engineering_inputs(
     nwp_in_window = NwpOnDisk.to_nwp_in_memory(NwpOnDisk.scan_delta(settings.nwp_data_path)).filter(
         pl.col("valid_time") >= window_start, pl.col("valid_time") <= window_end
     )
+    if ensemble_members is not None:
+        nwp_in_window = nwp_in_window.filter(pl.col("ensemble_member").is_in(ensemble_members))
     nwp_lf = pt.LazyFrame.from_existing(nwp_in_window).set_model(NwpInMemory)
 
     metadata_df = pt.DataFrame(
@@ -202,7 +212,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     )
 
     power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
-        settings, eligible_ids, train_start, train_end
+        settings, eligible_ids, train_start, train_end, ensemble_members=[0]
     )
 
     forecaster = forecaster_cls(model_params=config)
