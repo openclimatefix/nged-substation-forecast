@@ -3,9 +3,9 @@
 from dagster import Definitions, load_assets_from_modules
 from contracts.settings import Settings
 
-from nged_substation_forecast.defs import assets, cv_assets, jobs, schedules
+from nged_substation_forecast.defs import assets, cv_assets, jobs, plot_assets, schedules
 
-all_assets = load_assets_from_modules([assets, cv_assets])
+all_assets = load_assets_from_modules([assets, cv_assets, plot_assets])
 
 settings = Settings()
 

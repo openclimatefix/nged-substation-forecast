@@ -104,6 +104,14 @@ class Settings(BaseSettings):
     nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
     power_forecasts_data_path: Path = PROJECT_ROOT / "data" / "power_forecasts"
     forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
+    plots_data_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "plots",
+        description=(
+            "Directory where plot_power_forecast writes interactive forecast HTML files, one per"
+            " materialisation (filename derived from experiment, fold, init time, and the plotted"
+            " time_series_ids)."
+        ),
+    )
     eligible_time_series_data_path: Path = Field(
         default=PROJECT_ROOT / "data" / "eligible_time_series",
         description=(
