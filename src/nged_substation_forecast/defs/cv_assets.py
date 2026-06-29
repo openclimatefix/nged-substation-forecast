@@ -71,7 +71,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     ``min_training_months`` of history before the fold's ``val_start`` *and* reaches the fold's
     ``val_end``. Eligibility is derived from data coverage alone (not from any model/config), so
     every experiment evaluates the fold on the identical population — this is what keeps the
-    leaderboard apples-to-apples (see plan §4.5.1).
+    leaderboard apples-to-apples.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
     ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its
@@ -140,7 +140,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     **inclusive** training window. Features are engineered through the forecaster's own
     ``FeatureEngineer`` (so the spatial NWP mapping and feature pipeline are a model concern), the
     model is trained, and its artifacts are uploaded to the fold's MLflow run alongside the
-    training params (see plan §4.6).
+    training params.
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
     across processes and idempotent under Dagster retries.
