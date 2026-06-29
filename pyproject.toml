@@ -16,6 +16,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
+    "altair>=6.0.0",
     "dagster>=1.12.11",
     "dagster-webserver>=1.12.11",
     "patito",

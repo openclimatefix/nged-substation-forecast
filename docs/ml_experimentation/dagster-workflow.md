@@ -116,6 +116,42 @@ Experiment "xgboost_smoke_test"
 
 ---
 
+## Inspecting a forecast — `plot_power_forecast_job`
+
+Once forecasts exist in the `power_forecasts` Delta table, this job renders an interactive HTML
+plot of a single forecast so you can eyeball it. It is independent of the training flow above —
+launch it any time there are forecasts on disk to inspect.
+
+**Trigger:** Dagster UI → Jobs → `plot_power_forecast_job` → "Launch run". The default run config
+plots an existing smoke-test forecast, so you can launch it as-is; override the
+`PlotPowerForecastConfig` fields to plot a different forecast:
+
+| Field | Example | Notes |
+|---|---|---|
+| `experiment_name` | `"xgboost_smoke_test_3"` | Selects the `(experiment_name, fold_id)` Delta partition to read |
+| `fold_id` | `"smoke_test"` | Use `"live"` for a production forecast |
+| `power_fcst_init_time` | `"2025-01-29T06:00:00+00:00"` | ISO-8601 (Dagster config has no native datetime type); a naive value is read as UTC. The plot spans this time plus the 14-day horizon |
+| `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each is drawn on its own panel |
+
+**What the job does:**
+
+1. Reads `power_forecasts` for `(experiment_name, fold_id)` at the chosen `power_fcst_init_time`,
+   filtered to `time_series_ids`. Errors if no rows match — check the matching partition has been
+   materialised.
+2. Reads observed power over the 14-day horizon and the series metadata.
+3. Builds an Altair chart with one panel per `time_series_id`: all 51 ensemble members as thin
+   grey lines, ground truth (where available) as a thick blue line, and a shared, zoomable x-axis
+   so panning one panel moves them all.
+4. Saves it as a self-contained interactive HTML file under `plots_data_path` (`data/plots/`),
+   named `{experiment_name}__{fold_id}__{init_time}__ts-{ids}.html`. Open it in a browser to zoom
+   and hover (tooltips show the `ensemble_member` and value).
+
+This is a **job, not an asset**, because the plot is a throwaway artifact for human inspection —
+keyed by init time and series ids, with no lineage or durable catalog identity — rather than a
+tracked data object in the pipeline.
+
+---
+
 ## Why `trained_cv_model` reads config from MLflow, not from YAML
 
 When `register_experiment_job` runs, it resolves the base YAML plus any overrides into a single
