@@ -92,26 +92,9 @@ class XGBoostForecaster(BaseForecaster):
 
         For ``XGBoostForecaster`` this is exactly the set of series it holds a trained Booster for
         (one Booster per ``time_series_id``), so ``predict`` raises ``KeyError`` if asked for any
-        other series.
-
-        **Why this exists.** The model is not one thing but a *set* of per-series sub-models, and
-        two facts make the trained set load-bearing:
-
-        1. ``predict`` dispatches by ``time_series_id`` and cannot serve a series it never trained
-           on — so any caller must know the trained set to avoid a ``KeyError``.
-        2. The **train==predict population invariant** (plan §4.5.1): the population a model is
-           scored on must equal the population it was trained on, *even if* the live eligibility
-           set has drifted since training (power coverage changes, so a series may newly qualify
-           or drop out). This property is the model's own frozen record of who it actually saw, so
-           ``cv_power_forecasts`` (Phase 5) and ``live_forecasts`` (Phase 7) score exactly that
-           set — never whatever eligibility says *today*. That is what keeps the leaderboard
-           apples-to-apples and stops production forecasting a series the model never learned.
-
-        Persisted in ``meta.json`` by ``save()`` and read back at predict time. This property is
-        currently XGBoost-specific; Phase 5 promotes it to the ``BaseForecaster`` interface as the
-        model-agnostic "population this model will serve", framed so it still fits planned
-        **multi-series Boosters** (one Booster spanning all solar sites, another all primary
-        substations, …), where the trained set is *not* one-Booster-per-series.
+        other series. ``save()`` records this set in ``meta.json`` and ``load()`` reconstructs it
+        from the ``.ubj`` files on disk. See ``BaseForecaster.trained_time_series_ids`` for the
+        model-agnostic contract this implements (the train==predict population invariant).
         """
         return sorted(self._models.keys())
 
@@ -134,8 +117,14 @@ class XGBoostForecaster(BaseForecaster):
             )
             self._models[ts_id] = booster
 
-    def predict(self, data: pt.LazyFrame[AllFeatures]) -> pt.DataFrame[PowerForecast]:
-        """Generate one power_fcst per row, dispatching by time_series_id to the right Booster."""
+    def predict(
+        self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
+        """Generate one power_fcst per row, dispatching by time_series_id to the right Booster.
+
+        ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
+        supplies it). Defaults to the ``"live"`` production sentinel.
+        """
         df = data.collect()
         feature_cols = self._feature_cols
         cfg = self.model_params
@@ -165,11 +154,17 @@ class XGBoostForecaster(BaseForecaster):
                 power_fcst_model_version=pl.lit(self.MODEL_VERSION, dtype=pl.Int16),
                 ml_flow_experiment_id=pl.lit(cfg.ml_flow_experiment_id, dtype=pl.Int32),
                 experiment_name=pl.lit(cfg.experiment_name),
-                fold_id=pl.lit("live"),
+                fold_id=pl.lit(fold_id),
             )
             parts.append(part)
 
-        result = pl.concat(parts).cast(
+        # ``group_by`` and ``pl.concat`` preserve the input's Patito ``AllFeatures`` subclass, so a
+        # Patito ``.cast`` here would ignore the mapping and instead revert every column to its
+        # ``AllFeatures`` dtype (e.g. ``ensemble_member`` back to ``UInt8``) and leave the
+        # forecast-only columns untouched. Strip the Patito model so the dict-cast uses plain Polars
+        # semantics. ``_from_pydf`` reuses the same underlying frame (zero-copy).
+        combined = pl.concat(parts)
+        result = pl.DataFrame._from_pydf(combined._df).cast(
             {
                 "power_fcst_model_name": pl.Categorical,
                 "experiment_name": pl.Categorical,

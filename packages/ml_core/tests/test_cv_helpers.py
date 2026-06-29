@@ -6,10 +6,10 @@ import polars as pl
 from contracts.hydra_schemas import CvFoldConfig
 from ml_core._cv_helpers import (
     _subtract_months,
+    date_to_utc_datetime,
     eligible_time_series_ids,
     flatten_config,
     parse_cv_partition_key,
-    training_window,
 )
 from pydantic import BaseModel
 
@@ -21,36 +21,18 @@ def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second
 
 
 # ---------------------------------------------------------------------------
-# training_window
+# date_to_utc_datetime
 # ---------------------------------------------------------------------------
 
 
-def test_training_window_inclusive_end_of_day() -> None:
-    fold = CvFoldConfig(
-        fold_id="2024",
-        train_start=date(2020, 1, 1),
-        train_end=date(2023, 12, 31),
-        val_start=date(2024, 1, 1),
-        val_end=date(2024, 12, 31),
-    )
-    start, end = training_window(fold)
-    assert start == _utc(2020, 1, 1, 0, 0, 0)
-    assert end == _utc(2023, 12, 31, 23, 59, 59)
+def test_date_to_utc_datetime_start_of_day() -> None:
+    assert date_to_utc_datetime(date(2020, 1, 1)) == _utc(2020, 1, 1, 0, 0, 0)
 
 
-def test_training_window_honours_train_end_when_gap_before_val_start() -> None:
-    """A gap/embargo between train_end and val_start is respected: training stops at train_end."""
-    fold = CvFoldConfig(
-        fold_id="2024",
-        train_start=date(2020, 1, 1),
-        train_end=date(2023, 11, 30),  # one-month embargo before val_start
-        val_start=date(2024, 1, 1),
-        val_end=date(2024, 12, 31),
+def test_date_to_utc_datetime_inclusive_end_of_day() -> None:
+    assert date_to_utc_datetime(date(2023, 12, 31), end_of_day=True) == _utc(
+        2023, 12, 31, 23, 59, 59
     )
-    _, end = training_window(fold)
-    assert end == _utc(2023, 11, 30, 23, 59, 59)
-    # Crucially, training does NOT run up to val_start.
-    assert end < _utc(2024, 1, 1, 0, 0, 0)
 
 
 # ---------------------------------------------------------------------------
