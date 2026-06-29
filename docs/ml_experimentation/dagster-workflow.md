@@ -4,7 +4,8 @@ How to go from raw data to a trained, MLflow-tracked model using the Dagster pip
 
 The pipeline has two layers. The **data layer** (steps 1–4) is built once and refreshed as new
 data arrives; it is shared by all experiments. The **experiment layer** (steps 5–6) is repeated
-for each new model or hyperparameter configuration.
+for each new model or hyperparameter configuration — see [Model configuration](model-configuration.md)
+for how to choose features and set hyperparameters.
 
 ---
 
