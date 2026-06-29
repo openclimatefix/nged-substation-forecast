@@ -1350,7 +1350,7 @@ only reaches back to 2024-04-01.
 - **User can verify:** materialise `cv_power_forecasts` for `__mid_2025_to_mid_2026`, query the
   `power_forecasts` Delta table; re-materialise and confirm no duplicate rows.
 
-### 7.5.1 Phase 5.1 - `plot_power_forecast` asset
+### 7.5.1 Phase 5.1 - `plot_power_forecast` asset - Completed
 
 - This design is very rough. It'll need refining before implementing!
 - I want a Dagster asset that takes a `power_fcst_init_time`, and a set of `time_series_id`s, and
@@ -1366,7 +1366,7 @@ only reaches back to 2024-04-01.
   interactivity (e.g. I'd like the user to be able to zoom into the plot, and hover to see the
   ensemble_member ID, etc.).
 
-### 7.5.2 Phase 5.2 — `smoke_test` fold (fast-iteration, non-leaderboard)
+### 7.5.2 Phase 5.2 — `smoke_test` fold (fast-iteration, non-leaderboard) - Completed
 
 Implements §4.10. Independent of Phases 6–8 — it works with the already-built `trained_cv_model` +
 `cv_power_forecasts`, so it can land whenever (e.g. before or after Phase 5.1).
