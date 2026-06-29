@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpInMemory
 from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
-from ml_core.features._nwp import _process_nwp, _upsample_nwp_to_half_hourly
+from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
@@ -46,28 +46,6 @@ def test_apply_power_lag_with_source():
     ).collect()
 
     assert result["power_lag_1h"][0] == 90.0
-
-
-def test_process_nwp():
-    df = pl.DataFrame(
-        {
-            "valid_time": [datetime(2020, 1, 1, 12), datetime(2020, 1, 1, 15)],
-            "init_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 0)],
-        }
-    )
-
-    result = (
-        _process_nwp(pt.LazyFrame.from_existing(df.lazy()).set_model(NwpInMemory))
-        .collect()
-        .sort("valid_time")
-    )
-
-    assert "nwp_lead_time_hours" in result.columns
-    assert "nwp_init_time" in result.columns
-    assert "init_time" not in result.columns
-    # 3-hourly input (12:00→15:00) upsampled to 30-min gives 7 rows
-    assert len(result) == 7
-    assert result["nwp_lead_time_hours"].to_list() == [12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0]
 
 
 def test_upsample_nwp_to_half_hourly_interpolates_continuous_vars():

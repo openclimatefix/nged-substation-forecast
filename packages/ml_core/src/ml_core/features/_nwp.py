@@ -6,7 +6,6 @@ can consume, and the two NWP join modes (bulk training vs. single-run inference)
 
 from datetime import datetime, timedelta
 
-import patito as pt
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import NwpInMemory
@@ -134,22 +133,6 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
         )
 
     return upsampled
-
-
-def _process_nwp(nwp_lf: pt.LazyFrame[NwpInMemory]) -> pl.LazyFrame:
-    """Rename 'init_time', upsample to 30-minute resolution, and calculate NWP lead time.
-
-    Expects data already in physical units (NwpInMemory). Callers are responsible for
-    converting NwpOnDisk → NwpInMemory before passing data here; that conversion is lazy
-    and can be done with NwpOnDisk.to_nwp_in_memory().
-    """
-    renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
-    upsampled = _upsample_nwp_to_half_hourly(renamed)
-    return upsampled.with_columns(
-        nwp_lead_time_hours=(
-            (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600
-        ).cast(pl.Float32)
-    )
 
 
 def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:

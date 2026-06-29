@@ -34,7 +34,7 @@ from ml_core.features._nwp import (
     _build_historical_weather,
     _join_nwp_bulk_mode,
     _join_nwp_single_run,
-    _process_nwp,
+    _upsample_nwp_to_half_hourly,
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
 from ml_core.features.feature_engineer import FeatureEngineer
@@ -152,7 +152,16 @@ def _engineer_features(
     if nwp_lf is None and parsed_features.requires_weather_data():
         raise ValueError("Weather features were requested but no NWP data was provided.")
 
-    processed_nwp = _process_nwp(nwp_lf) if nwp_lf is not None else None
+    if nwp_lf is not None:
+        _renamed = nwp_lf.rename({"init_time": "nwp_init_time"})
+        _upsampled = _upsample_nwp_to_half_hourly(_renamed)
+        processed_nwp: pl.LazyFrame | None = _upsampled.with_columns(
+            nwp_lead_time_hours=(
+                (pl.col("valid_time") - pl.col("nwp_init_time")).dt.total_seconds() / 3600
+            ).cast(pl.Float32)
+        )
+    else:
+        processed_nwp = None
     weather_lags = [lag for lag in parsed_features.lags if lag.base_col != "power"]
     if processed_nwp is not None and weather_lags:
         if processed_nwp.filter(pl.col("ensemble_member") == 0).limit(1).collect().is_empty():
