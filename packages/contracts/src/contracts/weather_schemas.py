@@ -427,10 +427,14 @@ class NwpOnDisk(_NwpBase):
         """Scale integer columns to floating point representations in physical units."""
         scaling_params = NwpScalingParams.load() if scaling_params is None else scaling_params
 
+        # Resolve column names once: `LazyFrame.columns` raises a PerformanceWarning per access
+        # because it resolves the schema, and we'd otherwise hit it once per scaling-param row.
+        available_cols = nwp_on_disk.collect_schema().names()
+
         exprs = []
         for row in scaling_params.to_dicts():
             col_name = row["col_name"]
-            if col_name not in nwp_on_disk.columns:
+            if col_name not in available_cols:
                 raise ValueError(f"Column {col_name} is not in `nwp_on_disk`!")
 
             buffered_min = row["buffered_min"]

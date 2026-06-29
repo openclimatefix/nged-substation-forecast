@@ -18,7 +18,9 @@ from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
-from nged_substation_forecast.defs.cv_assets import trained_cv_model
+from contracts.settings import Settings
+
+from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs, trained_cv_model
 from nged_substation_forecast.defs.jobs import RegisterExperimentConfig, register_experiment_job
 
 pytestmark = pytest.mark.integration
@@ -69,24 +71,34 @@ def _write_power(path: str) -> None:
     ).write_delta(path)
 
 
+_NWP_ENSEMBLE_MEMBERS = (0, 1, 2)
+"""Members written to the synthetic NWP. Member 0 is the control; 1 and 2 exercise the
+``ensemble_members`` filter in ``_load_engineering_inputs`` (training keeps only the control)."""
+
+
 def _write_nwp(path: str) -> None:
-    """Write a minimal NwpOnDisk-shaped Delta (integer weather cols) for two cells/days."""
+    """Write a minimal NwpOnDisk-shaped Delta (integer weather cols) for two cells/days.
+
+    Each (cell, valid_time) carries all of ``_NWP_ENSEMBLE_MEMBERS`` so tests can assert that
+    training narrows NWP to the control member while prediction would keep every member.
+    """
     records = []
     for cell, day in ((_TS1_CELL, _IN_WINDOW), (_TS2_CELL, _AFTER_TRAIN_END)):
         init_time = day.replace(hour=0)
         for valid_time in pl.datetime_range(
             day.replace(hour=6), day.replace(hour=8), interval="30m", time_zone="UTC", eager=True
         ):
-            record = {
-                "nwp_model_id": "ECMWF_ENS_0_25_degree",
-                "init_time": init_time,
-                "valid_time": valid_time,
-                "ensemble_member": 0,
-                "h3_index": cell,
-                "categorical_precipitation_type_surface": None,
-            }
-            record.update({col: 2000 for col in _NWP_CONTINUOUS_COLS})
-            records.append(record)
+            for member in _NWP_ENSEMBLE_MEMBERS:
+                record = {
+                    "nwp_model_id": "ECMWF_ENS_0_25_degree",
+                    "init_time": init_time,
+                    "valid_time": valid_time,
+                    "ensemble_member": member,
+                    "h3_index": cell,
+                    "categorical_precipitation_type_surface": None,
+                }
+                record.update({col: 2000 for col in _NWP_CONTINUOUS_COLS})
+                records.append(record)
     df = pl.DataFrame(records).cast(
         {
             "init_time": pl.Datetime("us", "UTC"),
@@ -161,6 +173,27 @@ def _register(instance: DagsterInstance) -> None:
         instance=instance,
     )
     assert result.success
+
+
+def test_load_engineering_inputs_filters_ensemble_members(env: dict[str, str]) -> None:
+    """``ensemble_members`` narrows NWP at the scan; ``None`` keeps every member.
+
+    This is the lever that keeps training (control member only) from fanning every forecast row out
+    across all ~51 members against the same power target — the source of the training OOM.
+    """
+    settings = Settings()
+    train_start = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
+
+    _, _, nwp_control = _load_engineering_inputs(
+        settings, [1, 2], train_start, train_end, ensemble_members=[0]
+    )
+    assert nwp_control.collect()["ensemble_member"].unique().sort().to_list() == [0]
+
+    _, _, nwp_all = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    assert nwp_all.collect()["ensemble_member"].unique().sort().to_list() == list(
+        _NWP_ENSEMBLE_MEMBERS
+    )
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> None:
