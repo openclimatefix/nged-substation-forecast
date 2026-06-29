@@ -11,6 +11,8 @@ NGED's network (as of May 2026) consists of:
 - 52 grid supply points / GSPs (400/132 kV and 275/132 kV)
 - ~1,500 industrial customer generators (not domestic); roughly 558 at 33 kV or 132 kV connected to GSP/BSP busbars, and ~1,000 on the 11 kV network downstream of primaries
 
+![NGED's network](assets/NGED_network.png)
+
 ## Phased Rollout
 
 **Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar PV farms (5 EHV, 1 HV), 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, and 1 reciprocating gas generator. All implemented with a single XGBoost model family.
