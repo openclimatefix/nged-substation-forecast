@@ -5,12 +5,12 @@ description = "Unified ML model interface and shared utilities for substation fo
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "mlflow-skinny",
-    "polars>=1.0.0",
-    "patito",
-    "pydantic>=2.0.0",
-    "dagster",
     "contracts",
+    "hydra-core",
+    "mlflow-skinny",
+    "patito",
+    "polars>=1.0.0",
+    "pydantic>=2.0.0",
 ]
 
 [build-system]

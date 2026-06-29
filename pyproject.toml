@@ -17,21 +17,22 @@ classifiers = [
 ]
 dependencies = [
     "altair>=6.0.0",
+    "contracts",
     "dagster>=1.12.11",
     "dagster-webserver>=1.12.11",
+    "deltalake",
+    "dynamical_data",
+    "geo",
+    "hydra-core",
+    "ml_core",
+    "mlflow-skinny",
+    "nged_data",
+    "obstore",
     "patito",
     "polars>=1.0.0",
+    "pyarrow",
     "requests>=2.31.0",
-    "mlflow-skinny",
-    "dynamical_data",
-    "nged_data",
-    "contracts",
-    "ml_core",
-    "obstore",
     "xgboost_forecaster",
-    "hydra-core",
-    "deltalake",
-    "geo",
 ]
 
 [build-system]

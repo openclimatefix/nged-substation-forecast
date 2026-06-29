@@ -4,6 +4,8 @@ version = "0.0.1"
 description = "Package for handling NGED JSON data"
 requires-python = ">=3.14"
 dependencies = [
+    "obstore",
+    "patito",
     "polars>=1.0.0",
     "polars-h3",
 ]
