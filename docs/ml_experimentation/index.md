@@ -8,6 +8,9 @@ roadmap.
 
 ## Documents
 
+- [Running an ML experiment end-to-end](dagster-workflow.md) — step-by-step recipe for going
+  from raw data to a trained, MLflow-tracked model using the Dagster pipeline; explains why
+  `trained_cv_model` reads config from MLflow rather than YAML.
 - [Cross-validation folds](cross-validation-folds.md) — the expanding-window CV protocol, the
   current single MVP fold and why the data constrains us to it, the target multiple-yearly-fold
   protocol, and the fold-design alternatives we considered.
