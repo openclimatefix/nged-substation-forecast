@@ -12,6 +12,8 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
+from xgboost_forecaster._data_iter import LazyFrameBatchIter, _prepare_features
+
 
 class XGBoostConfig(BaseForecasterConfig):
     """Configuration for XGBoostForecaster.
@@ -28,6 +30,14 @@ class XGBoostConfig(BaseForecasterConfig):
     colsample_bytree: float = 0.8
     device: str = "cpu"
     objective: str = "reg:squarederror"
+    train_batch_size: int = 100_000
+    """Rows collected per batch when streaming training data into XGBoost's QuantileDMatrix.
+
+    Bounds peak training memory: only one batch of Float32 features is resident at a time, while
+    QuantileDMatrix keeps the rest as compressed 8-bit quantile bins. Not an XGBoost
+    hyperparameter, so it is excluded from to_xgb_params(); it serialises with the rest of the
+    config and so round-trips through save/load/MLflow.
+    """
 
     def to_xgb_params(self) -> dict[str, Any]:
         """Return the params dict accepted by xgb.train()."""
@@ -41,23 +51,6 @@ class XGBoostConfig(BaseForecasterConfig):
             "objective": self.objective,
             "seed": self.random_seed,
         }
-
-
-def _prepare_features(df: pt.DataFrame[AllFeatures], feature_cols: list[str]) -> pl.DataFrame:
-    """Return a Float32 DataFrame containing only the feature columns.
-
-    String, Categorical, and Enum columns are encoded as integer codes before casting,
-    so XGBoost treats them as ordinal numerics. Nulls are preserved as NaN, which XGBoost
-    handles natively as missing values.
-    """
-    exprs = []
-    for col in feature_cols:
-        dtype = df[col].dtype
-        if dtype == pl.String or dtype == pl.Categorical or isinstance(dtype, pl.Enum):
-            exprs.append(pl.col(col).cast(pl.Categorical).to_physical().cast(pl.Float32).alias(col))
-        else:
-            exprs.append(pl.col(col).cast(pl.Float32).alias(col))
-    return df.select(exprs)
 
 
 class XGBoostForecaster(BaseForecaster):
@@ -99,23 +92,31 @@ class XGBoostForecaster(BaseForecaster):
         return sorted(self._models.keys())
 
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
-        """Fit one Booster per time_series_id found in data."""
-        df = data.collect()
+        """Fit one Booster per time_series_id found in data.
+
+        Each series' rows are streamed into an ``xgb.QuantileDMatrix`` one batch at a time via
+        ``LazyFrameBatchIter`` (batch size from ``train_batch_size``), so the full Float32 dataset
+        is never resident and XGBoost never builds an uncompressed ``DMatrix`` copy. The lazy plan
+        is never collected whole — only the id column (to learn the population) and one row-batch
+        at a time.
+        """
         feature_cols = self._feature_cols
-        for group_key, group_df in df.group_by(["time_series_id"]):
-            ts_id: int = group_key[0]
-            clean = cast(pt.DataFrame[AllFeatures], group_df.drop_nulls(subset=["power"]))
-            if len(clean) == 0:
-                continue
-            X = _prepare_features(clean, feature_cols)
-            y = clean["power"].cast(pl.Float32)
-            dtrain = xgb.DMatrix(X, label=y)
+        batch_size = self.model_params.train_batch_size
+
+        # One cheap collect of just the id column yields the non-empty population (a series with no
+        # non-null power rows simply does not appear, so it gets no Booster).
+        counts = data.drop_nulls(subset=["power"]).group_by("time_series_id").len().collect()
+
+        for ts_id in counts["time_series_id"]:
+            per_ts = data.filter(pl.col("time_series_id") == ts_id).drop_nulls(subset=["power"])
+            data_iter = LazyFrameBatchIter(per_ts, feature_cols, batch_size=batch_size)
+            dtrain = xgb.QuantileDMatrix(data_iter)
             booster = xgb.train(
                 self.model_params.to_xgb_params(),
                 dtrain,
                 num_boost_round=self.model_params.n_estimators,
             )
-            self._models[ts_id] = booster
+            self._models[int(ts_id)] = booster
 
     def predict(
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"

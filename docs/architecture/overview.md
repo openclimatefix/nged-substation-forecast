@@ -30,18 +30,18 @@ NwpOnDisk.scan_delta(path)               # lazy scan
   → NwpOnDisk.to_nwp_in_memory()        # lazy expression; no collect
   → FeatureEngineer.engineer()           # spatial join + feature pipeline;
                                          #   returns pt.LazyFrame[AllFeatures]; no collect
-  → BaseForecaster.train/predict()       # subclass calls .collect() exactly once, right here
+  → BaseForecaster.train/predict()       # subclass materialises the data here, at the boundary
 ```
 
 **Why it matters:**
 
-- **Memory**: Polars only materialises the data once, at the last moment. Intermediate representations (individual join outputs, lag columns before filtering) are never written to RAM.
+- **Memory**: Polars only materialises the data at the last moment, at the model boundary. Intermediate representations (individual join outputs, lag columns before filtering) are never written to RAM.
 - **Query optimisation**: Polars can see the full plan end-to-end and push down filters (e.g. date ranges, `time_series_id` subsets) into the Delta Lake scan before any data crosses the wire.
-- **Clean boundaries**: The collect site is the model boundary — the one place where a third-party library (XGBoost, PyTorch, …) needs a concrete in-memory array. Keeping it there makes the boundary explicit and easy to find.
+- **Clean boundaries**: The materialisation site is the model boundary — the one place where a third-party library (XGBoost, PyTorch, …) needs a concrete in-memory array. Keeping it there makes the boundary explicit and easy to find.
 
 **The one exception** is a `limit(1).collect()` guard in `_build_historical_weather` (inside `ml_core`) that cheaply checks for the NWP control member before building the lazy plan, so the pipeline fails loudly instead of silently returning an empty frame.
 
-**Contract for `BaseForecaster` subclasses**: call `.collect()` exactly once, as late as possible — typically the line immediately before constructing the model's input matrix. Never ask callers to collect before passing data in.
+**Contract for `BaseForecaster` subclasses**: the lazy plan is materialised *at the model boundary*, as late as possible, and never by callers — never ask a caller to collect before passing data in. How a subclass materialises is its own concern: it may `.collect()` the frame once, or stream it in bounded batches to avoid holding the whole dataset in RAM. `XGBoostForecaster.train`, for instance, never collects the whole frame — it feeds fixed-size row batches (one `.collect()` per batch) to an `xgb.QuantileDMatrix` via `LazyFrameBatchIter`, so peak memory stays bounded regardless of dataset size (see the [XGBoost Forecaster API](../api/xgboost_forecaster/index.md)).
 
 ## The Universal Model Interface
 

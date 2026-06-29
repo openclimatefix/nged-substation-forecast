@@ -180,3 +180,41 @@ def test_random_seed_makes_training_deterministic() -> None:
     a = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
     b = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
     assert a["power_fcst"].to_list() == b["power_fcst"].to_list()
+
+
+def test_small_batch_size_still_trains_one_booster_per_ts_id() -> None:
+    """A batch_size that forces multiple batches per series still trains every series."""
+    df = _make_df(n_per_ts=48, ts_ids=[1, 2, 3])
+    forecaster = _trained(df, train_batch_size=16)  # 48 rows / 16 -> 3 batches per series
+    assert set(forecaster._models.keys()) == {1, 2, 3}
+
+
+def test_training_skips_series_with_all_null_power() -> None:
+    df = _make_df(ts_ids=[1, 2])
+    df = df.with_columns(
+        power=pl.when(pl.col("time_series_id") == 2)
+        .then(None)
+        .otherwise(pl.col("power"))
+        .cast(pl.Float32)
+    )
+    forecaster = _trained(df, train_batch_size=16)
+    assert forecaster.trained_time_series_ids == [1]
+
+
+def test_batch_size_does_not_change_predictions() -> None:
+    """Streaming in small batches yields the same model as a single-batch build."""
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+    sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
+
+    big = _trained(df, random_seed=7, train_batch_size=100_000).predict(lf).sort(sort_cols)
+    small = _trained(df, random_seed=7, train_batch_size=16).predict(lf).sort(sort_cols)
+    assert big["power_fcst"].to_list() == pytest.approx(small["power_fcst"].to_list())
+
+
+def test_train_batch_size_round_trips_through_save_load(tmp_path: Path) -> None:
+    df = _make_df()
+    forecaster = _trained(df, train_batch_size=12_345)
+    forecaster.save(tmp_path / "m")
+    loaded = XGBoostForecaster.load(tmp_path / "m")
+    assert loaded.model_params.train_batch_size == 12_345
