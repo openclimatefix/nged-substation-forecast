@@ -83,9 +83,12 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Polars only** — pandas is strictly forbidden. Use `pl.LazyFrame` and only `.collect()` when necessary.
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
-- **Comments must reflect current state only** — never reference previous iterations of the code,
-  deleted files, or temporary implementation plans (stored in `docs/temp/`). In code, never refer to sections
-  (e.g. "§4.3.1") of temporary implementation plans (stored in `docs/temp/`).
+- **Comments must reflect current state only** — never reference previous iterations of the
+  code or deleted files.
+- **Never reference temporary implementation plans** (in `plans/`) from code *or* docs — neither
+  the files themselves nor their sections (e.g. "§4.3.1"). These plans are deleted once the work
+  lands, so any reference to them rots. Linking *between code and the permanent docs under `docs/`*
+  is encouraged — e.g. a docstring pointing at a page in `docs/architecture/`.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
   ```python

@@ -1353,12 +1353,12 @@ only reaches back to 2024-04-01.
 - **User can verify:** full `uv run pytest` green, **including the full-stack cross-process
   integration test**.
 - **Docs:**
-    - Update `docs/`. 
-    - Check the docs are still up-to-date with the code. 
+    - Update `docs/`.
+    - Check the docs are still up-to-date with the code.
     - Add docs to (briefly) intro new users to the flow that our new code implements, and the reasoning behind it,
       and how to run the dagster pipeline. (Note that much of this content was added to the docs in
       Phase 4.1).
-    - Also make sure the permanent docs (i.e. the docs that live in `docs/` but not in `docs/temp/`) 
+    - Also make sure the permanent docs (i.e. the docs that live in `docs/` but not in `docs/temp/`)
       capture any important ideas from `docs/temp/dagster_plan.md`,
       because `dagster_plan.md` will be deleted once this plan has been implemented in code. In
       particular, check if the permanent docs describe the aims and main design ideas of the ML R&D and
