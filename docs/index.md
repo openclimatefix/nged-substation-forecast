@@ -24,8 +24,8 @@ Each forecast is:
 
 ## Documentation
 
-- [Architecture & Philosophy](architecture/philosophy.md) — design goals and principles
-- [Architecture Overview](architecture/overview.md) — technical components and data flow
+- [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
+- [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
 - [Code Style](architecture/code-style.md) — code conventions
 - [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML experimentation: cross-validation folds, the leaderboard, and how we evaluate models
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders

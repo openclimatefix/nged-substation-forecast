@@ -62,7 +62,7 @@ under nominal topology. This is not an approximation or a simplification. It is 
 quantity useful to network planners, who reason about headroom and capacity under the design
 topology, not the contingency state. (See [forecast building blocks](forecast-building-blocks.md)
 for how this "normal running arrangement" target is delivered, and
-[philosophy](../architecture/philosophy.md) for the operational context.)
+[project background](../background/network.md) for the operational context.)
 
 The differentiable physics framework described below is a principled, end-to-end approach to
 estimating this latent quantity and forecasting it.

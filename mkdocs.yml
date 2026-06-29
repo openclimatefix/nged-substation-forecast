@@ -33,8 +33,12 @@ plugins:
 
 nav:
   - Home: index.md
+  - Background & Challenges:
+      - NGED Network: background/network.md
+      - Requirements: background/requirements.md
+      - Data Quality: background/data-quality.md
+      - Switching Events: background/switching-events.md
   - Architecture:
-      - Philosophy: architecture/philosophy.md
       - Overview: architecture/overview.md
       - Code Style: architecture/code-style.md
   - ML Experimentation:
