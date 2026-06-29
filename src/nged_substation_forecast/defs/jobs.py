@@ -45,8 +45,9 @@ class RegisterExperimentConfig(Config):
     run_mode: Literal["smoke_test", "full_cv", "register_only"] = Field(
         default="smoke_test",
         description=(
-            "smoke_test: add only the earliest fold; full_cv / register_only: add every canonical"
-            " fold from conf/cv/default.yaml. No assets are materialised by the job itself."
+            "smoke_test: add the non-leaderboard dev folds; full_cv / register_only: add the"
+            " leaderboard folds from conf/cv/default.yaml. No assets are materialised by the job"
+            " itself."
         ),
     )
     description: str = Field(default="", description="Stored as an MLflow experiment tag.")
@@ -95,12 +96,12 @@ def _class_target(obj: type | object) -> str:
 def _fold_ids_for_run_mode(run_mode: str, cv_config: CvConfig) -> list[str]:
     """Return the fold ids a run mode expands to (read from the CV config, never hard-coded).
 
-    ``smoke_test`` uses only the earliest fold; ``full_cv`` and ``register_only`` use every
-    canonical fold.
+    Selection keys off the ``leaderboard`` flag, not fold position: ``smoke_test`` uses the
+    non-leaderboard dev folds; ``full_cv`` and ``register_only`` use the leaderboard folds.
     """
     if run_mode == "smoke_test":
-        return [cv_config.fold_ids[0]]
-    return cv_config.fold_ids
+        return [fold.fold_id for fold in cv_config.folds if not fold.leaderboard]
+    return cv_config.leaderboard_fold_ids
 
 
 @op

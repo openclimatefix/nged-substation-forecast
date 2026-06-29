@@ -93,9 +93,8 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
         .collect()
     )
 
-    eligible_ids = eligible_time_series_ids(
-        coverage, fold, min_training_months=_cv_config.min_training_months
-    )
+    min_training_months = fold.min_training_months or _cv_config.min_training_months
+    eligible_ids = eligible_time_series_ids(coverage, fold, min_training_months=min_training_months)
 
     eligible_df = EligibleTimeSeries.validate(
         pl.DataFrame(
@@ -123,7 +122,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
             "eligible_time_series_ids": str(eligible_ids),
             "val_start": str(fold.val_start),
             "val_end": str(fold.val_end),
-            "min_training_months": _cv_config.min_training_months,
+            "min_training_months": min_training_months,
         }
     )
 

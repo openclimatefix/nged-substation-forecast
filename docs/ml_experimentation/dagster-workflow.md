@@ -62,7 +62,7 @@ step before training.**
 | `experiment_name` | `"xgboost_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
 | `base_model_config` | `"conf/model/xgboost.yaml"` | Path relative to `PROJECT_ROOT` |
 | `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML |
-| `run_mode` | `"smoke_test"` | `smoke_test` adds only the earliest fold; `full_cv` or `register_only` adds all folds |
+| `run_mode` | `"smoke_test"` | `smoke_test` adds the non-leaderboard dev folds (e.g. `smoke_test`); `full_cv` or `register_only` adds the leaderboard folds |
 | `description` | `"Quick sanity check"` | Stored as an MLflow tag — optional |
 
 `smoke_test` is the right choice for a first run: it adds only one partition key, so you can
@@ -86,7 +86,7 @@ MLflow experiment and partition keys rather than creating duplicates.
 ## Step 6 — Materialise `trained_cv_model`
 
 **Trigger:** Materialise the partition `"{experiment_name}__{fold_id}"`, e.g.
-`"xgboost_smoke_test__mid_2025_to_mid_2026"`. The partition only appears after step 5 has run.
+`"xgboost_smoke_test__smoke_test"`. The partition only appears after step 5 has run.
 
 **What the asset does:**
 
@@ -109,7 +109,7 @@ The MLflow run structure looks like this:
 Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
-    └── mid_2025_to_mid_2026  tags={cv_role: fold, fold_id: mid_2025_to_mid_2026}
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
             params: train_start, train_end, n_eligible_time_series
             artifacts: model/   ← trained model binary files
 ```

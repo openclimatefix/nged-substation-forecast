@@ -59,7 +59,7 @@ def _parent_run(experiment_id: str):
     return runs[0]
 
 
-def test_smoke_test_registers_experiment_and_earliest_fold(mlflow_env: None) -> None:
+def test_smoke_test_registers_experiment_and_dev_fold(mlflow_env: None) -> None:
     instance = DagsterInstance.ephemeral()
     _run(instance, "exp_smoke", run_mode="smoke_test")
 
@@ -77,16 +77,16 @@ def test_smoke_test_registers_experiment_and_earliest_fold(mlflow_env: None) -> 
     # Resolved config is logged as flattened params (e.g. an XGBoost hyperparameter).
     assert "n_estimators" in parent.data.params
 
-    # conf/cv/default.yaml currently holds a single canonical fold.
-    assert _partition_keys(instance) == ["exp_smoke__mid_2025_to_mid_2026"]
+    # smoke_test selects the non-leaderboard dev folds; conf/cv/default.yaml holds one (smoke_test).
+    assert _partition_keys(instance) == ["exp_smoke__smoke_test"]
 
 
-def test_full_cv_registers_every_canonical_fold(mlflow_env: None) -> None:
+def test_full_cv_registers_the_leaderboard_folds(mlflow_env: None) -> None:
     instance = DagsterInstance.ephemeral()
     _run(instance, "exp_full", run_mode="full_cv")
 
-    # conf/cv/default.yaml currently holds a single canonical fold; the smoke-test-vs-full-CV
-    # fold-selection distinction is unit-tested in tests/test_jobs.py against a multi-fold config.
+    # full_cv selects the leaderboard folds; conf/cv/default.yaml currently holds a single one. The
+    # flag-based smoke-test-vs-full-CV distinction is unit-tested in tests/test_jobs.py.
     assert _partition_keys(instance) == ["exp_full__mid_2025_to_mid_2026"]
 
 

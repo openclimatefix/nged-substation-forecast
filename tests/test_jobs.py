@@ -46,34 +46,38 @@ def test_resolve_no_overrides_uses_yaml_defaults() -> None:
     assert config.experiment_name == "exp"
 
 
-def _three_fold_config() -> CvConfig:
-    """A synthetic 3-fold config so the run-mode distinction is testable independently of the
-    canonical (currently single-fold) conf/cv/default.yaml."""
-    return CvConfig(
-        folds=[
-            CvFoldConfig(
-                fold_id=f"fold_{i}",
-                train_start=date(2024, 4, 1),
-                train_end=date(2025, 1, 1),
-                val_start=date(2025, 1, 2),
-                val_end=date(2025, 6, 1),
-            )
-            for i in range(3)
-        ]
-    )
-
-
-def test_smoke_test_uses_only_the_earliest_fold() -> None:
-    assert _fold_ids_for_run_mode("smoke_test", _three_fold_config()) == ["fold_0"]
-
-
-def test_full_cv_uses_every_fold() -> None:
-    assert _fold_ids_for_run_mode("full_cv", _three_fold_config()) == ["fold_0", "fold_1", "fold_2"]
-
-
-def test_register_only_uses_every_fold() -> None:
-    assert _fold_ids_for_run_mode("register_only", _three_fold_config()) == [
-        "fold_0",
-        "fold_1",
-        "fold_2",
+def _mixed_fold_config() -> CvConfig:
+    """A synthetic config mixing leaderboard folds with a non-leaderboard dev fold, so the
+    flag-based run-mode selection is testable independently of conf/cv/default.yaml."""
+    leaderboard_folds = [
+        CvFoldConfig(
+            fold_id=f"fold_{i}",
+            train_start=date(2024, 4, 1),
+            train_end=date(2025, 1, 1),
+            val_start=date(2025, 1, 2),
+            val_end=date(2025, 6, 1),
+        )
+        for i in range(2)
     ]
+    dev_fold = CvFoldConfig(
+        fold_id="dev",
+        leaderboard=False,
+        min_training_months=1,
+        train_start=date(2025, 1, 1),
+        train_end=date(2025, 1, 31),
+        val_start=date(2025, 2, 1),
+        val_end=date(2025, 2, 28),
+    )
+    return CvConfig(folds=[*leaderboard_folds, dev_fold])
+
+
+def test_smoke_test_uses_the_non_leaderboard_folds() -> None:
+    assert _fold_ids_for_run_mode("smoke_test", _mixed_fold_config()) == ["dev"]
+
+
+def test_full_cv_uses_the_leaderboard_folds() -> None:
+    assert _fold_ids_for_run_mode("full_cv", _mixed_fold_config()) == ["fold_0", "fold_1"]
+
+
+def test_register_only_uses_the_leaderboard_folds() -> None:
+    assert _fold_ids_for_run_mode("register_only", _mixed_fold_config()) == ["fold_0", "fold_1"]
