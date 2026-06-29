@@ -8,16 +8,12 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "xgboost>=2.1.0",
-    "numpy>=1.24",
-    "scikit-learn>=1.5.0",
-    "polars>=1.0.0",
     "contracts",
     "ml_core",
+    "numpy>=1.24",
     "patito",
-    "pyarrow>=23.0.1",
-    "mlflow-skinny",
-    "altair>=6.0.0",
+    "polars>=1.0.0",
+    "xgboost>=2.1.0",
 ]
 
 [build-system]

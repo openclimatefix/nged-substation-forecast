@@ -8,17 +8,11 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
-    "altair>=6.0.0",
-    "deltalake>=1.4.2",
+    "contracts",
     "dynamical-catalog>=0.5.0",
-    "geo",
-    "icechunk>=1.1.18",
-    "lonboard>=0.14.0",
-    "marimo>=0.19.9",
-    "palettable>=3.3.3",
+    "numpy>=1.24",
+    "patito",
     "polars>=1.38.1",
-    "requests>=2.32.5",
-    "ruff>=0.15.1",
     "xarray>=2026.1.0",
 ]
 

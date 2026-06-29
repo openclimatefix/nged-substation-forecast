@@ -8,12 +8,12 @@ authors = [
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "contracts",
     "h3>=4.4.2",
+    "patito",
     "polars>=1.38.1",
     "polars-h3>=0.6.1",
     "shapely>=2.1.2",
-    "pyproj>=3.6.0",
-    "contracts",
 ]
 
 [build-system]
