@@ -9,7 +9,7 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from pydantic import BaseModel
 
-from ml_core.feature_engineer import FeatureEngineer, TabularNwpFeatureEngineer
+from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
 _MLFLOW_ARTIFACT_PATH: Final[str] = "model"
 """Sub-path under an MLflow run's artifact root where the model directory is stored."""
@@ -71,7 +71,7 @@ class BaseForecaster(ABC):
     MODEL_NAME: ClassVar[str]
     MODEL_VERSION: ClassVar[int]
 
-    feature_engineer: ClassVar[FeatureEngineer] = TabularNwpFeatureEngineer()
+    feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
     """The feature pipeline this forecaster's data is engineered through.
 
     Associated by composition (the forecaster *references* a feature engineer rather than

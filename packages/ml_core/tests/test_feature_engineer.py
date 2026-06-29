@@ -6,7 +6,10 @@ import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpInMemory
-from ml_core.feature_engineer import TabularNwpFeatureEngineer, _attach_nearest_nwp_cell
+from ml_core.features.tabular_feature_engineer import (
+    TabularFeatureEngineer,
+    _attach_nearest_nwp_cell,
+)
 
 
 def _nwp_two_cells() -> pt.LazyFrame[NwpInMemory]:
@@ -74,7 +77,7 @@ def test_tabular_feature_engineer_returns_all_features_shape() -> None:
         pl.DataFrame({"time_series_id": [1], "time": [valid_time], "power": [100.0]}).lazy()
     ).set_model(PowerTimeSeries)
 
-    result = TabularNwpFeatureEngineer().engineer(
+    result = TabularFeatureEngineer().engineer(
         selected_features={"temperature_2m"},
         power_time_series=power,
         time_series_metadata=_metadata_two_series(),
