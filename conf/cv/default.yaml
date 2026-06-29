@@ -1,9 +1,13 @@
-# Expanding-window cross-validation folds shared by all experiments on the leaderboard.
-# All models MUST be evaluated against these exact folds so leaderboard comparisons
-# are apples-to-apples.  Change these only when founding a new leaderboard epoch.
+# The CV fold registry. Two kinds of fold live here, distinguished by the `leaderboard` flag:
 #
-# Current state: a single MVP fold. Honest forecast-skill validation needs real forecast NWP
-# (ECMWF ENS) for both training and validation, and our ECMWF ENS archive only reaches back to
+#   * leaderboard: true  — the epoch-pinned evaluation protocol shared by all experiments. All
+#     models MUST be evaluated against these exact folds so leaderboard comparisons are
+#     apples-to-apples.  Change these only when founding a new leaderboard epoch.
+#   * leaderboard: false — optional non-leaderboard dev folds (e.g. smoke_test) for fast end-to-end
+#     sanity checks. They reuse the identical pipeline but never feed the leaderboard.
+#
+# Current leaderboard state: a single MVP fold. Honest forecast-skill validation needs real forecast
+# NWP (ECMWF ENS) for both training and validation, and our ECMWF ENS archive only reaches back to
 # 2024-04-01 (Dynamical.org are backfilling earlier years, but slowly). So we train on the longest
 # honest window we have and validate on the following 12 months.
 #
@@ -18,5 +22,16 @@ folds:
     val_start:   "2025-07-01"
     val_end:     "2026-06-30"
 
-# Minimum months of observations before val_start for a time series to be eligible.
+  # Non-leaderboard dev fold: ~1 month train / ~1 month val for fast end-to-end sanity checks.
+  # min_training_months matches the short train window so eligibility doesn't demand 6 months.
+  - fold_id: "smoke_test"
+    leaderboard: false
+    min_training_months: 1
+    train_start: "2025-01-01"
+    train_end:   "2025-01-31"
+    val_start:   "2025-02-01"
+    val_end:     "2025-02-28"
+
+# Default minimum months of observations before val_start for a time series to be eligible.
+# A fold may override this with its own `min_training_months`.
 min_training_months: 6

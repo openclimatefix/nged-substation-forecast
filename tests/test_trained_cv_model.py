@@ -166,7 +166,9 @@ def _register(instance: DagsterInstance) -> None:
                     experiment_name=EXPERIMENT_NAME,
                     base_model_config="conf/model/xgboost.yaml",
                     config_overrides={"selected_features": ["temperature_2m"], "n_estimators": 5},
-                    run_mode="smoke_test",
+                    # full_cv so the leaderboard fold's partition (FOLD_ID) is registered; this test
+                    # drives that fold's window and synthetic data, not the smoke_test fold.
+                    run_mode="full_cv",
                 )
             }
         ),

@@ -95,9 +95,50 @@ def test_cv_config_get_fold_unknown_raises():
         _two_fold_config().get_fold("2099")
 
 
+def test_cv_fold_config_defaults_leaderboard_true_and_no_override():
+    fold = CvFoldConfig(
+        fold_id="2022",
+        train_start=date(2020, 1, 1),
+        train_end=date(2021, 12, 31),
+        val_start=date(2022, 1, 1),
+        val_end=date(2022, 12, 31),
+    )
+    assert fold.leaderboard is True
+    assert fold.min_training_months is None
+
+
+def test_cv_config_leaderboard_fold_ids_excludes_dev_folds():
+    config = CvConfig(
+        folds=[
+            CvFoldConfig(
+                fold_id="2022",
+                train_start=date(2020, 1, 1),
+                train_end=date(2021, 12, 31),
+                val_start=date(2022, 1, 1),
+                val_end=date(2022, 12, 31),
+            ),
+            CvFoldConfig(
+                fold_id="smoke_test",
+                leaderboard=False,
+                min_training_months=1,
+                train_start=date(2021, 12, 1),
+                train_end=date(2021, 12, 31),
+                val_start=date(2022, 1, 1),
+                val_end=date(2022, 1, 31),
+            ),
+        ]
+    )
+    assert config.fold_ids == ["2022", "smoke_test"]
+    assert config.leaderboard_fold_ids == ["2022"]
+
+
 def test_load_cv_config_reads_canonical_yaml():
     """The canonical conf/cv/default.yaml loads, validates, and coerces dates."""
     config = load_cv_config(PROJECT_ROOT / "conf" / "cv" / "default.yaml")
-    assert config.fold_ids[0] == "mid_2025_to_mid_2026"
+    assert config.leaderboard_fold_ids == ["mid_2025_to_mid_2026"]
     assert config.min_training_months == 6
     assert config.get_fold("mid_2025_to_mid_2026").train_start == date(2024, 4, 1)
+
+    smoke = config.get_fold("smoke_test")
+    assert smoke.leaderboard is False
+    assert smoke.min_training_months == 1

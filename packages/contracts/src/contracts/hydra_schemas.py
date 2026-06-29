@@ -10,13 +10,24 @@ from contracts.power_schemas import FoldId
 
 
 class CvFoldConfig(BaseModel):
-    """Configuration for a single expanding-window CV fold."""
+    """Configuration for a single expanding-window CV fold.
+
+    ``leaderboard`` distinguishes the epoch-pinned leaderboard folds (the apples-to-apples
+    evaluation protocol) from optional non-leaderboard dev folds such as ``smoke_test``: a
+    ``leaderboard=False`` fold runs through the identical pipeline but never feeds the leaderboard.
+
+    ``min_training_months`` overrides ``CvConfig.min_training_months`` for this fold alone (``None``
+    falls back to the config-level value). A short dev fold sets it to its train length so
+    eligibility does not demand the leaderboard's longer history.
+    """
 
     fold_id: FoldId
     train_start: date
     train_end: date
     val_start: date
     val_end: date
+    leaderboard: bool = True
+    min_training_months: int | None = Field(default=None, ge=1)
 
 
 class CvConfig(BaseModel):
@@ -42,6 +53,15 @@ class CvConfig(BaseModel):
         registration into per-fold partition keys — always read from config, never hard-coded.
         """
         return [fold.fold_id for fold in self.folds]
+
+    @property
+    def leaderboard_fold_ids(self) -> list[str]:
+        """The fold ids of the leaderboard folds only, in declaration order.
+
+        Non-leaderboard dev folds (e.g. ``smoke_test``) are excluded. Used to expand the
+        ``full_cv`` / ``register_only`` run modes and to scope leaderboard metrics.
+        """
+        return [fold.fold_id for fold in self.folds if fold.leaderboard]
 
     def get_fold(self, fold_id: str) -> CvFoldConfig:
         """Return the fold with the given ``fold_id``.

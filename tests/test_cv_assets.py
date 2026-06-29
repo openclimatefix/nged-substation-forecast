@@ -1,9 +1,9 @@
 """Integration tests for the CV Dagster assets.
 
 These materialise ``eligible_time_series`` in-process against synthetic power data written to a
-temporary Delta table, exercising the real asset wiring (Dagster + Delta) for the single canonical
-fold in ``conf/cv/default.yaml``. The pure, fold-specific eligibility logic is unit-tested in
-``packages/ml_core/tests/test_cv_helpers.py``.
+temporary Delta table, exercising the real asset wiring (Dagster + Delta) for the leaderboard fold
+and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. The pure, fold-specific
+eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
 from datetime import datetime, timezone
@@ -16,9 +16,13 @@ from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import eligible_time_series
 
-# The single canonical fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
+# The leaderboard fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
 # validate 2025-07-01..2026-06-30, min_training_months=6.
 FOLD_ID = "mid_2025_to_mid_2026"
+
+# The non-leaderboard dev fold (conf/cv/default.yaml): validate 2025-02-01..2025-02-28 with the
+# per-fold override min_training_months=1.
+SMOKE_FOLD_ID = "smoke_test"
 
 
 def _utc(year: int, month: int, day: int) -> datetime:
@@ -30,17 +34,22 @@ def _write_synthetic_power(power_delta_path: str) -> None:
 
     Only the per-series min/max observation times matter for eligibility, so two rows per series
     (first + last) suffice. Coverage is chosen so eligibility differs across series for the
-    canonical fold (val_start 2025-07-01, val_end 2026-06-30, min_training_months=6 ⇒ first obs
+    leaderboard fold (val_start 2025-07-01, val_end 2026-06-30, min_training_months=6 ⇒ first obs
     must be ≤ 2025-01-01 and last obs ≥ 2026-06-30):
 
     - ts1: 2024-06-01 .. 2026-07-01 -> eligible (enough history, reaches val_end).
     - ts2: 2024-06-01 .. 2026-03-01 -> not eligible (stops before val_end).
     - ts3: 2025-03-01 .. 2026-07-01 -> not eligible (< 6 months history before val_start).
+    - ts4: 2024-12-01 .. 2025-03-01 -> not eligible for the leaderboard fold (stops before val_end),
+      but eligible for the smoke fold *only because* its per-fold min_training_months=1 override is
+      honoured: smoke val_start 2025-02-01 needs first obs ≤ 2025-01-01 (met by 2024-12-01), whereas
+      the default 6 months would require ≤ 2024-08-01 (not met). So ts4 is the override's witness.
     """
     coverage = {
         1: (_utc(2024, 6, 1), _utc(2026, 7, 1)),
         2: (_utc(2024, 6, 1), _utc(2026, 3, 1)),
         3: (_utc(2025, 3, 1), _utc(2026, 7, 1)),
+        4: (_utc(2024, 12, 1), _utc(2025, 3, 1)),
     }
     rows = [
         {"time_series_id": ts, "time": t, "power": 1.0}
@@ -98,6 +107,16 @@ def test_eligible_time_series_is_idempotent(cv_paths) -> None:
     fold_rows = pl.read_delta(cv_paths["eligible"]).filter(pl.col("fold_id") == FOLD_ID)
     assert len(fold_rows) == 1  # not 2
     assert fold_rows["time_series_id"].to_list() == [1]
+
+
+def test_eligible_time_series_honours_per_fold_min_training_months_override(cv_paths) -> None:
+    """The smoke fold's min_training_months=1 override widens eligibility to include ts4.
+
+    ts4 (first obs 2024-12-01) would be excluded under the config-level default of 6 months but is
+    eligible here because the fold's own override of 1 month is applied (see ts4 in the fixture).
+    """
+    assert materialize([eligible_time_series], partition_key=SMOKE_FOLD_ID).success
+    assert _read_eligible(cv_paths["eligible"], SMOKE_FOLD_ID) == [1, 2, 4]
 
 
 def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths) -> None:
