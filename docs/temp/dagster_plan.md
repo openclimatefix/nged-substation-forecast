@@ -1267,7 +1267,7 @@ only reaches back to 2024-04-01.
   `__mid_2025_to_mid_2026` partition; see the model artifact + fold run with training params in
   MLflow.
 
-### 7.4.1 Phase 4.1 - Document the Dagster workflow implemented so far - in progress
+### 7.4.1 Phase 4.1 - Document the Dagster workflow implemented so far - Completed in PR #188
 
 - Document (probably in `docs/ml_experimentation/`) the Dagster flow we have implemented so far.
   Structure it as a sequence of simple steps, like a food recipe, for running the steps all the way
