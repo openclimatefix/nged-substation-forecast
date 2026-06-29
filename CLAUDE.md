@@ -106,7 +106,9 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 These rules are all about making Polars code easy to read.
 
 - When casting, prefer using the `cast` method like this: `df.cast({"foo": pl.Int8})`, in favour of
-  using `df.with_columns(pl.col("foo").cast(pl.Int8))`
+  using `df.with_columns(pl.col("foo").cast(pl.Int8))`. **Caveat:** this is only safe on a plain
+  Polars frame — passing a `{column: dtype}` mapping to a *model-bearing* Patito frame silently does
+  the wrong thing. See "Patito + Polars Gotcha: `.cast({...})` on a model-bearing frame" below.
 - When using `.with_columns`, prefer specifying the destination column name as a key word argument
   like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
   `df.with_columns(pl.col("foo").expression().alias("bar"))`
@@ -128,6 +130,32 @@ left_patito_lf.join(plain_lf.select(...), on=..., how="inner")
 `pl.LazyFrame._from_pyldf` constructs a plain `pl.LazyFrame` from the same underlying Rust
 object — zero-copy, no data movement. The check passes because `type(left_lf)` is a subclass
 of `pl.LazyFrame`, so `isinstance(left_lf, type(plain_lf))` is `True`.
+
+### Patito + Polars Gotcha: `.cast({...})` on a model-bearing frame
+
+Patito **overrides** `.cast`: its signature is `cast(self, strict=False, columns=None)` and, on a
+frame that carries a model (set via `.set_model(...)` or a typed `pt.DataFrame[Schema]`), it casts
+every column to the *model's* declared dtypes. So `df.cast({"foo": pl.Int8})` on such a frame does
+**not** apply your mapping — Polars' `{column: dtype}` dict is swallowed as the `strict` argument
+and your `foo` cast is silently ignored while unrelated columns are reverted to model dtypes. The
+result usually only surfaces later as a confusing `validate()` dtype error.
+
+The trap fires only when the model is still attached. Many Polars ops **drop** the model
+(`group_by(...).agg(...)`, `.collect()`, `.unpivot()`, `.as_polars()`), so a dict-`.cast` after
+them is plain Polars and fine. But **iterating** `group_by` (`for k, g in df.group_by(...)`) yields
+sub-frames that **keep** the model, and `pl.concat` keeps it too — so a dict-`.cast` on the
+concatenated result hits the trap.
+
+Workaround: strip the Patito model before a `{column: dtype}` cast (mirrors the join gotcha above):
+
+```python
+# Strip the Patito model so the dict-cast uses plain Polars semantics (zero-copy)
+result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
+```
+
+(No-arg `df.cast()` — casting a model-bearing frame to its declared dtypes — *is* the intended
+Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
+plain Polars and unaffected.)
 
 ## This is a young project
 
