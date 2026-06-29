@@ -15,13 +15,44 @@ use ``mlflow`` / ``MlflowClient``, which honour whatever URI is in effect. This 
 helpers run against a file-based MLflow in tests with no server.
 """
 
-from typing import Final
+from typing import Final, cast
 
+import hydra
 import mlflow
 from mlflow.tracking import MlflowClient
 
+from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
+
 CV_PARENT_RUN_NAME: Final[str] = "cv_summary"
 """Run name of an experiment's parent run, which carries the aggregate leaderboard metrics."""
+
+
+def load_experiment_forecaster(
+    experiment_name: str,
+) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
+    """Reconstruct the forecaster class + resolved config from an experiment's MLflow tags.
+
+    ``register_experiment`` stamps three tags on the experiment: the config JSON, plus the
+    fully-qualified import paths of the forecaster class and its config class (``forecaster_target``
+    / ``config_target``). The config JSON alone carries no class identity, so both targets are
+    needed to deserialise it into the correct ``BaseForecasterConfig`` subclass. The caller is
+    responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+
+    Args:
+        experiment_name: The MLflow experiment name (also the partition-key prefix).
+
+    Returns:
+        A ``(forecaster_cls, forecaster_config)`` tuple — the same pair
+        ``register_experiment`` resolved, reconstructed from the stored tags.
+    """
+    experiment = mlflow.get_experiment_by_name(experiment_name)
+    if experiment is None:
+        raise ValueError(f"No MLflow experiment named {experiment_name!r}.")
+    tags = experiment.tags
+    forecaster_cls = cast(type[BaseForecaster], hydra.utils.get_class(tags["forecaster_target"]))
+    config_cls = cast(type[BaseForecasterConfig], hydra.utils.get_class(tags["config_target"]))
+    forecaster_config = config_cls.model_validate_json(tags["config"])
+    return forecaster_cls, forecaster_config
 
 
 def get_or_create_experiment(experiment_name: str) -> str:

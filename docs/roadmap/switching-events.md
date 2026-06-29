@@ -1,6 +1,6 @@
 # Estimating Latent Demand Under Switching Events — Approach & Implementation Roadmap
 
-**Scope.** How to estimate, for each NGED primary substation, its *latent demand under the normal running arrangement* — the demand that would be metered if the network were never reconfigured — given that the network is in fact reconfigured roughly 10% of the time by switching events. This document defines what switching events are, why they are hard, and a staged modelling plan for different versions of the NGED forecasting system (v0.6 → v2.5 → v2.6).
+**Scope.** How to estimate, for each NGED primary substation, its *latent demand under the normal running arrangement* — the demand that would be metered if the network were never reconfigured — given that the network is in fact reconfigured roughly 10% of the time by switching events. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the staged modelling plan (v0.6 → v2.5 → v2.6).
 
 > **Status: 🔬 Research / 🚧 Planned.** None of this is implemented yet. The v0.6 unsupervised
 > statistical detector is the nearest-term piece (it feeds the
@@ -13,108 +13,11 @@
 
 ---
 
-## Part 1 — What is a switching event?
-
-### 1.1 The HV network is meshed but run radially
-
-NGED's 11 kV / 6.6 kV high-voltage (HV) distribution network is **physically meshed**: there are many parallel electrical paths between substations. However, it is **operated radially** — at any given moment, a set of switches is held *open* to break the parallel paths, so that power flows in a tree (each load fed from exactly one source, no loops). The radial tree you observe at any instant is just *one configuration* of an underlying mesh.
-
-This matters enormously, and it is the crux of everything below:
-
-- **Almost any switch can be opened or closed.** The network can be reconfigured into an enormous number of valid radial trees by choosing which switches are open. The configuration is not fixed.
-- **There is no stable, re-identifiable "feeder."** Intuitively one might imagine a substation's load is divided into a handful of fixed "feeders," each a chunk that moves as a unit. NGED have been explicit that this is *not* how it works: because a switch can be opened essentially anywhere along a meshed path, the cut points themselves move. There is no persistent sub-unit with a stable identity or a stable composition.
-- **Load is a near-continuous distribution along the network.** Demand is spread along the HV circuits and can be split at (almost) any point. When operators reconfigure, the amount of load that moves is "whatever happened to sit between the old cut point and the new one" — an unknown, continuously variable quantity.
-
-The picture below contrasts the *physical* mesh (all paths exist) with the *operated* radial state (some switches held open, marked `/`, so power flows in a tree). `[A]`–`[D]` are primary substations; `===` is an energised circuit; `/` is a normally-open switch; `·` marks the load tapped along each circuit.
-
-```
-   PHYSICAL MESH (all paths exist)          OPERATED RADIALLY (open switches break loops)
-
-        [A]=====·=====[B]                        [A]=====·=====[B]
-         ||           ||                          ||           /        <- open: B's tail
-         ·            ·                           ·                         now fed from D
-         ||           ||                          ||
-        [C]=====·=====[D]                        [C]=====·=====[D]
-         (a loop exists A-B-D-C-A)                (no loop: radial tree rooted at A)
-```
-
-Both pictures are the *same wires*. Operators choose which switches are open, so the radial tree on the right is just one of many valid configurations of the mesh on the left. A switching event moves the `/` marks — and because the tapped load `·` is spread continuously along every circuit, moving a switch transfers *whatever load sat between the old and new cut points*.
-
-Switching events can last from minutes to months. Each substation is in a switching event for
-roughly 10% of the time. One "saving grace" is that, the smaller a switching event, the less we care
-about it (because a small switching event won't harm our forecast much).
-
-### 1.2 What actually happens during a switching event
-
-A **switching event** is a reconfiguration: one or more open switches are closed and/or one or more closed switches are opened, changing which source feeds which load. It can be:
-
-- **Planned** (maintenance, load balancing), or
-- **Unplanned** (automatic protection response to a fault).
-
-The **observable effect at the substation meters** is a sustained, roughly step-change in net power: load that used to be metered at substation A is, after the event, metered at substations B, C, … instead. The total power across the affected neighbourhood is conserved — power is neither created nor destroyed by reconfiguring — but *where it is metered* changes.
-
-### 1.3 Worked example (from NGED's control-room log)
-
-NGED supplied a real fault example. At 12:01:38 on 25/05/2026 the **DINDER** primary tripped on a fault (an 11 kV breaker tripped). Over the following ~90 seconds, the control system restored supply by closing switches that picked DINDER's load up from **multiple primaries**:
-
-- **Cathedral Park** (= **Wells** primary)
-- **16TD11**, **Cowl Street**, **16MW2** (all = **Shepton Mallet** primary)
-
-So a single source substation's load fanned out to **at least two distinct primaries** (Wells and Shepton Mallet), via several separate switching operations. This is a *whole-primary* transfer triggered by a fault.
-
-### 1.4 The two facts that make this hard
-
-NGED have confirmed two things that shape the entire problem:
-
-1. **Multi-recipient is the norm.** When load is diverted, it typically fans out to **2–3 neighbouring substations**, not one. Conservation must be reasoned about as a **node-level flow balance**: one source's lost power is absorbed by a *subset* of neighbours whose individual pickups sum to the source's loss.
-
-2. **Partial transfer is the common case, and it is harder.** The clean whole-primary transfer in the worked example (a big, obvious step) is the *easy, rarer* case. The common case is that **only some of a substation's load is diverted** — an arbitrary continuous slice, cut at a movable point. The transferred magnitude is a free continuous variable with no minimum size, so small partial transfers shade continuously down into the measurement noise. **Detection difficulty scales inversely with how much load moved.**
-
-The diagram shows why "how much moved?" has no clean answer. The load `·` is spread along the circuit between `[A]` and `[B]`; the cut point (open switch `/`) can sit anywhere, and wherever it sits determines how much load each end keeps.
-
-```
-   Circuit between two substations, load tapped continuously along it:
-
-   [A]==·==·==·==·==·==·==·== / ==·==·==[B]
-        \__________________/     \____/
-             fed from A         fed from B    <- cut point here: A keeps most
-
-
-   [A]==·==·==·==·==·== / ==·==·==·==·==[B]
-        \____________/    \____________/
-          fed from A        fed from B        <- cut point moved left: B keeps more
-
-   The amount transferred = whatever load lies between the OLD and NEW cut points.
-   It is continuous, unknown, and usually only a SLICE (not the whole substation).
-```
-
-### 1.5 The labels asymmetry (the dominant design constraint)
-
-We have **switching labels (control-room logs) only for the 32-series trial area** (16 primaries plus associated generation/GSP/BSP series). When the system expands to the full ~1,161 primary substations, **we will have no switching labels.**
-
-This is the single most important architectural fact in this document. It means:
-
-- **The production model must run fully unsupervised, on power time series alone.** Switching logs cannot be a runtime input, because at scale they do not exist.
-- **The 32-series logs are a one-time gold-standard *test set*, not a crutch.** We use them to *validate* the unsupervised method (measure detection precision/recall, recipient-set accuracy, magnitude error), then throw the method — not the labels — at the full network.
-- **Nothing may be learned only where labels exist and relied upon at scale.** Any per-substation or per-boundary parameter fitted only on the labelled 16 primaries is a parameter we cannot set for the other ~1,145. The 16 labelled primaries are a *yardstick*, not a representative seed. The thing that must generalise is the *method*, not a lookup table fitted to the pilot.
-
-### 1.6 The target variable
-
-NGED's stated requirement is to forecast each substation **as if it were always in its normal running arrangement (NRA)** — its design topology. So the quantity we want is not the raw meter reading (which is contaminated by whatever switching state happened to hold), but the **latent demand under NRA**: what the substation would have metered had no reconfiguration occurred. Network planners reason about headroom and capacity under the design topology, so this is the operationally useful signal.
-
-(Separately, the meter also nets demand against **distributed energy resources** — behind-the-meter solar PV, small wind, batteries. Recovering true demand also means accounting for these. Part 3 introduces explicit DER modelling; the earlier stages fold DERs implicitly into the latent signal.)
-
-### 1.7 Why power alone — there is no voltage to lean on
-
-Classical topology- and switch-state identification leans almost entirely on **voltage** measurements. We cannot. NGED does not meter voltage at primary-substation level, and even where it might, two facts defeat the approach: transformer **tap-changes** move voltage independently of load, and our **half-hourly** sampling blurs the sub-second transients that voltage-based methods rely on. So switching must be inferred from **real-power balance alone** — the conservation fingerprint at the heart of the methods below. Far from a regrettable data gap, this is a deliberate design stance: a method that works from power alone is the only method that can run at scale, where neither voltage nor switching labels exist.
-
----
-
-## Part 2 — The graph structure (and why it is not a GNN)
+## Part 1 — The graph structure (and why it is not a GNN)
 
 A **graph** is just **nodes** connected by **edges**. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the *same power moving*.
 
-It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise `N × N` problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 3 below.
+It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise `N × N` problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
 
 In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
 
@@ -123,7 +26,7 @@ In short: the graph tells us *who can connect to whom*; the simple statistics an
 
 ---
 
-## Part 3 — The staged roadmap
+## Part 2 — The staged roadmap
 
 Version numbers are aligned with the main codebase: **v0.6**, then **v2.5**, then **v2.6**. Each stage states its motivation, what it adds, what it misses, and its trade-offs. (Although, note that we haven't fully specified the roadmap _after_ v2, so read "v2.x" as just meaning "some time after v2 is operational"). Escalation between stages must be justified by *measured residual structure at the previous stage*, not by anticipation — this keeps effort matched to demonstrated need.
 
@@ -310,7 +213,7 @@ Each substation is now a small *bundle* of typed nodes rather than one node, and
 
 ---
 
-## Part 4 — Considered but rejected: the feeder-block model
+## Part 3 — Considered but rejected: the feeder-block model
 
 An earlier plan included a further stage that modelled the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **This stage is retired**, for two independent and decisive reasons:
 
@@ -321,7 +224,7 @@ An earlier plan included a further stage that modelled the **actual switchable p
 
 ---
 
-## Part 5 — Cross-cutting implementation requirements
+## Part 4 — Cross-cutting implementation requirements
 
 These apply at every stage and are the things most easily got wrong:
 
@@ -336,7 +239,7 @@ These apply at every stage and are the things most easily got wrong:
 
 ---
 
-## Part 6 — Open items / dependencies
+## Part 5 — Open items / dependencies
 
 - **Switching logs for the 32-series trial** (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.

@@ -9,6 +9,8 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from pydantic import BaseModel
 
+from ml_core.features import FeatureEngineer, TabularFeatureEngineer
+
 _MLFLOW_ARTIFACT_PATH: Final[str] = "model"
 """Sub-path under an MLflow run's artifact root where the model directory is stored."""
 
@@ -68,6 +70,15 @@ class BaseForecaster(ABC):
 
     MODEL_NAME: ClassVar[str]
     MODEL_VERSION: ClassVar[int]
+
+    feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
+    """The feature pipeline this forecaster's data is engineered through.
+
+    Associated by composition (the forecaster *references* a feature engineer rather than
+    *implementing* feature engineering), so a forecaster can swap the whole pipeline by overriding
+    this with a different ``FeatureEngineer``. The default produces the tabular ``AllFeatures``
+    frame that ``train``/``predict`` consume.
+    """
 
     def __init__(self, model_params: BaseForecasterConfig) -> None:
         self.model_params = model_params

@@ -74,6 +74,8 @@ The timeline below shows the order in which this work is planned.
 - `power_forecast_warnings`
 - `asset_health_history`
 
+![v0.1 Naive forecast](assets/v0.1_naive_forecast_flow_diagram.png)
+
 ---
 
 ## v0.2 — Code Quality & Documentation
@@ -158,6 +160,8 @@ The ML-assets architecture is designed to support this from day one (programmati
     3. `asset_health_history` — complete historical record of each time series's health state
     4. `effective_capacity` — half-hourly probabilistic generator capacity estimates (mean + std)
     5. `substation_switching` — estimated power diverted between substation pairs (mean + std)
+
+![v1.0 diagram](assets/v1_flow_diagram.png)
 
 ---
 

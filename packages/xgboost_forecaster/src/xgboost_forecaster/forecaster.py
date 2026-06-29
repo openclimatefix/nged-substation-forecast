@@ -88,10 +88,30 @@ class XGBoostForecaster(BaseForecaster):
 
     @property
     def trained_time_series_ids(self) -> list[int]:
-        """The sorted time_series_ids this forecaster has a trained Booster for.
+        """The sorted ``time_series_id``s this forecaster will serve a ``predict`` for.
 
-        Read back at predict time to guarantee the train==predict population and to give
-        production its population. Persisted in ``meta.json`` by ``save()``.
+        For ``XGBoostForecaster`` this is exactly the set of series it holds a trained Booster for
+        (one Booster per ``time_series_id``), so ``predict`` raises ``KeyError`` if asked for any
+        other series.
+
+        **Why this exists.** The model is not one thing but a *set* of per-series sub-models, and
+        two facts make the trained set load-bearing:
+
+        1. ``predict`` dispatches by ``time_series_id`` and cannot serve a series it never trained
+           on — so any caller must know the trained set to avoid a ``KeyError``.
+        2. The **train==predict population invariant** (plan §4.5.1): the population a model is
+           scored on must equal the population it was trained on, *even if* the live eligibility
+           set has drifted since training (power coverage changes, so a series may newly qualify
+           or drop out). This property is the model's own frozen record of who it actually saw, so
+           ``cv_power_forecasts`` (Phase 5) and ``live_forecasts`` (Phase 7) score exactly that
+           set — never whatever eligibility says *today*. That is what keeps the leaderboard
+           apples-to-apples and stops production forecasting a series the model never learned.
+
+        Persisted in ``meta.json`` by ``save()`` and read back at predict time. This property is
+        currently XGBoost-specific; Phase 5 promotes it to the ``BaseForecaster`` interface as the
+        model-agnostic "population this model will serve", framed so it still fits planned
+        **multi-series Boosters** (one Booster spanning all solar sites, another all primary
+        substations, …), where the trained set is *not* one-Booster-per-series.
         """
         return sorted(self._models.keys())
 

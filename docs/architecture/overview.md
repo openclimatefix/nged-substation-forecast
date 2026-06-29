@@ -1,5 +1,11 @@
 # Architecture Overview
 
+The architecture prioritises developer velocity, idempotent re-runs, and strict **Training-Serving Symmetry**.
+
+The primary aim is to develop novel, ambitious, state-of-the-art ML approaches to forecasting. We are simultaneously building a "test-harness" production service so that ML research runs in a production-like environment from day one.
+
+The aim is to manage the *entire* data pipeline in Dagster: download data, validate data, train ML models, run inference, perform backtests. MLflow tracks every experiment. Re-running a backtest should be as easy as clicking a button in Dagster. Swapping a new model into production should require minimal friction.
+
 The system is designed as a modular monorepo using [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/), with [Dagster](https://dagster.io/) orchestrating the data pipeline and [MLflow](https://mlflow.org/) tracking experiments.
 
 ## Core Components
@@ -20,10 +26,11 @@ The system is designed as a modular monorepo using [uv workspaces](https://docs.
 The entire feature-engineering pipeline operates on Polars `LazyFrame`s. No code between reading from storage and calling `BaseForecaster.train()` or `predict()` is allowed to call `.collect()`. The pipeline is:
 
 ```
-NwpOnDisk.scan_delta(path)          # lazy scan
-  → NwpOnDisk.to_nwp_in_memory()   # lazy expression; no collect
-  → engineer_features()             # returns pt.LazyFrame[AllFeatures]; no collect inside
-  → BaseForecaster.train/predict()  # subclass calls .collect() exactly once, right here
+NwpOnDisk.scan_delta(path)               # lazy scan
+  → NwpOnDisk.to_nwp_in_memory()        # lazy expression; no collect
+  → FeatureEngineer.engineer()           # spatial join + feature pipeline;
+                                         #   returns pt.LazyFrame[AllFeatures]; no collect
+  → BaseForecaster.train/predict()       # subclass calls .collect() exactly once, right here
 ```
 
 **Why it matters:**
@@ -40,6 +47,7 @@ NwpOnDisk.scan_delta(path)          # lazy scan
 
 All forecasting models subclass `BaseForecaster` (defined in `ml_core`), which provides a common `train` / `predict` / `save` / `load` interface. The model wrapper encapsulates the model weights and all translation logic, keeping Dagster assets completely agnostic to the underlying implementation. Each subclass of `BaseForecaster` is responsible for defining:
 
+- _Feature engineering_: Each subclass carries a `feature_engineer: ClassVar[FeatureEngineer]` strategy (composition, not inheritance) that owns the full preparation pipeline — from raw inputs (observed power, gridded NWP, time-series metadata) to an `AllFeatures` frame. The default `TabularFeatureEngineer` does the nearest-cell NWP spatial join then runs the tabular feature pipeline. A future model that needs a different data view (e.g. a CNN wanting a spatial NWP crop per time series) overrides `feature_engineer` with a different `FeatureEngineer` subclass without touching `BaseForecaster` or any other model. `FeatureEngineer` and `TabularFeatureEngineer` live in `packages/ml_core/src/ml_core/features/`.
 - _Input translation_: Transforms the canonical `AllFeatures` Polars LazyFrame into the required model shape.
 - _Output translation_: Converts native model outputs into the strict `PowerForecast` schema.
 - _Persistence_: Each subclass owns its own save/load format. `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a `meta.json` containing the full serialised `XGBoostConfig`. (This may change later. We may switch to saving models using native MLflow flavors (e.g., `mlflow.xgboost.log_model`), which serialize the raw model object directly.)

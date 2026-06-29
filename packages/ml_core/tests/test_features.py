@@ -6,17 +6,17 @@ import pytest
 from pydantic import ValidationError
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpInMemory
-from ml_core.features import (
+from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
+from ml_core.features._nwp import _upsample_nwp_to_half_hourly
+from ml_core.features._parsed_features import (
     STATIC_FEATURE_REGISTRY,
     LagFeature,
     ParsedFeatures,
+)
+from ml_core.features.tabular_feature_engineer import (
     _apply_local_time_features,
-    _apply_power_lag,
     _apply_rolling_mean_feature,
-    _nullify_leaky_lags,
-    _process_nwp,
-    _upsample_nwp_to_half_hourly,
-    engineer_features,
+    _engineer_features,
 )
 
 
@@ -46,28 +46,6 @@ def test_apply_power_lag_with_source():
     ).collect()
 
     assert result["power_lag_1h"][0] == 90.0
-
-
-def test_process_nwp():
-    df = pl.DataFrame(
-        {
-            "valid_time": [datetime(2020, 1, 1, 12), datetime(2020, 1, 1, 15)],
-            "init_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 0)],
-        }
-    )
-
-    result = (
-        _process_nwp(pt.LazyFrame.from_existing(df.lazy()).set_model(NwpInMemory))
-        .collect()
-        .sort("valid_time")
-    )
-
-    assert "nwp_lead_time_hours" in result.columns
-    assert "nwp_init_time" in result.columns
-    assert "init_time" not in result.columns
-    # 3-hourly input (12:00→15:00) upsampled to 30-min gives 7 rows
-    assert len(result) == 7
-    assert result["nwp_lead_time_hours"].to_list() == [12.0, 12.5, 13.0, 13.5, 14.0, 14.5, 15.0]
 
 
 def test_upsample_nwp_to_half_hourly_interpolates_continuous_vars():
@@ -477,7 +455,7 @@ def test_engineer_features_no_nwp():
     )
 
     # Run engineer_features with nwp=None
-    engineered = engineer_features(
+    engineered = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=None,
@@ -513,7 +491,7 @@ def test_engineer_features_empty_data():
         }
     )
 
-    engineered = engineer_features(
+    engineered = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=None,
@@ -550,7 +528,7 @@ def test_engineer_features_raises_value_error_when_weather_requested_but_nwp_non
     )
 
     def _call(features: set[str]) -> None:
-        engineer_features(
+        _engineer_features(
             power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
                 PowerTimeSeries
             ),
@@ -671,7 +649,7 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     )
 
     # Bulk mode: power_fcst_init_time=None — both NWP runs produce a row.
-    result = engineer_features(
+    result = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
@@ -692,7 +670,7 @@ def test_engineer_features_raises_when_nwp_init_time_given_without_power_fcst_in
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
     with pytest.raises(ValueError, match="nwp_init_time can only be provided in single-run mode"):
-        engineer_features(
+        _engineer_features(
             power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
                 PowerTimeSeries
             ),
@@ -753,7 +731,7 @@ def test_engineer_features_weather_lag_leakage_prevention():
     )
 
     # Run engineer_features in production/backtest mode
-    engineered = engineer_features(
+    engineered = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
@@ -791,7 +769,7 @@ def test_engineer_features_power_lag_nullification_end_to_end():
     )
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
-    result = engineer_features(
+    result = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         selected_features={"power_lag_24h"},
@@ -847,7 +825,7 @@ def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
     )
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
-    all_rows = engineer_features(
+    all_rows = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
@@ -887,7 +865,7 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
     power_df = pl.DataFrame({"time_series_id": ["ts1"], "time": [valid_time], "power": [100.0]})
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
-    result = engineer_features(
+    result = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
         nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
@@ -917,7 +895,7 @@ def test_engineer_features_raises_when_no_control_member_for_weather_lag():
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
 
     with pytest.raises(ValueError, match="control member"):
-        engineer_features(
+        _engineer_features(
             power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
                 PowerTimeSeries
             ),

@@ -7,10 +7,14 @@ the logic stays fast to unit-test and the assets stay readable.
 
 from typing import Final
 
+import mlflow
+import patito as pt
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
+from contracts.weather_schemas import NwpInMemory, NwpOnDisk
 from dagster import (
     AssetExecutionContext,
     DynamicPartitionsDefinition,
@@ -18,7 +22,17 @@ from dagster import (
     asset,
 )
 from deltalake import write_deltalake
-from ml_core._cv_helpers import eligible_time_series_ids
+from ml_core._cv_helpers import (
+    eligible_time_series_ids,
+    parse_cv_partition_key,
+    training_window,
+)
+from ml_core._mlflow_runs import (
+    get_or_create_experiment,
+    get_or_create_fold_run,
+    get_or_create_parent_run,
+    load_experiment_forecaster,
+)
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
 # (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
@@ -57,7 +71,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     ``min_training_months`` of history before the fold's ``val_start`` *and* reaches the fold's
     ``val_end``. Eligibility is derived from data coverage alone (not from any model/config), so
     every experiment evaluates the fold on the identical population — this is what keeps the
-    leaderboard apples-to-apples (see plan §4.5.1).
+    leaderboard apples-to-apples.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
     ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its
@@ -109,5 +123,93 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
             "val_start": str(fold.val_start),
             "val_end": str(fold.val_end),
             "min_training_months": _cv_config.min_training_months,
+        }
+    )
+
+
+@asset(
+    partitions_def=cv_experiment_folds,
+    deps=["power_time_series_and_metadata", "ecmwf_ens", "eligible_time_series"],
+)
+def trained_cv_model(context: AssetExecutionContext) -> None:
+    """Train one forecaster for a single ``(experiment, fold)`` partition and save it to MLflow.
+
+    Reads the experiment's resolved config from MLflow (the immutable record registered by
+    ``register_experiment_job``), the fold's canonical eligible ``time_series_id`` population from
+    the ``eligible_time_series`` asset, and the observed power + gridded NWP over the fold's
+    **inclusive** training window. Features are engineered through the forecaster's own
+    ``FeatureEngineer`` (so the spatial NWP mapping and feature pipeline are a model concern), the
+    model is trained, and its artifacts are uploaded to the fold's MLflow run alongside the
+    training params.
+
+    The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
+    across processes and idempotent under Dagster retries.
+    """
+    settings = Settings()
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
+    experiment_name, fold_id = parse_cv_partition_key(context.partition_key)
+    forecaster_cls, config = load_experiment_forecaster(experiment_name)
+
+    fold = _cv_config.get_fold(fold_id)
+    train_start, train_end = training_window(fold)
+
+    eligible_ids = (
+        pl.scan_delta(str(settings.eligible_time_series_data_path))
+        .filter(pl.col("fold_id") == fold_id)
+        .select("time_series_id")
+        .collect()["time_series_id"]
+        .to_list()
+    )
+
+    power_lf = pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta")).filter(
+        pl.col("time_series_id").is_in(eligible_ids),
+        pl.col("time") >= train_start,
+        pl.col("time") <= train_end,
+    )
+    power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
+
+    nwp_in_window = NwpOnDisk.to_nwp_in_memory(NwpOnDisk.scan_delta(settings.nwp_data_path)).filter(
+        pl.col("valid_time") >= train_start, pl.col("valid_time") <= train_end
+    )
+    nwp_lf = pt.LazyFrame.from_existing(nwp_in_window).set_model(NwpInMemory)
+
+    metadata_df = pt.DataFrame(
+        pl.read_parquet(settings.nged_data_path / "metadata.parquet").filter(
+            pl.col("time_series_id").is_in(eligible_ids)
+        )
+    ).set_model(TimeSeriesMetadata)
+
+    forecaster = forecaster_cls(model_params=config)
+    features = forecaster.feature_engineer.engineer(
+        selected_features=config.selected_features,
+        power_time_series=power_ts,
+        time_series_metadata=metadata_df,
+        nwp=nwp_lf,
+    )
+    forecaster.train(features)
+
+    experiment_id = get_or_create_experiment(experiment_name)
+    parent_run_id = get_or_create_parent_run(experiment_id)
+    fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
+
+    forecaster.save_to_mlflow(fold_run_id)
+    training_params = {
+        "fold_id": fold_id,
+        "train_start": train_start.isoformat(),
+        "train_end": train_end.isoformat(),
+        "n_eligible_time_series": len(eligible_ids),
+    }
+    with mlflow.start_run(run_id=fold_run_id):
+        mlflow.log_params(training_params)
+
+    context.add_output_metadata(
+        {
+            "experiment_name": experiment_name,
+            "fold_id": fold_id,
+            "n_eligible_time_series": len(eligible_ids),
+            "train_start": str(train_start),
+            "train_end": str(train_end),
+            "fold_run_id": fold_run_id,
         }
     )

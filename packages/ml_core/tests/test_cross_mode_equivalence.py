@@ -1,7 +1,7 @@
 """Cross-mode feature equivalence — the enforceable no-skew guarantee.
 
 The "zero training-serving skew" requirement is met by both CV/backtest and production calling
-the *same* ``engineer_features()``, differing only in operating mode:
+the *same* ``_engineer_features()``, differing only in operating mode:
 
 - **Bulk / backtest** (``power_fcst_init_time=None``): NWP-centric, vectorised over the whole
   window, one forecast per NWP run, ``power_fcst_init_time = nwp_init_time + delay`` per row.
@@ -31,7 +31,7 @@ import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import NwpInMemory
-from ml_core.features import engineer_features
+from ml_core.features.tabular_feature_engineer import _engineer_features
 from polars.testing import assert_frame_equal
 
 _DELAY_HOURS = 6
@@ -132,7 +132,7 @@ def _build_fixtures() -> tuple[
 def test_bulk_and_single_run_features_are_identical() -> None:
     power_ts, metadata, nwp = _build_fixtures()
 
-    bulk = engineer_features(
+    bulk = _engineer_features(
         selected_features=_FEATURES,
         power_time_series=power_ts,
         time_series_metadata=metadata,
@@ -144,7 +144,7 @@ def test_bulk_and_single_run_features_are_identical() -> None:
     # Replay each NWP run in single-run mode at the same t0 bulk derives for it.
     single_run_parts = []
     for run in _NWP_RUNS:
-        replay = engineer_features(
+        replay = _engineer_features(
             selected_features=_FEATURES,
             power_time_series=power_ts,
             time_series_metadata=metadata,
