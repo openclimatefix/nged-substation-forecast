@@ -1293,6 +1293,22 @@ only reaches back to 2024-04-01.
 - **User can verify:** materialise `cv_power_forecasts` for `__mid_2025_to_mid_2026`, query the
   `power_forecasts` Delta table; re-materialise and confirm no duplicate rows.
 
+### 7.5.1 Phase 5.1 - `plot_power_forecast` asset
+
+- This design is very rough. It'll need refining before implementing!
+- I want a Dagster asset that takes a `power_fcst_init_time`, and a set of `time_series_id`s, and
+  writes a plot to disk. The plot will show the full 14-day forecast, starting at
+  `power_fcst_init_time`. It will show all 51 ensemble members as thin grey lines. And, if
+  ground-truth power data is available, the it'll also plot the ground truth on the same plot (as a
+  thick blue line).
+- Each `time_series_id` should be plotted on a separate panel. The x-axes should be aligned across
+  `time_series_id` panels.
+- This asset should accept between 1 and 4 `time_series_id`s.
+- Please use Altair for the plot.
+- I guess we'd want to output the plot as an HTML file, to maintain
+  interactivity (e.g. I'd like the user to be able to zoom into the plot, and hover to see the
+  ensemble_member ID, etc.).
+
 ### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works
 
 - Implement §4.8 for the `leaderboard` and `ad_hoc` scopes (typed `PopulationFilter`, join
@@ -1336,13 +1352,19 @@ only reaches back to 2024-04-01.
   `cv_assets.py`/`production_assets.py`/`metric_assets.py` if it has grown long (§5.1).
 - **User can verify:** full `uv run pytest` green, **including the full-stack cross-process
   integration test**.
-- **Docs:** Update `docs/`. Check the docs are still up-to-date with the code. Add docs to
-  (briefly) intro new users to the flow that our new code implements, and the reasoning behind it,
-  and how to run the dagster pipeline. Also make sure the permanent docs (i.e. the docs that live in
-  `docs/` but not in `docs/temp/`) capture any important ideas from `docs/temp/dagster_plan.md`,
-  because `dagster_plan.md` will be deleted once this plan has been implemented in code. In
-  particular, check if the permanent docs describe the aims and main design ideas of the ML R&D and
-  MLops.
+- **Docs:**
+    - Update `docs/`. 
+    - Check the docs are still up-to-date with the code. 
+    - Add docs to (briefly) intro new users to the flow that our new code implements, and the reasoning behind it,
+      and how to run the dagster pipeline. (Note that much of this content was added to the docs in
+      Phase 4.1).
+    - Also make sure the permanent docs (i.e. the docs that live in `docs/` but not in `docs/temp/`) 
+      capture any important ideas from `docs/temp/dagster_plan.md`,
+      because `dagster_plan.md` will be deleted once this plan has been implemented in code. In
+      particular, check if the permanent docs describe the aims and main design ideas of the ML R&D and
+      MLops.
+    - Move any content from `docs/roadmap/` that has been implemented in this plan into `docs/`:
+      `docs/roadmap/` should _only_ contain ideas that have not yet been implemented in code.
 
 ### 7.10 A note on the full-stack integration tests
 
