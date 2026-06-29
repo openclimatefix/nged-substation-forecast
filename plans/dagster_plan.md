@@ -727,6 +727,63 @@ Promoting a new model to production = updating this run ID and restarting Dagste
 the model is downloaded from that MLflow run into the local cache, then served from disk.
 (A richer MLflow-based champion-model promotion flow is deferred to Phase 2.)
 
+### 4.10 Smoke-test fold for fast iteration
+
+A `smoke_test` fold is a hard-coded, **non-leaderboard** CV fold for fast end-to-end sanity checks
+on real data: train ~1 month, validate ~1 month, so the whole `register → train → predict → eyeball`
+loop runs in well under a minute on a laptop. It exists to answer "is the model learning something
+sane?", not to produce a comparable score.
+
+It is a **first-class fold**, so it reuses the entire existing pipeline unchanged —
+`eligible_time_series`, `trained_cv_model`, `cv_power_forecasts` — and is selectable per-run in the
+Dagster UI as the `{experiment}__smoke_test` partition. What keeps it off the leaderboard is a
+**flag, not a separate file**:
+
+- `CvFoldConfig` gains `leaderboard: bool = True`; the smoke fold sets `leaderboard: false`.
+  `conf/cv/default.yaml` becomes the fold **registry**: the epoch-pinned leaderboard folds (the
+  apples-to-apples protocol, §4.1.2) plus optional non-leaderboard dev folds, distinguished by this
+  flag. Keeping it in the one file is deliberate — the fold must be in the loaded fold set to reuse
+  the fold-partitioned eligibility asset and the partition picker; a second YAML would need new
+  import-time partition-loading plumbing and could only be swapped *globally* via a code-location
+  reload, not per-run.
+- `CvFoldConfig` gains optional `min_training_months: int | None = None`, overriding
+  `CvConfig.min_training_months` for that fold. The smoke fold sets it to its train length (`1`), so
+  eligibility requires only ~1 month of pre-`val_start` history (matching the 1-month train window)
+  instead of the leaderboard's 6. `eligible_time_series` passes
+  `fold.min_training_months or cv_config.min_training_months` into `eligible_time_series_ids`.
+- `_fold_ids_for_run_mode` (`defs/jobs.py`) stops keying off the positional `fold_ids[0]` and
+  selects by the flag instead: `smoke_test` → folds with `leaderboard == False`; `full_cv` /
+  `register_only` → folds with `leaderboard == True`. This makes the run-mode names honest and
+  removes the fragility where adding a fold silently shifts which fold `smoke_test` registers.
+- Smoke forecasts carry `fold_id="smoke_test"`, excluded from the leaderboard exactly as `"live"`
+  is: the Phase 6 `metrics` `leaderboard` scope scores only `leaderboard == True` folds. Smoke
+  results are meant to be **eyeballed** via §5.1 `plot_power_forecast` (51-member fan vs ground
+  truth) or scored under `ad_hoc`.
+
+Speed comes from three independent knobs: the short windows (this fold), control-member-only
+training (already in `trained_cv_model`), and a cheap experiment config (small `n_estimators` /
+feature set, supplied via `config_overrides` at registration). The fold supplies the first; the
+experiment supplies the last.
+
+Concrete fold (the ECMWF ENS archive starts 2024-04-01, so early-2025 windows are safe):
+
+```yaml
+- fold_id: "smoke_test"
+  leaderboard: false
+  min_training_months: 1
+  train_start: "2025-01-01"
+  train_end:   "2025-01-31"
+  val_start:   "2025-02-01"
+  val_end:     "2025-02-28"
+```
+
+**Alternatives considered and rejected:** (a) a separate `conf/cv/smoke_test.yaml` selected by
+`cv_config_path` — the partition set loads from a single import-time path, so swapping is global and
+needs a code-location reload, not the per-run UI selection we want; (b) a run-config "type two dates
+and train" ad-hoc job — it would bypass the fold-partitioned `eligible_time_series` and the
+train==predict population machinery the fold reuses for free. Arbitrary-window *evaluation* already
+lives in `ad_hoc` metrics (§4.8); arbitrary-window training-by-typed-dates stays out of scope.
+
 ---
 
 ## 5. Implementation Notes
@@ -1274,7 +1331,7 @@ only reaches back to 2024-04-01.
   up to `trained_cv_model`. Explain why `trained_cv_model` loads the config from MLflow, not from
   YAML.
 
-### 7.5 Phase 5 — `cv_power_forecasts` asset
+### 7.5 Phase 5 — `cv_power_forecasts` asset - Completed in PR #189
 
 - Implement §4.7 (`load_from_mlflow`, predict on **all 51 members** for the model's
   `trained_time_series_ids`, **idempotent partition overwrite** into `power_forecasts`, log
@@ -1308,6 +1365,30 @@ only reaches back to 2024-04-01.
 - I guess we'd want to output the plot as an HTML file, to maintain
   interactivity (e.g. I'd like the user to be able to zoom into the plot, and hover to see the
   ensemble_member ID, etc.).
+
+### 7.5.2 Phase 5.2 — `smoke_test` fold (fast-iteration, non-leaderboard)
+
+Implements §4.10. Independent of Phases 6–8 — it works with the already-built `trained_cv_model` +
+`cv_power_forecasts`, so it can land whenever (e.g. before or after Phase 5.1).
+
+- Add `leaderboard: bool = True` and `min_training_months: int | None = None` to `CvFoldConfig`
+  (`packages/contracts/src/contracts/hydra_schemas.py`).
+- Add the `smoke_test` fold to `conf/cv/default.yaml` (`leaderboard: false`,
+  `min_training_months: 1`, 1-month train / 1-month val); update the file header to describe it as
+  the fold registry (epoch-pinned leaderboard folds + optional non-leaderboard dev folds).
+- Thread the per-fold `min_training_months` override through the `eligible_time_series` asset
+  (`fold.min_training_months or cv_config.min_training_months`).
+- Redefine `_fold_ids_for_run_mode` (`src/.../defs/jobs.py`) to select by the `leaderboard` flag
+  rather than `fold_ids[0]`; update the `RegisterExperimentConfig.run_mode` field description.
+- Tests: `test_load_cv_config_reads_canonical_yaml` (assert the leaderboard-fold set is
+  `["mid_2025_to_mid_2026"]` and the smoke fold exists with `leaderboard=False`); the three
+  `test_register_experiment_job` run-mode tests (now flag-based selection); a unit test that
+  `eligible_time_series_ids` honours the per-fold override.
+- When Phase 6 lands, the `metrics` `leaderboard` scope filters to `leaderboard == True` folds.
+- **User can verify:** register a cheap experiment with `run_mode="smoke_test"`; materialise
+  `eligible_time_series` / `trained_cv_model` / `cv_power_forecasts` for `{experiment}__smoke_test`;
+  the full loop finishes in under a minute and the smoke forecasts never appear in leaderboard
+  metrics.
 
 ### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works
 
