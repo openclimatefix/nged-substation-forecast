@@ -250,9 +250,9 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     Loads the model ``trained_cv_model`` saved for this fold back from MLflow (via the local-disk
     cache), then forecasts the fold's **inclusive** validation window across **all** NWP ensemble
     members — the probabilistic leaderboard metrics are meaningless on a single member. The scored
-    population is the model's own ``trained_time_series_ids`` (the train==predict invariant, plan
-    §4.5.1), so a fold is always scored on exactly the population it was trained on even if power
-    coverage has drifted since training.
+    population is the model's own ``trained_time_series_ids`` (the train==predict invariant), so a
+    fold is always scored on exactly the population it was trained on even if power coverage has
+    drifted since training.
 
     Forecasts are written to the ``power_forecasts`` Delta table via an **idempotent partition
     overwrite** keyed by ``(experiment_name, fold_id)``: re-materialising a fold replaces its rows

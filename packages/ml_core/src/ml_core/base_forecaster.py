@@ -93,7 +93,7 @@ class BaseForecaster(ABC):
         model spanning many series, or anything in between; the contract is only about which
         ``time_series_id``s it will score.
 
-        **Why this is load-bearing.** The **train==predict population invariant** (plan §4.5.1): the
+        **Why this is load-bearing.** The **train==predict population invariant**: the
         population a model is scored on must equal the population it was trained on, *even if* the
         live eligibility set has drifted since training (power coverage changes, so a series may
         newly qualify or drop out). Consumers (``cv_power_forecasts``, ``live_forecasts``) filter
