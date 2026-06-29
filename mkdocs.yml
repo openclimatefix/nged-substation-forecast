@@ -43,6 +43,7 @@ nav:
       - Code Style: architecture/code-style.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
+      - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md
   - Roadmap:
       - Overview: roadmap/index.md
