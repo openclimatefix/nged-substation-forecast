@@ -146,6 +146,21 @@ def test_predict_stamps_experiment_name() -> None:
     assert (result["experiment_name"] == "my_experiment").all()
 
 
+def test_predict_defaults_fold_id_to_live() -> None:
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+    result = _trained(df).predict(lf)
+    assert (result["fold_id"] == "live").all()
+
+
+def test_predict_stamps_supplied_fold_id() -> None:
+    df = _make_df()
+    lf = pt.LazyFrame.from_existing(df.lazy())
+    result = _trained(df).predict(lf, fold_id="2024")
+    assert result["fold_id"].dtype == pl.Categorical
+    assert (result["fold_id"] == "2024").all()
+
+
 def test_save_records_trained_time_series_ids(tmp_path: Path) -> None:
     df = _make_df(ts_ids=[10, 20, 30])
     forecaster = _trained(df)

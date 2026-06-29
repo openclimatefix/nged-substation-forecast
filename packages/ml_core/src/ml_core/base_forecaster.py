@@ -83,6 +83,29 @@ class BaseForecaster(ABC):
     def __init__(self, model_params: BaseForecasterConfig) -> None:
         self.model_params = model_params
 
+    @property
+    @abstractmethod
+    def trained_time_series_ids(self) -> list[int]:
+        """The sorted ``time_series_id`` population this model will serve a ``predict`` for.
+
+        This is the model's own frozen record of who it trained on — *not* a statement about how
+        the model is internally structured. A model may hold one sub-model per series, a single
+        model spanning many series, or anything in between; the contract is only about which
+        ``time_series_id``s it will score.
+
+        **Why this is load-bearing.** The **train==predict population invariant** (plan §4.5.1): the
+        population a model is scored on must equal the population it was trained on, *even if* the
+        live eligibility set has drifted since training (power coverage changes, so a series may
+        newly qualify or drop out). Consumers (``cv_power_forecasts``, ``live_forecasts``) filter
+        their inputs to this set, so a model scores exactly the population it learned — never
+        whatever eligibility says *today*. That is what keeps the leaderboard apples-to-apples and
+        stops production forecasting a series the model never saw.
+
+        Subclasses persist and reconstruct this set through their own ``save``/``load`` (e.g. in
+        ``meta.json``), so it survives a round-trip through MLflow.
+        """
+        ...
+
     @abstractmethod
     def save(self, path: Path) -> None:
         """Save the trained model state to a directory."""
@@ -144,6 +167,16 @@ class BaseForecaster(ABC):
         pass
 
     @abstractmethod
-    def predict(self, data: pt.LazyFrame[AllFeatures]) -> pt.DataFrame[PowerForecast]:
-        """Return power forecasts for all rows in the given AllFeatures data."""
+    def predict(
+        self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
+        """Return power forecasts for all rows in the given AllFeatures data.
+
+        Args:
+            data: The engineered features to forecast from.
+            fold_id: The value stamped onto every row's ``fold_id`` column. The model has no
+                inherent notion of which CV fold it is serving (``fold_id`` is orchestration
+                context), so the caller supplies it: ``cv_power_forecasts`` passes the fold's
+                label, while production inference keeps the ``"live"`` default.
+        """
         pass

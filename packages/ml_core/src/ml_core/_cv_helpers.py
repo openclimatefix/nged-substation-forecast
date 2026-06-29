@@ -19,13 +19,17 @@ A double-underscore reduces collision risk with experiment names that contain si
 """
 
 
-def _date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
+def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
     """Return a tz-aware UTC datetime at the start (or inclusive end) of the given date.
+
+    Used to turn a fold's ``[start, end]`` calendar dates into the half-open-free, inclusive
+    ``[start 00:00:00, end 23:59:59]`` UTC window that the training and validation data loads filter
+    on (and that eligibility uses for ``val_end``).
 
     Args:
         d: The calendar date.
-        end_of_day: If True, return ``d`` at ``23:59:59`` (the inclusive end-of-day used by
-            both the training window and ``val_end``); otherwise ``00:00:00``.
+        end_of_day: If True, return ``d`` at ``23:59:59`` (the inclusive end-of-day used by both
+            the training/validation windows and ``val_end``); otherwise ``00:00:00``.
     """
     clock = time(23, 59, 59) if end_of_day else time(0, 0, 0)
     return datetime.combine(d, clock, tzinfo=timezone.utc)
@@ -42,20 +46,6 @@ def _subtract_months(d: date, months: int) -> date:
     month = month_zero_based + 1
     day = min(d.day, calendar.monthrange(year, month)[1])
     return date(year, month, day)
-
-
-def training_window(fold: CvFoldConfig) -> tuple[datetime, datetime]:
-    """Return the ``[start, end]`` training window for a fold, in UTC.
-
-    Uses **inclusive end-of-day** semantics that mirror ``val_end``: the window is
-    ``[train_start 00:00:00, train_end 23:59:59]``. When a fold leaves a gap/embargo between
-    ``train_end`` and ``val_start``, training correctly stops at ``train_end``, not at
-    ``val_start``.
-    """
-    return (
-        _date_to_utc_datetime(fold.train_start),
-        _date_to_utc_datetime(fold.train_end, end_of_day=True),
-    )
 
 
 def eligible_time_series_ids(
@@ -81,10 +71,10 @@ def eligible_time_series_ids(
     Returns:
         Sorted list of eligible ``time_series_id`` values.
     """
-    earliest_required_first_time = _date_to_utc_datetime(
+    earliest_required_first_time = date_to_utc_datetime(
         _subtract_months(fold.val_start, min_training_months)
     )
-    val_end_dt = _date_to_utc_datetime(fold.val_end, end_of_day=True)
+    val_end_dt = date_to_utc_datetime(fold.val_end, end_of_day=True)
     eligible = coverage.filter(
         (pl.col("first_time") <= earliest_required_first_time) & (pl.col("last_time") >= val_end_dt)
     )

@@ -28,6 +28,10 @@ class _FakeForecaster(BaseForecaster):
         super().__init__(model_params)
         self.payload = payload
 
+    @property
+    def trained_time_series_ids(self) -> list[int]:
+        return []
+
     def save(self, path: Path) -> None:
         path.mkdir(parents=True, exist_ok=True)
         (path / "payload.txt").write_text(self.payload)
@@ -41,8 +45,34 @@ class _FakeForecaster(BaseForecaster):
     def train(self, data: pt.LazyFrame[AllFeatures]) -> None:  # pragma: no cover - unused
         raise NotImplementedError
 
-    def predict(self, data: pt.LazyFrame[AllFeatures]) -> pt.DataFrame[PowerForecast]:
+    def predict(
+        self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
         raise NotImplementedError  # pragma: no cover - unused
+
+
+def test_trained_time_series_ids_is_abstract() -> None:
+    """A subclass that omits ``trained_time_series_ids`` cannot be instantiated."""
+
+    class _MissingPopulation(BaseForecaster):
+        MODEL_NAME = "missing"
+        MODEL_VERSION = 1
+
+        def save(self, path: Path) -> None: ...
+
+        @classmethod
+        def load(cls, path: Path) -> Self:
+            raise NotImplementedError
+
+        def train(self, data: pt.LazyFrame[AllFeatures]) -> None: ...
+
+        def predict(
+            self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+        ) -> pt.DataFrame[PowerForecast]:
+            raise NotImplementedError
+
+    with pytest.raises(TypeError):
+        _MissingPopulation(BaseForecasterConfig(selected_features=set()))
 
 
 @pytest.fixture
