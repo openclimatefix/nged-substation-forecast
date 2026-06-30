@@ -209,6 +209,15 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         .collect()["time_series_id"]
         .to_list()
     )
+    if not eligible_ids:
+        raise ValueError(
+            f"No eligible time series for fold {fold_id!r}, so there is nothing to train. "
+            "Either the `eligible_time_series` asset has not been materialised for this fold, "
+            "or no time series meets the eligibility window — a series must have "
+            f"`min_training_months` of history before val_start and observations through the "
+            f"fold's val_end ({date_to_utc_datetime(fold.val_end, end_of_day=True)}). Materialise "
+            "`eligible_time_series` for this fold and confirm power coverage reaches val_end."
+        )
 
     power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
         settings, eligible_ids, train_start, train_end, ensemble_members=[0]
@@ -223,6 +232,15 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     )
     forecaster.train(features, eligible_ids)
 
+    n_trained = len(forecaster.trained_time_series_ids)
+    if n_trained == 0:
+        raise ValueError(
+            f"Trained 0 of {len(eligible_ids)} eligible time series for fold {fold_id!r}: every "
+            "eligible series had no usable (non-null power) rows in the training window "
+            f"[{train_start}, {train_end}]. Check that power and NWP data exist for these series "
+            "across the training window."
+        )
+
     experiment_id = get_or_create_experiment(experiment_name)
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
@@ -233,6 +251,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         "train_start": train_start.isoformat(),
         "train_end": train_end.isoformat(),
         "n_eligible_time_series": len(eligible_ids),
+        "n_trained_time_series": n_trained,
     }
     with mlflow.start_run(run_id=fold_run_id):
         mlflow.log_params(training_params)
@@ -242,6 +261,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
             "experiment_name": experiment_name,
             "fold_id": fold_id,
             "n_eligible_time_series": len(eligible_ids),
+            "n_trained_time_series": n_trained,
             "train_start": str(train_start),
             "train_end": str(train_end),
             "fold_run_id": fold_run_id,
@@ -285,6 +305,11 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
 
     forecaster = forecaster_cls.load_from_mlflow(fold_run_id, settings.model_cache_base_path)
     trained_ids = forecaster.trained_time_series_ids
+    if not trained_ids:
+        raise ValueError(
+            f"The model loaded for fold {fold_id!r} has no trained time series, so there is "
+            "nothing to forecast. Re-materialise `trained_cv_model` for this fold."
+        )
 
     power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
         settings, trained_ids, val_start, val_end

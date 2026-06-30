@@ -219,3 +219,34 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> Non
     # past train_end, so the inclusive-window filter excludes it).
     loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id, Path(env["cache"]))
     assert loaded.trained_time_series_ids == [1]
+
+
+def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: dict[str, str]) -> None:
+    """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
+    # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
+    # un-materialised / coverage-excluded fold in production.
+    empty_for_fold = EligibleTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "fold_id": pl.Series(["unrelated_fold"], dtype=pl.String),
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+            }
+        )
+    )
+    write_deltalake(
+        table_or_uri=str(Settings().eligible_time_series_data_path),
+        data=empty_for_fold.to_arrow(),
+        mode="overwrite",
+        partition_by=["fold_id"],
+    )
+
+    instance = DagsterInstance.ephemeral()
+    _register(instance)
+    result = materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=instance, raise_on_error=False
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("trained_cv_model")
+    assert failure is not None
+    assert "No eligible time series" in str(failure.error)
