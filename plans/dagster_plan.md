@@ -1418,6 +1418,9 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
 - Add the `production_monitoring` scope to `metrics` (time-series logging to the dedicated
   experiment + trailing 24h/7d window columns; §4.8.1), the `monitoring_sensor` (§4.8.1), and
   `retire_experiment_job` (§4.3.1).
+- Remove the `fold_id="live"` restriction in `compute_metrics()` (currently documented in its
+  docstring); live rows use the same join logic but need the trailing-window bounds from the
+  monitoring sensor rather than fold dates.
 - Tests: sensor fires on a power update and runs `metrics(production_monitoring)`; monitoring rows
   land in Delta + the `production_monitoring` experiment and **never** on the leaderboard; retire
   job refuses to delete when results are absent and deletes when present.

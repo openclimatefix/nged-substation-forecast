@@ -39,7 +39,8 @@ def compute_metrics(
 
     Args:
         cv_forecasts: CV predictions to evaluate.
-            Must not contain ``fold_id="live"`` rows — pass only CV fold predictions.
+            Currently only CV fold rows are handled; ``fold_id="live"`` support will
+            be added with the ``production_monitoring`` scope in Phase 8.
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
         metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
             Series absent from ``metadata`` receive a null ``time_series_type``.
