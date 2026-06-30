@@ -498,35 +498,38 @@ class PopulationFilter(Config):
     valid_time_max: str | None = None
     """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
 
-    def apply(self, scan: pl.LazyFrame) -> pl.LazyFrame:
+    def apply(self, scan: pt.LazyFrame[PowerForecast]) -> pt.LazyFrame[PowerForecast]:
         """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
 
         Args:
-            scan: Lazy scan of the ``power_forecasts`` Delta table. Conceptually this is
-                ``PowerForecast`` data, but delta-rs stores all Categorical columns as plain
-                ``String`` on disk, so the scan does not yet conform to
-                ``pt.LazyFrame[PowerForecast]``. The caller casts Categorical columns back to
-                their declared dtypes immediately after ``.collect()``; this method operates on
-                the raw pre-cast scan.
+            scan: Typed lazy scan of the ``power_forecasts`` Delta table. The caller is
+                responsible for casting any ``String`` columns that ``PowerForecast`` declares as
+                ``Categorical`` before passing the scan here (delta-rs stores all
+                dictionary-encoded columns as plain ``String`` on disk; casting lazily via
+                ``.with_columns()`` before ``.collect()`` is zero-cost).
 
         Returns:
             The same lazy scan with each non-``None`` field added as a ``.filter()`` predicate.
         """
+        # Rebind to plain pl.LazyFrame: Polars' .filter() drops the pt.LazyFrame subclass, so
+        # accumulating filters via scan = scan.filter(...) would fail ty's assignment check.
+        # Re-wrap as pt.LazyFrame[PowerForecast] before returning (zero-copy).
+        lf: pl.LazyFrame = scan
         if self.experiment_name is not None:
-            scan = scan.filter(pl.col("experiment_name") == self.experiment_name)
+            lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
         if self.fold_id is not None:
-            scan = scan.filter(pl.col("fold_id") == self.fold_id)
+            lf = lf.filter(pl.col("fold_id") == self.fold_id)
         if self.valid_time_min is not None:
             min_dt = datetime.fromisoformat(self.valid_time_min)
             if min_dt.tzinfo is None:
                 min_dt = min_dt.replace(tzinfo=timezone.utc)
-            scan = scan.filter(pl.col("valid_time") >= min_dt)
+            lf = lf.filter(pl.col("valid_time") >= min_dt)
         if self.valid_time_max is not None:
             max_dt = datetime.fromisoformat(self.valid_time_max)
             if max_dt.tzinfo is None:
                 max_dt = max_dt.replace(tzinfo=timezone.utc)
-            scan = scan.filter(pl.col("valid_time") <= max_dt)
-        return scan
+            lf = lf.filter(pl.col("valid_time") <= max_dt)
+        return pt.LazyFrame.from_existing(lf).set_model(PowerForecast)
 
 
 class MetricsConfig(Config):
@@ -636,17 +639,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     # delta-rs stores all Arrow dictionary-encoded columns (Categorical, Enum) as plain String on
-    # disk. Cast them back immediately after collecting so the rest of the asset works with a
-    # properly-typed PowerForecast frame and avoids repeating the cast inside the loop.
-    forecasts_df = (
-        config.population_filter.apply(pl.scan_delta(str(settings.power_forecasts_data_path)))
-        .collect()
-        .with_columns(
+    # disk. Cast lazily before filtering so PopulationFilter.apply receives a properly-typed
+    # pt.LazyFrame[PowerForecast] and the collected frame already has the correct dtypes.
+    typed_scan = pt.LazyFrame.from_existing(
+        pl.scan_delta(str(settings.power_forecasts_data_path)).with_columns(
             experiment_name=pl.col("experiment_name").cast(pl.Categorical),
             fold_id=pl.col("fold_id").cast(pl.Categorical),
             power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
         )
-    )
+    ).set_model(PowerForecast)
+    forecasts_df = config.population_filter.apply(typed_scan).collect()
     if forecasts_df.height == 0:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
