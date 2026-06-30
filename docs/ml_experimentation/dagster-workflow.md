@@ -3,7 +3,7 @@
 How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.
 
 The pipeline has two layers. The **data layer** (steps 1–4) is built once and refreshed as new
-data arrives; it is shared by all experiments. The **experiment layer** (steps 5–6) is repeated
+data arrives; it is shared by all experiments. The **experiment layer** (steps 5–7) is repeated
 for each new model or hyperparameter configuration — see [Model configuration](model-configuration.md)
 for how to choose features and set hyperparameters.
 
@@ -93,15 +93,21 @@ MLflow experiment and partition keys rather than creating duplicates.
 1. Parses the partition key into `experiment_name` and `fold_id`.
 2. Reads the forecaster class and resolved config from the MLflow experiment tags (see below).
 3. Determines the training window: `[train_start 00:00 UTC, train_end 23:59 UTC]`.
-4. Reads the eligible `time_series_id`s from the `eligible_time_series` asset for this fold.
-5. Scans and filters `power_time_series.delta` and `nwp_data.delta` to the training window and
-   eligible population (lazy — no unnecessary data is loaded into memory).
+4. Reads the eligible `time_series_id`s from the `eligible_time_series` asset for this fold. If the
+   set is empty (the fold was never materialised in step 4, or no series meets the eligibility
+   window) the asset **raises** rather than silently training nothing.
+5. Loads inputs for the training window and eligible population. The NWP scan is pruned at the
+   source — control member only, the eligible series' H3 cells, and the window's `init_time`
+   partitions — and collected with the **streaming engine**, so a multi-month fold trains in a few
+   GB rather than OOMing on the tens-of-GB NWP table (see the "Bounding feature-engineering memory"
+   notes in `docs/architecture/overview.md`).
 6. Engineers features via the forecaster's `feature_engineer.engineer()`.
-7. Calls `forecaster.train(features)`.
+7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
+   then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
    `forecaster.save_to_mlflow(fold_run_id)`.
-9. Logs training params (`fold_id`, `train_start`, `train_end`, `n_eligible_time_series`) to
-   the fold run.
+9. Logs training params (`fold_id`, `train_start`, `train_end`, `n_eligible_time_series`,
+   `n_trained_time_series`) to the fold run.
 
 The MLflow run structure looks like this:
 
@@ -110,9 +116,33 @@ Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
-            params: train_start, train_end, n_eligible_time_series
+            params: train_start, train_end, n_eligible_time_series, n_trained_time_series
             artifacts: model/   ← trained model binary files
 ```
+
+---
+
+## Step 7 — Materialise `cv_power_forecasts`
+
+**Trigger:** Materialise the same `"{experiment_name}__{fold_id}"` partition (it depends on
+`trained_cv_model`).
+
+**What the asset does:**
+
+1. Loads the fold's model back from MLflow (via the local-disk cache) and reads its
+   `trained_time_series_ids` — the population it scores (the train==predict invariant). Raises if
+   the loaded model has no trained series.
+2. Forecasts the **inclusive validation window** across **all ~51 NWP ensemble members** (the
+   probabilistic leaderboard metrics are meaningless on a single member).
+3. Bounds memory by predicting **one `init_time` chunk at a time** (`_PREDICT_INIT_CHUNK`, 14 days):
+   the full ensemble over the whole window is tens of GB, so chunking on `init_time` (the partition
+   key and the axis that fans the output out across runs) keeps each chunk's forecast frame small
+   while every partition is read once. Measured ~9 GB peak for a 10-month fold.
+4. Writes to the `power_forecasts` Delta table keyed by `(experiment_name, fold_id)`: the **first**
+   chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
+   re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
+5. Logs `val_start`/`val_end` params and `n_forecast_rows`/`n_forecast_time_series`/
+   `n_ensemble_members` metrics to the fold run.
 
 ---
 

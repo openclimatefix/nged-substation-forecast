@@ -48,10 +48,10 @@ class XGBoostConfig(BaseForecasterConfig):
 class XGBoostForecaster(BaseForecaster):
     """Trains and serves one XGBoost Booster per time_series_id.
 
-    All lead times for a given time_series_id are handled by a single Booster. Ensemble
-    forecasts are produced by passing each NWP ensemble member through the relevant Booster
-    independently; the AllFeatures input to predict() should already be filtered to a single
-    ensemble member per call, or iterated over ensemble members by the caller.
+    All lead times for a given time_series_id are handled by a single Booster. The model is
+    deterministic; ensemble forecasts arise because each NWP ensemble member's weather is a separate
+    row through the relevant Booster. ``predict`` scores every ensemble member present in its input
+    in one call (it groups by ``time_series_id`` and dispatches each group to its Booster).
 
     Save layout: a directory containing one ``{time_series_id}.ubj`` file per trained
     Booster plus a ``meta.json`` that stores the full XGBoostConfig so that load() is
