@@ -617,6 +617,79 @@ def _write_metrics_to_delta(
     )
 
 
+def _score_forecast_group(
+    exp_name: str,
+    fold_id: str,
+    filtered_power_forecasts: pl.DataFrame,
+    actuals_lf: pt.LazyFrame[PowerTimeSeries],
+    metadata_df: pt.DataFrame[TimeSeriesMetadata],
+    evaluation_scope: EvalScopeType,
+    metrics_path: Path,
+    now: datetime,
+) -> tuple[int, dict[str, float] | None]:
+    """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
+    optionally log to MLflow.
+
+    Args:
+        exp_name: Experiment name for this group.
+        fold_id: Fold identifier for this group.
+        filtered_power_forecasts: All collected forecast rows that survived the population
+            filter; this function slices the single ``(exp_name, fold_id)`` group from it.
+        actuals_lf: Lazy observed power scan (only the joined subset is collected inside
+            ``compute_metrics()``).
+        metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
+        evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
+            skips MLflow entirely.
+        metrics_path: Filesystem path to the ``forecast_metrics`` Delta table.
+        now: UTC timestamp stamped on every row as ``computed_at`` (injected so all rows in
+            one asset materialisation share the same timestamp).
+
+    Returns:
+        A ``(n_rows_written, fold_metric_dict)`` tuple where:
+
+        - ``n_rows_written`` — number of ``Metrics`` rows written to Delta for this group.
+        - ``fold_metric_dict`` — flat ``{mlflow_metric_key: mean_value}`` dict logged to the
+          fold's MLflow child run (e.g. ``{"rmse__all": 0.42, "rmse__pv": 0.31}``). ``None``
+          for ``"ad_hoc"`` scope, where no MLflow run exists.
+    """
+    group_forecasts = PowerForecast.validate(
+        filtered_power_forecasts.filter(
+            (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
+        ),
+        allow_superfluous_columns=True,
+    )
+    per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
+
+    window_start, window_end, window_label = _resolve_eval_window(
+        evaluation_scope, fold_id, group_forecasts
+    )
+    mlflow_run_id: str | None = None
+    if evaluation_scope == "leaderboard":
+        experiment_id = get_or_create_experiment(exp_name)
+        parent_run_id = get_or_create_parent_run(experiment_id)
+        mlflow_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
+
+    enriched = enrich_metrics_rows(
+        per_series_metrics,
+        exp_name,
+        evaluation_scope,
+        window_start,
+        window_end,
+        window_label,
+        now,
+        mlflow_run_id,
+    )
+    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id)
+
+    if evaluation_scope == "leaderboard":
+        fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
+        with mlflow.start_run(run_id=mlflow_run_id):
+            mlflow.log_metrics(fold_metric_dict)
+        return enriched.height, fold_metric_dict
+
+    return enriched.height, None
+
+
 @asset(deps=["cv_power_forecasts"])
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
@@ -679,40 +752,18 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:
-        group_forecasts = PowerForecast.validate(
-            filtered_power_forecasts.filter(
-                (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
-            ),
-            allow_superfluous_columns=True,
-        )
-        per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
-
-        window_start, window_end, window_label = _resolve_eval_window(
-            config.evaluation_scope, fold_id, group_forecasts
-        )
-        mlflow_run_id: str | None = None
-        if config.evaluation_scope == "leaderboard":
-            experiment_id = get_or_create_experiment(exp_name)
-            parent_run_id = get_or_create_parent_run(experiment_id)
-            mlflow_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
-
-        enriched = enrich_metrics_rows(
-            per_series_metrics,
+        n_rows, fold_metric_dict = _score_forecast_group(
             exp_name,
+            fold_id,
+            filtered_power_forecasts,
+            actuals_lf,
+            metadata_df,
             config.evaluation_scope,
-            window_start,
-            window_end,
-            window_label,
+            settings.forecast_metrics_data_path,
             now,
-            mlflow_run_id,
         )
-        _write_metrics_to_delta(settings.forecast_metrics_data_path, enriched, exp_name, fold_id)
-        total_rows += enriched.height
-
-        if config.evaluation_scope == "leaderboard":
-            fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
-            with mlflow.start_run(run_id=mlflow_run_id):
-                mlflow.log_metrics(fold_metric_dict)
+        total_rows += n_rows
+        if fold_metric_dict is not None:
             exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
             for key, value in fold_metric_dict.items():
                 exp_metrics.setdefault(key, []).append(value)
