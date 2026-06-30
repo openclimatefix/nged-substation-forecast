@@ -13,7 +13,7 @@ import mlflow
 import patito as pt
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
-from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType
+from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
@@ -546,7 +546,7 @@ def _resolve_eval_window(
 
 def _write_metrics_to_delta(
     path: Path,
-    enriched: pl.DataFrame,
+    enriched: pt.DataFrame[Metrics],
     exp_name: str,
     fold_id: str,
 ) -> None:

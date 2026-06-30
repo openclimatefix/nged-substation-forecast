@@ -189,7 +189,7 @@ def enrich_metrics_rows(
     window_label: str,
     computed_at: datetime,
     mlflow_run_id: str | None,
-) -> pl.DataFrame:
+) -> pt.DataFrame[Metrics]:
     """Add scope and evaluation-window provenance columns to a per-series Metrics frame.
 
     Called by the ``metrics`` Dagster asset after ``compute_metrics()`` returns, once the
@@ -207,14 +207,16 @@ def enrich_metrics_rows(
         mlflow_run_id: MLflow fold run ID; ``None`` for ``ad_hoc``.
 
     Returns:
-        A ``pl.DataFrame`` with all ``Metrics`` columns fully populated.
+        A validated ``Metrics`` DataFrame with all columns fully populated.
     """
-    return per_series_metrics.with_columns(
-        experiment_name=pl.lit(experiment_name).cast(pl.Categorical),
-        evaluation_scope=pl.lit(evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
-        window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
-        window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),
-        window_label=pl.lit(window_label),
-        computed_at=pl.lit(computed_at).cast(UTC_DATETIME_DTYPE),
-        mlflow_run_id=pl.lit(mlflow_run_id),
+    return Metrics.validate(
+        per_series_metrics.with_columns(
+            experiment_name=pl.lit(experiment_name).cast(pl.Categorical),
+            evaluation_scope=pl.lit(evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
+            window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
+            window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),
+            window_label=pl.lit(window_label),
+            computed_at=pl.lit(computed_at).cast(UTC_DATETIME_DTYPE),
+            mlflow_run_id=pl.lit(mlflow_run_id),
+        )
     )
