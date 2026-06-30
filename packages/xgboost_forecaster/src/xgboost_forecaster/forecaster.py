@@ -86,24 +86,25 @@ class XGBoostForecaster(BaseForecaster):
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
         """Fit one Booster per ``time_series_id`` in ``time_series_ids``.
 
-        The frame is **never collected whole**. Each series is materialised on its own by filtering
-        ``data`` to that ``time_series_id`` — a predicate Polars pushes down into both join scans and
-        below the lag/rolling window functions (see ``docs/architecture/overview.md``), so the
-        feature-engineering join only ever runs for one series at a time. The series' rows are fed to
-        an ``xgb.QuantileDMatrix``, which compresses them to 8-bit quantile bins rather than holding
-        an uncompressed Float32 copy. A series with no non-null ``power`` rows (e.g. none in the
-        training window) is skipped and gets no Booster.
+        ``data`` is collected once and grouped in memory by ``time_series_id``; each group's rows
+        feed an ``xgb.QuantileDMatrix`` (compressed to 8-bit quantile bins, not an uncompressed
+        Float32 copy). Keeping this bounded is the *caller's* job — the NWP scan must be pruned at
+        the inputs (control member, the relevant H3 cells, the window's ``init_time`` partitions),
+        because filtering the engineered output cannot prune the upstream join/upsample. See
+        ``_load_engineering_inputs`` and the "NWP scan pruning" notes in
+        ``docs/architecture/overview.md``.
+
+        Only the requested ``time_series_ids`` are trained; a requested series with no non-null
+        ``power`` rows (e.g. none in the training window) simply does not appear and gets no Booster.
         """
         feature_cols = self._feature_cols
-        for ts_id in time_series_ids:
-            group = cast(
-                pt.DataFrame[AllFeatures],
-                data.filter(pl.col("time_series_id") == ts_id)
-                .drop_nulls(subset=["power"])
-                .collect(),
-            )
-            if group.is_empty():
+        requested = set(time_series_ids)
+        df = data.drop_nulls(subset=["power"]).collect()
+        for group_key, group in df.group_by(["time_series_id"]):
+            ts_id = int(group_key[0])
+            if ts_id not in requested:
                 continue
+            group = cast(pt.DataFrame[AllFeatures], group)
             features = _prepare_features(group, feature_cols)
             label = group["power"].cast(pl.Float32)
             dtrain = xgb.QuantileDMatrix(features, label=label)
@@ -112,18 +113,18 @@ class XGBoostForecaster(BaseForecaster):
                 dtrain,
                 num_boost_round=self.model_params.n_estimators,
             )
-            self._models[int(ts_id)] = booster
+            self._models[ts_id] = booster
 
     def predict(
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
     ) -> pt.DataFrame[PowerForecast]:
         """Generate one power_fcst per row, dispatching by time_series_id to the right Booster.
 
-        Like ``train``, the frame is never collected whole: it is materialised one series at a time
-        by filtering to each trained ``time_series_id`` (a predicate Polars pushes down into the
-        scans), which bounds peak memory — important at validation, where every NWP ensemble member
-        is present. Rows for a ``time_series_id`` this model was not trained on are ignored (the
-        model only scores its own trained population — see ``trained_time_series_ids``).
+        ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
+        ``time_series_id`` this model was not trained on are ignored (the model only scores its own
+        trained population — see ``trained_time_series_ids``). Keeping the collect bounded is the
+        caller's job: at validation every NWP ensemble member is present, so the caller engineers one
+        H3 cell at a time (see ``cv_power_forecasts`` and ``docs/architecture/overview.md``).
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.
@@ -152,20 +153,19 @@ class XGBoostForecaster(BaseForecaster):
                 fold_id=pl.lit(fold_id),
             )
 
+        df = data.collect()
         parts: list[pl.DataFrame] = []
-        for ts_id in self.trained_time_series_ids:
-            group = cast(
-                pt.DataFrame[AllFeatures],
-                data.filter(pl.col("time_series_id") == ts_id).collect(),
-            )
-            if group.is_empty():
-                continue
+        for group_key, group in df.group_by(["time_series_id"]):
+            booster = self._models.get(int(group_key[0]))
+            if booster is None:
+                continue  # ignore series this model was not trained on
+            group = cast(pt.DataFrame[AllFeatures], group)
             X = _prepare_features(group, feature_cols)
-            predictions: np.ndarray = self._models[ts_id].predict(xgb.DMatrix(X))
+            predictions: np.ndarray = booster.predict(xgb.DMatrix(X))
             parts.append(_build_part(group, predictions))
 
         if not parts:
-            empty = cast(pt.DataFrame[AllFeatures], data.limit(0).collect())
+            empty = cast(pt.DataFrame[AllFeatures], df.head(0))
             parts.append(_build_part(empty, np.empty(0, dtype=np.float32)))
 
         # ``select``/``with_columns`` and ``pl.concat`` preserve the input's Patito ``AllFeatures``

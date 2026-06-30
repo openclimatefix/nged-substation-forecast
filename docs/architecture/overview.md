@@ -41,35 +41,34 @@ NwpOnDisk.scan_delta(path)               # lazy scan
 
 **The one exception** is a `limit(1).collect()` guard in `_build_historical_weather` (inside `ml_core`) that cheaply checks for the NWP control member before building the lazy plan, so the pipeline fails loudly instead of silently returning an empty frame.
 
-**Contract for `BaseForecaster` subclasses**: the lazy plan is materialised *at the model boundary*, as late as possible, and never by callers — never ask a caller to collect before passing data in. How a subclass materialises is its own concern, but it must **bound peak memory** rather than collect the whole frame. `XGBoostForecaster` is passed the `time_series_id` population to `train()` and `collect()`s **one series at a time** — filtering `data` to a single `time_series_id`, a predicate Polars pushes down into the scans (see [Polars push-downs through the join](#polars-push-downs-through-the-join) below). `predict()` does the same. So the feature-engineering join only ever runs for one series, and peak memory stays bounded no matter how many series there are.
+**Contract for `BaseForecaster` subclasses**: the lazy plan is materialised *at the model boundary*, as late as possible, and never by callers — never ask a caller to collect before passing data in. A subclass typically does a single `.collect()`; keeping that bounded is the **caller's** job, by pruning the *inputs* before feature engineering (not by filtering the engineered output — see below).
 
-### Polars push-downs through the join
+### Bounding feature-engineering memory: prune the inputs, not the output
 
-The feature-engineering plan is dominated by the bulk NWP×power join (plus the NWP 30-min upsample, which `explode`s + `sort`s + `interpolate`s). Bounding memory means *not* running that whole join at once. What Polars does and does not push through the join — verified with `LazyFrame.explain()` — decides which operations actually bound it:
+The feature-engineering plan is dominated by the **NWP scan**. The NWP Delta is large — for the V1 trial it is **~83 GB**: 767 daily `init_time` partitions, each ~7.24M rows = **1671 H3 cells × 51 ensemble members × 85 native steps** (control member alone is 142k rows/partition). The 30-min upsample and the multi-run bulk join inflate that further. So the whole memory question is: *how little of that NWP do we touch?*
 
-| Operation on the engineered frame | Pushes through the join? | Bounds memory? |
-|---|---|---|
-| `filter(col("time_series_id") == x)` | **Yes** — into both scan sides, *below* the `.over("time_series_id")` lag/rolling windows | **Yes** |
-| `filter(col("time_series_id").is_in([...]))` | **Yes** — same as above (this is the lever for a future one-booster-per-group model) | **Yes** |
-| `filter(col("ensemble_member") == m)` | **Yes** — into the NWP scan | **Yes** (the axis for the future full-ensemble experiment) |
-| `filter(col("valid_time") …)` date window | **Yes** — into both scans, but needs a warm-up overlap so lag/rolling history survives | Yes, with care |
-| `slice(offset, n)` / `head(n)` (row count) | **No** — the join runs in full, then the slice applies at the end | **No** |
-| `group_by("time_series_id").len()` / `select("time_series_id").unique()` | n/a — still executes the whole join | **No** |
+**You cannot prune the scan by filtering the engineered output.** `data.filter(time_series_id == x)` runs the cell-attach join, the 30-min upsample (`group_by` + `explode` + `sort` + `interpolate`) and the bulk join *first*, then drops rows. And NWP is keyed by `h3_index`, not `time_series_id`, so a `time_series_id` predicate can never reach the NWP scan at all. Pruning must be applied to the **raw inputs**, in `_load_engineering_inputs`, *before* `to_nwp_in_memory` rescales Int16→Float32.
 
-**The rule:** bound the join with a **predicate on a key column** (`time_series_id`, `ensemble_member`, `valid_time`), which prunes the scans *before* the join. A raw **row-count** limit cannot be pushed before the join and so bounds nothing — this is why `XGBoostForecaster` partitions by `time_series_id` rather than by a row batch size. (An earlier row-batching attempt with an `xgb.DataIter` was abandoned for exactly this reason; the iterator survives in `xgboost_forecaster._data_iter` for the future full-ensemble path, where it will be fed a per-`ensemble_member` predicate-filtered frame — not row slices.)
+What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
-### Why per-series bounds memory — the maths
-
-Bulk mode emits one row per `(time_series_id, nwp_init_time, valid_time, ensemble_member)`. ECMWF ENS runs once/day with a 15-day horizon upsampled to 30-min (720 steps/run), and each `valid_time` is covered by ~15 overlapping daily runs, so over a ~456-day training window that is **~328k rows per series** (control member only).
-
-| | V1 (32 series) |
+| Predicate on the **raw NWP scan** | Effect |
 |---|---|
-| Whole engineered frame (`AllFeatures`, 30 cols ≈ ~150 B/row) | ~10.5M rows ≈ **~1.5 GB** (multi-GB peak during the upsample+join) |
-| A 100k-row batch | ~15 MB — *never* the constraint, yet producing it still runs the whole join first |
-| **`train`, one series at a time** (control member) | **~50 MB** |
-| **`predict`, one series at a time** (all ~51 members) | **~2 GB**, vs **~64 GB** for a whole-frame collect |
+| `init_time ∈ [start − 16d, end]` | **Partition prune** — NWP is partitioned by `init_time`, so only those partition directories are opened. A `valid_time` filter *alone* does **not** prune partitions (it scanned ~887 files). |
+| `ensemble_member ∈ {…}` **before** the rescale | Only the requested members are decoded/rescaled (≈50× less for control-member training). Applied *after* the rescale (the old bug), all 51 members are materialised first → OOM. |
+| `h3_index ∈ {cells}` | Restricts to the cells the requested series sit in. |
+| `time_series_id == x` on the **output** | Prunes the power scan + metadata join, but **not** the NWP scan (no `time_series_id` there), and only after the upsample. Doesn't help. |
+| `slice(n)` / `head(n)` (row count) on the output | **Nothing** — a row slice can't push through a join; the whole join runs first. |
 
-`predict` is the heavier path because validation scores every ensemble member. If even one series across the full ensemble is too large for the target box, the next lever is to also loop `ensemble_member` within each series (that predicate pushes down too) — and to stream a single huge group with `xgboost_forecaster._data_iter.LazyFrameBatchIter` fed predicate-filtered frames.
+**Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series live in just **9 cells**, one holding 12). So the unit that bounds the NWP scan is the **cell**, not the series — and co-located series should share a single cell scan, not re-scan per series.
+
+**Resulting design** (`_load_engineering_inputs` applies all three NWP predicates — `init_time`, `ensemble_member`, and `h3_index` = the requested series' cells — to the raw scan):
+
+| | control member (train) | full 51-member ensemble (predict) |
+|---|---|---|
+| All eligible series at once | ~1 GB → `train` collects once, groups in memory | tens of GB ✘ |
+| One H3 cell at a time | — | a few GB → `cv_power_forecasts` loops per cell, appends to Delta |
+
+If at V2 scale a single cell holds so many series that even one cell-batch is too big, the next lever is to also loop `ensemble_member` (it prunes the scan too). The unused `xgboost_forecaster._data_iter.LazyFrameBatchIter` is kept for that streaming path — fed a predicate-filtered frame or a parquet/Delta scan, never row slices of a join.
 
 ## The Universal Model Interface
 

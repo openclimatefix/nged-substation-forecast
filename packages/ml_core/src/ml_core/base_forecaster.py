@@ -59,10 +59,12 @@ class BaseForecaster(ABC):
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in; doing so wastes memory and prevents Polars
-    from optimising the full query plan. A subclass materialises the data at the model boundary,
-    bounding peak memory by collecting it in pieces along a `time_series_id` (or other pushdown)
-    predicate rather than collecting the whole frame at once — see the Polars join push-down notes
-    in `docs/architecture/overview.md`.
+    from optimising the full query plan. A subclass materialises the data at the model boundary
+    (typically a single `.collect()`). Keeping that bounded is the *caller's* responsibility: it
+    prunes the inputs (NWP control member, the relevant H3 cells, the window's `init_time`
+    partitions) and, where the full ensemble is needed, engineers one spatial cell at a time —
+    filtering the engineered output cannot prune the upstream join/upsample. See the NWP scan-pruning
+    notes in `docs/architecture/overview.md`.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
@@ -170,12 +172,10 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features (lazy; the caller must not pre-collect).
             time_series_ids: The population the model must train on — the caller's eligible set. The
-                model decides how to partition it into booster groups: one booster per id
-                (``XGBoostForecaster``), or one booster per group of ids (e.g. all solar sites) for a
-                future model. Passing the population explicitly lets each group be loaded with a
-                ``time_series_id`` predicate that pushes down into the scans, so the
-                feature-engineering join is materialised one group at a time — never the whole frame
-                (see the Polars join push-down notes in ``docs/architecture/overview.md``).
+                model decides how to map it onto boosters: one booster per id (``XGBoostForecaster``),
+                or one booster per group of ids (e.g. all solar sites) for a future model. It is the
+                model's frozen record of who it trained on (the train==predict invariant), and bounds
+                ``predict`` to that same population.
         """
         pass
 

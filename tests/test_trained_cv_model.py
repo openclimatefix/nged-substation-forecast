@@ -198,6 +198,24 @@ def test_load_engineering_inputs_filters_ensemble_members(env: dict[str, str]) -
     )
 
 
+def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
+    env: dict[str, str],
+) -> None:
+    """NWP is pruned to the requested series' H3 cells and the window's ``init_time`` partitions."""
+    settings = Settings()
+    train_start = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
+
+    # Requesting only ts1 must scan only ts1's cell, never ts2's.
+    _, _, nwp_ts1 = _load_engineering_inputs(settings, [1], train_start, train_end)
+    assert nwp_ts1.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+
+    # Requesting both: ts2's cell is initialised at 2025-08-01 (after train_end), so the init_time
+    # partition prune drops it entirely — only ts1's in-window cell survives.
+    _, _, nwp_both = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    assert nwp_both.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+
+
 def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> None:
     instance = DagsterInstance.ephemeral()
     _register(instance)
