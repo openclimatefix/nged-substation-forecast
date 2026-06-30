@@ -11,11 +11,11 @@ import polars as pl
 import pytest
 from altair import VConcatChart
 from dagster import RunConfig
+from plotting.forecast_chart import build_forecast_chart
 from pydantic import ValidationError
 
 from nged_substation_forecast.defs.plot_jobs import (
     PlotPowerForecastConfig,
-    build_forecast_chart,
     plot_power_forecast_job,
 )
 

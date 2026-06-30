@@ -5,8 +5,11 @@ app = marimo.App()
 
 with app.setup:
     from datetime import datetime, timezone
+
     import altair as alt
+    import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
+    from plotting.ocf_theme import GRID, ORANGE_RED
 
 
 @app.cell
@@ -66,7 +69,7 @@ def _(df, nwp_vars):
         )
 
         # Layer 1: A light gray background line showing the full time series extent
-        background_lines = base.mark_line(color="lightgray", strokeWidth=1).encode(
+        background_lines = base.mark_line(color=GRID, strokeWidth=1).encode(
             x=alt.X("valid_time:T", title="Valid Time"),
             detail="row_label:N",  # Ensures lines don't connect across different rows
         )
@@ -75,7 +78,7 @@ def _(df, nwp_vars):
         missing_marks = (
             base.transform_filter(alt.datum.is_missing)
             .mark_tick(
-                color="red",
+                color=ORANGE_RED,
                 thickness=3,  # Make the red mark stand out
                 size=12,  # Height of the tick mark
             )

@@ -19,9 +19,11 @@ with app.setup:
     import lonboard
     import marimo as mo
     import patito as pt
+    import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
     import pyarrow
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+    from plotting.ocf_theme import BLUE
 
     BASE_DELTA_PATH = PROJECT_ROOT / settings.nged_data_path / "power_time_series.delta"
 
@@ -130,7 +132,7 @@ def _(delta_df, df, layer_widget, map):
                             axis=alt.Axis(format="%H:%M %b %d"),
                         ),
                         y=alt.Y("power:Q", title=f"Power ({selected_df['units'].item()})"),
-                        color=alt.value("teal"),
+                        color=alt.value(BLUE),
                         tooltip=["time", "power"],
                     )
                     .properties(

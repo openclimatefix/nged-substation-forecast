@@ -11,5 +11,6 @@ dependencies = [
     "lonboard>=0.16.0",
     "marimo>=0.19.7",
     "palettable>=3.3.3",
+    "plotting",
     "polars>=1.37.1",
 ]
