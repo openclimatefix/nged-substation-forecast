@@ -221,7 +221,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         time_series_metadata=metadata_df,
         nwp=nwp_lf,
     )
-    forecaster.train(features)
+    forecaster.train(features, eligible_ids)
 
     experiment_id = get_or_create_experiment(experiment_name)
     parent_run_id = get_or_create_parent_run(experiment_id)

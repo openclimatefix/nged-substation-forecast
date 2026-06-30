@@ -58,9 +58,11 @@ class BaseForecaster(ABC):
     config edit.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
-    Subclasses should call `.collect()` exactly once, as late as possible — typically right
-    before handing data to the underlying model library. Callers must not collect before passing
-    data in; doing so wastes memory and prevents Polars from optimising the full query plan.
+    Callers must not collect before passing data in; doing so wastes memory and prevents Polars
+    from optimising the full query plan. A subclass materialises the data at the model boundary,
+    bounding peak memory by collecting it in pieces along a `time_series_id` (or other pushdown)
+    predicate rather than collecting the whole frame at once — see the Polars join push-down notes
+    in `docs/architecture/overview.md`.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
@@ -162,8 +164,19 @@ class BaseForecaster(ABC):
         return cls.load(model_dir)
 
     @abstractmethod
-    def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
-        """Fit the model on the given AllFeatures data."""
+    def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
+        """Fit the model on ``data`` for the given ``time_series_id`` population.
+
+        Args:
+            data: The engineered features (lazy; the caller must not pre-collect).
+            time_series_ids: The population the model must train on — the caller's eligible set. The
+                model decides how to partition it into booster groups: one booster per id
+                (``XGBoostForecaster``), or one booster per group of ids (e.g. all solar sites) for a
+                future model. Passing the population explicitly lets each group be loaded with a
+                ``time_series_id`` predicate that pushes down into the scans, so the
+                feature-engineering join is materialised one group at a time — never the whole frame
+                (see the Polars join push-down notes in ``docs/architecture/overview.md``).
+        """
         pass
 
     @abstractmethod

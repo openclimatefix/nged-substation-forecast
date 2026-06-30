@@ -58,10 +58,14 @@ def _make_config(**overrides) -> XGBoostConfig:
     return XGBoostConfig(**{**defaults, **overrides})
 
 
+def _ts_ids(df: pl.DataFrame) -> list[int]:
+    return df["time_series_id"].unique().sort().to_list()
+
+
 def _trained(df: pl.DataFrame, **config_overrides) -> XGBoostForecaster:
     lf = pt.LazyFrame.from_existing(df.lazy())
     forecaster = XGBoostForecaster(_make_config(**config_overrides))
-    forecaster.train(lf)
+    forecaster.train(lf, _ts_ids(df))
     return forecaster
 
 
@@ -91,13 +95,16 @@ def test_predict_with_mlflow_experiment_id() -> None:
     assert (result["ml_flow_experiment_id"] == 42).all()
 
 
-def test_predict_raises_for_unseen_ts_id() -> None:
+def test_predict_ignores_untrained_ts_ids() -> None:
+    """predict scores only its trained population; rows for other series are ignored."""
     df = _make_df(ts_ids=[1, 2])
     forecaster = _trained(df)
 
-    unknown = df.with_columns(pl.lit(999, dtype=pl.Int32).alias("time_series_id"))
-    with pytest.raises(KeyError, match="999"):
-        forecaster.predict(pt.LazyFrame.from_existing(unknown.lazy()))
+    mixed = pl.concat([df, _make_df(ts_ids=[999])])  # 999 was never trained
+    result = forecaster.predict(pt.LazyFrame.from_existing(mixed.lazy()))
+
+    assert set(result["time_series_id"].unique().to_list()) == {1, 2}
+    assert len(result) == len(df)
 
 
 def test_save_load_roundtrip(tmp_path: Path) -> None:
@@ -182,14 +189,8 @@ def test_random_seed_makes_training_deterministic() -> None:
     assert a["power_fcst"].to_list() == b["power_fcst"].to_list()
 
 
-def test_small_batch_size_still_trains_one_booster_per_ts_id() -> None:
-    """A batch_size that forces multiple batches per series still trains every series."""
-    df = _make_df(n_per_ts=48, ts_ids=[1, 2, 3])
-    forecaster = _trained(df, train_batch_size=16)  # 48 rows / 16 -> 3 batches per series
-    assert set(forecaster._models.keys()) == {1, 2, 3}
-
-
 def test_training_skips_series_with_all_null_power() -> None:
+    """A series with no non-null power rows gets no Booster."""
     df = _make_df(ts_ids=[1, 2])
     df = df.with_columns(
         power=pl.when(pl.col("time_series_id") == 2)
@@ -197,24 +198,14 @@ def test_training_skips_series_with_all_null_power() -> None:
         .otherwise(pl.col("power"))
         .cast(pl.Float32)
     )
-    forecaster = _trained(df, train_batch_size=16)
+    forecaster = _trained(df)
     assert forecaster.trained_time_series_ids == [1]
 
 
-def test_batch_size_does_not_change_predictions() -> None:
-    """Streaming in small batches yields the same model as a single-batch build."""
-    df = _make_df()
+def test_training_skips_requested_id_absent_from_data() -> None:
+    """An id in time_series_ids but with no rows in data is silently skipped."""
+    df = _make_df(ts_ids=[1, 2])
     lf = pt.LazyFrame.from_existing(df.lazy())
-    sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
-
-    big = _trained(df, random_seed=7, train_batch_size=100_000).predict(lf).sort(sort_cols)
-    small = _trained(df, random_seed=7, train_batch_size=16).predict(lf).sort(sort_cols)
-    assert big["power_fcst"].to_list() == pytest.approx(small["power_fcst"].to_list())
-
-
-def test_train_batch_size_round_trips_through_save_load(tmp_path: Path) -> None:
-    df = _make_df()
-    forecaster = _trained(df, train_batch_size=12_345)
-    forecaster.save(tmp_path / "m")
-    loaded = XGBoostForecaster.load(tmp_path / "m")
-    assert loaded.model_params.train_batch_size == 12_345
+    forecaster = XGBoostForecaster(_make_config())
+    forecaster.train(lf, [1, 2, 777])  # 777 has no rows
+    assert forecaster.trained_time_series_ids == [1, 2]

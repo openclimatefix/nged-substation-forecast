@@ -166,7 +166,6 @@ These fields live in `XGBoostConfig` (which inherits the universal fields from
 | `colsample_bytree` | `0.8` | Fraction of features sampled per tree. |
 | `device` | `"cpu"` | `"cpu"` or `"cuda"`. |
 | `objective` | `"reg:squarederror"` | Loss function. |
-| `train_batch_size` | `100_000` | Rows collected per batch when streaming training data into XGBoost's `QuantileDMatrix`. Bounds peak training memory; not an XGBoost hyperparameter. |
 
 ---
 

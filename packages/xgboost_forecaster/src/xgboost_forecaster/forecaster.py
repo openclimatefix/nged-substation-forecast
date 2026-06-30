@@ -12,7 +12,7 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
-from xgboost_forecaster._data_iter import LazyFrameBatchIter, _prepare_features
+from xgboost_forecaster._data_iter import _prepare_features
 
 
 class XGBoostConfig(BaseForecasterConfig):
@@ -30,14 +30,6 @@ class XGBoostConfig(BaseForecasterConfig):
     colsample_bytree: float = 0.8
     device: str = "cpu"
     objective: str = "reg:squarederror"
-    train_batch_size: int = 100_000
-    """Rows collected per batch when streaming training data into XGBoost's QuantileDMatrix.
-
-    Bounds peak training memory: only one batch of Float32 features is resident at a time, while
-    QuantileDMatrix keeps the rest as compressed 8-bit quantile bins. Not an XGBoost
-    hyperparameter, so it is excluded from to_xgb_params(); it serialises with the rest of the
-    config and so round-trips through save/load/MLflow.
-    """
 
     def to_xgb_params(self) -> dict[str, Any]:
         """Return the params dict accepted by xgb.train()."""
@@ -91,26 +83,30 @@ class XGBoostForecaster(BaseForecaster):
         """
         return sorted(self._models.keys())
 
-    def train(self, data: pt.LazyFrame[AllFeatures]) -> None:
-        """Fit one Booster per time_series_id found in data.
+    def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
+        """Fit one Booster per ``time_series_id`` in ``time_series_ids``.
 
-        Each series' rows are streamed into an ``xgb.QuantileDMatrix`` one batch at a time via
-        ``LazyFrameBatchIter`` (batch size from ``train_batch_size``), so the full Float32 dataset
-        is never resident and XGBoost never builds an uncompressed ``DMatrix`` copy. The lazy plan
-        is never collected whole — only the id column (to learn the population) and one row-batch
-        at a time.
+        The frame is **never collected whole**. Each series is materialised on its own by filtering
+        ``data`` to that ``time_series_id`` — a predicate Polars pushes down into both join scans and
+        below the lag/rolling window functions (see ``docs/architecture/overview.md``), so the
+        feature-engineering join only ever runs for one series at a time. The series' rows are fed to
+        an ``xgb.QuantileDMatrix``, which compresses them to 8-bit quantile bins rather than holding
+        an uncompressed Float32 copy. A series with no non-null ``power`` rows (e.g. none in the
+        training window) is skipped and gets no Booster.
         """
         feature_cols = self._feature_cols
-        batch_size = self.model_params.train_batch_size
-
-        # One cheap collect of just the id column yields the non-empty population (a series with no
-        # non-null power rows simply does not appear, so it gets no Booster).
-        counts = data.drop_nulls(subset=["power"]).group_by("time_series_id").len().collect()
-
-        for ts_id in counts["time_series_id"]:
-            per_ts = data.filter(pl.col("time_series_id") == ts_id).drop_nulls(subset=["power"])
-            data_iter = LazyFrameBatchIter(per_ts, feature_cols, batch_size=batch_size)
-            dtrain = xgb.QuantileDMatrix(data_iter)
+        for ts_id in time_series_ids:
+            group = cast(
+                pt.DataFrame[AllFeatures],
+                data.filter(pl.col("time_series_id") == ts_id)
+                .drop_nulls(subset=["power"])
+                .collect(),
+            )
+            if group.is_empty():
+                continue
+            features = _prepare_features(group, feature_cols)
+            label = group["power"].cast(pl.Float32)
+            dtrain = xgb.QuantileDMatrix(features, label=label)
             booster = xgb.train(
                 self.model_params.to_xgb_params(),
                 dtrain,
@@ -123,24 +119,22 @@ class XGBoostForecaster(BaseForecaster):
     ) -> pt.DataFrame[PowerForecast]:
         """Generate one power_fcst per row, dispatching by time_series_id to the right Booster.
 
+        Like ``train``, the frame is never collected whole: it is materialised one series at a time
+        by filtering to each trained ``time_series_id`` (a predicate Polars pushes down into the
+        scans), which bounds peak memory — important at validation, where every NWP ensemble member
+        is present. Rows for a ``time_series_id`` this model was not trained on are ignored (the
+        model only scores its own trained population — see ``trained_time_series_ids``).
+
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.
         """
-        df = data.collect()
         feature_cols = self._feature_cols
         cfg = self.model_params
-        parts: list[pl.DataFrame] = []
 
-        for group_key, group_df in df.group_by(["time_series_id"]):
-            group_df = cast(pt.DataFrame[AllFeatures], group_df)
-            ts_id: int = group_key[0]
-            booster = self._models.get(ts_id)
-            if booster is None:
-                raise KeyError(f"No trained model for time_series_id={ts_id!r}")
-            X = _prepare_features(group_df, feature_cols)
-            predictions: np.ndarray = booster.predict(xgb.DMatrix(X))
-
-            part = group_df.select(
+        def _build_part(
+            group_df: pt.DataFrame[AllFeatures], predictions: np.ndarray
+        ) -> pl.DataFrame:
+            return group_df.select(
                 [
                     "valid_time",
                     "time_series_id",
@@ -157,13 +151,28 @@ class XGBoostForecaster(BaseForecaster):
                 experiment_name=pl.lit(cfg.experiment_name),
                 fold_id=pl.lit(fold_id),
             )
-            parts.append(part)
 
-        # ``group_by`` and ``pl.concat`` preserve the input's Patito ``AllFeatures`` subclass, so a
-        # Patito ``.cast`` here would ignore the mapping and instead revert every column to its
-        # ``AllFeatures`` dtype (e.g. ``ensemble_member`` back to ``UInt8``) and leave the
-        # forecast-only columns untouched. Strip the Patito model so the dict-cast uses plain Polars
-        # semantics. ``_from_pydf`` reuses the same underlying frame (zero-copy).
+        parts: list[pl.DataFrame] = []
+        for ts_id in self.trained_time_series_ids:
+            group = cast(
+                pt.DataFrame[AllFeatures],
+                data.filter(pl.col("time_series_id") == ts_id).collect(),
+            )
+            if group.is_empty():
+                continue
+            X = _prepare_features(group, feature_cols)
+            predictions: np.ndarray = self._models[ts_id].predict(xgb.DMatrix(X))
+            parts.append(_build_part(group, predictions))
+
+        if not parts:
+            empty = cast(pt.DataFrame[AllFeatures], data.limit(0).collect())
+            parts.append(_build_part(empty, np.empty(0, dtype=np.float32)))
+
+        # ``select``/``with_columns`` and ``pl.concat`` preserve the input's Patito ``AllFeatures``
+        # subclass, so a Patito ``.cast`` here would ignore the mapping and instead revert every
+        # column to its ``AllFeatures`` dtype (e.g. ``ensemble_member`` back to ``UInt8``) and leave
+        # the forecast-only columns untouched. Strip the Patito model so the dict-cast uses plain
+        # Polars semantics. ``_from_pydf`` reuses the same underlying frame (zero-copy).
         combined = pl.concat(parts)
         result = pl.DataFrame._from_pydf(combined._df).cast(
             {

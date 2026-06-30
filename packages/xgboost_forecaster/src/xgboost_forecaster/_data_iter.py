@@ -1,9 +1,19 @@
 """Streaming a Polars ``LazyFrame`` into XGBoost one row-batch at a time.
 
-This is the memory-bounded training path: instead of collecting the whole ``AllFeatures``
-frame (and letting XGBoost build a second, uncompressed ``Float32`` ``DMatrix`` copy),
-``LazyFrameBatchIter`` feeds fixed-size row batches to an ``xgb.QuantileDMatrix``, which keeps
-the data as compressed 8-bit quantile bins. Only one batch is ever resident in memory.
+``_prepare_features`` is the shared feature-prep helper used by ``forecaster.py``.
+
+``LazyFrameBatchIter`` is **not currently used.** ``XGBoostForecaster`` bounds memory by
+collecting one ``time_series_id`` at a time (a predicate Polars pushes down into the scans), which
+is enough while training on a single NWP ensemble member. The iterator is kept for the **future**
+work of training across many ensemble members (or many series in one booster), where even a single
+booster's data will not fit in memory and must be streamed.
+
+When that day comes, feed it a **cheap-to-slice source** — a ``pl.scan_parquet``/``scan_delta``
+scan, or a frame already narrowed by a push-down predicate (e.g. one ``ensemble_member``). Do
+**not** point it at the full feature-engineering lazy join: a row ``slice`` does not push through a
+join, so each batch would re-run the entire join (and ``QuantileDMatrix`` sketches over several
+passes), which neither bounds memory nor performs. See the Polars join push-down notes in
+``docs/architecture/overview.md``.
 """
 
 from collections.abc import Callable
@@ -34,17 +44,18 @@ def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame
 class LazyFrameBatchIter(xgb.DataIter):
     """Streams a Polars ``LazyFrame`` to XGBoost one row-batch at a time.
 
-    Grouping-agnostic: it batches whatever ``LazyFrame`` it is given. The caller decides which
-    rows feed which booster (per ``time_series_id`` today; per time-series-*type* in a future
-    model that trains one booster across many series) by passing an already-filtered ``LazyFrame``.
-    Only one batch is collected into memory at a time.
+    Not currently wired into ``XGBoostForecaster`` — see the module docstring for when and how to
+    use it (the future multi-ensemble-member path), and what to feed it.
 
-    The caller is responsible for filtering out rows with a null label before constructing the
-    iterator, so batch boundaries fall on clean rows.
+    Grouping-agnostic: it batches whatever ``LazyFrame`` it is given. The caller decides which rows
+    feed which booster by passing an already-filtered ``LazyFrame``, and is responsible for filtering
+    out null-label rows first so batch boundaries fall on clean rows. Only one batch is collected at
+    a time.
 
     ``xgb.QuantileDMatrix`` iterates this object several full passes to sketch the quantiles, so
-    every pass re-executes ``lf.slice(...).collect()`` on the lazy plan — bounded memory is bought
-    with repeated computation. See ``docs/architecture/overview.md``.
+    every pass re-executes ``lf.slice(...).collect()``. That is cheap only when ``lf`` is a
+    cheap-to-slice source (a parquet/Delta scan, where ``slice`` pushes into the scan); on a
+    complex lazy join the slice cannot push through, so each pass re-runs the whole join.
     """
 
     def __init__(
