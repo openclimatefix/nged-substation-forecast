@@ -14,7 +14,7 @@ import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EVALUATION_SCOPES, EligibleTimeSeries
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
 from dagster import (
@@ -546,7 +546,12 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     actuals_lf = pt.LazyFrame.from_existing(
         pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
     ).set_model(PowerTimeSeries)
-    metadata_df = pl.read_parquet(settings.nged_data_path / "metadata.parquet")
+    # Validate metadata at the boundary; allow_superfluous_columns=True because the parquet
+    # also carries geo columns (e.g. h3_res_5) that are not part of TimeSeriesMetadata.
+    metadata_df = TimeSeriesMetadata.validate(
+        pl.read_parquet(settings.nged_data_path / "metadata.parquet"),
+        allow_superfluous_columns=True,
+    )
 
     # --- Process each (experiment_name, fold_id) group ---------------------------------------
     groups = (
@@ -568,7 +573,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
         )
 
-        per_series_metrics = compute_metrics(group_df, actuals_lf, metadata_df)
+        # Delta stores partition columns as String; cast back to Categorical so the frame
+        # conforms to PowerForecast before calling compute_metrics.
+        group_forecasts = PowerForecast.validate(
+            group_df.with_columns(
+                experiment_name=pl.col("experiment_name").cast(pl.Categorical),
+                fold_id=pl.col("fold_id").cast(pl.Categorical),
+            ),
+            allow_superfluous_columns=True,
+        )
+        per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
 
         # Resolve evaluation-window bounds.
         if config.evaluation_scope == "leaderboard":

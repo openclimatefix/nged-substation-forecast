@@ -11,13 +11,13 @@ from contracts.ml_schemas import (
     TIME_SERIES_TYPE_SLICES,
     Metrics,
 )
-from contracts.power_schemas import PowerTimeSeries
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 
 
 def compute_metrics(
-    cv_forecasts: pl.DataFrame,
+    cv_forecasts: pt.DataFrame[PowerForecast],
     actuals: pt.LazyFrame[PowerTimeSeries],
-    metadata: pl.DataFrame,
+    metadata: pt.DataFrame[TimeSeriesMetadata],
 ) -> pt.DataFrame[Metrics]:
     """Compute evaluation metrics from CV predictions and observed power.
 
@@ -38,14 +38,11 @@ def compute_metrics(
     added here later without changing the schema.
 
     Args:
-        cv_forecasts: CV predictions to evaluate. May be a Patito-validated
-            ``PowerForecast`` frame or a plain Polars DataFrame (e.g. read from Delta).
+        cv_forecasts: CV predictions to evaluate.
             Must not contain ``fold_id="live"`` rows — pass only CV fold predictions.
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
-        metadata: DataFrame with at least ``time_series_id`` (Int32) and
-            ``time_series_type`` columns. Values in ``time_series_type`` must be members of
-            ``TIME_SERIES_TYPE_SLICES``. Used to enrich each metric row with the series' type;
-            unmatched series get a null ``time_series_type``.
+        metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
+            Series absent from ``metadata`` receive a null ``time_series_type``.
 
     Returns:
         A validated tall ``Metrics`` DataFrame with ``time_series_type`` populated.

@@ -7,7 +7,12 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import Metrics
-from contracts.power_schemas import PowerForecast, PowerTimeSeries
+from contracts.power_schemas import (
+    LIST_OF_TIME_SERIES_TYPES,
+    PowerForecast,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics
 
 
@@ -58,12 +63,27 @@ def _make_cv_forecasts(
 
 def _make_metadata(
     time_series_ids: list[int], time_series_type: str = "Disaggregated Demand"
-) -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
-            "time_series_type": pl.Series([time_series_type] * len(time_series_ids)),
-        }
+) -> pt.DataFrame[TimeSeriesMetadata]:
+    n = len(time_series_ids)
+    return TimeSeriesMetadata.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
+                "time_series_name": [f"Substation {i}" for i in time_series_ids],
+                "time_series_type": pl.Series([time_series_type] * n).cast(
+                    pl.Enum(LIST_OF_TIME_SERIES_TYPES)
+                ),
+                "units": pl.Series(["MW"] * n).cast(pl.Enum(["MW", "MVA"])),
+                "licence_area": pl.Series(["EMids"] * n).cast(pl.Enum(["EMids"])),
+                "substation_number": pl.Series([i + 1 for i in range(n)], dtype=pl.Int32),
+                "substation_type": pl.Series(["Primary"] * n).cast(
+                    pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])
+                ),
+                "latitude": pl.Series([53.0] * n, dtype=pl.Float32),
+                "longitude": pl.Series([-0.5] * n, dtype=pl.Float32),
+                "h3_res_5": pl.Series([617700169958293503] * n, dtype=pl.UInt64),
+            }
+        )
     )
 
 
@@ -179,10 +199,8 @@ def test_compute_metrics_unknown_series_gets_null_type():
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [10.0])
     forecasts = _make_cv_forecasts(1, times, [10.0])
-    empty_metadata = pl.DataFrame(
-        {"time_series_id": pl.Series([], dtype=pl.Int32), "time_series_type": pl.Series([])}
-    )
-    result = compute_metrics(forecasts, actuals, empty_metadata)
+    # ts_id=1 is absent — metadata only knows about ts_id=99.
+    result = compute_metrics(forecasts, actuals, _make_metadata([99]))
     assert result["time_series_type"].is_null().all()
 
 

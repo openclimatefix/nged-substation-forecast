@@ -25,6 +25,7 @@ import mlflow
 import polars as pl
 import pytest
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES, TimeSeriesMetadata
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
@@ -124,12 +125,27 @@ def _write_nwp(path: str) -> None:
 
 
 def _write_metadata(path: Path) -> None:
-    pl.DataFrame(
-        {
-            "time_series_id": pl.Series([1], dtype=pl.Int32),
-            "h3_res_5": pl.Series([_TS1_CELL], dtype=pl.UInt64),
-            "time_series_type": ["Disaggregated Demand"],
-        }
+    # Full TimeSeriesMetadata frame plus h3_res_5 (used by the NWP spatial join).
+    TimeSeriesMetadata.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+                "time_series_name": ["Test Substation"],
+                "time_series_type": pl.Series(["Disaggregated Demand"]).cast(
+                    pl.Enum(LIST_OF_TIME_SERIES_TYPES)
+                ),
+                "units": pl.Series(["MW"]).cast(pl.Enum(["MW", "MVA"])),
+                "licence_area": pl.Series(["EMids"]).cast(pl.Enum(["EMids"])),
+                "substation_number": pl.Series([1], dtype=pl.Int32),
+                "substation_type": pl.Series(["Primary"]).cast(
+                    pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])
+                ),
+                "latitude": pl.Series([53.0], dtype=pl.Float32),
+                "longitude": pl.Series([-0.5], dtype=pl.Float32),
+                "h3_res_5": pl.Series([_TS1_CELL], dtype=pl.UInt64),
+            }
+        ),
+        allow_superfluous_columns=True,
     ).write_parquet(path)
 
 
