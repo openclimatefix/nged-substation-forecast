@@ -3,7 +3,7 @@
 How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.
 
 The pipeline has two layers. The **data layer** (steps 1–4) is built once and refreshed as new
-data arrives; it is shared by all experiments. The **experiment layer** (steps 5–7) is repeated
+data arrives; it is shared by all experiments. The **experiment layer** (steps 5–8) is repeated
 for each new model or hyperparameter configuration — see [Model configuration](model-configuration.md)
 for how to choose features and set hyperparameters.
 
@@ -109,7 +109,7 @@ MLflow experiment and partition keys rather than creating duplicates.
 9. Logs training params (`fold_id`, `train_start`, `train_end`, `n_eligible_time_series`,
    `n_trained_time_series`) to the fold run.
 
-The MLflow run structure looks like this:
+The MLflow run structure after training looks like this:
 
 ```
 Experiment "xgboost_smoke_test"
@@ -179,6 +179,51 @@ plots an existing smoke-test forecast, so you can launch it as-is; override the
 This is a **job, not an asset**, because the plot is a throwaway artifact for human inspection —
 keyed by init time and series ids, with no lineage or durable catalog identity — rather than a
 tracked data object in the pipeline.
+
+---
+
+## Step 8 — Materialise `metrics`
+
+**Trigger:** Materialise (unpartitioned — not tied to a single fold). Fill in `MetricsConfig`
+in the run config dialog before launching.
+
+| Field | Example | Notes |
+|---|---|---|
+| `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one experiment; leave null to score all experiments at once |
+| `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the experiment |
+| `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window for ad_hoc scoring |
+| `evaluation_scope` | `"leaderboard"` | `"leaderboard"` logs to MLflow; `"ad_hoc"` writes Delta only |
+
+**What the asset does:**
+
+1. Scans `power_forecasts` Delta, applying any non-null `PopulationFilter` predicates.
+2. Groups the matched rows by `(experiment_name, fold_id)` and for each group:
+   a. Calls `compute_metrics()` — joins observed power, averages ensemble members, computes
+      MAE / NMAE / RMSE / MBE per `(time_series_id, fold_id, power_fcst_model_name)`.
+   b. Enriches rows with scope (`evaluation_scope`), window bounds (`window_start`, `window_end`,
+      `window_label`), `computed_at`, and the MLflow fold run id (leaderboard scope only).
+   c. Writes to `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an
+      idempotent overwrite predicate — safe to re-run without duplicating rows.
+3. For `evaluation_scope="leaderboard"`: builds a per-type + overall aggregate metric dict (e.g.
+   `rmse__all`, `rmse__disaggregated_demand`) and logs it to the fold's MLflow child run, then
+   averages across folds and logs the mean to the parent run.
+
+After step 8, the MLflow run structure looks like this:
+
+```
+Experiment "xgboost_smoke_test"
+└── cv_summary (parent run)   tags={cv_role: parent}
+    │   params: n_estimators=100, learning_rate=0.05, …
+    │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
+            params: train_start, train_end, …
+            metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
+            artifacts: model/
+```
+
+The `forecast_metrics` Delta table stores one row per
+`(time_series_id, fold_id, power_fcst_model_name, horizon_slice, metric_name, metric_param)`,
+with `time_series_type` populated from metadata so per-type queries need only a simple filter.
 
 ---
 
