@@ -61,16 +61,16 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 **Pruning the partitions is necessary but not sufficient — you must also stream the collect.** `init_time` prunes whole partition *files*, but `ensemble_member` and `h3_index` are not partition keys, so they only filter at the *row* level. A single NWP parquet row group holds **every member × every cell** (the data is sorted `init → valid → member → h3`, so each row group spans all 1671 cells and 51 members), so their min/max stats can't skip groups for our 1 member / 9 cells. The **default (in-memory) engine therefore decodes every row in the pruned partitions before dropping 50/51 of the members and 1662/1671 of the cells** — measured at **7.2 GB to materialise a 611-row, one-cell, one-week, control-member slice**. The **streaming engine** (`collect(engine="streaming")`) applies the predicates per morsel, so peak memory is set by the morsel/row-group size, *not* the window length: the same slice peaks at ~2.4 GB, and a *full 15-month* control-member collect stays at ~2.5 GB. `XGBoostForecaster.train`/`predict` therefore collect with `engine="streaming"`.
 
-**Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series live in just **9 cells**, one holding 12). So the unit that bounds the NWP scan is the **cell**, not the series — and co-located series should share a single cell scan, not re-scan per series.
+**Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series live in just **9 cells**, one holding 12), so `h3_index` pruning is keyed on the (few) cells the requested series occupy, and the feature engineer's spatial join replicates each cell's weather across its series.
 
-**Resulting design** (`_load_engineering_inputs` applies all three NWP predicates — `init_time`, `ensemble_member`, and `h3_index` = the requested series' cells — to the raw scan):
+**Resulting design** (`_load_engineering_inputs` applies all three NWP predicates — `init_time`, `ensemble_member`, and `h3_index` = the requested series' cells — to the raw scan, and every collect streams):
 
 | | control member (train) | full 51-member ensemble (predict) |
 |---|---|---|
-| All eligible series at once | ~1 GB → `train` collects once, groups in memory | tens of GB ✘ |
-| One H3 cell at a time | — | a few GB → `cv_power_forecasts` loops per cell, appends to Delta |
+| All eligible series at once | ~5 GB → `train` collects once, groups in memory | ~25 GB ✘ (OOMs) |
+| One `init_time` chunk at a time | — | ~2–3 GB → `cv_power_forecasts` chunks by `init_time`, appends to Delta |
 
-If at V2 scale a single cell holds so many series that even one cell-batch is too big, the next lever is to also loop `ensemble_member` (it prunes the scan too). The unused `xgboost_forecaster._data_iter.LazyFrameBatchIter` is kept for that streaming path — fed a predicate-filtered frame or a parquet/Delta scan, never row slices of a join.
+Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is both the partition key and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). The unused `xgboost_forecaster._data_iter.LazyFrameBatchIter` is kept for a future streaming path — fed a predicate-filtered frame or a parquet/Delta scan, never row slices of a join.
 
 ## The Universal Model Interface
 

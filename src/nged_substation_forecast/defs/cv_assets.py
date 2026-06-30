@@ -69,6 +69,15 @@ run can cover a ``valid_time`` window ``[start, end]`` only if ``init_time`` lie
 ``_load_engineering_inputs``.
 """
 
+_PREDICT_INIT_CHUNK: Final[timedelta] = timedelta(days=14)
+"""``init_time`` window processed per ``cv_power_forecasts`` iteration.
+
+Prediction fans every NWP run out across all ~51 ensemble members, so the full validation window at
+once is tens of GB. ``init_time`` is both the partition key and the axis that inflates the output,
+so chunking by it bounds the per-iteration forecast frame (~2-3 GB at 14 days) while each partition
+is still read exactly once. See ``cv_power_forecasts``.
+"""
+
 
 @asset(
     partitions_def=cv_fold_partitions,
@@ -142,6 +151,8 @@ def _load_engineering_inputs(
     window_start: datetime,
     window_end: datetime,
     ensemble_members: list[int] | None = None,
+    init_time_start: datetime | None = None,
+    init_time_end: datetime | None = None,
 ) -> tuple[
     pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[NwpInMemory]
 ]:
@@ -175,7 +186,16 @@ def _load_engineering_inputs(
             the control member (``[0]``) to avoid fanning every forecast row out across all ~51
             members against the same power target; prediction passes ``None`` because the
             probabilistic leaderboard metrics need the full ensemble.
+        init_time_start, init_time_end: Optional explicit ``init_time`` partition bounds. When
+            ``None`` they default to ``[window_start - _MAX_NWP_LEAD, window_end]`` (every run that
+            can cover the window). ``cv_power_forecasts`` passes a narrower sub-range to process the
+            validation window in ``init_time`` chunks, so the full-ensemble forecast frame for one
+            chunk stays in RAM while the rest streams from the partition-pruned scan.
     """
+    if init_time_start is None:
+        init_time_start = window_start - _MAX_NWP_LEAD
+    if init_time_end is None:
+        init_time_end = window_end
     power_lf = pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta")).filter(
         pl.col("time_series_id").is_in(time_series_ids),
         pl.col("time") >= window_start,
@@ -194,8 +214,8 @@ def _load_engineering_inputs(
 
     nwp_scan = NwpOnDisk.scan_delta(settings.nwp_data_path).filter(
         # init_time is the partition key — this prunes whole partitions, not just row groups.
-        pl.col("init_time") >= window_start - _MAX_NWP_LEAD,
-        pl.col("init_time") <= window_end,
+        pl.col("init_time") >= init_time_start,
+        pl.col("init_time") <= init_time_end,
         pl.col("valid_time") >= window_start,
         pl.col("valid_time") <= window_end,
         pl.col("h3_index").is_in(cells),
@@ -319,13 +339,15 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     fold is always scored on exactly the population it was trained on even if power coverage has
     drifted since training.
 
-    To keep RAM bounded, prediction runs **one H3 cell at a time** (many series share a cell; see
-    the many-to-one note in ``docs/architecture/overview.md``). Predicting all series at once would
-    materialise the full ensemble across the validation window — tens of GB. Each cell's NWP scan is
-    pruned to that one cell, so a cell-batch is a few GB at most.
+    To keep RAM bounded, prediction runs **one ``init_time`` window at a time**
+    (``_PREDICT_INIT_CHUNK``). The full validation window fans every NWP run out across all ~51
+    ensemble members and all trained series — tens of GB. ``init_time`` is the NWP partition key
+    *and* the axis that inflates the output, so chunking by it bounds the per-iteration forecast
+    frame (~2-3 GB) while each partition is still read exactly once. See the "NWP scan pruning"
+    notes in ``docs/architecture/overview.md``.
 
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
-    ``(experiment_name, fold_id)``: the **first** cell overwrites the partition (clearing any prior
+    ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
     run) and the rest **append** to it, so a full re-materialisation replaces the fold's rows
     without ever holding all forecasts in memory. The fold's MLflow run is resolved **by tag** —
     never by a handle from ``trained_cv_model`` — so this is safe across processes.
@@ -352,20 +374,24 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "nothing to forecast. Re-materialise `trained_cv_model` for this fold."
         )
 
-    # Group the trained series by their H3 cell so each iteration scans only one cell's NWP.
-    metadata = pl.read_parquet(settings.nged_data_path / "metadata.parquet").filter(
-        pl.col("time_series_id").is_in(trained_ids)
-    )
-    ids_by_cell = [grp["time_series_id"].to_list() for _, grp in metadata.group_by("h3_res_5")]
-
     settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
     n_rows = 0
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
 
-    for cell_index, cell_ids in enumerate(ids_by_cell):
+    # Walk disjoint init_time chunks covering every run that can forecast into the window:
+    # init_time in [val_start - _MAX_NWP_LEAD, val_end].
+    chunk_start = val_start - _MAX_NWP_LEAD
+    is_first = True
+    while chunk_start <= val_end:
+        chunk_end = min(chunk_start + _PREDICT_INIT_CHUNK, val_end)
         power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
-            settings, cell_ids, val_start, val_end
+            settings,
+            trained_ids,
+            val_start,
+            val_end,
+            init_time_start=chunk_start,
+            init_time_end=chunk_end,
         )
         features = forecaster.feature_engineer.engineer(
             selected_features=config.selected_features,
@@ -374,9 +400,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             nwp=nwp_lf,
         )
         forecasts = forecaster.predict(features, fold_id=fold_id)
+        # init_times fall on day boundaries, so the 1µs step never drops a run from the next chunk.
+        chunk_start = chunk_end + timedelta(microseconds=1)
 
-        is_first = cell_index == 0
-        # Skip empty cell-batches except the first, which must run to (over)write the partition so a
+        # Skip empty chunks except the first, which must run to (over)write the partition so a
         # re-materialisation always replaces the fold's prior rows.
         if forecasts.height == 0 and not is_first:
             continue
@@ -388,7 +415,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             fold_id=pl.col("fold_id").cast(pl.String),
         ).to_arrow()
         if is_first:
-            # First cell overwrites the (experiment, fold) partition, clearing any prior run.
+            # The first chunk overwrites the (experiment, fold) partition, clearing any prior run.
             write_deltalake(
                 table_or_uri=settings.power_forecasts_data_path,
                 data=delta_data,
@@ -397,13 +424,14 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
                 partition_by=["experiment_name", "fold_id"],
             )
         else:
-            # Later cells append into the partition the first cell established.
+            # Later chunks append into the partition the first chunk established.
             write_deltalake(
                 table_or_uri=settings.power_forecasts_data_path,
                 data=delta_data,
                 mode="append",
                 partition_by=["experiment_name", "fold_id"],
             )
+        is_first = False
         n_rows += forecasts.height
         time_series_seen.update(forecasts["time_series_id"].to_list())
         ensemble_members_seen.update(forecasts["ensemble_member"].to_list())
