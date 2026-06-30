@@ -672,7 +672,10 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings.forecast_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     total_rows = 0
-    # Accumulate per-fold metric dicts per experiment for parent-run aggregation.
+    # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
+    # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
+    # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
+    # After the loop, each list is averaged and logged to the experiment's MLflow parent run.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:
