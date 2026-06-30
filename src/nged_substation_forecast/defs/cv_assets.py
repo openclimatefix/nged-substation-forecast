@@ -641,15 +641,15 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # delta-rs stores all Arrow dictionary-encoded columns (Categorical, Enum) as plain String on
     # disk. Cast lazily before filtering so PopulationFilter.apply receives a properly-typed
     # pt.LazyFrame[PowerForecast] and the collected frame already has the correct dtypes.
-    typed_scan = pt.LazyFrame.from_existing(
+    power_forecasts = pt.LazyFrame.from_existing(
         pl.scan_delta(str(settings.power_forecasts_data_path)).with_columns(
             experiment_name=pl.col("experiment_name").cast(pl.Categorical),
             fold_id=pl.col("fold_id").cast(pl.Categorical),
             power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
         )
     ).set_model(PowerForecast)
-    forecasts_df = config.population_filter.apply(typed_scan).collect()
-    if forecasts_df.height == 0:
+    filtered_power_forecasts = config.population_filter.apply(power_forecasts).collect()
+    if filtered_power_forecasts.height == 0:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
         return
@@ -664,7 +664,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     )
 
     groups = (
-        forecasts_df.select(["experiment_name", "fold_id"])
+        filtered_power_forecasts.select(["experiment_name", "fold_id"])
         .unique()
         .sort(["experiment_name", "fold_id"])
         .rows()
@@ -677,7 +677,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     for exp_name, fold_id in groups:
         group_forecasts = PowerForecast.validate(
-            forecasts_df.filter(
+            filtered_power_forecasts.filter(
                 (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
             ),
             allow_superfluous_columns=True,
