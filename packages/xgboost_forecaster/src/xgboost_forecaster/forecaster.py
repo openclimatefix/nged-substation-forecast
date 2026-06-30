@@ -12,7 +12,23 @@ from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 
-from xgboost_forecaster._data_iter import _prepare_features
+
+def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame:
+    """Return a Float32 DataFrame containing only the feature columns.
+
+    String, Categorical, and Enum columns are encoded as integer codes before casting,
+    so XGBoost treats them as ordinal numerics. Nulls are preserved as NaN, which XGBoost
+    handles natively as missing values. The Patito model is stripped from the result (zero-copy)
+    so XGBoost sees a plain ``pl.DataFrame``.
+    """
+    exprs = []
+    for col in feature_cols:
+        dtype = df[col].dtype
+        if dtype == pl.String or dtype == pl.Categorical or isinstance(dtype, pl.Enum):
+            exprs.append(pl.col(col).cast(pl.Categorical).to_physical().cast(pl.Float32).alias(col))
+        else:
+            exprs.append(pl.col(col).cast(pl.Float32).alias(col))
+    return pl.DataFrame._from_pydf(df.select(exprs)._df)
 
 
 class XGBoostConfig(BaseForecasterConfig):

@@ -8,8 +8,6 @@ One `xgb.Booster` is trained per `time_series_id`, so each substation's model ca
 
 `train()` collects its input once and groups in memory by `time_series_id`, feeding each series to an `xgb.QuantileDMatrix` (8-bit quantile bins, not an uncompressed `Float32` copy). Keeping that collect bounded is the **caller's** job — the dominant cost is the multi-tens-of-GB NWP scan, which must be pruned at the *inputs* (control member, the relevant H3 cells, the window's `init_time` partitions) and streamed; filtering the engineered *output* cannot prune the upstream join/upsample. `predict()` likewise collects once and groups by `time_series_id`; at validation the full ~51-member ensemble is too large to collect whole, so the caller (`cv_power_forecasts`) predicts **one `init_time` chunk at a time**, writing to Delta incrementally. See [Bounding feature-engineering memory](../../docs/architecture/overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output) for the dataset sizes and the table of which predicates actually prune the NWP scan.
 
-`_data_iter.py` (`LazyFrameBatchIter`) is **not currently used**. It is kept for the future experiment of training across many NWP ensemble members, where a single booster's data will not fit in memory and must be streamed — fed a per-`ensemble_member` predicate-filtered frame (or a parquet/Delta scan), *not* row slices of the full join.
-
 ## Save format
 
 `XGBoostForecaster.save(path)` writes:

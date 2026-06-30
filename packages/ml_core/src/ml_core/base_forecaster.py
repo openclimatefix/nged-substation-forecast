@@ -60,11 +60,11 @@ class BaseForecaster(ABC):
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in; doing so wastes memory and prevents Polars
     from optimising the full query plan. A subclass materialises the data at the model boundary
-    (typically a single `.collect()`). Keeping that bounded is the *caller's* responsibility: it
-    prunes the inputs (NWP control member, the relevant H3 cells, the window's `init_time`
-    partitions) and, where the full ensemble is needed, engineers one spatial cell at a time —
-    filtering the engineered output cannot prune the upstream join/upsample. See the NWP scan-pruning
-    notes in `docs/architecture/overview.md`.
+    (typically a single `.collect()`, streamed). Keeping that bounded is the *caller's*
+    responsibility: it prunes the inputs (NWP control member, the relevant H3 cells, the window's
+    `init_time` partitions) and, where the full ensemble is needed, processes one `init_time` chunk
+    at a time — filtering the engineered output cannot prune the upstream join/upsample. See the NWP
+    scan-pruning notes in `docs/architecture/overview.md`.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
