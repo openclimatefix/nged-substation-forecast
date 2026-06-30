@@ -99,7 +99,11 @@ class XGBoostForecaster(BaseForecaster):
         """
         feature_cols = self._feature_cols
         requested = set(time_series_ids)
-        df = data.drop_nulls(subset=["power"]).collect()
+        # Stream the collect. An NWP parquet row group holds every ensemble member and H3 cell, so
+        # the in-memory engine decodes the whole (init_time-pruned) scan before the row-level
+        # member/cell filters apply — 100+ GB for a multi-month window. The streaming engine applies
+        # the predicates per morsel, holding peak to a few GB. See docs/architecture/overview.md.
+        df = data.drop_nulls(subset=["power"]).collect(engine="streaming")
         for group_key, group in df.group_by(["time_series_id"]):
             ts_id = int(group_key[0])
             if ts_id not in requested:
@@ -153,7 +157,7 @@ class XGBoostForecaster(BaseForecaster):
                 fold_id=pl.lit(fold_id),
             )
 
-        df = data.collect()
+        df = data.collect(engine="streaming")  # stream the NWP scan — see train() / overview.md
         parts: list[pl.DataFrame] = []
         for group_key, group in df.group_by(["time_series_id"]):
             booster = self._models.get(int(group_key[0]))
