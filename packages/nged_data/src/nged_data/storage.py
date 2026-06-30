@@ -256,7 +256,7 @@ def select_new_rows(
         .filter(pl.col("max_time").is_null() | (pl.col(time_col) > pl.col("max_time")))
         .drop("max_time")
         .sort(by=columns_to_sort_by)
-        .collect(),
+        .collect()
     )
 
     return pt.DataFrame(filtered_df).set_model(pt_model).validate()

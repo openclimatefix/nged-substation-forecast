@@ -4,8 +4,15 @@ from pathlib import Path
 import patito as pt
 import polars as pl
 import pytest
-from contracts.power_schemas import TimeSeriesMetadata
-from nged_data.storage import _process_file_listing, _RawFileListItem, upsert_metadata
+from contracts.common import UTC_DATETIME_DTYPE
+from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from nged_data.storage import (
+    _ProcessedFileListing,
+    _RawFileListItem,
+    _process_file_listing,
+    select_new_rows,
+    upsert_metadata,
+)
 
 
 def test_upsert_metadata_new_file(tmp_path: Path):
@@ -224,6 +231,84 @@ def test_parse_file_listing_valid():
     assert result["filesize_bytes"][0] == 1024
     assert result["start_time"][0] == datetime(2026, 3, 26, 8, 0, 0, tzinfo=timezone.utc)
     assert result["end_time"][0] == datetime(2026, 3, 26, 14, 0, 0, tzinfo=timezone.utc)
+
+
+def test_select_new_rows_file_listing(tmp_path: Path):
+    """Regression: trailing comma made filtered_df a tuple, causing superfluous column_0 error."""
+    UTC = timezone.utc
+    delta_path = tmp_path / "power.delta"
+
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([datetime(2026, 1, 1, 12, 0, tzinfo=UTC)]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    raw = pl.DataFrame(
+        {
+            "path": ["old.json", "new_ts1.json", "new_ts2.json"],
+            "filesize_bytes": pl.Series([1000, 1000, 1000], dtype=pl.Int64),
+            "time_series_id": pl.Series([1, 1, 2], dtype=pl.Int32),
+            "start_time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 6, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 0, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "end_time": pl.Series(
+                [
+                    datetime(
+                        2026, 1, 1, 12, 0, tzinfo=UTC
+                    ),  # equals max_time for ts_id=1 → excluded
+                    datetime(2026, 1, 1, 18, 0, tzinfo=UTC),  # > max_time for ts_id=1 → included
+                    datetime(2026, 1, 1, 6, 0, tzinfo=UTC),  # ts_id=2 not in delta → included
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+        }
+    )
+    file_listing = pt.DataFrame(raw).set_model(_ProcessedFileListing).validate()
+
+    result = select_new_rows(file_listing, delta_path)
+
+    assert result.height == 2
+    assert set(result["path"].to_list()) == {"new_ts1.json", "new_ts2.json"}
+    _ProcessedFileListing.validate(result)  # schema must survive filtering
+
+
+def test_select_new_rows_power_time_series(tmp_path: Path):
+    """select_new_rows must filter PowerTimeSeries rows newer than the Delta table max."""
+    UTC = timezone.utc
+    delta_path = tmp_path / "power.delta"
+    T = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([T]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    input_power = PowerTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
+                "time": pl.Series([T, datetime(2026, 1, 1, 12, 30, tzinfo=UTC)]).cast(
+                    UTC_DATETIME_DTYPE
+                ),
+                "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+            }
+        )
+    )
+
+    result = select_new_rows(input_power, delta_path)
+
+    assert result.height == 1
+    assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
+    PowerTimeSeries.validate(result)  # schema must survive filtering
 
 
 def test_parse_file_listing_invalid():
