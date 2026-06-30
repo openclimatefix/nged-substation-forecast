@@ -1395,10 +1395,10 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
 - Implement §4.8 for the `leaderboard` and `ad_hoc` scopes (typed `PopulationFilter`, join
   actuals, `compute_metrics`, per-`time_series_type` + `"all"` aggregation, write
   `forecast_metrics` with window columns, log leaderboard aggregates to parent/fold runs).
-  **Delete the old `cv_metrics` asset.**
+  **Delete the old `cv_metrics` asset. (if it still exists?)**
 - **Full-stack integration test (§5.8, §7.10):** add the **cross-process** full-stack test here —
   a real `mlflow server` subprocess + a real `DagsterInstance` running
-  `register → trained_cv_model → cv_power_forecasts → metrics`, so the **by-tag cross-process run
+  `register → trained_cv_model → cv_power_forecasts → metrics -> plot_power_forecast`, so the **by-tag cross-process run
   resolution (§4.1.1)** and the **artifact round-trip (§4.5)** are exercised for real.
 - **User can verify:** the **entire CV leaderboard loop works for one experiment** — after
   materialising the smoke-test fold + `metrics`, the MLflow parent run shows the aggregate
