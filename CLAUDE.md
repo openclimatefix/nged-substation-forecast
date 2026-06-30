@@ -82,6 +82,7 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Python 3.14+** required.
 - **Polars only** — pandas is strictly forbidden. Use `pl.LazyFrame` and only `.collect()` when necessary.
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
+- **Prefer small functions.** Extract private helpers (`_name`) rather than letting a function body grow long, even if that means more parameters. A well-named helper with a clear docstring beats a long inline block. Eight parameters is acceptable when each is distinct and the division of labour is clear.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
 - **Comments must reflect current state only** — never reference previous iterations of the
   code or deleted files.
@@ -115,6 +116,18 @@ These rules are all about making Polars code easy to read.
 - When using `.with_columns`, prefer specifying the destination column name as a key word argument
   like this: `df.with_columns(bar=pl.col("foo").expression())` instead of using `alias` like this:
   `df.with_columns(pl.col("foo").expression().alias("bar"))`
+
+- **`Literal` type aliases — use a `Type` suffix** to distinguish them from the runtime tuples
+  that drive Polars `Enum` declarations. Example:
+  ```python
+  EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
+  """Runtime tuple — used as pl.Enum(EVALUATION_SCOPES)."""
+
+  EvalScopeType = Literal["leaderboard", "ad_hoc"]
+  """Type annotation — currently-implemented subset; update when adding a new scope."""
+  ```
+  The `Type`-suffixed alias is what goes in function signatures; the `UPPER_SNAKE_CASE` tuple is
+  what goes into `pl.Enum(...)`. They serve different purposes and should both exist.
 
 ### Patito + Polars Gotcha: cross-model LazyFrame joins
 
@@ -159,6 +172,44 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 (No-arg `df.cast()` — casting a model-bearing frame to its declared dtypes — *is* the intended
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
+
+### Delta Lake read-path: cast `String→Categorical` lazily, before filtering
+
+delta-rs stores all Arrow dictionary-encoded columns (`Categorical`, `Enum`) as plain `String` in
+Parquet (this is the write-path gotcha documented in `_write_metrics_to_delta`). On the **read**
+path, cast them back *lazily* — in the `pl.scan_delta(...)` result — before wrapping with
+`set_model` and passing to any typed helper:
+
+```python
+# Cast lazily so the scan is typed from the start; zero-cost until .collect().
+typed_scan = pt.LazyFrame.from_existing(
+    pl.scan_delta(str(path)).with_columns(
+        experiment_name=pl.col("experiment_name").cast(pl.Categorical),
+        fold_id=pl.col("fold_id").cast(pl.Categorical),
+    )
+).set_model(MySchema)
+```
+
+Casting after `.collect()` also works but is later than necessary: typed helpers that receive the
+scan (e.g. a filter method) would then have to accept `pl.LazyFrame` instead of
+`pt.LazyFrame[MySchema]`.
+
+### Patito + Polars Gotcha: `pt.LazyFrame.filter()` drops the Patito subclass
+
+Most Polars operations on a `pt.LazyFrame` return a plain `pl.LazyFrame`, including `.filter()`.
+Reassigning `scan = scan.filter(...)` where `scan: pt.LazyFrame[Schema]` therefore fails `ty`'s
+assignment check.
+
+Workaround: rebind to a plain `pl.LazyFrame` local for the filter accumulation, then re-wrap before
+returning:
+
+```python
+def apply(self, scan: pt.LazyFrame[MySchema]) -> pt.LazyFrame[MySchema]:
+    lf: pl.LazyFrame = scan  # .filter() drops the pt subclass; accumulate on a plain LazyFrame
+    if self.foo is not None:
+        lf = lf.filter(pl.col("foo") == self.foo)
+    return pt.LazyFrame.from_existing(lf).set_model(MySchema)  # zero-copy re-wrap
+```
 
 ## This is a young project
 
