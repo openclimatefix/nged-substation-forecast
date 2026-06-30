@@ -30,8 +30,13 @@ def compute_metrics(
     5. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
-    NMAE is normalised by the mean absolute observed power within the same group,
-    making it comparable across substations of different sizes.
+    NMAE is normalised by the 99th percentile of absolute observed power within the
+    same group (``P99(|power_actual|)``), giving a capacity-like denominator that is
+    more comparable across asset types than the mean — intermittent generators (PV, wind)
+    have a low mean due to night/calm periods, which would inflate their NMAE relative to
+    demand substations of similar peak capacity. Once the ``effective_capacity`` Dagster
+    asset exists (Phase 6.5), the denominator will be upgraded to that pre-computed
+    full-history P99 rather than the validation-window P99 used here.
 
     Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
     Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be
@@ -78,7 +83,7 @@ def compute_metrics(
     # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name).
     metrics_wide = with_error.group_by(["time_series_id", "fold_id", "power_fcst_model_name"]).agg(
         mae=pl.col("error").abs().mean(),
-        nmae=pl.col("error").abs().mean() / pl.col("power_actual").abs().mean(),
+        nmae=pl.col("error").abs().mean() / pl.col("power_actual").abs().quantile(0.99),
         rmse=(pl.col("error").pow(2).mean()).sqrt(),
         mbe=pl.col("error").mean(),
     )

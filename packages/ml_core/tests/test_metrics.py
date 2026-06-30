@@ -123,7 +123,7 @@ def test_compute_metrics_mbe_sign():
 
 
 def test_compute_metrics_nmae_normalisation():
-    """NMAE = MAE / mean(|actual|). When actuals are all 10 and MAE=2, NMAE=0.2."""
+    """NMAE = MAE / P99(|actual|). When actuals are all 10 and MAE=2, NMAE=0.2."""
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, mean|actual|=10
