@@ -502,9 +502,12 @@ class PopulationFilter(Config):
         """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
 
         Args:
-            scan: Lazy scan of the ``power_forecasts`` Delta table. The raw Delta scan has
-                Categorical columns stored as ``String``, so the frame does not yet conform to
-                ``PowerForecast`` — this method filters at the string level before any casting.
+            scan: Lazy scan of the ``power_forecasts`` Delta table. Conceptually this is
+                ``PowerForecast`` data, but delta-rs stores all Categorical columns as plain
+                ``String`` on disk, so the scan does not yet conform to
+                ``pt.LazyFrame[PowerForecast]``. The caller casts Categorical columns back to
+                their declared dtypes immediately after ``.collect()``; this method operates on
+                the raw pre-cast scan.
 
         Returns:
             The same lazy scan with each non-``None`` field added as a ``.filter()`` predicate.
@@ -542,7 +545,7 @@ class MetricsConfig(Config):
 def _resolve_eval_window(
     evaluation_scope: EvalScopeType,
     fold_id: str,
-    group_df: pl.DataFrame,
+    group_df: pt.DataFrame[PowerForecast],
 ) -> tuple[datetime, datetime, str]:
     """Return ``(window_start, window_end, window_label)`` for a metrics group.
 
@@ -553,8 +556,8 @@ def _resolve_eval_window(
         evaluation_scope: ``"leaderboard"`` uses fold-config dates; ``"ad_hoc"`` uses the
             observed ``valid_time`` range of the forecast group.
         fold_id: Fold identifier; only used when ``evaluation_scope == "leaderboard"``.
-        group_df: Raw forecast rows for this ``(experiment_name, fold_id)`` group. Only
-            ``valid_time`` is accessed, and only for the ``"ad_hoc"`` branch.
+        group_df: Validated ``PowerForecast`` rows for this ``(experiment_name, fold_id)``
+            group. Only ``valid_time`` is accessed, and only for the ``"ad_hoc"`` branch.
 
     Returns:
         ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
@@ -632,9 +635,18 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    forecasts_df = config.population_filter.apply(
-        pl.scan_delta(str(settings.power_forecasts_data_path))
-    ).collect()
+    # delta-rs stores all Arrow dictionary-encoded columns (Categorical, Enum) as plain String on
+    # disk. Cast them back immediately after collecting so the rest of the asset works with a
+    # properly-typed PowerForecast frame and avoids repeating the cast inside the loop.
+    forecasts_df = (
+        config.population_filter.apply(pl.scan_delta(str(settings.power_forecasts_data_path)))
+        .collect()
+        .with_columns(
+            experiment_name=pl.col("experiment_name").cast(pl.Categorical),
+            fold_id=pl.col("fold_id").cast(pl.Categorical),
+            power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
+        )
+    )
     if forecasts_df.height == 0:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
@@ -662,22 +674,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:
-        group_df = forecasts_df.filter(
-            (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
-        )
-        # Delta stores all Categorical columns as String; cast back before validating.
         group_forecasts = PowerForecast.validate(
-            group_df.with_columns(
-                experiment_name=pl.col("experiment_name").cast(pl.Categorical),
-                fold_id=pl.col("fold_id").cast(pl.Categorical),
-                power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
+            forecasts_df.filter(
+                (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
             ),
             allow_superfluous_columns=True,
         )
         per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
 
         window_start, window_end, window_label = _resolve_eval_window(
-            config.evaluation_scope, fold_id, group_df
+            config.evaluation_scope, fold_id, group_forecasts
         )
         mlflow_run_id: str | None = None
         if config.evaluation_scope == "leaderboard":
