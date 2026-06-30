@@ -17,6 +17,7 @@ members = [
     "nged-data",
     "nged-substation-forecast",
     "notebooks",
+    "plotting",
     "xgboost-forecaster",
 ]
 
@@ -730,6 +731,7 @@ dependencies = [
     { name = "lonboard" },
     { name = "marimo" },
     { name = "patito" },
+    { name = "plotting" },
     { name = "polars" },
     { name = "pyarrow" },
 ]
@@ -748,6 +750,7 @@ requires-dist = [
     { name = "lonboard", specifier = ">=0.13.0" },
     { name = "marimo", specifier = ">=0.19.7" },
     { name = "patito", specifier = ">=0.8.5" },
+    { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.37.1" },
     { name = "pyarrow", specifier = ">=23.0.0" },
 ]
@@ -2059,6 +2062,7 @@ dependencies = [
     { name = "nged-data" },
     { name = "obstore" },
     { name = "patito" },
+    { name = "plotting" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "requests" },
@@ -2093,6 +2097,7 @@ requires-dist = [
     { name = "nged-data", editable = "packages/nged_data" },
     { name = "obstore" },
     { name = "patito" },
+    { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pyarrow" },
     { name = "requests", specifier = ">=2.31.0" },
@@ -2132,6 +2137,7 @@ dependencies = [
     { name = "lonboard" },
     { name = "marimo" },
     { name = "palettable" },
+    { name = "plotting" },
     { name = "polars" },
 ]
 
@@ -2143,6 +2149,7 @@ requires-dist = [
     { name = "lonboard", specifier = ">=0.16.0" },
     { name = "marimo", specifier = ">=0.19.7" },
     { name = "palettable", specifier = ">=3.3.3" },
+    { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.37.1" },
 ]
 
@@ -2415,6 +2422,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d7/47/e4501f49c178ae1d9f4a75073fda4204f52647993f075a9db4d14930e0c5/platformdirs-4.10.0.tar.gz", hash = "sha256:31e761a6a0ca04faf7353ea759bdba55652be214725111e5aac52dfa29d4bef7", size = 31224, upload-time = "2026-05-28T03:32:53.587Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/e6/cd9575ac904136b3cbf7aa7ee819ef86eedb7274e46f230e94ea4342e729/platformdirs-4.10.0-py3-none-any.whl", hash = "sha256:fb516cdb12eb0d857d0cd85a7c57cea4d060bee4578d6cf5a14dfdf8cbf8784a", size = 22743, upload-time = "2026-05-28T03:32:52.175Z" },
+]
+
+[[package]]
+name = "plotting"
+version = "0.1.0"
+source = { editable = "packages/plotting" }
+dependencies = [
+    { name = "altair" },
+    { name = "polars" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "altair", specifier = ">=6.0.0" },
+    { name = "polars", specifier = ">=1.0.0" },
 ]
 
 [[package]]
@@ -2942,7 +2964,7 @@ name = "pyzmq"
 version = "27.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "implementation_name == 'pypy'" },
+    { name = "cffi", marker = "implementation_name == 'pypy' and sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/04/0b/3c9baedbdf613ecaa7aa07027780b8867f57b6293b6ee50de316c9f3222b/pyzmq-27.1.0.tar.gz", hash = "sha256:ac0765e3d44455adb6ddbf4417dcce460fc40a05978c08efdf2948072f6db540", size = 281750, upload-time = "2025-09-08T23:10:18.157Z" }
 wheels = [

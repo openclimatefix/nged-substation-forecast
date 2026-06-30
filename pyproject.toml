@@ -29,6 +29,7 @@ dependencies = [
     "nged_data",
     "obstore",
     "patito",
+    "plotting",
     "polars>=1.0.0",
     "pyarrow",
     "requests>=2.31.0",
@@ -65,6 +66,7 @@ members = ["packages/*"]
 nged_data = { workspace = true }
 contracts = { workspace = true }
 ml_core = { workspace = true }
+plotting = { workspace = true }
 xgboost_forecaster = { workspace = true }
 dynamical_data = { workspace = true }
 geo = { workspace = true }
