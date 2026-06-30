@@ -1,4 +1,4 @@
-"""Tests for compute_metrics()."""
+"""Tests for compute_metrics() and build_mlflow_aggregate_metrics()."""
 
 import math
 from datetime import datetime, timezone
@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from contracts.ml_schemas import Metrics
 from contracts.power_schemas import PowerForecast, PowerTimeSeries
-from ml_core.metrics import compute_metrics
+from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics
 
 
 def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
@@ -56,8 +56,19 @@ def _make_cv_forecasts(
     return PowerForecast.validate(df, allow_superfluous_columns=True)
 
 
+def _make_metadata(
+    time_series_ids: list[int], time_series_type: str = "Disaggregated Demand"
+) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
+            "time_series_type": pl.Series([time_series_type] * len(time_series_ids)),
+        }
+    )
+
+
 # ---------------------------------------------------------------------------
-# Tests
+# compute_metrics tests
 # ---------------------------------------------------------------------------
 
 
@@ -65,7 +76,7 @@ def test_compute_metrics_returns_metrics_schema():
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     assert isinstance(result, pl.DataFrame)
     Metrics.validate(result, allow_superfluous_columns=True)
 
@@ -76,7 +87,7 @@ def test_compute_metrics_mae_correctness():
     actuals = _make_actuals(1, times, [10.0, 10.0])
     # errors: +2, -2 → MAE = 2.0
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     mae_row = result.filter((pl.col("metric_name") == "mae") & (pl.col("horizon_slice") == "all"))
     assert math.isclose(mae_row["metric_value"][0], 2.0, rel_tol=1e-5)
 
@@ -86,7 +97,7 @@ def test_compute_metrics_mbe_sign():
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [15.0, 15.0])  # over-predict by 5
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     mbe_row = result.filter((pl.col("metric_name") == "mbe") & (pl.col("horizon_slice") == "all"))
     assert mbe_row["metric_value"][0] > 0
 
@@ -96,7 +107,7 @@ def test_compute_metrics_nmae_normalisation():
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, mean|actual|=10
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
     assert math.isclose(nmae_row["metric_value"][0], 0.2, rel_tol=1e-5)
 
@@ -125,7 +136,7 @@ def test_compute_metrics_ensemble_averaging():
     )
     forecasts = PowerForecast.validate(df, allow_superfluous_columns=True)
     actuals = _make_actuals(1, [time], [10.0])
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     mae_row = result.filter(pl.col("metric_name") == "mae")
     assert math.isclose(mae_row["metric_value"][0], 0.0, abs_tol=1e-5)
 
@@ -137,7 +148,7 @@ def test_compute_metrics_multiple_folds():
     fold1 = _make_cv_forecasts(1, [times[0]], [15.0], fold_id="2022")
     fold2 = _make_cv_forecasts(1, [times[1]], [10.0], fold_id="2023")
     forecasts = PowerForecast.validate(pl.concat([fold1, fold2]), allow_superfluous_columns=True)
-    result = compute_metrics(forecasts, actuals)
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
     fold1_mae = result.filter((pl.col("fold_id") == "2022") & (pl.col("metric_name") == "mae"))
     fold2_mae = result.filter((pl.col("fold_id") == "2023") & (pl.col("metric_name") == "mae"))
     assert math.isclose(fold1_mae["metric_value"][0], 5.0, rel_tol=1e-5)
@@ -151,4 +162,107 @@ def test_compute_metrics_raises_on_no_join():
         _make_cv_forecasts(1, [_utc(2023, 6, 1)], [10.0]), allow_superfluous_columns=True
     )
     with pytest.raises(ValueError, match="No rows"):
-        compute_metrics(forecasts, actuals)
+        compute_metrics(forecasts, actuals, _make_metadata([1]))
+
+
+def test_compute_metrics_populates_time_series_type():
+    """time_series_type from metadata is joined onto each metric row."""
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [10.0])
+    forecasts = _make_cv_forecasts(1, times, [10.0])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1], "PV"))
+    assert (result["time_series_type"] == "PV").all()
+
+
+def test_compute_metrics_unknown_series_gets_null_type():
+    """Series absent from metadata receive null time_series_type (left join)."""
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [10.0])
+    forecasts = _make_cv_forecasts(1, times, [10.0])
+    empty_metadata = pl.DataFrame(
+        {"time_series_id": pl.Series([], dtype=pl.Int32), "time_series_type": pl.Series([])}
+    )
+    result = compute_metrics(forecasts, actuals, empty_metadata)
+    assert result["time_series_type"].is_null().all()
+
+
+# ---------------------------------------------------------------------------
+# build_mlflow_aggregate_metrics tests
+# ---------------------------------------------------------------------------
+
+
+def _make_metrics_df(
+    rmse_by_type: dict[str, float],
+) -> pl.DataFrame:
+    """Build a minimal Metrics-shaped DataFrame for aggregate metric tests."""
+    rows = []
+    for ts_type, rmse in rmse_by_type.items():
+        rows.append(
+            {
+                "time_series_id": 1,
+                "metric_name": "rmse",
+                "metric_value": rmse,
+                "time_series_type": ts_type,
+                "horizon_slice": "all",
+                "metric_param": "all",
+            }
+        )
+    return pl.DataFrame(rows).cast(
+        {
+            "time_series_id": pl.Int32,
+            "metric_value": pl.Float32,
+        }
+    )
+
+
+def test_build_mlflow_aggregate_metrics_all_key():
+    """rmse__all is the mean RMSE across all series."""
+    df = _make_metrics_df({"PV": 2.0, "Wind": 4.0})
+    result = build_mlflow_aggregate_metrics(df)
+    assert math.isclose(result["rmse__all"], 3.0, rel_tol=1e-5)
+
+
+def test_build_mlflow_aggregate_metrics_per_type_keys():
+    """Per-type keys use slugified type names."""
+    df = _make_metrics_df({"PV": 2.0, "Disaggregated Demand": 6.0})
+    result = build_mlflow_aggregate_metrics(df)
+    assert "rmse__pv" in result
+    assert "rmse__disaggregated_demand" in result
+    assert math.isclose(result["rmse__pv"], 2.0, rel_tol=1e-5)
+    assert math.isclose(result["rmse__disaggregated_demand"], 6.0, rel_tol=1e-5)
+
+
+def test_build_mlflow_aggregate_metrics_other_demand_slug():
+    """Parentheses in type names are stripped from the slug."""
+    df = _make_metrics_df({"Other (Demand)": 3.0})
+    result = build_mlflow_aggregate_metrics(df)
+    assert "rmse__other_demand" in result
+
+
+def test_build_mlflow_aggregate_metrics_null_type_excluded_from_per_type():
+    """Series with null time_series_type contribute to 'all' but not to per-type keys."""
+    rows = [
+        {
+            "time_series_id": 1,
+            "metric_name": "rmse",
+            "metric_value": 2.0,
+            "time_series_type": "PV",
+            "horizon_slice": "all",
+            "metric_param": "all",
+        },
+        {
+            "time_series_id": 2,
+            "metric_name": "rmse",
+            "metric_value": 4.0,
+            "time_series_type": None,
+            "horizon_slice": "all",
+            "metric_param": "all",
+        },
+    ]
+    df = pl.DataFrame(rows).cast({"time_series_id": pl.Int32, "metric_value": pl.Float32})
+    result = build_mlflow_aggregate_metrics(df)
+    # null type: only "pv" per-type key, not a null-type key
+    assert "rmse__pv" in result
+    assert all("__none" not in k and "null" not in k for k in result)
+    # "all" includes both series
+    assert math.isclose(result["rmse__all"], 3.0, rel_tol=1e-5)

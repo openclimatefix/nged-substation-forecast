@@ -291,12 +291,11 @@ class Metrics(pt.Model):
     metric rows and have the asset enrich them with scope/window provenance before the frame is
     written to the ``forecast_metrics`` Delta table."""
 
-    time_series_type: str = pt.Field(
+    time_series_type: str | None = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
         allow_missing=True,
         description=(
-            "The time-series category this row aggregates, or the sentinel 'all' for the "
-            "across-everything aggregate."
+            "The time-series category for this row. Null when metadata is unavailable for a series."
         ),
     )
 
@@ -336,6 +335,16 @@ class Metrics(pt.Model):
         description=(
             "Convenience cross-link to the MLflow run this metric row belongs to. "
             "Null for 'ad_hoc' rows, which have no MLflow run."
+        ),
+    )
+
+    experiment_name: str = pt.Field(
+        dtype=pl.Categorical,
+        allow_missing=True,
+        description=(
+            "Experiment that produced these forecasts. Delta partition key alongside fold_id. "
+            "Populated by the metrics Dagster asset after compute_metrics() returns; "
+            "allow_missing so compute_metrics() itself need not produce it."
         ),
     )
 
