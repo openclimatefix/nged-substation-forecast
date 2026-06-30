@@ -58,7 +58,7 @@ def build_forecast_chart(
 
         ensemble_layer = (
             alt.Chart(forecast_panel)
-            .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.GRID)
+            .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
             .encode(
                 x=alt.X("valid_time:T", title="Valid time"),
                 y=alt.Y("power_fcst:Q", title=f"Power ({units})"),

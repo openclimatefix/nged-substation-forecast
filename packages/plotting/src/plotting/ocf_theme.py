@@ -38,7 +38,10 @@ BACKGROUND: Final[str] = "#FFFBF5"
 """Chart background colour."""
 
 GRID: Final[str] = "#EAEAEA"
-"""Axis grid line colour; also used for unobtrusive background elements."""
+"""Axis grid line colour."""
+
+ENSEMBLE_LINE: Final[str] = "#808080"
+"""Colour for individual ensemble member lines; mid-grey stays visible at low opacity on BACKGROUND."""
 
 _TEXT: Final[str] = "#292B2B"
 
