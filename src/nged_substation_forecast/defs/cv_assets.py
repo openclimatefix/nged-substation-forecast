@@ -439,7 +439,10 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     n_time_series = len(time_series_seen)
     n_ensemble_members = len(ensemble_members_seen)
     with mlflow.start_run(run_id=fold_run_id):
-        mlflow.log_params({"val_start": val_start.isoformat(), "val_end": val_end.isoformat()})
+        # Use set_tag (not log_params) so re-materialising with an extended val_end doesn't
+        # raise "Changing param values is not allowed" — the covered window is mutable metadata.
+        mlflow.set_tag("val_start", val_start.isoformat())
+        mlflow.set_tag("val_end", val_end.isoformat())
         mlflow.log_metrics(
             {
                 "n_forecast_rows": float(n_rows),

@@ -20,7 +20,7 @@ folds:
     train_start: "2024-04-01"
     train_end:   "2025-06-30"
     val_start:   "2025-07-01"
-    val_end:     "2026-05-13"  # TEMP: power archive ends 2026-05-14; revert to 2026-06-30
+    val_end:     "2026-06-30"
 
   # Non-leaderboard dev fold: ~1 month train / ~1 month val for fast end-to-end sanity checks.
   # min_training_months matches the short train window so eligibility doesn't demand 6 months.
