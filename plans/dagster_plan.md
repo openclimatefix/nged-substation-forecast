@@ -1390,7 +1390,7 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
   the full loop finishes in under a minute and the smoke forecasts never appear in leaderboard
   metrics.
 
-### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works
+### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works - Underway in PR 205
 
 - Implement §4.8 for the `leaderboard` and `ad_hoc` scopes (typed `PopulationFilter`, join
   actuals, `compute_metrics`, per-`time_series_type` + `"all"` aggregation, write

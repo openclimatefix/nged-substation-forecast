@@ -6,14 +6,14 @@ the logic stays fast to unit-test and the assets stay readable.
 """
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Final, Literal
 
 import mlflow
 import patito as pt
 import polars as pl
-from contracts.common import UTC_DATETIME_DTYPE
 from contracts.hydra_schemas import load_cv_config
-from contracts.ml_schemas import EVALUATION_SCOPES, EligibleTimeSeries
+from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
@@ -30,7 +30,7 @@ from ml_core._cv_helpers import (
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
-from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics
+from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics, enrich_metrics_rows
 from ml_core._mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
@@ -502,6 +502,78 @@ class MetricsConfig(Config):
     """
 
 
+def _apply_population_filter(scan: pl.LazyFrame, pf: PopulationFilter) -> pl.LazyFrame:
+    """Apply a ``PopulationFilter`` to a forecast ``LazyFrame``."""
+    if pf.experiment_name is not None:
+        scan = scan.filter(pl.col("experiment_name") == pf.experiment_name)
+    if pf.fold_id is not None:
+        scan = scan.filter(pl.col("fold_id") == pf.fold_id)
+    if pf.valid_time_min is not None:
+        min_dt = datetime.fromisoformat(pf.valid_time_min)
+        if min_dt.tzinfo is None:
+            min_dt = min_dt.replace(tzinfo=timezone.utc)
+        scan = scan.filter(pl.col("valid_time") >= min_dt)
+    if pf.valid_time_max is not None:
+        max_dt = datetime.fromisoformat(pf.valid_time_max)
+        if max_dt.tzinfo is None:
+            max_dt = max_dt.replace(tzinfo=timezone.utc)
+        scan = scan.filter(pl.col("valid_time") <= max_dt)
+    return scan
+
+
+def _resolve_eval_window(
+    evaluation_scope: str,
+    fold_id: str,
+    group_df: pl.DataFrame,
+) -> tuple[datetime, datetime, str]:
+    """Return ``(window_start, window_end, window_label)`` for a metrics group.
+
+    For ``"leaderboard"`` scope the bounds come from the fold config; for ``"ad_hoc"``
+    they are the observed ``valid_time`` extent of the forecast group.
+    """
+    if evaluation_scope == "leaderboard":
+        fold = _cv_config.get_fold(fold_id)
+        return (
+            date_to_utc_datetime(fold.val_start),
+            date_to_utc_datetime(fold.val_end, end_of_day=True),
+            fold_id,
+        )
+    # groups is derived from a non-empty forecasts_df, so min/max are always non-null datetimes.
+    window_start = group_df["valid_time"].min()
+    window_end = group_df["valid_time"].max()
+    assert isinstance(window_start, datetime) and isinstance(window_end, datetime)
+    return window_start, window_end, "ad_hoc"
+
+
+def _write_metrics_to_delta(
+    path: Path,
+    enriched: pl.DataFrame,
+    exp_name: str,
+    fold_id: str,
+) -> None:
+    """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
+
+    Casts all Categorical and Enum columns to ``String`` before writing — delta-rs stores
+    Arrow dictionary arrays as plain String in Parquet, so the on-disk schema is always
+    String. Re-sending Enum/Categorical data on an overwrite would cause a schema-mismatch
+    error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
+    so re-materialising the asset replaces rows rather than duplicating them.
+    """
+    cat_cols = [
+        c
+        for c, dtype in enriched.schema.items()
+        if dtype == pl.Categorical or hasattr(dtype, "categories")
+    ]
+    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in cat_cols).to_arrow()
+    write_deltalake(
+        table_or_uri=path,
+        data=delta_data,
+        mode="overwrite",
+        predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+
 @asset(deps=["cv_power_forecasts"])
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
@@ -518,53 +590,33 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    # --- Read forecasts with population filter ------------------------------------------------
-    forecasts_scan = pl.scan_delta(str(settings.power_forecasts_data_path))
-    pf = config.population_filter
-    if pf.experiment_name is not None:
-        forecasts_scan = forecasts_scan.filter(pl.col("experiment_name") == pf.experiment_name)
-    if pf.fold_id is not None:
-        forecasts_scan = forecasts_scan.filter(pl.col("fold_id") == pf.fold_id)
-    if pf.valid_time_min is not None:
-        min_dt = datetime.fromisoformat(pf.valid_time_min)
-        if min_dt.tzinfo is None:
-            min_dt = min_dt.replace(tzinfo=timezone.utc)
-        forecasts_scan = forecasts_scan.filter(pl.col("valid_time") >= min_dt)
-    if pf.valid_time_max is not None:
-        max_dt = datetime.fromisoformat(pf.valid_time_max)
-        if max_dt.tzinfo is None:
-            max_dt = max_dt.replace(tzinfo=timezone.utc)
-        forecasts_scan = forecasts_scan.filter(pl.col("valid_time") <= max_dt)
-
-    forecasts_df = forecasts_scan.collect()
+    forecasts_df = _apply_population_filter(
+        pl.scan_delta(str(settings.power_forecasts_data_path)),
+        config.population_filter,
+    ).collect()
     if forecasts_df.height == 0:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
         return
 
-    # --- Read supporting data -----------------------------------------------------------------
     actuals_lf = pt.LazyFrame.from_existing(
         pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
     ).set_model(PowerTimeSeries)
-    # Validate metadata at the boundary; allow_superfluous_columns=True because the parquet
-    # also carries geo columns (e.g. h3_res_5) that are not part of TimeSeriesMetadata.
+    # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
     metadata_df = TimeSeriesMetadata.validate(
         pl.read_parquet(settings.nged_data_path / "metadata.parquet"),
         allow_superfluous_columns=True,
     )
 
-    # --- Process each (experiment_name, fold_id) group ---------------------------------------
     groups = (
         forecasts_df.select(["experiment_name", "fold_id"])
         .unique()
         .sort(["experiment_name", "fold_id"])
         .rows()
     )
-
     settings.forecast_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     total_rows = 0
-
     # Accumulate per-fold metric dicts per experiment for parent-run aggregation.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
@@ -572,62 +624,39 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         group_df = forecasts_df.filter(
             (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
         )
-
-        # Delta stores partition columns as String; cast back to Categorical so the frame
-        # conforms to PowerForecast before calling compute_metrics.
+        # Delta stores all Categorical columns as String; cast back before validating.
         group_forecasts = PowerForecast.validate(
             group_df.with_columns(
                 experiment_name=pl.col("experiment_name").cast(pl.Categorical),
                 fold_id=pl.col("fold_id").cast(pl.Categorical),
+                power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
             ),
             allow_superfluous_columns=True,
         )
         per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
 
-        # Resolve evaluation-window bounds.
-        if config.evaluation_scope == "leaderboard":
-            fold = _cv_config.get_fold(fold_id)
-            window_start = date_to_utc_datetime(fold.val_start)
-            window_end = date_to_utc_datetime(fold.val_end, end_of_day=True)
-            window_label = fold_id
-        else:
-            window_start = group_df["valid_time"].min()
-            window_end = group_df["valid_time"].max()
-            window_label = "ad_hoc"
-
-        # Resolve MLflow fold run id (leaderboard only).
+        window_start, window_end, window_label = _resolve_eval_window(
+            config.evaluation_scope, fold_id, group_df
+        )
         mlflow_run_id: str | None = None
         if config.evaluation_scope == "leaderboard":
             experiment_id = get_or_create_experiment(exp_name)
             parent_run_id = get_or_create_parent_run(experiment_id)
             mlflow_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-        # Enrich per-series rows with scope and window provenance.
-        enriched = per_series_metrics.with_columns(
-            experiment_name=pl.lit(exp_name).cast(pl.Categorical),
-            evaluation_scope=pl.lit(config.evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
-            window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
-            window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),
-            window_label=pl.lit(window_label),
-            computed_at=pl.lit(now).cast(UTC_DATETIME_DTYPE),
-            mlflow_run_id=pl.lit(mlflow_run_id),
+        enriched = enrich_metrics_rows(
+            per_series_metrics,
+            exp_name,
+            config.evaluation_scope,
+            window_start,
+            window_end,
+            window_label,
+            now,
+            mlflow_run_id,
         )
-
-        # Write to forecast_metrics Delta, idempotent overwrite per (experiment, fold) partition.
-        delta_data = enriched.with_columns(
-            experiment_name=pl.col("experiment_name").cast(pl.String),
-            fold_id=pl.col("fold_id").cast(pl.String),
-        ).to_arrow()
-        write_deltalake(
-            table_or_uri=settings.forecast_metrics_data_path,
-            data=delta_data,
-            mode="overwrite",
-            predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
-            partition_by=["experiment_name", "fold_id"],
-        )
+        _write_metrics_to_delta(settings.forecast_metrics_data_path, enriched, exp_name, fold_id)
         total_rows += enriched.height
 
-        # Leaderboard scope: log per-fold metrics to the fold MLflow run.
         if config.evaluation_scope == "leaderboard":
             fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
             with mlflow.start_run(run_id=mlflow_run_id):
@@ -636,7 +665,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             for key, value in fold_metric_dict.items():
                 exp_metrics.setdefault(key, []).append(value)
 
-    # Leaderboard scope: log mean-across-folds aggregates to each experiment's parent run.
     if config.evaluation_scope == "leaderboard":
         for exp_name, fold_metrics in experiment_fold_metrics.items():
             experiment_id = get_or_create_experiment(exp_name)

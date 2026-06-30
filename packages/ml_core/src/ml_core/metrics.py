@@ -1,10 +1,13 @@
 """Metric computation for cross-validation results."""
 
 import re
+from datetime import datetime
 
 import patito as pt
 import polars as pl
+from contracts.common import UTC_DATETIME_DTYPE
 from contracts.ml_schemas import (
+    EVALUATION_SCOPES,
     HORIZON_SLICES,
     METRIC_NAMES,
     METRIC_PARAMS,
@@ -174,3 +177,43 @@ def build_mlflow_aggregate_metrics(
         result[f"{row['metric_name']}__all"] = float(row["mean_value"])
 
     return result
+
+
+def enrich_metrics_rows(
+    per_series_metrics: pt.DataFrame[Metrics],
+    experiment_name: str,
+    evaluation_scope: str,
+    window_start: datetime,
+    window_end: datetime,
+    window_label: str,
+    computed_at: datetime,
+    mlflow_run_id: str | None,
+) -> pl.DataFrame:
+    """Add scope and evaluation-window provenance columns to a per-series Metrics frame.
+
+    Called by the ``metrics`` Dagster asset after ``compute_metrics()`` returns, once the
+    window bounds and MLflow run ID are known. Kept here so the enrichment logic is
+    unit-testable without Dagster.
+
+    Args:
+        per_series_metrics: Frame produced by ``compute_metrics()``.
+        experiment_name: Experiment that produced these forecasts.
+        evaluation_scope: ``"leaderboard"`` or ``"ad_hoc"``.
+        window_start: Inclusive start of the evaluated ``valid_time`` window.
+        window_end: Inclusive end of the evaluated ``valid_time`` window.
+        window_label: Human-readable label (``fold_id`` for leaderboard; ``"ad_hoc"``).
+        computed_at: UTC timestamp when this metric batch was computed.
+        mlflow_run_id: MLflow fold run ID; ``None`` for ``ad_hoc``.
+
+    Returns:
+        A ``pl.DataFrame`` with all ``Metrics`` columns fully populated.
+    """
+    return per_series_metrics.with_columns(
+        experiment_name=pl.lit(experiment_name).cast(pl.Categorical),
+        evaluation_scope=pl.lit(evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
+        window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
+        window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),
+        window_label=pl.lit(window_label),
+        computed_at=pl.lit(computed_at).cast(UTC_DATETIME_DTYPE),
+        mlflow_run_id=pl.lit(mlflow_run_id),
+    )
