@@ -215,6 +215,14 @@ EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitori
 - `"ad_hoc"`: one-off analyses (no MLflow run)
 """
 
+EvalScopeType = Literal["leaderboard", "ad_hoc"]
+"""Type annotation for the evaluation scopes currently accepted by the ``metrics`` asset config.
+
+Distinct from ``EVALUATION_SCOPES`` (the runtime tuple driving the Polars Enum): that tuple
+includes ``"production_monitoring"`` for future use; this ``Literal`` reflects only the scopes
+the asset actually handles today. Expand to match ``EVALUATION_SCOPES`` when Phase 8 lands.
+"""
+
 TIME_SERIES_TYPE_SLICES: Final[tuple[str, ...]] = ("all", *LIST_OF_TIME_SERIES_TYPES)
 """Values for the `time_series_type` metric slice.
 

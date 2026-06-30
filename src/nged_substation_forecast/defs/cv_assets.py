@@ -7,13 +7,13 @@ the logic stays fast to unit-test and the assets stay readable.
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final
 
 import mlflow
 import patito as pt
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
-from contracts.ml_schemas import EligibleTimeSeries
+from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
@@ -488,12 +488,30 @@ class PopulationFilter(Config):
     valid_time_max: str | None = None
     """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
 
+    def apply(self, scan: pl.LazyFrame) -> pl.LazyFrame:
+        """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates."""
+        if self.experiment_name is not None:
+            scan = scan.filter(pl.col("experiment_name") == self.experiment_name)
+        if self.fold_id is not None:
+            scan = scan.filter(pl.col("fold_id") == self.fold_id)
+        if self.valid_time_min is not None:
+            min_dt = datetime.fromisoformat(self.valid_time_min)
+            if min_dt.tzinfo is None:
+                min_dt = min_dt.replace(tzinfo=timezone.utc)
+            scan = scan.filter(pl.col("valid_time") >= min_dt)
+        if self.valid_time_max is not None:
+            max_dt = datetime.fromisoformat(self.valid_time_max)
+            if max_dt.tzinfo is None:
+                max_dt = max_dt.replace(tzinfo=timezone.utc)
+            scan = scan.filter(pl.col("valid_time") <= max_dt)
+        return scan
+
 
 class MetricsConfig(Config):
     """Run config for the ``metrics`` asset (§4.8)."""
 
     population_filter: PopulationFilter = PopulationFilter()
-    evaluation_scope: Literal["leaderboard", "ad_hoc"] = "leaderboard"
+    evaluation_scope: EvalScopeType = "leaderboard"
     """Which evaluation scope this run produces.
 
     - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
@@ -502,27 +520,8 @@ class MetricsConfig(Config):
     """
 
 
-def _apply_population_filter(scan: pl.LazyFrame, pf: PopulationFilter) -> pl.LazyFrame:
-    """Apply a ``PopulationFilter`` to a forecast ``LazyFrame``."""
-    if pf.experiment_name is not None:
-        scan = scan.filter(pl.col("experiment_name") == pf.experiment_name)
-    if pf.fold_id is not None:
-        scan = scan.filter(pl.col("fold_id") == pf.fold_id)
-    if pf.valid_time_min is not None:
-        min_dt = datetime.fromisoformat(pf.valid_time_min)
-        if min_dt.tzinfo is None:
-            min_dt = min_dt.replace(tzinfo=timezone.utc)
-        scan = scan.filter(pl.col("valid_time") >= min_dt)
-    if pf.valid_time_max is not None:
-        max_dt = datetime.fromisoformat(pf.valid_time_max)
-        if max_dt.tzinfo is None:
-            max_dt = max_dt.replace(tzinfo=timezone.utc)
-        scan = scan.filter(pl.col("valid_time") <= max_dt)
-    return scan
-
-
 def _resolve_eval_window(
-    evaluation_scope: str,
+    evaluation_scope: EvalScopeType,
     fold_id: str,
     group_df: pl.DataFrame,
 ) -> tuple[datetime, datetime, str]:
@@ -590,9 +589,8 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    forecasts_df = _apply_population_filter(
-        pl.scan_delta(str(settings.power_forecasts_data_path)),
-        config.population_filter,
+    forecasts_df = config.population_filter.apply(
+        pl.scan_delta(str(settings.power_forecasts_data_path))
     ).collect()
     if forecasts_df.height == 0:
         context.log.warning("No forecasts matched the population filter — nothing to score.")

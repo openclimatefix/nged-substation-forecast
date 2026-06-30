@@ -12,6 +12,7 @@ from contracts.ml_schemas import (
     METRIC_NAMES,
     METRIC_PARAMS,
     TIME_SERIES_TYPE_SLICES,
+    EvalScopeType,
     Metrics,
 )
 from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
@@ -182,7 +183,7 @@ def build_mlflow_aggregate_metrics(
 def enrich_metrics_rows(
     per_series_metrics: pt.DataFrame[Metrics],
     experiment_name: str,
-    evaluation_scope: str,
+    evaluation_scope: EvalScopeType,
     window_start: datetime,
     window_end: datetime,
     window_label: str,

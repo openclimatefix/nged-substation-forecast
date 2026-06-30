@@ -1467,6 +1467,7 @@ only the `effective_capacity` asset body changes.
 - Add the `production_monitoring` scope to `metrics` (time-series logging to the dedicated
   experiment + trailing 24h/7d window columns; §4.8.1), the `monitoring_sensor` (§4.8.1), and
   `retire_experiment_job` (§4.3.1).
+- Expand `EvalScopeType` in `ml_schemas.py` to `Literal["leaderboard", "production_monitoring", "ad_hoc"]`, bringing it fully in sync with `EVALUATION_SCOPES`.
 - Remove the `fold_id="live"` restriction in `compute_metrics()` (currently documented in its
   docstring); live rows use the same join logic but need the trailing-window bounds from the
   monitoring sensor rather than fold dates.
