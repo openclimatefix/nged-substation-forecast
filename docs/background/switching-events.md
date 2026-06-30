@@ -2,6 +2,12 @@
 
 NGED's primary substations are fed by a meshed HV network that is **operated radially** — at any instant a set of switches is held open to break parallel paths so power flows in a tree. When operators reconfigure that tree (a "switching event"), load that was metered at one substation is, afterwards, metered at one or more neighbouring substations. Roughly 10% of the time a given substation is in an **abnormal running arrangement (ARA)**, and its meter reading does not reflect its *latent demand under the normal running arrangement (NRA)*. See [Switching Events & Latent Demand](../roadmap/switching-events.md) for the staged modelling plan to detect and reconstruct NRA demand (v0.6 detector → v2.5/v2.6 mixture models).
 
+The figure below shows an example of a real switching event, where power is temporarily diverted
+from on substation (in red) to a neighbouring substation (in blue). Note that this is an unusually
+_clear_ example of a switching events - most events are buried in much more noise!
+
+![Switching event](assets/switching_event.png)
+
 ## The HV network is meshed but run radially
 
 NGED's 11 kV / 6.6 kV high-voltage (HV) distribution network is **physically meshed**: there are many parallel electrical paths between substations. However, it is **operated radially** — at any given moment, a set of switches is held *open* to break the parallel paths, so that power flows in a tree (each load fed from exactly one source, no loops). The radial tree you observe at any instant is just *one configuration* of an underlying mesh.

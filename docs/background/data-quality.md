@@ -2,6 +2,11 @@
 
 NGED's distribution-level data is considerably messier than transmission-level data. Key issues observed in the trial area:
 
+## NGED Data Availability
+Availability of the data for the 32 time series in the trial area:
+
+![Availability of the data for the 32 time series in the trial area](assets/NGED_data_availability_periods.png)
+
 ## Early ramp-up period
 The first couple of months after a meter is installed tend to have poor data quality. This is handled by simply dropping the first two months of each time series. ![Bad data for the first few months for 3 substations](assets/bad_data_for_first_months.png)
 
@@ -21,9 +26,3 @@ Some substations only have MVA meters, which report the *absolute value* of powe
 Power is periodically diverted from one substation to another during maintenance or in response to faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in an abnormal arrangement. This severely biases lagged-power features (the single most informative feature for demand forecasting) if not detected and handled. Recovering the demand that *would* have been metered under the normal running arrangement is described in [Switching Events](switching-events.md); the staged solution plan is in the [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
 
 See the ["Data sources" section of our Milestone 1 report](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.etqoj9ahy92h) for a more detailed discussion, and plenty of graphs!
-
-## NGED Data Availability
-
-Availability of the data for the 32 time series in the trial area:
-
-![Availability of the data for the 32 time series in the trial area](assets/NGED_data_availability_periods.png)

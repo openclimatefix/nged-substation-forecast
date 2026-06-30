@@ -10,7 +10,7 @@ This roadmap outlines the planned order of development toward the v1.0 live fore
 ## How this folder is organised
 
 `docs/roadmap/` contains **only design for work that is not yet implemented**. It is a
-forward-looking backlog, never a mirror of the code. When a feature ships, its documentation
+forward-looking roadmap, never a mirror of the code. When a feature ships, its documentation
 **moves out** of `roadmap/` to its permanent home — `architecture/` for system design,
 [`ml_experimentation/`](../ml_experimentation/index.md) for ML methodology, and so on — and the
 roadmap entry shrinks to a one-line pointer. This keeps the roadmap from going stale and gives
@@ -168,11 +168,13 @@ The ML-assets architecture is designed to support this from day one (programmati
 ## v2.0 — Scale-Up (Future Research)
 
 **Required**:
+
 - Scale to approximately 2,500 time series: all of NGED's primary substations (1,161), BSPs (271), GSPs (52), and most customer meters (~1,000)
 - Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by disaggregating net primary substation power flows)
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
 **Research (advanced ML)**:
+
 - **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather — *not* a trained graph neural network: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing rather than message passing. A trained GNN remains an optional, residual-driven escalation. (This is **Phase 2** of the DP plan — see [Differentiable Physics §8](differentiable-physics.md#8-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [Switching events, Part 2](switching-events.md).)
 - **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
 - **Pre-trained neural network encoders**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
@@ -183,6 +185,7 @@ The ML-assets architecture is designed to support this from day one (programmati
 - **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history
 
 **Stretch goals**:
+
 - Forecast *unmetered* solar and wind power at each primary substation
 - Disaggregate additional DERs (price-sensitive assets like batteries) from substation power flow
 - Estimate cost savings (£) attributable to each forecasting approach in the leaderboard
