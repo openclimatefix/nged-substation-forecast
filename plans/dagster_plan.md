@@ -1390,7 +1390,7 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
   the full loop finishes in under a minute and the smoke forecasts never appear in leaderboard
   metrics.
 
-### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works
+### 7.6 Phase 6 — `metrics` asset (leaderboard + ad_hoc) → full CV loop works - Underway in PR 205
 
 - Implement §4.8 for the `leaderboard` and `ad_hoc` scopes (typed `PopulationFilter`, join
   actuals, `compute_metrics`, per-`time_series_type` + `"all"` aggregation, write
@@ -1403,6 +1403,55 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
 - **User can verify:** the **entire CV leaderboard loop works for one experiment** — after
   materialising the smoke-test fold + `metrics`, the MLflow parent run shows the aggregate
   leaderboard metrics and `forecast_metrics` holds the per-type/overall rows. *(Milestone.)*
+
+### 7.6.5 Phase 6.5 — MVP `effective_capacity` asset + NMAE normalisation upgrade
+
+*The data contract (`EffectiveCapacity`) and the NMAE P99 change in `compute_metrics` are already
+landed. This phase adds the Dagster asset that computes and persists the capacity estimate, then
+wires it into the `metrics` asset so the NMAE denominator uses full-history P99 rather than the
+validation-window P99 computed inline today.*
+
+**Background.** NMAE is currently normalised by P99 of `|power_actual|` computed within the
+joined forecast/actuals window. This is validation-window-dependent: an unusually calm year for a
+wind farm gives a low P99, inflating its NMAE. Pre-computing P99 over the full history fixes this.
+It also establishes the `effective_capacity` Delta table and schema that the v0.6 / v0.7
+differentiable-physics upgrade will slot into without schema or interface changes.
+
+**Already done:**
+- `EffectiveCapacity` data contract added to `contracts.power_schemas` — fields
+  `(time_series_id, time, effective_capacity_mw: Float32)`.
+- `compute_metrics` NMAE denominator changed from `mean(|power|)` to `quantile(0.99)(|power|)`.
+
+**To implement:**
+
+- **`effective_capacity` Dagster asset** (unpartitioned; deps: `power_time_series_and_metadata`):
+  read the `power_time_series` Delta table as a `LazyFrame`, compute
+  `P99(abs(power))` per `time_series_id` over the full available history, set `time` to the
+  latest observed `time` per series. Write one row per `time_series_id` to
+  `effective_capacity.delta` (path from `Settings.effective_capacity_data_path`, a new field).
+  Validate output against `EffectiveCapacity`.
+
+- **`Settings.effective_capacity_data_path`**: new `Path` field pointing at the MVP Delta table.
+
+- **Wire into `compute_metrics`**: add an optional third positional parameter
+  `capacity: pt.DataFrame[EffectiveCapacity] | None = None`. When provided, join on
+  `time_series_id` and use `effective_capacity_mw` as the NMAE denominator (replacing the inline
+  `quantile(0.99)` computation, which stays as the fallback when `capacity` is `None`).
+  The `metrics` Dagster asset reads `effective_capacity.delta` and passes it in.
+
+- **Tests:** unit test that `compute_metrics` uses the joined `effective_capacity_mw` when a
+  capacity frame is provided (and falls back to inline P99 when not). Integration test materialising
+  `effective_capacity` on synthetic power data and confirming one row per series with a physically
+  plausible P99 value.
+
+- **User can verify:** materialise `effective_capacity`; inspect the Delta table to confirm P99
+  values are physically reasonable (e.g. a 10 MW solar farm has `effective_capacity_mw ≈ 10`).
+  Re-run `metrics`; confirm NMAE values change slightly (validation-window P99 → full-history P99).
+
+**Future upgrade (v0.6 / v0.7):** replace the P99 computation in `effective_capacity` with the
+differentiable-physics capacity model (see `docs/roadmap/differentiable-physics.md` §5). The
+`EffectiveCapacity` schema, `compute_metrics` interface, and the `metrics` asset are all unchanged;
+only the `effective_capacity` asset body changes.
 
 ### 7.7 Phase 7 — `live_forecasts` asset
 
@@ -1418,6 +1467,10 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
 - Add the `production_monitoring` scope to `metrics` (time-series logging to the dedicated
   experiment + trailing 24h/7d window columns; §4.8.1), the `monitoring_sensor` (§4.8.1), and
   `retire_experiment_job` (§4.3.1).
+- Expand `EvalScopeType` in `ml_schemas.py` to `Literal["leaderboard", "production_monitoring", "ad_hoc"]`, bringing it fully in sync with `EVALUATION_SCOPES`.
+- Remove the `fold_id="live"` restriction in `compute_metrics()` (currently documented in its
+  docstring); live rows use the same join logic but need the trailing-window bounds from the
+  monitoring sensor rather than fold dates.
 - Tests: sensor fires on a power update and runs `metrics(production_monitoring)`; monitoring rows
   land in Delta + the `production_monitoring` experiment and **never** on the leaderboard; retire
   job refuses to delete when results are absent and deletes when present.

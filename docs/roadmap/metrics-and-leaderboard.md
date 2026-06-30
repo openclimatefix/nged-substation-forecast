@@ -2,10 +2,11 @@
 
 How OCF measures the skill of its forecasts and compares forecasting approaches.
 
-> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema exists in code
-> (✅); the interactive leaderboard visualisation and several metrics are 🚧 planned. The
-> implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has moved
-> out of the roadmap. See the [roadmap index](index.md) for status conventions.
+> **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the
+> `metrics` Dagster asset, and the deterministic metrics (MAE, NMAE, RMSE, MBE) are ✅
+> implemented. The interactive leaderboard visualisation and probabilistic metrics are 🚧 planned.
+> The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
+> moved out of the roadmap. See the [roadmap index](index.md) for status conventions.
 
 ---
 
@@ -39,19 +40,23 @@ alternatives we considered.
 
 | Metric | Type | Status | Purpose |
 |---|---|---|---|
-| Normalised mean bias error (MBE) | Deterministic | 🚧 | Systematic over/under-prediction. |
+| Mean absolute error (MAE) | Deterministic | ✅ | Typical error magnitude (MW). |
+| Normalised MAE (NMAE) | Deterministic | ✅ | MAE normalised by mean absolute power — comparable across substations of different sizes. |
+| Root mean squared error (RMSE) | Deterministic | ✅ | Heavily penalises large misses (one 100 MW error costs more than two 50 MW errors). |
+| Mean bias error (MBE) | Deterministic | ✅ | Systematic over/under-prediction. |
 | Histogram of errors | Deterministic | 🚧 | Visual check that errors are ~Normal. |
-| Normalised mean absolute error (MAE) | Deterministic | 🚧 | Typical error magnitude (normalised by capacity). |
-| Root mean squared error (RMSE) | Deterministic | 🚧 | Arguably the most critical grid metric — squares errors, so heavily penalises large misses (one 100 MW error costs more than two 50 MW errors). |
 | Pinball loss (quantile loss) | Quantile | 🚧 | Penalises asymmetrically by target quantile. Averaged across quantiles for a single quantile-skill score. |
 | PICP (Prediction Interval Coverage Probability) | Quantile | 🚧 | Of a P10–P90 band, exactly 80% of observations should fall inside. < 80% ⇒ overconfident. |
 | CRPS (Continuous Ranked Probability Score) | Ensemble | 🚧 | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. |
 | Spread-Skill Ratio | Ensemble | 🚧 | Ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; < 1 under-dispersed (overconfident); > 1 over-dispersed (underconfident). |
 
-> The `Metrics` schema (`contracts.ml_schemas.Metrics`) is ✅ implemented and stores results as
+> The `Metrics` schema (`contracts.ml_schemas.Metrics`) stores results as
 > `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param,
 > metric_value)`. `metric_param` carries, e.g., the quantile for Pinball Loss (`p10`) or the band
-> for PICP (`p10_p90`).
+> for PICP (`p10_p90`). The `metrics` Dagster asset computes the deterministic metrics ✅ and writes
+> per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
+> per-fold and mean-across-folds aggregates logged to MLflow — see
+> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8--materialise-metrics).
 
 ### Peak events — the metric filter that matters most for flexibility
 

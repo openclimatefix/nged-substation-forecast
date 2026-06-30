@@ -35,7 +35,7 @@ There are **five** tables. This table tracks where each one stands today:
 | 1 | `power_forecast` | ✅ Implemented (deterministic-ensemble flavour only) | `contracts.power_schemas.PowerForecast` |
 | 2 | `power_forecast_warnings` | 🚧 Planned (partial in MVP) | not yet in code |
 | 3 | `asset_health_history` | 🚧 Planned | not yet in code |
-| 4 | `effective_capacity` | 🚧 Planned (v0.6 / v0.7) | not yet in code |
+| 4 | `effective_capacity` | 🚧 MVP in v0.1 (P99 estimate); DP upgrade planned for v0.6 / v0.7 | `contracts.power_schemas.EffectiveCapacity` |
 | 5 | `substation_switching` | 🚧 Planned (v0.6 / v0.7) | not yet in code |
 
 > **Naming note.** The Milestone 1 report drafted these tables with the column name `timeseries_id`,
@@ -184,29 +184,36 @@ Notes on specific flags:
 
 ## Table 4 — `effective_capacity` 🚧
 
-> **Status: 🚧 Planned (v0.6 / v0.7).** Depends on differentiable-physics capacity estimation; see
+> **Status: 🚧 MVP in v0.1** using P99 of observed power as a static capacity proxy.
+> Schema lives in `contracts.power_schemas.EffectiveCapacity`.
+> **Planned upgrade in v0.6 / v0.7** to differentiable-physics capacity estimation — see
 > [Differentiable Physics](differentiable-physics.md).
 
-OCF's probabilistic estimate of each generator's **effective capacity** at every half-hourly
-timestep of the historical data, plus the effective "capacity" (max observed load) of substations.
-This table is **backward-looking only** — it does not cover the forecast period.
+OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly
+timestep of the historical time series data. This table is **backward-looking only** — it does
+not cover the forecast period.
 
-- **Generators:** the prior comes from the Embedded Capacity Register; the estimate is then updated
-  at each half-hour from the generator's power time series. Represented as the mean + standard
-  deviation of a Normal distribution. Effective capacity **absorbs** PV-panel degradation, partial
-  inverter trips, etc., but **ignores ANM**: if a wind farm *could* generate 10 MW but ANM ramps it
-  to 5 MW, effective capacity is still 10 MW.
-- **Substations:** the 99th percentile of observed load over a rolling window. Only populated with
-  "normal arrangement" load — *not* updated during switching events. During a switching event, the
-  effective capacity is obtained by adding the "transferred power" from
-  [Table 5](#table-5-substation_switching) to the last-known "normal arrangement" capacity.
+**MVP approach (v0.1):** one row per `time_series_id`, `effective_capacity_mw` = P99 of
+`|power|` over the full available observation history. This is a static scalar per series — a
+robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
+capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
+It is also the denominator used to normalise NMAE in the `forecast_metrics` table.
+
+**DP upgrade (v0.6 / v0.7):** replace the static P99 with a time-varying estimate from the
+differentiable-physics model. For generators, the prior comes from the Embedded Capacity Register
+and is updated at each half-hour from the generator's power time series, absorbing PV-panel
+degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM-capped at 5 MW
+with 10 MW physical capability has `effective_capacity_mw = 10`). For substations, the 99th
+percentile of observed load over a rolling window, under normal running arrangement only. During a
+switching event, effective capacity = last known normal-arrangement value plus the "switched
+power" from [Table 5](#table-5-substation_switching). The schema is unchanged between MVP and DP;
+only the Dagster asset body changes.
 
 | Field | Data type | Notes |
 |---|---|---|
 | `time_series_id` | `int32` | NGED's time-series ID. |
-| `time` | `datetime` (UTC), every half hour | Timestamp from the original NGED time series. |
-| `effective_capacity_MW_mean` | `float32` | Mean of OCF's probabilistic capacity estimate. |
-| `effective_capacity_MW_std` | `float32` | Standard deviation of OCF's probabilistic capacity estimate. |
+| `time` | `datetime` (UTC), every half hour | The half-hourly timestep this estimate applies to. In the MVP, set to the end of the available observation history for that series. |
+| `effective_capacity_mw` | `float32` | OCF's estimate of the effective capacity (MW) at this timestep. |
 
 ---
 

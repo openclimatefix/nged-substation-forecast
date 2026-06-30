@@ -5,19 +5,21 @@ thin orchestration shell delegating its logic to the pure helpers in ``ml_core._
 the logic stays fast to unit-test and the assets stay readable.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Final
 
 import mlflow
 import patito as pt
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
-from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
+from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
 from dagster import (
     AssetExecutionContext,
+    Config,
     DynamicPartitionsDefinition,
     StaticPartitionsDefinition,
     asset,
@@ -28,6 +30,7 @@ from ml_core._cv_helpers import (
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
+from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics, enrich_metrics_rows
 from ml_core._mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
@@ -181,6 +184,12 @@ def _load_engineering_inputs(
       that cell by the feature engineer's spatial join.
 
     Args:
+        settings: Application settings (data paths, credentials).
+        time_series_ids: IDs to include; all three inputs are filtered to this population.
+        window_start: Inclusive start of the time window for power observations and NWP
+            ``valid_time``.
+        window_end: Inclusive end of the time window for power observations and NWP
+            ``valid_time``.
         ensemble_members: If provided, NWP is filtered to these ``ensemble_member`` indices. If
             ``None`` (the default), every ensemble member is carried through. Training restricts to
             the control member (``[0]``) to avoid fanning every forecast row out across all ~51
@@ -191,6 +200,10 @@ def _load_engineering_inputs(
             can cover the window). ``cv_power_forecasts`` passes a narrower sub-range to process the
             validation window in ``init_time`` chunks, so the full-ensemble forecast frame for one
             chunk stays in RAM while the rest streams from the partition-pruned scan.
+
+    Returns:
+        ``(power_time_series, metadata, nwp)`` — a lazy power frame, an eager metadata frame, and a
+        lazy in-memory NWP frame, all filtered to ``time_series_ids`` and the requested window.
     """
     if init_time_start is None:
         init_time_start = window_start - _MAX_NWP_LEAD
@@ -461,5 +474,313 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "val_start": str(val_start),
             "val_end": str(val_end),
             "fold_run_id": fold_run_id,
+        }
+    )
+
+
+# ---------------------------------------------------------------------------
+# metrics asset
+# ---------------------------------------------------------------------------
+
+
+class PopulationFilter(Config):
+    """Typed filter over ``power_forecasts`` rows to score (§4.8).
+
+    All fields default to ``None`` (= no filter on that dimension). A mistyped field name is a
+    Dagster config validation error, not a silent wrong population — that is the whole point of
+    using a typed config rather than a free ``dict``.
+    """
+
+    experiment_name: str | None = None
+    fold_id: str | None = None
+    valid_time_min: str | None = None
+    """ISO-8601 UTC timestamp; rows with ``valid_time`` before this are excluded."""
+    valid_time_max: str | None = None
+    """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
+
+    def apply(self, scan: pt.LazyFrame[PowerForecast]) -> pt.LazyFrame[PowerForecast]:
+        """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
+
+        Args:
+            scan: Typed lazy scan of the ``power_forecasts`` Delta table. The caller is
+                responsible for casting any ``String`` columns that ``PowerForecast`` declares as
+                ``Categorical`` before passing the scan here (delta-rs stores all
+                dictionary-encoded columns as plain ``String`` on disk; casting lazily via
+                ``.with_columns()`` before ``.collect()`` is zero-cost).
+
+        Returns:
+            The same lazy scan with each non-``None`` field added as a ``.filter()`` predicate.
+        """
+        # Rebind to plain pl.LazyFrame: Polars' .filter() drops the pt.LazyFrame subclass, so
+        # accumulating filters via scan = scan.filter(...) would fail ty's assignment check.
+        # Re-wrap as pt.LazyFrame[PowerForecast] before returning (zero-copy).
+        lf: pl.LazyFrame = scan
+        if self.experiment_name is not None:
+            lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
+        if self.fold_id is not None:
+            lf = lf.filter(pl.col("fold_id") == self.fold_id)
+        if self.valid_time_min is not None:
+            min_dt = datetime.fromisoformat(self.valid_time_min)
+            if min_dt.tzinfo is None:
+                min_dt = min_dt.replace(tzinfo=timezone.utc)
+            lf = lf.filter(pl.col("valid_time") >= min_dt)
+        if self.valid_time_max is not None:
+            max_dt = datetime.fromisoformat(self.valid_time_max)
+            if max_dt.tzinfo is None:
+                max_dt = max_dt.replace(tzinfo=timezone.utc)
+            lf = lf.filter(pl.col("valid_time") <= max_dt)
+        return pt.LazyFrame.from_existing(lf).set_model(PowerForecast)
+
+
+class MetricsConfig(Config):
+    """Run config for the ``metrics`` asset (§4.8)."""
+
+    population_filter: PopulationFilter = PopulationFilter()
+    evaluation_scope: EvalScopeType = "leaderboard"
+    """Which evaluation scope this run produces.
+
+    - ``"leaderboard"``: logs per-fold + aggregate metrics to the golden leaderboard MLflow
+      experiments (canonical complete-window folds only).
+    - ``"ad_hoc"``: writes to ``forecast_metrics`` Delta only; no MLflow logging.
+    """
+
+
+def _resolve_eval_window(
+    evaluation_scope: EvalScopeType,
+    fold_id: str,
+    group_df: pt.DataFrame[PowerForecast],
+) -> tuple[datetime, datetime, str]:
+    """Return ``(window_start, window_end, window_label)`` for a metrics group.
+
+    For ``"leaderboard"`` scope the bounds come from the fold config; for ``"ad_hoc"``
+    they are the observed ``valid_time`` extent of the forecast group.
+
+    Args:
+        evaluation_scope: ``"leaderboard"`` uses fold-config dates; ``"ad_hoc"`` uses the
+            observed ``valid_time`` range of the forecast group.
+        fold_id: Fold identifier; only used when ``evaluation_scope == "leaderboard"``.
+        group_df: Validated ``PowerForecast`` rows for this ``(experiment_name, fold_id)``
+            group. Only ``valid_time`` is accessed, and only for the ``"ad_hoc"`` branch.
+
+    Returns:
+        ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
+        and a human-readable label (``fold_id`` for leaderboard; ``"ad_hoc"`` otherwise).
+    """
+    if evaluation_scope == "leaderboard":
+        fold = _cv_config.get_fold(fold_id)
+        return (
+            date_to_utc_datetime(fold.val_start),
+            date_to_utc_datetime(fold.val_end, end_of_day=True),
+            fold_id,
+        )
+    # groups is derived from a non-empty forecasts_df, so min/max are always non-null datetimes.
+    window_start = group_df["valid_time"].min()
+    window_end = group_df["valid_time"].max()
+    assert isinstance(window_start, datetime) and isinstance(window_end, datetime)
+    return window_start, window_end, "ad_hoc"
+
+
+def _write_metrics_to_delta(
+    path: Path,
+    enriched: pt.DataFrame[Metrics],
+    exp_name: str,
+    fold_id: str,
+) -> None:
+    """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
+
+    Casts all Categorical and Enum columns to ``String`` before writing — delta-rs stores
+    Arrow dictionary arrays as plain String in Parquet, so the on-disk schema is always
+    String. Re-sending Enum/Categorical data on an overwrite would cause a schema-mismatch
+    error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
+    so re-materialising the asset replaces rows rather than duplicating them.
+
+    Args:
+        path: Filesystem path to the ``forecast_metrics`` Delta table.
+        enriched: Fully populated ``Metrics`` rows, with all provenance columns set by
+            ``enrich_metrics_rows()``.
+        exp_name: Experiment name; used in the Delta overwrite predicate to scope the
+            replacement to this ``(experiment_name, fold_id)`` partition.
+        fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
+    """
+    cat_cols = [
+        c
+        for c, dtype in enriched.schema.items()
+        if dtype == pl.Categorical or hasattr(dtype, "categories")
+    ]
+    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in cat_cols).to_arrow()
+    write_deltalake(
+        table_or_uri=path,
+        data=delta_data,
+        mode="overwrite",
+        predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+
+def _score_forecast_group(
+    exp_name: str,
+    fold_id: str,
+    filtered_power_forecasts: pl.DataFrame,
+    actuals_lf: pt.LazyFrame[PowerTimeSeries],
+    metadata_df: pt.DataFrame[TimeSeriesMetadata],
+    evaluation_scope: EvalScopeType,
+    metrics_path: Path,
+    now: datetime,
+) -> tuple[int, dict[str, float] | None]:
+    """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
+    optionally log to MLflow.
+
+    Args:
+        exp_name: Experiment name for this group.
+        fold_id: Fold identifier for this group.
+        filtered_power_forecasts: All collected forecast rows that survived the population
+            filter; this function slices the single ``(exp_name, fold_id)`` group from it.
+        actuals_lf: Lazy observed power scan (only the joined subset is collected inside
+            ``compute_metrics()``).
+        metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
+        evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
+            skips MLflow entirely.
+        metrics_path: Filesystem path to the ``forecast_metrics`` Delta table.
+        now: UTC timestamp stamped on every row as ``computed_at`` (injected so all rows in
+            one asset materialisation share the same timestamp).
+
+    Returns:
+        A ``(n_rows_written, fold_metric_dict)`` tuple where:
+
+        - ``n_rows_written`` — number of ``Metrics`` rows written to Delta for this group.
+        - ``fold_metric_dict`` — flat ``{mlflow_metric_key: mean_value}`` dict logged to the
+          fold's MLflow child run (e.g. ``{"rmse__all": 0.42, "rmse__pv": 0.31}``). ``None``
+          for ``"ad_hoc"`` scope, where no MLflow run exists.
+    """
+    group_forecasts = PowerForecast.validate(
+        filtered_power_forecasts.filter(
+            (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
+        ),
+        allow_superfluous_columns=True,
+    )
+    per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
+
+    window_start, window_end, window_label = _resolve_eval_window(
+        evaluation_scope, fold_id, group_forecasts
+    )
+    mlflow_run_id: str | None = None
+    if evaluation_scope == "leaderboard":
+        experiment_id = get_or_create_experiment(exp_name)
+        parent_run_id = get_or_create_parent_run(experiment_id)
+        mlflow_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
+
+    enriched = enrich_metrics_rows(
+        per_series_metrics,
+        exp_name,
+        evaluation_scope,
+        window_start,
+        window_end,
+        window_label,
+        now,
+        mlflow_run_id,
+    )
+    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id)
+
+    if evaluation_scope == "leaderboard":
+        fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
+        with mlflow.start_run(run_id=mlflow_run_id):
+            mlflow.log_metrics(fold_metric_dict)
+        return enriched.height, fold_metric_dict
+
+    return enriched.height, None
+
+
+@asset(deps=["cv_power_forecasts"])
+def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
+    """Compute evaluation metrics and write to ``forecast_metrics``.
+
+    Reads the filtered ``power_forecasts`` Delta, joins observed power, computes MAE/NMAE/RMSE/MBE
+    per series (via ``compute_metrics()``), enriches each row with scope and evaluation-window
+    provenance, and writes to the ``forecast_metrics`` Delta table partitioned by
+    ``(experiment_name, fold_id)``.
+
+    For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
+    fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
+    Lookup is by tag (§4.1.1) so this is idempotent under Dagster retries.
+
+    Args:
+        context: Dagster execution context; used for logging and ``add_output_metadata``.
+        config: Population filter and evaluation scope for this materialisation. Defaults to
+            no filter and ``"leaderboard"`` scope.
+    """
+    settings = Settings()
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
+    # delta-rs stores all Arrow dictionary-encoded columns (Categorical, Enum) as plain String on
+    # disk. Cast lazily before filtering so PopulationFilter.apply receives a properly-typed
+    # pt.LazyFrame[PowerForecast] and the collected frame already has the correct dtypes.
+    power_forecasts = pt.LazyFrame.from_existing(
+        pl.scan_delta(str(settings.power_forecasts_data_path)).with_columns(
+            experiment_name=pl.col("experiment_name").cast(pl.Categorical),
+            fold_id=pl.col("fold_id").cast(pl.Categorical),
+            power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
+        )
+    ).set_model(PowerForecast)
+    filtered_power_forecasts = config.population_filter.apply(power_forecasts).collect()
+    if filtered_power_forecasts.height == 0:
+        context.log.warning("No forecasts matched the population filter — nothing to score.")
+        context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
+        return
+
+    actuals_lf = pt.LazyFrame.from_existing(
+        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
+    ).set_model(PowerTimeSeries)
+    # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
+    metadata_df = TimeSeriesMetadata.validate(
+        pl.read_parquet(settings.nged_data_path / "metadata.parquet"),
+        allow_superfluous_columns=True,
+    )
+
+    groups = (
+        filtered_power_forecasts.select(["experiment_name", "fold_id"])
+        .unique()
+        .sort(["experiment_name", "fold_id"])
+        .rows()
+    )
+    settings.forecast_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
+    now = datetime.now(timezone.utc)
+    total_rows = 0
+    # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
+    # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
+    # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
+    # After the loop, each list is averaged and logged to the experiment's MLflow parent run.
+    experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
+
+    for exp_name, fold_id in groups:
+        n_rows, fold_metric_dict = _score_forecast_group(
+            exp_name,
+            fold_id,
+            filtered_power_forecasts,
+            actuals_lf,
+            metadata_df,
+            config.evaluation_scope,
+            settings.forecast_metrics_data_path,
+            now,
+        )
+        total_rows += n_rows
+        if fold_metric_dict is not None:
+            exp_metrics = experiment_fold_metrics.setdefault(exp_name, {})
+            for key, value in fold_metric_dict.items():
+                exp_metrics.setdefault(key, []).append(value)
+
+    if config.evaluation_scope == "leaderboard":
+        for exp_name, fold_metrics in experiment_fold_metrics.items():
+            experiment_id = get_or_create_experiment(exp_name)
+            parent_run_id = get_or_create_parent_run(experiment_id)
+            parent_metric_dict = {k: sum(v) / len(v) for k, v in fold_metrics.items()}
+            with mlflow.start_run(run_id=parent_run_id):
+                mlflow.log_metrics(parent_metric_dict)
+
+    context.add_output_metadata(
+        {
+            "n_rows_written": total_rows,
+            "n_groups": len(groups),
+            "evaluation_scope": config.evaluation_scope,
+            "groups": str(groups),
         }
     )

@@ -296,3 +296,45 @@ class PowerForecast(pt.Model):
             "filter on this column to select the population you need."
         ),
     )
+
+
+class EffectiveCapacity(pt.Model):
+    """Effective capacity of each time series at each half-hourly timestep.
+
+    Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report,
+    ``docs/roadmap/delivery-tables.md``). This table is backward-looking only — it does not cover
+    the forecast period.
+
+    **MVP implementation (v0.1):** one row per ``time_series_id``, ``time`` set to the end of
+    the available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over
+    the full observed history. This is a static scalar per series.
+
+    **Planned upgrade (v0.6 / v0.7):** replace the P99 scalar with a time-varying estimate from
+    the differentiable-physics capacity model (see ``docs/roadmap/differentiable-physics.md``),
+    giving one row per ``(time_series_id, time)`` half-hourly timestep. Schema and interface are
+    unchanged; only the asset body changes.
+    """
+
+    time_series_id: int = _get_time_series_id_dtype()
+
+    time: datetime = pt.Field(
+        dtype=UTC_DATETIME_DTYPE,
+        description=(
+            "The half-hourly timestep this capacity estimate applies to. "
+            "In the MVP, this is the end of the available observation history for that series."
+        ),
+    )
+
+    effective_capacity_mw: float = pt.Field(
+        dtype=pl.Float32,
+        gt=0,
+        description=(
+            "OCF's estimate of the effective capacity (MW) of this asset at this timestep. "
+            "For generators: absorbs PV panel degradation, partial inverter trips, etc., "
+            "but ignores ANM curtailment — a wind farm ANM-capped at 5 MW with 10 MW physical "
+            "capability has effective_capacity_mw = 10. "
+            "For substations: the 99th percentile of observed load over a rolling time window, "
+            "under normal running arrangement only. 'Switched' power (Table 5) should be "
+            "added or subtracted when a switching event is in effect."
+        ),
+    )
