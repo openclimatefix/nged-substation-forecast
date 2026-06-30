@@ -184,6 +184,12 @@ def _load_engineering_inputs(
       that cell by the feature engineer's spatial join.
 
     Args:
+        settings: Application settings (data paths, credentials).
+        time_series_ids: IDs to include; all three inputs are filtered to this population.
+        window_start: Inclusive start of the time window for power observations and NWP
+            ``valid_time``.
+        window_end: Inclusive end of the time window for power observations and NWP
+            ``valid_time``.
         ensemble_members: If provided, NWP is filtered to these ``ensemble_member`` indices. If
             ``None`` (the default), every ensemble member is carried through. Training restricts to
             the control member (``[0]``) to avoid fanning every forecast row out across all ~51
@@ -194,6 +200,10 @@ def _load_engineering_inputs(
             can cover the window). ``cv_power_forecasts`` passes a narrower sub-range to process the
             validation window in ``init_time`` chunks, so the full-ensemble forecast frame for one
             chunk stays in RAM while the rest streams from the partition-pruned scan.
+
+    Returns:
+        ``(power_time_series, metadata, nwp)`` — a lazy power frame, an eager metadata frame, and a
+        lazy in-memory NWP frame, all filtered to ``time_series_ids`` and the requested window.
     """
     if init_time_start is None:
         init_time_start = window_start - _MAX_NWP_LEAD
@@ -489,7 +499,16 @@ class PopulationFilter(Config):
     """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
 
     def apply(self, scan: pl.LazyFrame) -> pl.LazyFrame:
-        """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates."""
+        """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
+
+        Args:
+            scan: Lazy scan of the ``power_forecasts`` Delta table. The raw Delta scan has
+                Categorical columns stored as ``String``, so the frame does not yet conform to
+                ``PowerForecast`` — this method filters at the string level before any casting.
+
+        Returns:
+            The same lazy scan with each non-``None`` field added as a ``.filter()`` predicate.
+        """
         if self.experiment_name is not None:
             scan = scan.filter(pl.col("experiment_name") == self.experiment_name)
         if self.fold_id is not None:
@@ -529,6 +548,17 @@ def _resolve_eval_window(
 
     For ``"leaderboard"`` scope the bounds come from the fold config; for ``"ad_hoc"``
     they are the observed ``valid_time`` extent of the forecast group.
+
+    Args:
+        evaluation_scope: ``"leaderboard"`` uses fold-config dates; ``"ad_hoc"`` uses the
+            observed ``valid_time`` range of the forecast group.
+        fold_id: Fold identifier; only used when ``evaluation_scope == "leaderboard"``.
+        group_df: Raw forecast rows for this ``(experiment_name, fold_id)`` group. Only
+            ``valid_time`` is accessed, and only for the ``"ad_hoc"`` branch.
+
+    Returns:
+        ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
+        and a human-readable label (``fold_id`` for leaderboard; ``"ad_hoc"`` otherwise).
     """
     if evaluation_scope == "leaderboard":
         fold = _cv_config.get_fold(fold_id)
@@ -557,6 +587,14 @@ def _write_metrics_to_delta(
     String. Re-sending Enum/Categorical data on an overwrite would cause a schema-mismatch
     error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
     so re-materialising the asset replaces rows rather than duplicating them.
+
+    Args:
+        path: Filesystem path to the ``forecast_metrics`` Delta table.
+        enriched: Fully populated ``Metrics`` rows, with all provenance columns set by
+            ``enrich_metrics_rows()``.
+        exp_name: Experiment name; used in the Delta overwrite predicate to scope the
+            replacement to this ``(experiment_name, fold_id)`` partition.
+        fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
     """
     cat_cols = [
         c
@@ -585,6 +623,11 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
     fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.
     Lookup is by tag (§4.1.1) so this is idempotent under Dagster retries.
+
+    Args:
+        context: Dagster execution context; used for logging and ``add_output_metadata``.
+        config: Population filter and evaluation scope for this materialisation. Defaults to
+            no filter and ``"leaderboard"`` scope.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
