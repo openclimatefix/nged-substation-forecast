@@ -198,6 +198,24 @@ def test_load_engineering_inputs_filters_ensemble_members(env: dict[str, str]) -
     )
 
 
+def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
+    env: dict[str, str],
+) -> None:
+    """NWP is pruned to the requested series' H3 cells and the window's ``init_time`` partitions."""
+    settings = Settings()
+    train_start = datetime(2024, 4, 1, tzinfo=timezone.utc)
+    train_end = datetime(2025, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
+
+    # Requesting only ts1 must scan only ts1's cell, never ts2's.
+    _, _, nwp_ts1 = _load_engineering_inputs(settings, [1], train_start, train_end)
+    assert nwp_ts1.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+
+    # Requesting both: ts2's cell is initialised at 2025-08-01 (after train_end), so the init_time
+    # partition prune drops it entirely — only ts1's in-window cell survives.
+    _, _, nwp_both = _load_engineering_inputs(settings, [1, 2], train_start, train_end)
+    assert nwp_both.collect()["h3_index"].unique().to_list() == [_TS1_CELL]
+
+
 def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> None:
     instance = DagsterInstance.ephemeral()
     _register(instance)
@@ -219,3 +237,34 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> Non
     # past train_end, so the inclusive-window filter excludes it).
     loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id, Path(env["cache"]))
     assert loaded.trained_time_series_ids == [1]
+
+
+def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: dict[str, str]) -> None:
+    """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
+    # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
+    # un-materialised / coverage-excluded fold in production.
+    empty_for_fold = EligibleTimeSeries.validate(
+        pl.DataFrame(
+            {
+                "fold_id": pl.Series(["unrelated_fold"], dtype=pl.String),
+                "time_series_id": pl.Series([1], dtype=pl.Int32),
+            }
+        )
+    )
+    write_deltalake(
+        table_or_uri=str(Settings().eligible_time_series_data_path),
+        data=empty_for_fold.to_arrow(),
+        mode="overwrite",
+        partition_by=["fold_id"],
+    )
+
+    instance = DagsterInstance.ephemeral()
+    _register(instance)
+    result = materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=instance, raise_on_error=False
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("trained_cv_model")
+    assert failure is not None
+    assert "No eligible time series" in str(failure.error)

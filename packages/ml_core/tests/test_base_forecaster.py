@@ -42,7 +42,9 @@ class _FakeForecaster(BaseForecaster):
         instance.payload = (path / "payload.txt").read_text()
         return instance
 
-    def train(self, data: pt.LazyFrame[AllFeatures]) -> None:  # pragma: no cover - unused
+    def train(
+        self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]
+    ) -> None:  # pragma: no cover - unused
         raise NotImplementedError
 
     def predict(
@@ -64,7 +66,7 @@ def test_trained_time_series_ids_is_abstract() -> None:
         def load(cls, path: Path) -> Self:
             raise NotImplementedError
 
-        def train(self, data: pt.LazyFrame[AllFeatures]) -> None: ...
+        def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None: ...
 
         def predict(
             self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
