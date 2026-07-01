@@ -247,11 +247,17 @@ def file_mlflow_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str
     return _base_env(tmp_path, monkeypatch, tracking_uri)
 
 
-def _run_cv_pipeline(instance: DagsterInstance) -> None:
-    """Register, train, and predict for the leaderboard fold."""
+def _run_cv_pipeline(instance: DagsterInstance, materialise_capacity: bool = True) -> None:
+    """Register, train, and predict for the leaderboard fold.
+
+    Also materialises ``effective_capacity`` (the NMAE denominator ``metrics`` now requires) unless
+    ``materialise_capacity`` is False — used by the test that asserts ``metrics`` fails without it.
+    """
     _register(instance)
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
     assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+    if materialise_capacity:
+        assert materialize([effective_capacity], instance=instance).success
 
 
 def test_metrics_leaderboard_writes_forecast_metrics_delta(
@@ -333,38 +339,43 @@ def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
     assert pl.read_delta(str(file_mlflow_env["metrics"])).height == first_height
 
 
-def _read_nmae(metrics_path: Path) -> float:
-    fm = pl.read_delta(str(metrics_path)).filter(pl.col("metric_name") == "nmae")
+def _read_metric(metrics_path: Path, metric_name: str) -> float:
+    fm = pl.read_delta(str(metrics_path)).filter(pl.col("metric_name") == metric_name)
     assert fm.height == 1
     return float(fm["metric_value"][0])
 
 
-def test_metrics_uses_effective_capacity_when_materialised(
+def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Path]) -> None:
+    """The metrics asset requires the effective_capacity table and fails cleanly when it is absent."""
+    instance = DagsterInstance.ephemeral()
+    _run_cv_pipeline(instance, materialise_capacity=False)
+
+    result = materialize(
+        [metrics],
+        run_config=_metrics_run_config("leaderboard"),
+        instance=instance,
+        raise_on_error=False,
+    )
+    assert not result.success
+
+
+def test_metrics_nmae_denominator_is_effective_capacity(
     file_mlflow_env: dict[str, Path],
 ) -> None:
-    """With effective_capacity present, NMAE uses the full-history P99 denominator.
-
-    ts1's validation-window power peaks near 84 MW but its full observation history peaks near
-    104 MW (the training window). The full-history P99 is a larger denominator, so the
-    capacity-normalised NMAE is strictly smaller than the window-P99 fallback.
-    """
+    """NMAE is MAE divided by the series' full-history effective_capacity_mw."""
     instance = DagsterInstance.ephemeral()
     _run_cv_pipeline(instance)
-
-    # Fallback path: effective_capacity not yet materialised → window-P99 NMAE.
     assert materialize(
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
     ).success
-    nmae_window = _read_nmae(file_mlflow_env["metrics"])
 
-    # Full-history path: materialise effective_capacity, then re-score the same fold.
-    assert materialize([effective_capacity], instance=instance).success
-    assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
-    ).success
-    nmae_full_history = _read_nmae(file_mlflow_env["metrics"])
+    mae = _read_metric(file_mlflow_env["metrics"], "mae")
+    nmae = _read_metric(file_mlflow_env["metrics"], "nmae")
+    capacity = pl.read_delta(str(file_mlflow_env["effective_capacity"])).filter(
+        pl.col("time_series_id") == 1
+    )["effective_capacity_mw"][0]
 
-    assert nmae_full_history < nmae_window
+    assert nmae == pytest.approx(mae / capacity, rel=1e-5)
 
 
 def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:
@@ -463,6 +474,9 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
         assert materialize(
             [cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance
         ).success
+
+        # The NMAE denominator table that metrics requires.
+        assert materialize([effective_capacity], instance=instance).success
 
         # Score — proves tag-based run resolution: the asset calls get_or_create_fold_run()
         # with a fresh MlflowClient connection and finds the same run that trained_cv_model used.

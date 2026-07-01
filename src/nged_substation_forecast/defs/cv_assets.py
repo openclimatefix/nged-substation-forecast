@@ -691,7 +691,7 @@ def _score_forecast_group(
     filtered_power_forecasts: pl.DataFrame,
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
-    capacity_df: pt.DataFrame[EffectiveCapacity] | None,
+    capacity_df: pt.DataFrame[EffectiveCapacity],
     evaluation_scope: EvalScopeType,
     metrics_path: Path,
     now: datetime,
@@ -707,8 +707,8 @@ def _score_forecast_group(
         actuals_lf: Lazy observed power scan (only the joined subset is collected inside
             ``compute_metrics()``).
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
-        capacity_df: Optional per-series effective capacity used as the NMAE denominator; ``None``
-            falls back to the validation-window P99 inside ``compute_metrics()``.
+        capacity_df: Per-series effective capacity used as the NMAE denominator inside
+            ``compute_metrics()``; must cover every scored series.
         evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
             skips MLflow entirely.
         metrics_path: Filesystem path to the ``forecast_metrics`` Delta table.
@@ -807,19 +807,15 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         allow_superfluous_columns=True,
     )
 
-    # Read the full-history effective capacity if it has been materialised; compute_metrics falls
-    # back to the validation-window P99 when it is absent.
-    capacity_df: pt.DataFrame[EffectiveCapacity] | None = None
-    if settings.effective_capacity_data_path.exists():
-        capacity_df = EffectiveCapacity.validate(
-            pl.read_delta(str(settings.effective_capacity_data_path))
+    # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
+    if not settings.effective_capacity_data_path.exists():
+        raise FileNotFoundError(
+            f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
+            "materialise the effective_capacity asset before running metrics."
         )
-    else:
-        context.log.warning(
-            "effective_capacity Delta not found at %s — NMAE will use the validation-window P99. "
-            "Materialise the effective_capacity asset to use the full-history denominator.",
-            settings.effective_capacity_data_path,
-        )
+    capacity_df = EffectiveCapacity.validate(
+        pl.read_delta(str(settings.effective_capacity_data_path))
+    )
 
     groups = (
         filtered_power_forecasts.select(["experiment_name", "fold_id"])
