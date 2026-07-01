@@ -579,22 +579,28 @@ class PopulationFilter(Config):
     valid_time_max: str | None = None
     """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
 
-    def apply(self, scan: pt.LazyFrame[PowerForecast]) -> pt.LazyFrame[PowerForecast]:
+    def apply(self, scan: pl.LazyFrame) -> pl.LazyFrame:
         """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
 
         Args:
-            scan: Typed lazy scan of the ``power_forecasts`` Delta table. The caller is
-                responsible for casting any ``String`` columns that ``PowerForecast`` declares as
-                ``Categorical`` before passing the scan here (delta-rs stores all
-                dictionary-encoded columns as plain ``String`` on disk; casting lazily via
-                ``.with_columns()`` before ``.collect()`` is zero-cost).
+            scan: **Raw** lazy scan of the ``power_forecasts`` Delta table, i.e. the direct
+                ``pl.scan_delta(...)`` result with ``experiment_name`` / ``fold_id`` still as
+                plain ``String`` (delta-rs stores all dictionary-encoded columns as ``String`` on
+                disk). It must **not** yet be cast to the ``Categorical`` dtypes that
+                ``PowerForecast`` declares — see the return note below for why.
 
         Returns:
-            The same lazy scan with each non-``None`` field added as a ``.filter()`` predicate.
+            A plain ``pl.LazyFrame`` — deliberately **not** a ``pt.LazyFrame[PowerForecast]``.
+            The whole point of this method is that its ``.filter()`` predicates push down into the
+            Delta scan for partition pruning (``experiment_name`` / ``fold_id`` are the on-disk
+            partition columns) and row-group skipping. A ``String → Categorical`` cast placed
+            between ``scan_delta`` and these filters would block that pushdown and force Polars to
+            read every partition, so the cast is deliberately deferred to *after* filtering — done
+            per group by ``_load_forecast_group``, which is where the frame becomes a typed
+            ``pt.DataFrame[PowerForecast]``. Returning a plain frame keeps that ordering honest:
+            there is no model to attach until the columns actually hold their declared dtypes.
         """
-        # Rebind to plain pl.LazyFrame: Polars' .filter() drops the pt.LazyFrame subclass, so
-        # accumulating filters via scan = scan.filter(...) would fail ty's assignment check.
-        # Re-wrap as pt.LazyFrame[PowerForecast] before returning (zero-copy).
+        # Polars' .filter() already returns a plain pl.LazyFrame; annotate for clarity.
         lf: pl.LazyFrame = scan
         if self.experiment_name is not None:
             lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
@@ -610,7 +616,7 @@ class PopulationFilter(Config):
             if max_dt.tzinfo is None:
                 max_dt = max_dt.replace(tzinfo=timezone.utc)
             lf = lf.filter(pl.col("valid_time") <= max_dt)
-        return pt.LazyFrame.from_existing(lf).set_model(PowerForecast)
+        return lf
 
 
 class MetricsConfig(Config):
@@ -698,10 +704,42 @@ def _write_metrics_to_delta(
     )
 
 
+def _load_forecast_group(
+    pruned_scan: pl.LazyFrame, exp_name: str, fold_id: str
+) -> pt.DataFrame[PowerForecast]:
+    """Collect and validate a single ``(experiment_name, fold_id)`` group.
+
+    Narrows the already-pruned scan to one partition. Because ``pruned_scan`` is a plain
+    ``pl.LazyFrame`` (the raw String Delta scan with ``PopulationFilter`` predicates already
+    applied), this extra ``.filter()`` on the partition columns pushes down into the Delta scan, so
+    only this partition's Parquet files are read. The ``String → Categorical`` cast happens *after*
+    the filter so it never blocks that pushdown. Peak memory is therefore a single fold, regardless
+    of how many groups the population filter matched.
+
+    Args:
+        pruned_scan: Raw ``pl.LazyFrame`` returned by ``PopulationFilter.apply`` (String partition
+            columns, predicates already applied, not yet cast to ``Categorical``).
+        exp_name: Experiment name of the group to load.
+        fold_id: Fold identifier of the group to load.
+
+    Returns:
+        The validated ``PowerForecast`` rows for this one group.
+    """
+    group_scan = pruned_scan.filter(
+        (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
+    ).with_columns(
+        experiment_name=pl.col("experiment_name").cast(pl.Categorical),
+        fold_id=pl.col("fold_id").cast(pl.Categorical),
+        power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
+    )
+    collected = pt.LazyFrame.from_existing(group_scan).set_model(PowerForecast).collect()
+    return PowerForecast.validate(collected, allow_superfluous_columns=True)
+
+
 def _score_forecast_group(
     exp_name: str,
     fold_id: str,
-    filtered_power_forecasts: pl.DataFrame,
+    group_forecasts: pt.DataFrame[PowerForecast],
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     capacity_df: pt.DataFrame[EffectiveCapacity],
@@ -715,8 +753,8 @@ def _score_forecast_group(
     Args:
         exp_name: Experiment name for this group.
         fold_id: Fold identifier for this group.
-        filtered_power_forecasts: All collected forecast rows that survived the population
-            filter; this function slices the single ``(exp_name, fold_id)`` group from it.
+        group_forecasts: The already-sliced, validated ``PowerForecast`` rows for this single
+            ``(exp_name, fold_id)`` group (loaded by ``_load_forecast_group``).
         actuals_lf: Lazy observed power scan (only the joined subset is collected inside
             ``compute_metrics()``).
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
@@ -736,12 +774,6 @@ def _score_forecast_group(
           fold's MLflow child run (e.g. ``{"rmse__all": 0.42, "rmse__pv": 0.31}``). ``None``
           for ``"ad_hoc"`` scope, where no MLflow run exists.
     """
-    group_forecasts = PowerForecast.validate(
-        filtered_power_forecasts.filter(
-            (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
-        ),
-        allow_superfluous_columns=True,
-    )
     per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df, capacity_df)
 
     window_start, window_end, window_label = _resolve_eval_window(
@@ -795,18 +827,25 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    # delta-rs stores all Arrow dictionary-encoded columns (Categorical, Enum) as plain String on
-    # disk. Cast lazily before filtering so PopulationFilter.apply receives a properly-typed
-    # pt.LazyFrame[PowerForecast] and the collected frame already has the correct dtypes.
-    power_forecasts = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.power_forecasts_data_path)).with_columns(
-            experiment_name=pl.col("experiment_name").cast(pl.Categorical),
-            fold_id=pl.col("fold_id").cast(pl.Categorical),
-            power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
-        )
-    ).set_model(PowerForecast)
-    filtered_power_forecasts = config.population_filter.apply(power_forecasts).collect()
-    if filtered_power_forecasts.height == 0:
+    # Apply the population filter to the RAW String scan so its predicates push into the Delta scan
+    # (experiment_name / fold_id are the on-disk partition columns → partition pruning). The
+    # String → Categorical cast is deliberately deferred to _load_forecast_group, after filtering,
+    # because a cast between scan_delta and the filter would defeat pushdown. See
+    # PopulationFilter.apply for the full rationale.
+    raw_scan = pl.scan_delta(str(settings.power_forecasts_data_path))
+    pruned_scan = config.population_filter.apply(raw_scan)
+
+    # Discover the matching groups from the pruned scan — projecting to only the two partition
+    # columns keeps this collect cheap (partition metadata, not row data). Each group is then
+    # loaded and scored one at a time, so peak memory is a single fold.
+    groups = (
+        pruned_scan.select(["experiment_name", "fold_id"])
+        .unique()
+        .sort(["experiment_name", "fold_id"])
+        .collect()
+        .rows()
+    )
+    if not groups:
         context.log.warning("No forecasts matched the population filter — nothing to score.")
         context.add_output_metadata({"n_rows_written": 0, "n_groups": 0})
         return
@@ -830,12 +869,6 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         pl.read_delta(str(settings.effective_capacity_data_path))
     )
 
-    groups = (
-        filtered_power_forecasts.select(["experiment_name", "fold_id"])
-        .unique()
-        .sort(["experiment_name", "fold_id"])
-        .rows()
-    )
     settings.forecast_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     total_rows = 0
@@ -846,10 +879,11 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:
+        group_forecasts = _load_forecast_group(pruned_scan, exp_name, fold_id)
         n_rows, fold_metric_dict = _score_forecast_group(
             exp_name,
             fold_id,
-            filtered_power_forecasts,
+            group_forecasts,
             actuals_lf,
             metadata_df,
             capacity_df,

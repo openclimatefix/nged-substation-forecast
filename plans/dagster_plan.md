@@ -1475,7 +1475,7 @@ nullable `String`). This makes the entire `ad_hoc` metrics path broken today; th
   with `evaluation_scope="ad_hoc"` writes `forecast_metrics` rows with a null (but `String`-typed)
   `mlflow_run_id` and no MLflow logging.
 
-### 7.6.7 Phase 6.7 — `metrics` asset: only load the `power_forecasts` partitions it needs
+### 7.6.7 Phase 6.7 — `metrics` asset: only load the `power_forecasts` partitions it needs - Completed in PR #214
 
 *Deferred from the Phase 6.5 line of work to keep that PR small.*
 

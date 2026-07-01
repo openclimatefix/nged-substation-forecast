@@ -406,6 +406,70 @@ def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> N
         assert "rmse__all" not in run.data.metrics
 
 
+def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
+    """``PopulationFilter.apply`` pushes its predicate into the Delta scan (partition pruning).
+
+    Regression guard for Phase 6.7: casting ``experiment_name`` / ``fold_id`` *before* filtering
+    (the prior behaviour) forces Polars to read every partition. Applying the filter to the raw
+    ``String`` scan prunes to just the named partition — the explain plan lists only that
+    partition's Parquet path and never the other experiment's.
+    """
+    path = str(tmp_path / "power_forecasts")
+    valid_time = pl.Series([datetime(2025, 8, 1, 6, tzinfo=timezone.utc)] * 4).dt.cast_time_unit(
+        "us"
+    )
+    df = pl.DataFrame(
+        {
+            "experiment_name": ["expA", "expA", "expB", "expB"],
+            "fold_id": ["f1", "f1", "f1", "f1"],
+            "valid_time": valid_time,
+            "power_hat": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    write_deltalake(
+        table_or_uri=path, data=df.to_arrow(), partition_by=["experiment_name", "fold_id"]
+    )
+
+    plan = PopulationFilter(experiment_name="expA").apply(pl.scan_delta(path)).explain()
+    assert "experiment_name=expA" in plan
+    assert "experiment_name=expB" not in plan
+
+
+def test_metrics_no_filter_scores_every_group(file_mlflow_env: dict[str, Path]) -> None:
+    """A default (no-filter) ``metrics`` run scores every ``(experiment_name, fold_id)`` group.
+
+    The pipeline produces forecasts for one experiment; we duplicate them under a second
+    experiment so two groups exist on disk, then run ``metrics`` with the default
+    ``PopulationFilter()`` (no filter) and assert both groups land in ``forecast_metrics``.
+    """
+    instance = DagsterInstance.ephemeral()
+    _run_cv_pipeline(instance)
+
+    # Duplicate the produced forecasts under a second experiment so two groups exist on disk.
+    forecasts_path = str(file_mlflow_env["forecasts"])
+    second_experiment = f"{EXPERIMENT_NAME}_2"
+    duplicate = pl.read_delta(forecasts_path).with_columns(
+        experiment_name=pl.lit(second_experiment)
+    )
+    write_deltalake(
+        table_or_uri=forecasts_path,
+        data=duplicate.to_arrow(),
+        mode="append",
+        partition_by=["experiment_name", "fold_id"],
+    )
+
+    # Default PopulationFilter() = no filter → score everything.
+    assert materialize(
+        [metrics],
+        run_config=RunConfig(ops={"metrics": MetricsConfig(evaluation_scope="ad_hoc")}),
+        instance=instance,
+    ).success
+
+    fm = pl.read_delta(str(file_mlflow_env["metrics"]))
+    scored_experiments = set(fm["experiment_name"].unique().to_list())
+    assert scored_experiments == {EXPERIMENT_NAME, second_experiment}
+
+
 # ---------------------------------------------------------------------------
 # Full-stack cross-process test (real mlflow server)
 # ---------------------------------------------------------------------------

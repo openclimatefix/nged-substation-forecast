@@ -213,6 +213,17 @@ Casting after `.collect()` also works but is later than necessary: typed helpers
 scan (e.g. a filter method) would then have to accept `pl.LazyFrame` instead of
 `pt.LazyFrame[MySchema]`.
 
+**Caveat — filter *before* the cast when the column is filtered on (especially a Delta partition
+column).** The lazy cast above is right for columns you only *read*, but a `String→Categorical`
+cast placed between `pl.scan_delta(...)` and a `.filter()` on that column **blocks predicate
+pushdown**: Polars can no longer prune Delta partitions or skip row groups, so it reads the *whole*
+table even when the filter names one partition. `experiment_name` / `fold_id` are the on-disk
+partition columns of `power_forecasts`, so when filtering on them, filter the **raw `String`
+scan first, then cast** the surviving rows per group. Confirm pushdown with `.explain()` — it
+should list only the matching `partition=value` paths. (This is the ordering `PopulationFilter.apply`
+and `_load_forecast_group` in `cv_assets.py` follow, and the reason `apply` returns a *plain*
+`pl.LazyFrame` — there is no model to attach until after the cast.)
+
 ### Patito + Polars Gotcha: `pt.LazyFrame.filter()` drops the Patito subclass
 
 Most Polars operations on a `pt.LazyFrame` return a plain `pl.LazyFrame`, including `.filter()`.
