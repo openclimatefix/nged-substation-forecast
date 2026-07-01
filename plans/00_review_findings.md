@@ -56,7 +56,7 @@ set and deleted; its permanent design ideas now live in
 
 | Plan | Work |
 |---|---|
-| [12_xgboost_quick_wins.md](12_xgboost_quick_wins.md) | The issue #145 sub-issues ordered by skill-per-effort — starting with a review discovery: the model never sees `nwp_lead_time_hours` despite the `horizon_as_feature` config tag. Best run after 02 and 03 Phase A so wins are measurable |
+| [12_xgboost_quick_wins.md](12_xgboost_quick_wins.md) | The issue #145 sub-issues merged with further review suggestions (init-time-anchored features, holidays, effective temperature, clear-sky-index upsampling, early stopping, …), ordered best bang-for-the-buck first in effort tiers — led by a review discovery: the model never sees `nwp_lead_time_hours` despite the `horizon_as_feature` config tag. Best run after 02 and 03 Phase A so wins are measurable |
 
 ## Findings with no plan (accepted / watch)
 
