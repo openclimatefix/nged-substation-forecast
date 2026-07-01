@@ -56,7 +56,7 @@ alternatives we considered.
 > for PICP (`p10_p90`). The `metrics` Dagster asset computes the deterministic metrics ✅ and writes
 > per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
 > per-fold and mean-across-folds aggregates logged to MLflow — see
-> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8--materialise-metrics).
+> [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
 
 ### Peak events — the metric filter that matters most for flexibility
 
