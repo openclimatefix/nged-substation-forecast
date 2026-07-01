@@ -244,12 +244,12 @@ class PowerForecast(pt.Model):
     )
 
     power_fcst_model_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description="Identifier for our ML-based power forecasting model. Model-family identity set by the BaseForecaster subclass (MODEL_NAME).",
     )
 
     experiment_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description=(
             "Per-experiment key identifying the experiment that produced this forecast."
             " Distinct from `power_fcst_model_name`, which is the model-family identity"
@@ -286,7 +286,7 @@ class PowerForecast(pt.Model):
     )
 
     fold_id: FoldId = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description=(
             "Identifies the source of this forecast row.  "
             "For cross-validation runs, the value is the fold's label from conf/cv/default.yaml "

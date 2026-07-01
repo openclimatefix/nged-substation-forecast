@@ -254,12 +254,12 @@ class Metrics(pt.Model):
     time_series_id: int = _get_time_series_id_dtype()
 
     power_fcst_model_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
     )
 
     fold_id: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description="CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches PowerForecast.fold_id.",
     )
 
@@ -348,7 +348,7 @@ class Metrics(pt.Model):
     )
 
     experiment_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         allow_missing=True,
         description=(
             "Experiment that produced these forecasts. Delta partition key alongside fold_id. "

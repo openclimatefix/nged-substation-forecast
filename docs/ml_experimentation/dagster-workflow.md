@@ -196,9 +196,10 @@ in the run config dialog before launching.
 
 **What the asset does:**
 
-1. Scans `power_forecasts` Delta, applying any non-null `PopulationFilter` predicates. The filter
-   runs on the raw scan so its predicates push into the Delta scan: naming an experiment/fold
-   prunes to just that partition rather than reading the whole (unbounded) table.
+1. Scans `power_forecasts` Delta, applying any non-null `PopulationFilter` predicates. The
+   partition columns (`experiment_name` / `fold_id`) are `String`, matching what delta-rs stores,
+   so the predicates push straight into the Delta scan: naming an experiment/fold prunes to just
+   that partition rather than reading the whole (unbounded) table.
 2. Discovers the matching `(experiment_name, fold_id)` groups, then loads and scores **one group at
    a time** — peak memory is a single fold, not the entire matched population. For each group:
    a. Calls `compute_metrics()` — joins observed power, averages ensemble members, computes

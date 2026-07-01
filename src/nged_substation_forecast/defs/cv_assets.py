@@ -502,12 +502,9 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         if forecasts.height == 0 and not is_first:
             continue
 
-        # Cast the partition columns to plain strings so Delta stores them as Hive-style string
-        # directories (delta-rs cannot partition on a dictionary-encoded Categorical column).
-        delta_data = forecasts.with_columns(
-            experiment_name=pl.col("experiment_name").cast(pl.String),
-            fold_id=pl.col("fold_id").cast(pl.String),
-        ).to_arrow()
+        # experiment_name / fold_id are String (their PowerForecast dtype), which is exactly what
+        # delta-rs needs for Hive-style partition directories — no cast required.
+        delta_data = forecasts.to_arrow()
         if is_first:
             # The first chunk overwrites the (experiment, fold) partition, clearing any prior run.
             write_deltalake(
@@ -579,28 +576,23 @@ class PopulationFilter(Config):
     valid_time_max: str | None = None
     """ISO-8601 UTC timestamp; rows with ``valid_time`` after this are excluded."""
 
-    def apply(self, scan: pl.LazyFrame) -> pl.LazyFrame:
+    def apply(self, scan: pt.LazyFrame[PowerForecast]) -> pt.LazyFrame[PowerForecast]:
         """Return ``scan`` with all non-``None`` filter fields applied as Polars predicates.
 
+        ``experiment_name`` / ``fold_id`` are ``String`` in ``PowerForecast`` (matching how
+        delta-rs stores the on-disk partition columns), so the ``pl.scan_delta`` result can be
+        typed with ``set_model(PowerForecast)`` directly and these ``.filter()`` predicates push
+        straight down into the Delta scan — partition pruning on ``experiment_name`` / ``fold_id``
+        plus row-group skipping — with no dtype cast in the way.
+
         Args:
-            scan: **Raw** lazy scan of the ``power_forecasts`` Delta table, i.e. the direct
-                ``pl.scan_delta(...)`` result with ``experiment_name`` / ``fold_id`` still as
-                plain ``String`` (delta-rs stores all dictionary-encoded columns as ``String`` on
-                disk). It must **not** yet be cast to the ``Categorical`` dtypes that
-                ``PowerForecast`` declares — see the return note below for why.
+            scan: Typed lazy scan of the ``power_forecasts`` Delta table.
 
         Returns:
-            A plain ``pl.LazyFrame`` — deliberately **not** a ``pt.LazyFrame[PowerForecast]``.
-            The whole point of this method is that its ``.filter()`` predicates push down into the
-            Delta scan for partition pruning (``experiment_name`` / ``fold_id`` are the on-disk
-            partition columns) and row-group skipping. A ``String → Categorical`` cast placed
-            between ``scan_delta`` and these filters would block that pushdown and force Polars to
-            read every partition, so the cast is deliberately deferred to *after* filtering — done
-            per group by ``_load_forecast_group``, which is where the frame becomes a typed
-            ``pt.DataFrame[PowerForecast]``. Returning a plain frame keeps that ordering honest:
-            there is no model to attach until the columns actually hold their declared dtypes.
+            The same scan with the filter predicates applied, re-wrapped as a
+            ``pt.LazyFrame[PowerForecast]`` (``.filter()`` drops the Patito subclass).
         """
-        # Polars' .filter() already returns a plain pl.LazyFrame; annotate for clarity.
+        # .filter() drops the pt subclass; accumulate on a plain LazyFrame, re-wrap on return.
         lf: pl.LazyFrame = scan
         if self.experiment_name is not None:
             lf = lf.filter(pl.col("experiment_name") == self.experiment_name)
@@ -616,7 +608,7 @@ class PopulationFilter(Config):
             if max_dt.tzinfo is None:
                 max_dt = max_dt.replace(tzinfo=timezone.utc)
             lf = lf.filter(pl.col("valid_time") <= max_dt)
-        return lf
+        return pt.LazyFrame.from_existing(lf).set_model(PowerForecast)
 
 
 class MetricsConfig(Config):
@@ -675,9 +667,9 @@ def _write_metrics_to_delta(
 ) -> None:
     """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
 
-    Casts all Categorical and Enum columns to ``String`` before writing — delta-rs stores
-    Arrow dictionary arrays as plain String in Parquet, so the on-disk schema is always
-    String. Re-sending Enum/Categorical data on an overwrite would cause a schema-mismatch
+    Casts the ``Enum`` columns (e.g. ``metric_name``, ``horizon_slice``) to ``String`` before
+    writing — delta-rs stores Arrow dictionary arrays as plain String in Parquet, so the on-disk
+    schema is always String. Re-sending Enum data on an overwrite would cause a schema-mismatch
     error. Performs an idempotent overwrite of the ``(experiment_name, fold_id)`` partition
     so re-materialising the asset replaces rows rather than duplicating them.
 
@@ -689,12 +681,8 @@ def _write_metrics_to_delta(
             replacement to this ``(experiment_name, fold_id)`` partition.
         fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
     """
-    cat_cols = [
-        c
-        for c, dtype in enriched.schema.items()
-        if dtype == pl.Categorical or hasattr(dtype, "categories")
-    ]
-    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in cat_cols).to_arrow()
+    enum_cols = [c for c, dtype in enriched.schema.items() if isinstance(dtype, pl.Enum)]
+    delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in enum_cols).to_arrow()
     write_deltalake(
         table_or_uri=path,
         data=delta_data,
@@ -705,20 +693,18 @@ def _write_metrics_to_delta(
 
 
 def _load_forecast_group(
-    pruned_scan: pl.LazyFrame, exp_name: str, fold_id: str
+    pruned_scan: pt.LazyFrame[PowerForecast], exp_name: str, fold_id: str
 ) -> pt.DataFrame[PowerForecast]:
     """Collect and validate a single ``(experiment_name, fold_id)`` group.
 
-    Narrows the already-pruned scan to one partition. Because ``pruned_scan`` is a plain
-    ``pl.LazyFrame`` (the raw String Delta scan with ``PopulationFilter`` predicates already
-    applied), this extra ``.filter()`` on the partition columns pushes down into the Delta scan, so
-    only this partition's Parquet files are read. The ``String → Categorical`` cast happens *after*
-    the filter so it never blocks that pushdown. Peak memory is therefore a single fold, regardless
-    of how many groups the population filter matched.
+    Narrows the already-pruned scan to one partition. This extra ``.filter()`` on the String
+    partition columns pushes down into the Delta scan, so only this partition's Parquet files are
+    read. Peak memory is therefore a single fold, regardless of how many groups the population
+    filter matched.
 
     Args:
-        pruned_scan: Raw ``pl.LazyFrame`` returned by ``PopulationFilter.apply`` (String partition
-            columns, predicates already applied, not yet cast to ``Categorical``).
+        pruned_scan: The ``pt.LazyFrame[PowerForecast]`` returned by ``PopulationFilter.apply``
+            (partition predicates already applied).
         exp_name: Experiment name of the group to load.
         fold_id: Fold identifier of the group to load.
 
@@ -727,10 +713,6 @@ def _load_forecast_group(
     """
     group_scan = pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
-    ).with_columns(
-        experiment_name=pl.col("experiment_name").cast(pl.Categorical),
-        fold_id=pl.col("fold_id").cast(pl.Categorical),
-        power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
     )
     collected = pt.LazyFrame.from_existing(group_scan).set_model(PowerForecast).collect()
     return PowerForecast.validate(collected, allow_superfluous_columns=True)
@@ -827,13 +809,14 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    # Apply the population filter to the RAW String scan so its predicates push into the Delta scan
-    # (experiment_name / fold_id are the on-disk partition columns → partition pruning). The
-    # String → Categorical cast is deliberately deferred to _load_forecast_group, after filtering,
-    # because a cast between scan_delta and the filter would defeat pushdown. See
-    # PopulationFilter.apply for the full rationale.
-    raw_scan = pl.scan_delta(str(settings.power_forecasts_data_path))
-    pruned_scan = config.population_filter.apply(raw_scan)
+    # Apply the population filter to the scan so its predicates push into the Delta scan
+    # (experiment_name / fold_id are the on-disk partition columns → partition pruning). These
+    # columns are String in PowerForecast, matching how delta-rs stores them, so no dtype cast
+    # sits between scan_delta and the filter to defeat pushdown. See PopulationFilter.apply.
+    scan = pt.LazyFrame.from_existing(
+        pl.scan_delta(str(settings.power_forecasts_data_path))
+    ).set_model(PowerForecast)
+    pruned_scan = config.population_filter.apply(scan)
 
     # Discover the matching groups from the pruned scan — projecting to only the two partition
     # columns keeps this collect cheap (partition metadata, not row data). Each group is then

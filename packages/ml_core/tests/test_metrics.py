@@ -52,11 +52,11 @@ def _make_cv_forecasts(
             "ensemble_member": pl.Series([0] * n, dtype=pl.Int8),
             "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
             "power_fcst": pl.Series(power_fcst, dtype=pl.Float32),
-            "power_fcst_model_name": pl.Series(["stub"] * n).cast(pl.Categorical),
+            "power_fcst_model_name": pl.Series(["stub"] * n, dtype=pl.String),
             "power_fcst_model_version": pl.Series([1] * n, dtype=pl.Int16),
             "ml_flow_experiment_id": pl.Series([None] * n, dtype=pl.Int32),
-            "experiment_name": pl.Series(["stub_exp"] * n).cast(pl.Categorical),
-            "fold_id": pl.Series([fold_id] * n).cast(pl.Categorical),
+            "experiment_name": pl.Series(["stub_exp"] * n, dtype=pl.String),
+            "fold_id": pl.Series([fold_id] * n, dtype=pl.String),
         }
     )
     return PowerForecast.validate(df, allow_superfluous_columns=True)
@@ -186,11 +186,11 @@ def test_compute_metrics_ensemble_averaging():
             "ensemble_member": pl.Series([0, 1], dtype=pl.Int8),
             "nwp_init_time": pl.Series([None, None], dtype=pl.Datetime("us", "UTC")),
             "power_fcst": pl.Series([8.0, 12.0], dtype=pl.Float32),
-            "power_fcst_model_name": pl.Series(["stub", "stub"]).cast(pl.Categorical),
+            "power_fcst_model_name": pl.Series(["stub", "stub"], dtype=pl.String),
             "power_fcst_model_version": pl.Series([1, 1], dtype=pl.Int16),
             "ml_flow_experiment_id": pl.Series([None, None], dtype=pl.Int32),
-            "experiment_name": pl.Series(["stub_exp", "stub_exp"]).cast(pl.Categorical),
-            "fold_id": pl.Series(["2022", "2022"]).cast(pl.Categorical),
+            "experiment_name": pl.Series(["stub_exp", "stub_exp"], dtype=pl.String),
+            "fold_id": pl.Series(["2022", "2022"], dtype=pl.String),
         }
     )
     forecasts = PowerForecast.validate(df, allow_superfluous_columns=True)
