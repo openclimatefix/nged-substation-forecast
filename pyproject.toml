@@ -111,3 +111,11 @@ norecursedirs = [".venv", "venv", ".git", "__pycache__"]
 markers = [
     "integration: tests that exercise real wiring (Dagster + file-based MLflow + temp Delta)",
 ]
+
+[tool.pymarkdown]
+# Line length: prose isn't hard-wrapped in this repo's docs, and ruff's default lint
+# selection doesn't enforce E501 either, so there's no existing precedent to match.
+plugins.md013.enabled = false
+# Duplicate heading: only flag duplicates under the same parent heading, not across
+# the whole file (e.g. "Usage" appearing under two different top-level sections).
+plugins.md024.siblings_only = true
