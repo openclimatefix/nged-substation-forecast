@@ -159,9 +159,17 @@ def _compute_effective_capacity(
     """Compute the MVP effective capacity (full-history P99 of ``|power|``) per time series.
 
     One row per ``time_series_id``: ``effective_capacity_mw`` is the 99th percentile of
-    ``abs(power)`` over all non-null observations, and ``time`` is that series' latest observed
-    timestep. Series whose P99 is null or non-positive (e.g. all-null or all-zero power) are
-    dropped, since ``EffectiveCapacity`` requires ``effective_capacity_mw > 0``.
+    ``abs(power)`` over all non-null observations. Series whose P99 is null or non-positive (e.g.
+    all-null or all-zero power) are dropped, since ``EffectiveCapacity`` requires
+    ``effective_capacity_mw > 0``.
+
+    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The MVP capacity
+    is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
+    as current to the end of the observed history — rather than a timestep the value varies over. The
+    v0.6 / v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
+    time)``), and only then does ``time`` carry per-row meaning; see the "Normalising NMAE by
+    ``effective_capacity``" section of ``docs/roadmap/metrics-and-leaderboard.md`` for why the MVP is
+    one scalar row per series rather than the value repeated at every half-hour.
 
     Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
     """
