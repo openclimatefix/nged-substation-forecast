@@ -13,6 +13,7 @@ uv run ruff check .            # check
 uv run ruff check . --fix      # fix
 uv run ruff format .           # format
 uv run ty check                # type checking
+uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md  # markdown lint
 
 # Testing
 uv run pytest                                # all tests
@@ -24,6 +25,11 @@ uv run dg dev                  # open http://localhost:3000
 # Marimo notebooks
 uv run marimo edit packages/notebooks/some_notebook.py
 ```
+
+Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
+pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint
+command above yourself before committing, for faster feedback than waiting on the commit-time
+hook.
 
 ## Architecture
 
