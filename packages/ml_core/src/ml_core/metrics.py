@@ -238,8 +238,8 @@ def enrich_metrics_rows(
             evaluation_scope=pl.lit(evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
             window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
             window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),
-            window_label=pl.lit(window_label),
+            window_label=pl.lit(window_label, dtype=pl.String),
             computed_at=pl.lit(computed_at).cast(UTC_DATETIME_DTYPE),
-            mlflow_run_id=pl.lit(mlflow_run_id),
+            mlflow_run_id=pl.lit(mlflow_run_id, dtype=pl.String),
         )
     )
