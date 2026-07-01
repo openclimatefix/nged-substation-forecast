@@ -227,6 +227,28 @@ with `time_series_type` populated from metadata so per-type queries need only a 
 
 ---
 
+## Viewing results in the MLflow UI
+
+To browse experiments, compare the leaderboard, and inspect per-fold metrics and artifacts, launch
+the MLflow web UI against the same tracking store the pipeline writes to:
+
+```bash
+uv run mlflow ui --gunicorn-opts "--workers 1"
+```
+
+Then open `http://localhost:5000`.
+
+**The `--gunicorn-opts` flag is required on Python 3.14.** MLflow 3.14's default server
+(uvicorn + FastAPI) fails to start on Python 3.14 — `mlflow.server.assistant` imports
+`importlib.abc.Traversable`, which was removed in 3.14. Passing `--gunicorn-opts` selects the
+Flask/gunicorn server instead, which works. Drop the flag once MLflow ships a Python 3.14-compatible
+FastAPI server.
+
+Full MLflow (which bundles the web server) is in the `dev` dependency group, so `uv sync` installs
+it; production runs use `mlflow-skinny` (the client, without the server).
+
+---
+
 ## Why `trained_cv_model` reads config from MLflow, not from YAML
 
 When `register_experiment_job` runs, it resolves the base YAML plus any overrides into a single

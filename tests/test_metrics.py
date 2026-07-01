@@ -435,6 +435,7 @@ def _wait_for_mlflow_server(
         try:
             urllib.request.urlopen(url, timeout=1)
             return
+        # Unparenthesised except-tuple (PEP 758, Python 3.14+); ruff format emits this form.
         except urllib.error.URLError, OSError:
             time.sleep(0.5)
     pytest.fail(
