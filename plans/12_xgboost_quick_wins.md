@@ -8,6 +8,10 @@ have good capacity estimation"). This plan merges its nine sub-issues with addit
 from the codebase review, ordered **best bang-for-the-buck first** (expected skill per unit
 effort), grouped into effort tiers.
 
+**Deferred until v0.1 is running on AWS** — getting *any* forecast live takes priority over
+forecast quality; see the sequencing in `00_review_findings.md` (01 → 09 → 05 → 13 → 10, then
+this plan).
+
 **Measure before optimising.** Land plan 02 (persistence/climatology baselines — without them
 "improved" is unanchored) and plan 03 Phase A (horizon-sliced metrics — several wins below are
 horizon-specific and invisible in the `"all"` aggregate) first. Each win is one registered

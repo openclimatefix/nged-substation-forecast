@@ -26,7 +26,24 @@ Verified during review (not just sub-agent claims):
 - `.env` is **not** tracked by git (gitignored, no history) — no secrets exposure.
 - `uv run pytest` from the repo root fails collection (duplicate `test_metrics.py` basenames).
 
-## The plans, in priority order
+## Recommended sequencing
+
+**Top priority is getting *any* v0.1 forecast running on AWS** (decided 2026-07-01); the
+scientific-improvement work waits until it is live. Order:
+
+1. [01_ci.md](01_ci.md) — CI safety net first.
+2. [09_live_forecasts.md](09_live_forecasts.md) — the production inference asset (built before
+   its container so the container has something to run).
+3. [05_production_model_artifacts.md](05_production_model_artifacts.md) — container + baked
+   champion model.
+4. [13_aws_deployment.md](13_aws_deployment.md) — S3-capable data paths, the one-shot
+   production job, Fargate/EventBridge infra. **Ship v0.1.**
+5. [10_production_monitoring.md](10_production_monitoring.md) — once live forecasts are
+   accumulating, there is something to monitor.
+6. Then the science and hygiene plans: 02 and 03 Phase A first (baselines + horizon slices make
+   wins measurable), then 12 (skill quick wins), with 04, 06, 07, 08, 11 slotted in alongside.
+
+## The plans (review findings)
 
 | Plan | Finding |
 |---|---|
@@ -52,7 +69,13 @@ set and deleted; its permanent design ideas now live in
 | [10_production_monitoring.md](10_production_monitoring.md) | `production_monitoring` metrics scope + `monitoring_sensor` + `retire_experiment_job` (after 09) |
 | [11_rigor_tests_and_cleanup.md](11_rigor_tests_and_cleanup.md) | CV-windowing no-lookahead, leaderboard-fairness, and determinism tests; split `cv_assets.py`; docs freshness pass (after 09+10) |
 
-## Final step: forecast-skill quick wins
+## Deployment
+
+| Plan | Work |
+|---|---|
+| [13_aws_deployment.md](13_aws_deployment.md) | Ship v0.1 on AWS (issue #206 Level 1): S3-capable data paths, one-shot `live_pipeline_job` with the freshness check, Fargate + EventBridge + IAM-role infra, alerting. Runs after 01 → 09 → 05 |
+
+## Forecast-skill quick wins (after v0.1 is on AWS)
 
 | Plan | Work |
 |---|---|
