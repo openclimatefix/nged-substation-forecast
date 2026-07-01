@@ -52,6 +52,12 @@ set and deleted; its permanent design ideas now live in
 | [10_production_monitoring.md](10_production_monitoring.md) | `production_monitoring` metrics scope + `monitoring_sensor` + `retire_experiment_job` (after 09) |
 | [11_rigor_tests_and_cleanup.md](11_rigor_tests_and_cleanup.md) | CV-windowing no-lookahead, leaderboard-fairness, and determinism tests; split `cv_assets.py`; docs freshness pass (after 09+10) |
 
+## Final step: forecast-skill quick wins
+
+| Plan | Work |
+|---|---|
+| [12_xgboost_quick_wins.md](12_xgboost_quick_wins.md) | The issue #145 sub-issues ordered by skill-per-effort — starting with a review discovery: the model never sees `nwp_lead_time_hours` despite the `horizon_as_feature` config tag. Best run after 02 and 03 Phase A so wins are measurable |
+
 ## Findings with no plan (accepted / watch)
 
 - **AWS deployment Level 1 is the right call.** Delta already provides the atomic-write property
