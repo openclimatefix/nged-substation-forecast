@@ -25,12 +25,15 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 3. **Install pre-commit hooks**: `uv run pre-commit install`
 
 To run Dagster:
+
 1. `uv run dg dev`
-2. Open http://localhost:3000 in your browser to see the project.
+2. Open `http://localhost:3000` in your browser to see the project.
 
 Optional: To allow Dagster to remember its state after you shut it down:
+
 1. `mkdir ~/dagster_home/`
 2. Put the following into `~/dagster_home/dagster.yaml`:
+
     ```yaml
     storage:
       sqlite:
@@ -45,6 +48,7 @@ Optional: To allow Dagster to remember its state after you shut it down:
         - nged_data
       python_log_level: DEBUG
     ```
+
 3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
 
 ### Linting & Formatting
@@ -53,6 +57,12 @@ Optional: To allow Dagster to remember its state after you shut it down:
 - **Fix linting**: `uv run ruff check . --fix`
 - **Format code**: `uv run ruff format .`
 - **Type checking**: `uv run ty check`
+- **Markdown linting**: `uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md`
+
+Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
+pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint
+command above yourself before committing, for faster feedback than waiting on the commit-time
+hook.
 
 ### Testing
 
@@ -62,14 +72,14 @@ Optional: To allow Dagster to remember its state after you shut it down:
 ### Development
 
 - **Run Dagster UI**: `uv run dagster dev`
-- Open http://localhost:3000 in your browser to see the project.
+- Open `http://localhost:3000` in your browser to see the project.
 - **Run Marimo notebooks**: `uv run marimo edit packages/notebooks/some_notebook.py`
 
 ### Documentation
 
 The docs are built with [MkDocs](https://www.mkdocs.org/) (Material theme). The tooling is part of the `dev` dependency group, so `uv sync` installs it.
 
-- **Serve docs locally with live reload**: `uv run mkdocs serve`, then open http://localhost:8000. The site rebuilds automatically as you edit files in `docs/`.
+- **Serve docs locally with live reload**: `uv run mkdocs serve`, then open `http://localhost:8000`. The site rebuilds automatically as you edit files in `docs/`.
 - **Build the static site**: `uv run mkdocs build` — renders the docs into the `site/` directory.
 
 ---

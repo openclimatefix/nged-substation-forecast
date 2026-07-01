@@ -50,19 +50,22 @@ The timeline below shows the order in which this work is planned.
 **Goal**: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a baseline. Intentionally does not detect switching events or estimate effective capacity — hence "naive" (assumes the grid is always in perfect health).
 
 **Data engineering**:
+
 - Download ECMWF ENS NWP from Dynamical.org; convert to Delta Lake with H3 spatial indexes on S3 ✓
 - Download NGED data from S3; convert to Delta Lake with H3 spatial indexes ✓
 - Automatic data cleaning:
-    - Remove isolated zeros in non-zero time series
-    - Remove values more than N standard deviations from the mean
-    - Remove "stuck" values (std dev near zero over a 24-hour rolling window)
-    - Drop first ~2 months of each time series (poor quality during meter ramp-up)
+  - Remove isolated zeros in non-zero time series
+  - Remove values more than N standard deviations from the mean
+  - Remove "stuck" values (std dev near zero over a 24-hour rolling window)
+  - Drop first ~2 months of each time series (poor quality during meter ramp-up)
 
 **Software engineering**:
+
 - Universal model interface (`BaseForecaster`) for all ML models ✓
 - Orchestrate everything with Dagster: data ingestion, model training, inference, backtesting ✓
 
 **ML model**:
+
 - Separate XGBoost model per `time_series_id` ✓
 - Train on the ECMWF control ensemble member; run inference on all 51 members ✓
 - Features: ECMWF ENS NWP variables, derived weather features (e.g. wind chill), lagged power (7 and 14 days ago), datetime features (`hour_of_day`, `day_of_week`, `day_of_month`, `day_of_year`, `is_weekend`, `is_bank_holiday`, `is_christmas`, `is_easter`, `utc_offset`, `forecast_horizon`)
@@ -70,6 +73,7 @@ The timeline below shows the order in which this work is planned.
 - Static capacity estimate: 99th percentile of observed power as a simple proxy
 
 **Outputs** (Delta tables on S3):
+
 - `power_forecast`
 - `power_forecast_warnings`
 - `asset_health_history`
@@ -125,32 +129,36 @@ The ML-assets architecture is designed to support this from day one (programmati
 *Internal only for first month, then shared with NGED.*
 
 **Switching events**:
+
 - Detect "abnormal running arrangement" events from the power time series alone, using statistical methods
 - Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
 - Populate the `substation_switching` Delta table
 
 **Dynamic effective capacity estimation for *metered* generators ([differentiable physics](differentiable-physics.md))**:
+
 - Implement a basic [differentiable physics (DP)](differentiable-physics.md) model for the *metered* wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is **Phase 1** of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is v2 research.
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
-    - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
-    - **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity
+  - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
+  - **CM SAF** (Satellite Application Facility on Climate Monitoring) — high-resolution satellite-derived irradiance, used to estimate solar PV capacity
 - Populate the `effective_capacity` Delta table
 
 **Dynamic effective capacity estimation for substations**:
+
 - For now, while we're forecasting substations top-down, just use the 99th percentile per year as
   the effective capacity. Later, in v2, the system should already capture everything we need to
   know about substation capacity, as a function of all the things that drive the substation's
   behaviour.
 
 **"Prevailing conditions" building block**:
+
 - Produce example Python code for NGED to construct a "prevailing conditions" forecast from OCF's building blocks
 
 ---
 
 ## v1.0 — Stable Live Service for NGED's Trial Area
 
-**Target: January 2027**
+Target: **January 2027**
 
 - All features listed above (v0.1–v0.7), plus fixes discovered during live running
 - 32 time series in the NGED trial area: 16 primary substations, 6 solar PV farms, 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, 1 reciprocating gas generator

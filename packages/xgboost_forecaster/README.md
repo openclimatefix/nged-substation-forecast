@@ -11,6 +11,7 @@ One `xgb.Booster` is trained per `time_series_id`, so each substation's model ca
 ## Save format
 
 `XGBoostForecaster.save(path)` writes:
+
 - `{time_series_id}.ubj` — one XGBoost native binary model per trained substation
 - `meta.json` — the full `XGBoostConfig` serialised via Pydantic, so `load()` is completely self-contained
 

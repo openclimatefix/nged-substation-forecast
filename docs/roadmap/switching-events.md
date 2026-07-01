@@ -23,7 +23,6 @@ In short: the graph tells us *who can connect to whom*; the simple statistics an
 
 > **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
 
-
 ---
 
 ## Part 2 — The staged roadmap
@@ -32,7 +31,7 @@ Version numbers are aligned with the main codebase: **v0.6**, then **v2.5**, the
 
 ### Overview of the ladder
 
-```
+```text
 v0.6  ── Unsupervised statistical detector on power data.
   │       Flags/masks switching events; VALIDATED against the 32-series logs.
   │       Produces the detection sensitivity floor (a quantified, honest limit).
@@ -70,7 +69,7 @@ For each substation, form an expected-power baseline that is a function of **exo
 
 A level shift at one substation could be many things (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*. Because transfers fan out to 2–3 neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude `Δ` at substation `i` at time `t`, solve a small constrained attribution: *which subset of `i`'s neighbours show coincident rises (≈ `t`) that sum to ≈ `Δ`?* With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — it is what keeps the search to a handful of substations rather than all `N`. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
 
-```
+```text
 residuals around time t (observed - expected), one row per substation:
 
  source  i :   ‾‾‾‾‾‾|____________   drop of Δ = 9 MW at t
@@ -134,7 +133,7 @@ This is a histogram (step magnitude vs. hour-of-day), not a fitted model — del
 
 **Method.** Each substation `i` has a latent normal-demand signal `d_i(t)`. Observed power is a time-varying mixture over the neighbourhood:
 
-```
+```text
 observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
 ```
 
@@ -147,15 +146,18 @@ observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
 **Why "arbitrary continuous slice" is handled natively.** `α_ij(t)` is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
 **What it adds over v0.6.**
+
 - Produces the actual latent NRA demand signal, not just event flags.
 - Models routing continuously rather than detecting it after the fact.
 - Accommodates multi-donor partial transfer through the summed mixture + node-level balance.
 
 **What it misses / cons.**
+
 - A fractional mixture `α_ij·d_j` moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). v2.5 can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), this is largely **not a fixable limitation** — v2.5's approximation is about as good as the data structurally permits for the *demand* total. v2.6 only partially improves it, and only for the DER component.
 - DERs are folded implicitly into `d_i` (no explicit PV/wind separation yet).
 
 **Pros.**
+
 - Well-posed, identifiable, far easier to fit than any sub-primary model.
 - No sub-primary modelling whatsoever; fully unsupervised; scales.
 - Degrades gracefully; faithful to continuous, multi-donor, partial transfer.
@@ -171,7 +173,7 @@ observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
 
-```
+```text
 d_i(t) = gross_demand_i(t)
        − pv_metered_i(t)   − pv_unmetered_i(t)
        − wind_metered_i(t) − wind_unmetered_i(t)
@@ -184,7 +186,7 @@ d_i(t) = gross_demand_i(t)
 
 Mixing operates **per component-type**, each with its own routing weights:
 
-```
+```text
 observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
                     − α^pv_ij(t)·pv_j(t)
                     − α^wind_ij(t)·wind_j(t) ]
@@ -193,20 +195,24 @@ observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
 Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
 
 **Prior structure.**
+
 1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, `s_ij(t) ∈ {0,1}`, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when `s_ij(t)=1`. Types switch *together*; the moved slice can still be disproportionately one type.
 2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior `θ_ij` ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and `θ_ij` could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
 3. **Multi-donor (one-to-many).** As in v2.5, several `s_ij(t)` may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
 
 **What it adds over v2.5.**
+
 - Captures disproportionate-*type* transfer (more PV than load can move).
 - Differentiable modules give separately-shaped PV/wind/demand signals, so a step can be attributed to the right type by its temporal signature (midday irradiance-shaped → PV; evening temperature-tracking → load).
 - Cleans DERs from the demand estimate generally, not just during switching.
 
 **What it misses / cons.**
+
 - Still moves a *scaled fraction of neighbour j's total PV/wind/demand*, not the specific moved slice's profile. Fixes wrong *type-mix*; does **not** fix wrong *within-type shape*. Given movable cut points, the within-type shape is not stably recoverable anyway, so this residual is largely irreducible and almost certainly second-order for forecasting.
 - Larger latent space (three routing matrices): risk the optimiser trades PV- vs wind- vs demand-transfer to fit one step. **Mitigation:** the three types have distinct observable temporal signatures and cannot masquerade as each other if priors lean on irradiance/wind/temperature covariates; regularise each routing weight toward identity and piecewise-constant. When genuinely confounded (a windless, overcast event), accept non-identifiability and let uncertainty reflect it.
 
 **Pros.**
+
 - Physically grounded; the extra freedom is tied to physics, not invented structure.
 - Still only primary-level objects; no sub-primary modelling; unsupervised; scales.
 - Produces interpretable DER estimates as a by-product.

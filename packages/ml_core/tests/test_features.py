@@ -613,7 +613,7 @@ def test_parsed_features_forbids_valid_time_index():
 def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     """Multi-run backtesting must use power_fcst_init_time=None (bulk training mode).
 
-    Passing power_fcst_init_time=<scalar> with multi-run data stamps the same constant
+    Passing a scalar `power_fcst_init_time` with multi-run data stamps the same constant
     nwp_init_time on every row, so the NWP join matches only one run and leaves everything
     else null. This test verifies that bulk mode (power_fcst_init_time=None) correctly
     generates one row per (nwp_init_time, valid_time) combination, which is what a

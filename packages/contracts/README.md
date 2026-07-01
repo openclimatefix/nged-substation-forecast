@@ -1,4 +1,4 @@
-## Contracts
+# Contracts
 
 Defines the "data contracts": the schemas defining the precise shape of each data source and its semantics.
 

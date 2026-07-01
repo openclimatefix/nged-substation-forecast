@@ -10,11 +10,11 @@ Each forecast is:
 
 - **Probabilistic** — expressed as an ensemble of 51 members (one per ECMWF ENS member), or as percentiles
 - **14-day horizon**, half-hourly temporal resolution
-- **Updated every 6 hours**
+- Refreshed **every 6 hours**
 - **Scaled to [−1, +1]** — a normalised value that NGED multiplies by the site's capacity to get MW/MVA
-- **Sign convention**:
-    - *Substations*: positive = power flowing towards end-users; negative = excess generation flowing back into the grid
-    - *Customer meters (generators)*: positive = generator sending power to NGED's grid; negative = customer consuming power
+- **Sign convention** depends on the time series type:
+  - *Substations*: positive = power flowing towards end-users; negative = excess generation flowing back into the grid
+  - *Customer meters (generators)*: positive = generator sending power to NGED's grid; negative = customer consuming power
 
 ## Scope
 

@@ -13,6 +13,7 @@ uv run ruff check .            # check
 uv run ruff check . --fix      # fix
 uv run ruff format .           # format
 uv run ty check                # type checking
+uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md  # markdown lint
 
 # Testing
 uv run pytest                                # all tests
@@ -24,6 +25,11 @@ uv run dg dev                  # open http://localhost:3000
 # Marimo notebooks
 uv run marimo edit packages/notebooks/some_notebook.py
 ```
+
+Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
+pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint
+command above yourself before committing, for faster feedback than waiting on the commit-time
+hook.
 
 ## Architecture
 
@@ -45,6 +51,7 @@ This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is t
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 
 Three main assets:
+
 - `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts metadata parquet
 - `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP aggregation
 - `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP, scales to `Int16`, writes to Delta Lake
@@ -66,6 +73,7 @@ All tabular data flowing through the system is validated with **Patito** models.
 **Critical design invariant — no lookahead bias:** `power_fcst_init_time` (when we make the forecast) is distinct from `nwp_init_time` (when the NWP model ran). Power lag features are nullified via `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time. Weather lags use a dual-strategy join: same NWP run for future target times, freshest NWP run for past target times.
 
 Two operating modes:
+
 - **Bulk training and multi-run backtesting** (recommended for most callers): `power_fcst_init_time` is `None`; it is derived per-row as `nwp_init_time + nwp_publication_delay_hours`.
 - **Single-run inference or backfilling**: `power_fcst_init_time` is provided; NWP is joined on `(time_series_id, valid_time, nwp_init_time)` for the one matching NWP run.
 
@@ -92,6 +100,7 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
   is encouraged — e.g. a docstring pointing at a page in `docs/architecture/`.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
+
   ```python
   MY_CONST: Final[str] = "value"
   """One-line summary.
@@ -99,6 +108,7 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
   Optional further detail.
   """
   ```
+
 - `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
 - All function signatures must have complete type hints including return types.
 - All consts must be marked with the maximally "constant" type.
@@ -119,6 +129,7 @@ These rules are all about making Polars code easy to read.
 
 - **`Literal` type aliases — use a `Type` suffix** to distinguish them from the runtime tuples
   that drive Polars `Enum` declarations. Example:
+
   ```python
   EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
   """Runtime tuple — used as pl.Enum(EVALUATION_SCOPES)."""
@@ -126,6 +137,7 @@ These rules are all about making Polars code easy to read.
   EvalScopeType = Literal["leaderboard", "ad_hoc"]
   """Type annotation — currently-implemented subset; update when adding a new scope."""
   ```
+
   The `Type`-suffixed alias is what goes in function signatures; the `UPPER_SNAKE_CASE` tuple is
   what goes into `pl.Enum(...)`. They serve different purposes and should both exist.
 

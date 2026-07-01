@@ -118,6 +118,7 @@ class AllFeatures(pt.Model):
 
         This custom validation step is crucial for preventing weather forecast leakage
         and ensuring data integrity. We enforce uniqueness on the combination of:
+
         - `time_series_id`: Identifies the specific substation/time series.
         - `power_fcst_init_time`: The initialization time of the power forecast.
         - `valid_time`: The target time for which the forecast is made.

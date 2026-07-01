@@ -231,6 +231,7 @@ class ParsedFeatures:
         """Determine if the requested features require weather (NWP) data.
 
         This checks:
+
         1. If any lookback features (lags or rolling means) are based on weather variables.
         2. If any static features (like windchill) require weather variables.
         3. If any raw weather features are requested directly.

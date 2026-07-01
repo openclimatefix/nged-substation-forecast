@@ -111,7 +111,7 @@ MLflow experiment and partition keys rather than creating duplicates.
 
 The MLflow run structure after training looks like this:
 
-```
+```text
 Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
@@ -210,7 +210,7 @@ in the run config dialog before launching.
 
 After step 8, the MLflow run structure looks like this:
 
-```
+```text
 Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …

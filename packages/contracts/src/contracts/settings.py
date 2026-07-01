@@ -15,6 +15,7 @@ class DataQualitySettings(BaseSettings):
     """Settings for data quality thresholds in substation flow processing.
 
     These thresholds are used to identify problematic telemetry data:
+
     - `stuck_std_threshold`: When the rolling standard deviation falls below this value
       (across `stuck_window_periods`), the sensor is likely stuck. We replace such
       values with null to preserve the temporal grid. A value of 0.01 MW was chosen
