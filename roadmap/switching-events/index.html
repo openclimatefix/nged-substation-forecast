@@ -1,0 +1,1910 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../differentiable-physics/">
+      
+      
+        <link rel="next" href="../disaggregation-evaluation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Switching Events - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#estimating-latent-demand-under-switching-events-approach-implementation-roadmap" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Switching Events
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-the-graph-structure-and-why-it-is-not-a-gnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — The graph structure (and why it is not a GNN)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-the-staged-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — The staged roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — The staged roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview-of-the-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview of the ladder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v06-unsupervised-statistical-switching-event-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.6 — Unsupervised statistical switching-event detector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.6 — Unsupervised statistical switching-event detector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-per-series-weathercalendar-baseline-then-detect-changepoints-on-the-residual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1. Per-series weather/calendar baseline, then detect changepoints on the residual.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-node-level-coincidence-balance-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2. Node-level coincidence / balance attribution.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-composition-corroboration-post-attribution-per-recipient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3. Composition corroboration (post-attribution, per recipient).
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v25-magnitude-only-mixture-model-the-workhorse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.5 — Magnitude-only mixture model (the workhorse)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v26-type-resolved-mixture-with-differentiable-physics-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.6 — Type-resolved mixture with differentiable physics modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-3-considered-but-rejected-the-feeder-block-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 3 — Considered but rejected: the feeder-block model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-4-cross-cutting-implementation-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 4 — Cross-cutting implementation requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-5-open-items-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 5 — Open items / dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#part-1-the-graph-structure-and-why-it-is-not-a-gnn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 1 — The graph structure (and why it is not a GNN)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-2-the-staged-roadmap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 2 — The staged roadmap
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Part 2 — The staged roadmap">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview-of-the-ladder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview of the ladder
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v06-unsupervised-statistical-switching-event-detector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.6 — Unsupervised statistical switching-event detector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v0.6 — Unsupervised statistical switching-event detector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#stage-1-per-series-weathercalendar-baseline-then-detect-changepoints-on-the-residual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 1. Per-series weather/calendar baseline, then detect changepoints on the residual.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-2-node-level-coincidence-balance-attribution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 2. Node-level coincidence / balance attribution.
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stage-3-composition-corroboration-post-attribution-per-recipient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stage 3. Composition corroboration (post-attribution, per recipient).
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#other-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v25-magnitude-only-mixture-model-the-workhorse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.5 — Magnitude-only mixture model (the workhorse)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#v26-type-resolved-mixture-with-differentiable-physics-modules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2.6 — Type-resolved mixture with differentiable physics modules
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-3-considered-but-rejected-the-feeder-block-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 3 — Considered but rejected: the feeder-block model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-4-cross-cutting-implementation-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 4 — Cross-cutting implementation requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#part-5-open-items-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Part 5 — Open items / dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="estimating-latent-demand-under-switching-events-approach-implementation-roadmap">Estimating Latent Demand Under Switching Events — Approach &amp; Implementation Roadmap</h1>
+<p><strong>Scope.</strong> How to estimate, for each NGED primary substation, its <em>latent demand under the normal running arrangement</em> — the demand that would be metered if the network were never reconfigured — given that the network is in fact reconfigured roughly 10% of the time by switching events. Background on what switching events are and why they are hard is at <a href="../../background/switching-events/"><strong>Switching Events</strong></a>. This document defines the staged modelling plan (v0.6 → v2.5 → v2.6).</p>
+<blockquote>
+<p><strong>Status: 🔬 Research / 🚧 Planned.</strong> None of this is implemented yet. The v0.6 unsupervised
+statistical detector is the nearest-term piece (it feeds the
+<a href="../delivery-tables/#table-5-substation_switching"><code>substation_switching</code></a> table and the
+training-data mask); the v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is
+not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
+<a href="../">roadmap index</a> for status conventions and where this fits the overall plan. This is the
+<strong>canonical</strong> treatment of switching events — it supersedes the earlier "switching state-space
+model" sketch in <a href="../differentiable-physics/">differentiable physics</a>.</p>
+</blockquote>
+<hr />
+<h2 id="part-1-the-graph-structure-and-why-it-is-not-a-gnn">Part 1 — The graph structure (and why it is not a GNN)</h2>
+<p>A <strong>graph</strong> is just <strong>nodes</strong> connected by <strong>edges</strong>. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a <em>cross-substation</em> phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the <em>same power moving</em>.</p>
+<p>It is worth being explicit, because the term invites confusion: <strong>none of the approaches in this document require a graph neural network (GNN).</strong> A GNN is a <em>trained</em> model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a <strong>data structure</strong> — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even <em>eligible</em> to exchange load, pruning an otherwise <code>N × N</code> problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.</p>
+<p>In short: the graph tells us <em>who can connect to whom</em>; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.</p>
+<blockquote>
+<p><strong>A note on differentiable physics.</strong> Only the v2.6 stage uses <em>differentiable physics</em>: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based <strong>inversion</strong> (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in <a href="../differentiable-physics/">Differentiable Physics</a>, which is the single source of truth for that machinery; we do not re-derive it here.</p>
+</blockquote>
+<hr />
+<h2 id="part-2-the-staged-roadmap">Part 2 — The staged roadmap</h2>
+<p>Version numbers are aligned with the main codebase: <strong>v0.6</strong>, then <strong>v2.5</strong>, then <strong>v2.6</strong>. Each stage states its motivation, what it adds, what it misses, and its trade-offs. (Although, note that we haven't fully specified the roadmap <em>after</em> v2, so read "v2.x" as just meaning "some time after v2 is operational"). Escalation between stages must be justified by <em>measured residual structure at the previous stage</em>, not by anticipation — this keeps effort matched to demonstrated need.</p>
+<h3 id="overview-of-the-ladder">Overview of the ladder</h3>
+<div class="highlight"><pre><span></span><code>v0.6  ── Unsupervised statistical detector on power data.
+  │       Flags/masks switching events; VALIDATED against the 32-series logs.
+  │       Produces the detection sensitivity floor (a quantified, honest limit).
+  │
+v2.5  ── Magnitude-only mixture model. The workhorse.
+  │       Reconstructs latent NRA demand per substation. Fully unsupervised.
+  │       Faithful to &quot;arbitrary continuous slice, multi-donor&quot; transfer.
+  │
+v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
+          Lets a switching event move proportionally more PV than load.
+</code></pre></div>
+<hr />
+<h3 id="v06-unsupervised-statistical-switching-event-detector">v0.6 — Unsupervised statistical switching-event detector</h3>
+<p><strong>Goal.</strong> Flag periods of abnormal running arrangement using simple statistics on the power time series. <strong>No GNN, no differentiable physics, no latent-variable inference, no switching-log inputs.</strong></p>
+<p><strong>Motivation.</strong> Before any reconstruction model, we need to (a) flag/mask switching-affected periods so they stop poisoning forecasting training data; (b) produce an evaluation set to validate heavier models later; and (c) — critically — <em>quantify how well switching events can be detected from power data at all</em>, since at scale that is the only signal available.</p>
+<p><strong>Method — three stages, in order:</strong></p>
+<h4 id="stage-1-per-series-weathercalendar-baseline-then-detect-changepoints-on-the-residual">Stage 1. <strong>Per-series weather/calendar baseline, then detect changepoints on the residual.</strong></h4>
+<p>For each substation, form an expected-power baseline that is a function of <strong>exogenous, switching-independent covariates only</strong> — temperature, solar irradiance, recent weather, time-of-day, day-of-week, holidays — fitted across a long history (e.g. an XGBoost or GAM regression). Take the residual (observed − expected). A switching event then shows up as a <em>sustained level shift</em> in this residual — not a spike, not a slope. Detect level shifts with a standard mean-shift changepoint method (PELT or binary segmentation with an L2 cost, or CUSUM). <strong>Output:</strong> candidate step times and magnitudes per substation.</p>
+<p><strong>Why the baseline must be weather/calendar-based and <em>not</em> a lagged-power baseline.</strong> A tempting cheap baseline is "same half-hour last week." It is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the <strong>sign reversed</strong>, because the contamination is in the <em>reference</em>, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact, manufacturing phantom events and mis-attributing them. Worse, because switching events can persist for days to months, a lag can land <em>inside the same ongoing event</em>, so there is no step at all and a real event is masked entirely. Weather and clock time are unaffected by network topology, so a baseline built only from them cannot be contaminated by switching state — the residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.</p>
+<p><strong>Two residual-contamination routes to handle:</strong></p>
+<ul>
+<li><em>Training-set contamination.</em> If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit <strong>robustly</strong> (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data.</li>
+<li><em>Persistent events.</em> A months-long ARA appears as a residual level shift that <em>stays</em> shifted, not a transient. The changepoint detector handles this (it catches the onset step), but the baseline must <strong>not</strong> be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.</li>
+</ul>
+<h4 id="stage-2-node-level-coincidence-balance-attribution">Stage 2. <strong>Node-level coincidence / balance attribution.</strong></h4>
+<p>A level shift at one substation could be many things (fault, new connection, meter error). What makes it a <em>switching event</em> is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that <em>collectively balance</em>. Because transfers fan out to 2–3 neighbours, <strong>do not match pairwise.</strong> Instead, for each candidate drop of magnitude <code>Δ</code> at substation <code>i</code> at time <code>t</code>, solve a small constrained attribution: <em>which subset of <code>i</code>'s neighbours show coincident rises (≈ <code>t</code>) that sum to ≈ <code>Δ</code>?</em> With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — it is what keeps the search to a handful of substations rather than all <code>N</code>. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."</p>
+<div class="highlight"><pre><span></span><code>residuals around time t (observed - expected), one row per substation:
+
+ source  i :   ‾‾‾‾‾‾|____________   drop of Δ = 9 MW at t
+                     t
+
+ nbr     j :   ______|‾‾‾‾‾‾‾‾‾‾‾‾   rise +5
+ nbr     k :   ______|‾‾‾‾‾‾‾‾‾‾‾‾   rise +4
+ nbr     m :   ____________________  no change (0)   &lt;- correctly excluded
+                     t
+
+ balance test:  +5 (j) + 4 (k) = 9  ==  Δ at i      -&gt; switching event, donors {j,k}
+                (pairwise matching would FAIL: neither j nor k alone equals 9)
+</code></pre></div>
+<h4 id="stage-3-composition-corroboration-post-attribution-per-recipient">Stage 3. <strong>Composition corroboration (post-attribution, per recipient).</strong></h4>
+<p><em>Aim.</em> Stages 1–2 tell us <em>that</em> a switching event happened, <em>when</em>, and <em>how much net power</em> moved to each donor. They do <strong>not</strong> tell us <em>what kind</em> of power moved. A slice of the network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the <em>net</em> (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one might be 8 MW of demand with negligible generation, another might be 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a cheap, qualitative read on that make-up: <em>was the moved slice demand-dominated, PV-dominated, or wind-dominated?</em> This is corroboration and enrichment, not detection — it does not change whether we flagged the event, but it characterises it.</p>
+<p><em>Why we want it.</em> Three uses. (a) <strong>Sanity-checking the attribution:</strong> a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) <strong>A free preview of v2.6:</strong> the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap one. (c) <strong>Richer event labels:</strong> the delivered event list becomes "source → donors, magnitude <em>and</em> rough composition per leg," which is more useful to NGED and to downstream stages.</p>
+<p><em>Mechanism.</em> The make-up of a slice is exposed by <em>when, within the day,</em> its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor <code>j</code> picked up some load at event onset, look at the <strong>shape of <code>j</code>'s residual step across the hours of the day</strong> (e.g. average the step magnitude by half-hour-of-day over the event's duration):</p>
+<ul>
+<li>a step that appears mainly around <strong>midday and vanishes overnight</strong> → the moved slice was <strong>PV-heavy</strong> (PV only generates in daylight, so a slice rich in PV changes <code>j</code>'s net power most when the sun is up);</li>
+<li>a step that is <strong>roughly flat, or tracks the evening demand peak</strong> → <strong>demand-heavy</strong>;</li>
+<li>a step that is <strong>large but uncorrelated with daylight, gusty/variable</strong> → <strong>wind-heavy</strong>.</li>
+</ul>
+<p>This is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching the spirit of v0.5.</p>
+<p><em>Order matters — read composition off the recipient, never the source.</em> The diurnal shape must be measured on <strong>each recipient's individual step</strong>, <em>after</em> attribution has identified which donor took which leg. It must <strong>not</strong> be read off the source substation's lumped drop. The reason: a source commonly sheds <em>different</em> slices to <em>different</em> donors at once — say a PV-heavy slice to donor <code>j</code> and a demand-heavy slice to donor <code>k</code>. The source's own residual shows only the <em>sum</em> of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what <code>j</code> got" vs. "what <code>k</code> got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)</p>
+<h4 id="other-notes">Other notes</h4>
+<p><strong>Validation against the 32-series logs (this is the point).</strong> Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the <strong>detection sensitivity floor</strong>: the transferred-magnitude threshold above which we reliably detect events and below which we cannot. Pair this with the forecast impact of missed small events. <em>The detector must not consume the logs as input — only as a scoring oracle.</em></p>
+<p><strong>Diagnostic precursor.</strong> Before formal changepoints, a near-trivial check: first-difference each residual (steps → spikes) and, over rolling windows, confirm that a source's negative spike coincides with the <em>summed</em> rises of a neighbour subset. If known-neighbour groups show no such coincidence, the neighbour list or baseline is wrong — fix that first.</p>
+<p><strong>What it delivers.</strong> A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.</p>
+<p><strong>What this approach misses / cons.</strong></p>
+<ul>
+<li>Misses slow/gradual reconfigurations (because changepoint detection algos assume abrupt shift).</li>
+<li>Misses small partial transfers near the noise floor — but these are both the <em>hardest</em> and (per the tolerance principle) the <em>least important</em> for the forecast, so the failure mode is aligned with priorities. The sensitivity floor makes this limit explicit rather than hidden.</li>
+<li><strong>Blind to events that straddle the start of the record.</strong> A switching state already in force before the data begins has no observable onset — it is only detectable if and when it <em>ends</em>. This is a structural blind spot, not a fixable one, and belongs in the sensitivity-floor reporting alongside the magnitude threshold.</li>
+<li>Struggles with temporally overlapping events on one neighbourhood.</li>
+<li>Composition read-off is qualitative only.</li>
+</ul>
+<p><strong>Pros.</strong></p>
+<ul>
+<li>Trivial to build and debug; transparent; every flag is human-interpretable.</li>
+<li>Runs unsupervised, exactly as the scale regime demands.</li>
+<li>Produces the masking artifact and the honest sensitivity floor that everything downstream relies on.</li>
+<li>De-risks the programme at minimal cost.</li>
+</ul>
+<hr />
+<h3 id="v25-magnitude-only-mixture-model-the-workhorse">v2.5 — Magnitude-only mixture model (the workhorse)</h3>
+<p><strong>Goal.</strong> Reconstruct a latent NRA demand <code>d_i(t)</code> per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.</p>
+<p><strong>Motivation.</strong> v0.6 only flags events; it does not reconstruct the clean NRA signal. v2.5 is the simplest model that actually <em>produces</em> latent demand — and it does so <strong>without modelling anything below the primary</strong>, sidestepping the (non-existent) feeder-discovery problem entirely. The latent objects are the substations themselves, which we observe. This is the workhorse: faithful to how the network actually behaves, and fully unsupervised.</p>
+<p><strong>Method.</strong> Each substation <code>i</code> has a latent normal-demand signal <code>d_i(t)</code>. Observed power is a time-varying mixture over the neighbourhood:</p>
+<div class="highlight"><pre><span></span><code>observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
+</code></pre></div>
+<ul>
+<li><strong>The neighbourhood is the graph:</strong> <code>neighbours(i)</code> is exactly <code>i</code>'s neighbour set in the network graph, so the edges act as a <em>sparsity pattern</em> on the mixing matrix — most <code>α_ij</code> are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an <code>N × N</code> free-for-all.</li>
+<li>Under NRA: <code>α_ii ≈ 1</code>, <code>α_ij ≈ 0</code>.</li>
+<li>During an ARA: weight shifts from a source onto <strong>one or more</strong> neighbours. Multiple <code>α_ij(t)</code> may be active at once for a single source.</li>
+<li><strong>Conservation = node-level flow balance:</strong> weight leaving <code>i</code> is distributed across a subset of neighbours and must sum to the weight lost at <code>i</code> (approximately mass-preserving over the affected neighbourhood). <strong>Do not</strong> implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.</li>
+<li><strong>Priors / regularisation:</strong> <code>α(t)</code> strongly regularised toward the identity (NRA) and <strong>piecewise-constant in time</strong>, because switching events are rare (~10%) and abrupt. A useful by-product: jumps in <code>α</code> are directly interpretable as detected switching events.</li>
+</ul>
+<p><strong>Why "arbitrary continuous slice" is handled natively.</strong> <code>α_ij(t)</code> is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact <em>fidelity</em> to a network where the transferred amount is genuinely continuous and the cut point is free.</p>
+<p><strong>What it adds over v0.6.</strong></p>
+<ul>
+<li>Produces the actual latent NRA demand signal, not just event flags.</li>
+<li>Models routing continuously rather than detecting it after the fact.</li>
+<li>Accommodates multi-donor partial transfer through the summed mixture + node-level balance.</li>
+</ul>
+<p><strong>What it misses / cons.</strong></p>
+<ul>
+<li>A fractional mixture <code>α_ij·d_j</code> moves a <em>scaled copy of neighbour j's whole aggregate demand</em>. The slice that really moved may have a <em>different shape</em> (e.g. unusually PV-heavy). v2.5 can match the step magnitude but carries the wrong shape with it. <strong>Important nuance:</strong> because there is <em>no stable sub-unit</em> with a "true" recoverable shape (movable cut points), this is largely <strong>not a fixable limitation</strong> — v2.5's approximation is about as good as the data structurally permits for the <em>demand</em> total. v2.6 only partially improves it, and only for the DER component.</li>
+<li>DERs are folded implicitly into <code>d_i</code> (no explicit PV/wind separation yet).</li>
+</ul>
+<p><strong>Pros.</strong></p>
+<ul>
+<li>Well-posed, identifiable, far easier to fit than any sub-primary model.</li>
+<li>No sub-primary modelling whatsoever; fully unsupervised; scales.</li>
+<li>Degrades gracefully; faithful to continuous, multi-donor, partial transfer.</li>
+<li>The right workhorse: build it, measure residual structure around detected events, escalate only if residuals show systematic shape error.</li>
+</ul>
+<hr />
+<h3 id="v26-type-resolved-mixture-with-differentiable-physics-modules">v2.6 — Type-resolved mixture with differentiable physics modules</h3>
+<p><strong>Goal.</strong> Decompose each substation into physically-typed components (demand, PV, wind), each from its own differentiable module, and let each <em>type</em> transfer with its own routing weights — so a switching event can move proportionally more PV than load.</p>
+<p><strong>Motivation.</strong> v2.5's residual error is wrong-<em>shape</em> transfer. Part of that shape error is <em>type mix</em>: the moved slice may carry disproportionate PV or wind relative to the parent's aggregate. Separating the physical types lets the model represent that. The differentiable modules also clean the meter of DERs generally (PV/wind net off demand whether or not switching occurs), which is independently valuable.</p>
+<p><strong>Method.</strong> Decompose each substation into typed components, each from its own differentiable forward module:</p>
+<div class="highlight"><pre><span></span><code>d_i(t) = gross_demand_i(t)
+       − pv_metered_i(t)   − pv_unmetered_i(t)
+       − wind_metered_i(t) − wind_unmetered_i(t)
+</code></pre></div>
+<ul>
+<li><strong>Demand:</strong> temperature- and time-of-week-shaped.</li>
+<li><strong>PV:</strong> irradiance-driven (NWP/satellite) via differentiable panel physics (temperature/spectral correction, inverter clipping); capacity is a latent parameter.</li>
+<li><strong>Wind:</strong> wind speed via a differentiable power curve.</li>
+<li><strong>Metered vs unmetered split:</strong> metered modules are tightly constrained by registered capacity/generation and mainly <em>remove</em> known generation cleanly; unmetered modules carry the genuine latent inference (latent capacity, latent siting), confined to the smaller residual — a meaningful conditioning win.</li>
+</ul>
+<p>Mixing operates <strong>per component-type</strong>, each with its own routing weights:</p>
+<div class="highlight"><pre><span></span><code>observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
+                    − α^pv_ij(t)·pv_j(t)
+                    − α^wind_ij(t)·wind_j(t) ]
+</code></pre></div>
+<p>Each substation is now a small <em>bundle</em> of typed nodes rather than one node, and routing happens per type. But the graph stays a plain <strong>data structure</strong>, exactly as in the earlier stages: when the i→j boundary is active, each <em>type</em> moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.</p>
+<p><strong>Prior structure.</strong></p>
+<ol>
+<li><strong>Coupled switching, separate composition.</strong> A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent <strong>switching indicator per ordered pair</strong>, <code>s_ij(t) ∈ {0,1}</code>, piecewise-constant and sparse, governing <em>whether</em> the i→j boundary is active; the <strong>type composition</strong> (what fraction of demand/PV/wind rides along) applies only when <code>s_ij(t)=1</code>. Types switch <em>together</em>; the moved slice can still be disproportionately one type.</li>
+<li><strong>Per-pair composition prior — DOWNGRADED.</strong> An earlier design proposed a <em>learnable per-boundary</em> prior <code>θ_ij</code> ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. <strong>This is downgraded to at most a weak, shared empirical prior, or dropped entirely.</strong> Reason: movable cut points mean a boundary has <em>no stable composition</em> — what crosses depends on where the switch was opened this time — and <code>θ_ij</code> could not be fitted at scale anyway, since that requires labels we won't have. Do <strong>not</strong> rely on per-boundary learned composition.</li>
+<li><strong>Multi-donor (one-to-many).</strong> As in v2.5, several <code>s_ij(t)</code> may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.</li>
+</ol>
+<p><strong>What it adds over v2.5.</strong></p>
+<ul>
+<li>Captures disproportionate-<em>type</em> transfer (more PV than load can move).</li>
+<li>Differentiable modules give separately-shaped PV/wind/demand signals, so a step can be attributed to the right type by its temporal signature (midday irradiance-shaped → PV; evening temperature-tracking → load).</li>
+<li>Cleans DERs from the demand estimate generally, not just during switching.</li>
+</ul>
+<p><strong>What it misses / cons.</strong></p>
+<ul>
+<li>Still moves a <em>scaled fraction of neighbour j's total PV/wind/demand</em>, not the specific moved slice's profile. Fixes wrong <em>type-mix</em>; does <strong>not</strong> fix wrong <em>within-type shape</em>. Given movable cut points, the within-type shape is not stably recoverable anyway, so this residual is largely irreducible and almost certainly second-order for forecasting.</li>
+<li>Larger latent space (three routing matrices): risk the optimiser trades PV- vs wind- vs demand-transfer to fit one step. <strong>Mitigation:</strong> the three types have distinct observable temporal signatures and cannot masquerade as each other if priors lean on irradiance/wind/temperature covariates; regularise each routing weight toward identity and piecewise-constant. When genuinely confounded (a windless, overcast event), accept non-identifiability and let uncertainty reflect it.</li>
+</ul>
+<p><strong>Pros.</strong></p>
+<ul>
+<li>Physically grounded; the extra freedom is tied to physics, not invented structure.</li>
+<li>Still only primary-level objects; no sub-primary modelling; unsupervised; scales.</li>
+<li>Produces interpretable DER estimates as a by-product.</li>
+</ul>
+<hr />
+<h2 id="part-3-considered-but-rejected-the-feeder-block-model">Part 3 — Considered but rejected: the feeder-block model</h2>
+<p>An earlier plan included a further stage that modelled the <strong>actual switchable physical units (feeders / load blocks)</strong> explicitly — decomposing each substation into discrete blocks, each routed as a unit. <strong>This stage is retired</strong>, for two independent and decisive reasons:</p>
+<ol>
+<li><strong>The unit does not exist.</strong> NGED have been explicit that the network is meshed and run radially with movable cut points; load is a near-continuous distribution splittable almost anywhere. There is no stable, re-identifiable feeder with a persistent identity or composition to discover and route. The model would be trying to recover units that do not persist.</li>
+<li><strong>It lives in the unlabelled regime.</strong> This stage is precisely what would run at full scale (~1,161 primary substations), where <strong>no switching labels exist.</strong> Any block model that needed supervision to identify blocks is doomed there twice over.</li>
+</ol>
+<p><strong>Possible deferred successor (a research bet, not a planned step).</strong> If within-type shape error in v2.6 ever proves to materially hurt the forecast, the conceptually correct (but much harder) direction is to model <strong>load as distributed along network arcs with movable cut points</strong>, inferring the cut location rather than assuming discrete blocks. This is a genuine spatial-inference research problem and should be explicitly <em>deferred</em>, not chased — and only entertained if v2.6 residuals demonstrate the need.</p>
+<hr />
+<h2 id="part-4-cross-cutting-implementation-requirements">Part 4 — Cross-cutting implementation requirements</h2>
+<p>These apply at every stage and are the things most easily got wrong:</p>
+<ul>
+<li><strong>Fully unsupervised at runtime.</strong> The production model uses <strong>power time series only</strong>. Switching logs are never a runtime input. They exist for the 32-series trial only, and serve exclusively as a <strong>gold-standard test set</strong>.</li>
+<li><strong>Do not fit pilot-only parameters and rely on them at scale.</strong> Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a production dependency. The <em>method</em> generalises; a pilot lookup does not.</li>
+<li><strong>Conservation is node-level flow balance, everywhere.</strong> One source's lost power is absorbed by a <em>subset</em> of neighbours whose pickups sum to it. Never implement conservation as independent pairwise equal-and-opposite matches — confirmed 2–3-way fan-out makes that wrong.</li>
+<li><strong>Composition is read from recipients, never the source.</strong> Any per-leg composition estimate (v0.6 stage 3) must come from each recipient's individual step <em>after</em> attribution; the source's step blends all simultaneous outgoing legs.</li>
+<li><strong>Partial transfer is the common case.</strong> Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor; do not assume a clean event/no-event separation.</li>
+<li><strong>Routing/switching priors:</strong> regularise toward the identity (NRA) and piecewise-constant in time; switching is rare and abrupt.</li>
+<li><strong>Metered vs unmetered DER</strong> kept as separate modules from v2.6 onward; metered tightly constrained, unmetered carrying the latent inference.</li>
+<li><strong>Interpretability artifacts</strong> (detected events, inferred <code>s_ij</code>, DER estimates) are deliverables in their own right for NGED validation, not just internal state.</li>
+</ul>
+<hr />
+<h2 id="part-5-open-items-dependencies">Part 5 — Open items / dependencies</h2>
+<ul>
+<li><strong>Switching logs for the 32-series trial</strong> (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. <strong>Not</strong> available at full scale — this asymmetry drives the whole design.</li>
+<li><strong>Neighbour/adjacency structure</strong> for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.</li>
+<li><strong>Confirmed by NGED:</strong> (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.expand", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
