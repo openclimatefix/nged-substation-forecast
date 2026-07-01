@@ -2,18 +2,18 @@
 
 ## Context
 
-Issue #145 (v0.5): quick wins to make XGBoost a strong baseline before the advanced approaches
+Issue [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) (v0.5): quick wins to make XGBoost a strong baseline before the advanced approaches
 land — explicitly *not* deep ML work ("little point in spending ages on the ML model before we
 have good capacity estimation"). This plan merges its nine sub-issues with additional tricks
 from the codebase review, ordered **best bang-for-the-buck first** (expected skill per unit
 effort), grouped into effort tiers.
 
 **Deferred until v0.1 is running on AWS** — getting *any* forecast live takes priority over
-forecast quality; see the sequencing in `00_review_findings.md` (01 → 09 → 05 → 13 → 10, then
-this plan).
+forecast quality; see the sequencing in `00_review_findings.md` (01 → 02 → 03 → 04 → 05, then
+this plan, 09).
 
-**Measure before optimising.** Land plan 02 (persistence/climatology baselines — without them
-"improved" is unanchored) and plan 03 Phase A (horizon-sliced metrics — several wins below are
+**Measure before optimising.** Land plan 06 (persistence/climatology baselines — without them
+"improved" is unanchored) and plan 07 Phase A (horizon-sliced metrics — several wins below are
 horizon-specific and invisible in the `"all"` aggregate) first. Each win is one registered
 experiment (`register_experiment_job`) scored against the current champion on the leaderboard
 fold; headline metric NMAE, sliced by horizon and `time_series_type`. Several items interact
@@ -77,7 +77,7 @@ EWM of `temperature_2m` over the past ~1–3 days (computed from the NWP traject
 horizon-safe) plus heating-degree `max(15.5 − T, 0)`. Linearises the demand–temperature
 relationship the same way item 7 does for generation.
 
-### 7. Linearised physics features for solar and wind (#168)
+### 7. Linearised physics features for solar and wind ([#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168))
 
 Trees are poor at smooth monotone functions; give them the physics directly:
 
@@ -132,7 +132,7 @@ Each series currently gets its nearest NWP cell only. Add the mean and gradient 
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
 expected gain, cheap given the `geo` H3 machinery exists.
 
-### 12. Per-`time_series_type` feature lists (#201)
+### 12. Per-`time_series_type` feature lists ([#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201))
 
 YAML gains `selected_features_by_type: {type: [...]}` with the existing `selected_features` as
 the default for unlisted types. Boosters are already per-series, so each can resolve its
@@ -142,30 +142,30 @@ in `meta.json`. Becomes genuinely valuable once items 4–9 diverge the useful f
 
 ## Tier 4 — structural model changes (weeks)
 
-### 13. Per-horizon-window models (#149)
+### 13. Per-horizon-window models ([#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149))
 
 One booster per `(time_series_id, horizon_window)` — e.g. 0–2 d, 2–7 d, 7–14 d, configurable.
 Train and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a window dimension.
-**Requires plan 03 Phase A to evaluate** — its win is by construction horizon-sliced. Compare
+**Requires plan 07 Phase A to evaluate** — its win is by construction horizon-sliced. Compare
 against item 1 first: if the lead-time feature captures most of the benefit, the extra model
 count may not pay.
 
-### 14. Batched training via `xgb.DataIter` (#91 — enabler)
+### 14. Batched training via `xgb.DataIter` ([#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) — enabler)
 
-Issue #91 already contains a complete, validated implementation design (`LazyFrameBatchIter` +
+Issue [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) already contains a complete, validated implementation design (`LazyFrameBatchIter` +
 `QuantileDMatrix`, grouping-agnostic, no temp disk, `train_batch_size` config field) — treat
 the issue body as the plan and implement as written. No direct skill gain; unblocks 15 and 16.
 
-### 15. Train on more ensemble members (#148 — after 14)
+### 15. Train on more ensemble members ([#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) — after 14)
 
 Training on all 51 members multiplies training data ~51× for correlated rows. Run the
 dose-response experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP
 loader already takes `ensemble_members: list[int]`, `cv_assets.py:237`). Training on members
 also teaches the model the member-spread input distribution it actually sees at inference —
-the train/serve input-skew flagged in the review. Ensemble *calibration* itself is plan 03's
+the train/serve input-skew flagged in the review. Ensemble *calibration* itself is plan 07's
 territory.
 
-### 16. Global model per `time_series_type` (#104)
+### 16. Global model per `time_series_type` ([#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104))
 
 One booster for all primaries, one for all PV sites, etc. — the biggest potential win for
 data-poor series (transfer across sites), and the stepping stone to V2 scale. **Hard
@@ -177,20 +177,20 @@ boundary of "quick".
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **#167 CERRA pre-training** — needs a whole new data-source ingestion (CERRA download,
+- **[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) CERRA pre-training** — needs a whole new data-source ingestion (CERRA download,
   contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
   belongs to `docs/ml_experimentation/evaluating-new-data-sources.md`.
-- **#198 NWP row-group layout** — throughput, not skill (~1 h per 51-member fold prediction is
+- **[#198](https://github.com/openclimatefix/nged-substation-forecast/issues/198) NWP row-group layout** — throughput, not skill (~1 h per 51-member fold prediction is
   decode-bound). Do it when experiment iteration speed becomes the bottleneck — likely around
   item 15, which multiplies NWP reads.
-- **#176 local-time power lags** — a DST edge case affecting a handful of half-hours per year;
+- **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power lags** — a DST edge case affecting a handful of half-hours per year;
   the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
   ever show a DST-transition artefact.
 
 ## Verification
 
 Each win lands as its own experiment on the leaderboard: register → `full_cv` → `metrics`
-(leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once plan 03A is
-in) against the current champion and the plan-02 baselines. Keep losing experiments in MLflow
+(leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once plan 07 Phase A is
+in) against the current champion and the plan-06 baselines. Keep losing experiments in MLflow
 (negative results are results); promote winners' settings into `conf/model/xgboost.yaml` one
 at a time so attribution stays clean.

@@ -2,7 +2,7 @@
 
 ## Finding
 
-The AWS deployment plan (issue #206, Level 1: hourly EventBridge → one-shot Fargate → exit) is
+The AWS deployment plan (issue [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), Level 1: hourly EventBridge → one-shot Fargate → exit) is
 the right architecture, but it never mentions MLflow — and the inference path loads models via
 `BaseForecaster.load_from_mlflow(run_id, cache_base_path)`
 (`packages/ml_core/src/ml_core/base_forecaster.py:140`). An ephemeral container has neither a
@@ -24,7 +24,7 @@ prod, and slower cold starts.
 - Multi-stage `uv` build (standard pattern: `ghcr.io/astral-sh/uv` image, `uv sync --frozen
   --no-dev`, copy `.venv` + source into a slim `python:3.14` runtime stage).
 - Build args: `PRODUCTION_MODEL_RUN_ID` (required), `GIT_SHA` (stamped as an OCI label and env
-  var; complements plan 04).
+  var; complements plan 08).
 - Model injection: keep the image build hermetic — the build **copies** the model directory
   from the build context (`data/model_cache/{run_id}/model`, populated beforehand by a small
   script `scripts/fetch_model.py` that calls `load_from_mlflow` against the researcher's

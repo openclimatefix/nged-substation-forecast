@@ -1,12 +1,12 @@
 # `live_forecasts` asset (production inference)
 
 *Merged from the Dagster ML-assets plan, Phase 7 — the first of its three remaining phases
-(see also plans 10 and 11). Phases 0–6.7 of that plan are complete (PRs #182–#214).*
+(see also plans 05 and 13). Phases 0–6.7 of that plan are complete (PRs #182–#214).*
 
 ## Context
 
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
-asset is what the deployed container (plan `05_production_model_artifacts.md`) will actually
+asset is what the deployed container (plan `03_production_model_artifacts.md`) will actually
 run every 6 hours: load the production model, forecast the latest NWP, write to
 `power_forecasts` with `fold_id="live"`.
 
@@ -48,7 +48,7 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
   this run's `power_fcst_init_time` rows in `power_forecasts` (`replaceWhere`), so re-running a
   6-hourly partition (or a replay) never duplicates rows.
 - **Logs nothing to MLflow.** A 6-hourly forecast run is not an experiment; live performance
-  is tracked by the monitoring scope (plan 10), never by this asset.
+  is tracked by the monitoring scope (plan 05), never by this asset.
 
 Implementation notes:
 
@@ -59,7 +59,7 @@ Implementation notes:
 - Reuse the identity-stamping tail shared with `cv_power_forecasts` (predict → stamp →
   validate) rather than duplicating it; extract a shared helper if one doesn't already exist.
 - File placement: `defs/cv_assets.py` is already 898 lines — put this in a new
-  `defs/production_assets.py` (the split plan 11 formalises).
+  `defs/production_assets.py` (the split plan 13 formalises).
 
 ## Tests
 
@@ -74,4 +74,6 @@ Implementation notes:
 
 Set `production_model_run_id` to a smoke-test model's fold run, materialise `live_forecasts`
 for the current partition, and confirm `fold_id="live"` rows in `power_forecasts` — then plot
-them via `plot_power_forecast_job` (`fold_id: "live"`).
+them via `plot_power_forecast_job` (`fold_id: "live"`). Running the job 6-hourly on a
+workstation for a few days, then back-filling any missed slots with `replay`, is exactly
+the test described in [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208).

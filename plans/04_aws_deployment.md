@@ -1,13 +1,13 @@
-# Deploy v0.1 to AWS (issue #206, Level 1)
+# Deploy v0.1 to AWS (issues #137 / #206, Level 1)
 
 ## Context
 
 **Top priority: get *any* forecast running on AWS.** Forecast quality does not matter yet — the
 science plans (02, 03, 12, …) wait until v0.1 is live. This plan is the Level 1 ("super
-simple") design from issue #206, which Peter endorsed ("go simple"), made concrete and merged
+simple") design from issue [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), which Peter endorsed ("go simple"), made concrete and merged
 with the review's caveats. Recommended sequencing across the plan set is in
-`00_review_findings.md`: **01 (CI) → 09 (`live_forecasts`) → 05 (container + baked model) →
-this plan → 10 (monitoring) → science.**
+`00_review_findings.md`: **01 (CI) → 02 (`live_forecasts`) → 03 (container + baked model) →
+this plan (04) → 05 (monitoring) → science.**
 
 ## Architecture recap (Level 1 — nothing always-on)
 
@@ -61,15 +61,15 @@ A new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
 2. **Ingest** — materialise `power_time_series_and_metadata`, and the missing `ecmwf_ens`
    daily partitions **computed from the Delta table's max `init_time` vs Dynamical
    availability** (an explicit op input, not Dagster partition status).
-3. **Forecast** — `live_forecasts` (plan 09) for the current slot, `availability_mode="live"`.
+3. **Forecast** — `live_forecasts` (plan 02) for the current slot, `availability_mode="live"`.
    The job wrapper computes the current time-window partition key from the clock (injected
    `now`, per repo convention) since one-shot execution must pass partitions explicitly.
-4. *(after plan 10 lands)* — append a `metrics(production_monitoring)` step; not a blocker.
+4. *(after plan 05 lands)* — append a `metrics(production_monitoring)` step; not a blocker.
 
 Keep each op a thin shell over unit-tested pure helpers (freshness comparison, missing-
 partition computation).
 
-## Workstream 3 — container (plan 05, unchanged)
+## Workstream 3 — container (plan 03, unchanged)
 
 Dockerfile with the champion model baked in (`PRODUCTION_MODEL_RUN_ID` build arg → model dir
 copied into the image's cache path), entrypoint `dagster job execute` on the job above. MLflow
@@ -90,7 +90,22 @@ source credentials via Secrets Manager/SSM references in the task definition.
 - **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
 - Codify as a small Terraform module (one file is fine) so the environment is reproducible;
   document the few one-time manual steps (SNS subscription confirm) in a runbook page
-  (`docs/architecture/production-deployment.md`, extending plan 05's runbook).
+  (`docs/architecture/production-deployment.md`, extending plan 03's runbook).
+
+
+## Related GitHub issues (sub-issues of the [#137 v0.1 epic](https://github.com/openclimatefix/nged-substation-forecast/issues/137))
+
+| Issue | Where it lands in this plan |
+|---|---|
+| [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This plan (the Level 1 design is in its last comment) |
+| [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | Workstream 1 |
+| [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Workstream 1 |
+| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Workstream 2 + the local dress rehearsal (also exercises plan 02's replay mode) |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
+| [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | The NGED-delivery projection — part of the epic, deferred from "forecast running" |
+| [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Mostly plan 10 (clip logging); ingestion op metadata here |
+| [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Largely superseded once S3 is the primary store; close or re-scope when this ships |
+| [#209 Bump version number to v0.1](https://github.com/openclimatefix/nged-substation-forecast/issues/209) | The final ship step |
 
 ## Verification
 

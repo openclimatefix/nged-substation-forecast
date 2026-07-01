@@ -15,6 +15,10 @@ storm winds, record pressure lows), they are silently flattened to the boundary 
 exactly the extreme-weather inputs that matter most for peak forecasting, with no signal that
 it happened.
 
+Related: [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) asks for more Dagster-UI metrics and validation checks on NWP
+ingestion — the clip counts here are the highest-value of those checks; close or trim #161
+accordingly when this lands.
+
 ## Implementation
 
 ### 1. Pure counting helper in contracts

@@ -1,6 +1,6 @@
 # `production_monitoring` scope, `monitoring_sensor`, `retire_experiment_job`
 
-*Merged from the Dagster ML-assets plan, Phase 8. Depends on plan 09 (`live_forecasts`) —
+*Merged from the Dagster ML-assets plan, Phase 8. Depends on plan 02 (`live_forecasts`) —
 there is nothing to monitor until live forecasts exist.*
 
 ## Context
@@ -60,9 +60,9 @@ Retirement does **not** delete MLflow runs or Delta forecasts — those remain t
 record; it only prunes Dagster's execution ledger. Lives beside `register_experiment_job` in
 `defs/jobs.py`; ops use `OpExecutionContext` (they need `context.instance`).
 
-## Interaction with plan 03 (probabilistic metrics)
+## Interaction with plan 07 (probabilistic metrics)
 
-Any metric added to `compute_metrics` flows through this scope automatically — once plan 03's
+Any metric added to `compute_metrics` flows through this scope automatically — once plan 07's
 PICP/spread-skill land, production monitoring tracks ensemble calibration over time for free.
 No coupling needed; just note the ordering is flexible.
 

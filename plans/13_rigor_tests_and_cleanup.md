@@ -1,6 +1,6 @@
 # Remaining rigor tests and cleanup
 
-*Merged from the Dagster ML-assets plan, Phase 9 — the final phase. Runs after plans 09 and 10.*
+*Merged from the Dagster ML-assets plan, Phase 9 — the final phase. Runs after plans 02 and 05.*
 
 ## Context
 
@@ -35,11 +35,11 @@ The permanent-docs migration from the old `dagster_plan.md` is **already done** 
 limitation) and `docs/ml_experimentation/evaluating-new-data-sources.md` now capture its
 important ideas, and the plan file has been deleted. What remains:
 
-- Check `docs/` against the code after plans 09/10 land — in particular extend
+- Check `docs/` against the code after plans 02/05 land — in particular extend
   `docs/ml_experimentation/dagster-workflow.md` with the live-forecast and monitoring flows,
   and update the "Known limitation" and MLflow-logging notes in
   `docs/architecture/ml-orchestration.md` if the implementations diverged from the plans.
-- Move any `docs/roadmap/` content that plans 09/10 implemented into the permanent docs —
+- Move any `docs/roadmap/` content that plans 02/05 implemented into the permanent docs —
   `docs/roadmap/` should only contain ideas not yet implemented in code (e.g. flip the
   relevant 🚧 statuses in `docs/roadmap/metrics-and-leaderboard.md` once monitoring lands).
 

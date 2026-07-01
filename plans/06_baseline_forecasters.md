@@ -71,5 +71,5 @@ leaderboard rows.
 2. Smoke-test fold end-to-end via the existing integration-test pattern
    (`tests/test_trained_cv_model.py` fixtures).
 3. Sanity-check the numbers: persistence NMAE should be *worse overall* than XGBoost but
-   plausibly competitive at short horizons (fully visible once plan 03's horizon slices land —
+   plausibly competitive at short horizons (fully visible once plan 07's horizon slices land —
    note the two plans compound).
