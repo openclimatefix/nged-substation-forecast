@@ -122,6 +122,14 @@ class Settings(BaseSettings):
             " identical, experiment-independent population."
         ),
     )
+    effective_capacity_data_path: Path = Field(
+        default=PROJECT_ROOT / "data" / "effective_capacity",
+        description=(
+            "Delta table of per-series effective capacity (MVP: full-history P99 of |power|),"
+            " written by the effective_capacity asset and read by the metrics asset as the NMAE"
+            " denominator."
+        ),
+    )
     trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
     h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
     model_cache_base_path: Path = Field(
