@@ -1453,6 +1453,28 @@ differentiable-physics capacity model (see `docs/roadmap/differentiable-physics.
 `EffectiveCapacity` schema, `compute_metrics` interface, and the `metrics` asset are all unchanged;
 only the `effective_capacity` asset body changes.
 
+### 7.6.6 Phase 6.6 — fix `ad_hoc` scope `mlflow_run_id` null-dtype validation bug
+
+*Pre-existing bug discovered during Phase 6.5 (fails on `main`, unrelated to the capacity work).
+Deferred so it lands in its own PR after the Phase 6.5 PR merges.*
+
+**Bug.** `enrich_metrics_rows` (`packages/ml_core/src/ml_core/metrics.py`) builds the
+`mlflow_run_id` column with `pl.lit(mlflow_run_id)`. For the `ad_hoc` scope `mlflow_run_id` is
+`None`, so Polars infers a `Null` dtype column, which then fails `Metrics.validate` with
+`Polars dtype Null does not match model field type` (the schema declares `mlflow_run_id` as a
+nullable `String`). This makes the entire `ad_hoc` metrics path broken today; the existing
+`test_metrics_ad_hoc_no_mlflow_logging` integration test fails.
+
+**To implement:**
+
+- In `enrich_metrics_rows`, give the literal an explicit dtype so a `None` value yields a
+  `String`-typed all-null column rather than a `Null`-typed one, e.g.
+  `mlflow_run_id=pl.lit(mlflow_run_id, dtype=pl.String)`. Check the other `pl.lit(...)` columns
+  in the same call (`window_label`, etc.) for the same latent issue and pin their dtypes too.
+- **User can verify:** `test_metrics_ad_hoc_no_mlflow_logging` passes; materialising `metrics`
+  with `evaluation_scope="ad_hoc"` writes `forecast_metrics` rows with a null (but `String`-typed)
+  `mlflow_run_id` and no MLflow logging.
+
 ### 7.7 Phase 7 — `live_forecasts` asset
 
 - Implement §4.9 (`load_from_mlflow` from cache by `production_model_run_id`, single-run inference
