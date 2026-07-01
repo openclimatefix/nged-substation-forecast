@@ -244,10 +244,14 @@ class PowerForecast(pt.Model):
     )
 
     power_fcst_model_name: str = pt.Field(
-        dtype=pl.String,
+        dtype=pl.String,  # String, not Categorical — see experiment_name below.
         description="Identifier for our ML-based power forecasting model. Model-family identity set by the BaseForecaster subclass (MODEL_NAME).",
     )
 
+    # String (not Categorical): experiment_name/fold_id are the Delta partition columns and delta-rs
+    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
+    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha:
+    # ../../../../CLAUDE.md#delta-lake-dictionary-encoded-columns-declare-delta-filterpartition-columns-as-string
     experiment_name: str = pt.Field(
         dtype=pl.String,
         description=(
@@ -286,7 +290,7 @@ class PowerForecast(pt.Model):
     )
 
     fold_id: FoldId = pt.Field(
-        dtype=pl.String,
+        dtype=pl.String,  # String, not Categorical — see experiment_name above.
         description=(
             "Identifies the source of this forecast row.  "
             "For cross-validation runs, the value is the fold's label from conf/cv/default.yaml "

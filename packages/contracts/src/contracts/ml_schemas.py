@@ -255,7 +255,8 @@ class Metrics(pt.Model):
 
     # String (not Categorical): fold_id/experiment_name are Delta partition columns and delta-rs
     # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha.
+    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha:
+    # ../../../../CLAUDE.md#delta-lake-dictionary-encoded-columns-declare-delta-filterpartition-columns-as-string
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
