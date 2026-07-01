@@ -14,7 +14,12 @@ import patito as pt
 import polars as pl
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    EffectiveCapacity,
+    PowerForecast,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpInMemory, NwpOnDisk
 from dagster import (
@@ -144,6 +149,82 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
             "val_start": str(fold.val_start),
             "val_end": str(fold.val_end),
             "min_training_months": min_training_months,
+        }
+    )
+
+
+def _compute_effective_capacity(
+    power_lf: pt.LazyFrame[PowerTimeSeries],
+) -> pt.DataFrame[EffectiveCapacity]:
+    """Compute the MVP effective capacity (full-history P99 of ``|power|``) per time series.
+
+    One row per ``time_series_id``: ``effective_capacity_mw`` is the 99th percentile of
+    ``abs(power)`` over all non-null observations. Series whose P99 is null or non-positive (e.g.
+    all-null or all-zero power) are dropped, since ``EffectiveCapacity`` requires
+    ``effective_capacity_mw > 0``.
+
+    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The MVP capacity
+    is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
+    as current to the end of the observed history — rather than a timestep the value varies over. The
+    v0.6 / v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
+    time)``), and only then does ``time`` carry per-row meaning; see the "Normalising NMAE by
+    ``effective_capacity``" section of ``docs/roadmap/metrics-and-leaderboard.md`` for why the MVP is
+    one scalar row per series rather than the value repeated at every half-hour.
+
+    Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
+    """
+    capacity = (
+        power_lf.filter(pl.col("power").is_not_null())
+        .group_by("time_series_id")
+        .agg(
+            effective_capacity_mw=pl.col("power").abs().quantile(0.99),
+            time=pl.col("time").max(),
+        )
+        .filter(pl.col("effective_capacity_mw") > 0)
+        .sort("time_series_id")
+        .collect()
+        .cast({"effective_capacity_mw": pl.Float32})
+    )
+    return EffectiveCapacity.validate(capacity)
+
+
+@asset(deps=["power_time_series_and_metadata"])
+def effective_capacity(context: AssetExecutionContext) -> None:
+    """Compute and persist each series' MVP effective capacity (full-history P99 of ``|power|``).
+
+    Reads the full ``power_time_series`` Delta and writes one row per ``time_series_id`` to the
+    ``effective_capacity`` Delta table (``Settings.effective_capacity_data_path``): the 99th
+    percentile of ``abs(power)`` over the series' entire observed history, with ``time`` set to the
+    latest observed timestep. This full-history capacity is the NMAE denominator used by the
+    ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to fold.
+
+    The whole (small — one row per series) table is overwritten on each materialisation. The MVP is
+    deliberately one scalar row per series, **not** the value repeated at every half-hour; see the
+    "Normalising NMAE by ``effective_capacity``" section of
+    ``docs/roadmap/metrics-and-leaderboard.md`` for why densifying a constant buys nothing.
+
+    A future upgrade (v0.6 / v0.7) swaps the P99 for the differentiable-physics capacity model,
+    emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,
+    but ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
+    ``time_series_id`` alone (same doc section).
+    """
+    settings = Settings()
+    power_lf = pt.LazyFrame.from_existing(
+        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
+    ).set_model(PowerTimeSeries)
+    capacity_df = _compute_effective_capacity(power_lf)
+
+    settings.effective_capacity_data_path.parent.mkdir(parents=True, exist_ok=True)
+    write_deltalake(
+        table_or_uri=settings.effective_capacity_data_path,
+        data=capacity_df.to_arrow(),
+        mode="overwrite",
+    )
+
+    context.add_output_metadata(
+        {
+            "n_time_series": capacity_df.height,
+            "effective_capacity_data_path": str(settings.effective_capacity_data_path),
         }
     )
 
@@ -623,6 +704,7 @@ def _score_forecast_group(
     filtered_power_forecasts: pl.DataFrame,
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
+    capacity_df: pt.DataFrame[EffectiveCapacity],
     evaluation_scope: EvalScopeType,
     metrics_path: Path,
     now: datetime,
@@ -638,6 +720,8 @@ def _score_forecast_group(
         actuals_lf: Lazy observed power scan (only the joined subset is collected inside
             ``compute_metrics()``).
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
+        capacity_df: Per-series effective capacity used as the NMAE denominator inside
+            ``compute_metrics()``; must cover every scored series.
         evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
             skips MLflow entirely.
         metrics_path: Filesystem path to the ``forecast_metrics`` Delta table.
@@ -658,7 +742,7 @@ def _score_forecast_group(
         ),
         allow_superfluous_columns=True,
     )
-    per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df)
+    per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df, capacity_df)
 
     window_start, window_end, window_label = _resolve_eval_window(
         evaluation_scope, fold_id, group_forecasts
@@ -690,7 +774,7 @@ def _score_forecast_group(
     return enriched.height, None
 
 
-@asset(deps=["cv_power_forecasts"])
+@asset(deps=["cv_power_forecasts", "effective_capacity"])
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
 
@@ -736,6 +820,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         allow_superfluous_columns=True,
     )
 
+    # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
+    if not settings.effective_capacity_data_path.exists():
+        raise FileNotFoundError(
+            f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
+            "materialise the effective_capacity asset before running metrics."
+        )
+    capacity_df = EffectiveCapacity.validate(
+        pl.read_delta(str(settings.effective_capacity_data_path))
+    )
+
     groups = (
         filtered_power_forecasts.select(["experiment_name", "fold_id"])
         .unique()
@@ -758,6 +852,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             filtered_power_forecasts,
             actuals_lf,
             metadata_df,
+            capacity_df,
             config.evaluation_scope,
             settings.forecast_metrics_data_path,
             now,

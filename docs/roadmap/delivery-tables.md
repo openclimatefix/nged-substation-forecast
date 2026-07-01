@@ -197,7 +197,10 @@ not cover the forecast period.
 `|power|` over the full available observation history. This is a static scalar per series — a
 robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
 capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
-It is also the denominator used to normalise NMAE in the `forecast_metrics` table.
+It is also the denominator used to normalise NMAE in the `forecast_metrics` table — see
+[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
+for why the MVP stores one scalar row per series (rather than repeating the value at every half-hour)
+and how the metrics join evolves for the DP upgrade.
 
 **DP upgrade (v0.6 / v0.7):** replace the static P99 with a time-varying estimate from the
 differentiable-physics model. For generators, the prior comes from the Embedded Capacity Register
@@ -207,7 +210,9 @@ with 10 MW physical capability has `effective_capacity_mw = 10`). For substation
 percentile of observed load over a rolling window, under normal running arrangement only. During a
 switching event, effective capacity = last known normal-arrangement value plus the "switched
 power" from [Table 5](#table-5-substation_switching). The schema is unchanged between MVP and DP;
-only the Dagster asset body changes.
+the asset body changes to emit one row per `(time_series_id, time)`, and the metrics pipeline swaps
+its `time_series_id`-only capacity join for a temporal as-of join (see
+[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)).
 
 | Field | Data type | Notes |
 |---|---|---|

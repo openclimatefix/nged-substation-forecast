@@ -34,6 +34,7 @@ from nged_substation_forecast.defs.cv_assets import (
     MetricsConfig,
     PopulationFilter,
     cv_power_forecasts,
+    effective_capacity,
     metrics,
     trained_cv_model,
 )
@@ -173,6 +174,7 @@ def _base_env(
     forecasts_path = tmp_path / "power_forecasts"
     metrics_path = tmp_path / "forecast_metrics"
     cache_path = tmp_path / "cache"
+    effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
@@ -184,13 +186,21 @@ def _base_env(
     monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(cache_path))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
+    # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
+    # table is absent until a test materialises it, so NMAE falls back to the window P99 by default.
+    monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_power_with_actuals(str(nged_path / "power_time_series.delta"))
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
 
-    return {"forecasts": forecasts_path, "metrics": metrics_path, "cache": cache_path}
+    return {
+        "forecasts": forecasts_path,
+        "metrics": metrics_path,
+        "cache": cache_path,
+        "effective_capacity": effective_capacity_path,
+    }
 
 
 def _register(instance: DagsterInstance) -> None:
@@ -237,11 +247,17 @@ def file_mlflow_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str
     return _base_env(tmp_path, monkeypatch, tracking_uri)
 
 
-def _run_cv_pipeline(instance: DagsterInstance) -> None:
-    """Register, train, and predict for the leaderboard fold."""
+def _run_cv_pipeline(instance: DagsterInstance, materialise_capacity: bool = True) -> None:
+    """Register, train, and predict for the leaderboard fold.
+
+    Also materialises ``effective_capacity`` (the NMAE denominator ``metrics`` now requires) unless
+    ``materialise_capacity`` is False — used by the test that asserts ``metrics`` fails without it.
+    """
     _register(instance)
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
     assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+    if materialise_capacity:
+        assert materialize([effective_capacity], instance=instance).success
 
 
 def test_metrics_leaderboard_writes_forecast_metrics_delta(
@@ -321,6 +337,45 @@ def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
     ).success
     assert pl.read_delta(str(file_mlflow_env["metrics"])).height == first_height
+
+
+def _read_metric(metrics_path: Path, metric_name: str) -> float:
+    fm = pl.read_delta(str(metrics_path)).filter(pl.col("metric_name") == metric_name)
+    assert fm.height == 1
+    return float(fm["metric_value"][0])
+
+
+def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Path]) -> None:
+    """The metrics asset requires the effective_capacity table and fails cleanly when it is absent."""
+    instance = DagsterInstance.ephemeral()
+    _run_cv_pipeline(instance, materialise_capacity=False)
+
+    result = materialize(
+        [metrics],
+        run_config=_metrics_run_config("leaderboard"),
+        instance=instance,
+        raise_on_error=False,
+    )
+    assert not result.success
+
+
+def test_metrics_nmae_denominator_is_effective_capacity(
+    file_mlflow_env: dict[str, Path],
+) -> None:
+    """NMAE is MAE divided by the series' full-history effective_capacity_mw."""
+    instance = DagsterInstance.ephemeral()
+    _run_cv_pipeline(instance)
+    assert materialize(
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+    ).success
+
+    mae = _read_metric(file_mlflow_env["metrics"], "mae")
+    nmae = _read_metric(file_mlflow_env["metrics"], "nmae")
+    capacity = pl.read_delta(str(file_mlflow_env["effective_capacity"])).filter(
+        pl.col("time_series_id") == 1
+    )["effective_capacity_mw"][0]
+
+    assert nmae == pytest.approx(mae / capacity, rel=1e-5)
 
 
 def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:
@@ -419,6 +474,9 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
         assert materialize(
             [cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance
         ).success
+
+        # The NMAE denominator table that metrics requires.
+        assert materialize([effective_capacity], instance=instance).success
 
         # Score — proves tag-based run resolution: the asset calls get_or_create_fold_run()
         # with a fresh MlflowClient connection and finds the same run that trained_cv_model used.

@@ -9,6 +9,7 @@ import pytest
 from contracts.ml_schemas import Metrics
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
+    EffectiveCapacity,
     PowerForecast,
     PowerTimeSeries,
     TimeSeriesMetadata,
@@ -96,7 +97,7 @@ def test_compute_metrics_returns_metrics_schema():
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     assert isinstance(result, pl.DataFrame)
     Metrics.validate(result, allow_superfluous_columns=True)
 
@@ -107,7 +108,7 @@ def test_compute_metrics_mae_correctness():
     actuals = _make_actuals(1, times, [10.0, 10.0])
     # errors: +2, -2 → MAE = 2.0
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mae_row = result.filter((pl.col("metric_name") == "mae") & (pl.col("horizon_slice") == "all"))
     assert math.isclose(mae_row["metric_value"][0], 2.0, rel_tol=1e-5)
 
@@ -117,19 +118,57 @@ def test_compute_metrics_mbe_sign():
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [15.0, 15.0])  # over-predict by 5
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mbe_row = result.filter((pl.col("metric_name") == "mbe") & (pl.col("horizon_slice") == "all"))
     assert mbe_row["metric_value"][0] > 0
 
 
 def test_compute_metrics_nmae_normalisation():
-    """NMAE = MAE / P99(|actual|). When actuals are all 10 and MAE=2, NMAE=0.2."""
+    """NMAE = MAE / effective_capacity_mw. With capacity 10 and MAE=2, NMAE=0.2."""
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
-    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, mean|actual|=10
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, capacity=10
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
     assert math.isclose(nmae_row["metric_value"][0], 0.2, rel_tol=1e-5)
+
+
+def _make_capacity(
+    time_series_ids: list[int], effective_capacity_mw: list[float]
+) -> pt.DataFrame[EffectiveCapacity]:
+    n = len(time_series_ids)
+    return EffectiveCapacity.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
+                "time": pl.Series([_utc(2026, 1, 1)] * n, dtype=pl.Datetime("us", "UTC")),
+                "effective_capacity_mw": pl.Series(effective_capacity_mw, dtype=pl.Float32),
+            }
+        )
+    )
+
+
+def test_compute_metrics_nmae_uses_supplied_capacity():
+    """When a capacity frame is supplied, NMAE = MAE / effective_capacity_mw, not the window P99."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])  # window P99(|actual|) = 10
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE = 2
+    # Capacity of 20 → NMAE = 2/20 = 0.1, distinct from the window-P99 result of 2/10 = 0.2.
+    capacity = _make_capacity([1], [20.0])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), capacity)
+    nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
+    assert math.isclose(nmae_row["metric_value"][0], 0.1, rel_tol=1e-5)
+
+
+def test_compute_metrics_raises_when_series_missing_capacity():
+    """A scored series absent from `capacity` is a loud error, not a silent fallback."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])
+    # Capacity covers only ts 99, not the scored ts 1.
+    capacity = _make_capacity([99], [5.0])
+    with pytest.raises(ValueError, match="No effective_capacity row"):
+        compute_metrics(forecasts, actuals, _make_metadata([1]), capacity)
 
 
 def test_compute_metrics_ensemble_averaging():
@@ -156,7 +195,7 @@ def test_compute_metrics_ensemble_averaging():
     )
     forecasts = PowerForecast.validate(df, allow_superfluous_columns=True)
     actuals = _make_actuals(1, [time], [10.0])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mae_row = result.filter(pl.col("metric_name") == "mae")
     assert math.isclose(mae_row["metric_value"][0], 0.0, abs_tol=1e-5)
 
@@ -168,7 +207,7 @@ def test_compute_metrics_multiple_folds():
     fold1 = _make_cv_forecasts(1, [times[0]], [15.0], fold_id="2022")
     fold2 = _make_cv_forecasts(1, [times[1]], [10.0], fold_id="2023")
     forecasts = PowerForecast.validate(pl.concat([fold1, fold2]), allow_superfluous_columns=True)
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     fold1_mae = result.filter((pl.col("fold_id") == "2022") & (pl.col("metric_name") == "mae"))
     fold2_mae = result.filter((pl.col("fold_id") == "2023") & (pl.col("metric_name") == "mae"))
     assert math.isclose(fold1_mae["metric_value"][0], 5.0, rel_tol=1e-5)
@@ -182,7 +221,7 @@ def test_compute_metrics_raises_on_no_join():
         _make_cv_forecasts(1, [_utc(2023, 6, 1)], [10.0]), allow_superfluous_columns=True
     )
     with pytest.raises(ValueError, match="No rows"):
-        compute_metrics(forecasts, actuals, _make_metadata([1]))
+        compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
 
 
 def test_compute_metrics_populates_time_series_type():
@@ -190,7 +229,9 @@ def test_compute_metrics_populates_time_series_type():
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [10.0])
     forecasts = _make_cv_forecasts(1, times, [10.0])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1], "PV"))
+    result = compute_metrics(
+        forecasts, actuals, _make_metadata([1], "PV"), _make_capacity([1], [10.0])
+    )
     assert (result["time_series_type"] == "PV").all()
 
 
@@ -200,7 +241,7 @@ def test_compute_metrics_unknown_series_gets_null_type():
     actuals = _make_actuals(1, times, [10.0])
     forecasts = _make_cv_forecasts(1, times, [10.0])
     # ts_id=1 is absent — metadata only knows about ts_id=99.
-    result = compute_metrics(forecasts, actuals, _make_metadata([99]))
+    result = compute_metrics(forecasts, actuals, _make_metadata([99]), _make_capacity([1], [10.0]))
     assert result["time_series_type"].is_null().all()
 
 

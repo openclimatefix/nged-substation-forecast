@@ -1404,7 +1404,7 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
   materialising the smoke-test fold + `metrics`, the MLflow parent run shows the aggregate
   leaderboard metrics and `forecast_metrics` holds the per-type/overall rows. *(Milestone.)*
 
-### 7.6.5 Phase 6.5 — MVP `effective_capacity` asset + NMAE normalisation upgrade
+### 7.6.5 Phase 6.5 — MVP `effective_capacity` asset + NMAE normalisation upgrade - Underway in PR #211
 
 *The data contract (`EffectiveCapacity`) and the NMAE P99 change in `compute_metrics` are already
 landed. This phase adds the Dagster asset that computes and persists the capacity estimate, then
@@ -1452,6 +1452,73 @@ differentiable-physics upgrade will slot into without schema or interface change
 differentiable-physics capacity model (see `docs/roadmap/differentiable-physics.md` §5). The
 `EffectiveCapacity` schema, `compute_metrics` interface, and the `metrics` asset are all unchanged;
 only the `effective_capacity` asset body changes.
+
+### 7.6.6 Phase 6.6 — fix `ad_hoc` scope `mlflow_run_id` null-dtype validation bug
+
+*Pre-existing bug discovered during Phase 6.5 (fails on `main`, unrelated to the capacity work).
+Deferred so it lands in its own PR after the Phase 6.5 PR merges.*
+
+**Bug.** `enrich_metrics_rows` (`packages/ml_core/src/ml_core/metrics.py`) builds the
+`mlflow_run_id` column with `pl.lit(mlflow_run_id)`. For the `ad_hoc` scope `mlflow_run_id` is
+`None`, so Polars infers a `Null` dtype column, which then fails `Metrics.validate` with
+`Polars dtype Null does not match model field type` (the schema declares `mlflow_run_id` as a
+nullable `String`). This makes the entire `ad_hoc` metrics path broken today; the existing
+`test_metrics_ad_hoc_no_mlflow_logging` integration test fails.
+
+**To implement:**
+
+- In `enrich_metrics_rows`, give the literal an explicit dtype so a `None` value yields a
+  `String`-typed all-null column rather than a `Null`-typed one, e.g.
+  `mlflow_run_id=pl.lit(mlflow_run_id, dtype=pl.String)`. Check the other `pl.lit(...)` columns
+  in the same call (`window_label`, etc.) for the same latent issue and pin their dtypes too.
+- **User can verify:** `test_metrics_ad_hoc_no_mlflow_logging` passes; materialising `metrics`
+  with `evaluation_scope="ad_hoc"` writes `forecast_metrics` rows with a null (but `String`-typed)
+  `mlflow_run_id` and no MLflow logging.
+
+### 7.6.7 Phase 6.7 — `metrics` asset: only load the `power_forecasts` partitions it needs
+
+*Deferred from the Phase 6.5 line of work to keep that PR small.*
+
+**Problem.** `power_forecasts` grows without bound (every experiment × fold × ~51 ensemble members
+× half-hourly valid_times × trained series), and the `metrics` asset does **not** read only the
+slice a run asks for:
+
+- **Partition pruning is silently defeated.** The table is partitioned on disk by
+  `(experiment_name, fold_id)`, but the asset casts those columns to `Categorical` *before* applying
+  `PopulationFilter`, so the filter lands *above* the cast and Polars reads **every** partition even
+  when the run names one experiment/fold. Confirmed with `explain()`: filtering the raw String scan
+  reads only the matching partition dirs, whereas the current cast-then-filter order reads all of
+  them.
+- **The whole matched population is `.collect()`ed into memory at once**, then re-sliced per group.
+  The default `PopulationFilter()` has no filter (a documented "score everything" mode), i.e. the
+  entire table into RAM.
+
+**To implement:**
+
+- **`PopulationFilter.apply`** — operate on a plain raw `pl.LazyFrame` (String partition columns +
+  `valid_time`) so the predicates push into the Delta scan (partition pruning + row-group stats);
+  drop the `pt.LazyFrame[PowerForecast]` wrap/re-wrap. Cast to `Categorical` *after* filtering.
+- **`metrics` asset** — discover the matching `(experiment_name, fold_id)` groups from the pruned
+  scan (`select(["experiment_name","fold_id"]).unique()`), then score **one group at a time** via a
+  per-group partition-pruned scan → cast → `set_model` → `collect` → `validate`, so peak memory is a
+  single fold regardless of how many groups match.
+- **`_score_forecast_group`** — take the already-sliced per-group `pt.DataFrame[PowerForecast]`
+  instead of the full frame + in-memory re-slice.
+- **`CLAUDE.md`** — add a caveat to the "cast `String→Categorical` lazily, before filtering"
+  read-path gotcha: when a column is *filtered on* (especially a Delta *partition* column), filter
+  the raw String scan **first**, then cast, or pushdown is lost. Update
+  `docs/ml_experimentation/dagster-workflow.md` step 8 (pruning + per-group memory).
+- Out of scope: column projection (row explosion dominates IO, and full `PowerForecast.validate`
+  needs all columns).
+
+**Tests:** a pruning regression test asserting
+`PopulationFilter(experiment_name="expA").apply(scan).explain()` lists only `experiment_name=expA`
+partition paths; existing metrics integration tests stay green under the per-group restructure; a
+multi-experiment no-filter run scores every group.
+
+- **User can verify:** materialise `metrics` filtered to one experiment/fold and confirm (via
+  `.explain()` or run time) only that partition is scanned; a no-filter run still scores every
+  group but holds only one fold in memory at a time.
 
 ### 7.7 Phase 7 — `live_forecasts` asset
 

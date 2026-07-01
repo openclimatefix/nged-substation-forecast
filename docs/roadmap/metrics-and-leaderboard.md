@@ -41,7 +41,7 @@ alternatives we considered.
 | Metric | Type | Status | Purpose |
 |---|---|---|---|
 | Mean absolute error (MAE) | Deterministic | ✅ | Typical error magnitude (MW). |
-| Normalised MAE (NMAE) | Deterministic | ✅ | MAE normalised by mean absolute power — comparable across substations of different sizes. |
+| Normalised MAE (NMAE) | Deterministic | ✅ | MAE normalised by the series' [effective capacity](#normalising-nmae-by-effective_capacity) (full-history P99) — comparable across substations of different sizes. |
 | Root mean squared error (RMSE) | Deterministic | ✅ | Heavily penalises large misses (one 100 MW error costs more than two 50 MW errors). |
 | Mean bias error (MBE) | Deterministic | ✅ | Systematic over/under-prediction. |
 | Histogram of errors | Deterministic | 🚧 | Visual check that errors are ~Normal. |
@@ -57,6 +57,51 @@ alternatives we considered.
 > per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
+
+### Normalising NMAE by `effective_capacity`
+
+NMAE is MAE divided by a per-series **effective capacity**, not by the mean or a per-fold P99. A
+capacity-like denominator is what makes NMAE comparable across asset types: intermittent generators
+(PV, wind) spend much of their time near zero output, so normalising by the *mean* would inflate
+their NMAE relative to a demand substation of similar peak size. Computing the denominator over each
+series' **full history** (rather than within the validation window) also keeps it stable across
+folds — an unusually calm year for a wind farm would otherwise give a low in-window P99 and an
+inflated NMAE.
+
+The denominator comes from the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity)
+Delta table (schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
+(`ml_core.metrics`).
+
+**MVP representation (v0.1): one scalar row per series.** The `effective_capacity` asset writes one
+row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation
+history, `time` = the latest observed timestep. `compute_metrics` joins it onto the per-series
+metrics **on `time_series_id` alone** and divides.
+
+**Why the MVP is a single row per series, not the value repeated at every half-hour.** The
+v0.6 / v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
+genuinely *time-varying* value. In the MVP the value is a single constant per series, so repeating it
+across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
+series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
+express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
+because the real MVP→DP interface change is not the data shape but **the join** (below). The
+`EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
+both the one-row-per-series MVP and the one-row-per-half-hour DP shape with no schema change; that is
+the forward-compatibility we want.
+
+**DP upgrade (v0.6 / v0.7): time-varying, and the join changes.** The
+[differentiable-physics](differentiable-physics.md) capacity model produces a value that changes over
+time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
+nothing else:
+
+- the `effective_capacity` asset body emits one row per `(time_series_id, time)`; and
+- `compute_metrics` changes its capacity join from `time_series_id`-only to a **temporal as-of join**
+  on `(time_series_id, valid_time)` — matching each forecast's `valid_time` to the capacity in effect
+  at that time.
+
+The `Metrics` schema and the rest of the metrics pipeline are untouched. Note the table is
+**backward-looking only** (it holds no future `valid_time`s): fine for historical CV folds (whose
+validation windows lie inside the observed history), but live-forecast scoring (Phase 7 / 8) must
+choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
 
 ### Peak events — the metric filter that matters most for flexibility
 

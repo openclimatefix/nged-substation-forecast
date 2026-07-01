@@ -15,13 +15,19 @@ from contracts.ml_schemas import (
     EvalScopeType,
     Metrics,
 )
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    EffectiveCapacity,
+    PowerForecast,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 
 
 def compute_metrics(
     cv_forecasts: pt.DataFrame[PowerForecast],
     actuals: pt.LazyFrame[PowerTimeSeries],
     metadata: pt.DataFrame[TimeSeriesMetadata],
+    capacity: pt.DataFrame[EffectiveCapacity],
 ) -> pt.DataFrame[Metrics]:
     """Compute evaluation metrics from CV predictions and observed power.
 
@@ -34,13 +40,13 @@ def compute_metrics(
     5. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
-    NMAE is normalised by the 99th percentile of absolute observed power within the
-    same group (``P99(|power_actual|)``), giving a capacity-like denominator that is
-    more comparable across asset types than the mean — intermittent generators (PV, wind)
-    have a low mean due to night/calm periods, which would inflate their NMAE relative to
-    demand substations of similar peak capacity. Once the ``effective_capacity`` Dagster
-    asset exists (Phase 6.5), the denominator will be upgraded to that pre-computed
-    full-history P99 rather than the validation-window P99 used here.
+    NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
+    ``time_series_id`` from ``capacity``) — a capacity-like denominator. This ``time_series_id``-only
+    join is correct while ``capacity`` is one scalar row per series (the MVP). When the v0.6 / v0.7
+    differentiable-physics upgrade makes capacity time-varying (one row per ``(time_series_id,
+    time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``. See
+    the "Normalising NMAE by ``effective_capacity``" section of
+    ``docs/roadmap/metrics-and-leaderboard.md``.
 
     Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
     Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be
@@ -53,13 +59,15 @@ def compute_metrics(
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
         metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
             Series absent from ``metadata`` receive a null ``time_series_type``.
+        capacity: Pre-computed per-series effective capacity; ``effective_capacity_mw`` is the
+            NMAE denominator. Must cover every scored ``time_series_id``.
 
     Returns:
         A validated tall ``Metrics`` DataFrame with ``time_series_type`` populated.
 
     Raises:
-        ValueError: If no rows survive the inner join (forecasts cover a period
-            with no observed data).
+        ValueError: If no rows survive the inner join (forecasts cover a period with no observed
+            data), or if any scored series has no row in ``capacity``.
     """
     # Join forecasts to actuals; rename power → power_actual to avoid shadowing.
     # Strip the Patito model subclass from actuals so that Polars' cross-subclass
@@ -87,15 +95,30 @@ def compute_metrics(
     # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name).
     metrics_wide = with_error.group_by(["time_series_id", "fold_id", "power_fcst_model_name"]).agg(
         mae=pl.col("error").abs().mean(),
-        nmae=pl.col("error").abs().mean() / pl.col("power_actual").abs().quantile(0.99),
         rmse=(pl.col("error").pow(2).mean()).sqrt(),
         mbe=pl.col("error").mean(),
     )
 
-    # Pivot to tall format.
+    # Join the pre-computed full-history effective capacity — the NMAE denominator. Strip the
+    # Patito model so Polars' cross-subclass join type check doesn't reject the join.
+    capacity_denom = pl.LazyFrame._from_pyldf(capacity.lazy()._ldf).select(
+        ["time_series_id", "effective_capacity_mw"]
+    )
+    wide = metrics_wide.join(capacity_denom, on="time_series_id", how="left").collect()
+
+    # Every scored series must have a capacity row; fail loudly rather than silently emitting a
+    # null NMAE (which Metrics.metric_value, a non-nullable Float32, would reject anyway).
+    missing = wide.filter(pl.col("effective_capacity_mw").is_null())["time_series_id"]
+    if missing.len() > 0:
+        raise ValueError(
+            f"No effective_capacity row for time_series_id(s) {sorted(set(missing.to_list()))}; "
+            "materialise the effective_capacity asset for these series before scoring."
+        )
+    wide = wide.with_columns(nmae=pl.col("mae") / pl.col("effective_capacity_mw"))
+
+    # Pivot to tall format. The leftover effective_capacity_mw column is dropped by the unpivot.
     metrics_tall = (
-        metrics_wide.collect()
-        .unpivot(
+        wide.unpivot(
             on=["mae", "nmae", "rmse", "mbe"],
             index=["time_series_id", "fold_id", "power_fcst_model_name"],
             variable_name="metric_name",

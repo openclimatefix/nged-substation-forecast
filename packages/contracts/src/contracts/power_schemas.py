@@ -311,8 +311,11 @@ class EffectiveCapacity(pt.Model):
 
     **Planned upgrade (v0.6 / v0.7):** replace the P99 scalar with a time-varying estimate from
     the differentiable-physics capacity model (see ``docs/roadmap/differentiable-physics.md``),
-    giving one row per ``(time_series_id, time)`` half-hourly timestep. Schema and interface are
-    unchanged; only the asset body changes.
+    giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
+    the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its
+    ``time_series_id``-only NMAE-denominator join for a temporal as-of join. Do **not** pre-densify
+    the MVP scalar into one row per half-hour — see the "Normalising NMAE by ``effective_capacity``"
+    section of ``docs/roadmap/metrics-and-leaderboard.md`` for why, and for how the join evolves.
     """
 
     time_series_id: int = _get_time_series_id_dtype()
