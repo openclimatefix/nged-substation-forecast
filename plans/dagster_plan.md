@@ -1453,7 +1453,7 @@ differentiable-physics capacity model (see `docs/roadmap/differentiable-physics.
 `EffectiveCapacity` schema, `compute_metrics` interface, and the `metrics` asset are all unchanged;
 only the `effective_capacity` asset body changes.
 
-### 7.6.6 Phase 6.6 — fix `ad_hoc` scope `mlflow_run_id` null-dtype validation bug - Completed
+### 7.6.6 Phase 6.6 — fix `ad_hoc` scope `mlflow_run_id` null-dtype validation bug - Completed in PR #212
 
 *Pre-existing bug discovered during Phase 6.5 (fails on `main`, unrelated to the capacity work).
 Deferred so it lands in its own PR after the Phase 6.5 PR merges.*
