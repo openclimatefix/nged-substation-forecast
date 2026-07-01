@@ -1404,7 +1404,7 @@ Implements §4.10. Independent of Phases 6–8 — it works with the already-bui
   materialising the smoke-test fold + `metrics`, the MLflow parent run shows the aggregate
   leaderboard metrics and `forecast_metrics` holds the per-type/overall rows. *(Milestone.)*
 
-### 7.6.5 Phase 6.5 — MVP `effective_capacity` asset + NMAE normalisation upgrade
+### 7.6.5 Phase 6.5 — MVP `effective_capacity` asset + NMAE normalisation upgrade - Underway in PR #211
 
 *The data contract (`EffectiveCapacity`) and the NMAE P99 change in `compute_metrics` are already
 landed. This phase adds the Dagster asset that computes and persists the capacity estimate, then
