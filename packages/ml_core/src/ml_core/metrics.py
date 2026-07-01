@@ -41,12 +41,7 @@ def compute_metrics(
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
     NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
-    ``time_series_id`` from ``capacity``) — a capacity-like denominator more comparable across
-    asset types than the mean, since intermittent generators (PV, wind) have a low mean due to
-    night/calm periods that would inflate their NMAE relative to demand substations of similar peak
-    capacity. Using the full-history capacity (rather than a per-window P99, which varies fold to
-    fold — a calm year for a wind farm gives a low P99, inflating its NMAE) keeps the leaderboard
-    denominator consistent across folds. Every scored series must have a ``capacity`` row.
+    ``time_series_id`` from ``capacity``) — a capacity-like denominator.
 
     Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
     Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be
