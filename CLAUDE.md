@@ -31,6 +31,13 @@ pre-commit hook, but when developing code or docs it's a good idea to run the ma
 command above yourself before committing, for faster feedback than waiting on the commit-time
 hook.
 
+## Docs
+
+`docs/` contains a lot of useful information beyond API reference, including detailed discussion
+of plans and future direction (`docs/roadmap/`), background/requirements context
+(`docs/background/`), and architecture notes (`docs/architecture/`). When planning new features,
+check `docs/` for relevant prior discussion before proposing an approach.
+
 ## Architecture
 
 This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
