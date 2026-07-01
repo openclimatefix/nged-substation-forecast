@@ -133,8 +133,6 @@ def compute_metrics(
         .with_columns(
             horizon_slice=pl.lit("all").cast(pl.Enum(HORIZON_SLICES)),
             metric_param=pl.lit("all").cast(pl.Enum(METRIC_PARAMS)),
-            power_fcst_model_name=pl.col("power_fcst_model_name").cast(pl.Categorical),
-            fold_id=pl.col("fold_id").cast(pl.Categorical),
         )
     )
 
@@ -234,7 +232,7 @@ def enrich_metrics_rows(
     """
     return Metrics.validate(
         per_series_metrics.with_columns(
-            experiment_name=pl.lit(experiment_name).cast(pl.Categorical),
+            experiment_name=pl.lit(experiment_name, dtype=pl.String),
             evaluation_scope=pl.lit(evaluation_scope).cast(pl.Enum(EVALUATION_SCOPES)),
             window_start=pl.lit(window_start).cast(UTC_DATETIME_DTYPE),
             window_end=pl.lit(window_end).cast(UTC_DATETIME_DTYPE),

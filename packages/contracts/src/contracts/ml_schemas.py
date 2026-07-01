@@ -253,13 +253,17 @@ class Metrics(pt.Model):
 
     time_series_id: int = _get_time_series_id_dtype()
 
+    # String (not Categorical): fold_id/experiment_name are Delta partition columns and delta-rs
+    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
+    # predicate pushdown work. See the "declare Delta filter/partition columns as String" gotcha:
+    # ../../../../CLAUDE.md#delta-lake-dictionary-encoded-columns-declare-delta-filterpartition-columns-as-string
     power_fcst_model_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
     )
 
     fold_id: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,
         description="CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches PowerForecast.fold_id.",
     )
 
@@ -348,7 +352,7 @@ class Metrics(pt.Model):
     )
 
     experiment_name: str = pt.Field(
-        dtype=pl.Categorical,
+        dtype=pl.String,  # String (not Categorical) — Delta partition column, see fold_id above.
         allow_missing=True,
         description=(
             "Experiment that produced these forecasts. Delta partition key alongside fold_id. "

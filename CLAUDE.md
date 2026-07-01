@@ -192,37 +192,35 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
 
-### Delta Lake read-path: cast `String→Categorical` lazily, before filtering
+### Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 
 delta-rs stores all Arrow dictionary-encoded columns (`Categorical`, `Enum`) as plain `String` in
-Parquet (this is the write-path gotcha documented in `_write_metrics_to_delta`). On the **read**
-path, cast them back *lazily* — in the `pl.scan_delta(...)` result — before wrapping with
-`set_model` and passing to any typed helper:
+Parquet (this is the write-path gotcha documented in `_write_metrics_to_delta`, which casts the
+remaining `Enum` columns to `String` before writing). Two consequences:
 
-```python
-# Cast lazily so the scan is typed from the start; zero-cost until .collect().
-typed_scan = pt.LazyFrame.from_existing(
-    pl.scan_delta(str(path)).with_columns(
-        experiment_name=pl.col("experiment_name").cast(pl.Categorical),
-        fold_id=pl.col("fold_id").cast(pl.Categorical),
-    )
-).set_model(MySchema)
-```
+1. **A contract column you filter or partition on in Delta should be `String`, not `Categorical`.**
+   If the schema declared it `Categorical`, every read would need a `String → Categorical` cast to
+   satisfy the model — and a cast placed between `pl.scan_delta(...)` and a `.filter()` on that
+   column **blocks predicate pushdown** (Polars can no longer prune Delta partitions or skip row
+   groups, so it reads the *whole* table even when the filter names one partition). Declaring the
+   column `String` matches what is on disk, so the scan is typed by `set_model` with no cast, the
+   filter pushes straight down, and there is no dtype tension at the write boundary either.
+   `PowerForecast.experiment_name` / `fold_id` (the `power_forecasts` partition columns) and
+   `power_fcst_model_name` are `String` for exactly this reason; `PopulationFilter.apply` therefore
+   takes and returns a typed `pt.LazyFrame[PowerForecast]`. Confirm pushdown with `.explain()` — it
+   should list only the matching `partition=value` paths.
 
-Casting after `.collect()` also works but is later than necessary: typed helpers that receive the
-scan (e.g. a filter method) would then have to accept `pl.LazyFrame` instead of
-`pt.LazyFrame[MySchema]`.
+2. **For a genuinely low-cardinality column you only *read* (never filter on), cast `String →
+   Enum`/`Categorical` lazily** — in the `pl.scan_delta(...)` result, before `set_model` — so the
+   scan is typed from the start and the cast stays zero-cost until `.collect()`:
 
-**Caveat — filter *before* the cast when the column is filtered on (especially a Delta partition
-column).** The lazy cast above is right for columns you only *read*, but a `String→Categorical`
-cast placed between `pl.scan_delta(...)` and a `.filter()` on that column **blocks predicate
-pushdown**: Polars can no longer prune Delta partitions or skip row groups, so it reads the *whole*
-table even when the filter names one partition. `experiment_name` / `fold_id` are the on-disk
-partition columns of `power_forecasts`, so when filtering on them, filter the **raw `String`
-scan first, then cast** the surviving rows per group. Confirm pushdown with `.explain()` — it
-should list only the matching `partition=value` paths. (This is the ordering `PopulationFilter.apply`
-and `_load_forecast_group` in `cv_assets.py` follow, and the reason `apply` returns a *plain*
-`pl.LazyFrame` — there is no model to attach until after the cast.)
+   ```python
+   typed_scan = pt.LazyFrame.from_existing(
+       pl.scan_delta(str(path)).with_columns(
+           metric_name=pl.col("metric_name").cast(pl.Enum(METRIC_NAMES)),
+       )
+   ).set_model(MetricsSchema)
+   ```
 
 ### Patito + Polars Gotcha: `pt.LazyFrame.filter()` drops the Patito subclass
 

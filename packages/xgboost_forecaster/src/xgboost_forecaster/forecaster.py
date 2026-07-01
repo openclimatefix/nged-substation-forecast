@@ -188,20 +188,10 @@ class XGBoostForecaster(BaseForecaster):
             empty = cast(pt.DataFrame[AllFeatures], df.head(0))
             parts.append(_build_part(empty, np.empty(0, dtype=np.float32)))
 
-        # ``select``/``with_columns`` and ``pl.concat`` preserve the input's Patito ``AllFeatures``
-        # subclass, so a Patito ``.cast`` here would ignore the mapping and instead revert every
-        # column to its ``AllFeatures`` dtype (e.g. ``ensemble_member`` back to ``UInt8``) and leave
-        # the forecast-only columns untouched. Strip the Patito model so the dict-cast uses plain
-        # Polars semantics. ``_from_pydf`` reuses the same underlying frame (zero-copy).
-        combined = pl.concat(parts)
-        result = pl.DataFrame._from_pydf(combined._df).cast(
-            {
-                "power_fcst_model_name": pl.Categorical,
-                "experiment_name": pl.Categorical,
-                "fold_id": pl.Categorical,
-            }
-        )
-        return PowerForecast.validate(result)
+        # The identity columns (power_fcst_model_name / experiment_name / fold_id) are built as
+        # ``pl.lit(str)`` above, so they are already ``String`` — the dtype PowerForecast declares —
+        # and need no cast before validation.
+        return PowerForecast.validate(pl.concat(parts))
 
     def save(self, path: Path) -> None:
         """Save all Boosters as .ubj files plus a meta.json with the full config."""

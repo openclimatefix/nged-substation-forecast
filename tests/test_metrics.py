@@ -23,10 +23,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import mlflow
+import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES, TimeSeriesMetadata
+from contracts.power_schemas import (
+    LIST_OF_TIME_SERIES_TYPES,
+    PowerForecast,
+    TimeSeriesMetadata,
+)
 from dagster import DagsterInstance, RunConfig, materialize
 from deltalake import write_deltalake
 from mlflow.tracking import MlflowClient
@@ -409,9 +414,9 @@ def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> N
 def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
     """``PopulationFilter.apply`` pushes its predicate into the Delta scan (partition pruning).
 
-    Regression guard for Phase 6.7: casting ``experiment_name`` / ``fold_id`` *before* filtering
-    (the prior behaviour) forces Polars to read every partition. Applying the filter to the raw
-    ``String`` scan prunes to just the named partition — the explain plan lists only that
+    Regression guard for partition pruning: ``experiment_name`` / ``fold_id`` are ``String`` in
+    ``PowerForecast`` (matching how delta-rs stores them on disk), so the filter pushes straight
+    into the Delta scan with no dtype cast in the way. The explain plan lists only the named
     partition's Parquet path and never the other experiment's.
     """
     path = str(tmp_path / "power_forecasts")
@@ -430,7 +435,8 @@ def test_population_filter_prunes_partitions(tmp_path: Path) -> None:
         table_or_uri=path, data=df.to_arrow(), partition_by=["experiment_name", "fold_id"]
     )
 
-    plan = PopulationFilter(experiment_name="expA").apply(pl.scan_delta(path)).explain()
+    scan = pt.LazyFrame.from_existing(pl.scan_delta(path)).set_model(PowerForecast)
+    plan = PopulationFilter(experiment_name="expA").apply(scan).explain()
     assert "experiment_name=expA" in plan
     assert "experiment_name=expB" not in plan
 

@@ -82,7 +82,7 @@ def test_predict_output_schema() -> None:
 
     assert len(result) == len(df)
     assert result["power_fcst"].dtype == pl.Float32
-    assert result["power_fcst_model_name"].dtype == pl.Categorical
+    assert result["power_fcst_model_name"].dtype == pl.String
     assert result["power_fcst_model_version"].dtype == pl.Int16
     # ml_flow_experiment_id=None → every row is null
     assert result["ml_flow_experiment_id"].is_null().all()
@@ -149,7 +149,7 @@ def test_predict_stamps_experiment_name() -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
     result = _trained(df, experiment_name="my_experiment").predict(lf)
-    assert result["experiment_name"].dtype == pl.Categorical
+    assert result["experiment_name"].dtype == pl.String
     assert (result["experiment_name"] == "my_experiment").all()
 
 
@@ -164,7 +164,7 @@ def test_predict_stamps_supplied_fold_id() -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
     result = _trained(df).predict(lf, fold_id="2024")
-    assert result["fold_id"].dtype == pl.Categorical
+    assert result["fold_id"].dtype == pl.String
     assert (result["fold_id"] == "2024").all()
 
 
