@@ -40,12 +40,14 @@ nav:
       - Switching Events: background/switching-events.md
   - Architecture:
       - Overview: architecture/overview.md
+      - ML Orchestration Design: architecture/ml-orchestration.md
       - Code Style: architecture/code-style.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
       - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md
+      - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
   - Roadmap:
       - Overview: roadmap/index.md
       - Delivery Tables: roadmap/delivery-tables.md
