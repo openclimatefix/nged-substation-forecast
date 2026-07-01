@@ -41,7 +41,12 @@ def compute_metrics(
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
     NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
-    ``time_series_id`` from ``capacity``) — a capacity-like denominator.
+    ``time_series_id`` from ``capacity``) — a capacity-like denominator. This ``time_series_id``-only
+    join is correct while ``capacity`` is one scalar row per series (the MVP). When the v0.6 / v0.7
+    differentiable-physics upgrade makes capacity time-varying (one row per ``(time_series_id,
+    time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``. See
+    the "Normalising NMAE by ``effective_capacity``" section of
+    ``docs/roadmap/metrics-and-leaderboard.md``.
 
     Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
     Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be

@@ -189,7 +189,10 @@ This is deliberately the **simplest** application of DP, and **none of the "clev
 ARA inversion happens here.** We deploy a basic DP model of the **metered PV and wind sites** purely
 to estimate their physical parameters — most importantly the effective capacity, which bumps up and
 down over time as a result of maintenance, faults, and build-out — feeding the
-[`effective_capacity`](delivery-tables.md#table-4-effective_capacity) delivery table.
+[`effective_capacity`](delivery-tables.md#table-4-effective_capacity) delivery table. Because this
+turns the MVP's single scalar-per-series capacity into a time-varying series, the metrics pipeline
+must also swap its `time_series_id`-only NMAE-denominator join for a temporal as-of join — see
+[Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).
 
 - **The problem:** A generator's effective capacity drifts over time — turbines fail, inverters drop
   out, panels soil and degrade (or are cleaned and replaced). A static nameplate value introduces

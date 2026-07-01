@@ -190,10 +190,15 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     latest observed timestep. This full-history capacity is the NMAE denominator used by the
     ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to fold.
 
-    The whole (small — one row per series) table is overwritten on each materialisation.
+    The whole (small — one row per series) table is overwritten on each materialisation. The MVP is
+    deliberately one scalar row per series, **not** the value repeated at every half-hour; see the
+    "Normalising NMAE by ``effective_capacity``" section of
+    ``docs/roadmap/metrics-and-leaderboard.md`` for why densifying a constant buys nothing.
 
-    A future upgrade (v0.6 / v0.7) swaps the P99 for the differentiable-physics capacity model; the
-    ``EffectiveCapacity`` schema and the downstream ``metrics`` interface are unchanged.
+    A future upgrade (v0.6 / v0.7) swaps the P99 for the differentiable-physics capacity model,
+    emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,
+    but ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
+    ``time_series_id`` alone (same doc section).
     """
     settings = Settings()
     power_lf = pt.LazyFrame.from_existing(
