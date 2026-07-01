@@ -9,6 +9,7 @@ import pytest
 from contracts.ml_schemas import Metrics
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
+    EffectiveCapacity,
     PowerForecast,
     PowerTimeSeries,
     TimeSeriesMetadata,
@@ -128,6 +129,45 @@ def test_compute_metrics_nmae_normalisation():
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, mean|actual|=10
     result = compute_metrics(forecasts, actuals, _make_metadata([1]))
+    nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
+    assert math.isclose(nmae_row["metric_value"][0], 0.2, rel_tol=1e-5)
+
+
+def _make_capacity(
+    time_series_ids: list[int], effective_capacity_mw: list[float]
+) -> pt.DataFrame[EffectiveCapacity]:
+    n = len(time_series_ids)
+    return EffectiveCapacity.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series(time_series_ids, dtype=pl.Int32),
+                "time": pl.Series([_utc(2026, 1, 1)] * n, dtype=pl.Datetime("us", "UTC")),
+                "effective_capacity_mw": pl.Series(effective_capacity_mw, dtype=pl.Float32),
+            }
+        )
+    )
+
+
+def test_compute_metrics_nmae_uses_supplied_capacity():
+    """When a capacity frame is supplied, NMAE = MAE / effective_capacity_mw, not the window P99."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])  # window P99(|actual|) = 10
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE = 2
+    # Capacity of 20 → NMAE = 2/20 = 0.1, distinct from the window-P99 result of 2/10 = 0.2.
+    capacity = _make_capacity([1], [20.0])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), capacity)
+    nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
+    assert math.isclose(nmae_row["metric_value"][0], 0.1, rel_tol=1e-5)
+
+
+def test_compute_metrics_nmae_falls_back_to_window_p99_for_uncovered_series():
+    """A series present in forecasts but absent from `capacity` falls back to the window P99."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE = 2, window P99 = 10
+    # Capacity covers only ts 99, not ts 1 → ts 1 coalesces to the window P99 → 2/10 = 0.2.
+    capacity = _make_capacity([99], [5.0])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), capacity)
     nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
     assert math.isclose(nmae_row["metric_value"][0], 0.2, rel_tol=1e-5)
 

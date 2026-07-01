@@ -14,7 +14,7 @@ from contracts.ml_schemas import EligibleTimeSeries
 from dagster import materialize
 from deltalake import write_deltalake
 
-from nged_substation_forecast.defs.cv_assets import eligible_time_series
+from nged_substation_forecast.defs.cv_assets import effective_capacity, eligible_time_series
 
 # The leaderboard fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
 # validate 2025-07-01..2026-06-30, min_training_months=6.
@@ -75,15 +75,17 @@ def cv_paths(tmp_path, monkeypatch) -> dict[str, str]:
     """
     nged_path = tmp_path / "NGED"
     eligible_path = tmp_path / "eligible_time_series"
+    effective_capacity_path = tmp_path / "effective_capacity"
     nged_path.mkdir()
     monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
     monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
     monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(eligible_path))
+    monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_synthetic_power(str(nged_path / "power_time_series.delta"))
-    return {"eligible": str(eligible_path)}
+    return {"eligible": str(eligible_path), "effective_capacity": str(effective_capacity_path)}
 
 
 def _read_eligible(eligible_path: str, fold_id: str) -> list[int]:
@@ -144,3 +146,26 @@ def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths) -> None:
 
     assert _read_eligible(cv_paths["eligible"], "prior_epoch") == [99]
     assert _read_eligible(cv_paths["eligible"], FOLD_ID) == [1]
+
+
+def test_effective_capacity_materialises_one_row_per_series(cv_paths) -> None:
+    """The asset writes one full-history P99 row per time series with a plausible capacity.
+
+    The synthetic power fixture has ``power == 1.0`` for every observation, so P99(|power|) == 1.0
+    for all four series, and ``time`` is each series' latest observation.
+    """
+    assert materialize([effective_capacity]).success
+
+    capacity = pl.read_delta(cv_paths["effective_capacity"]).sort("time_series_id")
+    assert capacity["time_series_id"].to_list() == [1, 2, 3, 4]
+    assert capacity["effective_capacity_mw"].to_list() == pytest.approx([1.0, 1.0, 1.0, 1.0])
+    # `time` is the latest observed timestep per series (see _write_synthetic_power coverage).
+    assert capacity.filter(pl.col("time_series_id") == 1)["time"][0] == _utc(2026, 7, 1)
+
+
+def test_effective_capacity_is_idempotent(cv_paths) -> None:
+    """Re-materialising overwrites the whole table rather than appending duplicate rows."""
+    assert materialize([effective_capacity]).success
+    assert materialize([effective_capacity]).success
+
+    assert pl.read_delta(cv_paths["effective_capacity"]).height == 4

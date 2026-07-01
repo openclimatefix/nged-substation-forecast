@@ -15,13 +15,19 @@ from contracts.ml_schemas import (
     EvalScopeType,
     Metrics,
 )
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    EffectiveCapacity,
+    PowerForecast,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 
 
 def compute_metrics(
     cv_forecasts: pt.DataFrame[PowerForecast],
     actuals: pt.LazyFrame[PowerTimeSeries],
     metadata: pt.DataFrame[TimeSeriesMetadata],
+    capacity: pt.DataFrame[EffectiveCapacity] | None = None,
 ) -> pt.DataFrame[Metrics]:
     """Compute evaluation metrics from CV predictions and observed power.
 
@@ -34,13 +40,15 @@ def compute_metrics(
     5. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
-    NMAE is normalised by the 99th percentile of absolute observed power within the
-    same group (``P99(|power_actual|)``), giving a capacity-like denominator that is
-    more comparable across asset types than the mean — intermittent generators (PV, wind)
-    have a low mean due to night/calm periods, which would inflate their NMAE relative to
-    demand substations of similar peak capacity. Once the ``effective_capacity`` Dagster
-    asset exists (Phase 6.5), the denominator will be upgraded to that pre-computed
-    full-history P99 rather than the validation-window P99 used here.
+    NMAE is normalised by a capacity-like denominator — more comparable across asset types
+    than the mean, since intermittent generators (PV, wind) have a low mean due to night/calm
+    periods that would inflate their NMAE relative to demand substations of similar peak capacity.
+    When a ``capacity`` frame is supplied, the denominator is that pre-computed full-history
+    ``effective_capacity_mw`` (joined per ``time_series_id``); otherwise it falls back to the 99th
+    percentile of absolute observed power within the joined window (``P99(|power_actual|)``). The
+    full-history capacity is preferred because the window P99 varies fold to fold (a calm year for
+    a wind farm gives a low P99, inflating its NMAE). ``coalesce`` keeps the window P99 fallback
+    for any series present in the forecasts but absent from ``capacity``.
 
     Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
     Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be
@@ -53,6 +61,10 @@ def compute_metrics(
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
         metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
             Series absent from ``metadata`` receive a null ``time_series_type``.
+        capacity: Optional pre-computed per-series effective capacity. When provided,
+            ``effective_capacity_mw`` is used as the NMAE denominator (falling back to the
+            window ``P99(|power_actual|)`` for any series it does not cover). When ``None``,
+            the window P99 is used for every series.
 
     Returns:
         A validated tall ``Metrics`` DataFrame with ``time_series_type`` populated.
@@ -85,12 +97,25 @@ def compute_metrics(
     with_error = ensemble_mean.with_columns(error=pl.col("power_fcst") - pl.col("power_actual"))
 
     # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name).
+    # `_p99_inline` is the validation-window NMAE denominator fallback, used when no capacity is
+    # supplied (or for series the capacity frame doesn't cover); dropped by the unpivot below.
     metrics_wide = with_error.group_by(["time_series_id", "fold_id", "power_fcst_model_name"]).agg(
         mae=pl.col("error").abs().mean(),
-        nmae=pl.col("error").abs().mean() / pl.col("power_actual").abs().quantile(0.99),
         rmse=(pl.col("error").pow(2).mean()).sqrt(),
         mbe=pl.col("error").mean(),
+        _p99_inline=pl.col("power_actual").abs().quantile(0.99),
     )
+
+    if capacity is not None:
+        # Strip the Patito model so Polars' cross-subclass join type check doesn't reject the join.
+        capacity_denom = pl.LazyFrame._from_pyldf(capacity.lazy()._ldf).select(
+            ["time_series_id", "effective_capacity_mw"]
+        )
+        metrics_wide = metrics_wide.join(
+            capacity_denom, on="time_series_id", how="left"
+        ).with_columns(nmae=pl.col("mae") / pl.coalesce("effective_capacity_mw", "_p99_inline"))
+    else:
+        metrics_wide = metrics_wide.with_columns(nmae=pl.col("mae") / pl.col("_p99_inline"))
 
     # Pivot to tall format.
     metrics_tall = (

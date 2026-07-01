@@ -34,6 +34,7 @@ from nged_substation_forecast.defs.cv_assets import (
     MetricsConfig,
     PopulationFilter,
     cv_power_forecasts,
+    effective_capacity,
     metrics,
     trained_cv_model,
 )
@@ -173,6 +174,7 @@ def _base_env(
     forecasts_path = tmp_path / "power_forecasts"
     metrics_path = tmp_path / "forecast_metrics"
     cache_path = tmp_path / "cache"
+    effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
@@ -184,13 +186,21 @@ def _base_env(
     monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(cache_path))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
+    # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
+    # table is absent until a test materialises it, so NMAE falls back to the window P99 by default.
+    monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_power_with_actuals(str(nged_path / "power_time_series.delta"))
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
 
-    return {"forecasts": forecasts_path, "metrics": metrics_path, "cache": cache_path}
+    return {
+        "forecasts": forecasts_path,
+        "metrics": metrics_path,
+        "cache": cache_path,
+        "effective_capacity": effective_capacity_path,
+    }
 
 
 def _register(instance: DagsterInstance) -> None:
@@ -321,6 +331,40 @@ def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
         [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
     ).success
     assert pl.read_delta(str(file_mlflow_env["metrics"])).height == first_height
+
+
+def _read_nmae(metrics_path: Path) -> float:
+    fm = pl.read_delta(str(metrics_path)).filter(pl.col("metric_name") == "nmae")
+    assert fm.height == 1
+    return float(fm["metric_value"][0])
+
+
+def test_metrics_uses_effective_capacity_when_materialised(
+    file_mlflow_env: dict[str, Path],
+) -> None:
+    """With effective_capacity present, NMAE uses the full-history P99 denominator.
+
+    ts1's validation-window power peaks near 84 MW but its full observation history peaks near
+    104 MW (the training window). The full-history P99 is a larger denominator, so the
+    capacity-normalised NMAE is strictly smaller than the window-P99 fallback.
+    """
+    instance = DagsterInstance.ephemeral()
+    _run_cv_pipeline(instance)
+
+    # Fallback path: effective_capacity not yet materialised → window-P99 NMAE.
+    assert materialize(
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+    ).success
+    nmae_window = _read_nmae(file_mlflow_env["metrics"])
+
+    # Full-history path: materialise effective_capacity, then re-score the same fold.
+    assert materialize([effective_capacity], instance=instance).success
+    assert materialize(
+        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
+    ).success
+    nmae_full_history = _read_nmae(file_mlflow_env["metrics"])
+
+    assert nmae_full_history < nmae_window
 
 
 def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:
