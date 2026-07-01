@@ -12,6 +12,7 @@ Tests at two tiers:
    connection to resolve runs by tag.
 """
 
+import os
 import shutil
 import socket
 import subprocess
@@ -416,15 +417,30 @@ def _find_free_port() -> int:
         return s.getsockname()[1]
 
 
-def _wait_for_mlflow_server(url: str, timeout_s: float = 30.0) -> None:
+def _wait_for_mlflow_server(
+    url: str,
+    proc: subprocess.Popen[bytes],
+    log_path: Path,
+    timeout_s: float = 30.0,
+) -> None:
+    def _server_output() -> str:
+        return log_path.read_text() if log_path.exists() else "(no output captured)"
+
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            pytest.fail(
+                f"MLflow server exited early with code {proc.returncode}:\n{_server_output()}"
+            )
         try:
             urllib.request.urlopen(url, timeout=1)
             return
+        # Unparenthesised except-tuple (PEP 758, Python 3.14+); ruff format emits this form.
         except urllib.error.URLError, OSError:
             time.sleep(0.5)
-    pytest.fail(f"MLflow server at {url} did not become ready within {timeout_s}s")
+    pytest.fail(
+        f"MLflow server at {url} did not become ready within {timeout_s}s:\n{_server_output()}"
+    )
 
 
 def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -436,7 +452,17 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
     The artifact round-trip is proved by deleting the local model cache between
     ``trained_cv_model`` and ``cv_power_forecasts``.
     """
+    # The real MLflow HTTP server needs the server runtime stack (full ``mlflow``, in the dev
+    # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail.
+    # This test runs the Flask app under gunicorn (see ``--gunicorn-opts`` below).
+    pytest.importorskip("flask")
+    pytest.importorskip("gunicorn")
+
     port = _find_free_port()
+    # Capture server output to a file (not DEVNULL) so an early-dying server is diagnosable, and
+    # not a PIPE, which the long-running server could otherwise fill and block on.
+    server_log = tmp_path / "mlflow_server.log"
+    log_file = server_log.open("wb")
     mlflow_proc = subprocess.Popen(
         [
             "mlflow",
@@ -449,13 +475,20 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
             str(tmp_path / "mlruns"),
             "--default-artifact-root",
             str(tmp_path / "artifacts"),
+            # Force the Flask/gunicorn server: mlflow 3.14's default uvicorn+FastAPI app imports
+            # importlib.abc.Traversable, removed in Python 3.14, so it fails to start.
+            "--gunicorn-opts",
+            "--workers 1",
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        # mlflow 3.14 puts the file-store backend in maintenance mode unless this is set; the
+        # subprocess does not inherit the fixture's env, so pass it through explicitly.
+        env={**os.environ, "MLFLOW_ALLOW_FILE_STORE": "true"},
     )
     try:
         tracking_uri = f"http://127.0.0.1:{port}"
-        _wait_for_mlflow_server(f"{tracking_uri}/health")
+        _wait_for_mlflow_server(f"{tracking_uri}/health", mlflow_proc, server_log)
         mlflow.set_tracking_uri(tracking_uri)
 
         paths = _base_env(tmp_path, monkeypatch, tracking_uri)
@@ -510,3 +543,4 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
     finally:
         mlflow_proc.terminate()
         mlflow_proc.wait(timeout=10)
+        log_file.close()
