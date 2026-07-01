@@ -15,7 +15,7 @@ It is the deep-dive behind two of the "innovative and unique" capabilities highl
 Milestone 1 report: estimating the **dynamically changing effective capacity** of generators, and
 natively handling **apparent-power (MVA) metering** and **unmetered generation**.
 
-### How to read this document
+## How to read this document
 
 The sections build up from the problem statement to the full system, roughly in roadmap order:
 
@@ -74,16 +74,16 @@ learn basic physical invariants and are prone to overfitting or hallucinating no
 behaviour. We inject a **Differentiable Physics (DP)** layer directly into our computational graph
 for three core reasons:
 
-* **Data and sample efficiency:** The model does not have to spend capacity re-learning solar
+- **Data and sample efficiency:** The model does not have to spend capacity re-learning solar
   geometry (where the sun is) or the shape of a turbine power curve (roughly cubic in wind speed
   between cut-in and rated, then flat to rated power, then zero beyond cut-out). The physics engine
   supplies these constraints for free, letting the ML components focus entirely on atmospheric and
   behavioural nuances.
-* **True invertibility (inputs as parameters):** Because every operation in our physics engine
+- **True invertibility (inputs as parameters):** Because every operation in our physics engine
   preserves gradients, we can backpropagate errors all the way to the *inputs*. This lets us treat
   unobserved variables (like local irradiance) or system configurations as parameters that can be
   solved via gradient descent.
-* **Interpretability:** Instead of inspecting uninterpretable latent layers, our system updates
+- **Interpretability:** Instead of inspecting uninterpretable latent layers, our system updates
   explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
   audit the model's assumptions.
 
@@ -115,7 +115,7 @@ synchronised-peak regime (precisely the regime NGED cares about most) is the har
 The fundamental insight is to treat the meter reading as the output of a **forward model** that
 takes latent demand and DER generation as inputs:
 
-```
+```text
 observed_power(t) = latent_demand(t) − pv_generation(t) − wind_generation(t) − battery_net(t) + losses(t)
 ```
 
@@ -141,7 +141,7 @@ solar PV farms, large wind farms, grid-scale batteries — while a long tail of 
 (and, strictly, EV chargers and heat pumps on the demand side). Written out in full, the forward
 model is closer to:
 
-```
+```text
 observed = latent_demand
            − (pv_metered + pv_unmetered)
            − (wind_metered + wind_unmetered)
@@ -191,20 +191,20 @@ to estimate their physical parameters — most importantly the effective capacit
 down over time as a result of maintenance, faults, and build-out — feeding the
 [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) delivery table.
 
-* **The problem:** A generator's effective capacity drifts over time — turbines fail, inverters drop
+- **The problem:** A generator's effective capacity drifts over time — turbines fail, inverters drop
   out, panels soil and degrade (or are cleaned and replaced). A static nameplate value introduces
   large downstream errors.
-* **The solution:** With the site's coordinates locked and live weather passed through the DP
+- **The solution:** With the site's coordinates locked and live weather passed through the DP
   module, any residual between expected and actual power is backpropagated to update the
   **effective-capacity parameter** ($\mu_{\text{capacity}}$) on a rolling basis. This doubles as a
   real-time health and availability monitor.
-* **What effective capacity must exclude:** ANM curtailment is a deliberate, network-driven
+- **What effective capacity must exclude:** ANM curtailment is a deliberate, network-driven
   reduction, not a loss of physical capability. We identify curtailed periods from NGED's
   curtailment/ANM feed and model them as a separate [curtailment gate](#8-scaling-to-the-full-grid-a-graph-structured-dp-engine), so the capacity estimate reflects only
   the asset's true availability. Folding curtailment into capacity would corrupt exactly the signal
   NGED needs — and [capacity regularisation](#5-estimating-capacity-with-dp) covers how we further stop the capacity parameter from absorbing unexplained
   noise.
-* **How capacity feeds the forecast:** as described in the roadmap, this is a **two-pass** approach —
+- **How capacity feeds the forecast:** as described in the roadmap, this is a **two-pass** approach —
   the first pass estimates effective capacity (here), and the second normalises each generator's time
   series by its effective capacity before the power-forecast model trains on it. XGBoost continues to
   do the actual power forecasting in v1; DP is responsible only for *estimating capacity* of
@@ -453,7 +453,7 @@ class UniversalFleetNode(nn.Module):
 
 ## 7. Combining differentiable physics with the weather encoder
 
-```
+```text
 +-------------------+
 | Learnt parameters |
 |     per site:     |
@@ -481,7 +481,6 @@ class UniversalFleetNode(nn.Module):
 - **Systematic / local anomalies** (the "unknown unknowns") are handled by the **retrieval / alignment** module: "on days that looked exactly like this in the past, the physics model consistently over-predicted the evening ramp-down by 5% because of that one tree on the horizon" (residual correction).
 
 `pvlib-pytorch` is a planned Open Climate Fix open-source library — a differentiable, PyTorch-native port of [pvlib](https://pvlib-python.readthedocs.io/) — that we intend to spin out of this project. It would generalise the hand-rolled transposition and panel geometry in the [single-site](#4-the-core-building-block-differentiablesolarplant) and [fleet](#6-scaling-to-aggregate-fleets-fleetsolarnode) sketches into a reusable, tested component; treat those sketches as the prototype it grows from.
-
 
 ---
 

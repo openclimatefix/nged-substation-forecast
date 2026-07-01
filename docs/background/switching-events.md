@@ -20,7 +20,7 @@ This matters enormously, and it is the crux of everything below:
 
 The picture below contrasts the *physical* mesh (all paths exist) with the *operated* radial state (some switches held open, marked `/`, so power flows in a tree). `[A]`–`[D]` are primary substations; `===` is an energised circuit; `/` is a normally-open switch; `·` marks the load tapped along each circuit.
 
-```
+```text
    PHYSICAL MESH (all paths exist)          OPERATED RADIALLY (open switches break loops)
 
         [A]=====·=====[B]                        [A]=====·=====[B]
@@ -65,7 +65,7 @@ NGED have confirmed two things that shape the entire problem:
 
 The diagram shows why "how much moved?" has no clean answer. The load `·` is spread along the circuit between `[A]` and `[B]`; the cut point (open switch `/`) can sit anywhere, and wherever it sits determines how much load each end keeps.
 
-```
+```text
    Circuit between two substations, load tapped continuously along it:
 
    [A]==·==·==·==·==·==·==·== / ==·==·==[B]

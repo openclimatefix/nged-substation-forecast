@@ -16,17 +16,18 @@ As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compr
 level) results in Parquet files ranging between about 205 MB to 240 MB.
 
 The conclusion is to:
+
 - sort by "init_time", "lead_time", "ensemble_member", "h3_index"
 - Compress using: compression="zstd", compression_level=14
 - Minimal size = save as UInt8 = 51 MB
 - But we're worried that UInt8 might lose too much info. So we're scaling to `[0, 2¹²)` and saving a
   Int16 in Delta Lake, which roughly halves the size from 240 MB for `float32` down to 120 MB.
 
+### Test different sort orders
 
-### Test different sort orders:
 (After scaling to `[0, 255]` and saving as `UInt8`, and compressing using zstd with the default level)
 
-```
+```text
 "init_time", "lead_time", "ensemble_member", "h3_index" = 54 MB (BEST YET)
 "init_time", "ensemble_member", "lead_time", "h3_index" = 56 MB
 "init_time", "lead_time", "h3_index", "ensemble_member" = 59 MB
@@ -35,10 +36,11 @@ The conclusion is to:
 ```
 
 ### Test compression algorithm
+
 (after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and scaling to `[0, 255]`
 and saving as `UInt8`)
 
-```
+```text
 compression="zstd", compression_level=12 = 54 MB
 compression="zstd", compression_level=13 = 53 MB
 compression="zstd", compression_level=14 = 51 MB, 2.26s (BEST MIX OF SPEED & COMPRESSION RATIO)
@@ -57,9 +59,10 @@ compression="brotli", compression_level=11 = 48 MB, 17.75s!
 ```
 
 ### Testing different dtypes
+
 (after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and compressing using zstd level 14)
 
-```
+```text
 Scale to 2¹⁶ - 1, and save as UInt16 = 145 MB
 Scale to 2¹² - 1, and save as UInt16 = 117 MB
 Scale to 2¹⁰ - 1, and save as UInt16 =  79 MB
@@ -67,4 +70,3 @@ Scale to 2⁹  - 1, and save as UInt16 =  62 MB
 Scale to 2⁸  - 1, and save as UInt16 =  51 MB
 Scale to 2⁸  - 1, and save as UInt8  =  51 MB
 ```
-

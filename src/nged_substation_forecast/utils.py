@@ -19,6 +19,7 @@ def create_dagster_type_from_patito_model(model: Type[pt.Model]) -> DagsterType:
     This factory function takes a Patito model and returns a DagsterType.
     The returned DagsterType uses a `type_check_fn` to validate the output
     DataFrame against the model's schema. We handle both DataFrame and LazyFrame:
+
     - For eager DataFrames, we validate the actual data.
     - For LazyFrames, we only validate the schema (using an empty dummy DataFrame)
       to avoid triggering expensive computations during type checking.
