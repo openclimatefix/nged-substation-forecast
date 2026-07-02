@@ -33,14 +33,10 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
 - **Use Dagster "properly"**: persistent run history, one-click UI backfills of missed
   partitions, and the ability to launch backtests on AWS whenever the model improves.
-- **An always-on dev dashboard**: a simple Marimo web app showing the latest live forecasts.
-- **Multi-user access** to the Dagster UI and the dashboard (rules out single-user tracking
+- **Multi-user access** to the Dagster UI (and, later, to the dev dashboard) (rules out single-user tracking
   services).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
   failure (SNS → email), and cost-conscious operation (~$30–40/month target).
-- [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
-  windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire
-  stale experiment partitions.
 
 **Post-MVP (explicitly deferred):**
 
@@ -53,9 +49,11 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - Telemetry to Sentry.io
   ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — CloudWatch +
   SNS cover alerting first.
-- An **MLflow tracking server** and a separate **development dashboard** (for researchers,
-  distinct from the production dev dashboard above), both hosted on the always-on
-  control-plane box once it exists — see the [note below](#aws-architecture).
+- An **MLflow tracking server** and a separate **development dashboard**, both hosted on the
+  always-on control-plane box once it exists — see the [note below](#aws-architecture).
+- [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
+  windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire
+  stale experiment partitions.
 
 ## The `live_forecasts` asset
 
