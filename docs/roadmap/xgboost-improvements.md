@@ -1,24 +1,25 @@
-# XGBoost forecast-skill quick wins (issue #145 + review suggestions)
+# XGBoost improvements ("quick wins")
 
-## Context
+> **Status: 🚧 Planned (v0.5) — deferred until v0.1 is live on AWS.** Epic:
+> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Getting *any*
+> forecast live ([Live service](live-service.md)) takes priority over forecast quality.
 
-Issue [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) (v0.5): quick wins to make XGBoost a strong baseline before the advanced approaches
-land — explicitly *not* deep ML work ("little point in spending ages on the ML model before we
-have good capacity estimation"). This plan merges its nine sub-issues with additional tricks
-from the codebase review, ordered **best bang-for-the-buck first** (expected skill per unit
-effort), grouped into effort tiers.
+Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly
+*not* deep ML work ("little point in spending ages on the ML model before we have good capacity
+estimation"). This page merges [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)'s
+nine sub-issues with additional tricks from the 2026-07 codebase review, ordered **best
+bang-for-the-buck first** (expected skill per unit effort), grouped into effort tiers.
 
-**Deferred until v0.1 is running on AWS** — getting *any* forecast live takes priority over
-forecast quality; see the sequencing in `docs/roadmap/index.md` (01 → 02 → 03 → 04 → 05, then
-this plan, 09).
-
-**Measure before optimising.** Land plan 06 (persistence/climatology baselines — without them
-"improved" is unanchored) and plan 07 Phase A (horizon-sliced metrics — several wins below are
-horizon-specific and invisible in the `"all"` aggregate) first. Each win is one registered
-experiment (`register_experiment_job`) scored against the current champion on the leaderboard
-fold; headline metric NMAE, sliced by horizon and `time_series_type`. Several items interact
-(e.g. init-time-anchored features overlap short lags at short horizons), so land winners into
-`conf/model/xgboost.yaml` one at a time to keep attribution clean.
+**Measure before optimising.** Land the
+[persistence/climatology baselines](metrics-and-leaderboard.md#baseline-forecasters) (without
+them "improved" is unanchored) and
+[horizon-sliced metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
+(several wins below are horizon-specific and invisible in the `"all"` aggregate) first. Each
+win is one registered experiment (`register_experiment_job`) scored against the current
+champion on the leaderboard fold; headline metric NMAE, sliced by horizon and
+`time_series_type`. Several items interact (e.g. init-time-anchored features overlap short lags
+at short horizons), so land winners into `conf/model/xgboost.yaml` one at a time to keep
+attribution clean.
 
 ## Tier 1 — config-level changes (hours each)
 
@@ -146,9 +147,9 @@ in `meta.json`. Becomes genuinely valuable once items 4–9 diverge the useful f
 
 One booster per `(time_series_id, horizon_window)` — e.g. 0–2 d, 2–7 d, 7–14 d, configurable.
 Train and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a window dimension.
-**Requires plan 07 Phase A to evaluate** — its win is by construction horizon-sliced. Compare
-against item 1 first: if the lead-time feature captures most of the benefit, the extra model
-count may not pay.
+**Requires [horizon-sliced metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
+to evaluate** — its win is by construction horizon-sliced. Compare against item 1 first: if
+the lead-time feature captures most of the benefit, the extra model count may not pay.
 
 ### 14. Batched training via `xgb.DataIter` ([#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) — enabler)
 
@@ -162,8 +163,8 @@ Training on all 51 members multiplies training data ~51× for correlated rows. R
 dose-response experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP
 loader already takes `ensemble_members: list[int]`, `cv_assets.py:237`). Training on members
 also teaches the model the member-spread input distribution it actually sees at inference —
-the train/serve input-skew flagged in the review. Ensemble *calibration* itself is plan 07's
-territory.
+the train/serve input-skew flagged in the review. Ensemble *calibration* itself belongs to
+[probabilistic evaluation](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 
 ### 16. Global model per `time_series_type` ([#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104))
 
@@ -179,7 +180,8 @@ boundary of "quick".
 
 - **[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) CERRA pre-training** — needs a whole new data-source ingestion (CERRA download,
   contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
-  belongs to `docs/ml_experimentation/evaluating-new-data-sources.md`.
+  belongs to
+  [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
 - **[#198](https://github.com/openclimatefix/nged-substation-forecast/issues/198) NWP row-group layout** — throughput, not skill (~1 h per 51-member fold prediction is
   decode-bound). Do it when experiment iteration speed becomes the bottleneck — likely around
   item 15, which multiplies NWP reads.
@@ -187,10 +189,11 @@ boundary of "quick".
   the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
   ever show a DST-transition artefact.
 
-## Verification
+## How each win is evaluated
 
 Each win lands as its own experiment on the leaderboard: register → `full_cv` → `metrics`
-(leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once plan 07 Phase A is
-in) against the current champion and the plan-06 baselines. Keep losing experiments in MLflow
-(negative results are results); promote winners' settings into `conf/model/xgboost.yaml` one
-at a time so attribution stays clean.
+(leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once horizon
+slicing is in) against the current champion and the
+[baselines](metrics-and-leaderboard.md#baseline-forecasters). Keep losing experiments in
+MLflow (negative results are results); promote winners' settings into
+`conf/model/xgboost.yaml` one at a time so attribution stays clean.

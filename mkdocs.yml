@@ -55,12 +55,15 @@ nav:
       - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
   - Roadmap:
       - Overview: roadmap/index.md
+      - Live Service: roadmap/live-service.md
       - Delivery Tables: roadmap/delivery-tables.md
       - Forecast Building Blocks: roadmap/forecast-building-blocks.md
       - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
       - Data Sources: roadmap/data-sources.md
       - Capacity Estimation: roadmap/capacity-estimation.md
       - Switching Events: roadmap/switching-events.md
+      - XGBoost Improvements: roadmap/xgboost-improvements.md
+      - Engineering Health: roadmap/engineering-health.md
   - API Reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md

@@ -33,10 +33,33 @@ hook.
 
 ## Docs
 
-`docs/` contains a lot of useful information beyond API reference, including detailed discussion
-of plans and future direction (`docs/roadmap/`), background/requirements context
-(`docs/background/`), and architecture notes (`docs/architecture/`). When planning new features,
-check `docs/` for relevant prior discussion before proposing an approach.
+`docs/` contains a lot of useful information beyond API reference: forward-looking plans and
+their ordering (`docs/roadmap/`), durable explainers of solution methods (`docs/techniques/`),
+background/requirements context (`docs/background/`), and architecture notes
+(`docs/architecture/`). When planning new features, check `docs/` for relevant prior discussion
+before proposing an approach.
+
+## How planning works
+
+Full description and a "which place do I use?" table: `docs/roadmap/index.md`. In brief:
+
+- **GitHub** (issues + the OCF Project board) is the *complete, ordered* task list — task-level
+  priority lives only there. When current priorities matter, query it with `gh` (epics map 1:1
+  to roadmap milestones; dependencies are `blocked by` issue links).
+- **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics
+  sit inside each page under an "Implementation details (deleted when this ships)" section.
+- **`plans/`** holds at most one file: the in-flight PR's mechanical checklist, deleted on
+  merge. Usually empty.
+
+**Ship-time triage** — when a PR lands a roadmap item, that PR (or an immediate follow-up)
+must also:
+
+1. Promote surviving design decisions to their permanent home (`docs/architecture/`,
+   `docs/ml_experimentation/`, …).
+2. Delete the item's "Implementation details" section (and any `plans/` file), pasting it (or
+   a summary) into the PR body. When a roadmap page's last 🚧 item ships, delete the page
+   (nav entry, map-table row, inbound doc links).
+3. Close the GitHub issue; update the map table and status emoji in `docs/roadmap/index.md`.
 
 ## Architecture
 
@@ -101,10 +124,13 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
 - **Comments must reflect current state only** — never reference previous iterations of the
   code or deleted files.
-- **Never reference temporary implementation plans** (in `plans/`) from code *or* docs — neither
-  the files themselves nor their sections (e.g. "§4.3.1"). These plans are deleted once the work
-  lands, so any reference to them rots. Linking *between code and the permanent docs under `docs/`*
-  is encouraged — e.g. a docstring pointing at a page in `docs/architecture/`.
+- **Code links only to durable docs** — `docs/background/`, `docs/techniques/`,
+  `docs/architecture/`, `docs/ml_experimentation/`. Never link from code *or* docs to `plans/`
+  files, and never from code to `docs/roadmap/` pages or to any
+  "Implementation details (deleted when this ships)" section — all of those are deleted when
+  the work lands, so the reference rots. (Docs-to-docs links into `docs/roadmap/` are fine;
+  retargeting them is part of ship-time triage.) Linking from a docstring to a durable page —
+  e.g. `docs/architecture/` — is encouraged.
 - **MkDocs-compatible constant docs** — document module-level constants with a string literal
   immediately after the assignment, not with Sphinx-style `#:` comments. This is correct:
 

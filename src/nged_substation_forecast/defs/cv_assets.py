@@ -167,9 +167,9 @@ def _compute_effective_capacity(
     is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
     as current to the end of the observed history — rather than a timestep the value varies over. The
     v0.6 / v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
-    time)``), and only then does ``time`` carry per-row meaning; see the "Normalising NMAE by
-    ``effective_capacity``" section of ``docs/roadmap/metrics-and-leaderboard.md`` for why the MVP is
-    one scalar row per series rather than the value repeated at every half-hour.
+    time)``), and only then does ``time`` carry per-row meaning. The MVP stays one scalar row per
+    series rather than the value repeated at every half-hour: densifying a constant adds rows
+    without information, and the metrics join is by ``time_series_id`` alone until capacity varies.
 
     Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
     """
@@ -199,9 +199,8 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to fold.
 
     The whole (small — one row per series) table is overwritten on each materialisation. The MVP is
-    deliberately one scalar row per series, **not** the value repeated at every half-hour; see the
-    "Normalising NMAE by ``effective_capacity``" section of
-    ``docs/roadmap/metrics-and-leaderboard.md`` for why densifying a constant buys nothing.
+    deliberately one scalar row per series, **not** the value repeated at every half-hour —
+    densifying a constant buys nothing.
 
     A future upgrade (v0.6 / v0.7) swaps the P99 for the differentiable-physics capacity model,
     emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,

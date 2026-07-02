@@ -26,6 +26,76 @@ database. The leaderboard will be displayed as an interactive table (inspiration
 
 ---
 
+## Baseline forecasters 🚧
+
+No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
+`contracts/power_schemas.py:242`). Without a persistence row and a climatology row on the
+leaderboard, XGBoost's NMAE numbers aren't interpretable: at 0–6 h persistence is famously hard
+to beat, and at day 8–14 seasonal climatology often beats everything. A model could "win" the
+leaderboard while adding no skill over naive methods and nobody would know.
+([#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147))
+
+Side benefit: a second and third `BaseForecaster` implementation pressure-tests the abstraction
+(the docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
+
+### Implementation details — baselines (deleted when they ship)
+
+New workspace package `packages/baseline_forecasters/` mirroring the `xgboost_forecaster`
+layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`). Add to the root
+`pyproject.toml` `[tool.uv.sources]` and dependencies.
+
+**1. `PersistenceForecaster` (seasonal-naive).** Reuse the existing lag machinery instead of
+writing any new time-series logic:
+
+- `selected_features` = `{"power_lag_24h", "power_lag_48h", "power_lag_168h",
+  "power_lag_336h"}` (configurable in the config, this is the default).
+- `predict()` = `pl.coalesce` of the lag columns in ascending-lag order. The existing
+  `_nullify_leaky_lags` already nulls any lag ≤ lead time, so coalesce naturally selects the
+  *shortest non-leaky* lag per row — same-time-yesterday for day-1 horizons, last-week for
+  day 2–7, two-weeks-ago beyond that. Zero lookahead risk because it rides the audited pipeline.
+- `train()` records `trained_time_series_ids` only (nothing to fit). `save`/`load` persist a
+  `meta.json` with the config + ids (copy the pattern from `XGBoostForecaster`).
+- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`.
+- Rows where all lags are null (long horizons + data gaps): drop those rows from the output
+  (`PowerForecast.power_fcst` presumably non-nullable — check) and log the dropped count.
+
+**2. `ClimatologyForecaster`.**
+
+- `train()`: collect `(time_series_id, valid_time, power)` from the features frame and build a
+  lookup table of mean power per `(time_series_id, month, half-hour-of-day, is_weekend)` over
+  the training window. Store as a small Polars frame; `save` writes it as one parquet +
+  `meta.json`.
+- `predict()`: join the lookup onto the prediction rows by the same keys.
+- `selected_features` needs only the target join — reuse existing time features
+  (`local_time_of_day_*` etc.) or derive month/half-hour directly from `valid_time` inside the
+  forecaster; prefer deriving directly to keep the feature list empty.
+- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
+
+**3. Configs and registration.**
+
+- `conf/model/persistence.yaml` and `conf/model/climatology.yaml` following
+  `conf/model/xgboost.yaml`'s `_target_` structure, with `weather_source: "none"`.
+- `PowerForecast.nwp_init_time` is already nullable for exactly this case
+  (`power_schemas.py:242`); confirm `cv_power_forecasts` tolerates it end-to-end.
+- **Ensemble members:** the CV predict path feeds all ~51 members; baselines produce identical
+  forecasts per member. That is wasteful but harmless (the ensemble mean is unchanged). MVP:
+  accept it. Do not special-case the pipeline for baselines in this PR; if the waste matters
+  later, add a per-forecaster `uses_nwp_ensemble` class flag and let `cv_power_forecasts`
+  restrict to member 0.
+
+**4. Run and publish.** Register both via `register_experiment_job` (`run_mode: smoke_test`
+first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
+so both appear in MLflow as leaderboard rows.
+
+**Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: persistence picks
+the shortest non-null lag; climatology lookup round-trips through `save`/`load`; both freeze
+`trained_time_series_ids`. (2) Smoke-test fold end-to-end via the existing integration-test
+pattern (`tests/test_trained_cv_model.py` fixtures). (3) Sanity-check the numbers: persistence
+NMAE should be *worse overall* than XGBoost but plausibly competitive at short horizons (fully
+visible once the horizon slices land — the two plans compound).
+
+---
+
 ## Cross-fold validation
 
 The cross-validation protocol is **implemented**, so it has moved to its permanent home:
@@ -33,6 +103,60 @@ The cross-validation protocol is **implemented**, so it has moved to its permane
 That page covers the expanding-window protocol, the current single MVP fold (and why the available
 weather data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
 alternatives we considered.
+
+### Fold hygiene: selection bias and a final-test window 🚧
+
+The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`: train 2024-04 →
+2025-06, validate 2025-07 → 2026-06) serves as **both** the model-selection set and the
+reported skill number. Every hyperparameter choice, feature ablation, and model comparison is
+adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned
+experiments (the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's
+reported skill will be optimistically biased — classic leaderboard overfitting. The epoch
+mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
+
+Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
+than fold-level noise should not drive decisions; and the number of experiments per epoch is
+itself a relevant statistic (visible as the MLflow experiment count).
+
+#### Implementation details — final-test window (deleted when it ships)
+
+**1. Document the caveat (immediately).** A short "Selection bias" subsection in
+`docs/ml_experimentation/cross-validation-folds.md` restating the paragraph above.
+
+**2. Reserve a final-test window (next leaderboard epoch).** Found a new epoch in
+`conf/cv/default.yaml` (the epoch mechanism exists for exactly this):
+
+- Shrink the leaderboard fold's validation window to `2025-07-01 → 2026-03-31`.
+- Add a `final_test` fold `2026-04-01 → 2026-06-30` with a new per-fold flag
+  `final_test: true` (extend `CvConfig` / the fold schema in
+  `packages/contracts/src/contracts/hydra_schemas.py`; it is neither a leaderboard fold nor a
+  dev fold — `_fold_ids_for_run_mode` in `defs/jobs.py:96` must *not* include it in any
+  run mode, so no experiment trains or scores on it in the normal flow).
+- Scoring against the final-test window is a deliberate, rare act — only for champion
+  candidates immediately before promotion — via the `metrics` asset with
+  `evaluation_scope="ad_hoc"` and the window's `valid_time` bounds in the existing
+  `PopulationFilter`. No new asset needed; the discipline is procedural. Note: the model
+  trained for the leaderboard fold is reused as-is (train window unchanged), so final-test
+  scoring needs a `cv_power_forecasts` run over the reserved window — check whether the
+  existing asset can forecast a window disjoint from the fold's `val_start/val_end`, and add a
+  window override to its config if not.
+- Rule, documented alongside: final-test results are never used to *choose between*
+  candidates (that re-creates the problem); they exist to report honest skill for the chosen
+  champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
+
+**3. Trade-off (decide at implementation time).** This costs 3 of the 12 validation months, on
+a dataset that is already short. The alternative — accepting documented bias until
+Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is
+expected within a couple of months, do part 1 now and fold part 2 into the multi-fold epoch
+instead of spending a separate epoch on it. Decide based on the backfill outlook.
+
+**Verification.** (1) `register_experiment_job` in all three run modes never creates a
+partition for the `final_test` fold (extend `tests/test_register_experiment_job.py`).
+(2) Eligibility for the leaderboard fold is unchanged by the shrunk validation window (the
+eligibility rule keys off `val_start`/`val_end` — re-materialise `eligible_time_series` and
+diff). (3) End-to-end: score one existing experiment against the reserved window via the
+`ad_hoc` metrics path and confirm rows land in `forecast_metrics.delta` with the window label,
+and nothing is logged to the leaderboard MLflow runs.
 
 ---
 
@@ -145,6 +269,83 @@ for periods with switching events in the model inputs (or in the forecast's `val
 distinguishes models that perform well *only* on clean periods from models that handle switching
 events in their inputs. The flags come from the detector described in
 [Switching events & latent demand](switching-events.md).
+
+---
+
+## Delivering the probabilistic metrics 🚧
+
+The 51-member ensemble is very likely **underdispersed**: XGBoost trained with squared error on
+the control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 members through
+it yields spread from *weather uncertainty only* — no model or observation uncertainty. Such
+ensembles are systematically overconfident, worst at short horizons where members haven't
+diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
+directly — yet nothing measures calibration today: `compute_metrics` averages members into a
+deterministic mean (`packages/ml_core/src/ml_core/metrics.py:84-90`) and scores only MAE/NMAE/
+RMSE/MBE on the `"all"` horizon slice (`metrics.py:51`). We pay 51× inference cost and score
+only the mean.
+
+Fix in three phases, each an independent PR. Phases A and B are pure evaluation (no model
+changes) and should land before any further MAE-driven experimentation.
+
+### Phase A — horizon-sliced metrics
+
+`HORIZON_SLICES` already exists in `contracts/ml_schemas.py:172` and the
+[time-slices table above](#time-slices-for-performance-evaluation) argues skill drivers differ
+radically by horizon; only `"all"` is computed.
+
+- In `compute_metrics` (`metrics.py`), derive `lead_time = valid_time − power_fcst_init_time`
+  per row (confirm `power_fcst_init_time` survives into the forecast/actuals join; it is a
+  `PowerForecast` primary-key column) and map it onto the `HORIZON_SLICES` bands with
+  `pl.when/then` chains or `cut`.
+- Compute the existing four metrics per `(series, fold, model, horizon_slice)` via one
+  `group_by` including the slice column, plus the existing `"all"` aggregate.
+- `build_mlflow_aggregate_metrics` gains keys like `nmae__all__day_ahead`. Keep the existing
+  key format for `"all"` slices unchanged so historical MLflow runs stay comparable.
+- Schema needs no change (the `Metrics` tall format was designed for this).
+
+### Phase B — probabilistic metrics from the existing ensemble
+
+Compute member-aware metrics *before* the ensemble-mean collapse in `compute_metrics`:
+
+- **Spread-skill ratio**: mean ensemble stddev ÷ RMSE of the ensemble mean, per group. Ratio
+  ≪ 1 confirms underdispersion — this is the headline diagnostic for the finding above.
+- **PICP**: empirical member quantiles per `(series, valid_time)` (`pl.quantile` over members),
+  then coverage of the P10–P90 interval. `metric_param` (currently only `"all"`,
+  `ml_schemas.py:203`) carries the interval label, e.g. `"p10_p90"`.
+- **Pinball loss** at P10/P50/P90 from the same empirical quantiles; `metric_param` = quantile
+  label. (Schema docstrings already anticipate pinball/PICP.)
+- **CRPS** (fair/ensemble form): per timestamp, `mean|xᵢ − y| − ½·mean|xᵢ − xⱼ|`. The pairwise
+  term over 51 members is computable with a self-join on member index within
+  `(series, valid_time)` groups; ~51² × rows is fine at V1 scale. If it's slow, the
+  sorted-member O(m log m) form is a known optimisation — don't start there.
+- Extend `METRIC_NAMES` (`ml_schemas.py:188`) and `METRIC_PARAMS` accordingly. Both are
+  `pl.Enum` columns written to Delta as String (documented gotcha) — additive enum growth is
+  safe for existing data.
+- Flip the statuses in the [metrics table above](#evaluation-metrics) from 🚧 to ✅ as they
+  land.
+
+### Phase C — cheap calibration (after B proves the diagnosis)
+
+Decide based on Phase B's spread-skill numbers; recommended order:
+
+1. **Post-hoc spread inflation** (EMOS-lite): per horizon slice, fit a scalar `s` on the
+   *training* window so that inflating members around the ensemble mean
+   (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero new model —
+   implementable as an optional step in `predict` or as a wrapper forecaster. Fit on train,
+   apply on validation (no tuning on the fold being scored).
+2. **XGBoost native multi-quantile** (`objective: reg:quantileerror`, several
+   `quantile_alpha`s) as a separate experiment/model family. This gives directly calibrated
+   quantiles but requires a percentile representation in `PowerForecast` (the
+   [delivery tables](delivery-tables.md) already plan percentiles) — a bigger schema/design
+   step, so keep it as its own follow-up plan when Phase B/C1 results justify it.
+
+### Implementation details — probabilistic metrics (deleted when they ship)
+
+Verification: (1) unit tests in `packages/ml_core/tests/` with hand-computable fixtures — a
+3-member toy ensemble where PICP, spread-skill, pinball, and CRPS are worked out by hand.
+(2) Property check: CRPS of a single-member "ensemble" equals MAE. (3) Re-score an existing
+experiment via the `metrics` asset (`ad_hoc` scope) and eyeball that spread-skill ≪ 1 at short
+horizons — the expected signature of the finding.
 
 ---
 
