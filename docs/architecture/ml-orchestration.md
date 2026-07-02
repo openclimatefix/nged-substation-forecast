@@ -49,11 +49,13 @@ methods (`save_to_mlflow` / `load_from_mlflow`) that delegate to each subclass's
 `{model_cache_base_path}/{run_id}/model`; the cache key is the **immutable run ID**, so a
 cached model never goes stale and never needs invalidation.
 
-The cache is also the production-resilience mechanism: once the production model is cached (or
-pre-seeded into the container image), live inference loads from disk and never contacts MLflow
-on the hot path — the live service keeps running through an MLflow outage. The cache should
-live on a persistent volume, or be baked into the image, so a restart during an outage still
-finds the model.
+Today this pair is used by the CV/experiment pipeline: `cv_power_forecasts` loads a fold's
+freshly trained model back from MLflow (a separate Dagster process) via this cache. Production
+inference does **not** use it for v0.1 — the champion model is baked directly into the
+container image at build time and loaded via the subclass's own `load`, with no MLflow call on
+the runtime path at all. Once production instead fetches its champion model from MLflow
+dynamically, `load_from_mlflow`'s cache becomes the mechanism that lets it keep serving through
+an MLflow outage — but that is future work, not the v0.1 design.
 
 ## Idempotent writes and concurrency
 

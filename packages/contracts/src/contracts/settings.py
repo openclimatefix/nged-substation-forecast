@@ -82,16 +82,6 @@ class Settings(BaseSettings):
             },
         )
 
-    production_model_run_id: str | None = Field(
-        default=None,
-        description=(
-            "MLflow run ID of the model the production service serves."
-            " Downloaded once into the local model cache (model_cache_base_path) and reused."
-            " Set manually for now; a later champion_model asset will populate it"
-            " automatically."
-        ),
-    )
-
     cv_config_path: Path = Field(
         default=PROJECT_ROOT / "conf" / "cv" / "default.yaml",
         description=(
@@ -135,9 +125,11 @@ class Settings(BaseSettings):
     model_cache_base_path: Path = Field(
         default=PROJECT_ROOT / "data" / "model_cache",
         description=(
-            "Root of the local-disk model cache, keyed by MLflow run ID."
-            " Put this on a persistent volume so the production cache survives restarts"
-            " during an MLflow outage."
+            "Root of the local-disk model cache, keyed by MLflow run ID, used by"
+            " BaseForecaster.load_from_mlflow. Currently only the CV pipeline"
+            " (cv_power_forecasts) reads a model back through this cache; production"
+            " inference does not use it for v0.1 (the model is baked directly into the"
+            " container image instead)."
         ),
     )
 

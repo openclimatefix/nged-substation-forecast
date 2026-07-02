@@ -24,8 +24,10 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   (`fold_id="live"`) — the [`live_forecasts` asset](#the-live_forecasts-asset).
 - Forecast *quality* does not matter yet — science improvements (baselines, XGBoost) are
   explicitly out of scope for this milestone.
-- Production inference must work with **no live dependency on MLflow** — a cache-hit model load
-  so the service keeps running if the tracking server is down.
+- Production inference must have **zero dependency on MLflow at runtime** — for v0.1 the
+  champion model is baked directly into the container image at build time and loaded via a
+  plain `save`/`load`, so there is no run ID, cache lookup, or tracking-server call on the hot
+  path at all.
 - Support both **live** (current partition) and **replay** (historical backfill) NWP
   availability modes, so missed runs can be backfilled
   ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
@@ -66,11 +68,11 @@ partitions_def: TimeWindowPartitionsDefinition(cron="0 0,6,12,18 * * *", ...)
 deps: [ecmwf_ens, power_time_series_and_metadata]
 ```
 
-- **Model loading:** `ForecasterClass.load_from_mlflow(settings.production_model_run_id,
-  settings.model_cache_base_path)` — served from the local cache, so the live service keeps
-  running if MLflow is down (only a cache miss contacts MLflow). The concrete class is
-  reconstructed from the `model_class` field in the saved model's `meta.json`. Both `Settings`
-  fields already exist.
+- **Model loading:** `ForecasterClass.load(path)` — a plain disk load of the model directory
+  baked into the container image at build time (see
+  [Production model artifacts](#production-model-artifacts)); no MLflow client, run ID, or
+  cache lookup involved. The concrete class is reconstructed from the `model_class` field in
+  the saved model's `meta.json`.
 - **Population:** forecast **only** the `trained_time_series_ids` recorded in the production
   model's `meta.json` — never a series the model has not seen (the train==predict invariant).
 - **Inference mode:** **single-run** feature engineering
@@ -102,19 +104,28 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
 ## Production model artifacts
 
 The deployment below runs forecasts as ephemeral Fargate tasks under every architecture
-option, but the inference path loads models via
-`BaseForecaster.load_from_mlflow(run_id, cache_base_path)`
-(`packages/ml_core/src/ml_core/base_forecaster.py:140`). An ephemeral container has neither a
-persistent model cache nor a reachable tracking server, so without a decision here, production
-inference has no way to get a model. This must be decided before writing the Dockerfile.
+option. An ephemeral container has no persistent disk and, under some architecture options, no
+reachable tracking server — so without a decision here, production inference has no way to get
+a model. This must be decided before writing the Dockerfile.
 
-**Decision: bake the champion model into the image at build time.** The cache-hit path in
-`load_from_mlflow` (`base_forecaster.py:157-166`) never contacts MLflow when
-`{cache_base_path}/{run_id}/model` exists — the existing design already supports fully offline
-serving. Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps
-MLflow out of the production runtime under every architecture option. Rejected alternative:
-MLflow artifact root on S3 fetched at container startup — more runtime moving parts, needs
-tracking-store access from prod, and slower cold starts.
+**Decision: bake the champion model into the image at build time, loaded via a plain
+`save`/`load` — no MLflow, run ID, or cache involved at runtime.** The model directory is
+produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard
+and downloads its artifacts to local disk), then `COPY`'d into the image at build time.
+Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow
+completely out of the production runtime under every architecture option. Rejected
+alternative: MLflow artifact root on S3 fetched at container startup — more runtime moving
+parts, needs tracking-store access from prod, and slower cold starts.
+
+This is deliberately simpler than reusing `BaseForecaster.load_from_mlflow`'s cache (the
+mechanism the CV pipeline already uses — see
+[ML orchestration](../architecture/ml-orchestration.md#model-artifacts-mlflow-artifact-store-immutable-local-cache)):
+v0.1 has no MLflow dependency to cache against in the first place. **Future work:** once
+production wants to pick up a new champion without a rebuild + redeploy (e.g. after the
+[XGBoost quick wins](xgboost-improvements.md) start landing regularly), switch to fetching the
+champion model from MLflow dynamically — at that point `load_from_mlflow`'s local-disk cache
+becomes the production-resilience mechanism again (serving from disk on a cache hit so the live
+service survives an MLflow outage), exactly as it does for CV today.
 
 ## AWS architecture
 
@@ -340,7 +351,7 @@ Tests:
 - Idempotency: materialise the same partition twice → row count unchanged.
 - Injected-clock unit tests for the run-selection helper.
 
-Verification: set `production_model_run_id` to a smoke-test model's fold run, materialise
+Verification: point `production_model_path` at a smoke-test model's saved directory, materialise
 `live_forecasts` for the current partition, and confirm `fold_id="live"` rows in
 `power_forecasts` — then plot them via `plot_power_forecast_job` (`fold_id: "live"`). Running
 the job 6-hourly on a workstation for a few days, then back-filling any missed slots with
@@ -353,15 +364,16 @@ Dockerfile (repo root):
 
 - Multi-stage `uv` build (standard pattern: `ghcr.io/astral-sh/uv` image, `uv sync --frozen
   --no-dev`, copy `.venv` + source into a slim `python:3.14` runtime stage).
-- Build args: `PRODUCTION_MODEL_RUN_ID` (required), `GIT_SHA` (stamped as an OCI label and env
-  var; complements
+- Build args: `MODEL_RUN_ID` (the champion fold run ID, stamped only as an OCI label for
+  traceability — the build never contacts MLflow with it), `GIT_SHA` (stamped as an OCI label
+  and env var; complements
   [reproducibility stamping](engineering-health.md#reproducibility-stamp-git-sha-and-delta-table-versions-on-mlflow-runs)).
-- Model injection: keep the image build hermetic — the build **copies** the model directory
-  from the build context (`data/model_cache/{run_id}/model`, populated beforehand by a small
-  script `scripts/fetch_model.py` that calls `load_from_mlflow` against the researcher's
-  tracking store). `COPY` it to the image's `model_cache_base_path` location and set
-  `ENV PRODUCTION_MODEL_RUN_ID=...`. Downloading from inside `docker build` is rejected
-  (needs tracking credentials in the build).
+- Model injection: keep the image build hermetic — the build **copies** a plain model
+  directory from the build context (`data/production_model/`, populated beforehand by a small
+  script, e.g. `scripts/fetch_model.py`, that downloads the champion run's artifacts straight
+  from MLflow — a one-off, researcher-run step, not the `load_from_mlflow` cache wrapper).
+  `COPY` it to a fixed in-image path that the entrypoint passes straight to `ForecasterClass.load`.
+  Downloading from inside `docker build` is rejected (needs tracking credentials in the build).
 - Entrypoint: `dagster job execute` one-shot (the exact job comes with the `live_forecasts`
   asset; until that exists, the entrypoint can materialise the data-ingestion assets so the
   image is testable now). Under Option B the same image also serves as the code-location
@@ -369,16 +381,15 @@ Dockerfile (repo root):
   overrides the command, so the one-shot entrypoint stays the default either way. Build for
   **arm64** (ARM Fargate is 20% cheaper and the candidate control-plane boxes are Graviton).
 
-Settings: `Settings.production_model_run_id` and `model_cache_base_path` already exist
-(`packages/contracts/src/contracts/settings.py`) — no schema change; just document that in the
-container they're env-var-driven (`.env` is dev-only).
+Settings: add a simple fixed path (e.g. `Settings.production_model_path`) for where the
+in-image model directory lives — no MLflow-related setting is needed for v0.1.
 
 Promotion runbook — short page `docs/architecture/production-deployment.md` (permanent docs,
 written when this ships):
 
 1. Pick the champion fold run ID from the MLflow leaderboard.
-2. `uv run python scripts/fetch_model.py --run-id <id>` → populates `data/model_cache/`.
-3. `docker build --build-arg PRODUCTION_MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD)
+2. `uv run python scripts/fetch_model.py --run-id <id>` → populates `data/production_model/`.
+3. `docker build --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD)
    -t nged-forecast:<id-short> .` and push to ECR.
 4. Point the ECS task definition at the new tag.
 
@@ -392,8 +403,8 @@ records; (b) Delta commits already give the atomic "outputs are the freshness re
 Container verification:
 
 1. `docker build` with a smoke-test-fold run ID succeeds.
-2. `docker run` **with no network access to any MLflow store** loads the model (cache-hit
-   path) and executes the entrypoint — this is the critical test.
+2. `docker run` **with no network access to any MLflow store** loads the model straight from
+   disk and executes the entrypoint — this is the critical test.
 3. Image labels show the run ID and git SHA (`docker inspect`).
 
 ### Deployment workstream 1 — S3-capable data paths (the biggest unknown; start first)
