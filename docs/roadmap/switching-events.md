@@ -2,7 +2,9 @@
 
 **Scope.** How to estimate, for each NGED primary substation, its *latent demand under the normal running arrangement* — the demand that would be metered if the network were never reconfigured — given that the network is in fact reconfigured roughly 10% of the time by switching events. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the staged modelling plan (v0.6 → v2.5 → v2.6).
 
-> **Status: 🔬 Research / 🚧 Planned.** None of this is implemented yet. The v0.6 unsupervised
+> **Status: 🔬 Research / 🚧 Planned.** Epic:
+> [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (the v0.6
+> detector). None of this is implemented yet. The v0.6 unsupervised
 > statistical detector is the nearest-term piece (it feeds the
 > [`substation_switching`](delivery-tables.md#table-5-substation_switching) table and the
 > training-data mask); the v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is

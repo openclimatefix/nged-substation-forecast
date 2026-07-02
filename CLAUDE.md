@@ -82,8 +82,9 @@ must also:
    `docs/ml_experimentation/`, …).
 2. Delete the item's "Implementation details" section (and any `plans/` file), pasting it (or
    a summary) into the PR body. When a roadmap page's last 🚧 item ships, delete the page
-   (nav entry, map-table row, inbound doc links).
-3. Close the GitHub issue; update the map table and status emoji in `docs/roadmap/index.md`.
+   (nav entry, inbound doc links).
+3. Close the GitHub issue; update the status banner on the roadmap page (and the milestone
+   section in `docs/roadmap/index.md` if the arc changed).
 
 ## Architecture
 

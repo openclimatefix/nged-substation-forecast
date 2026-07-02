@@ -7,6 +7,11 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > implemented. The interactive leaderboard visualisation and probabilistic metrics are 🚧 planned.
 > The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
 > moved out of the roadmap. See the [roadmap index](index.md) for status conventions.
+> The 🚧 items are tracked under the v0.3 epic
+> [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6):
+> baseline forecasters [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) ·
+> probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
+> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226).
 
 ---
 

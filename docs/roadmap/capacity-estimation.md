@@ -1,6 +1,7 @@
 # Effective-capacity estimation
 
-> **Status: 🚧 Planned (Phase 1, v0.6 / v0.7) · 🔬 Research (Phase 2, v2).** This page is the
+> **Status: 🚧 Planned (Phase 1, v0.6 / v0.7) · 🔬 Research (Phase 2, v2).** Epic:
+> [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141). This page is the
 > *plan* for applying [differentiable physics](../techniques/differentiable-physics.md) (DP) to
 > capacity estimation; the method itself — the forward models, variational machinery, and the
 > graph-structured engine — is explained on that techniques page. See the

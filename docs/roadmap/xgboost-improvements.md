@@ -1,8 +1,10 @@
 # XGBoost improvements ("quick wins")
 
 > **Status: 🚧 Planned (v0.5) — deferred until v0.1 is live on AWS.** Epic:
-> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Getting *any*
-> forecast live ([Live service](live-service.md)) takes priority over forecast quality.
+> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145); the Tier-1
+> quick wins are [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230).
+> Getting *any* forecast live ([Live service](live-service.md)) takes priority over forecast
+> quality.
 
 Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly
 *not* deep ML work ("little point in spending ages on the ML model before we have good capacity
