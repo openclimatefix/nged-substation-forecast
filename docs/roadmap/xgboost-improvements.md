@@ -8,8 +8,9 @@
 
 Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly
 *not* deep ML work ("little point in spending ages on the ML model before we have good capacity
-estimation"). This page merges [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)'s
-nine sub-issues with additional tricks from the 2026-07 codebase review, ordered **best
+estimation"). This page merges the sub-issues of
+[#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)
+with additional tricks from the 2026-07 codebase review, ordered **best
 bang-for-the-buck first** (expected skill per unit effort), grouped into effort tiers.
 
 **Measure before optimising.** Land the

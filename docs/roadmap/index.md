@@ -13,13 +13,13 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
 
 ## How planning works
 
-Plans live in three places with deliberately non-overlapping jobs:
+Planning content lives in four places with deliberately non-overlapping jobs:
 
 | Place | Job |
 |---|---|
 | **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the milestones below; dependencies are recorded as `blocked by` issue relationships. |
-| **`docs/roadmap/` (this folder)**:| Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
-| **`docs/`[techniques](../techniques/index.md), [background](../background/network.md), [architecture](../architecture/overview.md)**: |What is already build. This is where content moves to from `docs/roadmap/` after implementation.|
+| **`docs/roadmap/` (this folder)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
+| **`docs/`[techniques](../techniques/index.md), [background](../background/network.md), [architecture](../architecture/overview.md)** | What is already built. This is where content moves to from `docs/roadmap/` after implementation. |
 | **`plans/`** (repo root, not published) | At most **one** file: the mechanical checklist for the PR currently in flight, deleted when it merges. Usually empty. |
 
 **Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the

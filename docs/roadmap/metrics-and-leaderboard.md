@@ -234,7 +234,8 @@ nothing else:
 
 The `Metrics` schema and the rest of the metrics pipeline are untouched. Note the table is
 **backward-looking only** (it holds no future `valid_time`s): fine for historical CV folds (whose
-validation windows lie inside the observed history), but live-forecast scoring (Phase 7 / 8) must
+validation windows lie inside the observed history), but live-forecast scoring
+([production monitoring](live-service.md#production-monitoring)) must
 choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
 
 One related distinction to keep straight: the *metric denominator* may use the full-history
