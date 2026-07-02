@@ -16,6 +16,45 @@
 plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives in
 [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
 
+## Requirements
+
+**MVP (v0.1 — get a live forecast running on AWS):**
+
+- Deploy the naive forecast so it runs live on AWS, 6-hourly, writing to `power_forecasts`
+  (`fold_id="live"`) — the [`live_forecasts` asset](#the-live_forecasts-asset).
+- Forecast *quality* does not matter yet — science improvements (baselines, XGBoost) are
+  explicitly out of scope for this milestone.
+- Production inference must work with **no live dependency on MLflow** — a cache-hit model load
+  so the service keeps running if the tracking server is down.
+- Support both **live** (current partition) and **replay** (historical backfill) NWP
+  availability modes, so missed runs can be backfilled
+  ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
+- **Use Dagster "properly"**: persistent run history, one-click UI backfills of missed
+  partitions, and the ability to launch backtests on AWS whenever the model improves.
+- **An always-on dev dashboard**: a simple Marimo web app showing the latest live forecasts.
+- **Multi-user access** to the Dagster UI and the dashboard (rules out single-user tracking
+  services).
+- AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
+  failure (SNS → email), and cost-conscious operation (~$30–40/month target).
+- [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
+  windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire
+  stale experiment partitions.
+
+**Post-MVP (explicitly deferred):**
+
+- Forecast quality/science work —
+  [baselines](metrics-and-leaderboard.md#baseline-forecasters),
+  [XGBoost improvements](xgboost-improvements.md).
+- The NGED-delivery schema/contract
+  ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)) — v0.1 is
+  "forecast running", not "delivery contract live".
+- Telemetry to Sentry.io
+  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — CloudWatch +
+  SNS cover alerting first.
+- An **MLflow tracking server** and a separate **development dashboard** (for researchers,
+  distinct from the production dev dashboard above), both hosted on the always-on
+  control-plane box once it exists — see the [note below](#aws-architecture).
+
 ## The `live_forecasts` asset
 
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
@@ -198,6 +237,12 @@ Dagster+ you use sensors, the better design anyway).
 backtest compute *and* a free dashboard home, for ~$15–25/month over Level 1. Option C is the
 fallback if operational simplicity trumps backtest speed and ~$40/month. D pays an RDS+ALB
 tax for purism; E's 1-user cap rules it out.
+
+**Future work (not MVP):** once an always-on control-plane box exists (Option B or later), it's
+also a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing
+the local file-store) and a **"development dashboard"** (a Marimo app for researchers, distinct
+from the production dev dashboard already scoped above). Neither is needed to ship v0.1; revisit
+once the box exists.
 
 ## Production monitoring
 
