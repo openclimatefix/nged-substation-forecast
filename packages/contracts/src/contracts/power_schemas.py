@@ -314,7 +314,7 @@ class EffectiveCapacity(pt.Model):
     the full observed history. This is a static scalar per series.
 
     **Planned upgrade (v0.6 / v0.7):** replace the P99 scalar with a time-varying estimate from
-    the differentiable-physics capacity model (see ``docs/roadmap/differentiable-physics.md``),
+    the differentiable-physics capacity model (see ``docs/roadmap/capacity-estimation.md``),
     giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
     the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its
     ``time_series_id``-only NMAE-denominator join for a temporal as-of join. Do **not** pre-densify

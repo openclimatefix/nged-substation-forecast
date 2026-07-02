@@ -89,7 +89,7 @@ both the one-row-per-series MVP and the one-row-per-half-hour DP shape with no s
 the forward-compatibility we want.
 
 **DP upgrade (v0.6 / v0.7): time-varying, and the join changes.** The
-[differentiable-physics](differentiable-physics.md) capacity model produces a value that changes over
+[differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over
 time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
 nothing else:
 
@@ -107,7 +107,7 @@ One related distinction to keep straight: the *metric denominator* may use the f
 **smoothed** DP capacity estimate, but any capacity used to normalise model inputs at forecast init
 time (the two-pass training scheme) must be the **causal** estimate available at that init time, or
 backtests gain lookahead — see
-[Differentiable Physics §3](differentiable-physics.md#3-how-dp-fits-into-the-roadmap).
+[Capacity estimation, Phase 1](capacity-estimation.md#phase-1-dynamic-capacity-estimation-for-metered-generators-v1).
 
 ### Peak events — the metric filter that matters most for flexibility
 
