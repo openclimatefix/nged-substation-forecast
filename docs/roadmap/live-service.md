@@ -485,6 +485,8 @@ Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` 
 
 | Issue | Where it lands in this plan |
 |---|---|
+| [#221 Add the `live_forecasts` Dagster asset](https://github.com/openclimatefix/nged-substation-forecast/issues/221) | [The `live_forecasts` asset](#the-live_forecasts-asset) |
+| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) + the container-build notes above |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis — post a correcting comment when decided) |
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | Workstream 1 |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Workstream 1 |
