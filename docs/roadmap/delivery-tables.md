@@ -187,7 +187,7 @@ Notes on specific flags:
 > **Status: 🚧 MVP in v0.1** using P99 of observed power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
 > **Planned upgrade in v0.6 / v0.7** to differentiable-physics capacity estimation — see
-> [Differentiable Physics](differentiable-physics.md).
+> [Capacity estimation](capacity-estimation.md).
 
 OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly
 timestep of the historical time series data. This table is **backward-looking only** — it does

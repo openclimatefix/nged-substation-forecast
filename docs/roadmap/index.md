@@ -30,16 +30,17 @@ pointed at when the time comes to implement them.
   metrics, horizon time-slices, and leaderboard grouping tags.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, CERRA, CM SAF).
-- [Differentiable Physics](differentiable-physics.md) — DP for effective-capacity estimation of
-  metered generators (v1), and graph-structured disaggregation of net substation power into latent
-  demand and DER generation (v2).
+- [Capacity estimation](capacity-estimation.md) — applying
+  [differentiable physics](../techniques/differentiable-physics.md) to effective-capacity
+  estimation of metered generators (v1), and the path to graph-structured disaggregation of net
+  substation power into latent demand and DER generation (v2).
 - [Switching events](switching-events.md) — the canonical treatment of switching events and
   estimating latent demand under the normal running arrangement: the v0.6 unsupervised statistical
   detector and the v2 mixture models (the graph is a data structure, not a GNN).
-- [Disaggregation evaluation](disaggregation-evaluation.md) — the multi-pronged evaluation protocol
-  for the no-clean-ground-truth disaggregation problem (v2).
-- [Encoders](encoders.md) — shared learned encoder modules (WeatherEncoder, TimeEncoder) and why they
-  pair naturally with differentiable physics (v2).
+
+The *methods* behind these plans — differentiable physics itself, learned encoders, and the
+disaggregation-evaluation protocol — are explained in the [Techniques](../techniques/index.md)
+section, which is durable and survives the roadmap items that apply it.
 
 The timeline below shows the order in which this work is planned.
 
@@ -134,9 +135,9 @@ The ML-assets architecture is designed to support this from day one (programmati
 - Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
 - Populate the `substation_switching` Delta table
 
-**Dynamic effective capacity estimation for *metered* generators ([differentiable physics](differentiable-physics.md))**:
+**Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**:
 
-- Implement a basic [differentiable physics (DP)](differentiable-physics.md) model for the *metered* wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is **Phase 1** of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is v2 research.
+- Implement a basic [differentiable physics (DP)](../techniques/differentiable-physics.md) model for the *metered* wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is **Phase 1** of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is v2 research.
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
   - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
@@ -183,13 +184,13 @@ Target: **January 2027**
 
 **Research (advanced ML)**:
 
-- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather — *not* a trained graph neural network: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing rather than message passing. A trained GNN remains an optional, residual-driven escalation. (This is **Phase 2** of the DP plan — see [Differentiable Physics §8](differentiable-physics.md#8-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [Switching events, Part 2](switching-events.md).)
+- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather — *not* a trained graph neural network: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing rather than message passing. A trained GNN remains an optional, residual-driven escalation. (This is **Phase 2** of the DP plan — see [the graph-structured DP engine](../techniques/differentiable-physics.md#6-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [Switching events, Part 2](switching-events.md).)
 - **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
-- **Pre-trained neural network encoders**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
+- **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
-- **[Differentiable physics](differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [Differentiable Physics §8](differentiable-physics.md#8-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [§10](differentiable-physics.md#10-apparent-power-mva-metering))
+- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [the graph-structured DP engine](../techniques/differentiable-physics.md#6-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [MVA metering](../techniques/differentiable-physics.md#8-apparent-power-mva-metering))
 - **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history
 
 **Stretch goals**:

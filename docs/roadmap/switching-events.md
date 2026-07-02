@@ -9,7 +9,7 @@
 > not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
 > [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
 > **canonical** treatment of switching events — it supersedes the earlier "switching state-space
-> model" sketch in [differentiable physics](differentiable-physics.md).
+> model" sketch in [differentiable physics](../techniques/differentiable-physics.md).
 
 ---
 
@@ -21,7 +21,7 @@ It is worth being explicit, because the term invites confusion: **none of the ap
 
 In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
 
-> **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
+> **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
 
 ---
 

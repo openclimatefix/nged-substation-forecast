@@ -3,7 +3,7 @@
 > **Status: 🔬 v2 research.** This applies to the full disaggregation problem (Phase 2 / v2).
 > Phase 1 capacity estimation for metered generators is evaluated with standard regression metrics
 > against the metered ground truth. See the [differentiable physics doc](differentiable-physics.md)
-> for the technical approach and [roadmap index](index.md) for status conventions.
+> for the technical approach and the [roadmap index](../roadmap/index.md) for status conventions.
 
 Substation disaggregation has **no single clean ground truth**: by definition, you are estimating
 quantities that are unmetered. Chasing a single objective metric is therefore a trap. The rigorous
@@ -23,7 +23,7 @@ Take individually metered sources (customer-metered PV/wind, the metered BESS, e
 a synthetic "substation," disaggregate, score against the held-out components. This gives an exact
 ground truth because you constructed the aggregate.
 
-**Caveat**: a synthetic clean sum lacks [switching events](switching-events.md), MVA bounce, false
+**Caveat**: a synthetic clean sum lacks [switching events](../roadmap/switching-events.md), MVA bounce, false
 zeros, unmetered load, and correctly-scaled correlated co-movement. It systematically flatters
 performance — it measures the model on an easier problem than reality. Always report as "performance
 under idealised aggregation," never as real-world skill.
