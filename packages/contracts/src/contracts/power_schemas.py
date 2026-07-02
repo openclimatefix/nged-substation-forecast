@@ -281,8 +281,8 @@ class PowerForecast(pt.Model):
             """ Positive values mean "power sent to NGED's grid","""
             """ and negative values mean "power drawn from NGED's grid"."""
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
-            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), as described in
-            # docs/roadmap/delivery-tables.md and docs/roadmap/forecast-building-blocks.md.
+            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
+            # delivery-contract design agreed with NGED in the Milestone 1 report.
             # For this very early version we forecast raw MW/MVA because we are not yet
             # estimating capacity; we will switch to the scaled value once capacity estimation
             # lands (roadmap v0.6 / v0.7).
@@ -305,21 +305,20 @@ class PowerForecast(pt.Model):
 class EffectiveCapacity(pt.Model):
     """Effective capacity of each time series at each half-hourly timestep.
 
-    Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report,
-    ``docs/roadmap/delivery-tables.md``). This table is backward-looking only — it does not cover
-    the forecast period.
+    Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
+    This table is backward-looking only — it does not cover the forecast period.
 
     **MVP implementation (v0.1):** one row per ``time_series_id``, ``time`` set to the end of
     the available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over
     the full observed history. This is a static scalar per series.
 
     **Planned upgrade (v0.6 / v0.7):** replace the P99 scalar with a time-varying estimate from
-    the differentiable-physics capacity model (see ``docs/roadmap/capacity-estimation.md``),
+    the differentiable-physics capacity model (see ``docs/techniques/differentiable-physics.md``),
     giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
     the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its
     ``time_series_id``-only NMAE-denominator join for a temporal as-of join. Do **not** pre-densify
-    the MVP scalar into one row per half-hour — see the "Normalising NMAE by ``effective_capacity``"
-    section of ``docs/roadmap/metrics-and-leaderboard.md`` for why, and for how the join evolves.
+    the MVP scalar into one row per half-hour — densifying a constant buys nothing, and the as-of
+    join handles sparse capacity rows naturally.
     """
 
     time_series_id: int = _get_time_series_id_dtype()

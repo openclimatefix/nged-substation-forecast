@@ -63,6 +63,13 @@ apply them.
   metrics, horizon time-slices, and leaderboard grouping tags.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, CERRA, CM SAF).
+- [Live service](live-service.md) — the v0.1 deployment: the `live_forecasts` inference
+  asset, the champion-model container, the costed AWS architecture options, and production
+  monitoring.
+- [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog, ordered best
+  bang-for-the-buck first across four effort tiers.
+- [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP clip
+  logging, Hydra removal, and scientific-rigor tests.
 - [Capacity estimation](capacity-estimation.md) — applying
   [differentiable physics](../techniques/differentiable-physics.md) to effective-capacity
   estimation of metered generators (v1), and the path to graph-structured disaggregation of net
@@ -75,24 +82,23 @@ apply them.
 
 The 2026-07 codebase review produced a set of substantial work items. This table maps each to its
 milestone, design doc, and tracking issue. **It is a map, not a queue** — the complete, current
-task ordering lives in the GitHub Project board, and row order here carries no commitment. Design
-docs marked — are being migrated into this folder.
+task ordering lives in the GitHub Project board, and row order here carries no commitment.
 
 | Work | Milestone | Design | GitHub | Notes |
 |---|---|---|---|---|
-| Live inference asset (`live_forecasts`: live/replay NWP semantics, all 51 members, `fold_id="live"`) | v0.1 | — | [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Built before its container, so the container has something to run |
-| Champion-model container (model baked into the Docker image) | v0.1 | — | — | Depends on the live inference asset |
-| AWS deployment (S3-capable data paths, production job + freshness check, Fargate + IAM infra, alerting) | v0.1 | — | [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Depends on the container; five architecture options costed 2026-07-02, leaning small EC2 control plane + `EcsRunLauncher` |
-| NWP quantisation clip logging | v0.1 | — | [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Int16 quantisation currently clips silently |
-| CI safety net (ruff + ty + pytest on every PR) | v0.2 | — | [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) | Root pytest collection currently broken by duplicate test basenames |
-| Reproducibility stamping (git SHA + Delta table versions on every MLflow run) | v0.2 | — | — | Cheap; improves every later experiment |
-| Drop Hydra (plain YAML + importlib + pydantic) | v0.2 | — | — | Hydra's composition/sweep value is unused |
-| Scientific-rigor tests & cleanup (no-lookahead, leaderboard-fairness, determinism tests; split `cv_assets.py`) | v0.2 | — | [#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62) | |
+| Live inference asset (`live_forecasts`: live/replay NWP semantics, all 51 members, `fold_id="live"`) | v0.1 | [Live service](live-service.md) | [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Built before its container, so the container has something to run |
+| Champion-model container (model baked into the Docker image) | v0.1 | [Live service](live-service.md) | — | Depends on the live inference asset |
+| AWS deployment (S3-capable data paths, production job + freshness check, Fargate + IAM infra, alerting) | v0.1 | [Live service](live-service.md) | [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Depends on the container; five architecture options costed 2026-07-02, leaning small EC2 control plane + `EcsRunLauncher` |
+| NWP quantisation clip logging | v0.1 | [Engineering health](engineering-health.md) | [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Int16 quantisation currently clips silently |
+| CI safety net (ruff + ty + pytest on every PR) | v0.2 | [Engineering health](engineering-health.md) | [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) | Root pytest collection currently broken by duplicate test basenames |
+| Reproducibility stamping (git SHA + Delta table versions on every MLflow run) | v0.2 | [Engineering health](engineering-health.md) | — | Cheap; improves every later experiment |
+| Drop Hydra (plain YAML + importlib + pydantic) | v0.2 | [Engineering health](engineering-health.md) | — | Hydra's composition/sweep value is unused |
+| Scientific-rigor tests & cleanup (no-lookahead, leaderboard-fairness, determinism tests; split `cv_assets.py`) | v0.2 | [Engineering health](engineering-health.md) | [#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62) | |
 | Baseline forecasters (persistence + climatology) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | Leaderboard scores aren't interpretable without them |
 | Probabilistic evaluation (horizon slices, PICP, spread-skill, CRPS → then calibration) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | — | The ensemble is likely underdispersed and nothing measures it yet |
 | Leaderboard fold hygiene (held-out final-test window) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | — | The single fold currently serves both model selection and reported skill |
-| Production monitoring (`production_monitoring` metrics scope, `monitoring_sensor`, `retire_experiment_job`) | v0.3 | — | — | Starts once live forecasts are accumulating |
-| XGBoost quick wins (lead-time feature, early stopping, holidays, physics features, global models, …) | v0.5 | — | [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) | Best bang-for-the-buck first: the model currently never sees the forecast horizon |
+| Production monitoring (`production_monitoring` metrics scope, `monitoring_sensor`, `retire_experiment_job`) | v0.3 | [Live service](live-service.md) | — | Starts once live forecasts are accumulating |
+| XGBoost quick wins (lead-time feature, early stopping, holidays, physics features, global models, …) | v0.5 | [XGBoost improvements](xgboost-improvements.md) | [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) | Best bang-for-the-buck first: the model currently never sees the forecast horizon |
 | Capacity estimation (differentiable physics, Phase 1) | v0.6/0.7 | [Capacity estimation](capacity-estimation.md) | [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141) | |
 | Switching-event detection (unsupervised statistical detector) | v0.6/0.7 | [Switching events](switching-events.md) | [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) | |
 
@@ -194,12 +200,8 @@ naive forecast on AWS. **This is the current focus.***
 
 Establish a strong XGBoost baseline before investing in capacity estimation and switching event detection.
 
-Ideas to test (informed by literature review):
-
-- Train a "global" XGBoost model across each category of time series (e.g. one model for all MW primary substations, one for all MVA primaries, one per generator type) instead of one model per `time_series_id`
-- Train separate XGBoost models per forecast horizon window (e.g. 0–2 days, 2–7 days, 7–14 days)
-- Train on all 51 NWP ensemble members (may require XGBoost's iterator API to handle data that doesn't fit in RAM)
-- Pre-train XGBoost on CERRA reanalysis (which covers 2020–2024, before our ECMWF dataset starts), then fine-tune on ECMWF ENS
+The full experiment backlog — sixteen ideas across four effort tiers, ordered best
+bang-for-the-buck first — is in [XGBoost improvements](xgboost-improvements.md).
 
 **Automated experimentation ("auto-research")**:
 
