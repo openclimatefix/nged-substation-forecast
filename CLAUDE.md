@@ -39,6 +39,12 @@ background/requirements context (`docs/background/`), and architecture notes
 (`docs/architecture/`). When planning new features, check `docs/` for relevant prior discussion
 before proposing an approach.
 
+The docs are published at <https://openclimatefix.github.io/nged-substation-forecast>. When
+linking to a docs page from anywhere outside `docs/` itself (GitHub issues, PR bodies, code
+docstrings), link to that rendered site (e.g.
+`https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#anchor`),
+never to a `github.com/.../blob/main/docs/...` path.
+
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/roadmap/index.md`. In brief:
@@ -50,6 +56,24 @@ Full description and a "which place do I use?" table: `docs/roadmap/index.md`. I
   sit inside each page under an "Implementation details (deleted when this ships)" section.
 - **`plans/`** holds at most one file: the in-flight PR's mechanical checklist, deleted on
   merge. Usually empty.
+
+**Creating GitHub issues** — whenever you create an issue, also set:
+
+- **Labels** and **Type** (org issue type: Task / Bug / Feature / Spike / Epic / …) — pick
+  whatever fits the issue.
+- Add it to the **OCF project** (org project 33, `gh project item-add 33 --owner
+  openclimatefix --url <issue-url>`) and set the project fields **Status = Todo**,
+  **Project = NGED**, **Area = ML**.
+- If it is a sub-issue, attach it to its parent epic **and position it appropriately in the
+  parent's sub-issue order** (execution order, respecting `blocked by` chains) — the
+  `reprioritizeSubIssue` GraphQL mutation with `afterId`/`beforeId`.
+- When the body links to a docs page, link to the **rendered site**
+  (`https://openclimatefix.github.io/nged-substation-forecast/...`), never a `github.com`
+  blob path.
+
+`gh issue create` can't set any of these: use `gh issue edit --add-label` for labels, the
+`updateIssueIssueType` GraphQL mutation for Type, and `gh project item-edit` (or the
+`updateProjectV2ItemFieldValue` mutation) for the project fields.
 
 **Ship-time triage** — when a PR lands a roadmap item, that PR (or an immediate follow-up)
 must also:
