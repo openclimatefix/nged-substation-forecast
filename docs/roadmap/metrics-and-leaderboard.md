@@ -68,6 +68,11 @@ series' **full history** (rather than within the validation window) also keeps i
 folds — an unusually calm year for a wind farm would otherwise give a low in-window P99 and an
 inflated NMAE.
 
+Normalisation is also why NMAE is the **headline cross-series metric**: the aggregate `mae__all` /
+`rmse__all` values logged to MLflow are unweighted means across series whose scales span roughly
+two orders of magnitude, so the GSPs dominate them. They are useful for tracking a single model
+over time, not for comparing skill across the population.
+
 The denominator comes from the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity)
 Delta table (schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
 (`ml_core.metrics`).
