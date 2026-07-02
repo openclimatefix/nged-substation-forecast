@@ -23,8 +23,8 @@ original testing strategy remain unwritten, plus general cleanup.
 ## Part 2 — cleanup
 
 - Remove any remaining dead code/imports from the phased build-out.
-- **Split `defs/cv_assets.py`** (898 lines — the complexity hotspot flagged in
-  `00_review_findings.md`) into `cv_assets.py` / `production_assets.py` /
+- **Split `defs/cv_assets.py`** (898 lines — the complexity hotspot flagged in the
+  2026-07 codebase review) into `cv_assets.py` / `production_assets.py` /
   `metric_assets.py`. Plan 09 already starts `production_assets.py`; move the `metrics` asset
   and its helpers into `metric_assets.py` here. Pure logic stays in `ml_core._cv_helpers`.
 

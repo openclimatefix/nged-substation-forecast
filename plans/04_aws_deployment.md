@@ -4,8 +4,8 @@
 
 **Top priority: get *any* forecast running on AWS.** Forecast quality does not matter yet — the
 science plans (06 onwards) wait until v0.1 is live. Recommended sequencing across the plan set
-is in `00_review_findings.md`: **01 (CI) → 02 (`live_forecasts`) → 03 (container + baked
-model) → this plan (04) → 05 (monitoring) → science.**
+(see also the map in `docs/roadmap/index.md`): **01 (CI) → 02 (`live_forecasts`) → 03
+(container + baked model) → this plan (04) → 05 (monitoring) → science.**
 
 This plan originally committed to the Level 1 ("nothing always-on") design from issue
 [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206). A 2026-07-02

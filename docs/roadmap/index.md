@@ -1,25 +1,58 @@
 # Roadmap
 
-This roadmap outlines the planned order of development toward the v1.0 live forecast release (January 2027) and beyond. It reflects the plan as of the Milestone 1 report (28 May 2026). Technical plans change as we learn more — treat this as a best-estimate, not a guarantee.
+This roadmap outlines the planned order of development toward the v1.0 live forecast release
+(January 2027) and beyond. Last substantially revised **July 2026**, following a full codebase
+review and a reprioritisation (decided 2026-07-01): **the top priority is getting *any* v0.1
+forecast running on AWS** — scientific-improvement work waits until the live service is running.
+Technical plans change as we learn more — treat this as a best-estimate, not a guarantee.
 
 > **Status legend** (used throughout these design docs):
 > ✅ **Implemented** — exists in code today ·
 > 🚧 **Planned** — designed, not yet built ·
 > 🔬 **Research** — exploratory / v2.
 
-## How this folder is organised
+## How planning works
 
-`docs/roadmap/` contains **only design for work that is not yet implemented**. It is a
-forward-looking roadmap, never a mirror of the code. When a feature ships, its documentation
-**moves out** of `roadmap/` to its permanent home — `architecture/` for system design,
-[`ml_experimentation/`](../ml_experimentation/index.md) for ML methodology, and so on — and the
-roadmap entry shrinks to a one-line pointer. This keeps the roadmap from going stale and gives
-each implemented feature a single, durable home.
+Plans live in three places with deliberately non-overlapping jobs:
+
+| Place | Job |
+|---|---|
+| **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks that never appear in markdown — plus all discussion. **Task-level priority lives only here.** Epics map 1:1 to the milestones below; dependencies are recorded as `blocked by` issue relationships. |
+| **`docs/`** (this folder, [techniques](../techniques/index.md), [background](../background/network.md), [architecture](../architecture/overview.md)) | Design depth: the problem, the methods, what we plan to build and *why*, what is already built. The milestone arc and inter-plan dependencies are recorded here; task-level ordering is not. |
+| **`plans/`** (repo root, not published) | At most **one** file: the mechanical checklist for the PR currently in flight, deleted when it merges. Usually empty. |
+
+The invariant is one-directional: every substantial 🚧 plan in this folder has a GitHub issue,
+and every dependency stated here exists as a `blocked by` link on GitHub — but GitHub freely
+contains small issues with no markdown counterpart. (🔬 research ideas are exempt until they are
+promoted to a milestone.) The litmus test for needing a design doc: *does it take more than a few
+sentences to explain?*
+
+When a piece of work ships, its design content **moves out** of `roadmap/` to its permanent home —
+`architecture/` for system design, [`ml_experimentation/`](../ml_experimentation/index.md) for ML
+methodology — and the roadmap page shrinks; when a page's last 🚧 item ships, the page is deleted.
+This folder therefore contains **only design for work that is not yet implemented**, and is never
+a mirror of the code. Because roadmap pages are deletable, **code must never link into
+`roadmap/`** — code docstrings link to the durable sections (`techniques/`, `architecture/`,
+`background/`, `ml_experimentation/`) instead. The *methods* behind these plans — differentiable
+physics, learned encoders, the disaggregation-evaluation protocol — live in
+[Techniques](../techniques/index.md) for exactly this reason: they survive the roadmap items that
+apply them.
+
+### Which place do I use?
+
+| I want to… | Go to |
+|---|---|
+| Decide what to work on this morning | The GitHub Project board (complete, ordered) |
+| Discuss / challenge a plan | GitHub issue comments (fold conclusions back into the roadmap page) |
+| Think through a substantial design | A `docs/roadmap/` page, reviewed via PR |
+| Communicate direction to NGED / leadership | The [milestones](#milestones) below (published site) |
+| Give an AI coding tool context on the broader plan | `docs/roadmap/` (plus `gh` for live task priorities) |
+| Understand a method (DP, encoders, …) | [`docs/techniques/`](../techniques/index.md) |
+| Understand what's already built | [`docs/architecture/`](../architecture/overview.md), [`docs/ml_experimentation/`](../ml_experimentation/index.md) |
+| File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |
+| Write the mechanical checklist for the PR in flight | `plans/` (single file, deleted on merge) |
 
 ## Design documents
-
-This folder captures the detailed technical plans from the Milestone 1 report, so they can be
-pointed at when the time comes to implement them.
 
 - [Delivery tables](delivery-tables.md) — the five Delta Lake tables OCF delivers to NGED
   (`power_forecast`, `power_forecast_warnings`, `asset_health_history`, `effective_capacity`,
@@ -38,15 +71,42 @@ pointed at when the time comes to implement them.
   estimating latent demand under the normal running arrangement: the v0.6 unsupervised statistical
   detector and the v2 mixture models (the graph is a data structure, not a GNN).
 
-The *methods* behind these plans — differentiable physics itself, learned encoders, and the
-disaggregation-evaluation protocol — are explained in the [Techniques](../techniques/index.md)
-section, which is durable and survives the roadmap items that apply it.
+## Map of substantial work
 
-The timeline below shows the order in which this work is planned.
+The 2026-07 codebase review produced a set of substantial work items. This table maps each to its
+milestone, design doc, and tracking issue. **It is a map, not a queue** — the complete, current
+task ordering lives in the GitHub Project board, and row order here carries no commitment. Design
+docs marked — are being migrated into this folder.
+
+| Work | Milestone | Design | GitHub | Notes |
+|---|---|---|---|---|
+| Live inference asset (`live_forecasts`: live/replay NWP semantics, all 51 members, `fold_id="live"`) | v0.1 | — | [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Built before its container, so the container has something to run |
+| Champion-model container (model baked into the Docker image) | v0.1 | — | — | Depends on the live inference asset |
+| AWS deployment (S3-capable data paths, production job + freshness check, Fargate + IAM infra, alerting) | v0.1 | — | [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Depends on the container; five architecture options costed 2026-07-02, leaning small EC2 control plane + `EcsRunLauncher` |
+| NWP quantisation clip logging | v0.1 | — | [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Int16 quantisation currently clips silently |
+| CI safety net (ruff + ty + pytest on every PR) | v0.2 | — | [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) | Root pytest collection currently broken by duplicate test basenames |
+| Reproducibility stamping (git SHA + Delta table versions on every MLflow run) | v0.2 | — | — | Cheap; improves every later experiment |
+| Drop Hydra (plain YAML + importlib + pydantic) | v0.2 | — | — | Hydra's composition/sweep value is unused |
+| Scientific-rigor tests & cleanup (no-lookahead, leaderboard-fairness, determinism tests; split `cv_assets.py`) | v0.2 | — | [#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62) | |
+| Baseline forecasters (persistence + climatology) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | Leaderboard scores aren't interpretable without them |
+| Probabilistic evaluation (horizon slices, PICP, spread-skill, CRPS → then calibration) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | — | The ensemble is likely underdispersed and nothing measures it yet |
+| Leaderboard fold hygiene (held-out final-test window) | v0.3 | [Metrics & leaderboard](metrics-and-leaderboard.md) | — | The single fold currently serves both model selection and reported skill |
+| Production monitoring (`production_monitoring` metrics scope, `monitoring_sensor`, `retire_experiment_job`) | v0.3 | — | — | Starts once live forecasts are accumulating |
+| XGBoost quick wins (lead-time feature, early stopping, holidays, physics features, global models, …) | v0.5 | — | [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) | Best bang-for-the-buck first: the model currently never sees the forecast horizon |
+| Capacity estimation (differentiable physics, Phase 1) | v0.6/0.7 | [Capacity estimation](capacity-estimation.md) | [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141) | |
+| Switching-event detection (unsupervised statistical detector) | v0.6/0.7 | [Switching events](switching-events.md) | [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) | |
+
+## Milestones
+
+The milestone sections below show the order in which this work is planned. Each maps 1:1 to a
+GitHub epic issue.
 
 ---
 
 ## v0.1 — "Naive" MVP (internal only)
+
+*Epic: [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) — deploy the
+naive forecast on AWS. **This is the current focus.***
 
 **Goal**: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a baseline. Intentionally does not detect switching events or estimate effective capacity — hence "naive" (assumes the grid is always in perfect health).
 
@@ -73,6 +133,15 @@ The timeline below shows the order in which this work is planned.
 - Output: ensemble of 51 half-hourly power forecasts per `time_series_id`, scaled to [−1, +1], on a 14-day horizon
 - Static capacity estimate: 99th percentile of observed power as a simple proxy
 
+**Deployment** (the remaining v0.1 work — see the [map](#map-of-substantial-work) above):
+
+- `live_forecasts` production inference asset: single-run feature engineering across all 51
+  ensemble members every 6 hours, with explicit live/replay NWP-availability semantics
+- Champion model baked into the Docker image (the live service must not depend on MLflow being up)
+- AWS infrastructure: S3-capable data paths, scheduled Fargate runs, IAM roles, and alerting
+  (Sentry) — five architecture options costed 2026-07-02, leaning a small always-on EC2
+  control-plane box + `EcsRunLauncher`
+
 **Outputs** (Delta tables on S3):
 
 - `power_forecast`
@@ -85,28 +154,43 @@ The timeline below shows the order in which this work is planned.
 
 ## v0.2 — Code Quality & Documentation
 
-- More unit tests
-- CI on GitHub
+*Epic: [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)*
+
+- More unit tests, including scientific-rigor tests (CV-windowing no-lookahead,
+  leaderboard-fairness, determinism)
+- CI on GitHub (ruff + ty + pytest on every PR)
 - Improve documentation
 - Verify daylight savings time handling is correct
+- Reproducibility stamping: git SHA + Delta table versions on every MLflow run
+- Drop Hydra in favour of plain YAML + importlib + pydantic
 
 ---
 
 ## v0.3 — Leaderboard / Performance Analysis
 
+*Epic: [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6)*
+
 - Implement the ML energy forecasting "leaderboard" (cross-fold validation metrics in MLflow), ready for systematic ML experimentation ✓ (CV assets added)
-- Metrics: normalised MBE, normalised MAE, RMSE, Pinball loss, PICP, CRPS, Spread-Skill Ratio
+- Metrics: normalised MBE, normalised MAE, RMSE, Pinball loss, PICP, CRPS, Spread-Skill Ratio — the
+  deterministic metrics are ✅; the probabilistic ones are 🚧 (see
+  [Metrics & leaderboard](metrics-and-leaderboard.md))
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range (Day 8–14), peak events (top 5%)
+- Baseline forecasters (persistence + climatology) so leaderboard scores are interpretable
+- Production monitoring of the live service (`production_monitoring` metrics scope)
 
 ---
 
 ## v0.4 — Improved Automatic Data Cleaning
+
+*Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
 - More sophisticated automatic cleaning of NGED's power data (building on the basic cleaning in v0.1)
 
 ---
 
 ## v0.5 — XGBoost Upgrades ("Quick Wins")
+
+*Epic: [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)*
 
 Establish a strong XGBoost baseline before investing in capacity estimation and switching event detection.
 
@@ -127,7 +211,9 @@ The ML-assets architecture is designed to support this from day one (programmati
 
 ## v0.6 & v0.7 — Switching Events & Dynamic Generator Capacity
 
-*Internal only for first month, then shared with NGED.*
+*Epics: [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (switching
+events) and [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141)
+(capacity estimation). Internal only for first month, then shared with NGED.*
 
 **Switching events**:
 
@@ -159,6 +245,8 @@ The ML-assets architecture is designed to support this from day one (programmati
 
 ## v1.0 — Stable Live Service for NGED's Trial Area
 
+*Epic: [#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)*
+
 Target: **January 2027**
 
 - All features listed above (v0.1–v0.7), plus fixes discovered during live running
@@ -175,6 +263,9 @@ Target: **January 2027**
 ---
 
 ## v2.0 — Scale-Up (Future Research)
+
+*Epic: [#156](https://github.com/openclimatefix/nged-substation-forecast/issues/156) (WP5:
+delivery of the v2 live service)*
 
 **Required**:
 

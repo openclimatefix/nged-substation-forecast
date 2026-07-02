@@ -9,7 +9,7 @@ from the codebase review, ordered **best bang-for-the-buck first** (expected ski
 effort), grouped into effort tiers.
 
 **Deferred until v0.1 is running on AWS** — getting *any* forecast live takes priority over
-forecast quality; see the sequencing in `00_review_findings.md` (01 → 02 → 03 → 04 → 05, then
+forecast quality; see the sequencing in `docs/roadmap/index.md` (01 → 02 → 03 → 04 → 05, then
 this plan, 09).
 
 **Measure before optimising.** Land plan 06 (persistence/climatology baselines — without them

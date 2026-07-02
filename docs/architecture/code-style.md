@@ -29,6 +29,7 @@
 - **Lazy evaluation**: Use `pl.LazyFrame` throughout the pipeline. **Do not call `.collect()` before the model boundary.** See [Lazy Evaluation Strategy](overview.md#lazy-evaluation-strategy) for the full contract.
 - **Gridded/NWP Data**: Use **Xarray** and **Zarr**.
 - **Data Contracts**: Use **Patito** for defining and validating data schemas. Use Patito type annotations (`pt.DataFrame[MySchema]`, `pt.LazyFrame[MySchema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
+- **Patito friction budget**: CLAUDE.md documents four Patito-vs-Polars gotchas (cross-model LazyFrame joins, dict-`.cast` on model-bearing frames, `.filter()` dropping the Patito subclass, and Delta dictionary-encoded columns). Four workarounds is an acceptable price for schema validation — but if a fifth becomes necessary, revisit the approach: either validate only at I/O boundaries (typed annotations everywhere, `.validate()` only at persistence edges) or evaluate an alternative such as `dataframely`.
 - **Persistence**: Prefer partitioned Parquet files for tabular data.
 
 ## Machine Learning (PyTorch)
