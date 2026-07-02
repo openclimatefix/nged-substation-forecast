@@ -45,7 +45,7 @@ numbering *is* the implementation order:
 | [01_ci.md](01_ci.md) | CI safety net: ruff + ty + pytest on every PR (root pytest collection is currently broken by duplicate test basenames) |
 | [02_live_forecasts.md](02_live_forecasts.md) | Production inference asset (live/replay NWP availability, 51 members, `fold_id="live"`) — built before its container so the container has something to run ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)) |
 | [03_production_model_artifacts.md](03_production_model_artifacts.md) | Container + champion model baked into the image (the MLflow-in-ephemeral-Fargate hole in [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)) |
-| [04_aws_deployment.md](04_aws_deployment.md) | **Ship v0.1 on AWS** ([#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) / [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) Level 1): S3-capable data paths ([#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50)), one-shot job with freshness check, Fargate + EventBridge + IAM-role infra, alerting |
+| [04_aws_deployment.md](04_aws_deployment.md) | **Ship v0.1 on AWS** ([#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) / [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)): S3-capable data paths ([#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50)), production job with freshness check, Fargate runs + IAM-role infra, alerting; five architecture options costed 2026-07-02, leaning Option B (small always-on control-plane box + `EcsRunLauncher`) |
 | [05_production_monitoring.md](05_production_monitoring.md) | `production_monitoring` metrics scope + `monitoring_sensor` + `retire_experiment_job` — once live forecasts are accumulating |
 | [06_baseline_forecasters.md](06_baseline_forecasters.md) | Persistence + climatology baselines — without them leaderboard scores aren't interpretable |
 | [07_probabilistic_evaluation.md](07_probabilistic_evaluation.md) | Horizon-sliced metrics, PICP/spread-skill/CRPS, then cheap ensemble calibration — the ensemble is likely underdispersed and nothing measures it |
@@ -58,10 +58,14 @@ numbering *is* the implementation order:
 
 ## Findings with no plan (accepted / watch)
 
-- **AWS deployment Level 1 is the right call.** Delta already provides the atomic-write property
-  the plan worries about (make the forecast Delta commit the last write). Dagster partition
-  bookkeeping evaporates with throwaway SQLite, so "which `ecmwf_ens` partitions to materialise"
-  must be derived from Delta contents vs Dynamical availability — covered in plan 04.
+- **AWS deployment architecture.** The review initially endorsed #206's Level 1
+  ("nothing always-on"), but a 2026-07-02 pressure-test found #206's always-on cost estimate
+  inflated ~4× and the decision moved to leaning **Option B** (small EC2 control-plane box +
+  `EcsRunLauncher`) — the full five-option cost analysis is in plan 04. Two findings stand
+  regardless of option: Delta already provides the atomic-write property the freshness logic
+  needs (make the forecast Delta commit the last write), and under any ephemeral/one-shot
+  execution "which `ecmwf_ens` partitions to materialise" must be derived from Delta contents
+  vs Dynamical availability, not Dagster's materialisation records.
 - **Aggregate `mae__all`/`rmse__all`** are unweighted means across series spanning ~2 orders of
   magnitude of scale (GSPs dominate). NMAE is the headline metric; worth a sentence in
   `docs/roadmap/metrics-and-leaderboard.md` when next edited.

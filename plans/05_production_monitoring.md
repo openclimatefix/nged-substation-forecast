@@ -43,6 +43,11 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 `evaluation_scope="production_monitoring"` over `fold_id="live"` for both trailing windows.
 Sensor preferred over a schedule so it fires on the actual data update.
 
+Note this sensor needs a running Dagster daemon — plan 04's Option B (the direction we're
+leaning) provides one. If plan 04 instead ships Option A (nothing always-on), skip the sensor
+and run the monitoring step as the final op of the one-shot production job (plan 04
+workstream 2 already reserves that slot).
+
 ## Part 3 — `retire_experiment_job`
 
 A **manually triggered** job (deliberate and auditable — never automatic) with a single

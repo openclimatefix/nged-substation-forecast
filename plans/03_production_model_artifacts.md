@@ -2,8 +2,9 @@
 
 ## Finding
 
-The AWS deployment plan (issue [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), Level 1: hourly EventBridge → one-shot Fargate → exit) is
-the right architecture, but it never mentions MLflow — and the inference path loads models via
+The AWS deployment plan (plan 04; issue [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)) runs
+forecasts as ephemeral Fargate tasks under every architecture option, but never mentions
+MLflow — and the inference path loads models via
 `BaseForecaster.load_from_mlflow(run_id, cache_base_path)`
 (`packages/ml_core/src/ml_core/base_forecaster.py:140`). An ephemeral container has neither a
 persistent model cache nor a reachable tracking server, so as written, production inference has
@@ -12,8 +13,9 @@ no way to get a model. This must be decided before writing the Dockerfile.
 **Decision: bake the champion model into the image at build time.** The cache-hit path in
 `load_from_mlflow` (`base_forecaster.py:157-166`) never contacts MLflow when
 `{cache_base_path}/{run_id}/model` exists — the existing design already supports fully offline
-serving. Promotion becomes rebuild + redeploy, which is auditable (image tags) and preserves
-Level 1's "nothing always-on" property. Rejected alternative: MLflow artifact root on S3
+serving. Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps
+MLflow out of the production runtime under every plan-04 option. Rejected alternative: MLflow
+artifact root on S3
 fetched at container startup — more runtime moving parts, needs tracking-store access from
 prod, and slower cold starts.
 
@@ -33,7 +35,11 @@ prod, and slower cold starts.
   (needs tracking credentials in the build).
 - Entrypoint: `dagster job execute` one-shot (the exact job comes with the future
   `live_forecasts` asset; until that exists, the entrypoint can materialise the data-ingestion
-  assets so the image is testable now).
+  assets so the image is testable now). Under plan 04's Option B the same image also serves as
+  the code-location server on the control-plane box and as the `EcsRunLauncher` run image —
+  the launcher overrides the command, so the one-shot entrypoint stays the default either way.
+  Build for **arm64** (ARM Fargate is 20% cheaper and the candidate control-plane boxes are
+  Graviton).
 
 ### 2. Settings
 
@@ -52,7 +58,8 @@ Short page `docs/architecture/production-deployment.md` (permanent docs, not thi
 4. Point the ECS task definition at the new tag.
 
 Also record the two issue-#206 subtleties this review surfaced, so they're not lost when the
-Fargate work starts: (a) with throwaway SQLite, "which `ecmwf_ens` partitions need
+Fargate work starts: (a) whenever the job executes one-shot without persistent Dagster state
+(plan 04 Option A, or the local dress rehearsal), "which `ecmwf_ens` partitions need
 materialising" must be derived from Delta contents vs Dynamical availability, not Dagster's
 materialisation records; (b) Delta commits already give the atomic "outputs are the freshness
 record" property — just ensure the forecast Delta write is the run's final write.
