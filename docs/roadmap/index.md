@@ -87,7 +87,7 @@ task ordering lives in the GitHub Project board, and row order here carries no c
 | Work | Milestone | Design | GitHub | Notes |
 |---|---|---|---|---|
 | Live inference asset (`live_forecasts`: live/replay NWP semantics, all 51 members, `fold_id="live"`) | v0.1 | [Live service](live-service.md) | [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Built before its container, so the container has something to run |
-| Champion-model container (model baked into the Docker image) | v0.1 | [Live service](live-service.md) | — | Depends on the live inference asset |
+| Champion-model container (model baked into the Docker image, loaded via plain `save`/`load` — no MLflow at runtime) | v0.1 | [Live service](live-service.md) | — | Depends on the live inference asset |
 | AWS deployment (S3-capable data paths, production job + freshness check, Fargate + IAM infra, alerting) | v0.1 | [Live service](live-service.md) | [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206), [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121), [#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Depends on the container; five architecture options costed 2026-07-02, leaning small EC2 control plane + `EcsRunLauncher` |
 | NWP quantisation clip logging | v0.1 | [Engineering health](engineering-health.md) | [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Int16 quantisation currently clips silently |
 | CI safety net (ruff + ty + pytest on every PR) | v0.2 | [Engineering health](engineering-health.md) | [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) | Root pytest collection currently broken by duplicate test basenames |
@@ -143,7 +143,8 @@ naive forecast on AWS. **This is the current focus.***
 
 - `live_forecasts` production inference asset: single-run feature engineering across all 51
   ensemble members every 6 hours, with explicit live/replay NWP-availability semantics
-- Champion model baked into the Docker image (the live service must not depend on MLflow being up)
+- Champion model baked directly into the Docker image and loaded via a plain `save`/`load` —
+  no MLflow client, run ID, or cache lookup on the runtime path at all
 - AWS infrastructure: S3-capable data paths, scheduled Fargate runs, IAM roles, and alerting
   (Sentry) — five architecture options costed 2026-07-02, leaning a small always-on EC2
   control-plane box + `EcsRunLauncher`
