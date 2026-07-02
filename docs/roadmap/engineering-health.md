@@ -2,8 +2,14 @@
 
 > **Status: 🚧 Planned.** Tooling, reproducibility, and rigour improvements from the 2026-07
 > codebase review that don't change forecast behaviour. Each section is an independent,
-> roughly one-PR piece of work; sections are deleted as they ship. Task ordering lives in the
-> GitHub Project board (see the [map](index.md#map-of-substantial-work)).
+> roughly one-PR piece of work; sections are deleted as they ship. Mostly the v0.2 epic
+> [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138):
+> CI [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) ·
+> reproducibility stamping [#227](https://github.com/openclimatefix/nged-substation-forecast/issues/227) ·
+> NWP clip logging [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) ·
+> Hydra removal [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228) ·
+> rigor tests [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229).
+> Task ordering lives in the GitHub Project board.
 
 ## CI: run lint, types, and tests on every PR
 
