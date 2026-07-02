@@ -25,7 +25,7 @@ The sections build up from the problem statement to the full system, roughly in 
 3. [How DP fits into the roadmap](#3-how-dp-fits-into-the-roadmap) — the v1 → v2 map; read this next for orientation.
 4. [The core building block: `DifferentiableSolarPlant`](#4-the-core-building-block-differentiablesolarplant) — modelling a single metered site.
 5. [Estimating capacity with DP](#5-estimating-capacity-with-dp) — how the capacity parameter is regularised (the v1 deliverable).
-6. [Scaling to aggregate fleets: `FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode) — one node for many unmetered rooftops.
+6. [Scaling to aggregate fleets: `UniversalSolarFleetNode`](#6-scaling-to-aggregate-fleets-universalsolarfleetnode) — one node for many unmetered rooftops.
 7. [Combining DP with the weather encoder](#7-combining-differentiable-physics-with-the-weather-encoder) — the fuller forecasting architecture.
 8. [Scaling to the full grid: a graph-structured DP engine](#8-scaling-to-the-full-grid-a-graph-structured-dp-engine) — the full-grid v2 disaggregation engine.
 9. [Handling abnormal running arrangements](#9-handling-abnormal-running-arrangements) — pointer to the canonical [switching events](switching-events.md) doc.
@@ -159,7 +159,7 @@ differently:
 - **Unmetered DER fleets** cannot be modelled as a single asset — a primary substation may sit above
   hundreds or thousands of rooftops with a mishmash of orientations. These are modelled as an
   **aggregate fleet node** via the physics-informed basis expansion in
-  [`FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode). Estimating and disaggregating
+  [`UniversalSolarFleetNode`](#6-scaling-to-aggregate-fleets-universalsolarfleetnode). Estimating and disaggregating
   the *unmetered* DERs is the harder, **v2** goal.
 
 The forward model is **differentiable end-to-end**: every component is implemented in a
@@ -212,11 +212,28 @@ must also swap its `time_series_id`-only NMAE-denominator join for a temporal as
   series by its effective capacity before the power-forecast model trains on it. XGBoost continues to
   do the actual power forecasting in v1; DP is responsible only for *estimating capacity* of
   *metered* generators.
+- **Causal vs smoothed capacity — a lookahead trap in the two-pass scheme.** A capacity series
+  regularised over the whole record ([§5](#5-estimating-capacity-with-dp)) is a *smoother*: it uses
+  future observations, so the estimate for a given day changes once a later fault is seen. That is
+  correct for the historical [`effective_capacity`](delivery-tables.md#table-4-effective_capacity)
+  table and the NMAE denominator — but the capacity used to normalise at forecast init time, in live
+  running *and in backtests*, must be the **causal (filtered) estimate available at that init
+  time**, or backtest skill is quietly inflated by lookahead. This is the same no-lookahead
+  invariant the feature pipeline enforces for power lags.
+- **Irradiance inputs:** the beam/diffuse decomposition the [solar model](#4-the-core-building-block-differentiablesolarplant)
+  needs is covered by the v0.6 weather ingests. **CM SAF SARAH-3** provides global (SIS), direct
+  (SID) and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
+  SIS − SID) — the primary Phase 1 input, matching the half-hourly metering. **CERRA** provides
+  global plus time-integrated direct short-wave (diffuse by subtraction; accumulated fluxes from
+  3-hourly forecast cycles, so temporally coarser). The live **ECMWF ENS** feed carries only GHI —
+  fine for Phase 1, but Phase 2 DP *forecasting* of PV needs a differentiable GHI → DNI/DHI
+  decomposition model (or `fdir` added to the upstream dataset). See
+  [data sources](data-sources.md#weather-data).
 
 ### Phase 2: Full graph-structured disaggregation (v2)
 
 Part of [roadmap v2.0](index.md#v20-scale-up-future-research). Once the metered assets are accurately
-tracked, we unlock [the full architecture](#8-scaling-to-the-full-grid-a-graph-structured-dp-engine). The DP modules for the *unmetered* fleets ([`FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode)) are
+tracked, we unlock [the full architecture](#8-scaling-to-the-full-grid-a-graph-structured-dp-engine). The DP modules for the *unmetered* fleets ([`UniversalSolarFleetNode`](#6-scaling-to-aggregate-fleets-universalsolarfleetnode)) are
 bound to the graph's nodes. The network uses the verified metered assets and spatial weather cues to
 disaggregate the mixed substation signals, cleanly separating true gross demand from hidden
 behind-the-meter renewable generation. This is also where DP graduates from *estimating capacity* to
@@ -233,13 +250,20 @@ We model each physical parameter as a learnable Normal distribution $\mathcal{N}
 
 Crucially, the training objective is an **ELBO**, not a bare reconstruction loss: a power-reconstruction term *plus* a KL term that pulls each posterior toward a fixed physical prior. The KL term is not optional. Minimising power error alone always rewards shrinking $\sigma \to 0$, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.
 
+Two practical details the ELBO must get right — both classic failure modes of hand-rolled variational inference:
+
+- **The reconstruction term must be a proper likelihood, not a bare MSE.** Bare MSE silently assumes an observation-noise scale of 1 in whatever units the power happens to be in, which makes the balance between reconstruction and KL arbitrary — the posterior then either collapses onto the prior or ignores it, depending on nothing but the units. Use a Gaussian likelihood with a **learnable observation-noise scale** $\sigma_{\text{obs}}$ (see `negative_elbo` in the sketch).
+- **Scale the KL for minibatches.** The KL term regularises the *whole-dataset* objective once, so on a minibatch it must be weighted by `batch_size / dataset_size` — otherwise the effective prior strength depends on the batching.
+
 Three physics details the sketch gets right:
 
 - **Irradiance transposition.** Plane-of-array (POA) irradiance is *not* GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.
-- **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#6-scaling-to-aggregate-fleets-fleetsolarnode).
+- **DC and AC capacity.** The learnable `dc_capacity` is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. `ac_capacity` is a separate learnable parameter that clips the inverter output via `torch.minimum` — a single plant clips hard, unlike [the fleet soft clip](#6-scaling-to-aggregate-fleets-universalsolarfleetnode).
 - **Panel temperature derate.** Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the [subsection below](#panel-temperature) extends this to the broken-cloud effect.
 
-Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°).
+Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°). Beware that this differs from [pvlib](https://pvlib-python.readthedocs.io/)'s convention (north = 0°, clockwise, in degrees); `pvlib-pytorch` should adopt pvlib's own convention and convert at the boundary — mismatched angle conventions are the classic silent bug in PV modelling.
+
+One detail the sketch deliberately ignores — **interval averaging**. NWP and satellite irradiance are half-hourly *period means* (period-ending in our NWP schema), but the sketch evaluates the solar geometry at an instant. Over 30 minutes the sun's hour angle moves ~7.5°, and near sunrise/sunset the transposition is strongly non-linear, so evaluating at a single timestamp biases the fit. Worse, a timestamp-convention error (period-start vs period-end vs mid-point) masquerades as an azimuth shift that the optimiser will happily absorb into the fitted parameters. The fix is cheap: evaluate the geometry at ~5-minute sub-steps across each half-hour and average the modelled power to the metered interval — and unit-test the timestamp convention end-to-end before trusting any fitted azimuth.
 
 Here's a quick Python code sketch of the rough idea for applying differentiable physics to solar:
 
@@ -259,19 +283,22 @@ class DifferentiableSolarPlant(nn.Module):
     """Differentiable physical model of a single metered solar site.
 
     Each physical parameter is a mean-field variational posterior N(mu, sigma^2).
-    Training maximises an ELBO: a power-reconstruction term plus a KL term against a
-    fixed prior (see `kl_divergence`). The KL term is what stops the posterior spreads
-    from collapsing to zero under a pure reconstruction loss.
+    Training minimises `negative_elbo`: a Gaussian reconstruction likelihood (learnable
+    observation noise) plus a KL term against a fixed prior (see `kl_divergence`). The KL
+    term is what stops the posterior spreads from collapsing to zero under a pure
+    reconstruction loss.
 
     Azimuth convention: measured from due south, east negative, west positive.
     """
 
     def __init__(self, prior_tilt: float, prior_azimuth: float, prior_dc_capacity: float, prior_ac_capacity: float) -> None:
         super().__init__()
-        # Variational posteriors. tilt/azimuth are in radians; capacities live in
-        # log-space so they stay strictly positive without a gradient-breaking clamp.
-        self.tilt_mu = nn.Parameter(torch.tensor(prior_tilt))
-        self.tilt_log_std = nn.Parameter(torch.tensor(-2.0))  # exp(-2) ~ 0.13 rad initially
+        # Variational posteriors, each parameterised in an unconstrained space so no
+        # gradient-breaking clamp is needed and the Normal posterior/prior stay
+        # self-consistent: tilt in logit-space (squashed to (0, pi/2) in `forward`),
+        # azimuth in radians, capacities in log-space (strictly positive).
+        self.raw_tilt_mu = nn.Parameter(torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2)))
+        self.raw_tilt_log_std = nn.Parameter(torch.tensor(-2.0))
 
         self.azimuth_mu = nn.Parameter(torch.tensor(prior_azimuth))
         self.azimuth_log_std = nn.Parameter(torch.tensor(-2.0))
@@ -282,10 +309,14 @@ class DifferentiableSolarPlant(nn.Module):
         self.log_ac_capacity_mu = nn.Parameter(torch.log(torch.tensor(prior_ac_capacity)))
         self.log_ac_capacity_log_std = nn.Parameter(torch.tensor(-2.0))
 
+        # Observation-noise scale for the Gaussian reconstruction likelihood in
+        # `negative_elbo`: learnable, in log-space to stay strictly positive.
+        self.log_obs_noise = nn.Parameter(torch.tensor(0.0))
+
         # Fixed priors. Weakly-informative: "panels point roughly south at a UK roof pitch,
         # with a capacity near nameplate". These also keep the posterior spreads from collapsing.
         self.priors = {
-            "tilt": dist.Normal(torch.tensor(prior_tilt), torch.tensor(0.3)),
+            "raw_tilt": dist.Normal(torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2)), torch.tensor(0.3)),
             "azimuth": dist.Normal(torch.tensor(prior_azimuth), torch.tensor(0.5)),
             "log_dc_capacity": dist.Normal(torch.log(torch.tensor(prior_dc_capacity)), torch.tensor(0.5)),
             "log_ac_capacity": dist.Normal(torch.log(torch.tensor(prior_ac_capacity)), torch.tensor(0.3)),
@@ -294,7 +325,7 @@ class DifferentiableSolarPlant(nn.Module):
     def posteriors(self) -> dict[str, dist.Normal]:
         """The current variational posterior for each physical parameter."""
         return {
-            "tilt": dist.Normal(self.tilt_mu, self.tilt_log_std.exp()),
+            "raw_tilt": dist.Normal(self.raw_tilt_mu, self.raw_tilt_log_std.exp()),
             "azimuth": dist.Normal(self.azimuth_mu, self.azimuth_log_std.exp()),
             "log_dc_capacity": dist.Normal(self.log_dc_capacity_mu, self.log_dc_capacity_log_std.exp()),
             "log_ac_capacity": dist.Normal(self.log_ac_capacity_mu, self.log_ac_capacity_log_std.exp()),
@@ -304,6 +335,20 @@ class DifferentiableSolarPlant(nn.Module):
         """Sum of KL(posterior || prior) over all parameters — the regulariser in the ELBO."""
         q, p = self.posteriors(), self.priors
         return sum(dist.kl_divergence(q[key], p[key]) for key in q)
+
+    def negative_elbo(
+        self, predicted_power: torch.Tensor, observed_power: torch.Tensor, dataset_size: int
+    ) -> torch.Tensor:
+        """Minibatch training loss: Gaussian reconstruction likelihood + scaled KL.
+
+        The KL term regularises the whole-dataset objective once, so on a minibatch it is
+        weighted by batch_size / dataset_size — otherwise the effective prior strength
+        would depend on how the data happens to be batched.
+        """
+        obs_noise = self.log_obs_noise.exp()
+        log_lik = dist.Normal(predicted_power, obs_noise).log_prob(observed_power).sum()
+        kl_weight = observed_power.numel() / dataset_size
+        return kl_weight * self.kl_divergence() - log_lik
 
     def forward(
         self,
@@ -317,8 +362,10 @@ class DifferentiableSolarPlant(nn.Module):
         """Predict DC power with steady-state temperature derate. All inputs and operations preserve gradients."""
         q = self.posteriors()
 
-        # Reparameterised samples (one per forward pass).
-        tilt = q["tilt"].rsample().clamp(0.0, torch.pi / 2)
+        # Reparameterised samples (one per forward pass). tilt is sampled in logit-space
+        # and squashed to (0, pi/2) — a sigmoid, not a clamp, so gradients flow everywhere
+        # and the sample stays consistent with the Normal posterior used in the KL.
+        tilt = torch.sigmoid(q["raw_tilt"].rsample()) * (torch.pi / 2)
         azimuth = q["azimuth"].rsample()
         dc_capacity = q["log_dc_capacity"].rsample().exp()  # strictly positive by construction
 
@@ -379,9 +426,21 @@ The effective capacity of a metered generator changes in both directions: it dro
 
 The *installed* capacity of an unmetered fleet behaves differently: it essentially only ever grows, as more households and businesses fit panels. Here a monotonic representation is the right prior. We model capacity as a cumulative sum of per-week increments, each constrained to be **non-negative**, with an L1 (sparsity) penalty pushing most weekly increments to exactly zero — because installs happen in occasional bursts, not every week. The running total is then non-decreasing by construction.
 
+### Keeping weather bias out of capacity
+
+The irradiance driving the forward model is itself biased: NWP and satellite products carry regional, *seasonal* error (satellite retrievals degrade at low UK winter sun angles, for example). Per site, that bias is indistinguishable from slow capacity drift — an unconstrained fit will alias it into exactly the signal we deliver to NGED. The mitigation exploits structure: every site in a region sees the **same** weather bias, while genuine capacity changes are site-specific. Fitting a **shared regional irradiance-bias term jointly across the metered fleet** separates the two. This is the Phase 1-sized version of what [the weather encoder](#7-combining-differentiable-physics-with-the-weather-encoder) does in v2.
+
+### Economic curtailment (not in the ANM feed)
+
+[§3](#3-how-dp-fits-into-the-roadmap) keeps *network-driven* (ANM) curtailment out of capacity via the curtailment gate — but generators also **self-curtail economically**, increasingly commonly during negative-price periods, and that never appears in NGED's ANM feed. Unmodelled, it reads as capacity loss. Mitigations: treat capacity as an **upper envelope** (an asymmetric, quantile-flavoured loss that penalises under-predicting the best observed output far more than over-predicting typical output), and/or mask periods flagged as negative-price from public market data.
+
+### A cheap baseline to beat
+
+The DP estimator should be benchmarked against a deliberately simple baseline on the metered ground truth: a rolling quantile of clear-sky-normalised output (observed power ÷ physics-predicted clear-sky power), and/or the convex capacity-change detection in SLAC's [solar-data-tools](https://github.com/slacgismo/solar-data-tools). If DP cannot beat the cheap estimator, that is a finding worth surfacing early — and the baseline slots into the same leaderboard discipline used for the forecasting models.
+
 ---
 
-## 6. Scaling to aggregate fleets: `FleetSolarNode`
+## 6. Scaling to aggregate fleets: `UniversalSolarFleetNode`
 
 A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.
 
@@ -405,9 +464,9 @@ $$\text{smin}(P, P_{\max}) = P_{\max} - \frac{1}{\beta}\,\operatorname{softplus}
 
 The learnable $P_{\max}$ is the effective aggregate inverter (AC) capacity; the learnable sharpness $\beta$ sets the curvature of the shoulder.
 
-### 4. Implementation: `UniversalFleetNode`
+### 4. Implementation: `UniversalSolarFleetNode`
 
-This upgrades the node to handle orientation mix, tracking, and soft clipping in a single differentiable module.
+This upgrades the node to handle installed-capacity growth, orientation mix, tracking, and soft clipping in a single differentiable module. Note the division of labour: the softmax mix weights sum to 1, so the mixture alone is magnitude-free ("which way does the fleet face"); the magnitude ("how much is installed") is carried by a separate per-week capacity series, built as a cumulative sum of non-negative weekly increments so it is non-decreasing by construction — exactly the monotone representation from [capacity estimation](#5-estimating-capacity-with-dp).
 
 ```python
 import torch
@@ -415,11 +474,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class UniversalFleetNode(nn.Module):
-    """Aggregate solar fleet behind one substation: orientation mix + soft inverter clip."""
+class UniversalSolarFleetNode(nn.Module):
+    """Aggregate solar fleet behind one substation: capacity growth + orientation mix + soft clip."""
 
     def __init__(self, n_weeks: int) -> None:
         super().__init__()
+        # Installed DC capacity, tracked per week as a cumulative sum of non-negative
+        # increments (installs only ever add capacity — see section 5). An L1 penalty on
+        # the increments (not shown) pushes most weeks to exactly zero growth, because
+        # installs arrive in occasional bursts.
+        self.raw_capacity_increments = nn.Parameter(torch.full((n_weeks,), -2.0))
+
         # Orientation mix over [east, south, west, tracking], tracked per week because the
         # fleet composition drifts over time as new systems are installed.
         self.mix_logits = nn.Parameter(torch.zeros(n_weeks, 4))
@@ -432,7 +497,8 @@ class UniversalFleetNode(nn.Module):
     def forward(
         self, sun_vec: torch.Tensor, weather: torch.Tensor, week_idx: torch.Tensor
     ) -> torch.Tensor:
-        # 1. The four physical basis curves (ideal shapes from geometry + weather).
+        # 1. The four physical basis curves (ideal shapes from geometry + weather), each
+        #    normalised to unit DC capacity.
         #    calc_fixed / calc_tracker would come from pvlib-pytorch (see section 7).
         #    Azimuth convention matches section 4: south = 0, east = -90, west = +90.
         p_east = self.calc_fixed(sun_vec, weather, azimuth_deg=-90.0)
@@ -440,10 +506,12 @@ class UniversalFleetNode(nn.Module):
         p_west = self.calc_fixed(sun_vec, weather, azimuth_deg=90.0)
         p_track = self.calc_tracker(sun_vec, weather)  # single-axis backtracking logic
 
-        # 2. Mix the bases with this week's weights (the "asset identification").
+        # 2. Mix the unit bases with this week's weights (the "asset identification"),
+        #    then scale by this week's installed capacity — non-decreasing by construction.
         basis = torch.stack([p_east, p_south, p_west, p_track], dim=-1)
         weights = torch.softmax(self.mix_logits[week_idx], dim=-1)
-        p_raw = (basis * weights).sum(dim=-1)
+        capacity = F.softplus(self.raw_capacity_increments).cumsum(dim=0)
+        p_raw = capacity[week_idx] * (basis * weights).sum(dim=-1)
 
         # 3. Aggregate soft clip. Smooth-min stays ~linear until p_raw nears the limit,
         #    then rolls off — unlike tanh it does not suppress mid-range power.
@@ -483,7 +551,7 @@ class UniversalFleetNode(nn.Module):
 - **Physical constraints** are handled by the **differentiable physics**: "based on the corrected weather, the geometry of the sun and panel dictates $X$ power" (first-principles baseline).
 - **Systematic / local anomalies** (the "unknown unknowns") are handled by the **retrieval / alignment** module: "on days that looked exactly like this in the past, the physics model consistently over-predicted the evening ramp-down by 5% because of that one tree on the horizon" (residual correction).
 
-`pvlib-pytorch` is a planned Open Climate Fix open-source library — a differentiable, PyTorch-native port of [pvlib](https://pvlib-python.readthedocs.io/) — that we intend to spin out of this project. It would generalise the hand-rolled transposition and panel geometry in the [single-site](#4-the-core-building-block-differentiablesolarplant) and [fleet](#6-scaling-to-aggregate-fleets-fleetsolarnode) sketches into a reusable, tested component; treat those sketches as the prototype it grows from.
+`pvlib-pytorch` is a planned Open Climate Fix open-source library — a differentiable, PyTorch-native port of [pvlib](https://pvlib-python.readthedocs.io/) — that we intend to spin out of this project. It would generalise the hand-rolled transposition and panel geometry in the [single-site](#4-the-core-building-block-differentiablesolarplant) and [fleet](#6-scaling-to-aggregate-fleets-universalsolarfleetnode) sketches into a reusable, tested component; treat those sketches as the prototype it grows from.
 
 ---
 
@@ -501,14 +569,14 @@ Following the report's schematic, the graph uses the following node types:
 2. **Metered load nodes** — demand that NGED meters directly, where such metering exists.
 3. **Gross demand nodes** — the underlying, unmetered consumer load, inferred by the model. Implemented as a `BasisLoadNode`: a shared MLP learns a small set of universal demand-profile shapes (e.g. residential, commercial, light-industrial) as functions of time-of-day, day-of-week, and temperature; each substation carries a local "style vector" of mixing weights that describes its particular customer mix. The universal basis curves are shared across all substations; only the style vector is site-specific, so the model can distinguish a residential suburb from an industrial estate without re-learning basic human demand patterns from scratch at each site.
 4. **Metered PV / Wind nodes** — generators with dedicated, live generation metering.
-5. **Unmetered PV / Wind fleet nodes** — aggregated behind-the-meter (BTM) solar and distributed wind, grouped by location, with no direct metering (each implemented as a [`FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode)).
+5. **Unmetered PV / Wind fleet nodes** — aggregated behind-the-meter (BTM) solar and distributed wind, grouped by location, with no direct metering. PV fleets are each implemented as a [`UniversalSolarFleetNode`](#6-scaling-to-aggregate-fleets-universalsolarfleetnode); wind fleets get their own analogous node type, with a shared learnable aggregate power curve in place of the orientation-mix bases (a turbine fleet has no tilt/azimuth to mix).
 6. **Heat pump nodes** (v2 stretch) — heat pump demand exhibits a distinctive J-curve: as temperatures fall, heating demand rises, but aggregate COP also falls, so electricity draw grows super-linearly with cold. This non-linearity cannot be captured by treating temperature as a plain regression feature — it requires an explicit COP-rolloff function. A `HeatPumpNode` models this: it takes ambient temperature, applies a learned COP curve, and outputs the net electricity demand attributable to heat pumps. Contributes to gross demand at substations with significant residential or commercial heat pump penetration.
 
 Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the effective-capacity estimate stay a clean measure of physical availability — see [How DP fits into the roadmap](#3-how-dp-fits-into-the-roadmap) and Fig. 10.
 
 ### The fusion mechanism
 
-Spatial weather correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too) are already supplied by the **gridded NWP** each node consumes — they do not need to be re-learned by message passing. Where cross-site information genuinely helps the under-determined per-site fit, it enters as **hierarchical parameter sharing**, not message passing: the unmetered-fleet and demand nodes share a small set of universal basis shapes ([`FleetSolarNode`](#6-scaling-to-aggregate-fleets-fleetsolarnode); `BasisLoadNode` above), with only a per-site *style vector* learned locally. Each node's DP modules compute explicit physical generation, and a hard Kirchhoff balance node then aggregates the elements:
+Spatial weather correlations (e.g. if it is raining at Substation A, the adjacent Unmetered PV Fleet B is probably cloudy too) are already supplied by the **gridded NWP** each node consumes — they do not need to be re-learned by message passing. Where cross-site information genuinely helps the under-determined per-site fit, it enters as **hierarchical parameter sharing**, not message passing: the unmetered-fleet and demand nodes share a small set of universal basis shapes ([`UniversalSolarFleetNode`](#6-scaling-to-aggregate-fleets-universalsolarfleetnode); `BasisLoadNode` above), with only a per-site *style vector* learned locally. Each node's DP modules compute explicit physical generation, and a hard Kirchhoff balance node then aggregates the elements:
 
 $$\text{Net substation flow} = \text{Gross demand} - \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) - \gamma_{\text{wind}}\,(\text{Wind}_{\text{metered}} + \text{Wind}_{\text{unmetered}})$$
 
@@ -551,6 +619,11 @@ Some substations are metered only in apparent power (MVA), which reports the *ab
 $$\text{MVA}_{\text{measured}} \approx \bigl|\,\text{Net substation flow}\,\bigr|$$
 
 (assuming near-unity power factor). The physics grounds the model so that a sunny-day "bounce" is correctly attributed to reverse power flow from generation, not to a spike in demand. This is one of the two capabilities the Milestone 1 report highlights for DP — the other being unmetered disaggregation.
+
+Two implementation cautions:
+
+- **The magnitude loss needs smoothing.** $|x|$ is non-differentiable at zero and its gradient flips sign there — exactly where the bounce lives. Compare against a smoothed magnitude, e.g. $\sqrt{x^2 + \epsilon}$, and add a temporal-continuity prior on the *sign* of the reconstructed flow: flow direction persists for hours, it does not flicker half-hour to half-hour.
+- **The near-unity power-factor assumption is weakest precisely at the bounce.** As real power passes through zero, reactive power dominates the measured magnitude, so the MVA trace has a soft *floor* above zero rather than a clean reflection. Expect the reconstruction to under-fit the bottom of the bounce, and do not let the optimiser explain the floor with phantom demand.
 
 ---
 

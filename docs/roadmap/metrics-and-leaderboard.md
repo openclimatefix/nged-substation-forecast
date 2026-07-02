@@ -103,6 +103,12 @@ The `Metrics` schema and the rest of the metrics pipeline are untouched. Note th
 validation windows lie inside the observed history), but live-forecast scoring (Phase 7 / 8) must
 choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
 
+One related distinction to keep straight: the *metric denominator* may use the full-history
+**smoothed** DP capacity estimate, but any capacity used to normalise model inputs at forecast init
+time (the two-pass training scheme) must be the **causal** estimate available at that init time, or
+backtests gain lookahead — see
+[Differentiable Physics §3](differentiable-physics.md#3-how-dp-fits-into-the-roadmap).
+
 ### Peak events — the metric filter that matters most for flexibility
 
 Because NGED's goal is **flexibility procurement** (entirely about peak management and congestion),
