@@ -287,9 +287,11 @@ not a matcher bug.
 **Formally.** This is a **group fused lasso** on signed edge flows `e_ij(t)`, with a per-node
 anomaly slack `u_i(t)`:
 
-```text
-residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)     (+ where flow enters i, − where it leaves)
-```
+$$
+\text{residual}_i(t) \;\approx\; \sum_j \pm\, e_{ij}(t) + u_i(t)
+$$
+
+(`+` where flow enters `i`, `−` where it leaves.)
 
 Each term in that equation, and each penalty applied to it, is a deliberate design choice. The
 bullets below unpack them in turn: the two penalties that encode the switching priors, the
@@ -511,9 +513,9 @@ Notes on the sketch:
 
 **Method.** Each substation `i` has a latent normal-demand signal `d_i(t)`. Observed power is a time-varying mixture over the neighbourhood:
 
-```text
-observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
-```
+$$
+\text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighbours}(i)} \alpha_{ij}(t)\, d_j(t)
+$$
 
 - **The neighbourhood is the graph:** `neighbours(i)` is exactly `i`'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most `α_ij` are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an `N × N` free-for-all.
 - Under NRA: `α_ii ≈ 1`, `α_ij ≈ 0`.
@@ -605,11 +607,9 @@ the routing estimation should stay a convex layer even then.
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
 
-```text
-d_i(t) = gross_demand_i(t)
-       − pv_metered_i(t)   − pv_unmetered_i(t)
-       − wind_metered_i(t) − wind_unmetered_i(t)
-```
+$$
+d_i(t) = \text{gross\_demand}_i(t) - \text{pv\_metered}_i(t) - \text{pv\_unmetered}_i(t) - \text{wind\_metered}_i(t) - \text{wind\_unmetered}_i(t)
+$$
 
 - **Demand:** temperature- and time-of-week-shaped.
 - **PV:** irradiance-driven (NWP/satellite) via differentiable panel physics (temperature/spectral correction, inverter clipping); capacity is a latent parameter.
@@ -618,11 +618,9 @@ d_i(t) = gross_demand_i(t)
 
 Mixing operates **per component-type**, each with its own routing weights:
 
-```text
-observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
-                    − α^pv_ij(t)·pv_j(t)
-                    − α^wind_ij(t)·wind_j(t) ]
-```
+$$
+\text{observed}_i(t) = \sum_j \Big[\, \alpha^{\text{dem}}_{ij}(t)\, \text{gross\_demand}_j(t) - \alpha^{\text{pv}}_{ij}(t)\, \text{pv}_j(t) - \alpha^{\text{wind}}_{ij}(t)\, \text{wind}_j(t) \,\Big]
+$$
 
 Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
 

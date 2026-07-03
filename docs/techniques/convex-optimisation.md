@@ -34,9 +34,9 @@ identically, so any answer the solver returns is a best answer.)
 
 Formally, a function `f` is convex when, for all `x`, `y` and `0 ≤ λ ≤ 1`:
 
-```text
-f(λ·x + (1−λ)·y)  ≤  λ·f(x) + (1−λ)·f(y)
-```
+$$
+f(\lambda x + (1-\lambda) y) \;\le\; \lambda f(x) + (1-\lambda) f(y)
+$$
 
 You rarely check this by hand, because convexity has a *calculus* — a small rulebook that builds
 complicated convex functions from simple ones:
