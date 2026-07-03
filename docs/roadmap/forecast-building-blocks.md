@@ -4,7 +4,8 @@ How NGED assembles different kinds of forecast from the "Lego blocks" OCF delive
 
 > **Status: 🚧 Planned.** The normalised forecast is the long-term plan (the early MVP forecasts raw
 > MW/MVA — see [delivery tables, Table 1](delivery-tables.md#table-1-power_forecast)). The
-> capacity and switching building blocks depend on work scheduled for v0.6 / v0.7. OCF will provide
+> capacity and switching building blocks depend on work scheduled for v0.6 (switching) and
+> v0.7 (capacity). OCF will provide
 > example Python code (likely a small package) to demonstrate assembling these forecasts. See the
 > [roadmap index](index.md) for status conventions.
 

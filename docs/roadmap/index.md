@@ -154,17 +154,24 @@ The ML-assets architecture is designed to support this from day one (programmati
 
 ---
 
-## v0.6 & v0.7 — Switching Events & Dynamic Generator Capacity
+## v0.6 — Switching Events
 
-*Epics: [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (switching
-events) and [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141)
-(capacity estimation). Internal only for first month, then shared with NGED.*
+*Epic: [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151). Internal
+only for first month, then shared with NGED. (v0.6 vs v0.7: we don't yet know which of switching
+events and capacity estimation will actually land first — but naming one v0.6 and the other v0.7
+beats the ambiguity of "v0.6 or v0.7"; we'll swap them later if reality disagrees.)*
 
-**Switching events**:
-
-- Detect "abnormal running arrangement" events from the power time series alone, using statistical methods
+- Detect "abnormal running arrangement" events from the power time series alone, using statistical methods — see [Switching events & latent demand](switching-events.md)
+- Ingest the NGED supporting files the detector needs (substation adjacency, switching logs as the validation oracle)
 - Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
 - Populate the `substation_switching` Delta table
+
+---
+
+## v0.7 — Dynamic Generator Capacity
+
+*Epic: [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141). Internal
+only for first month, then shared with NGED.*
 
 **Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**:
 
@@ -182,7 +189,7 @@ events) and [#141](https://github.com/openclimatefix/nged-substation-forecast/is
   know about substation capacity, as a function of all the things that drive the substation's
   behaviour.
 
-**"Prevailing conditions" building block**:
+**"Prevailing conditions" building block** (needs both the v0.6 switching and v0.7 capacity blocks):
 
 - Produce example Python code for NGED to construct a "prevailing conditions" forecast from OCF's building blocks
 

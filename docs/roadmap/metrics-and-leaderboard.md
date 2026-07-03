@@ -212,7 +212,7 @@ history, `time` = the latest observed timestep. `compute_metrics` joins it onto 
 metrics **on `time_series_id` alone** and divides.
 
 **Why the MVP is a single row per series, not the value repeated at every half-hour.** The
-v0.6 / v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
+v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
 genuinely *time-varying* value. In the MVP the value is a single constant per series, so repeating it
 across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
 series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
@@ -222,7 +222,7 @@ because the real MVP→DP interface change is not the data shape but **the join*
 both the one-row-per-series MVP and the one-row-per-half-hour DP shape with no schema change; that is
 the forward-compatibility we want.
 
-**DP upgrade (v0.6 / v0.7): time-varying, and the join changes.** The
+**DP upgrade (v0.7): time-varying, and the join changes.** The
 [differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over
 time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
 nothing else:
