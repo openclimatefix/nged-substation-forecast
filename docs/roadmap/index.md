@@ -67,8 +67,8 @@ apply them.
 - [Live service](live-service.md) — the v0.1 deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
-- [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog, ordered best
-  bang-for-the-buck first across four effort tiers.
+- [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
+  tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP clip
   logging, Hydra removal, and scientific-rigor tests.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
@@ -147,8 +147,8 @@ models, and CV leaderboard are already built; the remaining work is deployment �
 
 Establish a strong XGBoost baseline before investing in capacity estimation and switching event detection.
 
-The full experiment backlog — sixteen ideas across four effort tiers, ordered best
-bang-for-the-buck first — is in [XGBoost improvements](xgboost-improvements.md).
+The full experiment backlog — fifteen ideas across four effort tiers, ordered best
+bang-for-the-buck within each tier — is in [XGBoost improvements](xgboost-improvements.md).
 
 **Automated experimentation ("auto-research")**:
 
