@@ -290,6 +290,11 @@ anomaly slack `u_i(t)`:
 residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)     (+ where flow enters i, − where it leaves)
 ```
 
+Each term in that equation, and each penalty applied to it, is a deliberate design choice. The
+bullets below unpack them in turn: the two penalties that encode the switching priors, the
+anomaly slack that keeps non-switching steps out of the flows, the residuals the fit term
+consumes, the approximation the parameterisation makes, and how the penalty weights are set.
+
 - **Fused penalty on grouped increments** → each flow is piecewise-constant with sparse changes.
   The *group* structure ties the increments across edges at each timestep, so a fan-out event —
   one switching action changing two or three edge flows at once — is encouraged to place all its
@@ -323,6 +328,35 @@ residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)     (+ where flow enters i, − where 
   sweeps over the magnitude × duration grid set the weights; the logged events stay reserved for
   final scoring — and injection-based tuning is the only kind available at full scale, where no
   logs exist.
+
+**Which of the staged pipeline's failure modes it retires — and which it doesn't.** Several of
+the statistical traps that stages 1–2 must handle with explicit machinery simply cannot occur in
+this parameterisation:
+
+- *Onset/reversion pairing disappears.* Stage 2 must detect each reversion step and pair it with
+  its onset — messy under staged restorations and ARA-to-ARA reconfigurations. Here an event is a
+  nonzero *run* of one flow variable, so its start and end are read off directly, and an
+  ARA-to-ARA move is just one flow stepping down as another steps up.
+- *Regional weather errors can't masquerade as events.* Flows are zero-sum across a neighbourhood
+  by construction, so a common-mode residual wave (an NWP bust hitting every nearby series with
+  the same sign) is *inexpressible* as edge flows — it falls into the anomaly slack instead. The
+  neighbourhood-sum test from stage 2 is not run as a separate check; the parameterisation
+  enforces it.
+- *The chance-balance null becomes a penalty competition.* Stage 2 needs an explicit permutation
+  null because some neighbour subset will approximately balance by luck. Here, for a candidate
+  event to enter the solution it must out-compete two rival explanations at once — "stay at zero"
+  (the sparsity price) and "call it an anomaly" (`u`) — evaluated jointly over the whole record.
+  That calibration is done once, by tuning the penalty weights on the injection harness.
+- *The loss/CVR tolerance band is implicit.* Exact conservation lives in the flows; the
+  few-percent real-world imbalance (losses change with path length, load is mildly
+  voltage-dependent) is absorbed by the fit term and `u`, with no hand-set band.
+
+What it does **not** retire: the dependency on well-behaved residuals (the
+normalised-and-whitened bullet above — phantom flows replace phantom changepoints, but only if
+that step is skipped), the sensitivity floor (noise and half-hourly sampling still impose a
+magnitude × duration limit, measured the same way on injections), the fleet-wide artifact
+pre-filter, and stage 3's composition preconditions (duration floor, weather-realisation
+confound).
 
 **What it reuses, and why it is not the day-one build.** Everything upstream: the same
 weather/calendar baseline, the same normalised/whitened residuals, the same adjacency, and the
