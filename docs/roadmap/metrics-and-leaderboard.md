@@ -11,6 +11,8 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6):
 > baseline forecasters [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) ·
 > probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
+> peak-events filter [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
+> tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
 > fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226).
 
 ---
@@ -48,18 +50,22 @@ exists to answer: **do we beat what NGED does today?**
 
 NGED's current approach to "forecasting" primary-substation demand uses no weather model and no
 ML. For each substation they build an ensemble of analogues from its own history — the observed
-power at the same time-of-day on the same weekday over the **last 5 weeks**, plus the same weekday
-and time-of-day from **roughly a year ago** (51, 52 and 53 weeks back) — **plot them all, and read
-a forecast off the spread by human judgement.** There is no automated point forecast: the human
-reading the plotted members *is* the method. This is *the bar we have to clear to justify the
-project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the
-deliverable. It is the first baseline we implement; if we implement only one, it is this one.
+power at the same time-of-day on the same weekday over the **last 6 weeks**, plus the same weekday
+and time-of-day from **roughly a year ago** (the seven weeks spanning **49–55 weeks back**) — then
+**plot all 13 and let an operator read a forecast off the spread by eye.** If they need a single
+deterministic number they take the **95th percentile** of the analogue values ("more of a *vibe*
+than anything rigorous", in their words) — a deliberately conservative operating point, because the
+tool exists to keep demand under the flex/firm capacity limit. This is *the bar we have to clear to
+justify the project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent"
+is the deliverable. It is the first baseline we implement; if we implement only one, it is this one.
+(Recipe confirmed by NGED, July 2026.)
 
-It slots into our machinery beautifully, because every one of its 8 members is just a **power
+It slots into our machinery beautifully, because every one of its 13 members is just a **power
 lag**:
 
-- Weekly group (last 5 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h`
-- Annual group (51/52/53 weeks ago, same weekday & time): `power_lag_8568h, 8736h, 8904h`
+- Weekly group (last 6 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h, 1008h`
+- Annual group (49–55 weeks ago, same weekday & time): `power_lag_8232h, 8400h, 8568h, 8736h,
+  8904h, 9072h, 9240h`
 
 So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (below) with zero
 new time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows
@@ -70,8 +76,8 @@ today, and a reason to keep the pure `PersistenceForecaster` as a contrast rathe
 recent-power member in.
 
 **It is also our first _probabilistic_ baseline — and this is the faithful representation, not a
-bonus.** Because NGED never collapse the members to a single number, the raw ensemble *is* the
-incumbent's output. We emit the 8 analogues as 8 `ensemble_member` rows and let the [probabilistic
+bonus.** The plotted spread *is* the incumbent's output — an operator reads it by eye. We emit the
+13 analogues as 13 `ensemble_member` rows and let the [probabilistic
 metrics](#phase-b--probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
 the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
 worth stating plainly:
@@ -82,13 +88,14 @@ worth stating plainly:
   `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
   unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
   runs with `weather_source: "none"`.
-- **The equal-weight mean is _our_ collapse, not NGED's.** NGED produce no point forecast at all,
-  so the deterministic leaderboard metrics need one and we take the **equal-weight** mean of the
-  members as a neutral default. Because there is no explicit NGED averaging step to reproduce,
-  equiprobable members (for both the mean and the Phase B metrics) is a faithful MVP, not a known
-  inaccuracy. Whether the human leans on some analogues more than others — e.g. recent weeks — is
-  open question 3; if the answer is yes, a weighted mean / weighted quantiles become a documented
-  follow-up.
+- **The deterministic collapse is NGED's own P95, not a mean.** For the deterministic leaderboard
+  metrics we need a single number, and NGED gave us theirs: the **95th percentile** of the 13
+  analogue values. It is deliberately conservative (a peak-safety operating point), so scoring it
+  with MAE/RMSE/MBE will show a large *positive* bias **by design** — a property of their risk
+  preference, not a forecasting error, and not something to "fix". The fair, like-for-like skill
+  comparison therefore lives in the probabilistic metrics (CRPS over the members); NGED weight the
+  analogues equally ("no further processing at all"), so equiprobable members are faithful, not an
+  approximation.
 
 ### A faithful replica and a "cheap upgrades" variant
 
@@ -127,17 +134,23 @@ below. Add to the root `pyproject.toml` `[tool.uv.sources]` and dependencies.
 the lag machinery exactly like persistence, but *combines* the members instead of coalescing to
 one:
 
-- `selected_features` = the 8 analogue lags `{"power_lag_168h", "power_lag_336h",
-  "power_lag_504h", "power_lag_672h", "power_lag_840h", "power_lag_8568h", "power_lag_8736h",
-  "power_lag_8904h"}` — 5 weekly + 3 annual. The weekly count and annual set are config-defaulted
-  so the recipe can be corrected cheaply once NGED confirm it (open questions below).
+- `selected_features` = the 13 analogue lags `{"power_lag_168h", "power_lag_336h",
+  "power_lag_504h", "power_lag_672h", "power_lag_840h", "power_lag_1008h", "power_lag_8232h",
+  "power_lag_8400h", "power_lag_8568h", "power_lag_8736h", "power_lag_8904h", "power_lag_9072h",
+  "power_lag_9240h"}` — 6 weekly + 7 annual, per NGED's confirmed recipe. Keep the weekly count
+  and annual span config-driven so variants stay cheap to try.
 - `predict()` unpivots the analogue-lag columns into `ensemble_member` rows (member index =
   analogue index) — this is where the ensemble is *synthesised*, not consumed from NWP. Members
   nulled by `_nullify_leaky_lags` (lag ≤ lead time) or by insufficient history are dropped; rows
   where *all* members are null (very long horizons + data gaps) are dropped and the count logged,
-  as in persistence. The members are the faithful output (NGED read the plotted spread by eye);
-  the **equal-weight** mean is *our* collapse, added only to feed the deterministic metrics (see
-  prose above / open question 3).
+  as in persistence. The members are the faithful output (NGED plot all 13 and read the spread by
+  eye); the deterministic point forecast is NGED's stated **95th-percentile** collapse over the
+  surviving members — conservative by design, so expect a positive MBE (see prose above).
+- **Deterministic-scoring wrinkle:** `compute_metrics` currently collapses members by *mean* for
+  the deterministic metrics. Scoring the incumbent's P95 faithfully needs a per-experiment collapse
+  statistic (default `mean`; `p95` for `nged_incumbent`) — a small `compute_metrics` extension, or
+  have the forecaster carry a designated point-forecast column. Do not silently score its members'
+  mean and call it the incumbent.
 - `train()` records `trained_time_series_ids` only. `save`/`load` persist a `meta.json` with the
   config + ids (copy the `XGBoostForecaster` pattern).
 - `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`; runs with `weather_source: "none"`.
@@ -196,7 +209,7 @@ machinery instead of writing any new time-series logic:
 - **Ensemble members:** for the *deterministic* baselines (persistence, climatology) the CV
   predict path feeds all ~51 members and they produce identical forecasts per member — wasteful
   but harmless (the ensemble mean is unchanged); MVP accepts it. `nged_incumbent` is different:
-  it emits its own 8-member ensemble, so broadcasting it across the 51 NWP members would be wrong,
+  it emits its own 13-member ensemble, so broadcasting it across the 51 NWP members would be wrong,
   not merely wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
   `cv_power_forecasts` honours — restricting deterministic baselines to member 0 and letting
   `nged_incumbent` own the member axis — resolves both at once.
@@ -205,29 +218,26 @@ machinery instead of writing any new time-series logic:
 first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
 so each appears in MLflow as a leaderboard row.
 
-**Open questions to NGED (documented until confirmed).** The current spec takes the first option
-in each; correcting any is a small config change (a code change only for holiday handling):
+**Recipe confirmed by NGED (July 2026).** No open questions remain; the spec above is their method
+verbatim:
 
-1. **Weekly analogues** — same weekday & time from each of the last **5** weeks? (or another
-   count)
-2. **Annual analogues** — same weekday & time, **51/52/53** weeks back (3 members)? or just 52
-   (1 member)?
-3. **Reading the spread** — NGED read a forecast off the plotted members rather than averaging;
-   when doing so, do they lean on some analogues more than others (e.g. recent weeks)? A "yes"
-   would justify a weighted mean / weighted quantiles.
-4. **Holidays** — any handling (bank-holiday day-type remap; moveable-feast alignment,
-   Easter→Easter)? — this is what motivates baseline 2.
-5. **Anything else** — discarding anomalous values, or scaling last-year values for load growth?
+- **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
+- **Annual analogues:** the **seven** weeks spanning **49–55 weeks back**, same weekday & time.
+- **Deterministic value:** the **95th percentile** of all 13 analogue values ("more of a vibe").
+- **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
+  load-growth scaling. (This is precisely why the holiday-aligned variant in item 2 is a genuine,
+  un-done upgrade — not a reimplementation of something NGED already do.)
 
 **Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: `nged_incumbent`
-unpivots to the expected members and its equal-weight mean matches a hand-computed value;
+unpivots to the expected 13 members and its **P95** collapse matches a hand-computed value;
 persistence picks the shortest non-null lag; climatology lookup round-trips through `save`/`load`;
 all freeze `trained_time_series_ids`. (2) Smoke-test fold end-to-end via the existing
 integration-test pattern (`tests/test_trained_cv_model.py` fixtures), and confirm the incumbent's
-8-member ensemble flows through the Phase B probabilistic metrics (e.g. CRPS computes over its
-members). (3) Sanity-check the numbers: persistence NMAE should be *worse overall* than XGBoost
-but plausibly competitive at short horizons, and `nged_incumbent` should sit between the naive
-bookends and XGBoost (fully visible once the horizon slices land — the plans compound).
+13-member ensemble flows through the Phase B probabilistic metrics (e.g. CRPS computes over its
+members). (3) Sanity-check the numbers: persistence NMAE should be *worse overall* than XGBoost but
+plausibly competitive at short horizons; `nged_incumbent`'s P95 point forecast should show a clear
+positive MBE (the conservative operating point) even where its CRPS over the 13 members is
+competitive — do not mistake that bias for a bug.
 
 ---
 
@@ -381,6 +391,8 @@ backtests gain lookahead — see
 
 ### Peak events — the metric filter that matters most for flexibility
 
+Issue: [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254)
+
 Because NGED's goal is **flexibility procurement** (entirely about peak management and congestion),
 overall RMSE only tells half the story. We add a **"Peak Events"** filter:
 
@@ -390,6 +402,8 @@ overall RMSE only tells half the story. We add a **"Peak Events"** filter:
   performance on those alone.
 
 ### Tricky days — a calendar-deterministic metric filter 🚧
+
+Issue: [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255)
 
 Alongside Peak Events, we add a **"Tricky days"** filter: score models separately on the handful of
 calendar dates whose demand shape departs sharply from the usual weekly rhythm. We scope it
