@@ -19,7 +19,7 @@
 
 A **graph** is just **nodes** connected by **edges**. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the *same power moving*.
 
-It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise `N × N` problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
+It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise $N \times N$ problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
 
 In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
 
@@ -116,7 +116,7 @@ detection runs on residuals that have been *normalised* and *whitened*:
 
 #### Stage 2. **Node-level coincidence / balance attribution.**
 
-A level shift at one substation could be many things (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*. Because transfers fan out to 2–3 neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude `Δ` at substation `i` at time `t`, solve a small constrained attribution: *which subset of `i`'s neighbours show coincident rises (≈ `t`) that sum to ≈ `Δ`?* With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — it is what keeps the search to a handful of substations rather than all `N`. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
+A level shift at one substation could be many things (fault, new connection, meter error). What makes it a *switching event* is the conservation fingerprint: coincident, opposite-sign shifts at neighbours that *collectively balance*. Because transfers fan out to 2–3 neighbours, **do not match pairwise.** Instead, for each candidate drop of magnitude $\Delta$ at substation $i$ at time $t$, solve a small constrained attribution: *which subset of $i$'s neighbours show coincident rises ($\approx t$) that sum to $\approx \Delta$?* With a handful of neighbours per primary this is cheap — enumerate subsets, or run a small non-negative least-squares of neighbour rises against the source drop. That candidate neighbour set is a fixed lookup from the network graph (the adjacency of who-can-exchange-load), with no learning over the graph — it is what keeps the search to a handful of substations rather than all $N$. Score by timing coincidence × magnitude-balance agreement. High score → switching event with an identified donor set; low score → "anomaly, unknown cause."
 
 ```text
 residuals around time t (observed - expected), one row per substation:
@@ -137,7 +137,7 @@ residuals around time t (observed - expected), one row per substation:
 sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
 **summed residual should show no step at all** across the event, while every member shows one. So,
 once a candidate attribution exists, compute the set's summed residual and require it to be
-(approximately — see the tolerance note below) step-free at `t`. This discriminates exactly the
+(approximately — see the tolerance note below) step-free at $t$. This discriminates exactly the
 failure mode the per-series view cannot: a **regional weather-model error** steps every nearby
 series *and their sum*; a genuine transfer steps the members but leaves the sum flat. It does not
 *replace* per-series detection — a flat sum alone cannot say which substations moved or by how
@@ -148,14 +148,14 @@ below). The [joint edge-flow estimator](#v061-the-joint-edge-flow-estimator) goe
 further: its parameterisation builds this test in, rather than running it as a separate check.
 
 **Calibrate the attribution score against chance.** With ~5 neighbours each carrying noisy
-candidate steps, *some* subset will approximately sum to `Δ` surprisingly often by luck alone —
+candidate steps, *some* subset will approximately sum to $\Delta$ surprisingly often by luck alone —
 subset-sum matching on noisy data is generous. The score therefore needs an explicit null:
 estimate, by permutation (run the same subset search at randomly chosen event-free times), how
 often a balancing subset of a given quality arises by chance, and only accept attributions that
 clear that null. Without this, the event list gets padded with confident-looking coincidences.
 
 **Conservation is only approximate — set the tolerance band accordingly.** Reconfiguration
-changes feeding-path lengths, so `I²R` losses change; and load served at a slightly different
+changes feeding-path lengths, so $I^2R$ losses change; and load served at a slightly different
 voltage draws slightly different power (load is mildly voltage-dependent — the effect behind
 conservation voltage reduction). Expect the
 donor pickups to miss the source drop systematically by a few percent, in either direction. The
@@ -183,9 +183,9 @@ multi-substation "events".
 
 *Why we want it.* Three uses. (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **A free preview of v2.6:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap one. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
 
-*Mechanism.* The make-up of a slice is exposed by *when, within the day,* its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor `j` picked up some load at event onset, look at the **shape of `j`'s residual step across the hours of the day** (e.g. average the step magnitude by half-hour-of-day over the event's duration):
+*Mechanism.* The make-up of a slice is exposed by *when, within the day,* its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor $j$ picked up some load at event onset, look at the **shape of $j$'s residual step across the hours of the day** (e.g. average the step magnitude by half-hour-of-day over the event's duration):
 
-- a step that appears mainly around **midday and vanishes overnight** → the moved slice was **PV-heavy** (PV only generates in daylight, so a slice rich in PV changes `j`'s net power most when the sun is up);
+- a step that appears mainly around **midday and vanishes overnight** → the moved slice was **PV-heavy** (PV only generates in daylight, so a slice rich in PV changes $j$'s net power most when the sun is up);
 - a step that is **roughly flat, or tracks the evening demand peak** → **demand-heavy**;
 - a step that is **large but uncorrelated with daylight, gusty/variable** → **wind-heavy**.
 
@@ -202,7 +202,7 @@ speed for wind, temperature and time-of-week for demand). That conditions on the
 actually happened instead of assuming a canonical sunny day, and it is still a regression-free
 read-off in the v0.6 spirit — a few correlations per leg.
 
-*Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor `j` and a demand-heavy slice to donor `k`. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what `j` got" vs. "what `k` got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
+*Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor $j$ and a demand-heavy slice to donor $k$. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what $j$ got" vs. "what $k$ got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 #### Other notes
 
@@ -284,12 +284,14 @@ different node subsets. They only become confusable if they hit identical edges 
 times, at which point no method could separate them and the honest answer is non-identifiability,
 not a matcher bug.
 
-**Formally.** This is a **group fused lasso** on signed edge flows `e_ij(t)`, with a per-node
-anomaly slack `u_i(t)`:
+**Formally.** This is a **group fused lasso** on signed edge flows $e_{ij}(t)$, with a per-node
+anomaly slack $u_i(t)$:
 
-```text
-residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)     (+ where flow enters i, − where it leaves)
-```
+$$
+\text{residual}_i(t) \;\approx\; \sum_j \pm\, e_{ij}(t) + u_i(t)
+$$
+
+($+$ where flow enters $i$, $-$ where it leaves.)
 
 Each term in that equation, and each penalty applied to it, is a deliberate design choice. The
 bullets below unpack them in turn: the two penalties that encode the switching priors, the
@@ -301,15 +303,15 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   one switching action changing two or three edge flows at once — is encouraged to place all its
   changes at one shared changepoint. (Refinement: group per node-neighbourhood rather than
   globally, so unrelated events elsewhere on the network don't share changepoint credit.)
-- **Level (ℓ1) penalty on the flows** pulls inactive pipes to *exactly* zero — the
+- **Level ($\ell_1$) penalty on the flows** pulls inactive pipes to *exactly* zero — the
   regularise-toward-NRA prior. The exactness matters: "nonzero stretch = detected event" only
   works if inactive pipes read 0.000 MW rather than a trickle of ±0.03 MW, and producing crisp
   zeros is precisely what convex solvers do well and gradient descent does not (see the
   [techniques page](../techniques/convex-optimisation.md#the-corners-are-a-feature-exact-zeros)).
-- **The per-node slack `u_i(t)`** (with its own ℓ1 penalty) is the escape valve for partnerless
+- **The per-node slack $u_i(t)$** (with its own $\ell_1$ penalty) is the escape valve for partnerless
   steps. A new connection, a meter fault, or genuine load growth steps one substation with
-  nothing balancing it at neighbours; without `u`, the optimiser's only vocabulary is pipes, so
-  it would be *forced* to invent flows. With it, partnerless steps land in `u` and are reported
+  nothing balancing it at neighbours; without $u$, the optimiser's only vocabulary is pipes, so
+  it would be *forced* to invent flows. With it, partnerless steps land in $u$ and are reported
   as "anomaly, unknown cause" — exactly as stage 2 would classify them.
 - **It consumes stage 1's normalised, whitened residuals** (see stage 1 for the plain-language
   version: measure surprise in units of each substation's usual wobble, after subtracting the
@@ -321,9 +323,9 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   and stage 3's composition read-off survives unchanged (read the residual around each fitted
   block, per recipient). If injections show the flat-block error matters, the still-convex
   refinement is a piecewise-constant *fraction* of the source's baseline —
-  `e_ij(t) = f_ij(t)·baseline_j(t)` — which is also the stepping stone to
+  $e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ — which is also the stepping stone to
   [v2.5](#v25-magnitude-only-mixture-model-the-workhorse), whose
-  `α_ij(t)·d_j(t)` is the same idea with the known baseline replaced by a jointly-inferred
+  $\alpha_{ij}(t) \cdot d_j(t)$ is the same idea with the known baseline replaced by a jointly-inferred
   latent.
 - **The penalty weights are tuned on the synthetic-injection harness, never on the logs.** Too
   strict smooths real events away; too loose produces confetti of tiny phantom flows. Injection
@@ -347,11 +349,11 @@ this parameterisation:
 - *The chance-balance null becomes a penalty competition.* Stage 2 needs an explicit permutation
   null because some neighbour subset will approximately balance by luck. Here, for a candidate
   event to enter the solution it must out-compete two rival explanations at once — "stay at zero"
-  (the sparsity price) and "call it an anomaly" (`u`) — evaluated jointly over the whole record.
+  (the sparsity price) and "call it an anomaly" ($u$) — evaluated jointly over the whole record.
   That calibration is done once, by tuning the penalty weights on the injection harness.
 - *The loss/CVR tolerance band is implicit.* Exact conservation lives in the flows; the
   few-percent real-world imbalance (losses change with path length, load is mildly
-  voltage-dependent) is absorbed by the fit term and `u`, with no hand-set band.
+  voltage-dependent) is absorbed by the fit term and $u$, with no hand-set band.
 
 What it does **not** solve: the dependency on well-behaved residuals (the
 normalised-and-whitened bullet above — phantom flows replace phantom changepoints, but only if
@@ -498,69 +500,69 @@ Notes on the sketch:
   don't share changepoint credit.
 - **Tuning the `lam_*` weights** happens on the synthetic-injection harness (step 4), never on
   the switching logs — see the escalation section above for why.
-- **The anomaly slack `u`** carries a plain ℓ1 penalty here; if injections show partnerless steps
-  are themselves step-like (a new connection is), `u` can be given its own fused penalty too.
+- **The anomaly slack $u$** carries a plain $\ell_1$ penalty here; if injections show partnerless steps
+  are themselves step-like (a new connection is), $u$ can be given its own fused penalty too.
 
 ---
 
 ### v2.5 — Magnitude-only mixture model (the workhorse)
 
-**Goal.** Reconstruct a latent NRA demand `d_i(t)` per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
+**Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
 **Motivation.** v0.6 only flags events; it does not reconstruct the clean NRA signal. v2.5 is the simplest model that actually *produces* latent demand — and it does so **without modelling anything below the primary**, sidestepping the (non-existent) feeder-discovery problem entirely. The latent objects are the substations themselves, which we observe. This is the workhorse: faithful to how the network actually behaves, and fully unsupervised.
 
-**Method.** Each substation `i` has a latent normal-demand signal `d_i(t)`. Observed power is a time-varying mixture over the neighbourhood:
+**Method.** Each substation $i$ has a latent normal-demand signal $d_i(t)$. Observed power is a time-varying mixture over the neighbourhood:
 
-```text
-observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
-```
+$$
+\text{observed}_i(t) = \alpha_{ii}(t)\, d_i(t) + \sum_{j \,\in\, \text{neighbours}(i)} \alpha_{ij}(t)\, d_j(t)
+$$
 
-- **The neighbourhood is the graph:** `neighbours(i)` is exactly `i`'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most `α_ij` are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an `N × N` free-for-all.
-- Under NRA: `α_ii ≈ 1`, `α_ij ≈ 0`.
-- During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple `α_ij(t)` may be active at once for a single source.
-- **Conservation = node-level flow balance:** weight leaving `i` is distributed across a subset of neighbours and must sum to the weight lost at `i` (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
-- **Priors / regularisation:** `α(t)` strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events are rare (~10%) and abrupt. A useful by-product: jumps in `α` are directly interpretable as detected switching events.
-- **`d_i(t)` must itself be modelled, not left free.** If the latent demand were an unconstrained
+- **The neighbourhood is the graph:** $\text{neighbours}(i)$ is exactly $i$'s neighbour set in the network graph, so the edges act as a *sparsity pattern* on the mixing matrix — most $\alpha_{ij}$ are structurally fixed at zero, and only the handful corresponding to real edges are free parameters. This is what makes the model identifiable and cheap rather than an $N \times N$ free-for-all.
+- Under NRA: $\alpha_{ii} \approx 1$, $\alpha_{ij} \approx 0$.
+- During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple $\alpha_{ij}(t)$ may be active at once for a single source.
+- **Conservation = node-level flow balance:** weight leaving $i$ is distributed across a subset of neighbours and must sum to the weight lost at $i$ (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
+- **Priors / regularisation:** $\alpha(t)$ strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events are rare (~10%) and abrupt. A useful by-product: jumps in $\alpha$ are directly interpretable as detected switching events.
+- **$d_i(t)$ must itself be modelled, not left free.** If the latent demand were an unconstrained
   value per timestep the model would be hopelessly underdetermined — any observation can be
-  explained by moving `d` instead of `α`. `d_i(t)` is a weather/calendar-driven model plus a
+  explained by moving $d$ instead of $\alpha$. $d_i(t)$ is a weather/calendar-driven model plus a
   smooth residual; in other words, v2.5 embeds the v0.6 baseline inside itself as the latent's
   backbone. The v0.6 work is reused, not discarded.
-- **Fitting is bilinear (non-convex) — initialise from v0.6.** The `α·d` products mean local
-  minima are a real risk. Initialise/anchor the `α` jump times from the v0.6 event list (or the
+- **Fitting is bilinear (non-convex) — initialise from v0.6.** The $\alpha \cdot d$ products mean local
+  minima are a real risk. Initialise/anchor the $\alpha$ jump times from the v0.6 event list (or the
   edge-flow estimator's fitted flows, which are the same object in additive form) so the
   optimiser starts near the right switching structure. v0.6's output is thus a direct *input* to
   v2.5, not just its validation set.
-- **Known degeneracies to guard.** (a) *Scale:* `α_ii·d_i` is invariant to rescaling one against
+- **Known degeneracies to guard.** (a) *Scale:* $\alpha_{ii} d_i$ is invariant to rescaling one against
   the other; the identity prior resolves this except for a substation observed under ARA for
   (nearly) its whole record, where v0.6's record-straddling blind spot applies unchanged.
-  (b) *Growth vs transfer:* genuine new load at `i` and a small persistent transfer onto `i` are
+  (b) *Growth vs transfer:* genuine new load at $i$ and a small persistent transfer onto $i$ are
   separated only by conservation (growth has no balancing donor) — keep an explicit per-node
   anomaly/slack term, as in the edge-flow estimator, so partnerless changes are not forced into
-  `α`. (c) *Net-zero crossing:* `α` is a fraction of **net** power, and a fraction of a signal
-  near zero moves almost nothing regardless of `α` — at PV-heavy substations whose net crosses
+  $\alpha$. (c) *Net-zero crossing:* $\alpha$ is a fraction of **net** power, and a fraction of a signal
+  near zero moves almost nothing regardless of $\alpha$ — at PV-heavy substations whose net crosses
   zero, the transfer's magnitude information vanishes around the crossing. v2.6's typed
   decomposition removes this by mixing gross components instead.
 
 **Tooling: v2.5 can be built entirely with CVXPY — by alternation, with one honest caveat.** As
-written, v2.5 is *not* one convex problem: `α·d` multiplies two unknowns, which is exactly the
+written, v2.5 is *not* one convex problem: $\alpha \cdot d$ multiplies two unknowns, which is exactly the
 kind of expression CVXPY's DCP check refuses (see
 [Convex Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a special
 structure — the problem is convex in each unknown *separately* — and that enables the classic
 **alternating** scheme, where every step is a plain CVXPY solve:
 
-- **α-step (fix `d`, solve for `α`).** With `d` treated as known data, the mixture is linear in
-  `α`, and the priors (identity-regularised, piecewise-constant in time, node-level balance as
+- **$\alpha$-step (fix $d$, solve for $\alpha$).** With $d$ treated as known data, the mixture is linear in
+  $\alpha$, and the priors (identity-regularised, piecewise-constant in time, node-level balance as
   linear constraints) make this the same group-fused-lasso family as the
   [v0.6.1 edge-flow estimator](#v061-the-joint-edge-flow-estimator) — convex, with the exact
-  zeros that let jumps in `α` read directly as detected events.
-- **d-step (fix `α`, solve for `d`).** With the routing fixed, the observation model is linear in
-  `d`, and "weather/calendar backbone plus smooth residual" is a convex regression.
+  zeros that let jumps in $\alpha$ read directly as detected events.
+- **$d$-step (fix $\alpha$, solve for $d$).** With the routing fixed, the observation model is linear in
+  $d$, and "weather/calendar backbone plus smooth residual" is a convex regression.
 
-Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing `d`
+Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing $d$
 to the exogenous baseline makes the whole model one convex problem — it is essentially
 [v0.6.1's](#v061-the-joint-edge-flow-estimator) shaped-flow refinement
-`e_ij(t) = f_ij(t)·baseline_j(t)` in mixture clothing — so solve that
-first, then let alternation release `d`. The caveat to state plainly: convexity now holds per
+$e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ in mixture clothing — so solve that
+first, then let alternation release $d$. The caveat to state plainly: convexity now holds per
 *step*, not overall. Alternation converges, but to a *local* optimum of the bilinear problem — the
 certified-global-optimum promise of the pure-convex world does **not** come back just because
 each step uses CVXPY. The v0.6 initialisation (bullet above) and the convex warm start are what
@@ -570,12 +572,12 @@ manage that risk. No part of v2.5 needs PyTorch.
 differentiable layer inside a PyTorch model
 ([the techniques page explains it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
 is *not needed* for v2.5 — alternation above is CVXPY in a loop. It earns its place at **v2.6**,
-when `d_i` decomposes into physics modules (panel trigonometry, power curves, products of
+when $d_i$ decomposes into physics modules (panel trigonometry, power curves, products of
 unknowns) that are genuinely non-convex and force PyTorch for the outer model — see the
 [v2.6 tooling paragraph](#v26-type-resolved-mixture-with-differentiable-physics-modules) for why
 the routing estimation should stay a convex layer even then.
 
-**Why "arbitrary continuous slice" is handled natively.** `α_ij(t)` is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
+**Why "arbitrary continuous slice" is handled natively.** $\alpha_{ij}(t)$ is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
 **What it adds over v0.6.**
 
@@ -585,8 +587,8 @@ the routing estimation should stay a convex layer even then.
 
 **What it misses / cons.**
 
-- A fractional mixture `α_ij·d_j` moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). v2.5 can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), this is largely **not a fixable limitation** — v2.5's approximation is about as good as the data structurally permits for the *demand* total. v2.6 only partially improves it, and only for the DER component.
-- DERs are folded implicitly into `d_i` (no explicit PV/wind separation yet).
+- A fractional mixture $\alpha_{ij} d_j$ moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). v2.5 can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), this is largely **not a fixable limitation** — v2.5's approximation is about as good as the data structurally permits for the *demand* total. v2.6 only partially improves it, and only for the DER component.
+- DERs are folded implicitly into $d_i$ (no explicit PV/wind separation yet).
 
 **Pros.**
 
@@ -605,11 +607,9 @@ the routing estimation should stay a convex layer even then.
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
 
-```text
-d_i(t) = gross_demand_i(t)
-       − pv_metered_i(t)   − pv_unmetered_i(t)
-       − wind_metered_i(t) − wind_unmetered_i(t)
-```
+$$
+d_i(t) = \text{gross\_demand}_i(t) - \text{pv\_metered}_i(t) - \text{pv\_unmetered}_i(t) - \text{wind\_metered}_i(t) - \text{wind\_unmetered}_i(t)
+$$
 
 - **Demand:** temperature- and time-of-week-shaped.
 - **PV:** irradiance-driven (NWP/satellite) via differentiable panel physics (temperature/spectral correction, inverter clipping); capacity is a latent parameter.
@@ -618,11 +618,9 @@ d_i(t) = gross_demand_i(t)
 
 Mixing operates **per component-type**, each with its own routing weights:
 
-```text
-observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
-                    − α^pv_ij(t)·pv_j(t)
-                    − α^wind_ij(t)·wind_j(t) ]
-```
+$$
+\text{observed}_i(t) = \sum_j \Big[\, \alpha^{\text{dem}}_{ij}(t)\, \text{gross\_demand}_j(t) - \alpha^{\text{pv}}_{ij}(t)\, \text{pv}_j(t) - \alpha^{\text{wind}}_{ij}(t)\, \text{wind}_j(t) \,\Big]
+$$
 
 Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
 
@@ -630,7 +628,7 @@ Each substation is now a small *bundle* of typed nodes rather than one node, and
 genuinely non-convex (see [Convex Optimisation](../techniques/convex-optimisation.md) for why),
 so the outer model lives in PyTorch per the
 [differentiable-physics](../techniques/differentiable-physics.md) plan. The per-type routing
-weights `α^type_ij(t)`, however, should **remain a differentiable convex layer** inside that
+weights $\alpha^{\text{type}}_{ij}(t)$, however, should **remain a differentiable convex layer** inside that
 model (via
 [`cvxpylayers`](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
 rather than becoming free tensors: the layer preserves exact zeros ("nonzero routing = detected
@@ -640,9 +638,9 @@ the v2.5 tooling note above.
 
 **Prior structure.**
 
-1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, `s_ij(t) ∈ {0,1}`, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when `s_ij(t)=1`. Types switch *together*; the moved slice can still be disproportionately one type.
-2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior `θ_ij` ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and `θ_ij` could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
-3. **Multi-donor (one-to-many).** As in v2.5, several `s_ij(t)` may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
+1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, $s_{ij}(t) \in \{0, 1\}$, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when $s_{ij}(t) = 1$. Types switch *together*; the moved slice can still be disproportionately one type.
+2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior $\theta_{ij}$ ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and $\theta_{ij}$ could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
+3. **Multi-donor (one-to-many).** As in v2.5, several $s_{ij}(t)$ may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
 
 **What it adds over v2.5.**
 
@@ -687,7 +685,7 @@ These apply at every stage and are the things most easily got wrong:
 - **Synthetic event injection is the standard tuning instrument at every stage.** Thresholds, penalties, and sensitivity frontiers are tuned and measured on injected events; the logged events are reserved for final scoring, never for tuning.
 - **Routing/switching priors:** regularise toward the identity (NRA) and piecewise-constant in time; switching is rare and abrupt.
 - **Metered vs unmetered DER** kept as separate modules from v2.6 onward; metered tightly constrained, unmetered carrying the latent inference.
-- **Interpretability artifacts** (detected events, inferred `s_ij`, DER estimates) are deliverables in their own right for NGED validation, not just internal state.
+- **Interpretability artifacts** (detected events, inferred $s_{ij}$, DER estimates) are deliverables in their own right for NGED validation, not just internal state.
 
 ---
 
