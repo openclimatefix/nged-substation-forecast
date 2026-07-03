@@ -56,9 +56,8 @@ is convex — and the rulebook is mechanical enough for software to verify (two 
 
 A solver is off-the-shelf software whose whole job is finding the best answer to an optimisation
 problem: hand it a scoring rule and a set of unknowns, and it returns the values that score best.
-Convex problems are the friendly kind — the score landscape is one smooth bowl with a single
-lowest point and no false valleys. The solver rolls downhill and is *guaranteed* to stop at the
-true bottom. Contrast training a neural network, where the landscape is full of dents and you
+Convex problems are the friendly kind — the score landscape is a single bowl with no false
+valleys. The solver rolls downhill and is *guaranteed* to stop at the true bottom. Contrast training a neural network, where the landscape is full of dents and you
 never know whether you found the best one. Here you always do, deterministically: no learning
 rates, no convergence babysitting, no random seeds, and the identical answer every run.
 
@@ -107,8 +106,8 @@ Because the same loss implemented in PyTorch surrenders the two properties that 
 convex formulation in the first place:
 
 1. **The guarantee.** CVXPY exploits convexity to deliver the certified global optimum,
-   identically, every run. Gradient descent doesn't know the bowl is smooth and inherits all the
-   usual tuning — learning rates, schedules, stopping criteria, seeds — for a problem that
+   identically, every run. Gradient descent doesn't know the landscape is one bowl and inherits
+   all the usual tuning — learning rates, schedules, stopping criteria, seeds — for a problem that
    required none.
 2. **Exact zeros.** As above: crisp zeros come from solvers that respect the ℓ1 corner; gradient
    descent leaves trickles and brings thresholds back.

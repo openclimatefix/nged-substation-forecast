@@ -144,7 +144,8 @@ series *and their sum*; a genuine transfer steps the members but leaves the sum 
 much (it is equally consistent with "no event at all") — it corroborates an attribution after
 stage 1 has proposed the pieces. The same statistic, computed around the *logged* events, is also
 the very first diagnostic to run, before any detector code exists (see the diagnostic precursor
-below).
+below). The [joint edge-flow estimator](#v061-the-joint-edge-flow-estimator) goes one step
+further: its parameterisation builds this test in, rather than running it as a separate check.
 
 **Calibrate the attribution score against chance.** With ~5 neighbours each carrying noisy
 candidate steps, *some* subset will approximately sum to `Δ` surprisingly often by luck alone —
@@ -320,7 +321,8 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   and stage 3's composition read-off survives unchanged (read the residual around each fitted
   block, per recipient). If injections show the flat-block error matters, the still-convex
   refinement is a piecewise-constant *fraction* of the source's baseline —
-  `e_ij(t) = f_ij(t)·baseline_j(t)` — which is also the stepping stone to v2.5, whose
+  `e_ij(t) = f_ij(t)·baseline_j(t)` — which is also the stepping stone to
+  [v2.5](#v25-magnitude-only-mixture-model-the-workhorse), whose
   `α_ij(t)·d_j(t)` is the same idea with the known baseline replaced by a jointly-inferred
   latent.
 - **The penalty weights are tuned on the synthetic-injection harness, never on the logs.** Too
@@ -351,7 +353,7 @@ this parameterisation:
   few-percent real-world imbalance (losses change with path length, load is mildly
   voltage-dependent) is absorbed by the fit term and `u`, with no hand-set band.
 
-What it does **not** retire: the dependency on well-behaved residuals (the
+What it does **not** solve: the dependency on well-behaved residuals (the
 normalised-and-whitened bullet above — phantom flows replace phantom changepoints, but only if
 that step is skipped), the sensitivity floor (noise and half-hourly sampling still impose a
 magnitude × duration limit, measured the same way on injections), the fleet-wide artifact
@@ -374,7 +376,7 @@ implementation-details section directly below.
 
 The build order for v0.6, simplest-first, each step delivering something testable before the next
 adds complexity. Steps 1–7 are the staged detector; step 8 is the joint edge-flow estimator, built
-only if steps 1-7 prove to be too fragile (or to test out convex optimisation as a warm-up for v2!)
+only if steps 1–7 prove to be too fragile (or to test out convex optimisation as a warm-up for v2!)
 
 1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
    (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
@@ -555,8 +557,9 @@ structure — the problem is convex in each unknown *separately* — and that en
   `d`, and "weather/calendar backbone plus smooth residual" is a convex regression.
 
 Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing `d`
-to the exogenous baseline makes the whole model one convex problem — it is essentially v0.6.1's
-shaped-flow refinement `e_ij(t) = f_ij(t)·baseline_j(t)` in mixture clothing — so solve that
+to the exogenous baseline makes the whole model one convex problem — it is essentially
+[v0.6.1's](#v061-the-joint-edge-flow-estimator) shaped-flow refinement
+`e_ij(t) = f_ij(t)·baseline_j(t)` in mixture clothing — so solve that
 first, then let alternation release `d`. The caveat to state plainly: convexity now holds per
 *step*, not overall. Alternation converges, but to a *local* optimum of the bilinear problem — the
 certified-global-optimum promise of the pure-convex world does **not** come back just because
@@ -568,11 +571,9 @@ differentiable layer inside a PyTorch model
 ([the techniques page explains it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
 is *not needed* for v2.5 — alternation above is CVXPY in a loop. It earns its place at **v2.6**,
 when `d_i` decomposes into physics modules (panel trigonometry, power curves, products of
-unknowns) that are genuinely non-convex and force PyTorch for the outer model. At that point the
-routing/switching estimation should *stay* a convex layer inside the PyTorch model rather than
-being re-implemented as free tensors: the layer keeps exact zeros (so "nonzero routing = detected
-event" survives) and built-in conservation, while gradients flow through the solve to train the
-physics modules end-to-end.
+unknowns) that are genuinely non-convex and force PyTorch for the outer model — see the
+[v2.6 tooling paragraph](#v26-type-resolved-mixture-with-differentiable-physics-modules) for why
+the routing estimation should stay a convex layer even then.
 
 **Why "arbitrary continuous slice" is handled natively.** `α_ij(t)` is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
