@@ -32,7 +32,7 @@ globally. (If the score is *strictly* convex the bottom is a single point; with 
 the absolute value the bottom can be a small flat face — but every point on it scores
 identically, so any answer the solver returns is a best answer.)
 
-Formally, a function `f` is convex when, for all `x`, `y` and `0 ≤ λ ≤ 1`:
+Formally, a function $f$ is convex when, for all $x$, $y$ and $0 \le \lambda \le 1$:
 
 $$
 f(\lambda x + (1-\lambda) y) \;\le\; \lambda f(x) + (1-\lambda) f(y)
@@ -41,11 +41,11 @@ $$
 You rarely check this by hand, because convexity has a *calculus* — a small rulebook that builds
 complicated convex functions from simple ones:
 
-- **Atoms.** Squared error `x²`; absolute value `|x|`; norms, including group norms such as the
-  ℓ2 norm of a vector of increments; `max`; the quantile/pinball loss; the Huber loss — all
+- **Atoms.** Squared error $x^2$; absolute value $|x|$; norms, including group norms such as the
+  $\ell_2$ norm of a vector of increments; $\max$; the quantile/pinball loss; the Huber loss — all
   convex.
 - **Combination rules.** A non-negative weighted sum of convex functions is convex (so
-  `fit + λ·penalty` is safe). A convex function of an *affine* expression (`A·x + b`) is convex
+  $\text{fit} + \lambda \cdot \text{penalty}$ is safe). A convex function of an *affine* expression ($A \cdot x + b$) is convex
   (so "residual = data − incidence-matrix × flows, then sum of squares" is safe). A pointwise max
   of convex functions is convex.
 
@@ -66,7 +66,7 @@ NGED should not change because a fit was re-run.
 
 ## The corners are a feature: exact zeros
 
-Lasso-family penalties (`|x|` and its group cousins) have a sharp corner at zero, and the corner
+Lasso-family penalties ($|x|$ and its group cousins) have a sharp corner at zero, and the corner
 is the point: it makes the optimum sit at *exactly* zero for most variables, rather than merely
 near it. Designs like the edge-flow estimator lean on this — "this pipe's stretch of nonzero
 flow" literally *is* the detected event, which only works if inactive pipes read 0.000 MW.
@@ -109,7 +109,7 @@ convex formulation in the first place:
    identically, every run. Gradient descent doesn't know the landscape is one bowl and inherits
    all the usual tuning — learning rates, schedules, stopping criteria, seeds — for a problem that
    required none.
-2. **Exact zeros.** As above: crisp zeros come from solvers that respect the ℓ1 corner; gradient
+2. **Exact zeros.** As above: crisp zeros come from solvers that respect the $\ell_1$ corner; gradient
    descent leaves trickles and brings thresholds back.
 
 The residual attractions of PyTorch are real — one toolchain across the project, GPUs at
