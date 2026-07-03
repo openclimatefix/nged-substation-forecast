@@ -22,6 +22,20 @@ Each forecast is:
 
 **Version 2** (future): Scale to approximately 2,500 time series covering all of NGED's primary substations and most customer meters.
 
+## More than a forecast
+
+A large part of this project is building a production forecasting system and researching novel
+forecasting methods. But NGED's interest goes beyond the forecasts themselves: they also want
+**information** — to learn which forecasting approaches actually work well on their data (a major
+reason we invest in a rigorous [leaderboard](ml_experimentation/index.md)), and to understand the
+underlying issues involved in forecasting their network.
+
+That means a negative result can be just as valuable as a positive one. For example, if we try
+hard to detect [switching events](background/switching-events.md) unsupervised and conclude it
+isn't reliably possible from power readings alone, that's a useful finding in its own right — NGED
+can use it as evidence to justify investing in extracting switching-event labels from their own
+operational systems, rather than us silently working around the gap.
+
 ## Documentation
 
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
