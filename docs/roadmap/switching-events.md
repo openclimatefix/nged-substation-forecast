@@ -94,13 +94,25 @@ or an unmodelled local effect persists for hours to days, and a naive detector f
 wander as if it were a step — the classic failure mode of changepoint-on-residual pipelines is
 hundreds of confident detections that are just weather-model error. And they are
 **heteroscedastic**: residual spread differs across substations by orders of magnitude and varies
-by time of day (PV-heavy substations are noisiest at midday). Two standard fixes, both required:
-(a) **normalise** — divide residuals by the baseline's own per-series, per-time spread estimate
-(the extra quantiles above), so detection runs on z-score-like series and one threshold scale
-works fleet-wide; and (b) **pre-whiten or calibrate** — either fit a low-order AR model to each
-normalised residual and detect on its innovations, or calibrate the changepoint penalty per
-series with a block bootstrap over believed-clean periods, so the false-alarm rate is controlled
-under the residual's actual autocorrelation rather than an i.i.d. fiction.
+by time of day (PV-heavy substations are noisiest at midday). Two standard fixes, both required —
+detection runs on residuals that have been *normalised* and *whitened*:
+
+- **Normalise: measure surprise in units of each substation's usual wobble.** A 2 MW residual is
+  an earthquake at a small rural substation and background noise at a large urban one — and the
+  same substation wobbles more at midday than at 4 a.m. So divide each residual by the baseline's
+  own estimate of "how wrong am I usually, for this substation, at this kind of moment" (the
+  extra quantiles above). Detection then runs on how-unusual-is-this scores rather than raw MW,
+  and one threshold scale works fleet-wide.
+- **Whiten: subtract the predictable stickiness, keep the genuine news.** Residual errors are
+  sticky — if the weather forecast was too cold at 09:00 it is probably still too cold at 09:30 —
+  so residuals drift in slow waves rather than arriving as independent coin flips, and a naive
+  detector reads each wave as a step. Whitening removes the part of each residual that was
+  predictable from the residuals just before it (fit a low-order autoregressive model; keep only
+  its surprises, the *innovations*). A genuine switching step is not predictable from the past,
+  so it survives whitening; a slow weather-error wave does not. The alternative with the same
+  effect: keep the residuals as-is but calibrate the changepoint penalty per series with a block
+  bootstrap over believed-clean periods, so the false-alarm rate is controlled under the
+  residual's actual stickiness rather than an i.i.d. fiction.
 
 #### Stage 2. **Node-level coincidence / balance attribution.**
 
@@ -222,78 +234,104 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 #### Escalation within v0.6 — the joint edge-flow estimator
 
-The three stages above are deliberately sequential: detect steps per substation, then match them
-across substations. That sequencing is easy to build and debug, but it has a known structural
-weakness (visible in the cons list): when events **overlap in time on one neighbourhood**, or
-when several attributions are individually ambiguous, a sequential matcher must make hard early
-choices that a joint method would not have to. There is a well-understood single-model
-alternative that performs detection and attribution **simultaneously**. It is the planned
-escalation *within* v0.6 — built if, and only if, validation shows that sequential matching is
-the thing that is failing.
+> **Status within v0.6:** documented as the known next move if sequential matching proves
+> brittle. The staged detect-then-match pipeline above remains the day-one implementation because
+> it fails legibly; this estimator is the same priors and the same graph with strictly better
+> structure, and may well turn out to be the right v0.6. The machinery it rests on — what a
+> solver is, why convexity matters, and why this is a CVXPY problem rather than a PyTorch one —
+> is explained for non-experts in [Convex Optimisation](../techniques/convex-optimisation.md).
 
-**The idea, in plain terms.** Instead of asking "does substation `i` show a step, and can we find
-neighbours to balance it?", write one equation for the whole neighbourhood and solve it in one
-go. Introduce, for every edge `i–j` of the graph, an unknown time series `e_ij(t)`: *the power
-crossing that boundary at time `t` because of switching* (zero under NRA). Each substation's
-residual is then, by construction, the signed sum of the flows on its own edges, plus a
-per-substation anomaly term:
+**The core idea, in plain language.** The three stages above look at each substation on its own,
+spot moments where its residual suddenly jumps or drops, and then play matchmaker afterwards:
+this substation dropped nine megawatts, those two neighbours rose by five and four, so presumably
+they belong together. Detection first, matching second.
+
+The edge-flow estimator flips what we search for. Instead of asking "which substations stepped?",
+ask "how much load is flowing across each boundary between neighbouring substations, at every
+moment?" Think of the network as a map where each pair of substations that can exchange load has
+an invisible pipe between them. Normally every pipe carries nothing. When engineers perform a
+switching operation, one or two pipes suddenly carry, say, five megawatts, for a few days, and
+then go back to nothing.
+
+Describing the world in terms of pipes rather than steps makes conservation of power automatic.
+Whatever flows out of one substation through a pipe necessarily flows into its neighbour — the
+same number appears with a minus sign on one side and a plus sign on the other. It is impossible,
+in this vocabulary, to describe nine megawatts vanishing from one substation while only eight
+appear elsewhere. The balance check that stage 2 performs as a separate verification step
+disappears: it is built into the parameterisation.
+
+The estimation question then becomes: given the residuals observed at every substation (stage 1's
+baseline is untouched by this proposal), what is the most plausible story about what all the
+pipes were carrying? "Plausible" encodes exactly the two priors stated throughout this page:
+switching is **rare**, so almost all pipes should carry exactly zero almost all the time; and it
+is **abrupt**, so when a pipe does carry something it should be a flat block — switch on, hold
+steady, switch off — rather than a gentle wiggle. We write down a score that rewards explaining
+the residuals and penalises stories with many active pipes or many changes, and find the single
+story with the best score. Because the problem is **convex**, that story is the certified best
+one, found deterministically every run — see
+[Convex Optimisation](../techniques/convex-optimisation.md) for what that promise means and why
+gradient-descent tooling cannot make it.
+
+**Everything falls out of that one answer.** Every stretch where a pipe carries something nonzero
+*is* a detected event; the pipe identifies source and donor; the level is the transferred MW; the
+stretch's endpoints are the event interval; "any incident pipe active" is the ARA mask.
+Overlapping events on one neighbourhood — a listed weakness of the sequential matcher — are
+handled natively: they are simply two pipe variables active over overlapping intervals, and the
+fit apportions each node's residual across its incident edges because the two events touch
+different node subsets. They only become confusable if they hit identical edges at identical
+times, at which point no method could separate them and the honest answer is non-identifiability,
+not a matcher bug.
+
+**Formally.** This is a **group fused lasso** on signed edge flows `e_ij(t)`, with a per-node
+anomaly slack `u_i(t)`:
 
 ```text
-residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)
+residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)     (+ where flow enters i, − where it leaves)
 ```
 
-(`+` where flow enters `i`, `−` where it leaves; `u_i` is explained below.) An optimiser then
-finds the edge flows that best explain **all substations' residuals at once**, subject to two
-penalties encoding what we know about switching:
-
-1. **Most flows are zero most of the time** (events are rare) — so penalise a flow for being
-   non-zero at all (a *sparsity* penalty).
-2. **When a flow is non-zero it is flat, with abrupt jumps** (switching is a step change held for
-   the event's duration) — so penalise a flow for *changing value* between consecutive time steps
-   (a *fused*, or total-variation, penalty — which is exactly what produces piecewise-constant
-   solutions).
-
-This combination is known as a **sparse fused lasso**. The crucial property is that the whole
-problem is **convex**: it has a single global best answer, no local minima, and standard fast
-solvers — unlike the v2.5 mixture model, whose products of unknowns make it genuinely harder to
-fit. In effort terms it sits just above the staged detector and well below v2.5.
-
-**Why it is attractive.**
-
-- **Conservation is built in, not checked afterwards.** A flow on edge `i–j` automatically
-  subtracts from one end and adds to the other; the parameterisation *cannot represent* a
-  non-conserving event, so there is no separate balance test to pass.
-- **Detection = attribution = magnitude estimation.** An event is simply "edge `i–j`'s flow
-  stepped from 0 to 4 MW at `t₁` and back at `t₂`". Source, donor set, per-leg magnitude, event
-  intervals, and the ARA mask all read directly off the fitted flows.
-- **Overlapping events are handled natively.** Two simultaneous transfers on one neighbourhood
-  are just two edge flows active at once; the optimiser separates them jointly instead of a
-  matcher untangling them sequentially.
-
-**Two details that matter.**
-
-- **The per-node slack term `u_i(t)`.** Not every step has a partner — a new connection, a meter
-  fault, or genuine load growth steps one substation with nothing balancing it at neighbours.
-  Without an escape valve the optimiser would be *forced* to invent edge flows to explain such
-  steps. `u_i(t)` is a per-substation "unexplained anomaly" series with its own sparsity penalty:
-  a partnerless step lands there and is reported as "anomaly, unknown cause" (exactly as stage 2
-  would report it) instead of contaminating the flows.
-- **Piecewise-constant is still an approximation.** A real transferred slice is live load — it
-  has its own diurnal shape, so over a long event the true `e_ij(t)` is not flat. The refinement,
-  if injections show it is needed: make the *fraction* piecewise-constant rather than the MW —
-  model `e_ij(t) = f_ij(t)·baseline_j(t)` with `f_ij` piecewise-constant, which is still convex
-  because the baseline is a known input. This is precisely the stepping stone to v2.5, whose
+- **Fused penalty on grouped increments** → each flow is piecewise-constant with sparse changes.
+  The *group* structure ties the increments across edges at each timestep, so a fan-out event —
+  one switching action changing two or three edge flows at once — is encouraged to place all its
+  changes at one shared changepoint. (Refinement: group per node-neighbourhood rather than
+  globally, so unrelated events elsewhere on the network don't share changepoint credit.)
+- **Level (ℓ1) penalty on the flows** pulls inactive pipes to *exactly* zero — the
+  regularise-toward-NRA prior. The exactness matters: "nonzero stretch = detected event" only
+  works if inactive pipes read 0.000 MW rather than a trickle of ±0.03 MW, and producing crisp
+  zeros is precisely what convex solvers do well and gradient descent does not (see the
+  [techniques page](../techniques/convex-optimisation.md#the-corners-are-a-feature-exact-zeros)).
+- **The per-node slack `u_i(t)`** (with its own ℓ1 penalty) is the escape valve for partnerless
+  steps. A new connection, a meter fault, or genuine load growth steps one substation with
+  nothing balancing it at neighbours; without `u`, the optimiser's only vocabulary is pipes, so
+  it would be *forced* to invent flows. With it, partnerless steps land in `u` and are reported
+  as "anomaly, unknown cause" — exactly as stage 2 would classify them.
+- **It consumes stage 1's normalised, whitened residuals** (see stage 1 for the plain-language
+  version: measure surprise in units of each substation's usual wobble, after subtracting the
+  predictable stickiness of weather-model error). Feeding it raw residuals would inflate phantom
+  flows exactly as it inflates phantom changepoints.
+- **Flat blocks are an approximation — the same one stage 1 makes.** A real transferred slice is
+  live load with its own diurnal shape; a piecewise-constant flow captures its *mean level* and
+  leaves the shape in the residual. That is no worse than the mean-shift changepoint detector,
+  and stage 3's composition read-off survives unchanged (read the residual around each fitted
+  block, per recipient). If injections show the flat-block error matters, the still-convex
+  refinement is a piecewise-constant *fraction* of the source's baseline —
+  `e_ij(t) = f_ij(t)·baseline_j(t)` — which is also the stepping stone to v2.5, whose
   `α_ij(t)·d_j(t)` is the same idea with the known baseline replaced by a jointly-inferred
   latent.
+- **The penalty weights are tuned on the synthetic-injection harness, never on the logs.** Too
+  strict smooths real events away; too loose produces confetti of tiny phantom flows. Injection
+  sweeps over the magnitude × duration grid set the weights; the logged events stay reserved for
+  final scoring — and injection-based tuning is the only kind available at full scale, where no
+  logs exist.
 
-**What it reuses.** Everything upstream: the same weather/calendar baseline, the same
-normalised/whitened residuals, the same adjacency, and the same synthetic-injection harness
-(which is how its two penalty weights are tuned). It replaces only stages 1–2's detect-then-match
-logic; stage 3's composition read-off applies unchanged to its output. This is also why it is an
-escalation rather than the starting point: it shares nearly all its parts with the staged
-detector, adds solver machinery, and is harder to inspect when it misbehaves. Build the
-transparent staged version first, keep it as the reference, and adopt the joint estimator only
-where a head-to-head comparison (on logs + injections) shows it wins.
+**What it reuses, and why it is not the day-one build.** Everything upstream: the same
+weather/calendar baseline, the same normalised/whitened residuals, the same adjacency, and the
+same synthetic-injection harness. It replaces only stages 1–2's detect-then-match logic; stage 3
+applies unchanged to its output. It is an escalation rather than the starting point because the
+staged detector fails *legibly* — every flag traces to a visible step and a named neighbour
+subset — while a joint optimiser is harder to inspect when it misbehaves. Build the transparent
+version first, keep it as the reference, and adopt the joint estimator where the head-to-head
+comparison (on logs + injections) shows it wins. A CVXPY implementation sketch lives in the
+implementation-details section at the bottom of this page.
 
 ---
 
@@ -480,4 +518,99 @@ only if the head-to-head justifies it.
 8. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 6/7 validation
    shows sequential matching is the binding error source (overlapping events, ambiguous
    attributions). Reuses steps 1–5 wholesale; penalty weights tuned on the injection harness;
-   adopted only where it beats the staged detector head-to-head.
+   adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
+
+### Sketch of the edge-flow estimator (step 8 — untested)
+
+Illustrative sketch code, not the implementation. Background on CVXPY and why this problem is
+convex: [Convex Optimisation](../techniques/convex-optimisation.md).
+
+```python
+import cvxpy as cp
+import numpy as np
+
+
+def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
+    """Joint convex estimator for switching events (untested sketch).
+
+    Args:
+        R: (T, N) normalised, whitened residuals (observed − baseline) for N
+            substations over T timesteps; NaNs allowed.
+        B: (N, E) signed node–edge incidence matrix over the who-can-exchange-load
+            graph (−1/+1 at the two ends of each oriented edge).
+        lam_fused: penalty weight on grouped changes over time (events are abrupt).
+        lam_sparse: penalty weight on flow levels (regularise toward NRA).
+        lam_anomaly: penalty weight on the per-node slack (partnerless steps).
+        weights: optional (T, N) fit weights; 0 masks missing data.
+
+    Returns:
+        (T, E) fitted edge flows and (T, N) fitted per-node anomalies.
+    """
+    n_times, n_nodes = R.shape
+    n_edges = B.shape[1]
+
+    e = cp.Variable((n_times, n_edges))  # edge flows (the "pipes")
+    u = cp.Variable((n_times, n_nodes))  # per-node anomaly slack
+
+    # --- fit term: each node's residual ≈ signed sum of incident flows + anomaly ---
+    if weights is None:
+        weights = np.where(np.isnan(R), 0.0, 1.0)
+    resid = np.nan_to_num(R) - e @ B.T - u
+    fit = cp.sum_squares(cp.multiply(np.sqrt(weights), resid))
+
+    # --- group fused penalty: piecewise-constant flows whose changes share timesteps ---
+    increments = e[1:, :] - e[:-1, :]
+    fused = cp.sum(cp.norm(increments, 2, axis=1))
+
+    # --- level sparsity: pull inactive pipes to exactly zero (NRA prior) ---
+    sparse = cp.sum(cp.abs(e))
+
+    # --- anomaly slack: partnerless steps land here, not in invented flows ---
+    anomaly = cp.sum(cp.abs(u))
+
+    prob = cp.Problem(
+        cp.Minimize(fit + lam_fused * fused + lam_sparse * sparse + lam_anomaly * anomaly)
+    )
+    prob.solve(solver=cp.CLARABEL)  # or ECOS / SCS
+    return e.value, u.value
+
+
+def extract_events(edge_flows, edge_list, times, tol=1e-4):
+    """Turn fitted flows into event records: maximal nonzero runs per edge.
+
+    ``edge_list[k]`` is the oriented pair ``(a, b)`` for edge ``k``, matching the
+    incidence matrix (−1 at ``a``, +1 at ``b``): positive flow moves load from
+    ``a``'s meter to ``b``'s. ``tol`` is a numerical tolerance for solver precision,
+    not a detection threshold — the sparsity penalty does the actual thresholding
+    inside the optimisation.
+    """
+    events = []
+    for k, (a, b) in enumerate(edge_list):
+        active = np.abs(edge_flows[:, k]) > tol
+        # Walk maximal runs of `active`.
+        idx = np.flatnonzero(np.diff(np.r_[0, active.astype(int), 0]))
+        for start, stop in zip(idx[::2], idx[1::2]):
+            level = float(np.median(edge_flows[start:stop, k]))
+            source, donor = (a, b) if level > 0 else (b, a)
+            events.append({
+                "source": source,  # lost the load
+                "donor": donor,  # picked it up
+                "start": times[start],
+                "end": times[stop - 1],
+                "magnitude_mw": abs(level),
+            })
+    return events
+```
+
+Notes on the sketch:
+
+- **Scale.** At V1 scale (32 series, half-hourly, months of data) this solves in seconds to
+  minutes on a laptop. At V2 scale (~2,500 series), solve per neighbourhood cluster and/or in
+  sliding windows rather than one monolithic problem.
+- **Group structure.** The `axis=1` group norm ties changepoints across *all* edges per timestep;
+  the refinement is grouping per node-neighbourhood, so unrelated events elsewhere on the network
+  don't share changepoint credit.
+- **Tuning the `lam_*` weights** happens on the synthetic-injection harness (step 4), never on
+  the switching logs — see the escalation section above for why.
+- **The anomaly slack `u`** carries a plain ℓ1 penalty here; if injections show partnerless steps
+  are themselves step-like (a new connection is), `u` can be given its own fused penalty too.

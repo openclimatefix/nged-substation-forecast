@@ -8,7 +8,10 @@
 > (graph-structured disaggregation of net substation power into latent demand and DER generation)
 > is [v2 research](../roadmap/index.md#v20-scale-up-future-research). Abnormal running
 > arrangements and latent-demand recovery under switching are covered in their own canonical doc,
-> [Switching events & latent demand](../roadmap/switching-events.md). The Python in this document
+> [Switching events & latent demand](../roadmap/switching-events.md). The tooling counterpart to
+> this page — which estimation problems belong in convex optimisation (CVXPY) rather than
+> PyTorch, and the `cvxpylayers` bridge between the two — is
+> [Convex Optimisation](convex-optimisation.md). The Python in this document
 > is illustrative sketch code, not the implementation. See the
 > [roadmap index](../roadmap/index.md) for status conventions.
 
