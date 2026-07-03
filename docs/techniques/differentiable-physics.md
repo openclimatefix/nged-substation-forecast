@@ -40,9 +40,11 @@ the computational graph, for three core reasons:
 The fundamental insight is to treat a meter reading as the output of a **forward model** that
 takes the unobserved quantities as inputs. For a substation:
 
-```text
-observed_power(t) = latent_demand(t) − pv_generation(t) − wind_generation(t) − battery_net(t) + losses(t)
-```
+$$P_{\text{obs}}(t) = P_{\text{demand}}(t) - P_{\text{pv}}(t) - P_{\text{wind}}(t) + P_{\text{loss}}(t)$$
+
+where $P_{\text{obs}}$ is the observed meter reading, $P_{\text{demand}}$ the latent (unobserved)
+demand, and $P_{\text{pv}}$, $P_{\text{wind}}$, $P_{\text{loss}}$ are the PV generation, wind
+generation, and network losses respectively.
 
 Each right-hand-side term is modelled explicitly as a physical function of weather and time, with
 its own latent parameters (capacities, orientations, power curves). The forward model is
