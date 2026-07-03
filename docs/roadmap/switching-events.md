@@ -232,14 +232,15 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - Produces the masking artifact and the honest sensitivity floor that everything downstream relies on.
 - De-risks the programme at minimal cost.
 
-#### Escalation within v0.6 — the joint edge-flow estimator
+#### v0.6.1 — the joint edge-flow estimator
 
-> **Status within v0.6:** documented as the known next move if sequential matching proves
-> brittle. The staged detect-then-match pipeline above remains the day-one implementation because
-> it fails legibly; this estimator is the same priors and the same graph with strictly better
-> structure, and may well turn out to be the right v0.6. The machinery it rests on — what a
-> solver is, why convexity matters, and why this is a CVXPY problem rather than a PyTorch one —
-> is explained for non-experts in [Convex Optimisation](../techniques/convex-optimisation.md).
+> **Status within v0.6:** this sections documents the known next move if sequential matching
+> (described above) proves brittle. The staged detect-then-match pipeline above remains the day-one
+> implementation because it fails legibly. v0.6.1 uses the same priors and the same graph but with
+> strictly better structure, and may well turn out to be the right method to get us to v1. The
+> machinery it rests on — what a solver is, why convexity matters, and why this is a CVXPY problem
+> rather than a PyTorch one — is explained for non-experts in [Convex
+> Optimisation](../techniques/convex-optimisation.md).
 
 **The core idea, in plain language.** The three stages above look at each substation on its own,
 spot moments where its residual suddenly jumps or drops, and then play matchmaker afterwards:
@@ -335,6 +336,134 @@ implementation-details section at the bottom of this page.
 
 ---
 
+#### Implementation details for v0.6.x (deleted when this ships)
+
+The build order for v0.6, simplest-first, each step delivering something testable before the next
+adds complexity. Steps 1–7 are the staged detector; step 8 is the joint edge-flow estimator, built
+only if steps 1-7 prove to be too fragile (or to test out convex optimisation as a warm-up for v2!)
+
+1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
+   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
+   list from NGED (see Part 5). Nothing downstream is testable without these.
+2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
+   (**no power-lag features**), quantile objective (median + spread quantiles), per series.
+   Output: normalised residual series. Sanity-check residual autocorrelation and per-series
+   spread before proceeding.
+3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
+   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
+   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
+   conservation premise in one cheap pass. If it fails, fix data before building any detector.
+4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
+   magnitude × duration grid into believed-clean periods. Built early because every later
+   threshold is tuned on it.
+5. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
+   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
+   injections.
+6. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
+   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
+   onset/reversion pairing into event intervals.
+7. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
+   duration floor only); score everything against the logged events (precision reported as a
+   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
+8. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 6/7 validation
+   shows sequential matching is the binding error source (overlapping events, ambiguous
+   attributions). Reuses steps 1–5 wholesale; penalty weights tuned on the injection harness;
+   adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
+
+##### Sketch of the edge-flow estimator
+
+Illustrative, untested sketch code, not the implementation. Background on CVXPY and why this problem
+is convex: [Convex Optimisation](../techniques/convex-optimisation.md).
+
+```python
+import cvxpy as cp
+import numpy as np
+
+
+def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
+    """Joint convex estimator for switching events (untested sketch).
+
+    Args:
+        R: (T, N) normalised, whitened residuals (observed − baseline) for N
+            substations over T timesteps; NaNs allowed.
+        B: (N, E) signed node–edge incidence matrix over the who-can-exchange-load
+            graph (−1/+1 at the two ends of each oriented edge).
+        lam_fused: penalty weight on grouped changes over time (events are abrupt).
+        lam_sparse: penalty weight on flow levels (regularise toward NRA).
+        lam_anomaly: penalty weight on the per-node slack (partnerless steps).
+        weights: optional (T, N) fit weights; 0 masks missing data.
+
+    Returns:
+        (T, E) fitted edge flows and (T, N) fitted per-node anomalies.
+    """
+    n_times, n_nodes = R.shape
+    n_edges = B.shape[1]
+
+    e = cp.Variable((n_times, n_edges))  # edge flows (the "pipes")
+    u = cp.Variable((n_times, n_nodes))  # per-node anomaly slack
+
+    # --- fit term: each node's residual ≈ signed sum of incident flows + anomaly ---
+    if weights is None:
+        weights = np.where(np.isnan(R), 0.0, 1.0)
+    resid = np.nan_to_num(R) - e @ B.T - u
+    fit = cp.sum_squares(cp.multiply(np.sqrt(weights), resid))
+
+    # --- group fused penalty: piecewise-constant flows whose changes share timesteps ---
+    increments = e[1:, :] - e[:-1, :]
+    fused = cp.sum(cp.norm(increments, 2, axis=1))
+
+    # --- level sparsity: pull inactive pipes to exactly zero (NRA prior) ---
+    sparse = cp.sum(cp.abs(e))
+
+    # --- anomaly slack: partnerless steps land here, not in invented flows ---
+    anomaly = cp.sum(cp.abs(u))
+
+    prob = cp.Problem(
+        cp.Minimize(fit + lam_fused * fused + lam_sparse * sparse + lam_anomaly * anomaly)
+    )
+    prob.solve(solver=cp.CLARABEL)  # or ECOS / SCS
+    return e.value, u.value
+
+
+def extract_events(edge_flows, edge_list, times, tol=1e-4):
+    """Turn fitted flows into event records: maximal nonzero runs per edge.
+
+    ``edge_list[k]`` is the oriented pair ``(a, b)`` for edge ``k``, matching the
+    incidence matrix (−1 at ``a``, +1 at ``b``): positive flow moves load from
+    ``a``'s meter to ``b``'s. ``tol`` is a numerical tolerance for solver precision,
+    not a detection threshold — the sparsity penalty does the actual thresholding
+    inside the optimisation.
+    """
+    events = []
+    for k, (a, b) in enumerate(edge_list):
+        active = np.abs(edge_flows[:, k]) > tol
+        # Walk maximal runs of `active`.
+        idx = np.flatnonzero(np.diff(np.r_[0, active.astype(int), 0]))
+        for start, stop in zip(idx[::2], idx[1::2]):
+            level = float(np.median(edge_flows[start:stop, k]))
+            source, donor = (a, b) if level > 0 else (b, a)
+            events.append({
+                "source": source,  # lost the load
+                "donor": donor,  # picked it up
+                "start": times[start],
+                "end": times[stop - 1],
+                "magnitude_mw": abs(level),
+            })
+    return events
+```
+
+Notes on the sketch:
+
+- **Scale.** At V1 scale (32 series, half-hourly, months of data) this solves in seconds to
+  minutes on a laptop. At V2 scale (~2,500 series), solve per neighbourhood cluster and/or in
+  sliding windows rather than one monolithic problem.
+- **Group structure.** The `axis=1` group norm ties changepoints across *all* edges per timestep;
+  the refinement is grouping per node-neighbourhood, so unrelated events elsewhere on the network
+  don't share changepoint credit.
+- **Tuning the `lam_*` weights** happens on the synthetic-injection harness (step 4), never on
+  the switching logs — see the escalation section above for why.
+- **The anomaly slack `u`** carries a plain ℓ1 penalty here; if injections show partnerless steps
+  are themselves step-like (a new connection is), `u` can be given its own fused penalty too.
 ### v2.5 — Magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand `d_i(t)` per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
@@ -486,131 +615,3 @@ These apply at every stage and are the things most easily got wrong:
 
 ---
 
-## Implementation details (deleted when this ships)
-
-The build order for v0.6, simplest-first, each step delivering something testable before the next
-adds complexity. Steps 1–7 are the staged detector; step 8 is the in-version escalation, built
-only if the head-to-head justifies it.
-
-1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
-   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
-   list from NGED (see Part 5). Nothing downstream is testable without these.
-2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
-   (**no power-lag features**), quantile objective (median + spread quantiles), per series.
-   Output: normalised residual series. Sanity-check residual autocorrelation and per-series
-   spread before proceeding.
-3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
-   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
-   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
-   conservation premise in one cheap pass. If it fails, fix data before building any detector.
-4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
-   magnitude × duration grid into believed-clean periods. Built early because every later
-   threshold is tuned on it.
-5. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
-   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
-   injections.
-6. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
-   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
-   onset/reversion pairing into event intervals.
-7. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
-   duration floor only); score everything against the logged events (precision reported as a
-   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
-8. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 6/7 validation
-   shows sequential matching is the binding error source (overlapping events, ambiguous
-   attributions). Reuses steps 1–5 wholesale; penalty weights tuned on the injection harness;
-   adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
-
-### Sketch of the edge-flow estimator (step 8 — untested)
-
-Illustrative sketch code, not the implementation. Background on CVXPY and why this problem is
-convex: [Convex Optimisation](../techniques/convex-optimisation.md).
-
-```python
-import cvxpy as cp
-import numpy as np
-
-
-def fit_edge_flows(R, B, lam_fused, lam_sparse, lam_anomaly, weights=None):
-    """Joint convex estimator for switching events (untested sketch).
-
-    Args:
-        R: (T, N) normalised, whitened residuals (observed − baseline) for N
-            substations over T timesteps; NaNs allowed.
-        B: (N, E) signed node–edge incidence matrix over the who-can-exchange-load
-            graph (−1/+1 at the two ends of each oriented edge).
-        lam_fused: penalty weight on grouped changes over time (events are abrupt).
-        lam_sparse: penalty weight on flow levels (regularise toward NRA).
-        lam_anomaly: penalty weight on the per-node slack (partnerless steps).
-        weights: optional (T, N) fit weights; 0 masks missing data.
-
-    Returns:
-        (T, E) fitted edge flows and (T, N) fitted per-node anomalies.
-    """
-    n_times, n_nodes = R.shape
-    n_edges = B.shape[1]
-
-    e = cp.Variable((n_times, n_edges))  # edge flows (the "pipes")
-    u = cp.Variable((n_times, n_nodes))  # per-node anomaly slack
-
-    # --- fit term: each node's residual ≈ signed sum of incident flows + anomaly ---
-    if weights is None:
-        weights = np.where(np.isnan(R), 0.0, 1.0)
-    resid = np.nan_to_num(R) - e @ B.T - u
-    fit = cp.sum_squares(cp.multiply(np.sqrt(weights), resid))
-
-    # --- group fused penalty: piecewise-constant flows whose changes share timesteps ---
-    increments = e[1:, :] - e[:-1, :]
-    fused = cp.sum(cp.norm(increments, 2, axis=1))
-
-    # --- level sparsity: pull inactive pipes to exactly zero (NRA prior) ---
-    sparse = cp.sum(cp.abs(e))
-
-    # --- anomaly slack: partnerless steps land here, not in invented flows ---
-    anomaly = cp.sum(cp.abs(u))
-
-    prob = cp.Problem(
-        cp.Minimize(fit + lam_fused * fused + lam_sparse * sparse + lam_anomaly * anomaly)
-    )
-    prob.solve(solver=cp.CLARABEL)  # or ECOS / SCS
-    return e.value, u.value
-
-
-def extract_events(edge_flows, edge_list, times, tol=1e-4):
-    """Turn fitted flows into event records: maximal nonzero runs per edge.
-
-    ``edge_list[k]`` is the oriented pair ``(a, b)`` for edge ``k``, matching the
-    incidence matrix (−1 at ``a``, +1 at ``b``): positive flow moves load from
-    ``a``'s meter to ``b``'s. ``tol`` is a numerical tolerance for solver precision,
-    not a detection threshold — the sparsity penalty does the actual thresholding
-    inside the optimisation.
-    """
-    events = []
-    for k, (a, b) in enumerate(edge_list):
-        active = np.abs(edge_flows[:, k]) > tol
-        # Walk maximal runs of `active`.
-        idx = np.flatnonzero(np.diff(np.r_[0, active.astype(int), 0]))
-        for start, stop in zip(idx[::2], idx[1::2]):
-            level = float(np.median(edge_flows[start:stop, k]))
-            source, donor = (a, b) if level > 0 else (b, a)
-            events.append({
-                "source": source,  # lost the load
-                "donor": donor,  # picked it up
-                "start": times[start],
-                "end": times[stop - 1],
-                "magnitude_mw": abs(level),
-            })
-    return events
-```
-
-Notes on the sketch:
-
-- **Scale.** At V1 scale (32 series, half-hourly, months of data) this solves in seconds to
-  minutes on a laptop. At V2 scale (~2,500 series), solve per neighbourhood cluster and/or in
-  sliding windows rather than one monolithic problem.
-- **Group structure.** The `axis=1` group norm ties changepoints across *all* edges per timestep;
-  the refinement is grouping per node-neighbourhood, so unrelated events elsewhere on the network
-  don't share changepoint credit.
-- **Tuning the `lam_*` weights** happens on the synthetic-injection harness (step 4), never on
-  the switching logs — see the escalation section above for why.
-- **The anomaly slack `u`** carries a plain ℓ1 penalty here; if injections show partnerless steps
-  are themselves step-like (a new connection is), `u` can be given its own fused penalty too.
