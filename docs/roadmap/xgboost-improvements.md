@@ -180,8 +180,17 @@ PV sites — and for MVA-metered substations whose readings bounce off zero from
     tilt/orientation modelling — embedded PV behind a substation is an unknown mix of
     orientations, and the booster can bend the proxy per series.
 
-- **Wind power curve**: 100 m wind speed through a generic turbine power curve (cut-in
-  ~3 m/s, rated ~12–14 m/s, cut-out ~25 m/s — a piecewise/logistic closed form is fine).
+- **Wind power curve**: 100 m wind speed through a generic *farm-level* power curve — either
+  a piecewise form (zero below cut-in ~3 m/s, normalised cubic ramp
+  $(v^3 - v_{ci}^3)/(v_r^3 - v_{ci}^3)$ to rated ~12–14 m/s, flat to cut-out ~25 m/s, zero
+  above) or a logistic sigmoid **masked to zero above cut-out** (an unmasked logistic is
+  actively wrong in storms — precisely when NGED cares). Exact shape matters less than it
+  looks: farm-level curves are smoother than single-turbine ones (aggregation, wakes,
+  hub-height spread), the booster monotonically re-bends the ramp anyway, and raw
+  `wind_speed_100m` stays in the feature list. What the proxy must get right is the
+  saturation at rated and the two dead zones — the parts trees can't build from raw speed.
+  (Large errors in the steep ramp region are dominated by NWP speed error amplified by the
+  physics' own $dP/dv$ — no closed form removes that; item 14 is what addresses it.)
 
 Implement stage (c) as derived-feature names in `_parsed_features.py` — same pattern as the
 existing `windchill` feature. That pattern gives the correct order of operations for free:
