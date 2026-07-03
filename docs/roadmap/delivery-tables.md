@@ -190,7 +190,9 @@ Notes on specific flags:
 > **Status: ✅ MVP implemented** — the `effective_capacity` Dagster asset writes P99 of observed
 > power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
-> **Planned upgrade in v0.7** to differentiable-physics capacity estimation — see
+> **Planned upgrade in v0.7**
+> ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247)) to
+> differentiable-physics capacity estimation — see
 > [Capacity estimation](capacity-estimation.md).
 
 OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly

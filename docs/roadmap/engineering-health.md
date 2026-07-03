@@ -13,6 +13,8 @@
 
 ## CI: run lint, types, and tests on every PR
 
+Issue: [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9)
+
 The only GitHub workflows are `docs.yml` (MkDocs deploy) and `contribution-bot.yml`. Code
 quality is enforced solely by local pre-commit hooks, so a contributor (or an agent) who skips
 hooks can merge broken code. Additionally, `uv run pytest` from the repo root currently
@@ -87,6 +89,8 @@ branch (e.g. an unused import) and confirm the workflow fails, then revert.
 
 ## Reproducibility: stamp git SHA and Delta table versions on MLflow runs
 
+Issue: [#227](https://github.com/openclimatefix/nged-substation-forecast/issues/227)
+
 Experiments log config, class targets, hyperparams, and window bounds to MLflow — but no git
 commit and no data versions (verified: nothing in `defs/jobs.py` or `ml_core/_mlflow_runs.py`).
 A run ID today cannot answer "exactly which code and which data produced this model?". Delta
@@ -134,6 +138,8 @@ MLflow UI. (4) Round-trip check: `pl.scan_delta(power_time_series_path, version=
 returns the training-time state after a subsequent append.
 
 ## NWP quantisation: count and surface clipped values
+
+Issue: [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161)
 
 `NwpOnDisk.from_nwp_in_memory` (`packages/contracts/src/contracts/weather_schemas.py:390`)
 clips each variable to its buffered range before Int16 encoding:
@@ -197,6 +203,8 @@ normal day).
 
 ## Drop Hydra (and OmegaConf): plain YAML + importlib + pydantic
 
+Issue: [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228)
+
 The project runs four config systems: Hydra, OmegaConf, pydantic-settings, and pydantic model
 configs. Hydra's actual usage is tiny — `hydra.utils.get_class` / `hydra.utils.instantiate` in
 `defs/jobs.py:80-81` and the experiment-reload path in `cv_assets.py`
@@ -257,6 +265,8 @@ experiment against an existing local MLflow store and confirm `load_experiment_f
 reloads a pre-migration experiment.
 
 ## Scientific-rigor tests and cleanup
+
+Issue: [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229)
 
 *Runs after the [live service and monitoring](live-service.md) land.* The feature-level
 no-lookahead tests, cross-mode equivalence test, idempotency tests, and the full-stack

@@ -57,6 +57,8 @@ So a single source substation's load fanned out to **at least two distinct prima
 
 ## The two facts that make this hard
 
+Issue: [#181](https://github.com/openclimatefix/nged-substation-forecast/issues/181)
+
 NGED have confirmed two things that shape the entire problem:
 
 1. **Multi-recipient is the norm.** When load is diverted, it typically fans out to **2–3 neighbouring substations**, not one. Conservation must be reasoned about as a **node-level flow balance**: one source's lost power is absorbed by a *subset* of neighbours whose individual pickups sum to the source's loss.

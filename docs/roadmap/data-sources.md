@@ -82,6 +82,9 @@ breakdown.
 
 ## Weather data
 
+Issues: [#142](https://github.com/openclimatefix/nged-substation-forecast/issues/142) (CM SAF),
+[#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (CERRA)
+
 | Source | Status | Description |
 |---|---|---|
 | **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, quantised to 12-bit `Int16` with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are actively back-filling earlier years, but this will take a while. Radiation: **global short-wave (GHI) only, no direct component** — [DP forecasting of PV](capacity-estimation.md#phase-2-full-graph-structured-disaggregation-v2) (v2) therefore needs a differentiable GHI → DNI/DHI decomposition model, or `fdir` added to the upstream dataset. |

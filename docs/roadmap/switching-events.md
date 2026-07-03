@@ -50,6 +50,9 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
 
 ### v0.6 — Unsupervised statistical switching-event detector
 
+Issues: [#117](https://github.com/openclimatefix/nged-substation-forecast/issues/117),
+[#118](https://github.com/openclimatefix/nged-substation-forecast/issues/118)
+
 **Goal.** Flag periods of abnormal running arrangement using simple statistics on the power time series. **No GNN, no differentiable physics, no latent-variable inference, no switching-log inputs.**
 
 **Motivation.** Before any reconstruction model, we need to (a) flag/mask switching-affected periods so they stop poisoning forecasting training data; (b) produce an evaluation set to validate heavier models later; and (c) — critically — *quantify how well switching events can be detected from power data at all*, since at scale that is the only signal available.
@@ -103,6 +106,8 @@ This is a histogram (step magnitude vs. hour-of-day), not a fitted model — del
 *Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor `j` and a demand-heavy slice to donor `k`. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what `j` got" vs. "what `k` got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 #### Other notes
+
+Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/180)
 
 **Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**: the transferred-magnitude threshold above which we reliably detect events and below which we cannot. Pair this with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.*
 

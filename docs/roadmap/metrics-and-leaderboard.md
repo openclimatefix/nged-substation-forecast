@@ -17,6 +17,8 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 
 ## The leaderboard concept 🚧
 
+Issue: [#4](https://github.com/openclimatefix/nged-substation-forecast/issues/4)
+
 A key deliverable is a **leaderboard** comparing many forecasting approaches. We plan **one
 leaderboard per forecasting task**, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
 farms, BESS, etc.
@@ -33,12 +35,13 @@ database. The leaderboard will be displayed as an interactive table (inspiration
 
 ## Baseline forecasters 🚧
 
+Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
+
 No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
 `contracts/power_schemas.py:242`). Without a persistence row and a climatology row on the
 leaderboard, XGBoost's NMAE numbers aren't interpretable: at 0–6 h persistence is famously hard
 to beat, and at day 8–14 seasonal climatology often beats everything. A model could "win" the
 leaderboard while adding no skill over naive methods and nobody would know.
-([#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147))
 
 Side benefit: a second and third `BaseForecaster` implementation pressure-tests the abstraction
 (the docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
@@ -110,6 +113,8 @@ weather data constrains us to it), the target multiple-yearly-fold protocol, and
 alternatives we considered.
 
 ### Fold hygiene: selection bias and a final-test window 🚧
+
+Issue: [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226)
 
 The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`: train 2024-04 →
 2025-06, validate 2025-07 → 2026-06) serves as **both** the model-selection set and the
@@ -282,6 +287,8 @@ events in their inputs. The flags come from the detector described in
 ---
 
 ## Delivering the probabilistic metrics 🚧
+
+Issue: [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)
 
 The 51-member ensemble is very likely **underdispersed**: XGBoost trained with squared error on
 the control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 members through
