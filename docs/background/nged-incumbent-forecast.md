@@ -49,8 +49,8 @@ same-weekday analogue selection is built to capture.
 
 ## Why it matters for us
 
-Because the incumbent uses no weather and no ML, beating it is the project's core deliverable — and
-because it does *"no further processing at all"*, several cheap upgrades (e.g. aligning bank
-holidays and moveable feasts) are genuinely un-done work rather than reimplementations. Both the
-faithful replica and the "cheap upgrades" variant are specified in [Metrics & leaderboard → Baseline
-forecasters](../roadmap/metrics-and-leaderboard.md#baseline-forecasters).
+Because the incumbent approach uses no weather and no ML, beating it is the project's core
+deliverable — and because it does *"no further processing at all"*, several cheap upgrades (e.g.
+aligning bank holidays and moveable feasts) are genuinely useful work rather than reimplementations.
+Both the faithful replica and the "cheap upgrades" variant are specified in [Metrics & leaderboard →
+Baseline forecasters](../roadmap/metrics-and-leaderboard.md#baseline-forecasters).
