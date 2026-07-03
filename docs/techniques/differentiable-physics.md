@@ -3,7 +3,7 @@
 > **Status: 🚧 Planned / 🔬 Research.** None of this is implemented yet. This page explains the
 > *method*; the plan for applying it lives in the roadmap. Phase 1 (capacity estimation for
 > *metered* generators) is targeted at
-> [roadmap v0.6 / v0.7](../roadmap/index.md#v06-v07-switching-events-dynamic-generator-capacity)
+> [roadmap v0.7](../roadmap/index.md#v07-dynamic-generator-capacity)
 > and planned in [Capacity estimation](../roadmap/capacity-estimation.md); Phase 2
 > (graph-structured disaggregation of net substation power into latent demand and DER generation)
 > is [v2 research](../roadmap/index.md#v20-scale-up-future-research). Abnormal running
@@ -154,7 +154,7 @@ differently:
   generation meter, we can fit explicit, physically-interpretable parameters for it — for a metered
   PV farm, that single site's panel **tilt**, **azimuth** and **effective capacity** (see the
   [single-site model](#3-the-core-building-block-differentiablesolarplant)). This is the
-  **v0.6 / v0.7** deliverable — see [Capacity estimation](../roadmap/capacity-estimation.md).
+  **v0.7** deliverable — see [Capacity estimation](../roadmap/capacity-estimation.md).
 - **Unmetered DER fleets** cannot be modelled as a single asset — a primary substation may sit above
   hundreds or thousands of rooftops with a mishmash of orientations. These are modelled as an
   **aggregate fleet node** via the physics-informed basis expansion in

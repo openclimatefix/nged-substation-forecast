@@ -285,7 +285,7 @@ class PowerForecast(pt.Model):
             # delivery-contract design agreed with NGED in the Milestone 1 report.
             # For this very early version we forecast raw MW/MVA because we are not yet
             # estimating capacity; we will switch to the scaled value once capacity estimation
-            # lands (roadmap v0.6 / v0.7).
+            # lands (roadmap v0.7).
         ),
     )
 
@@ -312,7 +312,7 @@ class EffectiveCapacity(pt.Model):
     the available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over
     the full observed history. This is a static scalar per series.
 
-    **Planned upgrade (v0.6 / v0.7):** replace the P99 scalar with a time-varying estimate from
+    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying estimate from
     the differentiable-physics capacity model (see ``docs/techniques/differentiable-physics.md``),
     giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
     the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its

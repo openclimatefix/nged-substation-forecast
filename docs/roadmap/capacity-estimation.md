@@ -1,6 +1,6 @@
 # Effective-capacity estimation
 
-> **Status: 🚧 Planned (Phase 1, v0.6 / v0.7) · 🔬 Research (Phase 2, v2).** Epic:
+> **Status: 🚧 Planned (Phase 1, v0.7) · 🔬 Research (Phase 2, v2).** Epic:
 > [#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141). This page is the
 > *plan* for applying [differentiable physics](../techniques/differentiable-physics.md) (DP) to
 > capacity estimation; the method itself — the forward models, variational machinery, and the
@@ -13,7 +13,7 @@ disaggregation in v2.
 
 ## Phase 1: Dynamic capacity estimation for metered generators (v1)
 
-Targeted at [roadmap v0.6 / v0.7](index.md#v06-v07-switching-events-dynamic-generator-capacity).
+Targeted at [roadmap v0.7](index.md#v07-dynamic-generator-capacity).
 This is deliberately the **simplest** application of DP, and **none of the "clever" latent-demand or
 ARA inversion happens here.** We deploy a basic DP model of the **metered PV and wind sites** purely
 to estimate their physical parameters — most importantly the effective capacity, which bumps up and
@@ -56,7 +56,7 @@ must also swap its `time_series_id`-only NMAE-denominator join for a temporal as
   invariant the feature pipeline enforces for power lags.
 - **Irradiance inputs:** the beam/diffuse decomposition the
   [solar model](../techniques/differentiable-physics.md#3-the-core-building-block-differentiablesolarplant)
-  needs is covered by the v0.6 weather ingests. **CM SAF SARAH-3** provides global (SIS), direct
+  needs is covered by the v0.7 weather ingests. **CM SAF SARAH-3** provides global (SIS), direct
   (SID) and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
   SIS − SID) — the primary Phase 1 input, matching the half-hourly metering. **CERRA** provides
   global plus time-integrated direct short-wave (diffuse by subtraction; accumulated fluxes from

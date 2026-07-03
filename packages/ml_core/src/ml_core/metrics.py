@@ -43,7 +43,7 @@ def compute_metrics(
     NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
     ``time_series_id`` from ``capacity``) — a capacity-like denominator, computed over the full
     history so it stays stable across folds. This ``time_series_id``-only join is correct while
-    ``capacity`` is one scalar row per series (the MVP). When the v0.6 / v0.7
+    ``capacity`` is one scalar row per series (the MVP). When the v0.7
     differentiable-physics upgrade makes capacity time-varying (one row per ``(time_series_id,
     time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``.
 
