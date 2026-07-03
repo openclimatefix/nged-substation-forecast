@@ -329,7 +329,7 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   final scoring — and injection-based tuning is the only kind available at full scale, where no
   logs exist.
 
-**Which of the staged pipeline's failure modes it retires — and which it doesn't.** Several of
+**Which of the staged pipeline's failure modes it solves — and which it doesn't.** Several of
 the statistical traps that stages 1–2 must handle with explicit machinery simply cannot occur in
 this parameterisation:
 
