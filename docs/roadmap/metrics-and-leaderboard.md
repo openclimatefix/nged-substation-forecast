@@ -20,17 +20,18 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 Issue: [#4](https://github.com/openclimatefix/nged-substation-forecast/issues/4)
 
 A key deliverable is a **leaderboard** comparing many forecasting approaches. We plan **one
-leaderboard per forecasting task**, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
+leaderboard per `time_series_type`**, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
 farms, BESS, etc.
 
-Each leaderboard has tens (maybe hundreds) of rows. Each row is one **ML experiment**: a particular
-model, trained with a particular set of features, processed a particular way. Entrants must be
-compared apples-to-apples — same test dataset, same metrics, same assumptions.
+Each leaderboard will have tens (maybe hundreds) of rows. Each row is one **ML experiment**: a
+particular model, trained with a particular set of features, processed a particular way. Entrants
+must be compared apples-to-apples — same test dataset, same metrics, same assumptions.
 
 Per-experiment configuration, trained weights, and metrics are stored in the project's **MLflow**
-database. The leaderboard will be displayed as an interactive table (inspiration: the
-"Weird ML Leaderboard") showing multiple metrics at a glance.
+database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
+glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
 
+![WeirdML leaderboard](assets/WeirdML_leaderboard.png)
 ---
 
 ## Baseline forecasters 🚧
