@@ -36,6 +36,7 @@ nav:
   - Background & Challenges:
       - NGED Network: background/network.md
       - Requirements: background/requirements.md
+      - NGED's Incumbent Forecast: background/nged-incumbent-forecast.md
       - Data Quality: background/data-quality.md
       - Switching Events: background/switching-events.md
   - Techniques:
