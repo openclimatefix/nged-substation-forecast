@@ -10,18 +10,19 @@
 > training-data mask); the v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is
 > not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
 > [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
-> **canonical** treatment of switching events — it supersedes the earlier "switching state-space
-> model" sketch in [differentiable physics](../techniques/differentiable-physics.md).
+> **canonical** treatment of switching events — it supersedes an earlier "switching state-space
+> model" sketch (see the retirement note in
+> [Net-demand disaggregation](disaggregation.md#handling-abnormal-running-arrangements)).
 
 ---
 
-## Part 1 — The graph structure (and why it is not a GNN)
+## Part 1 — The graph is a data structure
 
 A **graph** is just **nodes** connected by **edges**. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the *same power moving*.
 
-It is worth being explicit, because the term invites confusion: **none of the approaches in this document require a graph neural network (GNN).** A GNN is a *trained* model that passes learned "messages" along edges; it is a heavyweight tool we do not need. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise $N \times N$ problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
+It is worth being explicit about what the graph is *not*: it is not a trained model, and nothing is learned along its edges. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise $N \times N$ problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
 
-In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. If a future stage ever genuinely benefited from a trained GNN, that would be a deliberate escalation — but nothing here needs it.
+In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. (The project-wide design boundary — the same graph-as-data-structure stance across the disaggregation engine, and what evidence would ever revisit it — is stated once, in [the disaggregation page](disaggregation.md#the-fusion-mechanism).)
 
 > **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
 
@@ -55,7 +56,7 @@ v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
 Issues: [#117](https://github.com/openclimatefix/nged-substation-forecast/issues/117),
 [#118](https://github.com/openclimatefix/nged-substation-forecast/issues/118)
 
-**Goal.** Flag periods of abnormal running arrangement using simple statistics on the power time series. **No GNN, no differentiable physics, no latent-variable inference, no switching-log inputs.**
+**Goal.** Flag periods of abnormal running arrangement using simple statistics on the power time series. **No neural networks, no differentiable physics, no latent-variable inference, no switching-log inputs.**
 
 **Motivation.** Before any reconstruction model, we need to (a) flag/mask switching-affected periods so they stop poisoning forecasting training data; (b) produce an evaluation set to validate heavier models later; and (c) — critically — *quantify how well switching events can be detected from power data at all*, since at scale that is the only signal available.
 
@@ -658,7 +659,7 @@ $$
 \text{observed}_i(t) = \sum_j \Big[\, \alpha^{\text{dem}}_{ij}(t)\, \text{gross\_demand}_j(t) - \alpha^{\text{pv}}_{ij}(t)\, \text{pv}_j(t) - \alpha^{\text{wind}}_{ij}(t)\, \text{wind}_j(t) \,\Big]
 $$
 
-Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
+Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure plus arithmetic, with nothing learned along the edges.
 
 **Tooling.** This is the stage where PyTorch becomes unavoidable: the typed forward modules are
 genuinely non-convex (see [Convex Optimisation](../techniques/convex-optimisation.md) for why),

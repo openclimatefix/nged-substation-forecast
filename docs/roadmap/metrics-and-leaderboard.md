@@ -413,10 +413,10 @@ validation windows lie inside the observed history), but live-forecast scoring
 choose which reference time's capacity to apply rather than expecting a row at a future `valid_time`.
 
 One related distinction to keep straight: the *metric denominator* may use the full-history
-**smoothed** DP capacity estimate, but any capacity used to normalise model inputs at forecast init
+**smoothed** capacity estimate, but any capacity used to normalise model inputs at forecast init
 time (the two-pass training scheme) must be the **causal** estimate available at that init time, or
 backtests gain lookahead — see
-[Capacity estimation, Phase 1](capacity-estimation.md#phase-1-dynamic-capacity-estimation-for-metered-generators-v1).
+[Capacity estimation](capacity-estimation.md#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme).
 
 ### Peak events — the metric filter that matters most for flexibility
 
@@ -596,11 +596,11 @@ NWP?"). Example tags:
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
-| `model_family` | nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_gnn |
+| `model_family` | nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
 | `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, cerra |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |
-| `generator_capacity_estimation` | none, simple_p99, differentiable_physics |
+| `generator_capacity_estimation` | none, simple_p99, convex_envelope, differentiable_physics |
 | `switching_event_detection` | none, simple_statistical |
 | `pre_training` | none, CERRA |
 

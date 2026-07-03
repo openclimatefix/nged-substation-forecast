@@ -202,7 +202,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
     densifying a constant buys nothing.
 
-    A future upgrade (v0.7) swaps the P99 for the differentiable-physics capacity model,
+    A future upgrade (v0.7) swaps the P99 for a time-varying capacity estimator,
     emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,
     but ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
     ``time_series_id`` alone (same doc section).

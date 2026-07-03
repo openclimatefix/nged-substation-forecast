@@ -35,7 +35,6 @@
 ## Machine Learning (PyTorch)
 
 - Use **PyTorch** for differentiable physics models.
-- Use **PyTorch Geometric** for GNN implementations.
 - Use **MLFlow** for tracking experiments.
 - Follow the "test-harness" pattern: separate research logic from production orchestration but ensure they use the same data contracts.
 

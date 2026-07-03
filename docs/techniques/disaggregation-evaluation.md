@@ -1,9 +1,11 @@
 # Evaluating disaggregation: a multi-pronged protocol
 
-> **Status: 🔬 v2 research.** This applies to the full disaggregation problem (Phase 2 / v2).
-> Phase 1 capacity estimation for metered generators is evaluated with standard regression metrics
-> against the metered ground truth. See the [differentiable physics doc](differentiable-physics.md)
-> for the technical approach and the [roadmap index](../roadmap/index.md) for status conventions.
+> **Status: 🔬 v2 research.** This applies to the full disaggregation problem (v2) — the plan and
+> architecture live on the canonical
+> [Net-demand disaggregation](../roadmap/disaggregation.md) roadmap page. The v0.7 capacity
+> estimation for metered generators is evaluated separately, with its own
+> [head-to-head protocol](../roadmap/capacity-estimation.md#the-head-to-head-protocol) against the
+> metered ground truth. See the [roadmap index](../roadmap/index.md) for status conventions.
 
 Substation disaggregation has **no single clean ground truth**: by definition, you are estimating
 quantities that are unmetered. Chasing a single objective metric is therefore a trap. The rigorous

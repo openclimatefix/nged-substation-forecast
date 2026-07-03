@@ -191,8 +191,8 @@ Notes on specific flags:
 > power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
 > **Planned upgrade in v0.7**
-> ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247)) to
-> differentiable-physics capacity estimation — see
+> ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247)) to time-varying
+> capacity estimation, produced by whichever candidate estimator wins the head-to-head — see
 > [Capacity estimation](capacity-estimation.md).
 
 OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly
@@ -206,16 +206,19 @@ capacity-representative than the mean (which is dragged down by zero-output peri
 It is also the denominator used to normalise NMAE in the `forecast_metrics` table — see
 [Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
 for why the MVP stores one scalar row per series (rather than repeating the value at every half-hour)
-and how the metrics join evolves for the DP upgrade.
+and how the metrics join evolves for the v0.7 upgrade.
 
-**DP upgrade (v0.7):** replace the static P99 with a time-varying estimate from the
-differentiable-physics model. For generators, the prior comes from the Embedded Capacity Register
+**v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning
+[capacity estimator](capacity-estimation.md#several-estimators-one-winner). For generators, the
+prior comes from the Embedded Capacity Register
 and is updated at each half-hour from the generator's power time series, absorbing PV-panel
 degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM-capped at 5 MW
 with 10 MW physical capability has `effective_capacity_mw = 10`). For substations, the 99th
 percentile of observed load over a rolling window, under normal running arrangement only. During a
 switching event, effective capacity = last known normal-arrangement value plus the "switched
-power" from [Table 5](#table-5-substation_switching). The DP estimate is probabilistic, so the
+power" from [Table 5](#table-5-substation_switching). The v0.7 estimate should carry uncertainty
+(a [first-class judging criterion](capacity-estimation.md#uncertainty-a-first-class-judging-criterion)
+in the head-to-head), so the
 single `effective_capacity_mw` column is upgraded to a mean + std pair
 ([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247), matching Table 5's
 Normal-distribution convention); the asset body changes to emit one row per
