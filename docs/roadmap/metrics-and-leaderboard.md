@@ -48,17 +48,15 @@ exists to answer: **do we beat what NGED does today?**
 
 ### The headline baseline — `nged_incumbent`
 
-NGED's current approach to "forecasting" primary-substation demand uses no weather model and no
-ML. For each substation they build an ensemble of analogues from its own history — the observed
-power at the same time-of-day on the same weekday over the **last 6 weeks**, plus the same weekday
-and time-of-day from **roughly a year ago** (the seven weeks spanning **49–55 weeks back**) — then
-**plot all 13 and let an operator read a forecast off the spread by eye.** If they need a single
-deterministic number they take the **95th percentile** of the analogue values ("more of a *vibe*
-than anything rigorous", in their words) — a deliberately conservative operating point, because the
-tool exists to keep demand under the flex/firm capacity limit. This is *the bar we have to clear to
-justify the project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent"
-is the deliverable. It is the first baseline we implement; if we implement only one, it is this one.
-(Recipe confirmed by NGED, July 2026.)
+`nged_incumbent` is a faithful reproduction of
+[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) — the analogue-ensemble method
+they use today, with no weather model and no ML. In brief (full description and the operator's-eye
+view are in the background page): for each target half-hour it takes the observed power at the
+**same weekday & time-of-day** from the **last 6 weeks** and from **49–55 weeks back** — **13
+analogues** — which NGED plot and read by eye (taking the 95th percentile if they need a single
+number). Reproducing it matters because it is *the bar we have to clear to justify the project* —
+"XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the deliverable. It is
+the first baseline we implement; if we implement only one, it is this one.
 
 It slots into our machinery beautifully, because every one of its 13 members is just a **power
 lag**:
@@ -88,14 +86,15 @@ worth stating plainly:
   `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
   unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
   runs with `weather_source: "none"`.
-- **The deterministic collapse is NGED's own P95, not a mean.** For the deterministic leaderboard
-  metrics we need a single number, and NGED gave us theirs: the **95th percentile** of the 13
-  analogue values. It is deliberately conservative (a peak-safety operating point), so scoring it
-  with MAE/RMSE/MBE will show a large *positive* bias **by design** — a property of their risk
-  preference, not a forecasting error, and not something to "fix". The fair, like-for-like skill
-  comparison therefore lives in the probabilistic metrics (CRPS over the members); NGED weight the
-  analogues equally ("no further processing at all"), so equiprobable members are faithful, not an
-  approximation.
+- **Deterministic collapse: median for the headline, NGED's P95 reported alongside.** The headline
+  deterministic column collapses the 13 members to their **median** — a central estimate, so
+  `nged_incumbent` is compared apples-to-apples with every other model's central forecast.
+  Separately we report NGED's *actual* operating point, the **95th percentile**, as a labelled
+  secondary number: being deliberately conservative it carries a large *positive* MBE **by design**
+  (a peak-safety choice, not a forecasting error), so it belongs *beside* the central metric, not in
+  place of it. Either way NGED weight the analogues equally ("no further processing at all"), so
+  equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them — are
+  faithful, not an approximation.
 
 ### A faithful replica and a "cheap upgrades" variant
 
@@ -144,13 +143,15 @@ one:
   nulled by `_nullify_leaky_lags` (lag ≤ lead time) or by insufficient history are dropped; rows
   where *all* members are null (very long horizons + data gaps) are dropped and the count logged,
   as in persistence. The members are the faithful output (NGED plot all 13 and read the spread by
-  eye); the deterministic point forecast is NGED's stated **95th-percentile** collapse over the
-  surviving members — conservative by design, so expect a positive MBE (see prose above).
+  eye). The headline deterministic point forecast is the **median** of the surviving members;
+  NGED's **P95** operating point is reported alongside (conservative by design → large positive MBE;
+  see prose above).
 - **Deterministic-scoring wrinkle:** `compute_metrics` currently collapses members by *mean* for
-  the deterministic metrics. Scoring the incumbent's P95 faithfully needs a per-experiment collapse
-  statistic (default `mean`; `p95` for `nged_incumbent`) — a small `compute_metrics` extension, or
-  have the forecaster carry a designated point-forecast column. Do not silently score its members'
-  mean and call it the incumbent.
+  the deterministic metrics. Here the headline is the **median** plus NGED's **P95** as a secondary
+  operating-point column, so the metrics path needs a per-experiment collapse statistic *and* the
+  ability to emit more than one (`median` headline + `p95` alongside) — a small `compute_metrics`
+  extension, or have the forecaster carry designated point-forecast columns. Don't silently score
+  the members' mean and call it the incumbent.
 - `train()` records `trained_time_series_ids` only. `save`/`load` persist a `meta.json` with the
   config + ids (copy the `XGBoostForecaster` pattern).
 - `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`; runs with `weather_source: "none"`.
@@ -218,26 +219,28 @@ machinery instead of writing any new time-series logic:
 first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
 so each appears in MLflow as a leaderboard row.
 
-**Recipe confirmed by NGED (July 2026).** No open questions remain; the spec above is their method
-verbatim:
+**Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in
+[NGED's incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
 
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
 - **Annual analogues:** the **seven** weeks spanning **49–55 weeks back**, same weekday & time.
-- **Deterministic value:** the **95th percentile** of all 13 analogue values ("more of a vibe").
+- **Deterministic value:** NGED's own operating point is the **95th percentile** of all 13 analogue
+  values ("more of a vibe") — we report it alongside a **median** headline (see item 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
   load-growth scaling. (This is precisely why the holiday-aligned variant in item 2 is a genuine,
   un-done upgrade — not a reimplementation of something NGED already do.)
 
 **Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: `nged_incumbent`
-unpivots to the expected 13 members and its **P95** collapse matches a hand-computed value;
-persistence picks the shortest non-null lag; climatology lookup round-trips through `save`/`load`;
-all freeze `trained_time_series_ids`. (2) Smoke-test fold end-to-end via the existing
-integration-test pattern (`tests/test_trained_cv_model.py` fixtures), and confirm the incumbent's
-13-member ensemble flows through the Phase B probabilistic metrics (e.g. CRPS computes over its
-members). (3) Sanity-check the numbers: persistence NMAE should be *worse overall* than XGBoost but
-plausibly competitive at short horizons; `nged_incumbent`'s P95 point forecast should show a clear
-positive MBE (the conservative operating point) even where its CRPS over the 13 members is
-competitive — do not mistake that bias for a bug.
+unpivots to the expected 13 members and both its **median** (headline) and **P95** (operating-point)
+collapses match hand-computed values; persistence picks the shortest non-null lag; climatology
+lookup round-trips through `save`/`load`; all freeze `trained_time_series_ids`. (2) Smoke-test fold
+end-to-end via the existing integration-test pattern (`tests/test_trained_cv_model.py` fixtures),
+and confirm the incumbent's 13-member ensemble flows through the Phase B probabilistic metrics
+(e.g. CRPS computes over its members). (3) Sanity-check the numbers: persistence NMAE should be
+*worse overall* than XGBoost but plausibly competitive at short horizons; `nged_incumbent`'s median
+should be a roughly unbiased central estimate while its reported **P95** shows a clear positive MBE
+(the conservative operating point) — even where its CRPS over the 13 members is competitive; don't
+mistake the P95 bias for a bug.
 
 ---
 
