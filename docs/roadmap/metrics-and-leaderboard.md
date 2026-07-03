@@ -32,6 +32,7 @@ database. The leaderboard will be displayed as an interactive table showing mult
 glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.html):
 
 ![WeirdML leaderboard](assets/WeirdML_leaderboard.png)
+
 ---
 
 ## Baseline forecasters 🚧
@@ -39,22 +40,120 @@ glance, inspired by the [WeirdML leaderboard](https://htihle.github.io/weirdml.h
 Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
 
 No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
-`contracts/power_schemas.py:242`). Without a persistence row and a climatology row on the
-leaderboard, XGBoost's NMAE numbers aren't interpretable: at 0–6 h persistence is famously hard
-to beat, and at day 8–14 seasonal climatology often beats everything. A model could "win" the
-leaderboard while adding no skill over naive methods and nobody would know.
+`contracts/power_schemas.py:242`). Until the leaderboard carries naive rows, XGBoost's NMAE
+numbers aren't interpretable — and, more to the point, we can't answer the question this project
+exists to answer: **do we beat what NGED does today?**
 
-Side benefit: a second and third `BaseForecaster` implementation pressure-tests the abstraction
-(the docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
+### The headline baseline — `nged_incumbent`
+
+NGED's current approach to "forecasting" primary-substation demand uses no weather model and no
+ML. It averages the substation's own history: an ensemble of the observed power at the same
+time-of-day on the same weekday over the **last 5 weeks**, plus the same weekday and time-of-day
+from **roughly a year ago** (51, 52 and 53 weeks back). This is *the bar we have to clear to
+justify the project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent"
+is the deliverable. It is the first baseline we implement; if we implement only one, it is this
+one.
+
+It slots into our machinery beautifully, because every one of its 8 members is just a **power
+lag**:
+
+- Weekly group (last 5 weeks, same weekday & time): `power_lag_168h, 336h, 504h, 672h, 840h`
+- Annual group (51/52/53 weeks ago, same weekday & time): `power_lag_8568h, 8736h, 8904h`
+
+So it rides the same audited, no-lookahead pipeline as `PersistenceForecaster` (below) with zero
+new time-series logic. `_nullify_leaky_lags` already sheds the shortest members as lead time grows
+(past 7 days the 168 h member nullifies, past 14 days the 336 h, and so on), leaving the annual
+members to carry the full 14-day horizon. Because the shortest member is a week old, the incumbent
+has *no* short-horizon skill from recent power — realistic, since that is exactly what NGED do
+today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
+recent-power member in.
+
+**It is also our first _probabilistic_ baseline.** The 8 analogues are naturally an ensemble, so
+we emit them as 8 `ensemble_member` rows and let the [probabilistic
+metrics](#phase-b--probabilistic-metrics-from-the-existing-ensemble) score it for free — no model
+changes. Two consequences worth stating plainly:
+
+- **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble
+  member; for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning.
+  We document this on the `PowerForecast` / `AllFeatures` schema so nobody assumes
+  `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
+  unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
+  runs with `weather_source: "none"`.
+- **Members are not equiprobable.** NGED weight the analogues unequally, but our probabilistic
+  metrics (Phase B) assume equiprobable members. MVP resolves this by weighting all 8 **equally**;
+  faithfully reproducing NGED's weights (which would need weighted quantiles / weighted CRPS) is a
+  documented follow-up, not a silent simplification.
+
+### A faithful replica and a "cheap upgrades" variant
+
+We implement two closely-related incumbent baselines, and the *pair* carries a message that is
+itself a valuable project outcome — **most of the benefit may come from a few simple upgrades to
+what NGED already do, not from heavy ML**:
+
+- `nged_incumbent` — the faithful replica above. No holiday handling; warts and all. Pure lag
+  features.
+- `nged_incumbent_holiday_aligned` — the same skeleton, but analogue *selection* becomes
+  calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type
+  (a bank-holiday Monday behaves like a Sunday), and moveable feasts align holiday-to-holiday
+  (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
+  the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
+  bank-holiday calendar (the pure-Python `holidays` package), and ships as an immediate follow-up
+  PR, not part of the first one.
+
+### Persistence and climatology — diagnostic bookends
+
+The incumbent is really a *hybrid* — its weekly group is persistence-like recency, its annual
+group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
+short-horizon vs long-horizon naive skill (at 0–6 h persistence is famously hard to beat; at day
+8–14 seasonal climatology often beats everything). A model could "win" the leaderboard while
+adding no skill over either, and without these rows nobody would know.
+
+Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the
+docs promise the interface is model-agnostic; today only `XGBoostForecaster` exercises it).
 
 ### Implementation details — baselines (deleted when they ship)
 
 New workspace package `packages/baseline_forecasters/` mirroring the `xgboost_forecaster`
-layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`). Add to the root
-`pyproject.toml` `[tool.uv.sources]` and dependencies.
+layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`), hosting all the baselines
+below. Add to the root `pyproject.toml` `[tool.uv.sources]` and dependencies.
 
-**1. `PersistenceForecaster` (seasonal-naive).** Reuse the existing lag machinery instead of
-writing any new time-series logic:
+**1. `NGEDIncumbentForecaster` (`nged_incumbent`) — the faithful replica, built first.** Reuses
+the lag machinery exactly like persistence, but *combines* the members instead of coalescing to
+one:
+
+- `selected_features` = the 8 analogue lags `{"power_lag_168h", "power_lag_336h",
+  "power_lag_504h", "power_lag_672h", "power_lag_840h", "power_lag_8568h", "power_lag_8736h",
+  "power_lag_8904h"}` — 5 weekly + 3 annual. The weekly count and annual set are config-defaulted
+  so the recipe can be corrected cheaply once NGED confirm it (open questions below).
+- `predict()` unpivots the analogue-lag columns into `ensemble_member` rows (member index =
+  analogue index) — this is where the ensemble is *synthesised*, not consumed from NWP. Members
+  nulled by `_nullify_leaky_lags` (lag ≤ lead time) or by insufficient history are dropped; rows
+  where *all* members are null (very long horizons + data gaps) are dropped and the count logged,
+  as in persistence. The deterministic point forecast is the **equal-weight** mean of the
+  surviving members (weighting tension noted in the prose above / open question 3).
+- `train()` records `trained_time_series_ids` only. `save`/`load` persist a `meta.json` with the
+  config + ids (copy the `XGBoostForecaster` pattern).
+- `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`; runs with `weather_source: "none"`.
+- **Schema doc change (this PR):** document the `ensemble_member` overload on `PowerForecast` and
+  `AllFeatures` — an NWP-member index for NWP models, a historical-analogue index for
+  `nged_incumbent`. Because this baseline *owns* the member dimension, it must **not** be
+  broadcast across the NWP members (contrast the deterministic baselines in item 5); this is the
+  case where a per-forecaster `uses_nwp_ensemble = False` flag actually earns its keep.
+
+**2. `NGEDIncumbentForecaster` + holiday alignment (`nged_incumbent_holiday_aligned`) — immediate
+follow-up PR.** Same output shape and ensemble emission, but analogue *selection* becomes
+calendar-aware and so can no longer be a fixed set of lag columns:
+
+- A bespoke picker maps each target `valid_time` to its source timestamps: bank-holiday targets
+  draw from prior bank holidays / the matching day-type (a bank-holiday Monday → Sundays), and
+  moveable feasts align holiday-to-holiday (Easter→Easter) rather than by fixed week offset.
+- GB bank-holiday calendar via the pure-Python `holidays` package (pandas-free).
+- `MODEL_NAME = "nged_incumbent_holiday_aligned"`, `MODEL_VERSION = 1`.
+- Keep this out of the first PR; it ships once baseline 1 lands. It exists to test the project
+  thesis that a few cheap upgrades recover most of the benefit.
+
+**3. `PersistenceForecaster` (seasonal-naive) — diagnostic bookend.** Reuse the existing lag
+machinery instead of writing any new time-series logic:
 
 - `selected_features` = `{"power_lag_24h", "power_lag_48h", "power_lag_168h",
   "power_lag_336h"}` (configurable in the config, this is the default).
@@ -68,7 +167,7 @@ writing any new time-series logic:
 - Rows where all lags are null (long horizons + data gaps): drop those rows from the output
   (`PowerForecast.power_fcst` presumably non-nullable — check) and log the dropped count.
 
-**2. `ClimatologyForecaster`.**
+**4. `ClimatologyForecaster` — diagnostic bookend.**
 
 - `train()`: collect `(time_series_id, valid_time, power)` from the features frame and build a
   lookup table of mean power per `(time_series_id, month, half-hour-of-day, is_weekend)` over
@@ -80,28 +179,47 @@ writing any new time-series logic:
   forecaster; prefer deriving directly to keep the feature list empty.
 - `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
 
-**3. Configs and registration.**
+**5. Configs and registration.**
 
-- `conf/model/persistence.yaml` and `conf/model/climatology.yaml` following
-  `conf/model/xgboost.yaml`'s `_target_` structure, with `weather_source: "none"`.
+- `conf/model/nged_incumbent.yaml`, `conf/model/persistence.yaml`,
+  `conf/model/climatology.yaml` (and later `conf/model/nged_incumbent_holiday_aligned.yaml`)
+  following `conf/model/xgboost.yaml`'s `_target_` structure, with `weather_source: "none"`.
 - `PowerForecast.nwp_init_time` is already nullable for exactly this case
   (`power_schemas.py:242`); confirm `cv_power_forecasts` tolerates it end-to-end.
-- **Ensemble members:** the CV predict path feeds all ~51 members; baselines produce identical
-  forecasts per member. That is wasteful but harmless (the ensemble mean is unchanged). MVP:
-  accept it. Do not special-case the pipeline for baselines in this PR; if the waste matters
-  later, add a per-forecaster `uses_nwp_ensemble` class flag and let `cv_power_forecasts`
-  restrict to member 0.
+- **Ensemble members:** for the *deterministic* baselines (persistence, climatology) the CV
+  predict path feeds all ~51 members and they produce identical forecasts per member — wasteful
+  but harmless (the ensemble mean is unchanged); MVP accepts it. `nged_incumbent` is different:
+  it emits its own 8-member ensemble, so broadcasting it across the 51 NWP members would be wrong,
+  not merely wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
+  `cv_power_forecasts` honours — restricting deterministic baselines to member 0 and letting
+  `nged_incumbent` own the member axis — resolves both at once.
 
-**4. Run and publish.** Register both via `register_experiment_job` (`run_mode: smoke_test`
+**6. Run and publish.** Register each via `register_experiment_job` (`run_mode: smoke_test`
 first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
-so both appear in MLflow as leaderboard rows.
+so each appears in MLflow as a leaderboard row.
 
-**Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: persistence picks
-the shortest non-null lag; climatology lookup round-trips through `save`/`load`; both freeze
-`trained_time_series_ids`. (2) Smoke-test fold end-to-end via the existing integration-test
-pattern (`tests/test_trained_cv_model.py` fixtures). (3) Sanity-check the numbers: persistence
-NMAE should be *worse overall* than XGBoost but plausibly competitive at short horizons (fully
-visible once the horizon slices land — the two plans compound).
+**Open questions to NGED (documented until confirmed).** The current spec takes the first option
+in each; correcting any is a small config change (a code change only for holiday handling):
+
+1. **Weekly analogues** — same weekday & time from each of the last **5** weeks? (or another
+   count)
+2. **Annual analogues** — same weekday & time, **51/52/53** weeks back (3 members)? or just 52
+   (1 member)?
+3. **Weighting** — are the analogues combined **equally**, or weighted (e.g. recent weeks count
+   for more)?
+4. **Holidays** — any handling (bank-holiday day-type remap; moveable-feast alignment,
+   Easter→Easter)? — this is what motivates baseline 2.
+5. **Anything else** — discarding anomalous values, or scaling last-year values for load growth?
+
+**Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: `nged_incumbent`
+unpivots to the expected members and its equal-weight mean matches a hand-computed value;
+persistence picks the shortest non-null lag; climatology lookup round-trips through `save`/`load`;
+all freeze `trained_time_series_ids`. (2) Smoke-test fold end-to-end via the existing
+integration-test pattern (`tests/test_trained_cv_model.py` fixtures), and confirm the incumbent's
+8-member ensemble flows through the Phase B probabilistic metrics (e.g. CRPS computes over its
+members). (3) Sanity-check the numbers: persistence NMAE should be *worse overall* than XGBoost
+but plausibly competitive at short horizons, and `nged_incumbent` should sit between the naive
+bookends and XGBoost (fully visible once the horizon slices land — the plans compound).
 
 ---
 
@@ -376,7 +494,7 @@ NWP?"). Example tags:
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
-| `model_family` | baseline_persistence, xgboost, pytorch_mlp, pytorch_gnn |
+| `model_family` | nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_gnn |
 | `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, cerra |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |
