@@ -37,6 +37,8 @@ Version numbers are aligned with the main codebase: **v0.6**, then **v2.5**, the
 v0.6  ── Unsupervised statistical detector on power data.
   │       Flags/masks switching events; VALIDATED against the 32-series logs.
   │       Produces the detection sensitivity floor (a quantified, honest limit).
+  │       In-version escalation, only if sequential matching proves brittle:
+  │       the joint edge-flow estimator (detection + attribution in one solve).
   │
 v2.5  ── Magnitude-only mixture model. The workhorse.
   │       Reconstructs latent NRA demand per substation. Fully unsupervised.
@@ -65,10 +67,40 @@ For each substation, form an expected-power baseline that is a function of **exo
 
 **Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." It is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact, manufacturing phantom events and mis-attributing them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*, so there is no step at all and a real event is masked entirely. Weather and clock time are unaffected by network topology, so a baseline built only from them cannot be contaminated by switching state — the residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
-**Two residual-contamination routes to handle:**
+**Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
+production forecaster already consumes exactly the covariates the baseline needs — NWP weather,
+time-of-day, day-of-week, holidays — through the existing feature pipeline. Configuring it with
+**no power-lag features** yields the switching-independent baseline with no new machinery (a lag
+feature would smuggle the lagged-power contamination above back in through the side door). Fit
+with a **quantile (median) objective**, which doubles as the robust loss required below; fitting
+additional quantiles (e.g. 10%/90%) gives a per-series, per-time spread estimate for free — used
+by the normalisation step below.
+
+**Three residual-contamination routes to handle:**
 
 - *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data.
 - *Persistent events.* A months-long ARA appears as a residual level shift that *stays* shifted, not a transient. The changepoint detector handles this (it catches the onset step), but the baseline must **not** be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.
+- *Seasonal-maintenance confounding.* Planned switching is not uniform through the year — outages
+  cluster in maintenance seasons. A flexible time-of-year covariate fitted on contaminated history
+  can therefore absorb systematic ARA effects into "seasonality", and the robust loss does *not*
+  fix this, because the contamination is locally dense within the season even though it is only
+  ~10% overall. Keep seasonal terms low-flexibility, prefer multiple years of history, and make
+  sure the fit → flag → refit loop removes flagged periods from the seasonal fit too.
+
+**Changepoint detection must respect the residual's real statistics.** Textbook mean-shift
+detectors (PELT/BinSeg with an L2 cost, CUSUM) assume roughly independent noise with constant
+variance. Baseline residuals violate both assumptions. They are **autocorrelated**: an NWP error
+or an unmodelled local effect persists for hours to days, and a naive detector fires on that slow
+wander as if it were a step — the classic failure mode of changepoint-on-residual pipelines is
+hundreds of confident detections that are just weather-model error. And they are
+**heteroscedastic**: residual spread differs across substations by orders of magnitude and varies
+by time of day (PV-heavy substations are noisiest at midday). Two standard fixes, both required:
+(a) **normalise** — divide residuals by the baseline's own per-series, per-time spread estimate
+(the extra quantiles above), so detection runs on z-score-like series and one threshold scale
+works fleet-wide; and (b) **pre-whiten or calibrate** — either fit a low-order AR model to each
+normalised residual and detect on its innovations, or calibrate the changepoint penalty per
+series with a block bootstrap over believed-clean periods, so the false-alarm rate is controlled
+under the residual's actual autocorrelation rather than an i.i.d. fiction.
 
 #### Stage 2. **Node-level coincidence / balance attribution.**
 
@@ -89,6 +121,49 @@ residuals around time t (observed - expected), one row per substation:
                 (pairwise matching would FAIL: neither j nor k alone equals 9)
 ```
 
+**The neighbourhood-sum test (cheap, powerful corroboration).** Conservation offers a second,
+sharper statistic than "the rises sum to the drop": over the candidate set {source + donors}, the
+**summed residual should show no step at all** across the event, while every member shows one. So,
+once a candidate attribution exists, compute the set's summed residual and require it to be
+(approximately — see the tolerance note below) step-free at `t`. This discriminates exactly the
+failure mode the per-series view cannot: a **regional weather-model error** steps every nearby
+series *and their sum*; a genuine transfer steps the members but leaves the sum flat. It does not
+*replace* per-series detection — a flat sum alone cannot say which substations moved or by how
+much (it is equally consistent with "no event at all") — it corroborates an attribution after
+stage 1 has proposed the pieces. The same statistic, computed around the *logged* events, is also
+the very first diagnostic to run, before any detector code exists (see the diagnostic precursor
+below).
+
+**Calibrate the attribution score against chance.** With ~5 neighbours each carrying noisy
+candidate steps, *some* subset will approximately sum to `Δ` surprisingly often by luck alone —
+subset-sum matching on noisy data is generous. The score therefore needs an explicit null:
+estimate, by permutation (run the same subset search at randomly chosen event-free times), how
+often a balancing subset of a given quality arises by chance, and only accept attributions that
+clear that null. Without this, the event list gets padded with confident-looking coincidences.
+
+**Conservation is only approximate — set the tolerance band accordingly.** Reconfiguration
+changes feeding-path lengths, so `I²R` losses change; and load served at a slightly different
+voltage draws slightly different power (load is mildly voltage-dependent — the effect behind
+conservation voltage reduction). Expect the
+donor pickups to miss the source drop systematically by a few percent, in either direction. The
+balance and neighbourhood-sum tests need a tolerance band, not an equality — and the imbalance
+distribution observed on logged events is itself worth reporting.
+
+**Events are intervals, not onsets.** Everything downstream (the ARA mask, the delivered event
+table) needs `[start, end]`, so the reversion step must be detected and **paired** with its
+onset: an opposite-sign, magnitude-similar step on the same source/donor set. Pairing is not
+always clean — restorations can happen in stages; a network can be reconfigured directly from one
+ARA into another without passing through NRA; and a fault event has a brief total-loss interim
+(during which conservation does *not* hold — the load is simply off) before restoration
+completes. Treat unpaired onsets as open intervals (event still in force at the end of the
+record) rather than discarding them.
+
+**Filter fleet-wide artifacts before attribution.** Telemetry re-basing, unit changes, or other
+data-pipeline shifts on NGED's side produce coincident steps across *many* series at once. Any
+step time shared by a large fraction of the fleet is a data artifact, not a switching event, and
+must be excluded before the subset search runs — otherwise it manufactures spurious
+multi-substation "events".
+
 #### Stage 3. **Composition corroboration (post-attribution, per recipient).**
 
 *Aim.* Stages 1–2 tell us *that* a switching event happened, *when*, and *how much net power* moved to each donor. They do **not** tell us *what kind* of power moved. A slice of the network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the *net* (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one might be 8 MW of demand with negligible generation, another might be 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a cheap, qualitative read on that make-up: *was the moved slice demand-dominated, PV-dominated, or wind-dominated?* This is corroboration and enrichment, not detection — it does not change whether we flagged the event, but it characterises it.
@@ -103,15 +178,28 @@ residuals around time t (observed - expected), one row per substation:
 
 This is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching v0.6's simple-statistics spirit.
 
+*Two preconditions the read-off needs.* First, a **duration floor**: the diurnal histogram only
+fills if the event spans several days — for shorter events there is no hour-of-day coverage to
+average over, so composition should not be reported below (say) ~3–5 days of event duration.
+Second, a **weather-realisation confound**: the histogram measures the slice's shape *under the
+weather that actually occurred* — a PV-heavy slice moved during an overcast week reads as
+demand-heavy. Both are mitigated the same way: rather than hour-of-day alone, **correlate each
+recipient's residual step against the NWP covariates we already hold** (irradiance for PV, wind
+speed for wind, temperature and time-of-week for demand). That conditions on the weather that
+actually happened instead of assuming a canonical sunny day, and it is still a regression-free
+read-off in the v0.6 spirit — a few correlations per leg.
+
 *Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor `j` and a demand-heavy slice to donor `k`. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what `j` got" vs. "what `k` got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 
 #### Other notes
 
 Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/180)
 
-**Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**: the transferred-magnitude threshold above which we reliably detect events and below which we cannot. Pair this with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.*
+**Validation against the 32-series logs (this is the point).** Score the unsupervised detector against the known switching events: detection precision/recall, accuracy of the recovered donor set, error in transferred magnitude, and — most importantly — the **detection sensitivity floor**. The floor is not a single MW number: it is a frontier in **transferred magnitude × event duration**, reported per series relative to that series' residual noise. The duration axis exists because changepoint segmentation has a minimum detectable event length at half-hourly sampling (an event lasting minutes to a few hours appears as a spike or one odd interval, not a step), just as residual noise sets a minimum magnitude. Pair the frontier with the forecast impact of missed small events. *The detector must not consume the logs as input — only as a scoring oracle.* One caveat to carry into the scoring: measured **precision is a lower bound** — if the control-room logs are incomplete (worth asking NGED how complete they believe them to be), some "false positives" will be real, unlogged events.
 
-**Diagnostic precursor.** Before formal changepoints, a near-trivial check: first-difference each residual (steps → spikes) and, over rolling windows, confirm that a source's negative spike coincides with the *summed* rises of a neighbour subset. If known-neighbour groups show no such coincidence, the neighbour list or baseline is wrong — fix that first.
+**Synthetic event injection (the workhorse of tuning and validation).** The logs contain only however many events the trial period happens to contain, which caps the statistical power of any sensitivity estimate. Injection removes that cap: take periods believed clean, move a synthetic slice between real neighbours (subtract a scaled, plausibly-shaped signal from one series and add it across 1–3 others), and measure detection and attribution over a controlled **magnitude × duration grid**. This maps the full sensitivity frontier with arbitrary precision, tunes every threshold and penalty in stages 1–2 *without touching the gold-standard logs*, and works at any scale — including, later, on unlabelled full-fleet data. The real logs then play their proper role: confirming that the synthetic frontier transfers to reality, rather than carrying the whole measurement burden alone.
+
+**Diagnostic precursor.** Before formal changepoints, a near-trivial check: first-difference each residual (steps → spikes) and, over rolling windows, confirm that a source's negative spike coincides with the *summed* rises of a neighbour subset. Equivalently, around each *logged* event, plot the member residuals and the neighbourhood-sum residual: members should step, the sum should stay (approximately) flat. If known-neighbour groups show no such structure, the neighbour list or baseline is wrong — fix that first.
 
 **What it delivers.** A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.
 
@@ -120,7 +208,9 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - Misses slow/gradual reconfigurations (because changepoint detection algos assume abrupt shift).
 - Misses small partial transfers near the noise floor — but these are both the *hardest* and (per the tolerance principle) the *least important* for the forecast, so the failure mode is aligned with priorities. The sensitivity floor makes this limit explicit rather than hidden.
 - **Blind to events that straddle the start of the record.** A switching state already in force before the data begins has no observable onset — it is only detectable if and when it *ends*. This is a structural blind spot, not a fixable one, and belongs in the sensitivity-floor reporting alongside the magnitude threshold.
-- Struggles with temporally overlapping events on one neighbourhood.
+- Struggles with temporally overlapping events on one neighbourhood — the sequential
+  detect-then-match structure is the culprit; the joint edge-flow estimator below is the designed
+  escalation for exactly this.
 - Composition read-off is qualitative only.
 
 **Pros.**
@@ -129,6 +219,81 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - Runs unsupervised, exactly as the scale regime demands.
 - Produces the masking artifact and the honest sensitivity floor that everything downstream relies on.
 - De-risks the programme at minimal cost.
+
+#### Escalation within v0.6 — the joint edge-flow estimator
+
+The three stages above are deliberately sequential: detect steps per substation, then match them
+across substations. That sequencing is easy to build and debug, but it has a known structural
+weakness (visible in the cons list): when events **overlap in time on one neighbourhood**, or
+when several attributions are individually ambiguous, a sequential matcher must make hard early
+choices that a joint method would not have to. There is a well-understood single-model
+alternative that performs detection and attribution **simultaneously**. It is the planned
+escalation *within* v0.6 — built if, and only if, validation shows that sequential matching is
+the thing that is failing.
+
+**The idea, in plain terms.** Instead of asking "does substation `i` show a step, and can we find
+neighbours to balance it?", write one equation for the whole neighbourhood and solve it in one
+go. Introduce, for every edge `i–j` of the graph, an unknown time series `e_ij(t)`: *the power
+crossing that boundary at time `t` because of switching* (zero under NRA). Each substation's
+residual is then, by construction, the signed sum of the flows on its own edges, plus a
+per-substation anomaly term:
+
+```text
+residual_i(t) ≈ Σ_j ±e_ij(t) + u_i(t)
+```
+
+(`+` where flow enters `i`, `−` where it leaves; `u_i` is explained below.) An optimiser then
+finds the edge flows that best explain **all substations' residuals at once**, subject to two
+penalties encoding what we know about switching:
+
+1. **Most flows are zero most of the time** (events are rare) — so penalise a flow for being
+   non-zero at all (a *sparsity* penalty).
+2. **When a flow is non-zero it is flat, with abrupt jumps** (switching is a step change held for
+   the event's duration) — so penalise a flow for *changing value* between consecutive time steps
+   (a *fused*, or total-variation, penalty — which is exactly what produces piecewise-constant
+   solutions).
+
+This combination is known as a **sparse fused lasso**. The crucial property is that the whole
+problem is **convex**: it has a single global best answer, no local minima, and standard fast
+solvers — unlike the v2.5 mixture model, whose products of unknowns make it genuinely harder to
+fit. In effort terms it sits just above the staged detector and well below v2.5.
+
+**Why it is attractive.**
+
+- **Conservation is built in, not checked afterwards.** A flow on edge `i–j` automatically
+  subtracts from one end and adds to the other; the parameterisation *cannot represent* a
+  non-conserving event, so there is no separate balance test to pass.
+- **Detection = attribution = magnitude estimation.** An event is simply "edge `i–j`'s flow
+  stepped from 0 to 4 MW at `t₁` and back at `t₂`". Source, donor set, per-leg magnitude, event
+  intervals, and the ARA mask all read directly off the fitted flows.
+- **Overlapping events are handled natively.** Two simultaneous transfers on one neighbourhood
+  are just two edge flows active at once; the optimiser separates them jointly instead of a
+  matcher untangling them sequentially.
+
+**Two details that matter.**
+
+- **The per-node slack term `u_i(t)`.** Not every step has a partner — a new connection, a meter
+  fault, or genuine load growth steps one substation with nothing balancing it at neighbours.
+  Without an escape valve the optimiser would be *forced* to invent edge flows to explain such
+  steps. `u_i(t)` is a per-substation "unexplained anomaly" series with its own sparsity penalty:
+  a partnerless step lands there and is reported as "anomaly, unknown cause" (exactly as stage 2
+  would report it) instead of contaminating the flows.
+- **Piecewise-constant is still an approximation.** A real transferred slice is live load — it
+  has its own diurnal shape, so over a long event the true `e_ij(t)` is not flat. The refinement,
+  if injections show it is needed: make the *fraction* piecewise-constant rather than the MW —
+  model `e_ij(t) = f_ij(t)·baseline_j(t)` with `f_ij` piecewise-constant, which is still convex
+  because the baseline is a known input. This is precisely the stepping stone to v2.5, whose
+  `α_ij(t)·d_j(t)` is the same idea with the known baseline replaced by a jointly-inferred
+  latent.
+
+**What it reuses.** Everything upstream: the same weather/calendar baseline, the same
+normalised/whitened residuals, the same adjacency, and the same synthetic-injection harness
+(which is how its two penalty weights are tuned). It replaces only stages 1–2's detect-then-match
+logic; stage 3's composition read-off applies unchanged to its output. This is also why it is an
+escalation rather than the starting point: it shares nearly all its parts with the staged
+detector, adds solver machinery, and is harder to inspect when it misbehaves. Build the
+transparent staged version first, keep it as the reference, and adopt the joint estimator only
+where a head-to-head comparison (on logs + injections) shows it wins.
 
 ---
 
@@ -149,6 +314,26 @@ observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
 - During an ARA: weight shifts from a source onto **one or more** neighbours. Multiple `α_ij(t)` may be active at once for a single source.
 - **Conservation = node-level flow balance:** weight leaving `i` is distributed across a subset of neighbours and must sum to the weight lost at `i` (approximately mass-preserving over the affected neighbourhood). **Do not** implement this as independent pairwise equal-and-opposite constraints — that is wrong given confirmed 2–3-way fan-out.
 - **Priors / regularisation:** `α(t)` strongly regularised toward the identity (NRA) and **piecewise-constant in time**, because switching events are rare (~10%) and abrupt. A useful by-product: jumps in `α` are directly interpretable as detected switching events.
+- **`d_i(t)` must itself be modelled, not left free.** If the latent demand were an unconstrained
+  value per timestep the model would be hopelessly underdetermined — any observation can be
+  explained by moving `d` instead of `α`. `d_i(t)` is a weather/calendar-driven model plus a
+  smooth residual; in other words, v2.5 embeds the v0.6 baseline inside itself as the latent's
+  backbone. The v0.6 work is reused, not discarded.
+- **Fitting is bilinear (non-convex) — initialise from v0.6.** The `α·d` products mean local
+  minima are a real risk. Initialise/anchor the `α` jump times from the v0.6 event list (or the
+  edge-flow estimator's fitted flows, which are the same object in additive form) so the
+  optimiser starts near the right switching structure. v0.6's output is thus a direct *input* to
+  v2.5, not just its validation set.
+- **Known degeneracies to guard.** (a) *Scale:* `α_ii·d_i` is invariant to rescaling one against
+  the other; the identity prior resolves this except for a substation observed under ARA for
+  (nearly) its whole record, where v0.6's record-straddling blind spot applies unchanged.
+  (b) *Growth vs transfer:* genuine new load at `i` and a small persistent transfer onto `i` are
+  separated only by conservation (growth has no balancing donor) — keep an explicit per-node
+  anomaly/slack term, as in the edge-flow estimator, so partnerless changes are not forced into
+  `α`. (c) *Net-zero crossing:* `α` is a fraction of **net** power, and a fraction of a signal
+  near zero moves almost nothing regardless of `α` — at PV-heavy substations whose net crosses
+  zero, the transfer's magnitude information vanishes around the crossing. v2.6's typed
+  decomposition removes this by mixing gross components instead.
 
 **Why "arbitrary continuous slice" is handled natively.** `α_ij(t)` is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
@@ -245,7 +430,9 @@ These apply at every stage and are the things most easily got wrong:
 - **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a production dependency. The *method* generalises; a pilot lookup does not.
 - **Conservation is node-level flow balance, everywhere.** One source's lost power is absorbed by a *subset* of neighbours whose pickups sum to it. Never implement conservation as independent pairwise equal-and-opposite matches — confirmed 2–3-way fan-out makes that wrong.
 - **Composition is read from recipients, never the source.** Any per-leg composition estimate (v0.6 stage 3) must come from each recipient's individual step *after* attribution; the source's step blends all simultaneous outgoing legs.
-- **Partial transfer is the common case.** Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor; do not assume a clean event/no-event separation.
+- **Partial transfer is the common case.** Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor (a magnitude × duration frontier, per series); do not assume a clean event/no-event separation.
+- **Every detection statistic gets a null.** Changepoint penalties calibrated per series under the residual's real autocorrelation; attribution scores calibrated against chance-level subset balance by permutation. Uncalibrated thresholds are how phantom events happen.
+- **Synthetic event injection is the standard tuning instrument at every stage.** Thresholds, penalties, and sensitivity frontiers are tuned and measured on injected events; the logged events are reserved for final scoring, never for tuning.
 - **Routing/switching priors:** regularise toward the identity (NRA) and piecewise-constant in time; switching is rare and abrupt.
 - **Metered vs unmetered DER** kept as separate modules from v2.6 onward; metered tightly constrained, unmetered carrying the latent inference.
 - **Interpretability artifacts** (detected events, inferred `s_ij`, DER estimates) are deliverables in their own right for NGED validation, not just internal state.
@@ -257,3 +444,40 @@ These apply at every stage and are the things most easily got wrong:
 - **Switching logs for the 32-series trial** (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
 - **Confirmed by NGED:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
+- **To ask NGED:** how complete are the control-room switching logs for the trial area? (Determines whether measured detection precision is a tight bound or a loose lower bound.)
+
+---
+
+## Implementation details (deleted when this ships)
+
+The build order for v0.6, simplest-first, each step delivering something testable before the next
+adds complexity. Steps 1–7 are the staged detector; step 8 is the in-version escalation, built
+only if the head-to-head justifies it.
+
+1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
+   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
+   list from NGED (see Part 5). Nothing downstream is testable without these.
+2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
+   (**no power-lag features**), quantile objective (median + spread quantiles), per series.
+   Output: normalised residual series. Sanity-check residual autocorrelation and per-series
+   spread before proceeding.
+3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
+   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
+   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
+   conservation premise in one cheap pass. If it fails, fix data before building any detector.
+4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
+   magnitude × duration grid into believed-clean periods. Built early because every later
+   threshold is tuned on it.
+5. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
+   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
+   injections.
+6. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
+   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
+   onset/reversion pairing into event intervals.
+7. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
+   duration floor only); score everything against the logged events (precision reported as a
+   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
+8. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 6/7 validation
+   shows sequential matching is the binding error source (overlapping events, ambiguous
+   attributions). Reuses steps 1–5 wholesale; penalty weights tuned on the injection harness;
+   adopted only where it beats the staged detector head-to-head.
