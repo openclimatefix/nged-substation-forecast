@@ -166,7 +166,7 @@ def _compute_effective_capacity(
     ``time`` is set to that series' **latest** observed timestep (``time.max()``). The MVP capacity
     is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
     as current to the end of the observed history — rather than a timestep the value varies over. The
-    v0.6 / v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
+    v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
     time)``), and only then does ``time`` carry per-row meaning. The MVP stays one scalar row per
     series rather than the value repeated at every half-hour: densifying a constant adds rows
     without information, and the metrics join is by ``time_series_id`` alone until capacity varies.
@@ -202,7 +202,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
     densifying a constant buys nothing.
 
-    A future upgrade (v0.6 / v0.7) swaps the P99 for the differentiable-physics capacity model,
+    A future upgrade (v0.7) swaps the P99 for the differentiable-physics capacity model,
     emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,
     but ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
     ``time_series_id`` alone (same doc section).

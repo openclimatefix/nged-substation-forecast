@@ -36,8 +36,8 @@ There are **five** tables. This table tracks where each one stands today:
 | 1 | `power_forecast` | ✅ Implemented (deterministic-ensemble flavour only) | `contracts.power_schemas.PowerForecast` |
 | 2 | `power_forecast_warnings` | 🚧 Planned (partial in MVP) | not yet in code |
 | 3 | `asset_health_history` | 🚧 Planned | not yet in code |
-| 4 | `effective_capacity` | ✅ MVP implemented (static P99 estimate); DP upgrade planned for v0.6 / v0.7 | `contracts.power_schemas.EffectiveCapacity` |
-| 5 | `substation_switching` | 🚧 Planned (v0.6 / v0.7) | not yet in code |
+| 4 | `effective_capacity` | ✅ MVP implemented (static P99 estimate); DP upgrade planned for v0.7 | `contracts.power_schemas.EffectiveCapacity` |
+| 5 | `substation_switching` | 🚧 Planned (v0.6) | not yet in code |
 
 > **Naming note.** The Milestone 1 report drafted these tables with the column name `timeseries_id`,
 > but the codebase uses **`time_series_id`** everywhere. The implemented `PowerForecast` schema uses
@@ -90,7 +90,7 @@ filter on `fold_id` to select the population you need. See
 > contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a capacity
 > to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). We forecast raw
 > MW/MVA for now because we are **not yet estimating capacity**; once capacity estimation lands
-> (v0.6 / v0.7) we plan to switch `power_fcst` to the [−1, +1] scaled value. This is also noted in a
+> (v0.7) we plan to switch `power_fcst` to the [−1, +1] scaled value. This is also noted in a
 > comment on the `PowerForecast.power_fcst` field in `power_schemas.py`.
 
 ### Representation 2 — percentiles 🚧
@@ -188,7 +188,7 @@ Notes on specific flags:
 > **Status: ✅ MVP implemented** — the `effective_capacity` Dagster asset writes P99 of observed
 > power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
-> **Planned upgrade in v0.6 / v0.7** to differentiable-physics capacity estimation — see
+> **Planned upgrade in v0.7** to differentiable-physics capacity estimation — see
 > [Capacity estimation](capacity-estimation.md).
 
 OCF's estimate of each generator's or substation's **effective capacity** at every half-hourly
@@ -204,7 +204,7 @@ It is also the denominator used to normalise NMAE in the `forecast_metrics` tabl
 for why the MVP stores one scalar row per series (rather than repeating the value at every half-hour)
 and how the metrics join evolves for the DP upgrade.
 
-**DP upgrade (v0.6 / v0.7):** replace the static P99 with a time-varying estimate from the
+**DP upgrade (v0.7):** replace the static P99 with a time-varying estimate from the
 differentiable-physics model. For generators, the prior comes from the Embedded Capacity Register
 and is updated at each half-hour from the generator's power time series, absorbing PV-panel
 degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM-capped at 5 MW
@@ -226,7 +226,7 @@ its `time_series_id`-only capacity join for a temporal as-of join (see
 
 ## Table 5 — `substation_switching` 🚧
 
-> **Status: 🚧 Planned (v0.6 / v0.7).** Depends on switching-event detection.
+> **Status: 🚧 Planned (v0.6).** Depends on switching-event detection.
 
 Captures the amount of power OCF estimates has been **switched** from a "donor" substation to a
 "recipient" substation. OCF estimates switching events purely from the power-flow time series and
