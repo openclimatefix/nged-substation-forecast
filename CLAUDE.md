@@ -67,6 +67,9 @@ Full description and a "which place do I use?" table: `docs/roadmap/index.md`. I
 - If it is a sub-issue, attach it to its parent epic **and position it appropriately in the
   parent's sub-issue order** (execution order, respecting `blocked by` chains) — the
   `reprioritizeSubIssue` GraphQL mutation with `afterId`/`beforeId`.
+- **Body** — if (and only if) the docs already contain a plan for the issue (e.g. a
+  `docs/roadmap/` section), the body may be *just* a link to that rendered docs section and
+  nothing more; don't duplicate the plan. Otherwise, write a self-contained body.
 - When the body links to a docs page, link to the **rendered site**
   (`https://openclimatefix.github.io/nged-substation-forecast/...`), never a `github.com`
   blob path.
