@@ -389,6 +389,57 @@ overall RMSE only tells half the story. We add a **"Peak Events"** filter:
 - **Hand-picked "hard examples"**: if NGED supplies a list of historically tricky times, we compute
   performance on those alone.
 
+### Tricky days — a calendar-deterministic metric filter 🚧
+
+Alongside Peak Events, we add a **"Tricky days"** filter: score models separately on the handful of
+calendar dates whose demand shape departs sharply from the usual weekly rhythm. We scope it
+deliberately to the **calendar-deterministic** set — fixed and moveable public holidays (Christmas,
+Easter, and the rest of the GB bank holidays) plus the two annual daylight-saving transitions —
+because these are exactly the days our weekday/seasonal analogues are *built* to mishandle. Days
+that are hard for *data-dependent* reasons stay in their own already-planned filters:
+[switching-event days](#measuring-performance-during-switching-events) and NGED's hand-picked
+"hard examples" (above). One shared filter *mechanism*, several named filters — folding genuinely
+different failure modes into one bucket would make the number impossible to act on ("bad on tricky
+days" — is that Christmas, or a switching event?).
+
+Mechanically it is another population filter (the same mechanism the planned Peak Events filter
+uses): a boolean flag per timestep, derived from `valid_time` alone. Because it is purely
+calendar-driven it **shares its calendar module with `nged_incumbent_holiday_aligned`** — the same
+GB bank-holiday calendar (the pure-Python `holidays` package) plus the two DST dates feed both the
+holiday-aligned baseline and this metric filter. And the two reinforce each other: `nged_incumbent`
+(no holiday logic) should be *visibly* worst on tricky days, and `nged_incumbent_holiday_aligned`
+should recover most of the gap — turning "we added holiday alignment" into a *measurable* number,
+exactly the cheap-upgrades story we want to show NGED.
+
+**Flag the day _and_ its analogue-relevant neighbours, not just the day itself.** The disruption
+spills onto surrounding timesteps:
+
+- **DST transitions**: the hard part is not only the 23/25-hour day but that lag and analogue
+  features are misaligned by an hour on the days either side.
+- **The Christmas run-up**: demand in the days *before* Christmas is already atypical, so the window
+  must cover the run-up, not just the 25th.
+
+So the flag covers a small **window** around each date rather than a single day; the exact per-event
+widths are an implementation-time choice.
+
+**A subtlety to document now but _not_ model yet.** The shape of the Christmas run-up depends not
+just on the number of days before Christmas but also on **which weekday Christmas falls on** — the
+run-up demand pattern shifts year to year with that day-of-week alignment. We record it here as a
+known effect; the MVP tricky-days *flag* ignores it (it simply marks the window), and we defer any
+explicit day-of-week-aware modelling of the run-up until there is evidence it moves the leaderboard.
+
+#### Implementation details — tricky days (deleted when this ships)
+
+- A small calendar module (shared with baseline 2, `nged_incumbent_holiday_aligned`) answers, for
+  any `valid_time`, whether it falls inside a tricky-days window. Back it with the `holidays` GB
+  calendar plus the two annual DST dates; expose the per-event window widths as config.
+- Represent the tricky-days slice the same way the Peak Events filter is represented — one more
+  named population filter, resolved by the same mechanism, **not** a new schema axis — so the
+  leaderboard gains a **Tricky days** column with no `Metrics` schema change.
+- Verification: unit-test the flag on known dates (a Christmas week, an Easter, both DST
+  switchovers, and a plain week that must be *excluded*); on a smoke-test fold, confirm
+  `nged_incumbent` scores worse on the tricky-days slice than overall.
+
 ---
 
 ## Time-slices for performance evaluation
