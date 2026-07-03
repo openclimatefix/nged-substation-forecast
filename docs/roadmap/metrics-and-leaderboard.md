@@ -76,7 +76,7 @@ recent-power member in.
 **It is also our first _probabilistic_ baseline — and this is the faithful representation, not a
 bonus.** The plotted spread *is* the incumbent's output — an operator reads it by eye. We emit the
 13 analogues as 13 `ensemble_member` rows and let the [probabilistic
-metrics](#phase-b--probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
+metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
 the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
 worth stating plainly:
 
@@ -331,6 +331,32 @@ and nothing is logged to the leaderboard MLflow runs.
 > per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
+
+### ⚠️ Unresolved: which ensemble collapse defines the deterministic point forecast? 🚧
+
+The deterministic metrics (MAE, NMAE, RMSE, MBE) score a **single point forecast**, but every model
+on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical
+analogues for `nged_incumbent`). Something has to collapse each ensemble to one number, and **that
+choice is not yet consistent across models**:
+
+- `compute_metrics` today collapses every ensemble to its **mean**
+  (`packages/ml_core/src/ml_core/metrics.py`).
+- The [`nged_incumbent` baseline](#the-headline-baseline-nged_incumbent) instead wants its headline
+  to be the **median** (plus NGED's P95 reported alongside).
+
+Mean and median diverge for skewed or underdispersed ensembles, so a leaderboard that scores some
+models on their mean and others on their median is **not apples-to-apples** on the deterministic
+columns — a silent trap that will quietly mis-rank models.
+
+**Decision to make (flagged, not yet resolved):** pick **one** central statistic for the headline
+deterministic column — applied uniformly to *every* model — and treat any other collapse (NGED's
+P95, an ML model's own mean, etc.) strictly as an *extra, labelled* column, never the headline. The
+median is the more defensible uniform choice (robust to the skew and to the underdispersion the
+[probabilistic section](#delivering-the-probabilistic-metrics) documents), but standardising on it
+means changing the ML models' deterministic collapse from mean → median, which shifts every existing
+deterministic number. Resolve this *before* the leaderboard is used to adjudicate between models;
+it pairs naturally with the per-experiment collapse-statistic work noted in the
+[baseline implementation details](#implementation-details-baselines-deleted-when-they-ship).
 
 ### Normalising NMAE by `effective_capacity`
 
