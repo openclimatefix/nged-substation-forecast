@@ -61,6 +61,18 @@ The candidates:
 - **[Cheap baselines](#cheap-baselines-to-beat)**: a rolling quantile of clear-sky-normalised
   output, and SLAC's off-the-shelf convex capacity-change detection.
 
+Despite coming from different toolchains, the two serious candidates are the *same kind of
+thing*: both are **inverse modelling** — write down a forward model mapping unknown parameters
+(capacities, orientation) to predicted power, then invert it against the observed power to
+recover the parameters. Neither is "more physical" than the other; a fixed pvlib per-unit curve
+inside a convex problem is exactly as much a physics model as a transposition calculation inside
+a PyTorch module. What genuinely separates them is **expressiveness versus guarantees**:
+Candidate A restricts its forward model to what convexity can certify and gets the exact,
+reproducible global optimum in return; Candidate B may write down any differentiable physics it
+likes — and gives up the certificates. The head-to-head is therefore also a live measurement of
+that trade-off on NGED data; the framing is developed fully in
+[Two routes to the same inverse problem](../techniques/convex-optimisation.md#two-routes-to-the-same-inverse-problem).
+
 There is a testable prediction to settle, made when this contest was designed: **the convex
 estimator wins per-site, and the PyTorch route only pulls ahead when pooling many sites to
 *learn* shared physics corrections** (soiling, snow, systematic irradiance-model bias) — which is

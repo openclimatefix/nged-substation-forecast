@@ -119,6 +119,52 @@ The residual attractions of PyTorch are real — one toolchain across the projec
 the two properties above *for a formulation that is actually convex*. And the bridge below means
 the choice is not a wall.
 
+## Two routes to the same inverse problem
+
+It is tempting to file CVXPY and PyTorch under different activities — "optimisation" versus
+"physics modelling". That framing is wrong, and correcting it makes the tooling rule much easier
+to hold in your head. Both toolchains, as this project uses them, are doing **inverse
+modelling**: write down a *forward model* mapping unknown parameters to a predicted signal
+(capacities and orientations to power; edge flows to substation residuals), then invert it
+against observations to recover the parameters. And both host physics — a fixed per-unit
+[pvlib](https://pvlib-python.readthedocs.io/) curve inside a CVXPY problem is exactly as much a
+physical model as a transposition calculation inside a PyTorch module.
+
+The genuine difference is a single trade-off:
+
+- **CVXPY restricts what the forward model may contain** — only expressions the
+  [DCP rulebook](#cvxpy-the-modelling-language) can certify as convex in the unknowns — **and in
+  exchange guarantees the inversion**: the certified global optimum, identically every run, with
+  [exact zeros](#the-corners-are-a-feature-exact-zeros), no initialisation, no learning rates,
+  no "did I converge?" anxiety. The restriction bites on real physics: capacity × an
+  orientation-dependent per-unit curve is convex only once the orientation is fixed
+  ([grade 2 below](#where-pytorch-is-the-right-tool)), and capacity × a shared irradiance bias
+  is bilinear, full stop.
+- **PyTorch accepts any differentiable forward model** — temperature-dependent efficiency, hard
+  clips, neural components, variational posteriors — **and gives up the guarantees**: the
+  inversion is gradient descent on a dented landscape, managed with initialisation, restarts,
+  and validation. In return it gains unrestricted expressiveness and composability —
+  minibatching, joint training with neural nets, amortisation across sites.
+
+So the axis separating the tools is **expressiveness of the forward model versus guarantees on
+the inversion** — not whether physics is involved, and not whether differentiation is involved.
+
+That last point deserves spelling out, because "CVXPY doesn't use differentiation" is a natural
+misreading. The interior-point solvers behind CVXPY use derivative information heavily — that is
+how they navigate to the bottom of the bowl — and
+[`cvxpylayers`](#the-bridge-welding-cvxpy-into-pytorch) literally differentiates *through* a
+convex solve. What CVXPY does not do is backpropagate through an arbitrary user-written
+simulator, because it never sees a simulator: it sees a structured algebraic problem, and it is
+precisely by exploiting that structure that it can promise the global optimum. Conversely,
+"[differentiable physics](differentiable-physics.md)" is shorthand for *a physics simulator
+written in an autodiff framework so that it composes with gradient-based learning* — the
+differentiability is the enabling property, not the point.
+
+One honest wrinkle in the inverse-modelling framing: it covers the *estimation* applications on
+this page cleanly, but convex optimisation is broader — a future scheduling or dispatch problem
+would be a *forward* optimisation (choose the best actions), not an inversion. The framing
+describes the applications this project currently plans, not the whole convex world.
+
 ## The recurring pattern: fixed shapes, unknown coefficients
 
 Many estimation problems in this project share one algebraic skeleton. Physics (or a previously

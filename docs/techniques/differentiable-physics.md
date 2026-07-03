@@ -62,6 +62,14 @@ vs unmetered, which DER types are tractable, and the full graph-structured engin
 substation network — is planned in
 [Net-demand disaggregation](../roadmap/disaggregation.md).
 
+A note on the name: "differentiable physics" is shorthand for *a physics simulator written in an
+autodiff framework so that it composes with gradient-based learning* — the differentiability is
+the enabling property, not the point. The underlying activity is **inverse modelling**, and it is
+shared with the [convex route](convex-optimisation.md): both toolchains write a forward model and
+invert it against observations, and both host physics. What actually separates them is the
+expressiveness of the forward model versus the guarantees on the inversion — unpacked in
+[Two routes to the same inverse problem](convex-optimisation.md#two-routes-to-the-same-inverse-problem).
+
 ---
 
 ## The core building block: `DifferentiableSolarPlant`
