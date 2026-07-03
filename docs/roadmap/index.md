@@ -207,7 +207,10 @@ Target: **January 2027**
     1. `power_forecast` — [−1, +1] ensemble power forecasts
     2. `power_forecast_warnings` — per-`time_series_id` warnings (HEALTHY, MISSING VALUE, STUCK TIMESERIES, INVALID TIMESERIES VALUE, GENERATOR OR CIRCUIT FAULT, GENERATOR REDUCED CAPACITY, SUBSTATION ABNORMAL RUNNING ARRANGEMENT, STALE NWP, STALE POWER)
     3. `asset_health_history` — complete historical record of each time series's health state
-    4. `effective_capacity` — half-hourly probabilistic generator capacity estimates (mean + std)
+    4. `effective_capacity` — half-hourly probabilistic effective-capacity estimates (mean + std
+       after the v0.7 upgrade,
+       [#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247); a static
+       scalar per series in v0.1)
     5. `substation_switching` — estimated power diverted between substation pairs (mean + std)
 
 ![v1.0 diagram](assets/v1_flow_diagram.png)

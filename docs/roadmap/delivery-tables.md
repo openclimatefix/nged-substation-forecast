@@ -86,12 +86,14 @@ filter on `fold_id` to select the population you need. See
 | `ensemble_member` | `int8` | ID of the NWP ensemble member driving this forecast. ECMWF ENS has 51 members. |
 | `power_fcst` | `float32` | OCF's power forecast. **In this early version** the value is in physical units (MW for active power, MVA for apparent power). |
 
-> **🚧 Planned change — normalise `power_fcst` to [−1, +1].** The intended long-term delivery
-> contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a capacity
-> to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). We forecast raw
-> MW/MVA for now because we are **not yet estimating capacity**; once capacity estimation lands
-> (v0.7) we plan to switch `power_fcst` to the [−1, +1] scaled value. This is also noted in a
-> comment on the `PowerForecast.power_fcst` field in `power_schemas.py`.
+> **🚧 Planned change — normalise `power_fcst` to [−1, +1]
+> ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.1).** The
+> delivery contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a
+> capacity to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). The code
+> still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists
+> there is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
+> **v0.1**. This is also noted in a comment on the `PowerForecast.power_fcst` field in
+> `power_schemas.py`.
 
 ### Representation 2 — percentiles 🚧
 
@@ -154,7 +156,7 @@ capacity):
 
 **Self-assembly note:** NGED (or any user) can build their own forecast by multiplying the
 (future) [−1, +1] `power_forecast` by a capacity derived from the
-[`effective_capacity`](#table-4-effective_capacity) table's `effective_capacity_MW_mean` column —
+[`effective_capacity`](#table-4-effective_capacity) table's `effective_capacity_mw` column —
 its **maximum** over history (→ a "normal" forecast) or its **most recent** value (→ a
 "prevailing conditions" forecast). See [forecast building blocks](forecast-building-blocks.md).
 
@@ -211,8 +213,11 @@ degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM
 with 10 MW physical capability has `effective_capacity_mw = 10`). For substations, the 99th
 percentile of observed load over a rolling window, under normal running arrangement only. During a
 switching event, effective capacity = last known normal-arrangement value plus the "switched
-power" from [Table 5](#table-5-substation_switching). The schema is unchanged between MVP and DP;
-the asset body changes to emit one row per `(time_series_id, time)`, and the metrics pipeline swaps
+power" from [Table 5](#table-5-substation_switching). The DP estimate is probabilistic, so the
+single `effective_capacity_mw` column is upgraded to a mean + std pair
+([#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247), matching Table 5's
+Normal-distribution convention); the asset body changes to emit one row per
+`(time_series_id, time)`, and the metrics pipeline swaps
 its `time_series_id`-only capacity join for a temporal as-of join (see
 [Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)).
 

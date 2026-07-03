@@ -219,8 +219,11 @@ series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of mi
 express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
 because the real MVP→DP interface change is not the data shape but **the join** (below). The
 `EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
-both the one-row-per-series MVP and the one-row-per-half-hour DP shape with no schema change; that is
-the forward-compatibility we want.
+both the one-row-per-series MVP and the one-row-per-half-hour DP shape; that is the
+forward-compatibility we want. (The DP upgrade does widen the *columns* — the value becomes a
+mean + std pair,
+[#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but the row shape
+and the join are unaffected by that.)
 
 **DP upgrade (v0.7): time-varying, and the join changes.** The
 [differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over

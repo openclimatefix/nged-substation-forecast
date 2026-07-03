@@ -2,8 +2,11 @@
 
 How NGED assembles different kinds of forecast from the "Lego blocks" OCF delivers.
 
-> **Status: 🚧 Planned.** The normalised forecast is the long-term plan (the early MVP forecasts raw
-> MW/MVA — see [delivery tables, Table 1](delivery-tables.md#table-1-power_forecast)). The
+> **Status: 🚧 Planned.** The normalised [−1, +1] forecast is planned for **v0.1**, scaled by the
+> static P99 capacity
+> ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246); the code still
+> forecasts raw MW/MVA today — see
+> [delivery tables, Table 1](delivery-tables.md#table-1-power_forecast)). The
 > capacity and switching building blocks depend on work scheduled for v0.6 (switching) and
 > v0.7 (capacity). OCF will provide
 > example Python code (likely a small package) to demonstrate assembling these forecasts. See the
