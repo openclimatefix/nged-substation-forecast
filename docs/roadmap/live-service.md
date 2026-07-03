@@ -57,6 +57,8 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 
 ## The `live_forecasts` asset
 
+Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/221)
+
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
 asset is what the deployed container runs every 6 hours: load the production model, forecast
 the latest NWP, write to `power_forecasts` with `fold_id="live"`.
@@ -101,6 +103,8 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
 
 ## Production model artifacts
 
+Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)
+
 The deployment below runs forecasts as ephemeral Fargate tasks under every architecture
 option. An ephemeral container has no persistent disk and, under some architecture options, no
 reachable tracking server — so without a decision here, production inference has no way to get
@@ -127,8 +131,10 @@ service survives an MLflow outage), exactly as it does for CV today.
 
 ## AWS architecture
 
+Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)
+
 An earlier version of this plan committed to the Level 1 ("nothing always-on") design from
-issue [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206). A
+issue #206. A
 2026-07-02 pressure-test of that decision found the #206 cost analysis substantially wrong:
 the always-on control plane it priced at ~\$95–140/month actually costs ~\$14–27/month (it
 priced a 16 GB box big enough to run the *compute*, not a small control-plane box), and its
@@ -253,6 +259,8 @@ local file-store) and a **"development dashboard"** (a Marimo app for researcher
 needed to ship v0.1; revisit once the box exists.
 
 ## Production monitoring
+
+Issue: [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)
 
 *Depends on the [`live_forecasts` asset](#the-live_forecasts-asset) — there is nothing to
 monitor until live forecasts exist.*
@@ -406,6 +414,9 @@ Container verification:
 
 ### Deployment workstream 1 — S3-capable data paths (the biggest unknown; start first)
 
+Issues: [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121),
+[#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50)
+
 Every data location in `Settings` is a local `Path`
 (`packages/contracts/src/contracts/settings.py:104-135`) and all IO assumes a local
 filesystem. delta-rs/Polars read and write `s3://` URIs fine, but the plumbing has to allow it:
@@ -427,6 +438,8 @@ filesystem. delta-rs/Polars read and write `s3://` URIs fine, but the plumbing h
   settings.
 
 ### Deployment workstream 2 — the production job
+
+Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)
 
 A new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
 

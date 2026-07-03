@@ -81,7 +81,9 @@ EWM of `temperature_2m` over the past ~1–3 days (computed from the NWP traject
 horizon-safe) plus heating-degree `max(15.5 − T, 0)`. Linearises the demand–temperature
 relationship the same way item 7 does for generation.
 
-### 7. Linearised physics features for solar and wind ([#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168))
+### 7. Linearised physics features for solar and wind
+
+Issue: [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)
 
 Trees are poor at smooth monotone functions; give them the physics directly:
 
@@ -136,7 +138,10 @@ Each series currently gets its nearest NWP cell only. Add the mean and gradient 
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
 expected gain, cheap given the `geo` H3 machinery exists.
 
-### 12. Per-`time_series_type` feature lists ([#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201))
+### 12. Per-`time_series_type` feature lists
+
+Issues: [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201),
+[#107](https://github.com/openclimatefix/nged-substation-forecast/issues/107)
 
 YAML gains `selected_features_by_type: {type: [...]}` with the existing `selected_features` as
 the default for unlisted types. Boosters are already per-series, so each can resolve its
@@ -146,7 +151,9 @@ in `meta.json`. Becomes genuinely valuable once items 4–9 diverge the useful f
 
 ## Tier 4 — structural model changes (weeks)
 
-### 13. Per-horizon-window models ([#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149))
+### 13. Per-horizon-window models
+
+Issue: [#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149)
 
 One booster per `(time_series_id, horizon_window)` — e.g. 0–2 d, 2–7 d, 7–14 d, configurable.
 Train and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a window dimension.
@@ -154,13 +161,17 @@ Train and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a wind
 to evaluate** — its win is by construction horizon-sliced. Compare against item 1 first: if
 the lead-time feature captures most of the benefit, the extra model count may not pay.
 
-### 14. Batched training via `xgb.DataIter` ([#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) — enabler)
+### 14. Batched training via `xgb.DataIter` (enabler)
 
-Issue [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) already contains a complete, validated implementation design (`LazyFrameBatchIter` +
+Issue: [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91)
+
+Issue #91 already contains a complete, validated implementation design (`LazyFrameBatchIter` +
 `QuantileDMatrix`, grouping-agnostic, no temp disk, `train_batch_size` config field) — treat
 the issue body as the plan and implement as written. No direct skill gain; unblocks 15 and 16.
 
-### 15. Train on more ensemble members ([#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) — after 14)
+### 15. Train on more ensemble members (after 14)
+
+Issue: [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)
 
 Training on all 51 members multiplies training data ~51× for correlated rows. Run the
 dose-response experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP
@@ -169,7 +180,9 @@ also teaches the model the member-spread input distribution it actually sees at 
 the train/serve input-skew flagged in the review. Ensemble *calibration* itself belongs to
 [probabilistic evaluation](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 
-### 16. Global model per `time_series_type` ([#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104))
+### 16. Global model per `time_series_type`
+
+Issue: [#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104)
 
 One booster for all primaries, one for all PV sites, etc. — the biggest potential win for
 data-poor series (transfer across sites), and the stepping stone to V2 scale. **Hard

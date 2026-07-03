@@ -13,6 +13,9 @@ disaggregation in v2.
 
 ## Phase 1: Dynamic capacity estimation for metered generators (v1)
 
+Issues: [#157](https://github.com/openclimatefix/nged-substation-forecast/issues/157) (solar),
+[#158](https://github.com/openclimatefix/nged-substation-forecast/issues/158) (wind)
+
 Targeted at [roadmap v0.7](index.md#v07-dynamic-generator-capacity).
 This is deliberately the **simplest** application of DP, and **none of the "clever" latent-demand or
 ARA inversion happens here.** We deploy a basic DP model of the **metered PV and wind sites** purely

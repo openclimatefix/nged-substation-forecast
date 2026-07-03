@@ -75,6 +75,15 @@ Full description and a "which place do I use?" table: `docs/roadmap/index.md`. I
 `updateIssueIssueType` GraphQL mutation for Type, and `gh project item-edit` (or the
 `updateProjectV2ItemFieldValue` mutation) for the project fields.
 
+**Creating pull requests** — whenever you create a PR, also set:
+
+- **Labels** — pick whatever fits (e.g. `documentation`, `enhancement`, `bug`), same label set as
+  issues.
+- **Assignees = JackKelly**.
+
+`gh pr create` can't set either: use `gh pr edit --add-label` and `gh pr edit --add-assignee
+JackKelly` right after creating the PR.
+
 **Ship-time triage** — when a PR lands a roadmap item, that PR (or an immediate follow-up)
 must also:
 
