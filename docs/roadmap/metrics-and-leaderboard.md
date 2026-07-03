@@ -47,12 +47,13 @@ exists to answer: **do we beat what NGED does today?**
 ### The headline baseline — `nged_incumbent`
 
 NGED's current approach to "forecasting" primary-substation demand uses no weather model and no
-ML. It averages the substation's own history: an ensemble of the observed power at the same
-time-of-day on the same weekday over the **last 5 weeks**, plus the same weekday and time-of-day
-from **roughly a year ago** (51, 52 and 53 weeks back). This is *the bar we have to clear to
-justify the project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent"
-is the deliverable. It is the first baseline we implement; if we implement only one, it is this
-one.
+ML. For each substation they build an ensemble of analogues from its own history — the observed
+power at the same time-of-day on the same weekday over the **last 5 weeks**, plus the same weekday
+and time-of-day from **roughly a year ago** (51, 52 and 53 weeks back) — **plot them all, and read
+a forecast off the spread by human judgement.** There is no automated point forecast: the human
+reading the plotted members *is* the method. This is *the bar we have to clear to justify the
+project* — "XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the
+deliverable. It is the first baseline we implement; if we implement only one, it is this one.
 
 It slots into our machinery beautifully, because every one of its 8 members is just a **power
 lag**:
@@ -68,10 +69,12 @@ has *no* short-horizon skill from recent power — realistic, since that is exac
 today, and a reason to keep the pure `PersistenceForecaster` as a contrast rather than to sneak a
 recent-power member in.
 
-**It is also our first _probabilistic_ baseline.** The 8 analogues are naturally an ensemble, so
-we emit them as 8 `ensemble_member` rows and let the [probabilistic
-metrics](#phase-b--probabilistic-metrics-from-the-existing-ensemble) score it for free — no model
-changes. Two consequences worth stating plainly:
+**It is also our first _probabilistic_ baseline — and this is the faithful representation, not a
+bonus.** Because NGED never collapse the members to a single number, the raw ensemble *is* the
+incumbent's output. We emit the 8 analogues as 8 `ensemble_member` rows and let the [probabilistic
+metrics](#phase-b--probabilistic-metrics-from-the-existing-ensemble) score them for free — scoring
+the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
+worth stating plainly:
 
 - **`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble
   member; for `nged_incumbent` it indexes a *historical analogue*. Same column, different meaning.
@@ -79,10 +82,13 @@ changes. Two consequences worth stating plainly:
   `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
   unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
   runs with `weather_source: "none"`.
-- **Members are not equiprobable.** NGED weight the analogues unequally, but our probabilistic
-  metrics (Phase B) assume equiprobable members. MVP resolves this by weighting all 8 **equally**;
-  faithfully reproducing NGED's weights (which would need weighted quantiles / weighted CRPS) is a
-  documented follow-up, not a silent simplification.
+- **The equal-weight mean is _our_ collapse, not NGED's.** NGED produce no point forecast at all,
+  so the deterministic leaderboard metrics need one and we take the **equal-weight** mean of the
+  members as a neutral default. Because there is no explicit NGED averaging step to reproduce,
+  equiprobable members (for both the mean and the Phase B metrics) is a faithful MVP, not a known
+  inaccuracy. Whether the human leans on some analogues more than others — e.g. recent weeks — is
+  open question 3; if the answer is yes, a weighted mean / weighted quantiles become a documented
+  follow-up.
 
 ### A faithful replica and a "cheap upgrades" variant
 
@@ -129,8 +135,9 @@ one:
   analogue index) — this is where the ensemble is *synthesised*, not consumed from NWP. Members
   nulled by `_nullify_leaky_lags` (lag ≤ lead time) or by insufficient history are dropped; rows
   where *all* members are null (very long horizons + data gaps) are dropped and the count logged,
-  as in persistence. The deterministic point forecast is the **equal-weight** mean of the
-  surviving members (weighting tension noted in the prose above / open question 3).
+  as in persistence. The members are the faithful output (NGED read the plotted spread by eye);
+  the **equal-weight** mean is *our* collapse, added only to feed the deterministic metrics (see
+  prose above / open question 3).
 - `train()` records `trained_time_series_ids` only. `save`/`load` persist a `meta.json` with the
   config + ids (copy the `XGBoostForecaster` pattern).
 - `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`; runs with `weather_source: "none"`.
@@ -205,8 +212,9 @@ in each; correcting any is a small config change (a code change only for holiday
    count)
 2. **Annual analogues** — same weekday & time, **51/52/53** weeks back (3 members)? or just 52
    (1 member)?
-3. **Weighting** — are the analogues combined **equally**, or weighted (e.g. recent weeks count
-   for more)?
+3. **Reading the spread** — NGED read a forecast off the plotted members rather than averaging;
+   when doing so, do they lean on some analogues more than others (e.g. recent weeks)? A "yes"
+   would justify a weighted mean / weighted quantiles.
 4. **Holidays** — any handling (bank-holiday day-type remap; moveable-feast alignment,
    Easter→Easter)? — this is what motivates baseline 2.
 5. **Anything else** — discarding anomalous values, or scaling last-year values for load growth?
