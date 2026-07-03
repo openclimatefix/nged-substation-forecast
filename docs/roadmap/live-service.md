@@ -247,11 +247,10 @@ backtest compute *and* a free dashboard home, for ~\$15–25/month over Level 1.
 fallback if operational simplicity trumps backtest speed and ~\$40/month. D pays an RDS+ALB
 tax for purism; E's 1-user cap rules it out.
 
-**Future work (not MVP):** once an always-on control-plane box exists (Option B or later), it's
-also a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing
-the local file-store) and a **"development dashboard"** (a Marimo app for researchers, distinct
-from the production dashboard already scoped above). Neither is needed to ship v0.1; revisit
-once the box exists.
+**Future work (not MVP):** once an always-on control-plane box exists (Option B or later), it's also
+a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing the
+local file-store) and a **"development dashboard"** (a Marimo app for researchers). Neither is
+needed to ship v0.1; revisit once the box exists.
 
 ## Production monitoring
 
