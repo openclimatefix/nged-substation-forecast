@@ -63,6 +63,7 @@ nav:
       - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
       - Data Sources: roadmap/data-sources.md
       - Capacity Estimation: roadmap/capacity-estimation.md
+      - Net-Demand Disaggregation: roadmap/disaggregation.md
       - Switching Events: roadmap/switching-events.md
       - XGBoost Improvements: roadmap/xgboost-improvements.md
       - Engineering Health: roadmap/engineering-health.md

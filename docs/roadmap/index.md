@@ -71,13 +71,17 @@ apply them.
   bang-for-the-buck first across four effort tiers.
 - [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP clip
   logging, Hydra removal, and scientific-rigor tests.
-- [Capacity estimation](capacity-estimation.md) — applying
-  [differentiable physics](../techniques/differentiable-physics.md) to effective-capacity
-  estimation of metered generators (v1), and the path to graph-structured disaggregation of net
-  substation power into latent demand and DER generation (v2).
+- [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
+  estimators of the time-varying effective capacity of metered generators: a
+  [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a
+  [differentiable-physics](../techniques/differentiable-physics.md) variational estimator, and
+  cheap baselines — the winner ships in v1.
+- [Net-demand disaggregation](disaggregation.md) — the canonical v2 research arc:
+  graph-structured disaggregation of net substation power into latent demand and DER generation,
+  the convex dictionary baseline, MVA metering, prior art, and the novelty claims.
 - [Switching events](switching-events.md) — the canonical treatment of switching events and
   estimating latent demand under the normal running arrangement: the v0.6 unsupervised statistical
-  detector and the v2 mixture models (the graph is a data structure, not a GNN).
+  detector and the v2 mixture models (the graph is a data structure).
 
 ## Milestones
 
@@ -175,7 +179,7 @@ only for first month, then shared with NGED.*
 
 **Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**:
 
-- Implement a basic [differentiable physics (DP)](../techniques/differentiable-physics.md) model for the *metered* wind and solar PV generators to estimate their physical parameters — most importantly effective capacity at each half-hourly timestep, which bumps up and down with maintenance, faults and build-out (this is **Phase 1** of the DP plan). The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is v2 research.
+- Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality) are on the [capacity estimation](capacity-estimation.md) page. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
   - **CERRA** (Copernicus regional reanalysis) — high-resolution historical weather, useful for pre-training and for estimating historical generator capacity
@@ -225,18 +229,18 @@ delivery of the v2 live service)*
 **Required**:
 
 - Scale to approximately 2,500 time series: all of NGED's primary substations (1,161), BSPs (271), GSPs (52), and most customer meters (~1,000)
-- Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by disaggregating net primary substation power flows)
+- Estimate the installed capacity of *unmetered* solar PV and wind on each primary substation (by [disaggregating net primary substation power flows](disaggregation.md))
 - Compare top-down forecasts vs. bottom-up forecasts for BSPs and GSPs
 
 **Research (advanced ML)**:
 
-- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather — *not* a trained graph neural network: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing rather than message passing. A trained GNN remains an optional, residual-driven escalation. (This is **Phase 2** of the DP plan — see [the graph-structured DP engine](../techniques/differentiable-physics.md#6-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [Switching events, Part 2](switching-events.md).)
+- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [Switching events, Part 2](switching-events.md).)
 - **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
 - **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
-- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (the Phase 2 capability — see [the graph-structured DP engine](../techniques/differentiable-physics.md#6-scaling-to-the-full-grid-a-graph-structured-dp-engine) and [MVA metering](../techniques/differentiable-physics.md#8-apparent-power-mva-metering))
+- **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
 - **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history
 
 **Stretch goals**:

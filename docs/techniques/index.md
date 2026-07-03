@@ -9,14 +9,16 @@ pages, techniques pages are permanent: they stay put (and stay linkable — incl
 docstrings) as the work that applies them ships.
 
 - [Convex optimisation](convex-optimisation.md) — the one-bowl property, why a certified global
-  optimum beats gradient descent wherever it is available, exact zeros from ℓ1 penalties, and the
-  project tooling rule (CVXPY for convex estimation subproblems; PyTorch for physics + learning).
-  First applied by the edge-flow estimator on the
-  [switching-events roadmap page](../roadmap/switching-events.md).
+  optimum beats gradient descent wherever it is available, exact zeros from ℓ1 penalties,
+  hard limits as censoring, quantile envelopes, priors as penalties, and the project tooling rule
+  (CVXPY for convex estimation subproblems; PyTorch for physics + learning). First applications:
+  the edge-flow estimator on the
+  [switching-events roadmap page](../roadmap/switching-events.md), and the convex candidate in
+  the [v0.7 capacity head-to-head](../roadmap/capacity-estimation.md).
 - [Differentiable physics](differentiable-physics.md) — inversion through differentiable forward
-  models: the single-site solar plant, aggregate fleet nodes, the graph-structured disaggregation
-  engine, and native MVA handling. Applied by the
-  [capacity-estimation roadmap page](../roadmap/capacity-estimation.md).
+  models: the single-site solar plant and the aggregate fleet node. Applied by the
+  [capacity-estimation](../roadmap/capacity-estimation.md) and
+  [net-demand disaggregation](../roadmap/disaggregation.md) roadmap pages.
 - [Learned encoders](encoders.md) — shared WeatherEncoder / TimeEncoder modules and why they pair
   naturally with differentiable physics.
 - [Disaggregation evaluation](disaggregation-evaluation.md) — the multi-pronged protocol for
