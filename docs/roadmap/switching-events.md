@@ -98,7 +98,7 @@ residuals around time t (observed - expected), one row per substation:
 - a step that is **roughly flat, or tracks the evening demand peak** → **demand-heavy**;
 - a step that is **large but uncorrelated with daylight, gusty/variable** → **wind-heavy**.
 
-This is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching the spirit of v0.5.
+This is a histogram (step magnitude vs. hour-of-day), not a fitted model — deliberately cheap, matching v0.6's simple-statistics spirit.
 
 *Order matters — read composition off the recipient, never the source.* The diurnal shape must be measured on **each recipient's individual step**, *after* attribution has identified which donor took which leg. It must **not** be read off the source substation's lumped drop. The reason: a source commonly sheds *different* slices to *different* donors at once — say a PV-heavy slice to donor `j` and a demand-heavy slice to donor `k`. The source's own residual shows only the *sum* of everything it lost, which blends the two into a meaningless average that matches neither leg. Only the per-recipient steps separate cleanly into "what `j` got" vs. "what `k` got." (This is the same source-blends-everything pitfall noted for stage 1, applied to composition rather than magnitude.)
 

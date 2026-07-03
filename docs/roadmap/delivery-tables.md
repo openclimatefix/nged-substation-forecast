@@ -10,8 +10,9 @@ How OCF delivers forecasts and supporting data to NGED.
 ## How forecasts are delivered
 
 For v1 of the live service, OCF delivers live forecasts (and the supporting tables below) as
-**Delta Lake** tables in an AWS S3 bucket. We are **not** building a REST API for v1 (see
-[scope changes](index.md)); an API may be added later if it brings additional benefit.
+**Delta Lake** tables in an AWS S3 bucket. We are **not** building a REST API for v1 (a REST API is a v2
+[stretch goal](index.md#v20-scale-up-future-research)); an API may be added later if it brings
+additional benefit.
 
 - **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees on
   cheap object storage. NGED never reads a half-written forecast: each update is atomic, so the
@@ -35,7 +36,7 @@ There are **five** tables. This table tracks where each one stands today:
 | 1 | `power_forecast` | ✅ Implemented (deterministic-ensemble flavour only) | `contracts.power_schemas.PowerForecast` |
 | 2 | `power_forecast_warnings` | 🚧 Planned (partial in MVP) | not yet in code |
 | 3 | `asset_health_history` | 🚧 Planned | not yet in code |
-| 4 | `effective_capacity` | 🚧 MVP in v0.1 (P99 estimate); DP upgrade planned for v0.6 / v0.7 | `contracts.power_schemas.EffectiveCapacity` |
+| 4 | `effective_capacity` | ✅ MVP implemented (static P99 estimate); DP upgrade planned for v0.6 / v0.7 | `contracts.power_schemas.EffectiveCapacity` |
 | 5 | `substation_switching` | 🚧 Planned (v0.6 / v0.7) | not yet in code |
 
 > **Naming note.** The Milestone 1 report drafted these tables with the column name `timeseries_id`,
@@ -182,9 +183,10 @@ Notes on specific flags:
 
 ---
 
-## Table 4 — `effective_capacity` 🚧
+## Table 4 — `effective_capacity`
 
-> **Status: 🚧 MVP in v0.1** using P99 of observed power as a static capacity proxy.
+> **Status: ✅ MVP implemented** — the `effective_capacity` Dagster asset writes P99 of observed
+> power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
 > **Planned upgrade in v0.6 / v0.7** to differentiable-physics capacity estimation — see
 > [Capacity estimation](capacity-estimation.md).
