@@ -216,6 +216,22 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 **What it delivers.** A labelled list of detected events (time, source, donor set, per-leg magnitude, rough per-leg composition, score); an ARA mask for the forecasting data; a validation set for later stages; and the quantified sensitivity floor.
 
+**A zeroth-order NRA reconstruction comes for free.** The event table is more than flags: each
+event carries an interval, a donor set, and per-leg magnitudes, so a first-cut reconstruction of
+the NRA signal is plain arithmetic — over each event interval, add each leg's magnitude back onto
+the source and subtract it from its donor (with the
+[edge-flow estimator](#v061-the-joint-edge-flow-estimator) this is literally observed minus the
+fitted flows). What that restores is each series' mean *level* under NRA. What it cannot restore
+is the moved slice's *shape*: the transferred load is live demand with its own diurnal and
+seasonal variation, and subtracting a flat block leaves all of that variation sitting in the
+"corrected" donor series (and missing from the source), an error that grows with event duration.
+Closing that shape gap is exactly what
+[v2.5](#v25-magnitude-only-mixture-model-the-workhorse) is for. The subtraction version is still
+useful in its own right: it turns the ARA *mask* into an optional *patch* — keep
+switching-affected periods in the forecast training data with corrected values rather than
+discarding ~10% of the record — and whether the patch beats the hole is cheap to measure on the
+synthetic-injection harness.
+
 **What this approach misses / cons.**
 
 - Misses slow/gradual reconfigurations (because changepoint detection algos assume abrupt shift).
@@ -509,7 +525,15 @@ Notes on the sketch:
 
 **Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
-**Motivation.** v0.6 only flags events; it does not reconstruct the clean NRA signal. v2.5 is the simplest model that actually *produces* latent demand — and it does so **without modelling anything below the primary**, sidestepping the (non-existent) feeder-discovery problem entirely. The latent objects are the substations themselves, which we observe. This is the workhorse: faithful to how the network actually behaves, and fully unsupervised.
+**Motivation.** v0.6 already supports a
+[zeroth-order NRA reconstruction by subtraction](#v06-unsupervised-statistical-switching-event-detector)
+— but that correction is a flat block per event: it restores each series' mean NRA *level* while
+leaving the moved slice's time-varying *shape* behind. v2.5 is the simplest model whose
+reconstruction carries shape — the correction is a scaled copy of a live, jointly-inferred demand
+signal rather than a constant — and it produces latent demand **without modelling anything below
+the primary**, sidestepping the (non-existent) feeder-discovery problem entirely. The latent
+objects are the substations themselves, which we observe. This is the workhorse: faithful to how
+the network actually behaves, and fully unsupervised.
 
 **Method.** Each substation $i$ has a latent normal-demand signal $d_i(t)$. Observed power is a time-varying mixture over the neighbourhood:
 
@@ -579,9 +603,21 @@ the routing estimation should stay a convex layer even then.
 
 **Why "arbitrary continuous slice" is handled natively.** $\alpha_{ij}(t)$ is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
-**What it adds over v0.6.**
+**What it adds over v0.6 (including the v0.6.1 edge-flow estimator).**
 
-- Produces the actual latent NRA demand signal, not just event flags.
+- **Shape, not just level.** Both v0.6 reconstructions correct an event with a flat block — the
+  staged detector's subtraction and v0.6.1's piecewise-constant flows alike — leaving the moved
+  slice's diurnal/seasonal variation behind. v2.5's correction $\alpha_{ij}(t) \cdot d_j(t)$ is a
+  scaled copy of a live demand signal, so the moved load's variation moves with it. Even v0.6.1's
+  shaped-flow refinement $e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ only borrows shape
+  from the *fixed exogenous baseline*; v2.5's shape comes from the jointly-inferred latent
+  $d_j(t)$ — the weather/calendar backbone *plus* the smooth residual the baseline cannot see.
+- **Joint inference instead of point-estimate commitment.** The subtraction reconstruction
+  commits forever to the detector's noisy magnitude estimates (which also absorb the few-percent
+  loss/CVR imbalance). v2.5 re-estimates routing and latent demand together, so each refines the
+  other and detection-time noise in the magnitudes is smoothed against the demand model.
+- Produces the actual latent NRA demand signal $d_i(t)$ as a modelled object, not
+  observed-minus-detected-events arithmetic.
 - Models routing continuously rather than detecting it after the fact.
 - Accommodates multi-donor partial transfer through the summed mixture + node-level balance.
 
