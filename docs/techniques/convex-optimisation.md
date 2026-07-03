@@ -4,7 +4,7 @@
 > convex formulation is a fundamentally better deal than gradient-descent training wherever it is
 > available, and the project's practical tooling rule — **CVXPY for convex estimation
 > subproblems, PyTorch for physics + learning**. The first planned application is the
-> [joint edge-flow estimator](../roadmap/switching-events.md#escalation-within-v06-the-joint-edge-flow-estimator)
+> [joint edge-flow estimator](../roadmap/switching-events.md#v061-the-joint-edge-flow-estimator)
 > for switching-event detection; further applications are expected. The Python in this document
 > is illustrative sketch code, not the implementation.
 
@@ -140,16 +140,24 @@ There is a bridge between the two worlds: **differentiable convex optimisation l
 ([`cvxpylayers`](https://github.com/cvxgrp/cvxpylayers), from the same research group as CVXPY).
 It embeds a convex solve inside a PyTorch model as if it were another layer, with gradients
 flowing through the solve itself. Concretely for this project: the switching-event estimator need
-not remain a separate preprocessing step forever — it could eventually sit *inside* the v2.5
-mixture model, jointly trained, with the physics modules feeding it and gradients passing
-straight through. Not a day-one build — but it means choosing CVXPY for switching now does not
-wall that code off from the PyTorch future.
+not remain a separate preprocessing step forever — the routing/switching solve can eventually sit
+*inside* the v2.6 type-resolved model as a convex layer, with the differentiable-physics modules
+feeding it and gradients passing straight through, keeping exact zeros and built-in conservation
+where free tensors would lose both. (v2.5, by contrast, needs no PyTorch at all: it is buildable
+as alternating CVXPY solves.) When each rung earns its place is documented in the
+[v2.5 tooling note](../roadmap/switching-events.md#v25-magnitude-only-mixture-model-the-workhorse)
+on the switching-events roadmap page. Not a day-one build — but it means choosing CVXPY for
+switching now does not wall that code off from the PyTorch future.
 
 ## Applications in this project
 
 - **Switching-event detection — the
-  [joint edge-flow estimator](../roadmap/switching-events.md#escalation-within-v06-the-joint-edge-flow-estimator)**
+  [joint edge-flow estimator](../roadmap/switching-events.md#v061-the-joint-edge-flow-estimator)**
   (first planned application): a group fused lasso on signed edge flows; implementation sketch on
   the roadmap page.
+- **The v2.5 mixture model** — bilinear, so not one convex problem, but buildable entirely as
+  *alternating* CVXPY solves (each step convex; global-optimum guarantee holds per step, not
+  overall). See the
+  [v2.5 tooling note](../roadmap/switching-events.md#v25-magnitude-only-mixture-model-the-workhorse).
 - More are expected to follow. Roadmap pages that adopt a convex formulation should cite this
   page for the rationale and tooling choice rather than re-deriving them.

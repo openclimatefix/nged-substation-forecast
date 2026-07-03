@@ -37,7 +37,7 @@ Version numbers are aligned with the main codebase: **v0.6**, then **v2.5**, the
 v0.6  ── Unsupervised statistical detector on power data.
   │       Flags/masks switching events; VALIDATED against the 32-series logs.
   │       Produces the detection sensitivity floor (a quantified, honest limit).
-  │       In-version escalation, only if sequential matching proves brittle:
+  │       In-version escalation (v0.6.1), only if sequential matching proves brittle:
   │       the joint edge-flow estimator (detection + attribution in one solve).
   │
 v2.5  ── Magnitude-only mixture model. The workhorse.
@@ -234,7 +234,7 @@ Issue: [#180](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 #### v0.6.1 — the joint edge-flow estimator
 
-> **Status within v0.6:** this sections documents the known next move if sequential matching
+> **Status within v0.6:** this section documents the known next move if sequential matching
 > (described above) proves brittle. The staged detect-then-match pipeline above remains the day-one
 > implementation because it fails legibly. v0.6.1 uses the same priors and the same graph but with
 > strictly better structure, and may well turn out to be the right method to get us to v1. The
@@ -332,7 +332,7 @@ staged detector fails *legibly* — every flag traces to a visible step and a na
 subset — while a joint optimiser is harder to inspect when it misbehaves. Build the transparent
 version first, keep it as the reference, and adopt the joint estimator where the head-to-head
 comparison (on logs + injections) shows it wins. A CVXPY implementation sketch lives in the
-implementation-details section at the bottom of this page.
+implementation-details section directly below.
 
 ---
 
@@ -464,6 +464,9 @@ Notes on the sketch:
   the switching logs — see the escalation section above for why.
 - **The anomaly slack `u`** carries a plain ℓ1 penalty here; if injections show partnerless steps
   are themselves step-like (a new connection is), `u` can be given its own fused penalty too.
+
+---
+
 ### v2.5 — Magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand `d_i(t)` per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
@@ -501,6 +504,41 @@ observed_i(t) = α_ii(t)·d_i(t) + Σ_{j ∈ neighbours(i)} α_ij(t)·d_j(t)
   near zero moves almost nothing regardless of `α` — at PV-heavy substations whose net crosses
   zero, the transfer's magnitude information vanishes around the crossing. v2.6's typed
   decomposition removes this by mixing gross components instead.
+
+**Tooling: v2.5 can be built entirely with CVXPY — by alternation, with one honest caveat.** As
+written, v2.5 is *not* one convex problem: `α·d` multiplies two unknowns, which is exactly the
+kind of expression CVXPY's DCP check refuses (see
+[Convex Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a special
+structure — the problem is convex in each unknown *separately* — and that enables the classic
+**alternating** scheme, where every step is a plain CVXPY solve:
+
+- **α-step (fix `d`, solve for `α`).** With `d` treated as known data, the mixture is linear in
+  `α`, and the priors (identity-regularised, piecewise-constant in time, node-level balance as
+  linear constraints) make this the same group-fused-lasso family as the
+  [v0.6.1 edge-flow estimator](#v061-the-joint-edge-flow-estimator) — convex, with the exact
+  zeros that let jumps in `α` read directly as detected events.
+- **d-step (fix `α`, solve for `d`).** With the routing fixed, the observation model is linear in
+  `d`, and "weather/calendar backbone plus smooth residual" is a convex regression.
+
+Iterate the two steps to convergence. There is also a natural **convex warm start**: fixing `d`
+to the exogenous baseline makes the whole model one convex problem — it is essentially v0.6.1's
+shaped-flow refinement `e_ij(t) = f_ij(t)·baseline_j(t)` in mixture clothing — so solve that
+first, then let alternation release `d`. The caveat to state plainly: convexity now holds per
+*step*, not overall. Alternation converges, but to a *local* optimum of the bilinear problem — the
+certified-global-optimum promise of the pure-convex world does **not** come back just because
+each step uses CVXPY. The v0.6 initialisation (bullet above) and the convex warm start are what
+manage that risk. No part of v2.5 needs PyTorch.
+
+**Where `cvxpylayers` enters (and where it doesn't).** The bridge that embeds a convex solve as a
+differentiable layer inside a PyTorch model
+([the techniques page explains it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
+is *not needed* for v2.5 — alternation above is CVXPY in a loop. It earns its place at **v2.6**,
+when `d_i` decomposes into physics modules (panel trigonometry, power curves, products of
+unknowns) that are genuinely non-convex and force PyTorch for the outer model. At that point the
+routing/switching estimation should *stay* a convex layer inside the PyTorch model rather than
+being re-implemented as free tensors: the layer keeps exact zeros (so "nonzero routing = detected
+event" survives) and built-in conservation, while gradients flow through the solve to train the
+physics modules end-to-end.
 
 **Why "arbitrary continuous slice" is handled natively.** `α_ij(t)` is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
 
@@ -552,6 +590,18 @@ observed_i(t) = Σ_j [ α^dem_ij(t)·gross_demand_j(t)
 ```
 
 Each substation is now a small *bundle* of typed nodes rather than one node, and routing happens per type. But the graph stays a plain **data structure**, exactly as in the earlier stages: when the i→j boundary is active, each *type* moves with its own weight — structure-plus-arithmetic, with no message-passing network trained.
+
+**Tooling.** This is the stage where PyTorch becomes unavoidable: the typed forward modules are
+genuinely non-convex (see [Convex Optimisation](../techniques/convex-optimisation.md) for why),
+so the outer model lives in PyTorch per the
+[differentiable-physics](../techniques/differentiable-physics.md) plan. The per-type routing
+weights `α^type_ij(t)`, however, should **remain a differentiable convex layer** inside that
+model (via
+[`cvxpylayers`](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
+rather than becoming free tensors: the layer preserves exact zeros ("nonzero routing = detected
+event") and built-in conservation, while gradients flow through the solve to the physics modules.
+The full rationale, and the alternation-only path that gets v2.5 built without any PyTorch, is in
+the v2.5 tooling note above.
 
 **Prior structure.**
 
@@ -612,6 +662,3 @@ These apply at every stage and are the things most easily got wrong:
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
 - **Confirmed by NGED:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
 - **To ask NGED:** how complete are the control-room switching logs for the trial area? (Determines whether measured detection precision is a tight bound or a loose lower bound.)
-
----
-
