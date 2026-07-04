@@ -6,7 +6,7 @@
 > [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138):
 > CI [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) ·
 > reproducibility stamping [#227](https://github.com/openclimatefix/nged-substation-forecast/issues/227) ·
-> NWP clip logging [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) ·
+> NWP ingestion checks [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) ·
 > Hydra removal [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228) ·
 > rigor tests [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229).
 > Task ordering lives in the GitHub Project board.
@@ -137,69 +137,44 @@ the smoke-test fold end-to-end and confirm the fold run shows git + Delta-versio
 MLflow UI. (4) Round-trip check: `pl.scan_delta(power_time_series_path, version=<logged>)`
 returns the training-time state after a subsequent append.
 
-## NWP quantisation: count and surface clipped values
+## NWP ingestion: completeness checks and Dagster metrics
 
 Issue: [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161)
 
-`NwpOnDisk.from_nwp_in_memory` (`packages/contracts/src/contracts/weather_schemas.py:390`)
-clips each variable to its buffered range before Int16 encoding:
+`ecmwf_ens` currently records only `n_rows` in the Dagster UI, and nothing validates that a
+downloaded run is *complete* — `Nwp.validate` checks row-level invariants (dtypes, bounds,
+uniqueness, null patterns) but not run-level shape. A partial download (a missing ensemble
+member, a truncated forecast horizon, a dropped H3 cell) would land silently and only surface
+later as weird training data.
 
-```python
-clipped_col = pl.col(col_name).clip(lower_bound=buffered_min, upper_bound=buffered_max)
-```
+(This issue's design originally also covered counting values clipped by the Int16
+quantisation ranges — the highest-value check at the time. That failure mode was eliminated by
+[#271](https://github.com/openclimatefix/nged-substation-forecast/pull/271): Float32
+significand rounding has no ranges, so nothing clips.)
 
-The buffered ranges carry only a 5% margin over the min/max observed when
-`compute_scaling_params` ran. If ECMWF ENS later produces values outside that range (extreme
-storm winds, record pressure lows), they are silently flattened to the boundary — corrupting
-exactly the extreme-weather inputs that matter most for peak forecasting, with no signal that
-it happened.
+### Implementation details — ingestion checks (deleted when this ships)
 
-Related: [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) asks
-for more Dagster-UI metrics and validation checks on NWP ingestion — the clip counts here are
-the highest-value of those checks; close or trim #161 accordingly when this lands.
+**1. Run-level completeness check in contracts.** New `@classmethod` on `Nwp` — called from
+the asset, **not** from `Nwp.validate`: validation runs on arbitrary frames (filtered test
+fixtures, pruned scans), while completeness is a property of one whole ingested run.
+`check_run_completeness(df, expected_n_cells, expected_members)` asserts, per the issue:
 
-### Implementation details — clip logging (deleted when it ships)
+- `valid_time` spans `init_time` → `init_time + 15 days` with the expected 85 native steps
+  (3-hourly to 144 h, then 6-hourly to 360 h);
+- the expected number of unique `h3_index` values (from the H3 grid weights);
+- the expected `ensemble_member` set.
 
-**1. Pure counting helper in contracts.** New function in `weather_schemas.py` (near
-`from_nwp_in_memory`):
+Raise with a message naming exactly what's missing (which members, which lead times).
 
-```python
-def count_out_of_range(
-    nwp_in_memory: pt.DataFrame[NwpInMemory],
-    scaling_params: pt.DataFrame[NwpScalingParams],
-) -> dict[str, int]:
-    """Per-variable count of values outside the buffered scaling range (i.e. values that
-    from_nwp_in_memory would clip)."""
-```
+**2. Call it in `ecmwf_ens`** after `convert_nwp_xarray_dataset_to_polars_dataframe`, before
+`write_nwp`, and attach the counts to the materialisation metadata (`n_members`, `n_cells`,
+`n_valid_times`, `valid_time_min`/`valid_time_max` alongside the existing `n_rows`) so drift
+is visible in the Dagster UI timeline even when the check passes.
 
-One `select` building `((col < buffered_min) | (col > buffered_max)).sum()` per scaling-params
-row (mirror the loop structure at `weather_schemas.py:380-398`), returning only non-zero
-entries. Keep `from_nwp_in_memory` itself pure/unchanged — counting is the caller's concern,
-and the asset wants the numbers for metadata anyway.
-
-**2. Call it in the `ecmwf_ens` asset.** In `src/nged_substation_forecast/defs/assets.py`,
-where the day's `NwpInMemory` frame is converted via `from_nwp_in_memory`:
-
-- Call `count_out_of_range` on the same frame.
-- If any count > 0: `context.log.warning(...)` naming the variables and counts.
-- Always attach the dict to the asset materialisation metadata (e.g.
-  `clipped_values_total` plus per-variable entries), so drift is visible in the Dagster UI
-  timeline even at zero.
-
-Cost note: one extra aggregation pass over the day's frame (~7M rows) — negligible next to the
-download.
-
-**3. Docs.** One paragraph in the NWP section of `docs/roadmap/data-sources.md` (or wherever
-the quantisation scheme is described): clipping is monitored, and persistent non-zero counts
-mean `compute_scaling_params` should be re-run with a wider range (which requires re-encoding
-the Delta table — a deliberate, documented operation, not something to automate).
-
-**Verification.** (1) Unit test in `packages/contracts/tests/`: a small `NwpInMemory` fixture
-with values pushed beyond `buffered_max` for one variable → `count_out_of_range` reports
-exactly those counts, and zero for in-range variables. (2) Round-trip test: values at exactly
-`buffered_min`/`buffered_max` count as in-range (clip is inclusive). (3) Materialise one
-`ecmwf_ens` partition locally and confirm the metadata entry appears (expect zeros for a
-normal day).
+**Verification.** (1) Unit test in `packages/contracts/tests/`: a synthetic complete run
+passes; dropping one member / one cell / one lead time raises naming the gap. (2) Materialise
+one `ecmwf_ens` partition locally and confirm the new metadata entries appear in the Dagster
+UI.
 
 ## Drop Hydra (and OmegaConf): plain YAML + importlib + pydantic
 

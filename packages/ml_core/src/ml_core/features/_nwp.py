@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 
 
 def _join_nwp_bulk_mode(
@@ -88,12 +88,12 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     treat these as genuinely missing values, not as a data quality issue.
     """
     schema_names = nwp_lf.collect_schema().names()
-    all_weather_vars = NwpInMemory.all_weather_var_names()
+    all_weather_vars = Nwp.all_weather_var_names()
     group_cols = [
         col for col in schema_names if col != "valid_time" and col not in all_weather_vars
     ]
-    continuous_cols = [col for col in schema_names if col in NwpInMemory.continuous_var_names()]
-    categorical_cols = [col for col in schema_names if col in NwpInMemory.categorical_var_names]
+    continuous_cols = [col for col in schema_names if col in Nwp.continuous_var_names()]
+    categorical_cols = [col for col in schema_names if col in Nwp.categorical_var_names]
 
     # Build 30-min time grid per group: aggregate min/max valid_time per group,
     # expand each row into a list of half-hourly datetimes, then explode to rows.

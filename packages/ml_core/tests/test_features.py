@@ -5,7 +5,6 @@ import polars as pl
 import pytest
 from pydantic import ValidationError
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpInMemory
 from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
 from ml_core.features._parsed_features import (
@@ -652,7 +651,7 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     result = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+        nwp=nwp_df.lazy(),
         selected_features={"temperature_2m"},
         power_fcst_init_time=None,  # backtest / training mode
     ).collect()
@@ -734,7 +733,7 @@ def test_engineer_features_weather_lag_leakage_prevention():
     engineered = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+        nwp=nwp_df.lazy(),
         selected_features={"temperature_2m", "temperature_2m_lag_2h", "temperature_2m_lag_36h"},
         power_fcst_init_time=power_fcst_init_time,
         nwp_init_time=nwp_init_time,
@@ -828,7 +827,7 @@ def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
     all_rows = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+        nwp=nwp_df.lazy(),
         selected_features={"temperature_2m_lag_12h"},
         power_fcst_init_time=None,
         nwp_publication_delay_hours=6,
@@ -868,7 +867,7 @@ def test_engineer_features_bulk_mode_derives_power_fcst_init_time():
     result = _engineer_features(
         power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+        nwp=nwp_df.lazy(),
         selected_features={"temperature_2m"},
         nwp_publication_delay_hours=nwp_publication_delay_hours,
     ).collect()
@@ -900,7 +899,7 @@ def test_engineer_features_raises_when_no_control_member_for_weather_lag():
                 PowerTimeSeries
             ),
             time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-            nwp=pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+            nwp=nwp_df.lazy(),
             selected_features={"temperature_2m_lag_6h"},
             power_fcst_init_time=datetime(2023, 1, 1, 6, 0),
             nwp_init_time=nwp_init_time,

@@ -8,7 +8,7 @@ import xarray as xr
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.geo_schemas import H3GridWeights
 from contracts.settings import Settings
-from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, NwpInMemory, NwpModelId
+from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp, NwpModelId
 
 _SETTINGS = Settings()
 
@@ -16,7 +16,7 @@ _SETTINGS = Settings()
 def convert_nwp_xarray_dataset_to_polars_dataframe(
     ds: xr.Dataset,
     h3_grid: pt.DataFrame[H3GridWeights],
-) -> pt.DataFrame[NwpInMemory]:
+) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
@@ -56,11 +56,9 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         .drop(cs.matches("^wind_u_.*") | cs.matches("^wind_v_.*"))
     )
 
-    # Sort before validation to ensure consistent output order, and to optimise compression.
-    df = df.sort(by=["init_time", "valid_time", "ensemble_member", "h3_index"])
-
-    # Validate to ensure the interpolated data matches the expected schema
-    return NwpInMemory.validate(df)
+    # No sort here: physical row order is delta_store.nwp's job (the single source of truth for
+    # on-disk layout), and validation is order-independent.
+    return Nwp.validate(df)
 
 
 def _calc_wind_speed(height=Literal["10m", "100m"]) -> pl.Expr:
@@ -88,7 +86,7 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
     data_dict: dict[str, np.ndarray] = {"latitude": lat_grid, "longitude": lon_grid}
 
     all_nwp_vars = [str(v) for v in ds.data_vars]
-    categorical_vars = list(NwpInMemory.categorical_var_names)
+    categorical_vars = list(Nwp.categorical_var_names)
 
     # Add data variables
     for var_name in all_nwp_vars:
@@ -104,7 +102,7 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
     )
 
     # Aggregate NWP variables to H3 index.
-    numeric_vars = [v for v in all_nwp_vars if v not in NwpInMemory.categorical_var_names]
+    numeric_vars = [v for v in all_nwp_vars if v not in Nwp.categorical_var_names]
     return (
         joined.with_columns(pl.col(numeric_vars) * pl.col("proportion"))
         .group_by("h3_index")
