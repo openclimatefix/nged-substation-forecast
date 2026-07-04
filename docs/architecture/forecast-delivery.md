@@ -155,7 +155,7 @@ We're also in good company. "Analytical data as cloud-optimised files on object 
 queried in place" has quietly become one of the standard ways to ship large datasets:
 
 - [Dynamical.org](https://dynamical.org) publishes global weather datasets as Zarr on object
-  storage — and this project *consumes* its ECMWF ensemble NWP exactly that way, every day.
+  storage — and Flexpectation *consumes* its ECMWF ensemble NWP exactly that way, every day.
   Our delivery to NGED mirrors how we ourselves receive hundreds of gigabytes of upstream data.
 - [Earthmover](https://earthmover.io) built a commercial data platform around the same
   principle for scientific data.
@@ -163,7 +163,7 @@ queried in place" has quietly become one of the standard ways to ship large data
   [AWS Open Data programme](https://registry.opendata.aws/) distribute petabytes of public
   data as files on S3, not behind bespoke APIs.
 
-Internally, Delta Lake on object storage is already our
+Inside the Flexpectation codebase, Delta Lake on object storage is already our
 [storage layer](overview.md#core-components) for power telemetry and NWP data. Delivery adds no
 new technology to build, learn, or operate — the delivery tables are produced by the same
 mechanism as everything else in the pipeline.
