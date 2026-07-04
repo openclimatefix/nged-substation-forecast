@@ -21,7 +21,7 @@ soil and degrade (or are cleaned and replaced), arrays are extended. A static na
 introduces large downstream errors. The v0.7 deliverable is a **time-varying effective-capacity
 series per metered generator**, feeding the
 [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) delivery table. Because
-this turns the MVP's single scalar-per-series capacity into a time-varying series, the metrics
+this turns v0.1's single scalar-per-series capacity into a time-varying series, the metrics
 pipeline must also swap its `time_series_id`-only NMAE-denominator join for a temporal as-of
 join — see
 [Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity).

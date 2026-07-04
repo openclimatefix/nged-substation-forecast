@@ -29,12 +29,12 @@ folds).
 
 ---
 
-## Current state: a single MVP fold ✅
+## Current state: a single fold ✅
 
 Honest forecast-skill validation needs **real forecast NWP (ECMWF ENS) for both training and
 validation**. Our ECMWF ENS archive only reaches back to **2024-04-01** (Dynamical.org are
 back-filling earlier years, but slowly), so the entire usable window is ~2024-04 to mid-2026 —
-only enough for roughly **one** seasonally-complete fold. We therefore run a single MVP fold:
+only enough for roughly **one** seasonally-complete fold. We therefore run a single fold:
 
 | `fold_id` | Train | Validate | Weather source |
 |---|---|---|---|
@@ -102,7 +102,8 @@ Expanding training, but validate on the **next 3 months, non-overlapping**:
 Because the validation windows do not overlap, the folds are **genuinely independent**
 measurements, and the set covers all four seasons (so you see seasonal skill variation, then report
 per-season and the mean). This is the statistically sound version of what monthly CV reaches for.
-We deferred it to keep the MVP minimal; it is the recommended next step if we want multiple folds
+We deferred it to keep the initial CV setup minimal; it is the recommended next step if we want
+multiple folds
 *before* the ECMWF back-fill enables the full yearly protocol.
 
 ### Yearly folds backed by CERRA — rejected for validation

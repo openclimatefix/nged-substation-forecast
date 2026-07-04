@@ -149,6 +149,13 @@ Establish a strong XGBoost baseline before investing in capacity estimation and 
 
 The full experiment backlog — fifteen ideas across four effort tiers, ordered best
 bang-for-the-buck within each tier — is in [XGBoost improvements](xgboost-improvements.md).
+This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts
+pooled into delivered percentiles — Phase D of
+[Delivering the probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics);
+theory in
+[Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md)),
+which builds directly on the lead-time-feature and ensemble-member-training wins in that
+backlog.
 
 **Automated experimentation ("auto-research")**:
 
