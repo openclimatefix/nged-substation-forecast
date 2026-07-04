@@ -14,10 +14,11 @@ For v1 of the live service, OCF delivers live forecasts (and the supporting tabl
 [stretch goal](index.md#v20-scale-up-future-research)); an API may be added later if it brings
 additional benefit.
 
-- **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees on
-  cheap object storage. NGED never reads a half-written forecast: each update is atomic, so the
-  latest forecast is either fully available or not visible at all. Delta also supports schema
-  evolution and time-travel, and is readable from Excel, Polars, pandas, DuckDB, Power BI, etc.
+- **Why Delta Lake?** It is just Parquet files plus a transaction log, giving ACID guarantees
+  on cheap object storage — NGED never reads a half-written forecast, and the tables are
+  readable from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
+  comparison with a custom REST API) is on the durable
+  [Forecast Delivery](../architecture/forecast-delivery.md) architecture page.
 - **Access**: the bucket holds forecasts about NGED's customers, so it is protected with S3
   authentication (mirroring how NGED protects their own time-series JSON bucket).
 - **Update cadence**: every 6 hours, when a new forecast run is generated.
