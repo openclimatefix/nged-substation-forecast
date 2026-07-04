@@ -210,10 +210,10 @@ def test_cv_power_forecasts_predicts_validation_fold(env: dict[str, str]) -> Non
 def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
     """The written parquet files carry the compression-oriented storage format end-to-end.
 
-    Guards the write path in ``cv_power_forecasts``: ZSTD compression with the per-column
-    encodings from ``_POWER_FORECASTS_WRITER_PROPERTIES``, rows sorted per
-    ``_POWER_FORECASTS_SORT_COLS`` within each file, and ``power_fcst`` mantissa-truncated to
-    ``_POWER_FCST_KEPT_MANTISSA_BITS`` bits.
+    Guards that ``cv_power_forecasts`` writes through ``delta_store.power_forecasts``: ZSTD
+    compression with the per-column encodings, rows sorted within each file, and ``power_fcst``
+    rounded to ``POWER_FCST_SIGNIFICAND_BITS``. The format itself is unit-tested in
+    ``packages/delta_store/tests/``; this asserts the real asset actually uses it.
     """
     instance = DagsterInstance.ephemeral()
     _register(instance)
@@ -244,10 +244,11 @@ def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
         )["key"]
         assert sort_key.is_sorted()
 
-    # power_fcst mantissa is truncated: the low 11 bits (23 - 12 kept) of every finite value are
-    # zero, yet the values were not destroyed outright. (The synthetic fixture's constant NWP
-    # features make every prediction near-identical, so don't assert on value diversity — the
-    # fixture trains on power ≈ 100, so surviving values must still be in that ballpark.)
+    # power_fcst is rounded to a 13-bit significand: the low 11 fraction bits of every finite
+    # value are zero, yet the values were not destroyed outright. (The synthetic fixture's
+    # constant NWP features make every prediction near-identical, so don't assert on value
+    # diversity — the fixture trains on power ≈ 100, so surviving values must be in that
+    # ballpark.)
     stored = _read_forecasts(env)["power_fcst"].to_numpy()
     assert np.isfinite(stored).all()
     assert (stored.view(np.uint32) & np.uint32((1 << 11) - 1) == 0).all()

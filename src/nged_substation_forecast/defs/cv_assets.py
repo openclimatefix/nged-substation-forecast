@@ -10,10 +10,8 @@ from pathlib import Path
 from typing import Final
 
 import mlflow
-import numpy as np
 import patito as pt
 import polars as pl
-import pyarrow as pa
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
@@ -31,7 +29,8 @@ from dagster import (
     StaticPartitionsDefinition,
     asset,
 )
-from deltalake import ColumnProperties, WriterProperties, write_deltalake
+from delta_store.power_forecasts import write_power_forecasts
+from deltalake import write_deltalake
 from ml_core._cv_helpers import (
     date_to_utc_datetime,
     eligible_time_series_ids,
@@ -87,76 +86,6 @@ once is tens of GB. ``init_time`` is both the partition key and the axis that in
 so chunking by it bounds the per-iteration forecast frame (~2-3 GB at 14 days) while each partition
 is still read exactly once. See ``cv_power_forecasts``.
 """
-
-_POWER_FCST_KEPT_MANTISSA_BITS: Final[int] = 12
-"""Float32 mantissa bits (of 23) kept when storing ``power_fcst`` in ``power_forecasts``.
-
-Truncating toward zero to 12 bits caps the relative error at 2⁻¹² ≈ 2.4×10⁻⁴ — orders of
-magnitude below forecast error — while the discarded bits are pure entropy that defeats every
-compression codec (nearly every full-precision ``power_fcst`` value is distinct). Mirrors the
-12-bit quantisation already applied to NWP data (``NwpScalingParams``). See
-``_POWER_FORECASTS_WRITER_PROPERTIES`` for the measured size impact.
-"""
-
-_POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = (
-    "time_series_id",
-    "power_fcst_init_time",
-    "valid_time",
-    "ensemble_member",
-)
-"""Within-file row order for ``power_forecasts`` writes.
-
-Placing the ~51 ensemble members of one (series, init time, valid time) target on adjacent rows
-makes ``power_fcst`` locally smooth and the timestamp columns stepped sequences — exactly what
-the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED encodings in
-``_POWER_FORECASTS_WRITER_PROPERTIES`` need to compress well. Leading with ``time_series_id``
-also lets parquet row-group statistics prune scans that filter on one series.
-"""
-
-_TIMESTAMP_COLUMN_PROPERTIES: Final[ColumnProperties] = ColumnProperties(
-    encoding="DELTA_BINARY_PACKED", dictionary_enabled=False
-)
-"""Delta-encode timestamps: sorted microsecond timestamps have tiny, near-constant deltas."""
-
-_POWER_FORECASTS_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
-    compression="ZSTD",
-    compression_level=3,
-    column_properties={
-        "valid_time": _TIMESTAMP_COLUMN_PROPERTIES,
-        "power_fcst_init_time": _TIMESTAMP_COLUMN_PROPERTIES,
-        "nwp_init_time": _TIMESTAMP_COLUMN_PROPERTIES,
-        "power_fcst": ColumnProperties(encoding="BYTE_STREAM_SPLIT", dictionary_enabled=False),
-    },
-)
-"""Parquet writer settings for the ``power_forecasts`` Delta table.
-
-The delta-rs defaults (SNAPPY + dictionary encoding everywhere) leave ``power_fcst`` — ~76% of
-the bytes — essentially uncompressed. Measured on the table's largest real file (18.3M rows,
-105 MB): ZSTD-3 alone → 80% of the original size; adding these column encodings plus the
-``_POWER_FORECASTS_SORT_COLS`` row order → 50%; adding the 12-bit mantissa truncation
-(``_POWER_FCST_KEPT_MANTISSA_BITS``) → 29%.
-"""
-
-
-def _prepare_forecasts_for_storage(forecasts: pt.DataFrame[PowerForecast]) -> pa.Table:
-    """Truncate ``power_fcst`` precision, sort for compressibility, and convert to Arrow.
-
-    Applies the storage-format levers documented on ``_POWER_FORECASTS_WRITER_PROPERTIES``:
-    zeroes the low ``23 - _POWER_FCST_KEPT_MANTISSA_BITS`` mantissa bits of ``power_fcst``
-    (truncation toward zero) and sorts rows by ``_POWER_FORECASTS_SORT_COLS``.
-    """
-    original = forecasts["power_fcst"].to_numpy()
-    truncated = original.copy()
-    mantissa_bits = truncated.view(np.uint32)
-    mantissa_bits &= np.uint32(0xFFFF_FFFF) << np.uint32(23 - _POWER_FCST_KEPT_MANTISSA_BITS)
-    # Masking assumes ordinary finite floats — it could e.g. turn a NaN whose set mantissa bits
-    # all sit in the truncated range into ±inf — so keep non-finite values unchanged.
-    safe = np.where(np.isfinite(original), truncated, original)
-    return (
-        forecasts.with_columns(power_fcst=pl.Series(safe, dtype=pl.Float32))
-        .sort(*_POWER_FORECASTS_SORT_COLS)
-        .to_arrow()
-    )
 
 
 @asset(
@@ -514,10 +443,11 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
     ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
     run) and the rest **append** to it, so a full re-materialisation replaces the fold's rows
-    without ever holding all forecasts in memory. Each chunk is sorted and precision-truncated
-    for compressibility before writing (``_prepare_forecasts_for_storage`` /
-    ``_POWER_FORECASTS_WRITER_PROPERTIES``). The fold's MLflow run is resolved **by tag** —
-    never by a handle from ``trained_cv_model`` — so this is safe across processes.
+    without ever holding all forecasts in memory. Chunks are written through
+    ``delta_store.power_forecasts.write_power_forecasts``, which owns the table's compressed
+    storage format (sort order, ``power_fcst`` precision rounding, parquet encodings). The
+    fold's MLflow run is resolved **by tag** — never by a handle from ``trained_cv_model`` — so
+    this is safe across processes.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -575,28 +505,13 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         if forecasts.height == 0 and not is_first:
             continue
 
-        # experiment_name / fold_id are String (their PowerForecast dtype), which is exactly what
-        # delta-rs needs for Hive-style partition directories — no cast required.
-        delta_data = _prepare_forecasts_for_storage(forecasts)
-        if is_first:
-            # The first chunk overwrites the (experiment, fold) partition, clearing any prior run.
-            write_deltalake(
-                table_or_uri=settings.power_forecasts_data_path,
-                data=delta_data,
-                mode="overwrite",
-                predicate=f"experiment_name = '{experiment_name}' AND fold_id = '{fold_id}'",
-                partition_by=["experiment_name", "fold_id"],
-                writer_properties=_POWER_FORECASTS_WRITER_PROPERTIES,
-            )
-        else:
-            # Later chunks append into the partition the first chunk established.
-            write_deltalake(
-                table_or_uri=settings.power_forecasts_data_path,
-                data=delta_data,
-                mode="append",
-                partition_by=["experiment_name", "fold_id"],
-                writer_properties=_POWER_FORECASTS_WRITER_PROPERTIES,
-            )
+        # The first chunk overwrites the (experiment, fold) partition, clearing any prior run;
+        # later chunks append into the partition the first chunk established.
+        write_power_forecasts(
+            forecasts,
+            settings.power_forecasts_data_path,
+            replace_partition=(experiment_name, fold_id) if is_first else None,
+        )
         is_first = False
         n_rows += forecasts.height
         time_series_seen.update(forecasts["time_series_id"].to_list())

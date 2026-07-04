@@ -107,6 +107,7 @@ This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is t
 | Package | Purpose |
 |---|---|
 | `contracts` | Patito data schemas (the single source of truth for all data shapes) |
+| `delta_store` | Physical storage policy for Delta tables: parquet writer properties, sort orders, significand rounding, write helpers |
 | `ml_core` | Feature engineering and `BaseForecaster` abstract class |
 | `nged_data` | Reading NGED JSON files from S3 and writing to Delta Lake |
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |

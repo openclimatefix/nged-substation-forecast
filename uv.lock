@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "contracts",
     "dashboard",
+    "delta-store",
     "dynamical-data",
     "geo",
     "ml-core",
@@ -958,6 +959,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/60/8b/32f9823da46cde7df2087faa08cd98d01b908f8dcab982cdba9c84e85355/decorator-5.3.1.tar.gz", hash = "sha256:4cbcdd55a6efadb9dbea26b858f4fb3264567b52d69ca0d25b721b553f60ea82", size = 58084, upload-time = "2026-05-18T06:03:28.057Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/7f/798705f5296a58ca505d600456748d1be48078eac8a7050d8a98bc9edb89/decorator-5.3.1-py3-none-any.whl", hash = "sha256:f47fe6fdbd2edd623ecfe36875d37aba411624e2670dd395dddae1358689bb3c", size = 10365, upload-time = "2026-05-18T06:03:26.517Z" },
+]
+
+[[package]]
+name = "delta-store"
+version = "0.0.1"
+source = { editable = "packages/delta_store" }
+dependencies = [
+    { name = "contracts" },
+    { name = "deltalake" },
+    { name = "patito" },
+    { name = "polars" },
+    { name = "pyarrow" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "contracts", editable = "packages/contracts" },
+    { name = "deltalake" },
+    { name = "patito" },
+    { name = "polars", specifier = ">=1.0.0" },
+    { name = "pyarrow" },
 ]
 
 [[package]]
@@ -2488,6 +2510,7 @@ dependencies = [
     { name = "contracts" },
     { name = "dagster" },
     { name = "dagster-webserver" },
+    { name = "delta-store" },
     { name = "deltalake" },
     { name = "dynamical-data" },
     { name = "geo" },
@@ -2495,7 +2518,6 @@ dependencies = [
     { name = "ml-core" },
     { name = "mlflow-skinny" },
     { name = "nged-data" },
-    { name = "numpy" },
     { name = "obstore" },
     { name = "patito" },
     { name = "plotting" },
@@ -2512,6 +2534,7 @@ dev = [
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
     { name = "mlflow" },
+    { name = "numpy" },
     { name = "pre-commit" },
     { name = "pymarkdownlnt" },
     { name = "pytest" },
@@ -2526,6 +2549,7 @@ requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
     { name = "dagster", specifier = ">=1.12.11" },
     { name = "dagster-webserver", specifier = ">=1.12.11" },
+    { name = "delta-store", editable = "packages/delta_store" },
     { name = "deltalake" },
     { name = "dynamical-data", editable = "packages/dynamical_data" },
     { name = "geo", editable = "packages/geo" },
@@ -2533,7 +2557,6 @@ requires-dist = [
     { name = "ml-core", editable = "packages/ml_core" },
     { name = "mlflow-skinny" },
     { name = "nged-data", editable = "packages/nged_data" },
-    { name = "numpy", specifier = ">=1.24" },
     { name = "obstore" },
     { name = "patito" },
     { name = "plotting", editable = "packages/plotting" },
@@ -2550,6 +2573,7 @@ dev = [
     { name = "mkdocs-material", specifier = ">=9.7.6" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=1.0.3" },
     { name = "mlflow", specifier = ">=3.14.0" },
+    { name = "numpy", specifier = ">=1.24" },
     { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pymarkdownlnt", specifier = ">=0.9.13" },
     { name = "pytest", specifier = ">=9.0.2" },
