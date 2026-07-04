@@ -36,7 +36,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - **Multi-user access** to the Dagster UI (and, later, to the dev dashboard) (rules out single-user tracking
   services).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
-  failure (SNS → email), and cost-conscious operation (~\$30–40/month target).
+  failure (SNS → email), and cost-conscious operation (~£25–35/month target).
 
 **Post-v0.1 (explicitly deferred):**
 
@@ -136,7 +136,7 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 An earlier version of this plan committed to the Level 1 ("nothing always-on") design from
 issue #206. A
 2026-07-02 pressure-test of that decision found the #206 cost analysis substantially wrong:
-the always-on control plane it priced at ~\$95–140/month actually costs ~\$14–27/month (it
+the always-on control plane it priced at ~£70–105/month actually costs ~£10–20/month (it
 priced a 16 GB box big enough to run the *compute*, not a small control-plane box), and its
 RDS prerequisite dissolves on a single machine (Postgres-in-Docker, or SQLite on a real local
 filesystem). Two requirements also firmed up that Level 1 does not serve:
@@ -151,6 +151,31 @@ final call pending.** The five options researched are recorded below so the deci
 durable record. The implementation workstreams are identical under every option except the
 infrastructure one.
 
+### Cost summary
+
+All prices are for **eu-west-2 (London)** — the nearest AWS region to the UK — taken from
+the AWS price-list API (2026-07-03). AWS bills in USD; figures here are converted at
+**\$1 = £0.75** (ECB rate, 2026-07-03).
+
+**These estimates do *not* include ML training.** For v1 we expect most — maybe all — ML
+training to run on our own laptops; the only training AWS would see is an optional
+UI-launched backtest (~£0.65/run, priced below).
+
+Estimated total for the recommended Option B: **~£25–35/month**, made up of:
+
+| Component | £/month |
+|---|---|
+| Always-on control plane (EC2 `t4g.medium` + 20 GB EBS) | 15–22 (1-yr reserved vs on-demand) |
+| Live Fargate inference (4 runs/day) + hourly polling | 5–9 |
+| S3 storage (~130 GB) + requests | 3–4 |
+| Data transfer (ingress + egress) | ≈0 |
+| Backtests | ~£0.65 per run, as needed |
+
+The other options range from ~£12–22/month (Option A, which fails two requirements) to
+~£56–86/month (Option C). The detailed analysis follows: the
+[workload model](#workload-model), [storage & data transfer](#storage-data-transfer-common-to-all-options)
+(common to every option), then the per-option compute costs.
+
 ### Workload model
 
 Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 4/day,
@@ -160,14 +185,31 @@ materialisations (`eligible_time_series` + `trained_cv_model` + `cv_power_foreca
 fold, plus `metrics`; single leaderboard fold), rising to ~15–20 under the future
 multi-yearly-fold epoch.
 
-Fargate compute (eu-west-2, prices from the AWS price-list API, 2026-07-02): x86
-\$0.04656/vCPU-hr + \$0.00511/GB-hr; **ARM 20% cheaper** (\$0.03725 + \$0.00409) and
-polars/XGBoost run fine on arm64. A right-sized 4 vCPU / 16 GB ARM task (measured inference
-peak ~9 GB) is \$0.21/hr → 4 × 15-min live runs/day ≈ **\$7/month**; hourly empty polling
-wake-ups add ~\$2.50/month; a 2-hour 8 vCPU / 32 GB ARM backtest ≈ **\$0.86/run**. (The old
-\$15–25/month anchor assumed 8 vCPU / 32 GB x86.)
+Fargate compute: x86 £0.0349/vCPU-hr + £0.0038/GB-hr; **ARM 20% cheaper** (£0.0279 +
+£0.0031) and polars/XGBoost run fine on arm64. A right-sized 4 vCPU / 16 GB ARM task
+(measured inference peak ~9 GB) is £0.16/hr → 4 × 15-min live runs/day ≈ **£5/month**;
+hourly empty polling wake-ups add ~£1.90/month; a 2-hour 8 vCPU / 32 GB ARM backtest ≈
+**£0.65/run**. (The old £11–19/month anchor assumed 8 vCPU / 32 GB x86.)
 
-### Option A — Level 1: nothing always-on — ~\$11–25/month
+### Storage & data transfer (common to all options)
+
+Identical under every option, so counted once and folded into each headline range below —
+**~£3–4/month in total**:
+
+- **S3 Standard storage — ~£2.50–3/month.** The working set is ~130 GB (~100 GB NWP +
+  ~30 GB forecasts) at £0.018/GB-month → ~£2.40/month, plus headroom for Delta version
+  history between vacuums. Grows as daily NWP partitions accumulate.
+- **S3 requests — ~£0.50–1.50/month.** Delta Lake is request-heavy (transaction-log JSON
+  reads, checkpoints, many small parquet GETs per scan), but ~13 materialisations/day is
+  tiny volume: a generous 1–2 M GET (£0.00031/1k) + 100–200 k PUT/COPY/POST/LIST
+  (£0.0040/1k) per month lands well under £1.50.
+- **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical
+  costs nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free;
+  internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
+  GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
+  beyond).
+
+### Option A — Level 1: nothing always-on — ~£12–22/month
 
 Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
 throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
@@ -180,15 +222,15 @@ Dynamical availability, never Dagster's records (they evaporate with the throwaw
   needed by B/C/D anyway.
 - **Cons:** fails both new requirements — no run history, hand-rolled backfills (issue #208
   replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
-  always-on home (+\$8/month Fargate service) anyway.
+  always-on home (+£6/month Fargate service) anyway.
 
-### Option B — small EC2 control-plane box + `EcsRunLauncher` — ~\$29–42/month ← recommended
+### Option B — small EC2 control-plane box + `EcsRunLauncher` — ~£25–35/month ← recommended
 
-A `t4g.medium` (2 vCPU / 4 GB; **\$27.45/month on-demand, \$17.30/month 1-yr no-upfront
+A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
 reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
 **the Marimo dashboard**, behind Tailscale (no ALB). Every run — live schedules *and*
 UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized
-to the job. Add ~\$2.40 EBS, \$7–9/month live Fargate, ~\$1/backtest.
+to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
 
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
   centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
@@ -197,13 +239,13 @@ to the job. Add ~\$2.40 EBS, \$7–9/month live Fargate, ~\$1/backtest.
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
   config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
-  \$13.72/\$8.69 after, if everything squeezes into 2 GB — likely too tight with Marimo.
+  £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
-### Option C — one big box, everything on it (the OCF pattern) — ~\$70–110/month
+### Option C — one big box, everything on it (the OCF pattern) — ~£56–86/month
 
 Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
-`t4g.xlarge` \$109.79 on-demand / \$69.28 reserved-1yr; Lightsail 16 GB \$82.40 (4 vCPU, 40% CPU
-baseline); Lightsail memory-optimised 16 GB \$72.61 (2 vCPU). This is #206's "Level 3" and how
+`t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
+baseline); Lightsail memory-optimised 16 GB £54.40 (2 vCPU). This is #206's "Level 3" and how
 OCF runs everything else (with Airflow).
 
 - **Pros:** simplest architecture possible — no Fargate/ECR-per-run/EventBridge/run-launcher;
@@ -211,28 +253,28 @@ OCF runs everything else (with Airflow).
 - **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
   variants mean static AWS keys and burst-credit accounting; biggest pet.
 
-### Option D — serverless control plane (no pets) — ~\$50–55/month
+### Option D — serverless control plane (no pets) — ~£41–45/month
 
-Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (\$19.60), RDS
-`db.t4g.micro` Postgres (\$13–16, approximate — the one unverified price), Marimo as its own
-tiny Fargate service (approx \$8.30), runs on ephemeral Fargate.
+Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
+`db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
+tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
 
 - **Pros:** full Dagster with zero servers to patch; IAM-native throughout.
 - **Cons:** RDS is the tax (no local disk → no Postgres-in-Docker); webserver access needs an
-  ALB (+~\$22/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than in
-  practice.
+  ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
+  in practice.
 
-### Option E — Dagster+ Solo, Hybrid — ~\$45–55/month typical
+### Option E — Dagster+ Solo, Hybrid — ~£37–45/month typical
 
-\$10/month base + \$0.040/credit (1 credit = 1 materialisation or op execution; May 2026
-pricing). Live cadence ≈ 395 credits ≈ \$16/month; backtests \$0.20–0.70 each (a heavy
-50-experiment month adds \$10–35). Plus a stateless Hybrid agent (~\$9 tiny Fargate service) and
-Marimo hosting (~\$5–8), and the same per-run Fargate compute. Hybrid incurs no serverless
-charge; sensor evaluations are free (an hourly freshness *op* would cost +\$29/month — on
-Dagster+ you use sensors, the better design anyway).
+£7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
+pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
+50-experiment month adds £7.50–26). Plus a stateless Hybrid agent (~£6.75 tiny Fargate
+service) and Marimo hosting (~£3.75–6), and the same per-run Fargate compute. Hybrid incurs
+no serverless charge; sensor evaluations are free (an hourly freshness *op* would cost
++£22/month — on Dagster+ you use sensors, the better design anyway).
 
 - **Pros:** managed UI/daemon/alerting/backfills with nothing of ours to keep alive.
-- **Cons:** **Solo is 1 user** — collaborators can't log in (Starter is \$100/month base);
+- **Cons:** **Solo is 1 user** — collaborators can't log in (Starter is £75/month base);
   metering shapes design decisions; vendor dependency. The 1-user cap is likely disqualifying
   for an OCF collaboration.
 
@@ -240,17 +282,17 @@ Dagster+ you use sensors, the better design anyway).
 
 | | A: Level 1 | B: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
 |---|---|---|---|---|---|
-| \$/month | 11–25 | **29–42** | 70–110 | ~50–55 (+ALB) | 45–55 |
+| £/month | 12–22 | **25–35** | 56–86 | ~41–45 (+ALB) | 37–45 |
 | Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
-| Marimo dashboard | +\$8 add-on | ✓ free on box | ✓ free on box | +\$8 service | +\$5–8 |
+| Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
 | Servers to patch | 0 | 1 | 1 | 0 | 0 |
 | No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
 | Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
 
 **Recommendation: Option B** — the only shape giving full Dagster *and* workstation-beating
-backtest compute *and* a free dashboard home, for ~\$15–25/month over Level 1. Option C is the
-fallback if operational simplicity trumps backtest speed and ~\$40/month. D pays an RDS+ALB
+backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1. Option C is the
+fallback if operational simplicity trumps backtest speed and ~£30/month. D pays an RDS+ALB
 tax for purism; E's 1-user cap rules it out.
 
 **Future work (post-v0.1):** once an always-on control-plane box exists (Option B or later), it's also
@@ -302,7 +344,7 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 `evaluation_scope="production_monitoring"` over `fold_id="live"` for both trailing windows.
 Sensor preferred over a schedule so it fires on the actual data update.
 
-Note this sensor needs a running Dagster daemon — [Option B](#option-b-small-ec2-control-plane-box-ecsrunlauncher-2942month-recommended)
+Note this sensor needs a running Dagster daemon — [Option B](#option-b-small-ec2-control-plane-box-ecsrunlauncher-2535month-recommended)
 (the direction we're leaning) provides one. If the deployment instead ships Option A (nothing
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
