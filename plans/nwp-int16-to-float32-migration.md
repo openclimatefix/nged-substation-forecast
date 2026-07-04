@@ -443,19 +443,22 @@ NEW_TABLE = str(SETTINGS.nwp_data_path.with_name("NWP_migrating"))
 def main() -> None:
     scaling_params = NwpScalingParams.load()
 
+    # engine="streaming" for every whole-table query: the table holds ~1.6e9 rows, so even a
+    # single projected column OOMs the in-memory engine (measured: exit 137).
     init_times = (
         pl.scan_delta(OLD_TABLE)
         .select("init_time")
         .unique()
         .sort("init_time")
-        .collect()["init_time"]
+        .collect(engine="streaming")["init_time"]
         .to_list()
     )
     print(f"{len(init_times)} partitions to migrate {OLD_TABLE} -> {NEW_TABLE}")
 
     for i, init_time in enumerate(init_times):
         old_lf = pl.scan_delta(OLD_TABLE).filter(pl.col("init_time") == init_time)
-        old_df = pt.LazyFrame.from_existing(old_lf).set_model(NwpOnDisk).cast().collect()
+        old_lf = pt.LazyFrame.from_existing(old_lf).set_model(NwpOnDisk).cast()
+        old_df = old_lf.collect(engine="streaming")
 
         # NwpInMemory-shaped at runtime; write_nwp only needs the (identical) column names/dtypes,
         # so the pt.DataFrame[Nwp] annotation mismatch is harmless in this throwaway script.
@@ -467,7 +470,7 @@ def main() -> None:
             pl.scan_delta(NEW_TABLE)
             .filter(pl.col("init_time") == init_time)
             .select(pl.len())
-            .collect()
+            .collect(engine="streaming")
             .item()
         )
         assert new_rows == old_df.height, (

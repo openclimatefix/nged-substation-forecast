@@ -301,9 +301,6 @@ Needs item 13 at ensemble scale. The boundary of "quick".
   contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
   belongs to
   [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
-- **[#198](https://github.com/openclimatefix/nged-substation-forecast/issues/198) NWP row-group layout** — throughput, not skill (~1 h per 51-member fold prediction is
-  decode-bound). Do it when experiment iteration speed becomes the bottleneck — likely around
-  item 14, which multiplies NWP reads.
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power lags** — a DST edge case affecting a handful of half-hours per year;
   the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
   ever show a DST-transition artefact.
