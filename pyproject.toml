@@ -105,6 +105,10 @@ docstring-code-format = true
 docstring-code-line-length = 100
 
 [tool.pytest.ini_options]
+# importlib mode lets test modules in different directories share a basename (e.g.
+# tests/test_metrics.py and packages/ml_core/tests/test_metrics.py); the default prepend
+# mode aborts collection with an "import file mismatch" error on the duplicate name.
+addopts = "--import-mode=importlib"
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
 ]
