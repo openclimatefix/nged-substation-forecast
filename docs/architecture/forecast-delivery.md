@@ -67,7 +67,9 @@ packs that into **0.73 GB, ~1.8 bytes per row**.
 
 V2 scales to ~2,500 time series: ~78× more, or roughly **86 million rows per run** and on the
 order of **100 billion rows per year of history** — a couple of hundred gigabytes at the
-measured bytes-per-row, and several *terabytes* uncompressed. NGED wants routine access to all
+measured bytes-per-row, and several *terabytes* uncompressed. Serialised as uncompressed JSON
+(measured on real forecast rows: ~356 bytes each), the same year of history would be roughly
+**36 terabytes on the wire — about 200× the Delta footprint**. NGED wants routine access to all
 of it. That volume is an awkward fit for JSON request/response cycles; in
 practice, REST designs for workloads like this tend to grow a "bulk export" endpoint that hands
 back files — at which point the files are doing the real work, and the API has become a
