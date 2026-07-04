@@ -112,7 +112,14 @@ class BaseForecaster(ABC):
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Save the trained model state to a directory."""
+        """Save the trained model state to a directory.
+
+        The saved directory must contain a ``meta.json`` with a ``model_class`` field — the
+        fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
+        ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
+        (``ml_core._production_helpers.load_forecaster_from_dir``) can reconstruct the correct
+        class from a plain model directory with no other context (issue #221).
+        """
         pass
 
     @classmethod

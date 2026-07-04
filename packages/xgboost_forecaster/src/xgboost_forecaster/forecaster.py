@@ -205,6 +205,7 @@ class XGBoostForecaster(BaseForecaster):
                 {
                     "model_params": self.model_params.model_dump(mode="json"),
                     "trained_time_series_ids": self.trained_time_series_ids,
+                    "model_class": f"{type(self).__module__}.{type(self).__qualname__}",
                 }
             )
         )

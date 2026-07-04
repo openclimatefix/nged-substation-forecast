@@ -138,8 +138,16 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     )
 
 
+ecmwf_ens_partitions = DailyPartitionsDefinition(
+    start_date="2024-04-01", timezone="UTC", end_offset=1
+)
+"""One partition per day of ECMWF ENS 00Z runs. ``end_offset=1`` makes today's key exist before
+its 00Z run has actually landed, matching Dynamical's publication lag; shared with
+``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
+
+
 @asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2024-04-01", timezone="UTC", end_offset=1),
+    partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
     # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run

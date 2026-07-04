@@ -5,10 +5,21 @@ can consume, and the two NWP join modes (bulk training vs. single-run inference)
 """
 
 from datetime import datetime, timedelta
+from typing import Final
 
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
+
+NWP_PUBLICATION_DELAY_HOURS: Final[int] = 6
+"""Default delay between an NWP run's ``init_time`` and when it becomes publicly available.
+
+Used to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, and to derive
+``nwp_init_time`` from ``power_fcst_init_time`` when it is not supplied in single-run mode (see
+``_join_nwp_bulk_mode`` / ``_join_nwp_single_run``). Also the default for
+``select_nwp_init_time``'s replay-mode cutoff (``ml_core._production_helpers``), which
+reconstructs what was actually available at a historical ``t0``.
+"""
 
 
 def _join_nwp_bulk_mode(

@@ -31,6 +31,7 @@ from contracts.weather_schemas import Nwp
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
+    NWP_PUBLICATION_DELAY_HOURS,
     _build_historical_weather,
     _join_nwp_bulk_mode,
     _join_nwp_single_run,
@@ -73,6 +74,9 @@ class TabularFeatureEngineer(FeatureEngineer):
         power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
         nwp: pt.LazyFrame[Nwp],
+        power_fcst_init_time: datetime | None = None,
+        nwp_init_time: datetime | None = None,
+        nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
     ) -> pt.LazyFrame[AllFeatures]:
         nwp_per_time_series = _attach_nearest_nwp_cell(nwp, time_series_metadata)
         return _engineer_features(
@@ -80,6 +84,9 @@ class TabularFeatureEngineer(FeatureEngineer):
             power_time_series,
             time_series_metadata,
             nwp=nwp_per_time_series,
+            power_fcst_init_time=power_fcst_init_time,
+            nwp_init_time=nwp_init_time,
+            nwp_publication_delay_hours=nwp_publication_delay_hours,
         )
 
 
@@ -90,7 +97,7 @@ def _engineer_features(
     nwp: pl.LazyFrame | None = None,
     power_fcst_init_time: datetime | None = None,
     nwp_init_time: datetime | None = None,
-    nwp_publication_delay_hours: int = 6,
+    nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
 ) -> pt.LazyFrame[AllFeatures]:
     """Engineer features.
 
