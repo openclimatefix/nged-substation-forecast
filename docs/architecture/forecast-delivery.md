@@ -1,15 +1,18 @@
 # Forecast Delivery: Delta Lake on S3
 
 > **Status: durable architecture explainer.** This page explains *why* OCF delivers forecasts
-> to NGED as Delta Lake tables on S3 rather than through a custom REST API — and why that is an
-> enduring design choice, not a stop-gap. The concrete table schemas and their implementation
-> status live in the [delivery tables](../roadmap/delivery-tables.md) page.
+> to NGED as Delta Lake tables on S3 rather than through a custom REST API — where that choice
+> came from, what it gives NGED, and how a REST API could still fit in later. The concrete
+> table schemas and their implementation status live in the
+> [delivery tables](../roadmap/delivery-tables.md) page.
 
 OCF has real experience with both delivery styles: our national solar forecast is served
-through a custom REST API ([quartz-api](https://github.com/openclimatefix/quartz-api)), and it
-is the right tool for that product. NGED Flexpectation deliberately chooses differently. This
-page explains why the two products need different mechanisms, why "files on object storage" is
-neither primitive nor temporary, and when a REST API *would* earn its keep here.
+through a custom REST API ([quartz-api](https://github.com/openclimatefix/quartz-api)), and
+that's the right tool for that product. So when NGED Flexpectation delivers files on object
+storage instead, it's natural to ask why — "just files on S3" can sound like a shortcut we'd
+eventually replace with a real API. This page walks through the reasoning: why the two products
+suit different mechanisms, what Delta Lake on S3 actually gives NGED (more than it might first
+appear), and when a REST API *would* earn its keep here.
 
 ## Two products, two shapes of problem
 
@@ -23,7 +26,7 @@ problem:
 - **URL-shaped consumers.** Customers integrate the forecast into their own applications and
   want an HTTP endpoint, not a database.
 
-NGED Flexpectation differs on every one of those axes:
+NGED Flexpectation turns out to look quite different on each of those axes:
 
 - **One user.** NGED is the only consumer. There is no multi-tenant permission problem to
   solve — a single authenticated principal covers the entire requirement.
@@ -54,9 +57,10 @@ million rows (~6 GB compressed)** from 417 backtest init times — for just 32 t
 
 V2 scales to ~2,500 time series: ~78× more, or roughly **86 million rows per run** and on the
 order of **100 billion rows — more than a terabyte — per year of history**. NGED wants routine
-access to all of it. Paginating that through JSON request/response cycles is the wrong tool;
-any REST design for this workload ends up growing a "bulk export" endpoint that hands back
-files — at which point the files *are* the product, and the API is overhead.
+access to all of it. That volume is an awkward fit for JSON request/response cycles; in
+practice, REST designs for workloads like this tend to grow a "bulk export" endpoint that hands
+back files — at which point the files are doing the real work, and the API has become a
+wrapper around them.
 
 ## A very short history of REST
 
@@ -67,18 +71,19 @@ hypermedia resources, stateless request/response over HTTP, caches in the middle
 superb architecture for exactly that — operational queries, multi-tenant products, and
 integrations where each interaction moves a small resource.
 
-It was never designed for bulk analytical access to terabytes of tabular history. Teams that
-push it into that role end up re-implementing, one endpoint at a time, the things analytical
-storage formats already provide: pagination (chunked reads), retry-and-resume (transactional
-snapshots), server-side filtering (predicate pushdown), column selection (columnar layout), and
-compression. Every one of those is a bespoke design decision to make, document, and maintain —
-and a bespoke client for NGED to write against.
+What it wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
+that press it into that role tend to find themselves re-implementing, one endpoint at a time,
+the things analytical storage formats already provide: pagination (chunked reads),
+retry-and-resume (transactional snapshots), server-side filtering (predicate pushdown), column
+selection (columnar layout), and compression. Each of those becomes a bespoke design decision
+to make, document, and maintain — and a bespoke client for NGED to write against.
 
 ## "An API" is not the same thing as "a REST API"
 
-It is tempting to hear "we're not building an API, we're just putting files on S3" — but that
-framing is wrong on both counts. An API is a *contract*: a precisely specified interface that
-lets independent programs interoperate. Delta Lake is exactly that — an
+It's easy to hear this design as "we're not building an API, we're just putting files on S3" —
+but that framing undersells what's actually being delivered. An API is, at heart, a *contract*:
+a precisely specified interface that lets independent programs interoperate. Delta Lake is
+exactly that — an
 [open, versioned protocol specification](https://github.com/delta-io/delta/blob/master/PROTOCOL.md)
 with mature, independently developed client implementations: Polars, pandas, DuckDB, Spark,
 Power BI, Rust, and more.
@@ -134,8 +139,8 @@ bounded is exactly what keeps NGED's reads cheap.
 
 ## An established industry pattern
 
-"Analytical data as cloud-optimised files on object storage, queried in place" is not an
-experiment — it is how modern analytical data increasingly ships:
+We're also in good company. "Analytical data as cloud-optimised files on object storage,
+queried in place" has quietly become one of the standard ways to ship large datasets:
 
 - [Dynamical.org](https://dynamical.org) publishes global weather datasets as Zarr on object
   storage — and this project *consumes* its ECMWF ensemble NWP exactly that way, every day.
@@ -161,8 +166,8 @@ Choosing Delta Lake over a bespoke REST API removes an entire service from the p
 - no client SDK for NGED to install and for us to maintain;
 - availability is S3's SLA, not something we are on call for.
 
-For a small team whose mission is forecast quality, every one of those is engineering effort
-redirected away from the actual product.
+For a small team whose mission is forecast quality, that's a lot of engineering effort we get
+to spend on the forecasts themselves instead.
 
 ## Securing it
 
@@ -182,9 +187,9 @@ REST APIs have their place, and there are futures in which this project grows on
   just wants "the latest forecast for substation X" as JSON over HTTP.
 - **Browser-based consumers** that can't speak S3 directly.
 
-Crucially, adding one later is **purely additive**: a thin, stateless service that reads from
-the same Delta tables and serves slices of them over HTTP. Nothing about the Delta-first design
-forecloses it — which is why a REST API appears as a
+The reassuring part is that adding one later is **purely additive**: a thin, stateless service
+that reads from the same Delta tables and serves slices of them over HTTP. Nothing about the
+Delta-first design forecloses it — which is why a REST API sits comfortably as a
 [v2 stretch goal](../roadmap/index.md#v20-scale-up-future-research) rather than a v1
 requirement. The Delta tables remain the system of record either way; the API would be a
 convenience layer on top, added if and when a consumer appears whose needs it fits.
