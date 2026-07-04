@@ -101,8 +101,10 @@ sorted `(init_time, ensemble_member, valid_time, h3_index)` — i.e. **swap `ens
   mirroring `delta_store.power_forecasts`.
 - Update every call site: `ecmwf_ens` asset (write path), `_load_engineering_inputs` (read
   path), `ml_core` feature-engineering modules (type hints only), tests, docs.
-- One-off in-place rewrite of the local `data/NWP` table (~88 GB, 810+ daily partitions) into
-  the new format.
+- One-off rewrite of the local `data/NWP` table (~88 GB, 810+ daily partitions) into the new
+  format — building a **fresh table then swapping directories**, not rewriting in place (Delta
+  cannot change a column's dtype partition-by-partition; see Phase B for the measured failure
+  modes).
 - Delete now-dead code: `NwpOnDisk`, `NwpInMemory`, `NwpScalingParams`,
   `to_nwp_in_memory`/`from_nwp_in_memory`, `packages/dynamical_data/scripts/compute_scaling_params.py`,
   `metadata/scaling_params_for_ecmwf_ens_0_25_degree.csv`.
@@ -132,9 +134,10 @@ migrating away from.
 1. **Phase A (additive)** adds the new contract + writer alongside the old ones. Nothing is
    deleted, nothing else changes. This gives Phase B a `write_nwp()` to write through, while the
    old classes are still present to read with.
-2. **Phase B (data rewrite)** physically rewrites the on-disk table. Old code reads, new code
-   writes. Verified per-partition before vacuuming (checklist below — this is the step that bit
-   the `power_forecasts` rewrite; read it carefully).
+2. **Phase B (data rewrite)** builds a replacement table partition-by-partition, verifies it
+   against the untouched old table, then swaps directories. Old code reads, new code writes.
+   The old table is never written to — it stays the recovery point until the final delete
+   (checklist below).
 3. **Phase C (cutover)** repoints every call site at the new contract/writer and deletes the old
    code. By this point the on-disk table is already in the new format, so there's no window
    where code and data disagree.
@@ -311,29 +314,24 @@ NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
 that choice, which won for ``power_forecasts``, measures worse here."""
 
 
-def write_nwp(
-    nwp: pt.DataFrame[Nwp],
-    table_uri: str | Path,
-    *,
-    replace_partition: tuple[str, str] | None = None,
-) -> None:
-    """Write ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
+def write_nwp(nwp: pt.DataFrame[Nwp], table_uri: str | Path) -> None:
+    """Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
 
     Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts
     rows by ``NWP_SORT_COLS``, and writes with ``NWP_WRITER_PROPERTIES``. The table is
     partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``'s
-    partition-pruning assumptions.
+    partition-pruning assumptions; the first write creates the table.
+
+    Append-only: each ``(nwp_model_id, init_time)`` partition is written exactly once — the
+    daily ``ecmwf_ens`` asset downloads one brand-new NWP run per Dagster partition. (No
+    ``replace_partition`` option like ``write_power_forecasts``: nothing re-materialises an
+    existing NWP partition today, and a partition-replace predicate on a ``Timestamp`` partition
+    column would need its own careful verification — add it only when a caller actually needs
+    it.)
 
     Args:
-        nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition — the
-            ``ecmwf_ens`` asset processes one NWP run per Dagster partition, so callers normally
-            pass exactly one partition's worth of rows.
+        nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition.
         table_uri: Path or URI of the ``nwp`` Delta table.
-        replace_partition: ``(nwp_model_id, init_time)`` to overwrite — ``init_time`` formatted
-            exactly as Delta's partition-value string (``isoformat()`` with microseconds, to
-            match the Hive-style directory name) — or ``None`` to append. Only the historical
-            in-place rewrite (Phase B below) needs this; the daily ``ecmwf_ens`` asset always
-            appends a brand-new partition.
     """
     continuous_vars = sorted(Nwp.continuous_var_names())
     rounded = nwp.with_columns(
@@ -350,24 +348,13 @@ def write_nwp(
     # instead of applying it — strip first so this is a plain-Polars cast.
     prepared = pl.DataFrame._from_pydf(rounded._df).cast({"nwp_model_id": pl.String}).to_arrow()
 
-    if replace_partition is not None:
-        nwp_model_id, init_time = replace_partition
-        write_deltalake(
-            table_or_uri=table_uri,
-            data=prepared,
-            mode="overwrite",
-            predicate=f"nwp_model_id = '{nwp_model_id}' AND init_time = '{init_time}'",
-            partition_by=["nwp_model_id", "init_time"],
-            writer_properties=NWP_WRITER_PROPERTIES,
-        )
-    else:
-        write_deltalake(
-            table_or_uri=table_uri,
-            data=prepared,
-            mode="append",
-            partition_by=["nwp_model_id", "init_time"],
-            writer_properties=NWP_WRITER_PROPERTIES,
-        )
+    write_deltalake(
+        table_or_uri=table_uri,
+        data=prepared,
+        mode="append",
+        partition_by=["nwp_model_id", "init_time"],
+        writer_properties=NWP_WRITER_PROPERTIES,
+    )
 ```
 
 **A3. `packages/delta_store/src/delta_store/__init__.py`** — add the new export:
@@ -389,150 +376,135 @@ builder + `test_on_disk_format` asserting ZSTD compression and **no**
 `BYTE_STREAM_SPLIT`/`DELTA_BINARY_PACKED` encodings + sort order via
 `pl.struct(NWP_SORT_COLS).is_sorted()`, `test_continuous_vars_rounded_to_significand_bits`
 mirroring `test_power_fcst_rounded_to_significand_bits`'s bit-pattern assertion but looping over
-`Nwp.continuous_var_names()`, and `test_replace_partition_then_append` mirroring that test but
-keyed on `(nwp_model_id, init_time)` instead of `(experiment_name, fold_id)`). Use small
-made-up rows well inside each field's `ge`/`le` bounds.
+`Nwp.continuous_var_names()`, and — since `write_nwp` is append-only, *not* a mirror of the
+replace-partition test — `test_successive_appends_create_separate_partitions`: two `write_nwp`
+calls with different `init_time`s land as two Hive partitions (`init_time=...` directories) with
+both partitions' rows intact). Use small made-up rows well inside each field's `ge`/`le` bounds.
 
 **Checkpoint:** run `uv run pytest packages/contracts packages/delta_store` — should be all
 green, nothing else in the repo has changed yet.
 
-### Phase B — rewrite the historical local table
+### Phase B — rewrite the historical local table (fresh table + directory swap)
 
-This physically rewrites `data/NWP` (~88 GB, partitioned by `(nwp_model_id, init_time)`, 810+
-daily partitions as of 2026-07-04) from `Int16` to the new `Float32` format, using the *old*
-code (still present after Phase A) to read and the *new* `write_nwp()` to write.
+This rewrites `data/NWP` (~88 GB, partitioned by `(nwp_model_id, init_time)`, 810+ daily
+partitions as of 2026-07-04) from `Int16` to the new `Float32` format, using the *old* code
+(still present after Phase A) to read and the *new* `write_nwp()` to write.
+
+**Strategy: build a brand-new Delta table at a sibling path, verify it, swap directories,
+delete the old table.** Do **not** attempt to rewrite the existing table in place,
+partition-by-partition — a Delta table has a single schema, and this migration *changes column
+dtypes*, so in-place is impossible. Both in-place variants were tested empirically
+(delta-rs 1.6.1, 2026-07-04) and both fail dangerously:
+
+- `mode="overwrite"` + partition `predicate` with `Float32` data: delta-rs **silently casts the
+  incoming data back to the table's `Int16` schema** — no error, row counts match, but
+  physical-unit floats get stored as truncated integer "codes" that the old read path would then
+  mis-rescale. Silent data corruption that a row-count check cannot catch.
+- Adding `schema_mode="overwrite"`: the commit succeeds and flips the table schema to `Float32`,
+  but every not-yet-migrated partition still holds `Int16` parquet — **all scans of the table
+  then error** (`SchemaError: data type mismatch ... incoming: Int16 != target: Float32`),
+  including the migration's own verification reads.
+
+The fresh-table approach also removes, *by construction*, the version-pinning gotcha that bit
+the `power_forecasts` rewrite on 2026-07-04 (an unpinned read of a table being overwritten by
+the same script saw partition 1's overwrite and returned 0 pre-rewrite rows for partition 2 —
+nearly dropping 10.7M rows): here reads only touch the old table and writes only touch the new
+one, so the script cannot read its own writes. The old table is never modified — it *is* the
+rollback plan until the final `rm`.
+
+Disk headroom: the new table is approximately the same size as the old (~88–91 GB; see the
+storage table in §1), so both coexisting needs ~90 GB free — `df -h` showed 178 GB available on
+2026-07-04. Re-check before running.
 
 **Run this as a throwaway script — do not commit it to the repo.** (There's no repo precedent
 for keeping one-off rewrite scripts around; the equivalent `power_forecasts` rewrite wasn't
 committed either.) Save it anywhere outside the git tree (e.g. your scratch/tmp directory), run
 it once, then discard it.
 
-**Before running it against the full 810+ partitions, dry-run the `replace_partition` predicate
-against a *copy* of one partition.** `write_nwp`'s `replace_partition` builds a SQL-string
-predicate (`init_time = '{init_time_partition_str}'`) against a `Timestamp` column, not a
-`String` one (unlike `power_forecasts`' `experiment_name`/`fold_id`, which are `String` columns
-by design — see the "Delta Lake dictionary-encoded columns" gotcha in `CLAUDE.md`). Confirm
-delta-rs's predicate parser actually matches a quoted-string literal against a `Timestamp`
-column and replaces exactly that partition's files (not zero, not all of them) before trusting
-this across the whole table — copy `data/NWP` for a single `init_time` to a scratch path, run
-one iteration of the loop against the copy, and inspect the result with
-`DeltaTable(path).history()` / `pl.scan_delta(path).filter(...).collect().height` before
-proceeding to the real table.
-
 ```python
-"""One-off: rewrite data/NWP from Int16 affine quantisation to Float32 + significand rounding.
+"""One-off: rebuild data/NWP as Float32 + significand rounding, at a sibling path.
 
 Run once, after Phase A has landed `Nwp` / `delta_store.nwp.write_nwp` (needed to write) and
 before Phase C deletes `NwpOnDisk` / `NwpScalingParams` (needed to read the old format).
+Writes to data/NWP_migrating; the swap into place is a manual step afterwards (see checklist).
 """
-
-import sys
 
 import patito as pt
 import polars as pl
 from contracts.settings import Settings
 from contracts.weather_schemas import NwpOnDisk, NwpScalingParams
 from delta_store.nwp import write_nwp
-from deltalake import DeltaTable
 
 SETTINGS = Settings()
-NWP_MODEL_ID = "ECMWF_ENS_0_25_degree"  # only value in NwpModelId today
+OLD_TABLE = str(SETTINGS.nwp_data_path)
+NEW_TABLE = str(SETTINGS.nwp_data_path.with_name("NWP_migrating"))
 
 
 def main() -> None:
-    table_path = str(SETTINGS.nwp_data_path)
-    pinned_version = DeltaTable(table_path).version()
-    print(f"Pinned pre-rewrite version: {pinned_version}")
-
     scaling_params = NwpScalingParams.load()
 
-    # Every distinct init_time currently in the table, read at the PINNED version (matters even
-    # though there's no concurrent writer: partition 2's read must not see partition 1's
-    # overwrite from earlier in *this same script*).
     init_times = (
-        pl.scan_delta(table_path, version=pinned_version)
+        pl.scan_delta(OLD_TABLE)
         .select("init_time")
         .unique()
         .sort("init_time")
         .collect()["init_time"]
         .to_list()
     )
-    print(f"{len(init_times)} partitions to rewrite")
+    print(f"{len(init_times)} partitions to migrate {OLD_TABLE} -> {NEW_TABLE}")
 
     for i, init_time in enumerate(init_times):
-        # `NwpOnDisk.scan_delta` doesn't take a `version` kwarg, so build the pinned scan
-        # directly and re-wrap it with the same model/cast `NwpOnDisk.scan_delta` would apply.
-        old_pinned = pl.scan_delta(table_path, version=pinned_version).filter(
-            pl.col("init_time") == init_time
-        )
-        old_pinned = pt.LazyFrame.from_existing(old_pinned).set_model(NwpOnDisk).cast()
-        old_df = old_pinned.collect()
-        n_old_rows = old_df.height
+        old_lf = pl.scan_delta(OLD_TABLE).filter(pl.col("init_time") == init_time)
+        old_df = pt.LazyFrame.from_existing(old_lf).set_model(NwpOnDisk).cast().collect()
 
+        # NwpInMemory-shaped at runtime; write_nwp only needs the (identical) column names/dtypes,
+        # so the pt.DataFrame[Nwp] annotation mismatch is harmless in this throwaway script.
         nwp_in_memory = NwpOnDisk.to_nwp_in_memory(old_df, scaling_params)
 
-        # Max relative error check per continuous var, before trusting this partition.
-        # (Sanity only — real error is bounded by NWP_SIGNIFICAND_BITS, not by the old
-        # quantisation, so this mostly checks the read+rescale round-tripped correctly.)
+        write_nwp(nwp_in_memory, NEW_TABLE)  # append; the first call creates the table
 
-        init_time_partition_str = init_time.isoformat(sep=" ", timespec="microseconds")
-        write_nwp(
-            nwp_in_memory,
-            table_path,
-            replace_partition=(NWP_MODEL_ID, init_time_partition_str),
-        )
-
-        # Verify: re-read (still pinned logic doesn't apply here — we WANT the latest version,
-        # since this partition was just rewritten) and assert row count matches.
         new_rows = (
-            pl.scan_delta(table_path)
+            pl.scan_delta(NEW_TABLE)
             .filter(pl.col("init_time") == init_time)
             .select(pl.len())
             .collect()
             .item()
         )
-        if new_rows != n_old_rows:
-            print(f"ROW COUNT MISMATCH at {init_time}: old={n_old_rows} new={new_rows}")
-            sys.exit(1)
+        assert new_rows == old_df.height, (
+            f"ROW COUNT MISMATCH at {init_time}: old={old_df.height} new={new_rows}"
+        )
+        print(f"[{i + 1}/{len(init_times)}] {init_time}: {old_df.height:,} rows verified")
 
-        print(f"[{i + 1}/{len(init_times)}] {init_time}: {n_old_rows:,} rows verified")
-
-    print("All partitions verified. NOT vacuuming automatically — see checklist below.")
+    print("All partitions written and row-counted. Old table untouched.")
+    print("Next: spot-check relative error, then swap directories (see plan checklist).")
 
 
 if __name__ == "__main__":
     main()
 ```
 
-**Before running, read the gotcha this reproduces** (this bit the real `power_forecasts`
-rewrite on 2026-07-04 and would have silently dropped 10.7M rows): every read of the
-*pre-rewrite* data must be pinned to the version captured before the first write —
-`pl.scan_delta(path, version=pinned_version)`. An unpinned scan reads the *latest* version, so
-once partition 1 is overwritten, a later partition's "read the old data" step would see only
-already-rewritten rows (0 rows, if that partition happened to sort first in some other scan).
-
 **Checklist — do not skip any of these:**
 
-- [ ] Capture `DeltaTable(path).version()` **before** the first write; pin every read of
-      pre-rewrite data to it explicitly.
-- [ ] Assert per-partition row counts match (done above) — and additionally spot-check max
-      relative error for a couple of partitions: `abs(old_float - new_float) / abs(old_float) <=
-      2**-13` for every continuous var, confirming the rescale-then-round round-trip didn't
-      silently corrupt anything.
-- [ ] Do **not** call `vacuum()` until every partition has printed "verified". Vacuuming before
-      that point makes recovery impossible if a later partition fails (recovery requires
-      time-travel to the pre-rewrite version, which vacuum deletes).
-- [ ] Disk headroom: old + new files coexist per-partition until vacuum (~2× that partition's
-      size transiently, not 2× the whole table — this script overwrites one partition at a
-      time). For the whole-table vacuum at the end, check `df -h` has enough headroom for the
-      largest remaining old-format tail before running it.
-- [ ] After every partition is verified: `DeltaTable(table_path).vacuum(retention_hours=0,
-      enforce_retention_duration=False)`. This is the point of no return — do it only once, at
-      the end, after the loop above has completed without exiting early.
-- [ ] Re-run the Step 1 storage benchmark's byte-count check (or just `du -sh data/NWP`) after
-      vacuuming and compare against the ~40 GB/yr extrapolation above (810+ partitions × ~111
-      MB ≈ 88–90 GB total is the expected ballpark for ~2.25 years of history — this is a
-      sanity check, not a new experiment).
+- [ ] `df -h`: ≥ ~95 GB free before starting (old + new tables coexist until the final delete).
+- [ ] The script must **never write to the old table path** — reads from `OLD_TABLE`, writes to
+      `NEW_TABLE`, nothing else. (This is what makes the power_forecasts version-pinning gotcha
+      structurally impossible here.)
+- [ ] Per-partition row counts asserted in the loop (done above), plus a whole-table total:
+      `pl.scan_delta(OLD).select(pl.len())` == `pl.scan_delta(NEW).select(pl.len())`.
+- [ ] Spot-check relative error for a few partitions spread across the date range: rescale the
+      old partition with `NwpOnDisk.to_nwp_in_memory` and compare against the new table —
+      `abs(old_float - new_float) <= 2**-13 * abs(old_float)` for every continuous var (where
+      `old_float == 0`, require `new_float == 0` exactly; skip nulls). This is what catches
+      silent value corruption — row counts alone cannot.
+- [ ] Swap: `mv data/NWP data/NWP_old_int16 && mv data/NWP_migrating data/NWP`. (Note the new
+      table's `_delta_log` starts from version 0 — the old table's time-travel history is
+      intentionally left behind in `NWP_old_int16`.)
+- [ ] Run the Phase D3 read smoke-check against the swapped-in table **before** deleting
+      anything.
+- [ ] Only then, the point of no return: `rm -rf data/NWP_old_int16`.
+- [ ] `du -sh data/NWP` sanity check: 810+ partitions × ~113 MB ≈ 88–92 GB expected for ~2.25
+      years of history (matches the ~41 GB/yr extrapolation in §1 — a sanity check, not a new
+      experiment).
 
 **Checkpoint:** `data/NWP` is now physically `Float32` + significand-rounded, member-early
 sorted. The *code* (Phase A only landed so far) still contains the old `NwpOnDisk` /
@@ -601,6 +573,11 @@ NwpOnDisk.from_nwp_in_memory(nwp_in_memory, scaling_params)`, the
 `.cast({"nwp_model_id": pl.String})` line (now inside `write_nwp`), and the manual
 `write_deltalake(...)` call with its inline `WriterProperties(compression="ZSTD",
 compression_level=14)`.
+
+Also update the asset **docstring** (elided as `"""..."""` above): it currently says
+"converts it to a Polars DataFrame, scales it to integer representation, and appends it to the
+Delta table" — there is no integer scaling step any more; say it writes through
+`delta_store.nwp.write_nwp` (Float32, significand-rounded).
 
 **C3. `src/nged_substation_forecast/defs/cv_assets.py`** — `_load_engineering_inputs`:
 
@@ -704,12 +681,20 @@ any more; reword to "from Delta Lake comes directly from `Nwp.scan_delta()`".
   ```
 
   Replace `record.update({col: 2000 for col in _NWP_CONTINUOUS_COLS})` with
-  `record.update(_NWP_CONTINUOUS_COL_VALUES)`, drop the `.cast({... pl.Int16 ...})` block (just
-  cast the key/index columns: `init_time`, `valid_time`, `ensemble_member` → `pl.UInt8`,
-  `h3_index` → `pl.UInt64`, `categorical_precipitation_type_surface` → `pl.UInt8`; continuous
-  columns are already `Float64` from the Python literals — cast them to `pl.Float32` too, to
-  match `Nwp`'s declared dtype), and update the docstring ("Write a minimal `NwpOnDisk`-shaped
-  Delta..." → "Write a minimal `Nwp`-shaped Delta...").
+  `record.update(_NWP_CONTINUOUS_COL_VALUES)`; in the `.cast({...})` mapping keep the key/index
+  entries as they are (`init_time`/`valid_time` → `pl.Datetime("us", "UTC")`, `ensemble_member`
+  → `pl.UInt8`, `h3_index` → `pl.UInt64`, `categorical_precipitation_type_surface` → `pl.UInt8`)
+  and change only the continuous-column entry: `**{col: pl.Int16 for col in
+  _NWP_CONTINUOUS_COLS}` → `**{col: pl.Float32 for col in _NWP_CONTINUOUS_COLS}`. Update the
+  docstring ("Write a minimal `NwpOnDisk`-shaped Delta..." → "Write a minimal `Nwp`-shaped
+  Delta...").
+- `tests/test_cv_power_forecasts.py`: **don't miss this one — it never names the old classes,
+  so grepping for `NwpOnDisk`/`NwpInMemory` won't find it.** Its `_write_nwp()` fixture is a
+  near-copy of `test_trained_cv_model.py`'s (same flat `2000` constant, same `pl.Int16` cast) and
+  needs the identical treatment: the `_NWP_CONTINUOUS_COL_VALUES` dict, the `pl.Float32` cast,
+  and the docstring update. Left as-is it would "pass" misleadingly — `Nwp.scan_delta`'s cast
+  would coerce the stored Int16 codes to `2000.0` *physical* units (e.g. 2000 °C), out of every
+  field's bounds, silently skipping the rescale the fixture was designed around.
 - `packages/notebooks/plot_nwp_map.py`: `from contracts.weather_schemas import NwpOnDisk` →
   `Nwp`; `NwpOnDisk.scan_delta()` → `Nwp.scan_delta()`.
 
