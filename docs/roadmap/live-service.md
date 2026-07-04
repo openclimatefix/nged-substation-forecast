@@ -157,6 +157,10 @@ All prices are for **eu-west-2 (London)** — the nearest AWS region to the UK �
 the AWS price-list API (2026-07-03). AWS bills in USD; figures here are converted at
 **\$1 = £0.75** (ECB rate, 2026-07-03).
 
+**These estimates do *not* include ML training.** For v1 we expect most — maybe all — ML
+training to run on our own laptops; the only training AWS would see is an optional
+UI-launched backtest (~£0.65/run, priced below).
+
 Estimated total for the recommended Option B: **~£25–35/month**, made up of:
 
 | Component | £/month |
