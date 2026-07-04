@@ -52,8 +52,8 @@ most useful. We need headroom to iterate table schemas rapidly. Delta Lake suppo
 directly; a REST API would add a versioning-and-deprecation cycle on top of every schema change.
 
 And, crucially, NGED are _already_ finding uses for our "firehose of data" that we had never
-considered. Exactly the sort of unforeseen use-cases that simply wouldn't have occurred to anyone if
-we only provided a minimal dataset to NGED.
+considered. These are xactly the sort of unforeseen use-cases that simply wouldn't have occurred to
+anyone if we only provided a minimal API to NGED.
 
 ## How big is the data?
 
