@@ -10,63 +10,47 @@ We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
 
 ## Data storage experiments
 
-All these experiments were performed on a single model run of ECMWF ENS (2026-02-23T00), just for Great Britain.
+The storage format itself lives in `delta_store.nwp` (writer properties, sort order, precision);
+this section records the measurements behind it. Full before/after detail is in
+[PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271); earlier
+experiments (UInt8/Int16 affine quantisation, codec and sort-order sweeps) are in this file's
+git history.
 
-As a comparison: Saving a single ECMWF ENS run using `float32`, and `zstd` compression (with default compression
-level) results in Parquet files ranging between about 205 MB to 240 MB.
+**Current scheme:** physical-unit `Float32`, every continuous variable rounded to a 13-bit
+significand (max relative error 2⁻¹³ ≈ 1.2×10⁻⁴ — measured ≤ 0.004 °C for temperature, ≤ 8 Pa
+for MSL pressure), rows sorted `init_time → ensemble_member → valid_time → h3_index`, plain
+ZSTD level 3.
 
-The conclusion is to:
+**How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members ×
+85 lead times, up to ~7.24M rows) averages ~113 MB, so a year is **~41 GB**. The full local
+development table — 810 daily runs (Apr 2024 → Jun 2026, 1.57 billion rows) — is **86 GB**.
 
-- sort by "init_time", "lead_time", "ensemble_member", "h3_index"
-- Compress using: compression="zstd", compression_level=14
-- Minimal size = save as UInt8 = 51 MB
-- But we're worried that UInt8 might lose too much info. So we're scaling to `[0, 2¹²)` and saving a
-  Int16 in Delta Lake, which roughly halves the size from 240 MB for `float32` down to 120 MB.
+**Storage** (9 real partitions spread across every season):
 
-### Test different sort orders
+| Config | avg MB/partition | extrapolated GB/yr |
+|---|---:|---:|
+| Previous: Int16 12-bit quantisation, ZSTD-14 | 115.3 | 42.1 |
+| Float32 + 13-bit significand, ZSTD-3 | 110.6 | 40.4 |
+| **Adopted: same + member-early sort** | **112.9** | **41.2** |
+| Same + `BYTE_STREAM_SPLIT` | 133.8 | 48.8 |
 
-(After scaling to `[0, 255]` and saving as `UInt8`, and compressing using zstd with the default level)
+`BYTE_STREAM_SPLIT` makes this table *worse* (unlike `power_forecasts`, where it wins):
+significand rounding collapses NWP values into repeats that parquet's default dictionary+RLE
+encoding captures directly, and `BYTE_STREAM_SPLIT` scatters that repetition across four byte
+planes. Writer properties are data-dependent — measure per table.
 
-```text
-"init_time", "lead_time", "ensemble_member", "h3_index" = 54 MB (BEST YET)
-"init_time", "ensemble_member", "lead_time", "h3_index" = 56 MB
-"init_time", "lead_time", "h3_index", "ensemble_member" = 59 MB
-"init_time", "h3_index", "lead_time", "ensemble_member" = 60 MB
-"init_time", "ensemble_member", "h3_index", "lead_time" = 62 MB
-```
+**Read path** — the member-early sort means each ~1M-row parquet row group spans only a few
+ensemble members, so a single-member read (every training run reads just the control member)
+skips most row groups via min/max stats. Measured on a real 29-day, 9-cell, control-member
+collect: **~5× faster, ~5× less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a
+~2% storage cost.
 
-### Test compression algorithm
-
-(after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and scaling to `[0, 255]`
-and saving as `UInt8`)
-
-```text
-compression="zstd", compression_level=12 = 54 MB
-compression="zstd", compression_level=13 = 53 MB
-compression="zstd", compression_level=14 = 51 MB, 2.26s (BEST MIX OF SPEED & COMPRESSION RATIO)
-compression="zstd", compression_level=15 = 51 MB
-compression="zstd", compression_level=20 = 51 MB
-compression="zstd", compression_level=22 = 51 MB
-compression="lz4" = 68 MB
-compression="snappy" = 78 MB
-compression="gzip" = 56 MB
-compression="gzip", compression_level=9 = 53 MB, 1.49s
-compression="brotli", compression_level=6  = 54 MB, 1.88s
-compression="brotli", compression_level=8  = 54 MB, 2.75s
-compression="brotli", compression_level=9  = 53 MB, 3.9s
-compression="brotli", compression_level=10 = 48 MB, 12.59s
-compression="brotli", compression_level=11 = 48 MB, 17.75s!
-```
-
-### Testing different dtypes
-
-(after sorting by "init_time", "lead_time", "ensemble_member", "h3_index", and compressing using zstd level 14)
-
-```text
-Scale to 2¹⁶ - 1, and save as UInt16 = 145 MB
-Scale to 2¹² - 1, and save as UInt16 = 117 MB
-Scale to 2¹⁰ - 1, and save as UInt16 =  79 MB
-Scale to 2⁹  - 1, and save as UInt16 =  62 MB
-Scale to 2⁸  - 1, and save as UInt16 =  51 MB
-Scale to 2⁸  - 1, and save as UInt8  =  51 MB
-```
+**Why round at all, when Dynamical.org already rounds?** Dynamical stores ECMWF ENS with
+6–11 mantissa bits per variable (their
+[`binary_rounding.py`](https://github.com/dynamical-org/reformatters/blob/main/src/reformatters/common/binary_rounding.py)).
+But trailing zeros do not survive arithmetic: our H3 aggregation is a weighted mean over grid
+points, and wind speed/direction are derived from their u/v via `sqrt`/`arctan2`, so by the
+time values reach our writer their mantissas are full entropy again (measured: 100% of
+Dynamical-style rounded values have zeroed low bits; after a weighted mean, 0.07% do). Our
+13-significand-bit rounding restores compressibility while being 1–6 bits *finer* than the
+upstream precision, so it discards almost nothing beyond what Dynamical already dropped.
