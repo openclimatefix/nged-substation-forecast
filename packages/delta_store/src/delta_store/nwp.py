@@ -5,10 +5,9 @@ compression-friendly row order, and the significand-precision reduction of the c
 weather variables. Callers write through :func:`write_nwp` so it is impossible to land rows in
 the table without this format applied.
 
-Replaces the earlier ``Int16`` affine-quantisation scheme with plain ``Float32`` +
-``delta_store.precision.round_to_significand_bits`` — the technique used by
-``delta_store.power_forecasts``, but with *different* writer properties. Measured on real NWP
-data (9 partitions spread across two years of history): ``BYTE_STREAM_SPLIT`` made every
+Stores plain ``Float32`` + ``delta_store.precision.round_to_significand_bits`` — the technique
+used by ``delta_store.power_forecasts``, but with *different* writer properties. Measured on
+real NWP data (9 partitions spread across two years of history): ``BYTE_STREAM_SPLIT`` made every
 continuous column *larger*, not smaller — the opposite of the ``power_forecasts`` result.
 Working hypothesis: significand rounding collapses NWP values into a small set of repeats (many
 H3 cells / ensemble members round to the same value), which Parquet's *default* dictionary+RLE

@@ -115,10 +115,12 @@ class XGBoostForecaster(BaseForecaster):
         """
         feature_cols = self._feature_cols
         requested = set(time_series_ids)
-        # Stream the collect. An NWP parquet row group holds every ensemble member and H3 cell, so
-        # the in-memory engine decodes the whole (init_time-pruned) scan before the row-level
-        # member/cell filters apply — 100+ GB for a multi-month window. The streaming engine applies
-        # the predicates per morsel, holding peak to a few GB. See docs/architecture/overview.md.
+        # Stream the collect. init_time prunes whole NWP partitions, and the member-early sort
+        # (delta_store.nwp.NWP_SORT_COLS) lets row-group stats skip most of each partition for the
+        # control-member read — but h3_index is not a sort-early column, so cell filtering is still
+        # decode-then-filter within the surviving row groups. The streaming engine applies those
+        # predicates per morsel, holding peak memory to a few GB where the in-memory engine would
+        # materialise every surviving row first. See docs/architecture/overview.md.
         df = data.drop_nulls(subset=["power"]).collect(engine="streaming")
         for group_key, group in df.group_by(["time_series_id"]):
             ts_id = int(group_key[0])

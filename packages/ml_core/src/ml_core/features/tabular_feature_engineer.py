@@ -27,7 +27,7 @@ import patito as pt
 import polars as pl
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
@@ -41,7 +41,7 @@ from ml_core.features.feature_engineer import FeatureEngineer
 
 
 def _attach_nearest_nwp_cell(
-    nwp: pt.LazyFrame[NwpInMemory],
+    nwp: pt.LazyFrame[Nwp],
     time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
 ) -> pl.LazyFrame:
     """Map each gridded-NWP H3 cell to the time series that sits in it (nearest-cell join).
@@ -72,14 +72,14 @@ class TabularFeatureEngineer(FeatureEngineer):
         selected_features: set[str],
         power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwp: pt.LazyFrame[NwpInMemory],
+        nwp: pt.LazyFrame[Nwp],
     ) -> pt.LazyFrame[AllFeatures]:
         nwp_per_time_series = _attach_nearest_nwp_cell(nwp, time_series_metadata)
         return _engineer_features(
             selected_features,
             power_time_series,
             time_series_metadata,
-            nwp=pt.LazyFrame.from_existing(nwp_per_time_series).set_model(NwpInMemory),
+            nwp=pt.LazyFrame.from_existing(nwp_per_time_series).set_model(Nwp),
         )
 
 
@@ -87,7 +87,7 @@ def _engineer_features(
     selected_features: set[str],
     power_time_series: pt.LazyFrame[PowerTimeSeries],
     time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-    nwp: pt.LazyFrame[NwpInMemory] | None = None,
+    nwp: pt.LazyFrame[Nwp] | None = None,
     power_fcst_init_time: datetime | None = None,
     nwp_init_time: datetime | None = None,
     nwp_publication_delay_hours: int = 6,
@@ -98,12 +98,12 @@ def _engineer_features(
         selected_features: Set of features to engineer.
         power_time_series: Input power time series.
         time_series_metadata: Metadata for the time series.
-        nwp: NWP weather forecast data in physical units (NwpInMemory), already mapped to
+        nwp: NWP weather forecast data in physical units (Nwp), already mapped to
             **per-time-series** rows — it is joined on `time_series_id`, so it must carry a
             `time_series_id` column rather than the raw `h3_index` spatial key. Callers attach
             `time_series_id` first (e.g. via ``_attach_nearest_nwp_cell``). Callers loading
-            from Delta Lake should convert with NwpOnDisk.to_nwp_in_memory() first, which is
-            lazy and does not trigger a collect.
+            from Delta Lake come directly from ``Nwp.scan_delta()``, which is lazy and does
+            not trigger a collect.
         power_fcst_init_time: Controls the operating mode of the function.
 
             **None — bulk training and multi-run backtesting (recommended for most callers):**
@@ -146,7 +146,7 @@ def _engineer_features(
         )
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
-    nwp_lf: pt.LazyFrame[NwpInMemory] | None = nwp
+    nwp_lf: pt.LazyFrame[Nwp] | None = nwp
 
     parsed_features = ParsedFeatures.from_strings(selected_features)
     if nwp_lf is None and parsed_features.requires_weather_data():

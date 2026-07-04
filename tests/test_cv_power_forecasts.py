@@ -38,20 +38,22 @@ _TRAIN_DAY = datetime(
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=timezone.utc)  # inside val window [2025-07-01, 2026-06-30]
 _VAL_MEMBERS = (0, 1, 2)  # stands in for the full 51-member ensemble in this synthetic fixture
 
-_NWP_CONTINUOUS_COLS = (
-    "temperature_2m",
-    "dew_point_temperature_2m",
-    "wind_speed_10m",
-    "wind_direction_10m",
-    "wind_speed_100m",
-    "wind_direction_100m",
-    "pressure_surface",
-    "pressure_reduced_to_mean_sea_level",
-    "geopotential_height_500hpa",
-    "downward_long_wave_radiation_flux_surface",
-    "downward_short_wave_radiation_flux_surface",
-    "precipitation_surface",
-)
+_NWP_CONTINUOUS_COL_VALUES = {
+    "temperature_2m": 15.0,
+    "dew_point_temperature_2m": 10.0,
+    "wind_speed_10m": 5.0,
+    "wind_direction_10m": 180.0,
+    "wind_speed_100m": 8.0,
+    "wind_direction_100m": 180.0,
+    "pressure_surface": 101_000.0,
+    "pressure_reduced_to_mean_sea_level": 101_500.0,
+    "geopotential_height_500hpa": 5_500.0,
+    "downward_long_wave_radiation_flux_surface": 300.0,
+    "downward_short_wave_radiation_flux_surface": 200.0,
+    "precipitation_surface": 0.001,
+}
+"""Physically plausible Float32 constants, one per continuous ``Nwp`` variable, all inside the
+contract's ``ge``/``le`` bounds."""
 
 
 def _half_hours(day: datetime) -> pl.Series:
@@ -84,7 +86,7 @@ def _nwp_records(cell: int, day: datetime, members: tuple[int, ...]) -> list[dic
                 "h3_index": cell,
                 "categorical_precipitation_type_surface": None,
             }
-            record.update({col: 2000 for col in _NWP_CONTINUOUS_COLS})
+            record.update(_NWP_CONTINUOUS_COL_VALUES)
             records.append(record)
     return records
 
@@ -101,7 +103,7 @@ def _write_nwp(path: str) -> None:
             "ensemble_member": pl.UInt8,
             "h3_index": pl.UInt64,
             "categorical_precipitation_type_surface": pl.UInt8,
-            **{col: pl.Int16 for col in _NWP_CONTINUOUS_COLS},
+            **{col: pl.Float32 for col in _NWP_CONTINUOUS_COL_VALUES},
         }
     )
     write_deltalake(table_or_uri=path, data=df.to_arrow())

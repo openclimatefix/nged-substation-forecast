@@ -122,7 +122,7 @@ Three main assets:
 
 - `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts metadata parquet
 - `h3_grid_weights` — computes fractional H3 cell overlap with the GB boundary for spatial NWP aggregation
-- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP, scales to `Int16`, writes to Delta Lake
+- `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and appends it to Delta Lake via `delta_store.nwp.write_nwp`
 
 ### Data Contracts (`packages/contracts/`)
 
@@ -130,7 +130,7 @@ All tabular data flowing through the system is validated with **Patito** models.
 
 - `PowerTimeSeries` — half-hourly power observations (MW/MVA) per `time_series_id`
 - `TimeSeriesMetadata` — substation metadata including lat/lon, H3 index, substation type
-- `NwpInMemory` / `NwpOnDisk` — NWP weather data. Stored on disk as `Int16` (quantised to 12-bit range per `NwpScalingParams`) and converted back to `Float32` physical units in memory
+- `Nwp` — NWP weather data in physical-unit `Float32`, on disk and in memory alike (rounded to a 13-bit significand at write time by `delta_store.nwp`)
 - `AllFeatures` — the final joined dataset handed to ML models; primary key is `(time_series_id, power_fcst_init_time, valid_time[, ensemble_member])`
 - `PowerForecast` — model output schema
 

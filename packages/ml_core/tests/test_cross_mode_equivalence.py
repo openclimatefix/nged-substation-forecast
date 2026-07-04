@@ -30,7 +30,7 @@ from datetime import datetime, timedelta
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 from ml_core.features.tabular_feature_engineer import _engineer_features
 from polars.testing import assert_frame_equal
 
@@ -89,7 +89,7 @@ def _power_observation_times(run_init: datetime) -> list[datetime]:
 
 
 def _build_fixtures() -> tuple[
-    pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[NwpInMemory]
+    pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[Nwp]
 ]:
     nwp_rows = []
     for run in _NWP_RUNS:
@@ -125,7 +125,7 @@ def _build_fixtures() -> tuple[
     return (
         pt.LazyFrame.from_existing(power_df.lazy()).set_model(PowerTimeSeries),
         pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
-        pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(NwpInMemory),
+        pt.LazyFrame.from_existing(nwp_df.lazy()).set_model(Nwp),
     )
 
 

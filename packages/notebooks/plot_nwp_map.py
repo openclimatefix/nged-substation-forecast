@@ -10,7 +10,7 @@ with app.setup:
     import altair as alt
     import polars as pl
     from contracts.settings import Settings
-    from contracts.weather_schemas import NwpOnDisk
+    from contracts.weather_schemas import Nwp
     from lonboard import H3HexagonLayer, Map
 
     SETTINGS = Settings()
@@ -18,7 +18,7 @@ with app.setup:
 
 @app.cell
 def _():
-    df = NwpOnDisk.scan_delta().drop("nwp_model_id")
+    df = Nwp.scan_delta().drop("nwp_model_id")
     return (df,)
 
 

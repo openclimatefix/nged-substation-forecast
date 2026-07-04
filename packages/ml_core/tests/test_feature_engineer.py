@@ -5,14 +5,14 @@ from datetime import datetime
 import patito as pt
 import polars as pl
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 from ml_core.features.tabular_feature_engineer import (
     TabularFeatureEngineer,
     _attach_nearest_nwp_cell,
 )
 
 
-def _nwp_two_cells() -> pt.LazyFrame[NwpInMemory]:
+def _nwp_two_cells() -> pt.LazyFrame[Nwp]:
     """NWP for two H3 cells (10, 20) and one unmatched cell (99)."""
     valid_time = datetime(2024, 6, 1, 12, 0)
     init_time = datetime(2024, 6, 1, 0, 0)
@@ -25,7 +25,7 @@ def _nwp_two_cells() -> pt.LazyFrame[NwpInMemory]:
             "temperature_2m": [10.0, 12.0, 14.0],
         }
     )
-    return pt.LazyFrame.from_existing(df.lazy()).set_model(NwpInMemory)
+    return pt.LazyFrame.from_existing(df.lazy()).set_model(Nwp)
 
 
 def _metadata_two_series() -> pt.DataFrame[TimeSeriesMetadata]:

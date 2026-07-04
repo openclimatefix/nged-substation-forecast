@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 
 
 class FeatureEngineer(ABC):
@@ -25,7 +25,7 @@ class FeatureEngineer(ABC):
         selected_features: set[str],
         power_time_series: pt.LazyFrame[PowerTimeSeries],
         time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
-        nwp: pt.LazyFrame[NwpInMemory],
+        nwp: pt.LazyFrame[Nwp],
     ) -> pt.LazyFrame[AllFeatures]:
         """Engineer features for training/inference.
 

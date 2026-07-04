@@ -26,8 +26,10 @@ POWER_FCST_SIGNIFICAND_BITS: Final[int] = 13
 Rounding to nearest at 13 significand bits caps the relative error at 2⁻¹³ ≈ 1.2×10⁻⁴ — orders
 of magnitude below forecast error — and zeroes the 11 low fraction bits, which are otherwise
 pure entropy that defeats every compression codec (nearly every full-precision ``power_fcst``
-value is distinct). Mirrors the 12-bit quantisation already applied to NWP data
-(``NwpScalingParams``). See ``POWER_FORECASTS_WRITER_PROPERTIES`` for the measured size impact.
+value is distinct). Mirrors the significand-rounding scheme ``delta_store.nwp`` applies to NWP
+data — but with different writer properties; see that module's docstring for why the choice
+doesn't transfer between tables. See ``POWER_FORECASTS_WRITER_PROPERTIES`` for the measured
+size impact.
 """
 
 POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = (

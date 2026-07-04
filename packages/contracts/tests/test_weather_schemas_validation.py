@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 import polars as pl
 import patito as pt
-from contracts.weather_schemas import NwpInMemory
+from contracts.weather_schemas import Nwp
 
 
 def test_categorical_precipitation_type_surface_validation():
@@ -38,18 +38,18 @@ def test_categorical_precipitation_type_surface_validation():
     )
 
     # This should pass
-    NwpInMemory.validate(pt.DataFrame(df_valid).set_model(NwpInMemory).cast())
+    Nwp.validate(pt.DataFrame(df_valid).set_model(Nwp).cast())
 
     # Test case 2: Invalid data (not null before 2024-11-13)
     df_invalid_before = df_valid.with_columns(
         pl.Series("categorical_precipitation_type_surface", [1, 1])
     )
     with pytest.raises(ValueError, match="must be all null for init_time <= 2024-11-13"):
-        NwpInMemory.validate(pt.DataFrame(df_invalid_before).set_model(NwpInMemory).cast())
+        Nwp.validate(pt.DataFrame(df_invalid_before).set_model(Nwp).cast())
 
     # Test case 3: Invalid data (null after 2024-11-13)
     df_invalid_after = df_valid.with_columns(
         pl.Series("categorical_precipitation_type_surface", [None, None])
     )
     with pytest.raises(ValueError, match="must not be null for init_time > 2024-11-13"):
-        NwpInMemory.validate(pt.DataFrame(df_invalid_after).set_model(NwpInMemory).cast())
+        Nwp.validate(pt.DataFrame(df_invalid_after).set_model(Nwp).cast())

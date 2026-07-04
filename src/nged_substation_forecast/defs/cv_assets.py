@@ -21,7 +21,7 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from contracts.settings import Settings
-from contracts.weather_schemas import NwpInMemory, NwpOnDisk
+from contracts.weather_schemas import Nwp
 from dagster import (
     AssetExecutionContext,
     Config,
@@ -237,10 +237,8 @@ def _load_engineering_inputs(
     ensemble_members: list[int] | None = None,
     init_time_start: datetime | None = None,
     init_time_end: datetime | None = None,
-) -> tuple[
-    pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[NwpInMemory]
-]:
-    """Load observed power, metadata, and in-memory NWP for a window and time-series population.
+) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.DataFrame[TimeSeriesMetadata], pt.LazyFrame[Nwp]]:
+    """Load observed power, metadata, and NWP for a window and time-series population.
 
     Shared by ``trained_cv_model`` (training window + eligible population) and
     ``cv_power_forecasts`` (validation window + trained population). Power and NWP are filtered to
@@ -249,16 +247,18 @@ def _load_engineering_inputs(
 
     **Memory: prune the NWP scan at the source.** The NWP Delta is large (tens of GB: every
     ``init_time`` × every H3 cell × ~51 ensemble members × the 30-min forecast horizon). Every
-    filter below is applied to the *raw* ``NwpOnDisk.scan_delta`` **before**
-    ``NwpOnDisk.to_nwp_in_memory`` rescales Int16→Float32, so only the surviving rows are ever
-    decoded into memory. This is the difference between a few GB and an OOM. See the "NWP scan
-    pruning" notes in ``docs/architecture/overview.md``. The three levers:
+    filter below is applied directly to the ``Nwp.scan_delta`` scan, so only the surviving rows
+    are ever decoded into memory. This is the difference between a few GB and an OOM. See the
+    "NWP scan pruning" notes in ``docs/architecture/overview.md``. The three levers:
 
     - ``init_time``: the table is partitioned by ``init_time``, so bounding it to the runs that can
       cover the window (``[window_start - _MAX_NWP_LEAD, window_end]``) is a true *partition* prune
       — Polars opens only those partition directories. Filtering ``valid_time`` alone does **not**
       prune partitions.
-    - ``ensemble_member``: applied before the rescale so we never decode the ~50 members we discard.
+    - ``ensemble_member``: applied at the scan so we never decode the ~50 discarded members; the
+      member-early sort (``delta_store.nwp.NWP_SORT_COLS``) additionally lets Parquet row-group
+      stats skip most of each partition outright for this predicate — see
+      ``docs/architecture/overview.md``.
     - ``h3_index``: restricted to the cells the requested series sit in. There is a *many-to-one*
       relationship between ``time_series_id`` and ``h3_index`` (one NWP cell covers several series),
       so this is a small set of cells; the per-cell weather is later replicated across the series in
@@ -284,7 +284,7 @@ def _load_engineering_inputs(
 
     Returns:
         ``(power_time_series, metadata, nwp)`` — a lazy power frame, an eager metadata frame, and a
-        lazy in-memory NWP frame, all filtered to ``time_series_ids`` and the requested window.
+        lazy NWP frame, all filtered to ``time_series_ids`` and the requested window.
     """
     if init_time_start is None:
         init_time_start = window_start - _MAX_NWP_LEAD
@@ -306,7 +306,7 @@ def _load_engineering_inputs(
     # The H3 cells the requested series sit in (many series may share one cell).
     cells = metadata_df["h3_res_5"].unique().to_list()
 
-    nwp_scan = NwpOnDisk.scan_delta(settings.nwp_data_path).filter(
+    nwp_scan = Nwp.scan_delta(settings.nwp_data_path).filter(
         # init_time is the partition key — this prunes whole partitions, not just row groups.
         pl.col("init_time") >= init_time_start,
         pl.col("init_time") <= init_time_end,
@@ -316,10 +316,8 @@ def _load_engineering_inputs(
     )
     if ensemble_members is not None:
         nwp_scan = nwp_scan.filter(pl.col("ensemble_member").is_in(ensemble_members))
-    # ``.filter`` returns a plain ``pl.LazyFrame``; re-attach the model so ``to_nwp_in_memory``
-    # (which rescales Int16→Float32 and runs only on these pruned rows) sees the NwpOnDisk schema.
-    nwp_on_disk = pt.LazyFrame.from_existing(nwp_scan).set_model(NwpOnDisk)
-    nwp_lf = NwpOnDisk.to_nwp_in_memory(nwp_on_disk)
+    # ``.filter`` returns a plain ``pl.LazyFrame``; re-attach the model. (Zero-copy re-wrap.)
+    nwp_lf = pt.LazyFrame.from_existing(nwp_scan).set_model(Nwp)
 
     return power_ts, metadata_df, nwp_lf
 

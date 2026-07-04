@@ -8,7 +8,6 @@ import polars as pl
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
-from contracts.weather_schemas import NwpOnDisk, NwpScalingParams
 from dagster import (
     AssetExecutionContext,
     DailyPartitionsDefinition,
@@ -17,7 +16,7 @@ from dagster import (
     TableRecord,
     asset,
 )
-from deltalake import WriterProperties, write_deltalake
+from delta_store.nwp import write_nwp
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
@@ -153,8 +152,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     Downloads and processes ECMWF ensemble NWP data for a specific day.
 
     This asset fetches the 00Z NWP run for the partition date, converts it to a
-    Polars DataFrame, scales it to integer representation, and appends it to the
-    Delta table.
+    Polars DataFrame, and appends it to the Delta table through
+    ``delta_store.nwp.write_nwp`` (Float32, significand-rounded).
     """
     settings = Settings()
     partition_date_str = context.partition_key
@@ -162,33 +161,19 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     # Load dependencies
     h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
-    scaling_params = NwpScalingParams.load()
 
     # Download and convert
     ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
-    nwp_in_memory = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+    nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
 
-    # Validate and scale
-    nwp_on_disk = NwpOnDisk.from_nwp_in_memory(nwp_in_memory, scaling_params)
-
-    context.log.info(f"Columns: {nwp_on_disk.columns}")
+    context.log.info(f"Columns: {nwp.columns}")
 
     settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Delta Lake doesn't support Enums, so we must cast to String:
-    df_to_write = nwp_on_disk.as_polars().cast({"nwp_model_id": pl.String})
-
-    write_deltalake(
-        table_or_uri=settings.nwp_data_path,
-        data=df_to_write,
-        mode="append",
-        partition_by=["nwp_model_id", "init_time"],
-        writer_properties=WriterProperties(compression="ZSTD", compression_level=14),
-    )
+    write_nwp(nwp, settings.nwp_data_path)
 
     context.add_output_metadata(
         {
-            "n_rows": len(nwp_on_disk),
+            "n_rows": len(nwp),
             "path": str(settings.nwp_data_path),
             "init_time": str(nwp_init_time),
         }
