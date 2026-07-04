@@ -277,6 +277,10 @@ the control member is an increasingly unrepresentative sample of the ensemble, s
 this item concentrates precisely in the primary user band — worth remembering when deciding
 how soon to invest in item 13. Ensemble *calibration* itself belongs to
 [probabilistic evaluation](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
+Member training is also one of the
+[double-counting mitigations](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
+for the Phase-D quantile-ensemble pipeline — a second reason to land it, alongside this item
+and item 1 (the lead-time feature), before or with the quantile model family.
 
 ### 15. Global model per `time_series_type`
 

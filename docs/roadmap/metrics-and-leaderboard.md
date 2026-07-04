@@ -521,8 +521,15 @@ deterministic mean (`packages/ml_core/src/ml_core/metrics.py:84-90`) and scores 
 RMSE/MBE on the `"all"` horizon slice (`metrics.py:51`). We pay 51× inference cost and score
 only the mean.
 
-Fix in three phases, each an independent PR. Phases A and B are pure evaluation (no model
-changes) and should land before any further MAE-driven experimentation.
+The theory behind this diagnosis — the three-term uncertainty decomposition, why a
+deterministic model driven by an NWP ensemble captures only the weather term, and what the
+principled fix looks like — is the durable explainer
+[Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md).
+This section is the *plan* that applies it.
+
+Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are
+pure evaluation (no model changes) and should land before any further MAE-driven
+experimentation.
 
 ### Phase A — horizon-sliced metrics
 
@@ -563,18 +570,47 @@ Compute member-aware metrics *before* the ensemble-mean collapse in `compute_met
 
 ### Phase C — cheap calibration (after B proves the diagnosis)
 
-Decide based on Phase B's spread-skill numbers; recommended order:
+Decide based on Phase B's spread-skill numbers. **Post-hoc spread inflation** (EMOS-lite): per
+horizon slice, fit a scalar `s` on the *training* window so that inflating members around the
+ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero
+new model — implementable as an optional step in `predict` or as a wrapper forecaster. Fit on
+train, apply on validation (no tuning on the fold being scored).
 
-1. **Post-hoc spread inflation** (EMOS-lite): per horizon slice, fit a scalar `s` on the
-   *training* window so that inflating members around the ensemble mean
-   (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero new model —
-   implementable as an optional step in `predict` or as a wrapper forecaster. Fit on train,
-   apply on validation (no tuning on the fold being scored).
-2. **XGBoost native multi-quantile** (`objective: reg:quantileerror`, several
-   `quantile_alpha`s) as a separate experiment/model family. This gives directly calibrated
-   quantiles but requires a percentile representation in `PowerForecast` (the
-   [delivery tables](delivery-tables.md) already plan percentiles) — a bigger schema/design
-   step, so keep it as its own follow-up plan when Phase B/C1 results justify it.
+Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
+forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn its
+build cost.
+
+### Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
+
+The full fix from the
+[probabilistic-forecasting explainer](../techniques/probabilistic-forecasting.md): have the
+model emit a **conditional distribution per ensemble member** (per-member quantiles —
+[Representation 3](delivery-tables.md#representation-3-ensemble-of-percentile-forecasts) in the
+delivery tables), then recombine the 51 members with the **linear-pool mixture** into one set
+of delivered percentiles
+([Representation 2](delivery-tables.md#representation-2-percentiles)). Three steps, one PR
+each:
+
+1. **Percentile representations in `PowerForecast`**
+   ([#262](https://github.com/openclimatefix/nged-substation-forecast/issues/262)) — extend the
+   contract (and the Delta write/read paths) with the Rep 2 and Rep 3 percentile columns,
+   alongside the existing deterministic-ensemble representation.
+2. **Quantile XGBoost model family**
+   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) —
+   `objective: reg:quantileerror` with several
+   `quantile_alpha`s, as a separate experiment/model family emitting Rep 3. Sort each member's
+   quantiles at predict time (monotonic rearrangement fixes quantile crossing). The lead-time
+   feature and training on multiple members
+   ([xgboost-improvements](xgboost-improvements.md) items 1 and 14) are the double-counting
+   mitigations discussed in the explainer — land them first or measure without them
+   consciously.
+3. **Linear-pool combining step**
+   ([#264](https://github.com/openclimatefix/nged-substation-forecast/issues/264)) — pool the
+   per-member quantiles into delivered Rep 2
+   percentiles (the pseudo-sample recipe in the explainer), with a per-horizon affine
+   recalibration hook (fit on train) applied only if the pooled spread-skill/PICP numbers
+   demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C inflated
+   deterministic champion.
 
 ### Implementation details — probabilistic metrics (deleted when they ship)
 

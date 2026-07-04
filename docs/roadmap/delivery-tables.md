@@ -60,7 +60,15 @@ several of these:
 1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member. ✅ **Implemented** and
    the likely MVP representation.
 2. **Percentiles** — one row per `valid_time`, with a column per percentile. 🚧 Planned.
-3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🔬 Research.
+3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned.
+
+Representations 2 and 3 are two stages of one pipeline, not independent options:
+Representation 3 (per-member conditional quantiles) is produced by the model, and
+Representation 2 is **derived from it** by linear-pool mixing — see
+[Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md) for
+the theory and
+[Phase D of the probabilistic evaluation plan](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
+for the implementation plan.
 
 ### Fields common to all three representations
 
@@ -97,15 +105,24 @@ filter on `fold_id` to select the population you need. See
 
 ### Representation 2 — percentiles 🚧
 
-One row per `valid_time`, with one column per percentile:
+One row per `valid_time`, with one column per percentile. This is the primary NGED-facing
+probabilistic representation, derived from
+[Representation 3](#representation-3-ensemble-of-percentile-forecasts) by pooling the
+per-member quantiles (the equal-weight mixture — *not* per-level averaging, which would discard
+the between-member spread; see
+[the explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)):
 
 | Fields | Data type | Notes |
 |---|---|---|
 | `p1, p2, p5, p10, p20, p35, p50, p65, p80, p90, p95, p98, p99` | `float32` | The power forecast at each percentile. NGED is far more interested in the **tails** than the shoulders. Read `p50` as "50% chance the true power flow is below this value", `p99` as "99% chance below", etc. (Scaled to [−1, +1] once normalisation lands.) |
 
-### Representation 3 — ensemble of percentile forecasts 🔬
+### Representation 3 — ensemble of percentile forecasts 🚧
 
-Each ensemble member is itself a percentile forecast:
+Each ensemble member is itself a percentile forecast — "given this member's weather, power will
+land in this range with this shape" — produced by a quantile-objective model (see
+[Phase D](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)).
+Primarily an *internal* stage that Representation 2 is pooled from, but it may also be
+delivered for power users who want the weather-scenario structure:
 
 | Fields | Data type | Notes |
 |---|---|---|
