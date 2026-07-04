@@ -308,7 +308,7 @@ class EffectiveCapacity(pt.Model):
     Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
     This table is backward-looking only — it does not cover the forecast period.
 
-    **MVP implementation (v0.1):** one row per ``time_series_id``, ``time`` set to the end of
+    **v0.1 implementation:** one row per ``time_series_id``, ``time`` set to the end of
     the available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over
     the full observed history. This is a static scalar per series.
 
@@ -318,7 +318,7 @@ class EffectiveCapacity(pt.Model):
     giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
     the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its
     ``time_series_id``-only NMAE-denominator join for a temporal as-of join. Do **not** pre-densify
-    the MVP scalar into one row per half-hour — densifying a constant buys nothing, and the as-of
+    the v0.1 scalar into one row per half-hour — densifying a constant buys nothing, and the as-of
     join handles sparse capacity rows naturally.
     """
 
@@ -328,7 +328,7 @@ class EffectiveCapacity(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "The half-hourly timestep this capacity estimate applies to. "
-            "In the MVP, this is the end of the available observation history for that series."
+            "In v0.1, this is the end of the available observation history for that series."
         ),
     )
 

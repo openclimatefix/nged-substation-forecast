@@ -33,10 +33,10 @@ There are **five** tables. This table tracks where each one stands today:
 
 | # | Table | Status | Where the schema lives |
 |---|---|---|---|
-| 1 | `power_forecast` | ✅ Implemented (deterministic-ensemble flavour only) | `contracts.power_schemas.PowerForecast` |
-| 2 | `power_forecast_warnings` | 🚧 Planned (partial in MVP) | not yet in code |
+| 1 | `power_forecast` | ✅ Deterministic-ensemble flavour implemented (v0.1); percentile flavours planned for v0.5 | `contracts.power_schemas.PowerForecast` |
+| 2 | `power_forecast_warnings` | 🚧 Planned (partial at first; complete by v1.0) | not yet in code |
 | 3 | `asset_health_history` | 🚧 Planned | not yet in code |
-| 4 | `effective_capacity` | ✅ MVP implemented (static P99 estimate); DP upgrade planned for v0.7 | `contracts.power_schemas.EffectiveCapacity` |
+| 4 | `effective_capacity` | ✅ Implemented in v0.1 (static P99 estimate); time-varying upgrade planned for v0.7 | `contracts.power_schemas.EffectiveCapacity` |
 | 5 | `substation_switching` | 🚧 Planned (v0.6) | not yet in code |
 
 > **Naming note.** The Milestone 1 report drafted these tables with the column name `timeseries_id`,
@@ -48,8 +48,8 @@ There are **five** tables. This table tracks where each one stands today:
 ## Table 1 — `power_forecast`
 
 > **Status: ✅ Implemented** as `contracts.power_schemas.PowerForecast`, but only the
-> **deterministic-ensemble** representation of uncertainty (below). The two percentile-based
-> representations are 🚧 planned.
+> **deterministic-ensemble** representation of uncertainty (below; v0.1). The two
+> percentile-based representations are 🚧 planned for v0.5.
 
 Stores OCF's probabilistic power forecasts. The table extends ~14 days **forwards** in time (the
 forecast horizon) and **backwards** to the start of the backtesting period.
@@ -57,10 +57,10 @@ forecast horizon) and **backwards** to the start of the backtesting period.
 The Milestone 1 report describes **three** ways of expressing uncertainty. We may deliver one or
 several of these:
 
-1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member. ✅ **Implemented** and
-   the likely MVP representation.
-2. **Percentiles** — one row per `valid_time`, with a column per percentile. 🚧 Planned.
-3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned.
+1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member.
+   ✅ **Implemented in v0.1**.
+2. **Percentiles** — one row per `valid_time`, with a column per percentile. 🚧 Planned (v0.5).
+3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned (v0.5).
 
 Representations 2 and 3 are two stages of one pipeline, not independent options:
 Representation 3 (per-member conditional quantiles) is produced by the model, and
@@ -134,8 +134,8 @@ delivered for power users who want the weather-scenario structure:
 ## Table 2 — `power_forecast_warnings` 🚧
 
 > **Status: 🚧 Planned.** Some warning types depend on switching-event detection and effective-capacity
-> estimation, which do not exist yet — so this table will be **partial in the MVP** and complete by
-> v1.0.
+> estimation, which do not exist yet — so this table will be **partial when it first ships** and
+> complete by v1.0.
 
 Tells NGED whenever we detect abnormal behaviour in the **most recent meter reading** for a
 `time_series_id`. Such abnormality means the asset's actual performance may deviate from the
@@ -204,7 +204,7 @@ Notes on specific flags:
 
 ## Table 4 — `effective_capacity`
 
-> **Status: ✅ MVP implemented** — the `effective_capacity` Dagster asset writes P99 of observed
+> **Status: ✅ Implemented (v0.1)** — the `effective_capacity` Dagster asset writes P99 of observed
 > power as a static capacity proxy.
 > Schema lives in `contracts.power_schemas.EffectiveCapacity`.
 > **Planned upgrade in v0.7**
@@ -216,13 +216,13 @@ OCF's estimate of each generator's or substation's **effective capacity** at eve
 timestep of the historical time series data. This table is **backward-looking only** — it does
 not cover the forecast period.
 
-**MVP approach (v0.1):** one row per `time_series_id`, `effective_capacity_mw` = P99 of
+**v0.1 approach:** one row per `time_series_id`, `effective_capacity_mw` = P99 of
 `|power|` over the full available observation history. This is a static scalar per series — a
 robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
 capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
 It is also the denominator used to normalise NMAE in the `forecast_metrics` table — see
 [Normalising NMAE by `effective_capacity`](metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
-for why the MVP stores one scalar row per series (rather than repeating the value at every half-hour)
+for why v0.1 stores one scalar row per series (rather than repeating the value at every half-hour)
 and how the metrics join evolves for the v0.7 upgrade.
 
 **v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning
@@ -246,7 +246,7 @@ its `time_series_id`-only capacity join for a temporal as-of join (see
 | Field | Data type | Notes |
 |---|---|---|
 | `time_series_id` | `int32` | NGED's time-series ID. |
-| `time` | `datetime` (UTC), every half hour | The half-hourly timestep this estimate applies to. In the MVP, set to the end of the available observation history for that series. |
+| `time` | `datetime` (UTC), every half hour | The half-hourly timestep this estimate applies to. In v0.1, set to the end of the available observation history for that series. |
 | `effective_capacity_mw` | `float32` | OCF's estimate of the effective capacity (MW) at this timestep. |
 
 ---

@@ -115,7 +115,7 @@ class Settings(BaseSettings):
     effective_capacity_data_path: Path = Field(
         default=PROJECT_ROOT / "data" / "effective_capacity",
         description=(
-            "Delta table of per-series effective capacity (MVP: full-history P99 of |power|),"
+            "Delta table of per-series effective capacity (v0.1: full-history P99 of |power|),"
             " written by the effective_capacity asset and read by the metrics asset as the NMAE"
             " denominator."
         ),

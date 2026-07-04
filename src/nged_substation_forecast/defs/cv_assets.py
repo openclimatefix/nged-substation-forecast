@@ -156,18 +156,18 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
 def _compute_effective_capacity(
     power_lf: pt.LazyFrame[PowerTimeSeries],
 ) -> pt.DataFrame[EffectiveCapacity]:
-    """Compute the MVP effective capacity (full-history P99 of ``|power|``) per time series.
+    """Compute the v0.1 effective capacity (full-history P99 of ``|power|``) per time series.
 
     One row per ``time_series_id``: ``effective_capacity_mw`` is the 99th percentile of
     ``abs(power)`` over all non-null observations. Series whose P99 is null or non-positive (e.g.
     all-null or all-zero power) are dropped, since ``EffectiveCapacity`` requires
     ``effective_capacity_mw > 0``.
 
-    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The MVP capacity
+    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The v0.1 capacity
     is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
     as current to the end of the observed history — rather than a timestep the value varies over. The
     v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id,
-    time)``), and only then does ``time`` carry per-row meaning. The MVP stays one scalar row per
+    time)``), and only then does ``time`` carry per-row meaning. v0.1 stays one scalar row per
     series rather than the value repeated at every half-hour: densifying a constant adds rows
     without information, and the metrics join is by ``time_series_id`` alone until capacity varies.
 
@@ -190,7 +190,7 @@ def _compute_effective_capacity(
 
 @asset(deps=["power_time_series_and_metadata"])
 def effective_capacity(context: AssetExecutionContext) -> None:
-    """Compute and persist each series' MVP effective capacity (full-history P99 of ``|power|``).
+    """Compute and persist each series' v0.1 effective capacity (full-history P99 of ``|power|``).
 
     Reads the full ``power_time_series`` Delta and writes one row per ``time_series_id`` to the
     ``effective_capacity`` Delta table (``Settings.effective_capacity_data_path``): the 99th
@@ -198,7 +198,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     latest observed timestep. This full-history capacity is the NMAE denominator used by the
     ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to fold.
 
-    The whole (small — one row per series) table is overwritten on each materialisation. The MVP is
+    The whole (small — one row per series) table is overwritten on each materialisation. v0.1 is
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
     densifying a constant buys nothing.
 

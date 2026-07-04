@@ -209,7 +209,7 @@ machinery instead of writing any new time-series logic:
   (`power_schemas.py:242`); confirm `cv_power_forecasts` tolerates it end-to-end.
 - **Ensemble members:** for the *deterministic* baselines (persistence, climatology) the CV
   predict path feeds all ~51 members and they produce identical forecasts per member — wasteful
-  but harmless (the ensemble mean is unchanged); MVP accepts it. `nged_incumbent` is different:
+  but harmless (the ensemble mean is unchanged); v0.3 accepts it. `nged_incumbent` is different:
   it emits its own 13-member ensemble, so broadcasting it across the 51 NWP members would be wrong,
   not merely wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
   `cv_power_forecasts` honours — restricting deterministic baselines to member 0 and letting
@@ -248,7 +248,7 @@ mistake the P95 bias for a bug.
 
 The cross-validation protocol is **implemented**, so it has moved to its permanent home:
 [ML Experimentation → Cross-validation folds](../ml_experimentation/cross-validation-folds.md).
-That page covers the expanding-window protocol, the current single MVP fold (and why the available
+That page covers the expanding-window protocol, the current single fold (and why the available
 weather data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
 alternatives we considered.
 
@@ -377,26 +377,26 @@ The denominator comes from the [`effective_capacity`](delivery-tables.md#table-4
 Delta table (schema `contracts.power_schemas.EffectiveCapacity`), consumed by `compute_metrics`
 (`ml_core.metrics`).
 
-**MVP representation (v0.1): one scalar row per series.** The `effective_capacity` asset writes one
+**v0.1 representation: one scalar row per series.** The `effective_capacity` asset writes one
 row per `time_series_id` — `effective_capacity_mw` = P99 of `|power|` over the whole observation
 history, `time` = the latest observed timestep. `compute_metrics` joins it onto the per-series
 metrics **on `time_series_id` alone** and divides.
 
-**Why the MVP is a single row per series, not the value repeated at every half-hour.** The
+**Why v0.1 is a single row per series, not the value repeated at every half-hour.** The
 v0.7 upgrade below *will* store one row per `(time_series_id, time)` half-hour — but with a
-genuinely *time-varying* value. In the MVP the value is a single constant per series, so repeating it
+genuinely *time-varying* value. In v0.1 the value is a single constant per series, so repeating it
 across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
 series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
 express ~2,500 scalars, for zero extra information. It would also *not* buy forward-compatibility,
-because the real MVP→DP interface change is not the data shape but **the join** (below). The
+because the real v0.1→v0.7 interface change is not the data shape but **the join** (below). The
 `EffectiveCapacity` schema — `(time_series_id, time, effective_capacity_mw)` — already accommodates
-both the one-row-per-series MVP and the one-row-per-half-hour DP shape; that is the
-forward-compatibility we want. (The DP upgrade does widen the *columns* — the value becomes a
+both the one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
+forward-compatibility we want. (The v0.7 upgrade does widen the *columns* — the value becomes a
 mean + std pair,
 [#247](https://github.com/openclimatefix/nged-substation-forecast/issues/247) — but the row shape
 and the join are unaffected by that.)
 
-**DP upgrade (v0.7): time-varying, and the join changes.** The
+**v0.7 upgrade: time-varying, and the join changes.** The
 [differentiable-physics](capacity-estimation.md) capacity model produces a value that changes over
 time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
 nothing else:
@@ -468,7 +468,7 @@ widths are an implementation-time choice.
 **A subtlety to document now but _not_ model yet.** The shape of the Christmas run-up depends not
 just on the number of days before Christmas but also on **which weekday Christmas falls on** — the
 run-up demand pattern shifts year to year with that day-of-week alignment. We record it here as a
-known effect; the MVP tricky-days *flag* ignores it (it simply marks the window), and we defer any
+known effect; the v0.3 tricky-days *flag* ignores it (it simply marks the window), and we defer any
 explicit day-of-week-aware modelling of the run-up until there is evidence it moves the leaderboard.
 
 #### Implementation details — tricky days (deleted when this ships)

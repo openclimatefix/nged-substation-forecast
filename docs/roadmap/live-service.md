@@ -18,7 +18,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 
 ## Requirements
 
-**MVP (v0.1 — get a live forecast running on AWS):**
+**v0.1 (get a live forecast running on AWS):**
 
 - Deploy the naive forecast so it runs live on AWS, 6-hourly, writing to `power_forecasts`
   (`fold_id="live"`) — the [`live_forecasts` asset](#the-live_forecasts-asset).
@@ -38,7 +38,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
   failure (SNS → email), and cost-conscious operation (~\$30–40/month target).
 
-**Post-MVP (explicitly deferred):**
+**Post-v0.1 (explicitly deferred):**
 
 - Forecast quality/science work —
   [baselines](metrics-and-leaderboard.md#baseline-forecasters),
@@ -253,7 +253,7 @@ backtest compute *and* a free dashboard home, for ~\$15–25/month over Level 1.
 fallback if operational simplicity trumps backtest speed and ~\$40/month. D pays an RDS+ALB
 tax for purism; E's 1-user cap rules it out.
 
-**Future work (not MVP):** once an always-on control-plane box exists (Option B or later), it's also
+**Future work (post-v0.1):** once an always-on control-plane box exists (Option B or later), it's also
 a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing the
 local file-store) and a **"development dashboard"** (a Marimo app for researchers). Neither is
 needed to ship v0.1; revisit once the box exists.
