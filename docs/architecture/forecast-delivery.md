@@ -78,15 +78,14 @@ retry-and-resume (transactional snapshots), server-side filtering (predicate pus
 selection (columnar layout), and compression. Each of those becomes a bespoke design decision
 to make, document, and maintain — and a bespoke client for NGED to write against.
 
-## "An API" is not the same thing as "a REST API"
+## We _are_ delivering data over an API (but not a _custom REST API_)
 
-It's easy to hear this design as "we're not building an API, we're just putting files on S3" —
-but that framing undersells what's actually being delivered. An API is, at heart, a *contract*:
-a precisely specified interface that lets independent programs interoperate. Delta Lake is
-exactly that — an
-[open, versioned protocol specification](https://github.com/delta-io/delta/blob/master/PROTOCOL.md)
-with mature, independently developed client implementations: Polars, pandas, DuckDB, Spark,
-Power BI, Rust, and more.
+It's easy to hear this design as "we're not building an API, we're just putting files on S3" — but
+that framing undersells what's actually being delivered. An application programming interface (API)
+is, at heart, a *contract*: a precisely specified interface that lets independent programs
+interoperate. Delta Lake is exactly that — an [open, versioned protocol
+specification](https://github.com/delta-io/delta/blob/master/PROTOCOL.md) with mature, independently
+developed client implementations: Polars, pandas, DuckDB, Spark, Power BI, Rust, and more.
 
 So we *are* delivering through an API. The difference is that the protocol, the client
 libraries, the authentication layer (S3/IAM), and the server (S3 itself) are all off-the-shelf,
@@ -160,11 +159,12 @@ mechanism as everything else in the pipeline.
 
 Choosing Delta Lake over a bespoke REST API removes an entire service from the project:
 
-- no API server to design, write, deploy, monitor, scale, and keep patched;
+- no API server to design, write, deploy, monitor, scale, keep patched, and pay for;
 - no endpoint schema to version and document alongside the table schemas;
 - no authentication microservice or token lifecycle to manage;
 - no client SDK for NGED to install and for us to maintain;
-- availability is S3's SLA, not something we are on call for.
+- availability is S3's SLA, not something we are on call for: The on-call engineer _only_ has to
+  check the forecast has run at 00, 06, 12, and 18 hours. They aren't _constantly_ on call.
 
 For a small team whose mission is forecast quality, that's a lot of engineering effort we get
 to spend on the forecasts themselves instead.
@@ -185,11 +185,11 @@ REST APIs have their place, and there are futures in which this project grows on
   beyond NGED.
 - **Small operational queries from non-Python systems** — e.g. a control-room application that
   just wants "the latest forecast for substation X" as JSON over HTTP.
-- **Browser-based consumers** that can't speak S3 directly.
+- **Browser-based consumers** that can't speak S3 directly. (although WASM mostly solves that)
 
-The reassuring part is that adding one later is **purely additive**: a thin, stateless service
-that reads from the same Delta tables and serves slices of them over HTTP. Nothing about the
-Delta-first design forecloses it — which is why a REST API sits comfortably as a
-[v2 stretch goal](../roadmap/index.md#v20-scale-up-future-research) rather than a v1
-requirement. The Delta tables remain the system of record either way; the API would be a
-convenience layer on top, added if and when a consumer appears whose needs it fits.
+The reassuring part is that adding a REST API later is **purely additive**: a thin, stateless
+service that reads from the same Delta tables and serves slices of them over HTTP. Nothing would
+have to be re-written. Nothing about the Delta-first design forecloses a REST API — which is why a
+REST API sits comfortably as a [v2 stretch goal](../roadmap/index.md#v20-scale-up-future-research)
+rather than a v1 requirement. The Delta tables remain the system of record either way; the API would
+be a convenience layer on top, added if and when a consumer appears whose needs it fits.
