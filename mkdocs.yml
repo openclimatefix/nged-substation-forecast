@@ -48,6 +48,7 @@ nav:
       - Disaggregation Evaluation: techniques/disaggregation-evaluation.md
   - Architecture:
       - Overview: architecture/overview.md
+      - Forecast Delivery: architecture/forecast-delivery.md
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Code Style: architecture/code-style.md
   - ML Experimentation:

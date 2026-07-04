@@ -255,4 +255,4 @@ delivery of the v2 live service)*
 - Forecast *unmetered* solar and wind power at each primary substation
 - Disaggregate additional DERs (price-sensitive assets like batteries) from substation power flow
 - Estimate cost savings (£) attributable to each forecasting approach in the leaderboard
-- Build a REST API on top of the Delta Lake delivery mechanism
+- Build a REST API on top of the Delta Lake delivery mechanism (purely additive — see [when a REST API would earn its keep](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep))
