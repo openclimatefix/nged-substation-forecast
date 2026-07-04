@@ -60,11 +60,15 @@ anyone if we only provided a minimal API to NGED.
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of
 the 14-day horizon. For the V1 trial area that is 32 series × 51 members × ~672 half-hours ≈
 **1.1 million rows per run**. Our development `power_forecasts` table already holds **~404
-million rows (~6 GB compressed)** from 417 backtest init times — for just 32 time series.
+million rows** from 417 backtest init times — for just 32 time series. The `delta_store`
+storage format (compression-friendly sort, per-column parquet encodings, 13-bit-significand
+rounding — [PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268))
+packs that into **0.73 GB, ~1.8 bytes per row**.
 
 V2 scales to ~2,500 time series: ~78× more, or roughly **86 million rows per run** and on the
-order of **100 billion rows — more than a terabyte — per year of history**. NGED wants routine
-access to all of it. That volume is an awkward fit for JSON request/response cycles; in
+order of **100 billion rows per year of history** — a couple of hundred gigabytes at the
+measured bytes-per-row, and several *terabytes* uncompressed. NGED wants routine access to all
+of it. That volume is an awkward fit for JSON request/response cycles; in
 practice, REST designs for workloads like this tend to grow a "bulk export" endpoint that hands
 back files — at which point the files are doing the real work, and the API has become a
 wrapper around them.
