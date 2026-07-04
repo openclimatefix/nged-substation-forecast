@@ -10,7 +10,7 @@ OCF has real experience with both delivery styles: our national solar forecast i
 through a custom REST API ([quartz-api](https://github.com/openclimatefix/quartz-api)), and
 that's the right tool for that product. So when NGED Flexpectation delivers files on object
 storage instead, it's natural to ask why — "just files on S3" can sound like a shortcut we'd
-eventually replace with a real API. This page walks through the reasoning: why the two products
+eventually replace with a "real API". This page walks through the reasoning: why the two products
 suit different mechanisms, what Delta Lake on S3 actually gives NGED (more than it might first
 appear), and when a REST API *would* earn its keep here.
 
@@ -30,12 +30,13 @@ NGED Flexpectation turns out to look quite different on each of those axes:
 
 - **One user.** NGED is the only consumer. There is no multi-tenant permission problem to
   solve — a single authenticated principal covers the entire requirement.
-- **Power users.** NGED's analysts are comfortable in Python and want the full firehose: not
-  just the latest run, but routine access to the *entire history* of forecasts and backtests,
-  for their own evaluation and downstream analysis.
+- **Power users.** NGED's analysts are comfortable in Python and want the access to the full
+  firehose of data: not just the latest run, but routine access to the *entire history* of
+  forecasts, backtests, and our automated analysis of NGED's power data, all for their own
+  evaluation and downstream analysis.
 - **Much more data** — quantified below. Per-ensemble-member probabilistic forecasts across
-  thousands of time series are simply a different order of magnitude from a national
-  point forecast.
+  thousands of time series are simply a different order of magnitude compared to OCF's national
+  solar forecast.
 - **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information
   that has no analogue in OCF's existing products: per-ensemble-member forecasts,
   [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings),
@@ -43,12 +44,19 @@ NGED Flexpectation turns out to look quite different on each of those axes:
   [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history), and
   [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching). An API
   surface for all of this would have to be designed from scratch.
-- **Evolving requirements.** NGED are refreshingly open that they don't yet know exactly which
-  views of the data they will find most useful. We need headroom to iterate table schemas
-  rapidly. Delta Lake supports schema evolution directly; a REST API would add a
-  versioning-and-deprecation cycle on top of every schema change.
 
-### How big is the data?
+
+## Evolving requirements
+
+NGED are refreshingly open that they don't yet know exactly which views of the data they will find
+most useful. We need headroom to iterate table schemas rapidly. Delta Lake supports schema evolution
+directly; a REST API would add a versioning-and-deprecation cycle on top of every schema change.
+
+And, crucially, NGED are _already_ finding uses for our "firehose of data" that we had never
+considered. Exactly the sort of unforeseen use-cases that simply wouldn't have occurred to anyone if
+we only provided a minimal dataset to NGED.
+
+## How big is the data?
 
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of
 the 14-day horizon. For the V1 trial area that is 32 series × 51 members × ~672 half-hours ≈
@@ -176,6 +184,14 @@ standard S3/IAM authentication. With a single consumer this is straightforward �
 authenticated principal, no entitlement matrix — and it mirrors exactly how NGED protect their
 own time-series JSON bucket, which we read the same way. Every tool named above supports
 authenticated S3 access natively.
+
+## Strict data contracts (machine-verifiable)
+
+The project makes strict use of Patito data contracts (defined in the [`contracts`](/api/contracts/)
+sub-package). These enforce not just the _type_ of the data, but also the statistical properties of
+the data. These contracts also serve as the human-readable documentation for the project's data
+inputs and data outputs. (For example, every public function that consumes and/or returns a
+DataFrame must declare the exact data contract for that DataFrame in the function's type hints).
 
 ## When would a REST API earn its keep?
 
