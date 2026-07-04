@@ -27,6 +27,7 @@ dependencies = [
     "ml_core",
     "mlflow-skinny",
     "nged_data",
+    "numpy>=1.24",
     "obstore",
     "patito",
     "plotting",

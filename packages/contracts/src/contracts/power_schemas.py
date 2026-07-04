@@ -280,6 +280,9 @@ class PowerForecast(pt.Model):
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
             """ Positive values mean "power sent to NGED's grid","""
             """ and negative values mean "power drawn from NGED's grid"."""
+            " Rows read back from the internal `power_forecasts` Delta table carry reduced"
+            " precision: the Float32 mantissa is truncated to 12 bits at write time"
+            " (max relative error ≈ 2.4e-4, far below forecast error) to aid compression."
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
             # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
             # delivery-contract design agreed with NGED in the Milestone 1 report.
