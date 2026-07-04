@@ -49,7 +49,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - Telemetry to Sentry.io
   ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — CloudWatch +
   SNS cover alerting first.
-- An **MLflow tracking server** and a separate **development dashboard**, both hosted on the
+- An **MLflow tracking server** (issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate **development dashboard** ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on the
   always-on control-plane box once it exists — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
   windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire

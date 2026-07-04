@@ -152,12 +152,12 @@ horizons, where NWP error is large, the pooled distribution can come out **over*
 
 Mitigations, in order of practicality:
 
-- **Give the model the lead time as a feature** (`nwp_lead_time_hours`), so the learned
+- **Give the model the lead time as a feature** (`nwp_lead_time_hours`, planned in [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230)), so the learned
   conditional spread can be narrow when the weather input is trustworthy and wide when it
   isn't, rather than one horizon-averaged width.
-- **Train on many ensemble members, not just the control** — the model then sees "one plausible
+- **Train on many ensemble members, not just the control** (planned in [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)) — the model then sees "one plausible
   scenario" as its actual input distribution, which is what a member is at inference time.
-- **Measure, then correct**: check the spread-skill ratio and PICP of the *pooled* forecast per
+- **Measure, then correct**: check the spread-skill ratio and PICP (planned in [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)) of the *pooled* forecast per
   horizon slice, and apply a per-horizon affine recalibration of the pooled quantiles (fit on
   the training window) only if the numbers demand it.
 
@@ -170,9 +170,9 @@ over-stated risk) is a far safer failure mode than the under-dispersion it repla
 - **Diagnose first**: the spread-skill / PICP / pinball / CRPS metrics that quantify all of the
   above are Phases A–B of the
   [probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
-- **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble (Phase C
-  there) buys calibration without any of this machinery — the full mixture pipeline must beat
+- **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C
+  of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis)) buys calibration without any of this machinery — the full mixture pipeline must beat
   it to earn its keep.
-- **The full pipeline** (Phase D there): a quantile-objective XGBoost emits Representation 3;
+- **The full pipeline** ([Phase D of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)): a quantile-objective XGBoost emits Representation 3;
   the pooling recipe above derives Representation 2 for
   [delivery](../roadmap/delivery-tables.md#table-1-power_forecast).
