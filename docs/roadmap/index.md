@@ -69,8 +69,8 @@ apply them.
   monitoring.
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
-- [Engineering health](engineering-health.md) — CI, reproducibility stamping, Hydra
-  removal, and scientific-rigor tests.
+- [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP
+  ingestion checks, Hydra removal, and scientific-rigor tests.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
   estimators of the time-varying effective capacity of metered generators: a
   [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a
