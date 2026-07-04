@@ -29,6 +29,7 @@ from dagster import (
     StaticPartitionsDefinition,
     asset,
 )
+from delta_store.power_forecasts import write_power_forecasts
 from deltalake import write_deltalake
 from ml_core._cv_helpers import (
     date_to_utc_datetime,
@@ -442,8 +443,11 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     Forecasts are written to the ``power_forecasts`` Delta table keyed by
     ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
     run) and the rest **append** to it, so a full re-materialisation replaces the fold's rows
-    without ever holding all forecasts in memory. The fold's MLflow run is resolved **by tag** —
-    never by a handle from ``trained_cv_model`` — so this is safe across processes.
+    without ever holding all forecasts in memory. Chunks are written through
+    ``delta_store.power_forecasts.write_power_forecasts``, which owns the table's compressed
+    storage format (sort order, ``power_fcst`` precision rounding, parquet encodings). The
+    fold's MLflow run is resolved **by tag** — never by a handle from ``trained_cv_model`` — so
+    this is safe across processes.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -501,26 +505,13 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         if forecasts.height == 0 and not is_first:
             continue
 
-        # experiment_name / fold_id are String (their PowerForecast dtype), which is exactly what
-        # delta-rs needs for Hive-style partition directories — no cast required.
-        delta_data = forecasts.to_arrow()
-        if is_first:
-            # The first chunk overwrites the (experiment, fold) partition, clearing any prior run.
-            write_deltalake(
-                table_or_uri=settings.power_forecasts_data_path,
-                data=delta_data,
-                mode="overwrite",
-                predicate=f"experiment_name = '{experiment_name}' AND fold_id = '{fold_id}'",
-                partition_by=["experiment_name", "fold_id"],
-            )
-        else:
-            # Later chunks append into the partition the first chunk established.
-            write_deltalake(
-                table_or_uri=settings.power_forecasts_data_path,
-                data=delta_data,
-                mode="append",
-                partition_by=["experiment_name", "fold_id"],
-            )
+        # The first chunk overwrites the (experiment, fold) partition, clearing any prior run;
+        # later chunks append into the partition the first chunk established.
+        write_power_forecasts(
+            forecasts,
+            settings.power_forecasts_data_path,
+            replace_partition=(experiment_name, fold_id) if is_first else None,
+        )
         is_first = False
         n_rows += forecasts.height
         time_series_seen.update(forecasts["time_series_id"].to_list())

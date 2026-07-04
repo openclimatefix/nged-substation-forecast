@@ -20,6 +20,7 @@ dependencies = [
     "contracts",
     "dagster>=1.12.11",
     "dagster-webserver>=1.12.11",
+    "delta_store",
     "deltalake",
     "dynamical_data",
     "geo",
@@ -43,6 +44,7 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "dagster-dg-cli",
+    "numpy>=1.24",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "ruff>=0.14.13",
@@ -67,6 +69,7 @@ members = ["packages/*"]
 [tool.uv.sources]
 nged_data = { workspace = true }
 contracts = { workspace = true }
+delta_store = { workspace = true }
 ml_core = { workspace = true }
 plotting = { workspace = true }
 xgboost_forecaster = { workspace = true }

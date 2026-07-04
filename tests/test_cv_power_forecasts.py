@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import mlflow
+import numpy as np
 import polars as pl
+import pyarrow.parquet as pq
 import pytest
 from contracts.ml_schemas import EligibleTimeSeries
 from dagster import DagsterInstance, RunConfig, materialize
@@ -203,6 +205,54 @@ def test_cv_power_forecasts_predicts_validation_fold(env: dict[str, str]) -> Non
     )
     assert len(fold_runs) == 1
     assert fold_runs[0].data.metrics["n_forecast_rows"] == float(forecasts.height)
+
+
+def test_cv_power_forecasts_storage_format(env: dict[str, str]) -> None:
+    """The written parquet files carry the compression-oriented storage format end-to-end.
+
+    Guards that ``cv_power_forecasts`` writes through ``delta_store.power_forecasts``: ZSTD
+    compression with the per-column encodings, rows sorted within each file, and ``power_fcst``
+    rounded to ``POWER_FCST_SIGNIFICAND_BITS``. The format itself is unit-tested in
+    ``packages/delta_store/tests/``; this asserts the real asset actually uses it.
+    """
+    instance = DagsterInstance.ephemeral()
+    _register(instance)
+    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize([cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance).success
+
+    parquet_files = sorted(Path(env["forecasts"]).rglob("*.parquet"))
+    assert parquet_files
+
+    for parquet_file in parquet_files:
+        metadata = pq.ParquetFile(parquet_file).metadata
+        row_group = metadata.row_group(0)
+        encodings_by_column = {
+            row_group.column(i).path_in_schema: (
+                row_group.column(i).compression,
+                set(row_group.column(i).encodings),
+            )
+            for i in range(row_group.num_columns)
+        }
+        for column, (compression, encodings) in encodings_by_column.items():
+            assert compression == "ZSTD", f"{column} written as {compression}, expected ZSTD"
+        assert "DELTA_BINARY_PACKED" in encodings_by_column["valid_time"][1]
+        assert "BYTE_STREAM_SPLIT" in encodings_by_column["power_fcst"][1]
+
+        rows = pl.read_parquet(parquet_file)
+        sort_key = rows.select(
+            key=pl.struct("time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member")
+        )["key"]
+        assert sort_key.is_sorted()
+
+    # power_fcst is rounded to a 13-bit significand: the low 11 fraction bits of every finite
+    # value are zero, yet the values were not destroyed outright. (The synthetic fixture's
+    # constant NWP features make every prediction near-identical, so don't assert on value
+    # diversity — the fixture trains on power ≈ 100, so surviving values must be in that
+    # ballpark.)
+    stored = _read_forecasts(env)["power_fcst"].to_numpy()
+    assert np.isfinite(stored).all()
+    assert (stored.view(np.uint32) & np.uint32((1 << 11) - 1) == 0).all()
+    assert (np.abs(stored) > 50).all()
 
 
 def test_cv_power_forecasts_is_idempotent(env: dict[str, str]) -> None:

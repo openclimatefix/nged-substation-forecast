@@ -1,0 +1,23 @@
+[project]
+name = "delta_store"
+version = "0.0.1"
+description = "Physical storage policy for the project's Delta tables: parquet writer properties, compression-friendly sort orders, and significand-precision rounding"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "contracts",
+    "deltalake",
+    "patito",
+    "polars>=1.0.0",
+    "pyarrow",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/delta_store"]
