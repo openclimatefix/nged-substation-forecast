@@ -45,7 +45,6 @@ NGED Flexpectation turns out to look quite different on each of those axes:
   [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching). An API
   surface for all of this would have to be designed from scratch.
 
-
 ## Evolving requirements
 
 NGED are refreshingly open that they don't yet know exactly which views of the data they will find
