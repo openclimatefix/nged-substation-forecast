@@ -52,7 +52,7 @@ most useful. We need headroom to iterate table schemas rapidly. Delta Lake suppo
 directly; a REST API would add a versioning-and-deprecation cycle on top of every schema change.
 
 And, crucially, NGED are _already_ finding uses for our "firehose of data" that we had never
-considered. These are xactly the sort of unforeseen use-cases that simply wouldn't have occurred to
+considered. These are exactly the sort of unforeseen use-cases that simply wouldn't have occurred to
 anyone if we only provided a minimal API to NGED.
 
 ## How big is the data?
@@ -197,6 +197,67 @@ sub-package). These enforce not just the _type_ of the data, but also the statis
 the data. These contracts also serve as the human-readable documentation for the project's data
 inputs and data outputs. (For example, every public function that consumes and/or returns a
 DataFrame must declare the exact data contract for that DataFrame in the function's type hints).
+
+## What Delta Lake is (and who else uses it)
+
+Finally, it's worth being concrete about what Delta Lake actually *is*, because "Parquet files
+on S3" can conjure an image of our code carefully hand-crafting every file and hoping nothing
+goes wrong mid-write. That's not what happens. [Delta Lake](https://delta.io) is an open-source
+table format created at Databricks and donated to the Linux Foundation in 2019, and — just like
+a traditional database — all the fiddly bookkeeping is the library's job, not ours.
+
+Writing a forecast run is one function call:
+
+```python
+from deltalake import write_deltalake
+
+write_deltalake("s3://<bucket>/power_forecast", forecasts, mode="append")
+```
+
+The library ([delta-rs](https://github.com/delta-io/delta-rs), written in Rust) decides how to
+split rows across files, names the files, lays out the partition directories, records per-column
+statistics, and — the crucial part — atomically commits the new files to the transaction log.
+(Our `delta_store` package layers our own storage policy on top — row sort order, per-column
+parquet encodings, precision rounding — but that too is just configuration passed to the same
+library call.)
+
+On disk, the result looks like this (our development `power_forecasts` table):
+
+```text
+power_forecasts/
+├── _delta_log/                    ← the transaction log
+│   ├── 00000000000000000000.json
+│   ├── 00000000000000000001.json
+│   └── …
+├── experiment_name=xgboost_cv_0001/
+│   └── fold_id=mid_2025_to_mid_2026/
+│       ├── part-00000-cbb0236f-….zstd.parquet
+│       ├── part-00000-ef8aad4e-….zstd.parquet
+│       └── …
+└── …
+```
+
+Readers never touch those Parquet files directly. A client starts at `_delta_log`, which states
+exactly which files make up the current version of the table; a file that hasn't been committed
+to the log simply doesn't exist as far as any reader is concerned. That log is where the
+atomic-publish guarantee described [above](#and-it-is-a-database-acid-on-object-storage)
+physically lives.
+
+If this still feels unusual, remember that *every* database is ultimately files on disk.
+Postgres — OCF's workhorse — stores each table as files of 8 kB pages in a binary format that
+only Postgres can read, and you reach them through the Postgres server process. Delta Lake is
+the same idea with the layers rearranged: the on-disk format is open and columnar, so dozens of
+independently developed tools read it directly, and the "server" role is played by object
+storage. In neither case does application code manage the files by hand.
+
+And this is thoroughly mainstream technology, not an exotic bet. Databricks built its entire
+platform on Delta Lake; Apple, Comcast, Adobe, and Salesforce all run it at massive scale; and —
+closest to home — [NESO](https://www.neso.energy/), the National Energy System Operator for
+Great Britain, uses Delta Lake too. More broadly, the open-table-format family it belongs to
+(Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix;
+[Apache Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large
+companies store and share analytical data. In other words: we picked the boring, battle-tested
+option.
 
 ## When would a REST API earn its keep?
 
