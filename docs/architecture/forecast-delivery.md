@@ -94,7 +94,8 @@ problem:
 NGED Flexpectation turns out to look quite different on each of those axes:
 
 - **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information that
-  has no analogue in OCF's existing products. An API surface for all of this would have to be
+  has no analogue in OCF's existing products. We & NGED have spent many hours carefully designing
+  these tables and the data delivery mechanism. An API surface for all of this would have to be
   designed from scratch:
     - time-varying [effective capacity](../roadmap/delivery-tables.md#table-4-effective_capacity),
     - [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history),
@@ -105,9 +106,9 @@ NGED Flexpectation turns out to look quite different on each of those axes:
     - and [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
 - **Much more data** — quantified [below](#how-big-is-flexpectations-power-forecast-data).
   Per-ensemble-member probabilistic forecasts across thousands of time series are simply a different
-  order of magnitude compared to OCF's national solar forecast.
+  order of magnitude compared to OCF's commercial forecast products.
 - **One user.** NGED is the only consumer. There is no multi-tenant permission problem to solve — a
-  single authenticated user covers the entire requirement. But this is not a ceiling on the
+  single authenticated AWS user covers the entire requirement. But this is not a ceiling on the
   architecture: S3 can grant read access to further users via bucket policies or [S3 Access
   Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html), so having
   multiple consumers wouldn't force us off Delta Lake on S3. A small, fixed number of views can
@@ -117,10 +118,10 @@ NGED Flexpectation turns out to look quite different on each of those axes:
   query time rather than at data-layout time — many customers each needing their own filtered
   slice of the same table — which is where a REST API would earn its keep, as covered
   [below](#when-would-a-rest-api-earn-its-keep).
-- **Power users.** NGED's analysts are comfortable in Python and want the access to the full
-  firehose of data: not just the latest run, but routine access to the *entire history* of
-  forecasts, backtests, and our automated analysis of NGED's power data, all for their own
-  evaluation and downstream analysis.
+- **Power users.** NGED's analysts are comfortable in Python and want access to the full firehose of
+  data: not just the latest run, but routine access to the *entire history* of forecasts, backtests,
+  and OCF's automated analysis of NGED's power data, all for NGED's own evaluation and downstream
+  analysis.
 
 ## Evolving requirements
 
