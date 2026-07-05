@@ -55,7 +55,7 @@ And, crucially, NGED are _already_ finding uses for our "firehose of data" that 
 considered. These are exactly the sort of unforeseen use-cases that simply wouldn't have occurred to
 anyone if we only provided a minimal API to NGED.
 
-## How big is the data?
+## How big is Flexpectation's power forecast data?
 
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of
 the 14-day horizon. For the V1 trial area that is 32 series × 51 members × ~672 half-hours ≈
@@ -91,7 +91,7 @@ retry-and-resume (transactional snapshots), server-side filtering (predicate pus
 selection (columnar layout), and compression. Each of those becomes a bespoke design decision
 to make, document, and maintain — and a bespoke client for NGED to write against.
 
-## We _are_ delivering data over an API (but not a _custom REST API_)
+## We _are_ delivering data over an API (but not a _REST_ API)
 
 It's easy to hear this design as "we're not building an API, we're just putting files on S3" — but
 that framing undersells what's actually being delivered. An application programming interface (API)
@@ -168,7 +168,7 @@ Inside the Flexpectation codebase, Delta Lake on object storage is already our
 new technology to build, learn, or operate — the delivery tables are produced by the same
 mechanism as everything else in the pipeline.
 
-## What we don't have to build or run
+## What OCF doesn't have to build or run
 
 Choosing Delta Lake over a bespoke REST API removes an entire service from the project:
 
@@ -252,12 +252,11 @@ storage. In neither case does application code manage the files by hand.
 
 And this is thoroughly mainstream technology, not an exotic bet. Databricks built its entire
 platform on Delta Lake; Apple, Comcast, Adobe, and Salesforce all run it at massive scale; and —
-closest to home — [NESO](https://www.neso.energy/), the National Energy System Operator for
-Great Britain, uses Delta Lake too. More broadly, the open-table-format family it belongs to
-(Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix;
-[Apache Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large
-companies store and share analytical data. In other words: we picked the boring, battle-tested
-option.
+closest to home — [NESO](https://www.neso.energy/) uses Delta Lake too. More broadly, the
+open-table-format family it belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/),
+created at Netflix; [Apache Hudi](https://hudi.apache.org/), created at Uber) is now the standard
+way large companies store and share analytical data. In other words: we picked the boring,
+battle-tested option.
 
 ## When would a REST API earn its keep?
 
