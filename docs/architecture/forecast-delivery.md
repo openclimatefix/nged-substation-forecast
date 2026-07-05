@@ -192,8 +192,8 @@ authenticated S3 access natively.
 
 ## Strict data contracts (machine-verifiable)
 
-The project makes strict use of Patito data contracts (defined in the [`contracts`](/api/contracts/)
-sub-package). These enforce not just the _type_ of the data, but also the statistical properties of
+The project makes strict use of Patito data contracts (defined in the
+[`contracts`](../api/contracts/index.md) sub-package). These enforce not just the _type_ of the data, but also the statistical properties of
 the data. These contracts also serve as the human-readable documentation for the project's data
 inputs and data outputs. (For example, every public function that consumes and/or returns a
 DataFrame must declare the exact data contract for that DataFrame in the function's type hints).
