@@ -93,22 +93,6 @@ problem:
 
 NGED Flexpectation turns out to look quite different on each of those axes:
 
-- **One user.** NGED is the only consumer. There is no multi-tenant permission problem to
-  solve — a single authenticated principal covers the entire requirement. This is a property of
-  *today's* requirement, not a ceiling on the architecture: S3 can grant read access to further
-  principals via bucket policies or [S3 Access
-  Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html), so a second
-  consumer wouldn't force us off Delta Lake on S3. What it doesn't give for free is *per-customer*
-  entitlements — different consumers seeing different slices of the same table — which is where
-  a REST API would earn its keep, as covered
-  [below](#when-would-a-rest-api-earn-its-keep).
-- **Power users.** NGED's analysts are comfortable in Python and want the access to the full
-  firehose of data: not just the latest run, but routine access to the *entire history* of
-  forecasts, backtests, and our automated analysis of NGED's power data, all for their own
-  evaluation and downstream analysis.
-- **Much more data** — quantified below. Per-ensemble-member probabilistic forecasts across
-  thousands of time series are simply a different order of magnitude compared to OCF's national
-  solar forecast.
 - **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information
   that has no analogue in OCF's existing products: per-ensemble-member forecasts,
   [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings),
@@ -116,6 +100,22 @@ NGED Flexpectation turns out to look quite different on each of those axes:
   [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history), and
   [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching). An API
   surface for all of this would have to be designed from scratch.
+- **Much more data** — quantified below. Per-ensemble-member probabilistic forecasts across
+  thousands of time series are simply a different order of magnitude compared to OCF's national
+  solar forecast.
+- **One user.** NGED is the only consumer. There is no multi-tenant permission problem to solve — a
+  single authenticated user covers the entire requirement. This is a property of *today's*
+  requirement, not a ceiling on the architecture: S3 can grant read access to further users via
+  bucket policies or [S3 Access
+  Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html), so having
+  multiple consumers wouldn't force us off Delta Lake on S3. What it doesn't give for free is
+  *per-customer* entitlements — different consumers seeing different slices of the same table —
+  which is where a REST API would earn its keep, as covered
+  [below](#when-would-a-rest-api-earn-its-keep).
+- **Power users.** NGED's analysts are comfortable in Python and want the access to the full
+  firehose of data: not just the latest run, but routine access to the *entire history* of
+  forecasts, backtests, and our automated analysis of NGED's power data, all for their own
+  evaluation and downstream analysis.
 
 ## Evolving requirements
 
