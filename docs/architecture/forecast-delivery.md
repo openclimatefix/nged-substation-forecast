@@ -290,14 +290,14 @@ format we already rely on internally — and it earns its keep there on its own 
   table — 810 daily runs, 1.57 billion rows, April 2024 to June 2026 — is **86 GB**.
 - **It's fast to query, even on a laptop.** Row-group skipping on a member-sorted table means a
   single-ensemble-member read (the common case for training) touches only a few row groups instead
-  of the whole file — measured on a real 29-day, 9-cell, control-member read: **~5× faster and ~5×
-  less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a ~2% storage cost. That speed
-  is what lets us run cross-validation across every ensemble member, for every fold, on a laptop,
-  in a few minutes — no cluster required for day-to-day model development.
+  of the whole file and only takes 0.02 seconds and uses 205 MB of RAM (measured on a real 29-day, 9-cell, control-member read).
+  **That speed is what lets us run cross-validation across every ensemble member, for
+  every fold, on a laptop, in a few minutes** — no cluster required for day-to-day model development.
 - **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
   many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
   read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no
-  bespoke data-loading pipeline, and no separate "training data service" to build.
+  single database server to bottleneck the bandwidth, no bespoke data-loading pipeline, and no
+  separate "training data service" to build.
 
 There's a compounding benefit to using exactly the same storage technology everywhere: every
 improvement to `delta_store`'s writer properties, sort order, or precision policy
