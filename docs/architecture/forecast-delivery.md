@@ -53,11 +53,16 @@ power_forecasts/
 └── …
 ```
 
-Readers never touch those Parquet files directly. A client starts at `_delta_log`, which states
-exactly which files make up the current version of the table; a file that hasn't been committed
-to the log simply doesn't exist as far as any reader is concerned. That log is where the
-atomic-publish guarantee described [below](#and-it-is-a-database-acid-on-object-storage)
-physically lives.
+Readers never touch those Parquet files directly. Opening the table is a single call —
+`DeltaTable("s3://<bucket>/power_forecast")` — and the first thing that client does is read
+`_delta_log`. The log tells it exactly which Parquet files make up the current version of the
+table and, for each file, which partition values and value ranges it holds — so a query can
+skip irrelevant files without downloading them. A file the log doesn't mention — half-uploaded,
+or left behind by a failed write — simply doesn't exist as far as any reader is concerned. That
+log is where the atomic-publish guarantee described
+[below](#and-it-is-a-database-acid-on-object-storage) physically lives. And every tool that
+reads Delta Lake starts the same way, including Polars' `scan_delta`
+([below](#lazy-reads-query-it-dont-download-it)).
 
 If this still feels unusual, remember that *every* database is ultimately files on disk.
 Postgres — OCF's workhorse — stores each table as files of 8 kB pages in a binary format that
