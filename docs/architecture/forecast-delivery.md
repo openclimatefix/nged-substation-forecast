@@ -217,9 +217,9 @@ write_deltalake("s3://<bucket>/power_forecast", forecasts, mode="append")
 The library ([delta-rs](https://github.com/delta-io/delta-rs), written in Rust) decides how to
 split rows across files, names the files, lays out the partition directories, records per-column
 statistics, and — the crucial part — atomically commits the new files to the transaction log.
-(Our `delta_store` package layers our own storage policy on top — row sort order, per-column
-parquet encodings, precision rounding — but that too is just configuration passed to the same
-library call.)
+(Our [`delta_store`](../api/delta_store/index.md) package layers our own storage policy on top —
+row sort order, per-column parquet encodings, precision rounding — but that too is just
+configuration passed to the same library call.)
 
 On disk, the result looks like this (our development `power_forecasts` table):
 
