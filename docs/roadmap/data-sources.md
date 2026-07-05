@@ -68,12 +68,12 @@ As of May 2026, NGED's full network (the v2 target scope) consists of:
 - **271 bulk supply points (BSPs)** (132/33 kV & 132/66 kV)
 - **52 grid supply points (GSPs)** (400/132 kV & 275/132 kV)
 - **~1,500 generators** (industrial customer generators, not domestic):
-  - 558 connect directly to GSP/BSP busbars at 33 kV or 132 kV (modelled by NGED as
-    generation-only "substations"; mostly have telemetry; curtailable via ANM; comprising 329 solar,
-    63 wind, 166 other).
-  - ~1,000 are on the 11 kV network downstream of primaries; some metered, some not.
-  - Power flow from metered generators connected to primaries is **already subtracted** from the
-    primaries' power flow ("Disaggregated Demand").
+    - 558 connect directly to GSP/BSP busbars at 33 kV or 132 kV (modelled by NGED as
+      generation-only "substations"; mostly have telemetry; curtailable via ANM; comprising 329 solar,
+      63 wind, 166 other).
+    - ~1,000 are on the 11 kV network downstream of primaries; some metered, some not.
+    - Power flow from metered generators connected to primaries is **already subtracted** from the
+      primaries' power flow ("Disaggregated Demand").
 
 The **v1 trial area** is 32 of these time series — see the [roadmap index](index.md) for the
 breakdown.

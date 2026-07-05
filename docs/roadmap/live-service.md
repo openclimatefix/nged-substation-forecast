@@ -81,18 +81,18 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
   forecasts one explicit `power_fcst_init_time`, not one-per-NWP-run.
 - **NWP availability semantics** via a `RunConfig` field
   `availability_mode: Literal["live", "replay"]` (default `"live"`):
-  - `"live"` — the scheduled path. `t0 = now`; join the **freshest NWP run actually present**
-    in Delta with `nwp_init_time <= t0`. **No** modelled publication delay: reality already
-    constrains the table to genuinely published runs, so if the provider speeds up we
-    automatically use fresher data.
-  - `"replay"` — re-running a *past* slot (e.g. yesterday's failed run, today).
-    `t0 = the historical partition time`; join the freshest run with
-    `nwp_init_time <= t0 − nwp_publication_delay_hours`. The delay reconstructs what was
-    actually *available* at the historical `t0` — without it we would leak NWP runs that only
-    landed afterwards.
-  - The scheduled sensor/schedule always uses `"live"` for the current partition; manual
-    backfills of past partitions use `"replay"`. The explicit flag is the source of truth (an
-    automatic live-iff-recent rule is a possible later convenience).
+    - `"live"` — the scheduled path. `t0 = now`; join the **freshest NWP run actually present**
+      in Delta with `nwp_init_time <= t0`. **No** modelled publication delay: reality already
+      constrains the table to genuinely published runs, so if the provider speeds up we
+      automatically use fresher data.
+    - `"replay"` — re-running a *past* slot (e.g. yesterday's failed run, today).
+      `t0 = the historical partition time`; join the freshest run with
+      `nwp_init_time <= t0 − nwp_publication_delay_hours`. The delay reconstructs what was
+      actually *available* at the historical `t0` — without it we would leak NWP runs that only
+      landed afterwards.
+    - The scheduled sensor/schedule always uses `"live"` for the current partition; manual
+      backfills of past partitions use `"replay"`. The explicit flag is the source of truth (an
+      automatic live-iff-recent rule is a possible later convenience).
 - Load the needed NWP via `TimeWindowPartitionMapping` against the daily-partitioned
   `ecmwf_ens`.
 - **Write:** `forecaster.predict(..., fold_id="live")`, then an **idempotent overwrite** of

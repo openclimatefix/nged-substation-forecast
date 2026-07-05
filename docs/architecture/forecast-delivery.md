@@ -96,13 +96,13 @@ NGED Flexpectation turns out to look quite different on each of those axes:
 - **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information that
   has no analogue in OCF's existing products. An API surface for all of this would have to be
   designed from scratch:
-  - time-varying [effective capacity](../roadmap/delivery-tables.md#table-4-effective_capacity),
-  - [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history),
-  - [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching),
-  - [per-ensemble-member forecasts](../roadmap/delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts)
-    (including full backtest history & live forecasts in the same table, for multiple ML models
-    run in parallel, and multiple ways of representing uncertainty),
-  - and [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
+    - time-varying [effective capacity](../roadmap/delivery-tables.md#table-4-effective_capacity),
+    - [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history),
+    - [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching),
+    - [per-ensemble-member forecasts](../roadmap/delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts)
+      (including full backtest history & live forecasts in the same table, for multiple ML models
+      run in parallel, and multiple ways of representing uncertainty),
+    - and [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
 - **Much more data** — quantified [below](#how-big-is-flexpectations-power-forecast-data).
   Per-ensemble-member probabilistic forecasts across thousands of time series are simply a different
   order of magnitude compared to OCF's national solar forecast.
@@ -247,32 +247,6 @@ Inside the Flexpectation codebase, Delta Lake on object storage is already our
 new technology to build, learn, or operate — the delivery tables are produced by the same
 mechanism as everything else in the pipeline.
 
-## And it's excellent for our internal storage too
-
-Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
-format we already rely on internally — and it earns its keep there on its own merits:
-
-- **It's remarkably compact.** The same `delta_store` write policy that packs `power_forecasts`
-  to ~1.8 bytes/row ([above](#what-delta-lake-is-and-who-else-uses-it)) works just as well on
-  [ECMWF ENS NWP](../api/dynamical_data/index.md): a full daily run (~7.24 million rows across
-  1,671 H3 cells × 51 members × 85 lead times) averages ~113 MB, and our entire local development
-  table — 810 daily runs, 1.57 billion rows, April 2024 to June 2026 — is **86 GB**.
-- **It's fast to query, even on a laptop.** Row-group skipping on a member-sorted table means a
-  single-ensemble-member read (the common case for training) touches only a few row groups instead
-  of the whole file — measured on a real 29-day, 9-cell, control-member read: **~5× faster and ~5×
-  less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a ~2% storage cost. That speed
-  is what lets us run cross-validation across every ensemble member, for every fold, on a laptop,
-  in a few minutes — no cluster required for day-to-day model development.
-- **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
-  many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
-  read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no
-  bespoke data-loading pipeline, and no separate "training data service" to build.
-
-There's a compounding benefit to using exactly the same storage technology everywhere: every
-improvement to `delta_store`'s writer properties, sort order, or precision policy
-([above](#what-delta-lake-is-and-who-else-uses-it)) pays off for training, backtesting, *and*
-delivery to NGED simultaneously, instead of being three separate storage stacks to maintain.
-
 ## What OCF doesn't have to build or run
 
 Choosing Delta Lake over a bespoke REST API removes an entire service from the project:
@@ -303,6 +277,32 @@ data, but also the statistical properties of the data. These contracts also serv
 human-readable documentation for the project's data inputs and data outputs. (For example, every
 public function that consumes and/or returns a DataFrame must declare the exact data contract for
 that DataFrame in the function's type hints).
+
+## And it's excellent for our internal storage too
+
+Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
+format we already rely on internally — and it earns its keep there on its own merits:
+
+- **It's remarkably compact.** The same `delta_store` write policy that packs `power_forecasts`
+  to ~1.8 bytes/row ([above](#what-delta-lake-is-and-who-else-uses-it)) works just as well on
+  [ECMWF ENS NWP](../api/dynamical_data/index.md): a full daily run (~7.24 million rows across
+  1,671 H3 cells × 51 members × 85 lead times) averages ~113 MB, and our entire local development
+  table — 810 daily runs, 1.57 billion rows, April 2024 to June 2026 — is **86 GB**.
+- **It's fast to query, even on a laptop.** Row-group skipping on a member-sorted table means a
+  single-ensemble-member read (the common case for training) touches only a few row groups instead
+  of the whole file — measured on a real 29-day, 9-cell, control-member read: **~5× faster and ~5×
+  less peak memory** (0.15 s / ~1 GB → 0.02–0.04 s / ~205 MB), for a ~2% storage cost. That speed
+  is what lets us run cross-validation across every ensemble member, for every fold, on a laptop,
+  in a few minutes — no cluster required for day-to-day model development.
+- **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
+  many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
+  read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no
+  bespoke data-loading pipeline, and no separate "training data service" to build.
+
+There's a compounding benefit to using exactly the same storage technology everywhere: every
+improvement to `delta_store`'s writer properties, sort order, or precision policy
+([above](#what-delta-lake-is-and-who-else-uses-it)) pays off for training, backtesting, *and*
+delivery to NGED simultaneously, instead of being three separate storage stacks to maintain.
 
 ## When would a REST API earn its keep?
 

@@ -19,9 +19,9 @@
 - **Docstrings**: Use **Google convention** for docstrings.
 - **Imports**: Sorted automatically by `ruff` (isort rules).
 - **Naming**:
-  - Variables/Functions: `snake_case`
-  - Classes: `PascalCase`
-  - Constants: `UPPER_SNAKE_CASE`
+    - Variables/Functions: `snake_case`
+    - Classes: `PascalCase`
+    - Constants: `UPPER_SNAKE_CASE`
 
 ## Data Handling
 
