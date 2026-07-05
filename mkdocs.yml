@@ -72,6 +72,7 @@ nav:
   - API Reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md
+      - Delta Store: api/delta_store/index.md
       - Dynamical Data: api/dynamical_data/index.md
       - Geo: api/geo/index.md
       - ML Core: api/ml_core/index.md
