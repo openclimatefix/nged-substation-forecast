@@ -94,7 +94,14 @@ problem:
 NGED Flexpectation turns out to look quite different on each of those axes:
 
 - **One user.** NGED is the only consumer. There is no multi-tenant permission problem to
-  solve — a single authenticated principal covers the entire requirement.
+  solve — a single authenticated principal covers the entire requirement. This is a property of
+  *today's* requirement, not a ceiling on the architecture: S3 can grant read access to further
+  principals via bucket policies or [S3 Access
+  Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html), so a second
+  consumer wouldn't force us off Delta Lake on S3. What it doesn't give for free is *per-customer*
+  entitlements — different consumers seeing different slices of the same table — which is where
+  a REST API would earn its keep, as covered
+  [below](#when-would-a-rest-api-earn-its-keep).
 - **Power users.** NGED's analysts are comfortable in Python and want the access to the full
   firehose of data: not just the latest run, but routine access to the *entire history* of
   forecasts, backtests, and our automated analysis of NGED's power data, all for their own
