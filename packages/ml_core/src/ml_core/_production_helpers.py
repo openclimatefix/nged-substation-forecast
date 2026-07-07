@@ -3,7 +3,7 @@
 Every function here is unit-testable in isolation: the two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take an injected clock and no wall-clock
 reads, and the two disk/MLflow helpers (``load_forecaster_from_dir``, ``fetch_model_artifacts``)
-are thin, single-purpose IO wrappers. The ``live_forecasts`` and ``production_model`` Dagster
+are thin, single-purpose IO wrappers. The ``live_forecasts`` and ``promoted_model`` Dagster
 assets (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
@@ -128,14 +128,14 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
 
     Args:
         path: Directory previously populated by ``fetch_model_artifacts`` (the
-            ``production_model`` asset's output).
+            ``promoted_model`` asset's output).
 
     Returns:
         The reconstructed, trained forecaster.
 
     Raises:
         FileNotFoundError: ``path`` or its ``meta.json`` does not exist — materialise the
-            ``production_model`` asset first.
+            ``promoted_model`` asset first.
         ValueError: ``meta.json`` has no ``model_class`` field — it was saved by a code version
             predating this contract; re-promote with a version that stamps ``model_class``.
     """
@@ -143,7 +143,7 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     if not meta_path.exists():
         raise FileNotFoundError(
             f"No production model found at {path} (missing meta.json). Materialise the "
-            "`production_model` asset first."
+            "`promoted_model` asset first."
         )
     meta = json.loads(meta_path.read_text())
     model_class = meta.get("model_class")

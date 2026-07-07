@@ -43,10 +43,10 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 
 Copy the `run_id` of the fold you want to promote.
 
-## Step 2 — Materialise `production_model`
+## Step 2 — Materialise `promoted_model`
 
-**Trigger:** Dagster UI → Assets → `production_model` → "Materialize". Fill in
-`ProductionModelConfig.mlflow_run_id` with the run id from step 1.
+**Trigger:** Dagster UI → Assets → `promoted_model` → "Materialize". Fill in
+`PromotedModelConfig.mlflow_run_id` with the run id from step 1.
 
 **What the asset does:**
 
@@ -116,7 +116,7 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 
 | Field | Example | Notes |
 |---|---|---|
-| `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `production_model`'s output metadata from step 2) |
+| `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `promoted_model`'s output metadata from step 2) |
 | `fold_id` | `"live"` | Always `"live"` for a production forecast |
 | `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's `t0` — see the partition-semantics note in step 3 |
 | `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each drawn on its own panel |

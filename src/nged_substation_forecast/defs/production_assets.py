@@ -1,6 +1,6 @@
 """Production Dagster assets: model promotion and 6-hourly live inference.
 
-New file (``defs/cv_assets.py`` is already ~900 lines): ``production_model`` (manually-triggered
+New file (``defs/cv_assets.py`` is already ~900 lines): ``promoted_model`` (manually-triggered
 promotion of a champion model to local disk) and ``live_forecasts`` (the 6-hourly inference asset
 that reads it). Both stay thin shells over the pure/IO-light helpers in
 ``ml_core._production_helpers``.
@@ -69,11 +69,11 @@ at the midnight the key names.
 
 @asset
 def promotable_model_runs(context: AssetExecutionContext) -> None:
-    """List MLflow fold runs eligible for promotion via ``production_model``.
+    """List MLflow fold runs eligible for promotion via ``promoted_model``.
 
     Purely informational: materialise this on demand (it has no dependents and writes nothing to
     disk) to refresh the candidate list as a metadata table in the Dagster UI, then copy the
-    champion's ``run_id`` into ``production_model``'s launchpad. The champion is still picked by
+    champion's ``run_id`` into ``promoted_model``'s launchpad. The champion is still picked by
     eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key to
     automate the pick) — this just saves retyping/misremembering the run id.
     """
@@ -97,8 +97,8 @@ def promotable_model_runs(context: AssetExecutionContext) -> None:
     )
 
 
-class ProductionModelConfig(Config):
-    """Run config for the manually-triggered ``production_model`` asset."""
+class PromotedModelConfig(Config):
+    """Run config for the manually-triggered ``promoted_model`` asset."""
 
     mlflow_run_id: str
     """The champion fold run id, picked from the MLflow leaderboard (or from
@@ -106,7 +106,7 @@ class ProductionModelConfig(Config):
 
 
 @asset
-def production_model(context: AssetExecutionContext, config: ProductionModelConfig) -> None:
+def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) -> None:
     """Promote a champion model from MLflow to local disk for zero-MLflow-at-runtime inference.
 
     Manually triggered from the Dagster UI launchpad with ``mlflow_run_id`` set to the champion
@@ -168,7 +168,7 @@ class LiveForecastsConfig(Config):
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
-        "production_model",
+        "promoted_model",
     ],
 )
 def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) -> None:
@@ -188,7 +188,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     names.
 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
-    ``Settings.production_model_path``, populated out-of-band by the ``production_model``
+    ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
     asset) — **no MLflow import or call anywhere in this asset**; live performance is tracked by
     production monitoring, never logged here. Forecasts exactly
     ``forecaster.trained_time_series_ids`` (never today's eligibility set — the train==predict
@@ -217,7 +217,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     if not trained_ids:
         raise ValueError(
             "The production model has no trained time series, so there is nothing to "
-            "forecast. Re-promote `production_model` with a model that has trained boosters."
+            "forecast. Re-promote `promoted_model` with a model that has trained boosters."
         )
 
     available = _available_nwp_init_times(settings)

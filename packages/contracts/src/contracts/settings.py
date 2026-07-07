@@ -135,7 +135,7 @@ class Settings(BaseSettings):
     production_model_path: Path = Field(
         default=PROJECT_ROOT / "data" / "production_model",
         description=(
-            "Directory holding the current production model, written by the production_model"
+            "Directory holding the current production model, written by the promoted_model"
             " asset (ml_core._production_helpers.fetch_model_artifacts) and read by"
             " live_forecasts via a plain BaseForecaster disk load — no MLflow at inference"
             " time. Later COPY'd into the container image at build time (issue #222)."
