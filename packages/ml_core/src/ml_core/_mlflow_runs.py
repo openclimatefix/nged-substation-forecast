@@ -144,7 +144,7 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
 
 @dataclass(frozen=True)
 class PromotableRun:
-    """One MLflow fold run (``cv_role=fold``) — a valid ``production_model`` promotion candidate."""
+    """One MLflow fold run (``cv_role=fold``) — a valid ``promoted_model`` promotion candidate."""
 
     run_id: str
     experiment_name: str
@@ -157,7 +157,7 @@ def list_promotable_runs() -> list[PromotableRun]:
 
     A read-only convenience for the ``promotable_model_runs`` asset
     (``defs/production_assets.py``), which logs this as a metadata table in the Dagster UI so a
-    ``production_model`` promotion candidate's run id can be copy-pasted into that asset's
+    ``promoted_model`` promotion candidate's run id can be copy-pasted into that asset's
     launchpad rather than retyped from memory. The champion is still picked by eye off the MLflow
     leaderboard; this only lists candidates. The caller is responsible for setting the tracking
     URI (``mlflow.set_tracking_uri``) beforehand.

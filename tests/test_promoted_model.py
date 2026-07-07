@@ -1,8 +1,8 @@
-"""Integration test for the ``production_model`` asset (real file-based MLflow + Dagster).
+"""Integration test for the ``promoted_model`` asset (real file-based MLflow + Dagster).
 
 Trains a tiny real ``XGBoostForecaster`` directly (skipping the full CV pipeline — that's
 exercised elsewhere) and saves it to a genuine MLflow run, then materialises
-``production_model`` to promote it to local disk: the directory should be populated with
+``promoted_model`` to promote it to local disk: the directory should be populated with
 ``meta.json`` + ``promotion.json``, output metadata should be correct, and re-promoting with a
 second run id should replace the directory rather than merging into it.
 """
@@ -20,9 +20,9 @@ from dagster import DagsterInstance, RunConfig, TableMetadataValue, materialize
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.production_assets import (
-    ProductionModelConfig,
-    production_model,
+    PromotedModelConfig,
     promotable_model_runs,
+    promoted_model,
 )
 
 pytestmark = pytest.mark.integration
@@ -78,13 +78,13 @@ def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> st
     return run_id
 
 
-def test_production_model_promotes_and_populates_directory(env: dict[str, str]) -> None:
+def test_promoted_model_promotes_and_populates_directory(env: dict[str, str]) -> None:
     run_id = _save_trained_model_to_mlflow("promo_test", n_estimators=5)
 
     instance = DagsterInstance.ephemeral()
     result = materialize(
-        [production_model],
-        run_config=RunConfig(ops={"production_model": ProductionModelConfig(mlflow_run_id=run_id)}),
+        [promoted_model],
+        run_config=RunConfig(ops={"promoted_model": PromotedModelConfig(mlflow_run_id=run_id)}),
         instance=instance,
     )
     assert result.success
@@ -98,7 +98,7 @@ def test_production_model_promotes_and_populates_directory(env: dict[str, str]) 
     assert promotion["mlflow_run_id"] == run_id
     assert "promoted_at" in promotion
 
-    [materialization] = result.asset_materializations_for_node("production_model")
+    [materialization] = result.asset_materializations_for_node("promoted_model")
     metadata = materialization.metadata
     assert metadata["mlflow_run_id"].value == run_id
     assert metadata["model_class"].value == "xgboost_forecaster.forecaster.XGBoostForecaster"
@@ -114,9 +114,9 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
 
     instance = DagsterInstance.ephemeral()
     assert materialize(
-        [production_model],
+        [promoted_model],
         run_config=RunConfig(
-            ops={"production_model": ProductionModelConfig(mlflow_run_id=first_run_id)}
+            ops={"promoted_model": PromotedModelConfig(mlflow_run_id=first_run_id)}
         ),
         instance=instance,
     ).success
@@ -124,9 +124,9 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
     assert first_meta["model_params"]["experiment_name"] == "promo_test_v1"
 
     assert materialize(
-        [production_model],
+        [promoted_model],
         run_config=RunConfig(
-            ops={"production_model": ProductionModelConfig(mlflow_run_id=second_run_id)}
+            ops={"promoted_model": PromotedModelConfig(mlflow_run_id=second_run_id)}
         ),
         instance=instance,
     ).success

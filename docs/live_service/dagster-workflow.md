@@ -43,10 +43,10 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 
 Copy the `run_id` of the fold you want to promote.
 
-## Step 2 — Materialise `production_model`
+## Step 2 — Materialise `promoted_model`
 
-**Trigger:** Dagster UI → Assets → `production_model` → "Materialize". Fill in
-`ProductionModelConfig.mlflow_run_id` with the run id from step 1.
+**Trigger:** Dagster UI → Assets → `promoted_model` → "Materialize". Fill in
+`PromotedModelConfig.mlflow_run_id` with the run id from step 1.
 
 **What the asset does:**
 
@@ -64,8 +64,12 @@ in Dagster's run history — an audit trail for free. Re-promoting with a differ
 ## Step 3 — Let the schedule run, or materialise `live_forecasts` by hand
 
 Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours —
-at 00:00, 06:00, 12:00, and 18:00 UTC — via the `live_forecasts_job_schedule`. This needs the
-Dagster daemon running (part of `dg dev`; see
+at 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_time_series_and_metadata`
+(a separate, hourly-scheduled job `live_forecasts` depends on but isn't ordered against) is
+itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the time
+`live_forecasts` ticks — a cheap mitigation, not a guarantee; see
+`power_time_series_and_metadata_schedule`'s docstring (`defs/schedules.py`) for the more rigorous
+fix still to explore. This needs the Dagster daemon running (part of `dg dev`; see
 [Prerequisites](#prerequisites-a-persistent-dagster-instance) above) to fire on time.
 
 To materialise one 6-hourly slot yourself — e.g. right after promoting a model, so you don't have
@@ -116,7 +120,7 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 
 | Field | Example | Notes |
 |---|---|---|
-| `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `production_model`'s output metadata from step 2) |
+| `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `promoted_model`'s output metadata from step 2) |
 | `fold_id` | `"live"` | Always `"live"` for a production forecast |
 | `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's forecast init time — see the partition-semantics note in step 3 |
 | `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each drawn on its own panel |

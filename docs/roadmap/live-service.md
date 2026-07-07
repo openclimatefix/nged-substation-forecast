@@ -59,14 +59,14 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 
 Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/221)
 
-> **Status: ✅ Implemented**, alongside the `production_model` promotion asset (below) and local
+> **Status: ✅ Implemented**, alongside the `promoted_model` promotion asset (below) and local
 > 6-hourly automation (`dg dev` + persistent `DAGSTER_HOME`, part of
 > [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). For the
 > operational runbook — promoting a model, running the schedule, backfilling a missed slot — see
-> [Live Forecasts](../live_forecasts/index.md), the permanent home for this once-shipped
-> material. Remaining work on this page — the
-> [container build](#production-model-artifacts) and [AWS infrastructure](#aws-architecture) —
-> is unaffected.
+> [Live Service](../live_service/index.md), the permanent home this page's shipped material moves
+> to (and, eventually, this whole page, once every section below has landed). Remaining work on
+> this page — the [container build](#production-model-artifacts) and
+> [AWS infrastructure](#aws-architecture) — is unaffected.
 
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
 asset is what the deployed container runs every 6 hours: load the production model, forecast
@@ -139,7 +139,7 @@ becomes the production-resilience mechanism again (serving from disk on a cache 
 service survives an MLflow outage), exactly as it does for CV today.
 
 **Local operation (implemented):** for running on Jack's laptop, the "researcher downloads
-artifacts" step above is a manually-triggered Dagster asset, `production_model` (config
+artifacts" step above is a manually-triggered Dagster asset, `promoted_model` (config
 `mlflow_run_id`), rather than a bare script — promotion becomes a materialisation, giving an
 audit trail and lineage for free. The download logic itself
 (`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so

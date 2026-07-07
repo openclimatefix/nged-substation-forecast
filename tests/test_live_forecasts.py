@@ -128,7 +128,7 @@ def _write_metadata(path: Path) -> None:
     ).write_parquet(path)
 
 
-def _save_production_model(path: Path) -> None:
+def _save_promoted_model(path: Path) -> None:
     """A tiny real ``XGBoostForecaster`` trained on ts1 only, saved straight to disk."""
     times = [datetime(2025, 1, 1, hour, tzinfo=timezone.utc) for hour in (0, 1, 2)]
     train_df = pl.DataFrame(
@@ -168,7 +168,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     _write_power(str(nged_path / "power_time_series.delta"))
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
-    _save_production_model(production_model_path)
+    _save_promoted_model(production_model_path)
 
     return {"forecasts": str(forecasts_path)}
 
