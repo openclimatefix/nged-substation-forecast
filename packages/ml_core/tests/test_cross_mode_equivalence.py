@@ -5,7 +5,7 @@ the *same* ``_engineer_features()``, differing only in operating mode:
 
 - **Bulk / backtest** (``power_fcst_init_time=None``): NWP-centric, vectorised over the whole
   window, one forecast per NWP run, ``power_fcst_init_time = nwp_init_time + delay`` per row.
-- **Single-run / production** (explicit ``power_fcst_init_time``): one NWP run, stamped t0.
+- **Single-run / production** (explicit ``power_fcst_init_time``): one NWP run, stamped with it.
 
 This test takes a fixture spanning several **daily** NWP runs (real ECMWF ENS is issued once
 per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode with
@@ -140,7 +140,7 @@ def test_bulk_and_single_run_features_are_identical() -> None:
         nwp_publication_delay_hours=_DELAY_HOURS,
     ).collect()
 
-    # Replay each NWP run in single-run mode at the same t0 bulk derives for it.
+    # Replay each NWP run in single-run mode at the same power_fcst_init_time bulk derives for it.
     single_run_parts = []
     for run in _NWP_RUNS:
         replay = _engineer_features(

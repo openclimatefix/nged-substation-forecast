@@ -28,28 +28,30 @@ AvailabilityModeType = Literal["live", "replay"]
 """Which NWP-availability rule ``select_nwp_init_time`` applies.
 
 - ``"live"``: the scheduled path. No modelled publication delay — the Delta table only
-  contains runs that have genuinely been published, so the cutoff is ``t0`` itself.
-- ``"replay"``: re-running a past slot. The cutoff is ``t0 - nwp_publication_delay_hours``,
-  reconstructing what was actually available at that historical ``t0`` (without the delay we
-  would leak runs that only landed afterwards).
+  contains runs that have genuinely been published, so the cutoff is ``power_fcst_init_time``
+  itself.
+- ``"replay"``: re-running a past slot. The cutoff is
+  ``power_fcst_init_time - nwp_publication_delay_hours``, reconstructing what was actually
+  available at that historical ``power_fcst_init_time`` (without the delay we would leak runs
+  that only landed afterwards).
 """
 
 
 def select_nwp_init_time(
     available_init_times: Sequence[datetime],
     *,
-    t0: datetime,
+    power_fcst_init_time: datetime,
     availability_mode: AvailabilityModeType,
     nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
 ) -> datetime:
-    """Return the freshest NWP ``init_time`` available at ``t0`` under the given mode.
+    """Return the freshest NWP ``init_time`` available at ``power_fcst_init_time`` under the given mode.
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table
             (e.g. from ``DeltaTable(...).partitions()``).
-        t0: The scheduled forecast time (the partition's window end).
-        availability_mode: ``"live"`` uses cutoff ``t0``; ``"replay"`` uses cutoff
-            ``t0 - nwp_publication_delay_hours``.
+        power_fcst_init_time: The scheduled forecast time (the partition's window end).
+        availability_mode: ``"live"`` uses cutoff ``power_fcst_init_time``; ``"replay"`` uses
+            cutoff ``power_fcst_init_time - nwp_publication_delay_hours``.
         nwp_publication_delay_hours: Only used in ``"replay"`` mode.
 
     Returns:
@@ -59,14 +61,17 @@ def select_nwp_init_time(
         ValueError: If no available ``init_time`` qualifies.
     """
     cutoff = (
-        t0 if availability_mode == "live" else t0 - timedelta(hours=nwp_publication_delay_hours)
+        power_fcst_init_time
+        if availability_mode == "live"
+        else power_fcst_init_time - timedelta(hours=nwp_publication_delay_hours)
     )
     qualifying = [init_time for init_time in available_init_times if init_time <= cutoff]
     if not qualifying:
         raise ValueError(
             f"No NWP run available at or before cutoff {cutoff.isoformat()} "
-            f"(t0={t0.isoformat()}, availability_mode={availability_mode!r}). Available init "
-            f"times: {sorted(available_init_times)}"
+            f"(power_fcst_init_time={power_fcst_init_time.isoformat()}, "
+            f"availability_mode={availability_mode!r}). Available init times: "
+            f"{sorted(available_init_times)}"
         )
     return max(qualifying)
 
@@ -75,7 +80,7 @@ def build_live_power_frame(
     observed_power: pt.LazyFrame[PowerTimeSeries],
     time_series_ids: list[int],
     *,
-    t0: datetime,
+    power_fcst_init_time: datetime,
     history: timedelta,
     horizon: timedelta,
 ) -> pt.LazyFrame[PowerTimeSeries]:
@@ -83,26 +88,27 @@ def build_live_power_frame(
 
     Needed because ``ml_core.features._nwp._join_nwp_single_run`` is power-centric — with no
     future power rows a live run would emit zero forecast rows. Left-joins observed power onto
-    a spine covering ``(t0 - history, t0 + horizon]`` for every requested ``time_series_id``, so
-    rows beyond the last observation are present with ``power = null``. Also harmless for replay
-    (future observations already exist there; ``_nullify_leaky_lags`` prevents lag leakage
-    regardless).
+    a spine covering ``(power_fcst_init_time - history, power_fcst_init_time + horizon]`` for
+    every requested ``time_series_id``, so rows beyond the last observation are present with
+    ``power = null``. Also harmless for replay (future observations already exist there;
+    ``_nullify_leaky_lags`` prevents lag leakage regardless).
 
     Args:
         observed_power: Lazy observed power, one row per ``(time_series_id, time)``.
         time_series_ids: The series to build a spine for (typically
             ``forecaster.trained_time_series_ids``).
-        t0: The forecast init time. The spine's window is anchored on this.
-        history: How far before ``t0`` the spine extends (exclusive) — must cover the longest
-            power lag feature the model uses.
-        horizon: How far after ``t0`` the spine extends (inclusive) — the forecast horizon.
+        power_fcst_init_time: The forecast init time. The spine's window is anchored on this.
+        history: How far before ``power_fcst_init_time`` the spine extends (exclusive) — must
+            cover the longest power lag feature the model uses.
+        horizon: How far after ``power_fcst_init_time`` the spine extends (inclusive) — the
+            forecast horizon.
 
     Returns:
         A lazy ``PowerTimeSeries`` frame with one row per ``(time_series_id, time)`` on the
         half-hourly grid, observed values joined in, future/missing rows null.
     """
-    grid_start = t0 - history + timedelta(minutes=30)
-    grid_end = t0 + horizon
+    grid_start = power_fcst_init_time - history + timedelta(minutes=30)
+    grid_end = power_fcst_init_time + horizon
     grid_times = pl.datetime_range(
         grid_start, grid_end, interval="30m", time_zone="UTC", eager=True
     )

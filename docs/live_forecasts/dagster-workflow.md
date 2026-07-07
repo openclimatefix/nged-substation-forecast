@@ -74,18 +74,18 @@ to wait for the next tick, or to inspect a specific partition — go to Dagster 
 "Materialize".
 
 **Partition semantics — read this before picking a partition.** A partition key names the *start*
-of its 6-hour window; the forecast's `t0` (init time) is that window's *end*, six hours later. For
-example, partition key `"2026-07-04-00:00"` covers the window from 2026-07-04 00:00 UTC (the key
-itself) to 2026-07-04 06:00 UTC (the next tick), so *that* partition's forecast is initialised
-(`t0`) at 2026-07-04 06:00 UTC — not at the midnight the key names. (The `live_forecasts` asset's
-own docstring has the full explanation.)
+of its 6-hour window; the forecast's `power_fcst_init_time` (init time) is that window's *end*,
+six hours later. For example, partition key `"2026-07-04-00:00"` covers the window from
+2026-07-04 00:00 UTC (the key itself) to 2026-07-04 06:00 UTC (the next tick), so *that*
+partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnight the key names.
+(The `live_forecasts` asset's own docstring has the full explanation.)
 
 `availability_mode` controls which NWP run is used:
 
 | `availability_mode` | When to use | Behaviour |
 |---|---|---|
-| `"live"` (default; what the schedule always uses) | Materialising the current slot, right after it ticks | Joins the **freshest NWP run actually present** with `nwp_init_time <= t0` — no modelled delay, since reality already constrains the table to genuinely published runs |
-| `"replay"` | Backfilling a missed or historical slot | Joins the freshest run with `nwp_init_time <= t0 − nwp_publication_delay_hours`, reconstructing what was genuinely *available* at that historical `t0` (without the delay, a replay would leak NWP runs that only landed afterwards) |
+| `"live"` (default; what the schedule always uses) | Materialising the current slot, right after it ticks | Joins the **freshest NWP run actually present** with `nwp_init_time <= power_fcst_init_time` — no modelled delay, since reality already constrains the table to genuinely published runs |
+| `"replay"` | Backfilling a missed or historical slot | Joins the freshest run with `nwp_init_time <= power_fcst_init_time − nwp_publication_delay_hours`, reconstructing what was genuinely *available* at that historical `power_fcst_init_time` (without the delay, a replay would leak NWP runs that only landed afterwards) |
 
 **What the asset does:**
 
@@ -96,9 +96,9 @@ own docstring has the full explanation.)
    `availability_mode` (table above).
 3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough
    for the longest power-lag feature any production model uses) and the 14-day forecast horizon.
-4. Engineers features in **single-run mode** (`power_fcst_init_time=t0`) across **all NWP
-   ensemble members**, then drops join artefacts: history rows (`valid_time <= t0`) and any row
-   the ensemble join missed.
+4. Engineers features in **single-run mode** (an explicit `power_fcst_init_time`) across **all
+   NWP ensemble members**, then drops join artefacts: history rows
+   (`valid_time <= power_fcst_init_time`) and any row the ensemble join missed.
 5. Forecasts exactly `forecaster.trained_time_series_ids` — never today's eligibility set (the
    train==predict population invariant) — and writes to `power_forecasts` with `fold_id="live"`.
 6. **Idempotent write:** overwrites only this partition's rows (matching `experiment_name`,
@@ -118,7 +118,7 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 |---|---|---|
 | `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `production_model`'s output metadata from step 2) |
 | `fold_id` | `"live"` | Always `"live"` for a production forecast |
-| `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's `t0` — see the partition-semantics note in step 3 |
+| `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's forecast init time — see the partition-semantics note in step 3 |
 | `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each drawn on its own panel |
 
 ## Backfilling a missed slot
@@ -126,8 +126,8 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 If a scheduled tick was missed — the daemon was down, or a run failed — materialise that
 partition from the Dagster UI with `LiveForecastsConfig.availability_mode="replay"` (see the table
 in [step 3](#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)). This reconstructs
-what NWP data was genuinely available at that historical `t0`, rather than accidentally using data
-that only arrived afterwards.
+what NWP data was genuinely available at that historical `power_fcst_init_time`, rather than
+accidentally using data that only arrived afterwards.
 
 This is also the shape of the "local dress rehearsal" for
 [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208): run `dg dev`
