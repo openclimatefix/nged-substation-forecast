@@ -1,9 +1,10 @@
 """Pure, IO-light helpers for production (live) inference.
 
 Every function here is unit-testable in isolation: the two data-shaping helpers
-(``select_nwp_init_time``, ``build_live_power_frame``) take an injected clock and no wall-clock
-reads, and the two disk/MLflow helpers (``load_forecaster_from_dir``, ``fetch_model_artifacts``)
-are thin, single-purpose IO wrappers. The ``live_forecasts`` and ``promoted_model`` Dagster
+(``select_nwp_init_time``, ``build_live_power_frame``) take ``t0`` as an explicit parameter
+rather than calling ``datetime.now()`` internally, so a test can pass any fixed time and get a
+deterministic result; the two disk/MLflow helpers (``load_forecaster_from_dir``,
+``fetch_model_artifacts``) are thin, single-purpose IO wrappers. The ``live_forecasts`` and ``promoted_model`` Dagster
 assets (``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
 """
 
