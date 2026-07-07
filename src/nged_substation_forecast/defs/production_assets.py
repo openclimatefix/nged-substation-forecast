@@ -57,9 +57,13 @@ live_forecast_partitions = TimeWindowPartitionsDefinition(
 """One partition per 6-hourly tick (00/06/12/18 UTC). ``start`` is a few days before this asset
 shipped — no need for a deep empty backlog on a brand-new live asset.
 
-**Partition semantics**: the partition key is the window's *start*; a partition's forecast
-``t0`` is the window's *end* (see ``live_forecasts``'s docstring) — e.g. partition
-``"2026-07-04-00:00"`` produces the forecast initialised at ``06:00``.
+**Partition semantics**: a partition key names the *start* of its 6-hour window; the window runs
+until the *next* partition's key, 6 hours later. A partition's forecast ``t0`` is that window's
+*end* — i.e. the next tick's timestamp, not the key's own timestamp (see ``live_forecasts``'s
+docstring for why). E.g. partition key ``"2026-07-04-00:00"`` covers the window from
+2026-07-04 00:00 UTC (the key itself) to 2026-07-04 06:00 UTC (the next tick), so its forecast is
+initialised (``t0``) at 2026-07-04 06:00 UTC — six hours after the timestamp named in the key, not
+at the midnight the key names.
 """
 
 
@@ -170,10 +174,18 @@ class LiveForecastsConfig(Config):
 def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) -> None:
     """Production inference: forecast from the latest NWP for one 6-hourly slot.
 
-    **Partition semantics — read this before backfilling**: the partition key is the window's
-    *start*; ``t0`` (the forecast init time, ``context.partition_time_window.end``) is the
-    window's *end*. E.g. partition ``"2026-07-04-00:00"`` produces the forecast initialised at
-    ``06:00``, not at midnight.
+    **Partition semantics — read this before backfilling**: a partition key names the *start* of
+    its 6-hour window (``context.partition_time_window.start``); ``t0`` — the forecast init
+    time — is that window's *end* (``context.partition_time_window.end``). Dagster always defines
+    a ``TimeWindowPartitionsDefinition`` this way: each key is a window's start, and the window
+    extends until the *next* partition's key. ``live_forecast_partitions`` ticks every 6 hours
+    (00/06/12/18 UTC), so every window — and the gap between a key's timestamp and its ``t0`` — is
+    exactly 6 hours.
+
+    For example, partition key ``"2026-07-04-00:00"`` covers the window from 2026-07-04 00:00 UTC
+    (the key itself) up to 2026-07-04 06:00 UTC (the next tick). So that partition's ``t0`` is
+    2026-07-04 06:00 UTC: six hours after the timestamp named in the key, not the midnight the key
+    names.
 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
     ``Settings.production_model_path``, populated out-of-band by the ``production_model``
