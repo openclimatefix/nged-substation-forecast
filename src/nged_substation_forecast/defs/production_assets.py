@@ -110,7 +110,8 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     """Promote a champion model from MLflow to local disk for zero-MLflow-at-runtime inference.
 
     Manually triggered from the Dagster UI launchpad with ``mlflow_run_id`` set to the champion
-    fold's run id. Downloads that run's saved model artifacts to
+    fold's run id — materialise ``promotable_model_runs`` first and copy the id from its output
+    metadata table if you don't have it to hand. Downloads that run's saved model artifacts to
     ``Settings.production_model_path`` (via ``ml_core._production_helpers.fetch_model_artifacts``,
     which replaces the directory atomically), then reads back ``meta.json`` to report provenance.
     ``live_forecasts`` reads this directory with a plain disk load — never MLflow.
