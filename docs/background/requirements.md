@@ -9,8 +9,10 @@
 ## Core Objectives
 
 * Probabilistic, half-hourly, 14-day horizon forecasts updated every 6 hours. Within that
-  horizon, users mostly act on forecasts roughly **3 to 10 days ahead**, so skill in that band
+  horizon, users mostly act on forecasts roughly **1 to 10 days ahead**, so skill in that band
   matters most.
+    * For the day-ahead forecast: NGED want to look at the forecast at 11am to see the forecast from midnight to 
+    23:59 on the next day.
 * Cover substations (primary, BSP, GSP), metered generators (solar PV, wind, BESS, etc.), and customer meters.
 * Automatically detect and compensate for **switching events** — where power is diverted from one substation to another due to maintenance, changing the local demand signature.
 * Track the **effective capacity** of metered generators over time (turbine failures, inverter faults, PV panel degradation), ignoring NGED-imposed ANM curtailment.
