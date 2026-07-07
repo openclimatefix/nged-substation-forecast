@@ -84,21 +84,21 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
   the saved model's `meta.json`.
 - **Population:** forecast **only** the `trained_time_series_ids` recorded in the production
   model's `meta.json` — never a series the model has not seen (the train==predict invariant).
-- **Inference mode:** **single-run** feature engineering
-  (`engineer_features(power_fcst_init_time=t0, …)`) across **all 51 NWP ensemble members**,
-  where `t0` is the partition's scheduled time. Deliberately *not* bulk mode: production
-  forecasts one explicit `power_fcst_init_time`, not one-per-NWP-run.
+- **Inference mode:** **single-run** feature engineering (`engineer_features(power_fcst_init_time=…)`)
+  across **all 51 NWP ensemble members**, where `power_fcst_init_time` is the partition's
+  scheduled time. Deliberately *not* bulk mode: production forecasts one explicit
+  `power_fcst_init_time`, not one-per-NWP-run.
 - **NWP availability semantics** via a `RunConfig` field
   `availability_mode: Literal["live", "replay"]` (default `"live"`):
-    - `"live"` — the scheduled path. `t0 = now`; join the **freshest NWP run actually present**
-      in Delta with `nwp_init_time <= t0`. **No** modelled publication delay: reality already
-      constrains the table to genuinely published runs, so if the provider speeds up we
-      automatically use fresher data.
+    - `"live"` — the scheduled path. `power_fcst_init_time = now`; join the **freshest NWP run
+      actually present** in Delta with `nwp_init_time <= power_fcst_init_time`. **No** modelled
+      publication delay: reality already constrains the table to genuinely published runs, so if
+      the provider speeds up we automatically use fresher data.
     - `"replay"` — re-running a *past* slot (e.g. yesterday's failed run, today).
-      `t0 = the historical partition time`; join the freshest run with
-      `nwp_init_time <= t0 − nwp_publication_delay_hours`. The delay reconstructs what was
-      actually *available* at the historical `t0` — without it we would leak NWP runs that only
-      landed afterwards.
+      `power_fcst_init_time = the historical partition time`; join the freshest run with
+      `nwp_init_time <= power_fcst_init_time − nwp_publication_delay_hours`. The delay
+      reconstructs what was actually *available* at the historical `power_fcst_init_time` —
+      without it we would leak NWP runs that only landed afterwards.
     - The scheduled sensor/schedule always uses `"live"` for the current partition; manual
       backfills of past partitions use `"replay"`. The explicit flag is the source of truth (an
       automatic live-iff-recent rule is a possible later convenience).

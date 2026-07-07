@@ -23,7 +23,7 @@ from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 import patito as pt
 
-_T0 = datetime(2026, 7, 4, 6, 0, tzinfo=timezone.utc)
+_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=timezone.utc)
 
 
 # ---------------------------------------------------------------------------
@@ -31,35 +31,59 @@ _T0 = datetime(2026, 7, 4, 6, 0, tzinfo=timezone.utc)
 # ---------------------------------------------------------------------------
 
 
-def test_live_picks_freshest_run_at_or_before_t0() -> None:
-    available = [_T0 - timedelta(hours=24), _T0 - timedelta(hours=6), _T0]
-    assert select_nwp_init_time(available, t0=_T0, availability_mode="live") == _T0
-
-
-def test_replay_picks_freshest_run_at_or_before_delayed_cutoff() -> None:
-    available = [_T0 - timedelta(hours=24), _T0 - timedelta(hours=6), _T0]
-    # Replay cutoff is t0 - 6h (the default delay): the run exactly there qualifies, not t0.
-    assert select_nwp_init_time(available, t0=_T0, availability_mode="replay") == _T0 - timedelta(
-        hours=6
+def test_live_picks_freshest_run_at_or_before_power_fcst_init_time() -> None:
+    available = [
+        _POWER_FCST_INIT_TIME - timedelta(hours=24),
+        _POWER_FCST_INIT_TIME - timedelta(hours=6),
+        _POWER_FCST_INIT_TIME,
+    ]
+    assert (
+        select_nwp_init_time(
+            available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="live"
+        )
+        == _POWER_FCST_INIT_TIME
     )
 
 
+def test_replay_picks_freshest_run_at_or_before_delayed_cutoff() -> None:
+    available = [
+        _POWER_FCST_INIT_TIME - timedelta(hours=24),
+        _POWER_FCST_INIT_TIME - timedelta(hours=6),
+        _POWER_FCST_INIT_TIME,
+    ]
+    # Replay cutoff is power_fcst_init_time - 6h (the default delay): the run exactly there
+    # qualifies, not the run at power_fcst_init_time itself.
+    assert select_nwp_init_time(
+        available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="replay"
+    ) == _POWER_FCST_INIT_TIME - timedelta(hours=6)
+
+
 def test_live_and_replay_diverge_when_a_fresher_run_exists_within_the_delay_window() -> None:
-    """The whole point of the two modes: a run inside (t0-6h, t0] is live-only visible."""
-    available = [_T0 - timedelta(hours=24), _T0 - timedelta(hours=1)]
+    """The whole point of the two modes: a run inside (power_fcst_init_time-6h,
+    power_fcst_init_time] is live-only visible."""
+    available = [
+        _POWER_FCST_INIT_TIME - timedelta(hours=24),
+        _POWER_FCST_INIT_TIME - timedelta(hours=1),
+    ]
 
-    live = select_nwp_init_time(available, t0=_T0, availability_mode="live")
-    replay = select_nwp_init_time(available, t0=_T0, availability_mode="replay")
+    live = select_nwp_init_time(
+        available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="live"
+    )
+    replay = select_nwp_init_time(
+        available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="replay"
+    )
 
-    assert live == _T0 - timedelta(hours=1)
-    assert replay == _T0 - timedelta(hours=24)
+    assert live == _POWER_FCST_INIT_TIME - timedelta(hours=1)
+    assert replay == _POWER_FCST_INIT_TIME - timedelta(hours=24)
     assert live != replay
 
 
 def test_raises_when_no_run_qualifies() -> None:
-    available = [_T0 + timedelta(hours=1)]
+    available = [_POWER_FCST_INIT_TIME + timedelta(hours=1)]
     with pytest.raises(ValueError, match="No NWP run available"):
-        select_nwp_init_time(available, t0=_T0, availability_mode="live")
+        select_nwp_init_time(
+            available, power_fcst_init_time=_POWER_FCST_INIT_TIME, availability_mode="live"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -70,7 +94,8 @@ def test_raises_when_no_run_qualifies() -> None:
 def test_build_live_power_frame_grid_bounds_join_and_nulls() -> None:
     history = timedelta(hours=1)
     horizon = timedelta(hours=1)
-    observed_time = _T0 - timedelta(minutes=30)  # inside (t0-history, t0]
+    # Inside (power_fcst_init_time-history, power_fcst_init_time].
+    observed_time = _POWER_FCST_INIT_TIME - timedelta(minutes=30)
 
     power = pt.LazyFrame.from_existing(
         pl.DataFrame(
@@ -83,15 +108,20 @@ def test_build_live_power_frame_grid_bounds_join_and_nulls() -> None:
     ).set_model(PowerTimeSeries)
 
     result = build_live_power_frame(
-        power, [1, 2], t0=_T0, history=history, horizon=horizon
+        power,
+        [1, 2],
+        power_fcst_init_time=_POWER_FCST_INIT_TIME,
+        history=history,
+        horizon=horizon,
     ).collect()
 
-    # Grid is (t0-history, t0+horizon] on a half-hourly step: 4 slots here.
+    # Grid is (power_fcst_init_time-history, power_fcst_init_time+horizon] on a half-hourly step:
+    # 4 slots here.
     expected_times = [
-        _T0 - timedelta(minutes=30),
-        _T0,
-        _T0 + timedelta(minutes=30),
-        _T0 + timedelta(hours=1),
+        _POWER_FCST_INIT_TIME - timedelta(minutes=30),
+        _POWER_FCST_INIT_TIME,
+        _POWER_FCST_INIT_TIME + timedelta(minutes=30),
+        _POWER_FCST_INIT_TIME + timedelta(hours=1),
     ]
     ts1_times = sorted(result.filter(pl.col("time_series_id") == 1)["time"].to_list())
     assert ts1_times == expected_times

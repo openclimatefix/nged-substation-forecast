@@ -4,8 +4,8 @@ Exercises the real wiring end-to-end against temp Delta tables and a plain-disk 
 model (no MLflow — ``live_forecasts`` never touches it): a tiny trained ``XGBoostForecaster`` is
 saved directly to ``PRODUCTION_MODEL_PATH``, then ``live_forecasts`` is materialised for one
 6-hourly partition against two NWP runs — a same-day run and a day-earlier run, both covering
-valid times just after ``t0`` — so ``live`` and ``replay`` availability modes are forced to pick
-different runs.
+valid times just after ``power_fcst_init_time`` — so ``live`` and ``replay`` availability modes
+are forced to pick different runs.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -23,18 +23,22 @@ from nged_substation_forecast.defs.production_assets import LiveForecastsConfig,
 
 pytestmark = pytest.mark.integration
 
-# t0 = the partition's forecast init time (window end); the partition *key* is the window start,
-# 6 hours earlier (live_forecast_partitions ticks every 6h) — see live_forecasts's docstring.
-_T0 = datetime(2026, 7, 4, 0, 0, tzinfo=timezone.utc)
+# power_fcst_init_time = the partition's forecast init time (window end); the partition *key* is
+# the window start, 6 hours earlier (live_forecast_partitions ticks every 6h) — see
+# live_forecasts's docstring.
+_POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 0, 0, tzinfo=timezone.utc)
 _PARTITION_KEY = "2026-07-03-18:00"
 
-# The tick 6h before _T0: still after _DAY_EARLIER_RUN, still before _SAME_DAY_RUN, so "live" mode
-# picks _DAY_EARLIER_RUN here too — used by the accumulation test as a second, distinct partition.
-_EARLIER_TICK_T0 = _T0 - timedelta(hours=6)
+# The tick 6h before _POWER_FCST_INIT_TIME: still after _DAY_EARLIER_RUN, still before
+# _SAME_DAY_RUN, so "live" mode picks _DAY_EARLIER_RUN here too — used by the accumulation test
+# as a second, distinct partition.
+_EARLIER_TICK_POWER_FCST_INIT_TIME = _POWER_FCST_INIT_TIME - timedelta(hours=6)
 _EARLIER_TICK_PARTITION_KEY = "2026-07-03-12:00"
 
-_SAME_DAY_RUN = _T0  # 2026-07-04 00Z — only visible in "live" mode (within the replay delay).
-_DAY_EARLIER_RUN = _T0 - timedelta(days=1)  # 2026-07-03 00Z — the only run visible in "replay".
+_SAME_DAY_RUN = _POWER_FCST_INIT_TIME  # 2026-07-04 00Z — only visible in "live" (within the delay).
+_DAY_EARLIER_RUN = _POWER_FCST_INIT_TIME - timedelta(
+    days=1
+)  # 2026-07-03 00Z — visible in "replay".
 
 _TRAINED_CELL = 10
 _UNTRAINED_CELL = 20
@@ -56,7 +60,8 @@ _NWP_CONTINUOUS_COL_VALUES = {
 }
 """Physically plausible Float32 constants, one per continuous ``Nwp`` variable."""
 
-_VALID_TIMES = [_T0 + timedelta(minutes=30 * i) for i in range(1, 5)]  # 00:30 .. 02:00, after t0.
+_VALID_TIMES = [_POWER_FCST_INIT_TIME + timedelta(minutes=30 * i) for i in range(1, 5)]
+"""00:30 .. 02:00, after ``_POWER_FCST_INIT_TIME``."""
 
 
 def _nwp_records(cell: int, init_time: datetime, members: tuple[int, ...]) -> list[dict]:
@@ -97,8 +102,11 @@ def _write_nwp(path: str) -> None:
 
 
 def _write_power(path: str) -> None:
-    """A little pre-t0 history for both the trained and the untrained series."""
-    times = [_T0 - timedelta(hours=1), _T0 - timedelta(minutes=30)]
+    """A little history before ``_POWER_FCST_INIT_TIME`` for both the trained and untrained series."""
+    times = [
+        _POWER_FCST_INIT_TIME - timedelta(hours=1),
+        _POWER_FCST_INIT_TIME - timedelta(minutes=30),
+    ]
     rows = [
         {"time_series_id": ts_id, "time": t, "power": 100.0 + i}
         for ts_id in (1, 2)
@@ -225,13 +233,13 @@ def test_accumulation_across_partitions(env: dict[str, str]) -> None:
     instance = DagsterInstance.ephemeral()
     assert _materialize(instance, "live", partition_key=_EARLIER_TICK_PARTITION_KEY).success
     first_rows = _read_forecasts(env)
-    assert (first_rows["power_fcst_init_time"] == _EARLIER_TICK_T0).all()
+    assert (first_rows["power_fcst_init_time"] == _EARLIER_TICK_POWER_FCST_INIT_TIME).all()
 
     assert _materialize(instance, "live", partition_key=_PARTITION_KEY).success
 
     combined = _read_forecasts(env)
     assert combined.height > first_rows.height
     assert set(combined["power_fcst_init_time"].unique().to_list()) == {
-        _EARLIER_TICK_T0,
-        _T0,
+        _EARLIER_TICK_POWER_FCST_INIT_TIME,
+        _POWER_FCST_INIT_TIME,
     }

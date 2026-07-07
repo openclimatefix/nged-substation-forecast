@@ -18,7 +18,7 @@ Used to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, and
 ``nwp_init_time`` from ``power_fcst_init_time`` when it is not supplied in single-run mode (see
 ``_join_nwp_bulk_mode`` / ``_join_nwp_single_run``). Also the default for
 ``select_nwp_init_time``'s replay-mode cutoff (``ml_core._production_helpers``), which
-reconstructs what was actually available at a historical ``t0``.
+reconstructs what was actually available at a historical ``power_fcst_init_time``.
 """
 
 

@@ -39,10 +39,12 @@ from ml_core._production_helpers import (
 from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
-"""How far past ``t0`` ``live_forecasts`` forecasts — inside ECMWF ENS's ~15-day horizon."""
+"""How far past ``power_fcst_init_time`` ``live_forecasts`` forecasts — inside ECMWF ENS's
+~15-day horizon."""
 
 LIVE_POWER_HISTORY: Final[timedelta] = timedelta(days=15)
-"""How far before ``t0`` the live power spine (``build_live_power_frame``) reaches.
+"""How far before ``power_fcst_init_time`` the live power spine (``build_live_power_frame``)
+reaches.
 
 Must cover the longest power lag feature any production model uses (currently up to 336 h /
 14 days) plus a margin.
@@ -58,12 +60,12 @@ live_forecast_partitions = TimeWindowPartitionsDefinition(
 shipped — no need for a deep empty backlog on a brand-new live asset.
 
 **Partition semantics**: a partition key names the *start* of its 6-hour window; the window runs
-until the *next* partition's key, 6 hours later. A partition's forecast ``t0`` is that window's
-*end* — i.e. the next tick's timestamp, not the key's own timestamp (see ``live_forecasts``'s
-docstring for why). E.g. partition key ``"2026-07-04-00:00"`` covers the window from
-2026-07-04 00:00 UTC (the key itself) to 2026-07-04 06:00 UTC (the next tick), so its forecast is
-initialised (``t0``) at 2026-07-04 06:00 UTC — six hours after the timestamp named in the key, not
-at the midnight the key names.
+until the *next* partition's key, 6 hours later. A partition's ``power_fcst_init_time`` (when its
+forecast is initialised) is that window's *end* — i.e. the next tick's timestamp, not the key's
+own timestamp (see ``live_forecasts``'s docstring for why). E.g. partition key
+``"2026-07-04-00:00"`` covers the window from 2026-07-04 00:00 UTC (the key itself) to
+2026-07-04 06:00 UTC (the next tick), so its ``power_fcst_init_time`` is 2026-07-04 06:00 UTC —
+six hours after the timestamp named in the key, not at the midnight the key names.
 """
 
 
@@ -156,9 +158,10 @@ class LiveForecastsConfig(Config):
     """Run config for the ``live_forecasts`` asset."""
 
     availability_mode: AvailabilityModeType = "live"
-    """``"live"`` (the scheduled default) uses the freshest NWP run present as of ``t0``, no
-    modelled delay. ``"replay"`` (manual backfills only) reconstructs what was available
-    ``nwp_publication_delay_hours`` before ``t0``. See ``select_nwp_init_time``."""
+    """``"live"`` (the scheduled default) uses the freshest NWP run present as of
+    ``power_fcst_init_time``, no modelled delay. ``"replay"`` (manual backfills only)
+    reconstructs what was available ``nwp_publication_delay_hours`` before
+    ``power_fcst_init_time``. See ``select_nwp_init_time``."""
 
 
 @asset(
@@ -176,17 +179,18 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     """Production inference: forecast from the latest NWP for one 6-hourly slot.
 
     **Partition semantics — read this before backfilling**: a partition key names the *start* of
-    its 6-hour window (``context.partition_time_window.start``); ``t0`` — the forecast init
-    time — is that window's *end* (``context.partition_time_window.end``). Dagster always defines
-    a ``TimeWindowPartitionsDefinition`` this way: each key is a window's start, and the window
+    its 6-hour window (``context.partition_time_window.start``); ``power_fcst_init_time`` — when
+    this partition's forecast is initialised — is that window's *end*
+    (``context.partition_time_window.end``). Dagster always defines a
+    ``TimeWindowPartitionsDefinition`` this way: each key is a window's start, and the window
     extends until the *next* partition's key. ``live_forecast_partitions`` ticks every 6 hours
-    (00/06/12/18 UTC), so every window — and the gap between a key's timestamp and its ``t0`` — is
-    exactly 6 hours.
+    (00/06/12/18 UTC), so every window — and the gap between a key's timestamp and its
+    ``power_fcst_init_time`` — is exactly 6 hours.
 
     For example, partition key ``"2026-07-04-00:00"`` covers the window from 2026-07-04 00:00 UTC
-    (the key itself) up to 2026-07-04 06:00 UTC (the next tick). So that partition's ``t0`` is
-    2026-07-04 06:00 UTC: six hours after the timestamp named in the key, not the midnight the key
-    names.
+    (the key itself) up to 2026-07-04 06:00 UTC (the next tick). So that partition's
+    ``power_fcst_init_time`` is 2026-07-04 06:00 UTC: six hours after the timestamp named in the
+    key, not the midnight the key names.
 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
     ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
@@ -194,12 +198,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     production monitoring, never logged here. Forecasts exactly
     ``forecaster.trained_time_series_ids`` (never today's eligibility set — the train==predict
     population invariant) across every NWP ensemble member, using single-run feature engineering
-    stamped with this partition's ``t0``.
+    stamped with this partition's ``power_fcst_init_time``.
 
     NWP availability is resolved via ``config.availability_mode``: the scheduled tick always
     uses ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
     partitions pass ``"replay"`` (reconstructs what was available ``nwp_publication_delay_hours``
-    before ``t0``). See ``select_nwp_init_time``.
+    before ``power_fcst_init_time``). See ``select_nwp_init_time``.
 
     Writes idempotently: overwrites exactly this partition's rows in ``power_forecasts``
     (``experiment_name``, ``fold_id="live"``, and this ``power_fcst_init_time``) via
@@ -211,7 +215,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     should trip over this consciously.
     """
     settings = Settings()
-    t0 = context.partition_time_window.end
+    power_fcst_init_time = context.partition_time_window.end
 
     forecaster = load_forecaster_from_dir(settings.production_model_path)
     trained_ids = forecaster.trained_time_series_ids
@@ -222,18 +226,26 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         )
 
     available = _available_nwp_init_times(settings)
-    nwp_init = select_nwp_init_time(available, t0=t0, availability_mode=config.availability_mode)
+    nwp_init = select_nwp_init_time(
+        available,
+        power_fcst_init_time=power_fcst_init_time,
+        availability_mode=config.availability_mode,
+    )
 
     power_ts, metadata_df, nwp_lf = _load_engineering_inputs(
         settings,
         trained_ids,
-        window_start=t0 - LIVE_POWER_HISTORY,
-        window_end=t0 + LIVE_FORECAST_HORIZON,
+        window_start=power_fcst_init_time - LIVE_POWER_HISTORY,
+        window_end=power_fcst_init_time + LIVE_FORECAST_HORIZON,
         init_time_start=nwp_init,
         init_time_end=nwp_init,
     )
     power_full = build_live_power_frame(
-        power_ts, trained_ids, t0=t0, history=LIVE_POWER_HISTORY, horizon=LIVE_FORECAST_HORIZON
+        power_ts,
+        trained_ids,
+        power_fcst_init_time=power_fcst_init_time,
+        history=LIVE_POWER_HISTORY,
+        horizon=LIVE_FORECAST_HORIZON,
     )
 
     features = forecaster.feature_engineer.engineer(
@@ -241,23 +253,23 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         power_time_series=power_full,
         time_series_metadata=metadata_df,
         nwp=nwp_lf,
-        power_fcst_init_time=t0,
+        power_fcst_init_time=power_fcst_init_time,
         nwp_init_time=nwp_init,
     )
-    # History rows (valid_time <= t0) and rows outside this NWP run's coverage (ensemble_member
-    # null from the join miss) are join artefacts, not genuine forecasts.
+    # History rows (valid_time <= power_fcst_init_time) and rows outside this NWP run's coverage
+    # (ensemble_member null from the join miss) are join artefacts, not genuine forecasts.
     genuine_forecasts: pl.LazyFrame = features
     genuine_forecasts = genuine_forecasts.filter(
-        pl.col("valid_time") > t0, pl.col("ensemble_member").is_not_null()
+        pl.col("valid_time") > power_fcst_init_time, pl.col("ensemble_member").is_not_null()
     )
     features = pt.LazyFrame.from_existing(genuine_forecasts).set_model(AllFeatures)
 
     forecasts = forecaster.predict(features)  # fold_id="live" is the default.
     if forecasts.height == 0:
         raise ValueError(
-            f"live_forecasts produced 0 rows for t0={t0.isoformat()} "
-            f"(nwp_init_time={nwp_init.isoformat()}). Check NWP coverage and the model's "
-            "trained population."
+            f"live_forecasts produced 0 rows for power_fcst_init_time="
+            f"{power_fcst_init_time.isoformat()} (nwp_init_time={nwp_init.isoformat()}). Check "
+            "NWP coverage and the model's trained population."
         )
 
     settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
@@ -265,12 +277,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         forecasts,
         settings.power_forecasts_data_path,
         replace_partition=(forecaster.model_params.experiment_name, "live"),
-        replace_predicate_extra=f"power_fcst_init_time = '{t0.isoformat()}'",
+        replace_predicate_extra=f"power_fcst_init_time = '{power_fcst_init_time.isoformat()}'",
     )
 
     context.add_output_metadata(
         {
-            "t0": str(t0),
+            "power_fcst_init_time": str(power_fcst_init_time),
             "availability_mode": config.availability_mode,
             "nwp_init_time": str(nwp_init),
             "n_rows": forecasts.height,
