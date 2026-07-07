@@ -15,6 +15,8 @@ use ``mlflow`` / ``MlflowClient``, which honour whatever URI is in effect. This 
 helpers run against a file-based MLflow in tests with no server.
 """
 
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Final, cast
 
 import hydra
@@ -138,3 +140,41 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
             tags={"cv_role": "fold", "fold_id": fold_id},
         ) as fold_run:
             return fold_run.info.run_id
+
+
+@dataclass(frozen=True)
+class PromotableRun:
+    """One MLflow fold run (``cv_role=fold``) — a valid ``production_model`` promotion candidate."""
+
+    run_id: str
+    experiment_name: str
+    fold_id: str
+    start_time: datetime
+
+
+def list_promotable_runs() -> list[PromotableRun]:
+    """List every fold run (``cv_role=fold``) across all MLflow experiments, newest first.
+
+    A read-only convenience for the ``promotable_model_runs`` asset
+    (``defs/production_assets.py``), which logs this as a metadata table in the Dagster UI so a
+    ``production_model`` promotion candidate's run id can be copy-pasted into that asset's
+    launchpad rather than retyped from memory. The champion is still picked by eye off the MLflow
+    leaderboard; this only lists candidates. The caller is responsible for setting the tracking
+    URI (``mlflow.set_tracking_uri``) beforehand.
+    """
+    client = MlflowClient()
+    runs = [
+        PromotableRun(
+            run_id=run.info.run_id,
+            experiment_name=experiment.name,
+            fold_id=run.data.tags.get("fold_id", "unknown"),
+            start_time=datetime.fromtimestamp(run.info.start_time / 1000, tz=timezone.utc),
+        )
+        for experiment in client.search_experiments()
+        for run in client.search_runs(
+            experiment_ids=[experiment.experiment_id],
+            filter_string="tags.cv_role = 'fold'",
+            max_results=1000,
+        )
+    ]
+    return sorted(runs, key=lambda run: run.start_time, reverse=True)

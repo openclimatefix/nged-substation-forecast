@@ -16,10 +16,14 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
-from dagster import DagsterInstance, RunConfig, materialize
+from dagster import DagsterInstance, RunConfig, TableMetadataValue, materialize
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
-from nged_substation_forecast.defs.production_assets import ProductionModelConfig, production_model
+from nged_substation_forecast.defs.production_assets import (
+    ProductionModelConfig,
+    production_model,
+    promotable_model_runs,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -67,6 +71,9 @@ def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> st
     experiment_id = mlflow.create_experiment(experiment_name)
     with mlflow.start_run(experiment_id=experiment_id) as run:
         run_id = run.info.run_id
+        # Tag as a fold run, matching what trained_cv_model does via get_or_create_fold_run — so
+        # list_promotable_runs (and the promotable_model_runs asset) picks this run up.
+        mlflow.set_tags({"cv_role": "fold", "fold_id": "test_fold"})
     forecaster.save_to_mlflow(run_id)
     return run_id
 
@@ -128,3 +135,19 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
 
     promotion = json.loads((model_dir / "promotion.json").read_text())
     assert promotion["mlflow_run_id"] == second_run_id
+
+
+def test_promotable_model_runs_lists_fold_run_candidates(env: dict[str, str]) -> None:
+    run_id = _save_trained_model_to_mlflow("candidates_test", n_estimators=5)
+
+    result = materialize([promotable_model_runs], instance=DagsterInstance.ephemeral())
+    assert result.success
+
+    [materialization] = result.asset_materializations_for_node("promotable_model_runs")
+    metadata = materialization.metadata
+    assert metadata["n_candidates"].value == 1
+    candidates = metadata["candidates"]
+    assert isinstance(candidates, TableMetadataValue)
+    [row] = candidates.records
+    assert row.data["run_id"] == run_id
+    assert row.data["experiment_name"] == "candidates_test"

@@ -19,12 +19,15 @@ from dagster import (
     AssetDep,
     AssetExecutionContext,
     Config,
+    MetadataValue,
+    TableRecord,
     TimeWindowPartitionMapping,
     TimeWindowPartitionsDefinition,
     asset,
 )
 from delta_store.power_forecasts import write_power_forecasts
 from deltalake import DeltaTable
+from ml_core._mlflow_runs import list_promotable_runs
 from ml_core._production_helpers import (
     AvailabilityModeType,
     build_live_power_frame,
@@ -60,11 +63,42 @@ shipped — no need for a deep empty backlog on a brand-new live asset.
 """
 
 
+@asset
+def promotable_model_runs(context: AssetExecutionContext) -> None:
+    """List MLflow fold runs eligible for promotion via ``production_model``.
+
+    Purely informational: materialise this on demand (it has no dependents and writes nothing to
+    disk) to refresh the candidate list as a metadata table in the Dagster UI, then copy the
+    champion's ``run_id`` into ``production_model``'s launchpad. The champion is still picked by
+    eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key to
+    automate the pick) — this just saves retyping/misremembering the run id.
+    """
+    settings = Settings()
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    runs = list_promotable_runs()
+
+    table = [
+        TableRecord(
+            {
+                "run_id": run.run_id,
+                "experiment_name": run.experiment_name,
+                "fold_id": run.fold_id,
+                "started_at": run.start_time.strftime("%Y-%m-%d %H:%M UTC"),
+            }
+        )
+        for run in runs
+    ]
+    context.add_output_metadata(
+        {"n_candidates": len(runs), "candidates": MetadataValue.table(table)}
+    )
+
+
 class ProductionModelConfig(Config):
     """Run config for the manually-triggered ``production_model`` asset."""
 
     mlflow_run_id: str
-    """The champion fold run id, picked from the MLflow leaderboard."""
+    """The champion fold run id, picked from the MLflow leaderboard (or from
+    ``promotable_model_runs``'s candidate table)."""
 
 
 @asset

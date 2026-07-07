@@ -8,6 +8,7 @@ from ml_core._mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
     get_or_create_parent_run,
+    list_promotable_runs,
 )
 from mlflow.tracking import MlflowClient
 
@@ -64,3 +65,33 @@ def test_fold_runs_resolve_by_tag(mlflow_tracking: None) -> None:
     # Re-resolving each fold returns its own run, distinct from the other.
     assert get_or_create_fold_run(experiment_id, parent_run_id, "2022") == fold_2022
     assert get_or_create_fold_run(experiment_id, parent_run_id, "2023") == fold_2023
+
+
+def test_list_promotable_runs_lists_fold_runs_across_experiments_newest_first(
+    mlflow_tracking: None,
+) -> None:
+    exp_a = get_or_create_experiment("experiment_a")
+    parent_a = get_or_create_parent_run(exp_a)
+    fold_a = get_or_create_fold_run(exp_a, parent_a, "2022")
+
+    exp_b = get_or_create_experiment("experiment_b")
+    parent_b = get_or_create_parent_run(exp_b)
+    fold_b = get_or_create_fold_run(exp_b, parent_b, "2023")
+
+    runs = list_promotable_runs()
+
+    assert {run.run_id for run in runs} == {fold_a, fold_b}
+    # Newest first: fold_b was created after fold_a.
+    assert [run.run_id for run in runs] == [fold_b, fold_a]
+    by_id = {run.run_id: run for run in runs}
+    assert by_id[fold_a].experiment_name == "experiment_a"
+    assert by_id[fold_a].fold_id == "2022"
+    assert by_id[fold_b].experiment_name == "experiment_b"
+    assert by_id[fold_b].fold_id == "2023"
+
+
+def test_list_promotable_runs_excludes_parent_runs(mlflow_tracking: None) -> None:
+    experiment_id = get_or_create_experiment("my_experiment")
+    get_or_create_parent_run(experiment_id)  # cv_role=parent, not a fold — must be excluded.
+
+    assert list_promotable_runs() == []
