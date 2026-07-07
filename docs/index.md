@@ -13,8 +13,8 @@ Each forecast is:
 - Refreshed **every 6 hours**
 - **Scaled to [−1, +1]** — a normalised value that NGED multiplies by the site's capacity to get MW/MVA
 - **Sign convention** depends on the time series type:
-  - *Substations*: positive = power flowing towards end-users; negative = excess generation flowing back into the grid
-  - *Customer meters (generators)*: positive = generator sending power to NGED's grid; negative = customer consuming power
+    - *Substations*: positive = power flowing towards end-users; negative = excess generation flowing back into the grid
+    - *Customer meters (generators)*: positive = generator sending power to NGED's grid; negative = customer consuming power
 
 ## Scope
 

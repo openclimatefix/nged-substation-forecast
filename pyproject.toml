@@ -127,3 +127,7 @@ plugins.md013.enabled = false
 # Duplicate heading: only flag duplicates under the same parent heading, not across
 # the whole file (e.g. "Usage" appearing under two different top-level sections).
 plugins.md024.siblings_only = true
+# Nested list indent: MkDocs' renderer (Python-Markdown, no sane-lists extension) only treats a
+# sub-list as nested when it's indented a full 4 spaces; 2-space indent (this rule's default)
+# silently renders as a flat, unnested list instead. Match the renderer, not the default.
+plugins.md007.indent = 4

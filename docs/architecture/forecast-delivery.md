@@ -93,22 +93,35 @@ problem:
 
 NGED Flexpectation turns out to look quite different on each of those axes:
 
-- **One user.** NGED is the only consumer. There is no multi-tenant permission problem to
-  solve — a single authenticated principal covers the entire requirement.
-- **Power users.** NGED's analysts are comfortable in Python and want the access to the full
-  firehose of data: not just the latest run, but routine access to the *entire history* of
-  forecasts, backtests, and our automated analysis of NGED's power data, all for their own
-  evaluation and downstream analysis.
-- **Much more data** — quantified below. Per-ensemble-member probabilistic forecasts across
-  thousands of time series are simply a different order of magnitude compared to OCF's national
-  solar forecast.
-- **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information
-  that has no analogue in OCF's existing products: per-ensemble-member forecasts,
-  [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings),
-  time-varying [effective capacity](../roadmap/delivery-tables.md#table-4-effective_capacity),
-  [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history), and
-  [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching). An API
-  surface for all of this would have to be designed from scratch.
+- **Novel concepts.** The [delivery tables](../roadmap/delivery-tables.md) carry information that
+  has no analogue in OCF's existing products. We & NGED have spent many hours carefully designing
+  these tables and the data delivery mechanism. An API surface for all of this would have to be
+  designed from scratch:
+    - time-varying [effective capacity](../roadmap/delivery-tables.md#table-4-effective_capacity),
+    - [asset-health history](../roadmap/delivery-tables.md#table-3-asset_health_history),
+    - [substation switching](../roadmap/delivery-tables.md#table-5-substation_switching),
+    - [per-ensemble-member forecasts](../roadmap/delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts)
+      (including full backtest history & live forecasts in the same table, for multiple ML models
+      run in parallel, and multiple ways of representing uncertainty),
+    - and [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
+- **Much more data** — quantified [below](#how-big-is-flexpectations-power-forecast-data).
+  Per-ensemble-member probabilistic forecasts across thousands of time series are simply a different
+  order of magnitude compared to OCF's commercial forecast products.
+- **One user.** NGED is the only consumer. There is no multi-tenant permission problem to solve — a
+  single authenticated AWS user covers the entire requirement. But this is not a ceiling on the
+  architecture: S3 can grant read access to further users via bucket policies or [S3 Access
+  Points](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html), so having
+  multiple consumers wouldn't force us off Delta Lake on S3. A small, fixed number of views can
+  even be split across separate tables — e.g. keeping forecasts for NGED's generation customers
+  private while openly publishing the substation forecasts — with bucket-policy permissions set
+  per table. What doesn't fit that pattern is *dynamic, per-customer* entitlements decided at
+  query time rather than at data-layout time — many customers each needing their own filtered
+  slice of the same table — which is where a REST API would earn its keep, as covered
+  [below](#when-would-a-rest-api-earn-its-keep).
+- **Power users.** NGED's analysts are comfortable in Python and want access to the full firehose of
+  data: not just the latest run, but routine access to the *entire history* of forecasts, backtests,
+  and OCF's automated analysis of NGED's power data, all for NGED's own evaluation and downstream
+  analysis.
 
 ## Evolving requirements
 
@@ -118,29 +131,30 @@ directly; a REST API would add a versioning-and-deprecation cycle on top of ever
 
 And, crucially, NGED are _already_ finding uses for our "firehose of data" that we had never
 considered. These are exactly the sort of unforeseen use-cases that simply wouldn't have occurred to
-anyone if we only provided a minimal API to NGED.
+anyone if we only provided a minimal API to NGED. In fact, these "unforeseen use-cases" might end up
+being just as important to NGED as the power forecasts.
 
 ## How big is Flexpectation's power forecast data?
 
-Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of
-the 14-day horizon. For the V1 trial area that is 32 series × 51 members × ~672 half-hours ≈
-**1.1 million rows per run**. Our development `power_forecasts` table already holds **~404
-million rows** from 417 backtest init times — for just 32 time series. The `delta_store`
-storage format (compression-friendly sort, per-column parquet encodings, 13-bit-significand
-rounding — [PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268))
-packs that into **0.73 GB, ~1.8 bytes per row**.
+Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of the
+14-day horizon. For the V1 trial area that is 32 series × 51 members × 672 half-hours ≈ **1.1
+million rows per run**. Our development `power_forecasts` table already holds **~404 million rows**
+from 417 backtest init times — for just 32 time series. Our
+[`delta_store`](../api/delta_store/index.md) storage format packs that into **0.73 GB, ~1.8 bytes
+per row**.
 
 V2 scales to ~2,500 time series: ~78× more, or roughly **86 million rows per run** and on the
 order of **100 billion rows per year of history** — a couple of hundred gigabytes at the
 measured bytes-per-row, and several *terabytes* uncompressed. Serialised as uncompressed JSON
 (measured on real forecast rows: ~356 bytes each), the same year of history would be roughly
 **36 terabytes on the wire — about 200× the Delta footprint**. NGED wants routine access to all
-of it. That volume is an awkward fit for JSON request/response cycles; in
-practice, REST designs for workloads like this tend to grow a "bulk export" endpoint that hands
-back files — at which point the files are doing the real work, and the API has become a
-wrapper around them.
+of it!
 
-## A very short history of REST
+That volume is an awkward fit for JSON request/response cycles (to say the least!); in practice,
+REST designs for workloads like this tend to grow a "bulk export" endpoint that hands back files —
+at which point the files are doing the real work, and the REST API has become a wrapper around them.
+
+## What REST was designed for
 
 REST was named and formalised in Roy Fielding's
 [2000 PhD dissertation](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm) as
@@ -149,7 +163,7 @@ hypermedia resources, stateless request/response over HTTP, caches in the middle
 superb architecture for exactly that — operational queries, multi-tenant products, and
 integrations where each interaction moves a small resource.
 
-What it wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
+What REST wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
 that press it into that role tend to find themselves re-implementing, one endpoint at a time,
 the things analytical storage formats already provide: pagination (chunked reads),
 retry-and-resume (transactional snapshots), server-side filtering (predicate pushdown), column
@@ -264,6 +278,32 @@ data, but also the statistical properties of the data. These contracts also serv
 human-readable documentation for the project's data inputs and data outputs. (For example, every
 public function that consumes and/or returns a DataFrame must declare the exact data contract for
 that DataFrame in the function's type hints).
+
+## And it's excellent for our internal storage too
+
+Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
+format we already rely on internally — and it earns its keep there on its own merits:
+
+- **It's remarkably compact.** The same `delta_store` write policy that packs `power_forecasts`
+  to ~1.8 bytes/row ([above](#what-delta-lake-is-and-who-else-uses-it)) works just as well on
+  [ECMWF ENS NWP](../api/dynamical_data/index.md): a full daily run (~7.24 million rows across
+  1,671 H3 cells × 51 members × 85 lead times) averages ~113 MB, and our entire local development
+  table — 810 daily runs, 1.57 billion rows, April 2024 to June 2026 — is **86 GB**.
+- **It's fast to query, even on a laptop.** Row-group skipping on a member-sorted table means a
+  single-ensemble-member read (the common case for training) touches only a few row groups instead
+  of the whole file and only takes 0.02 seconds and uses 205 MB of RAM (measured on a real 29-day, 9-cell, control-member read).
+  **That speed is what lets us run cross-validation across every ensemble member, for
+  every fold, on a laptop, in a few minutes** — no cluster required for day-to-day model development.
+- **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
+  many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
+  read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no
+  single database server to bottleneck the bandwidth, no bespoke data-loading pipeline, and no
+  separate "training data service" to build.
+
+There's a compounding benefit to using exactly the same storage technology everywhere: every
+improvement to `delta_store`'s writer properties, sort order, or precision policy
+([above](#what-delta-lake-is-and-who-else-uses-it)) pays off for training, backtesting, *and*
+delivery to NGED simultaneously, instead of being three separate storage stacks to maintain.
 
 ## When would a REST API earn its keep?
 
