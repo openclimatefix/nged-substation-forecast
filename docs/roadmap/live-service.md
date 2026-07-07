@@ -4,11 +4,16 @@
 > [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) (deploy the
 > naive forecast on AWS); see also
 > [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) and
-> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208). Build order:
-> the [inference asset](#the-live_forecasts-asset) → the
-> [champion-model container](#production-model-artifacts) → the
-> [AWS infrastructure](#aws-architecture) → [monitoring](#production-monitoring). Forecast
-> *quality* deliberately does not matter yet — the science work
+> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208). **Build order**
+> (matches #137's sub-issue order): the
+> [inference asset](#the-live_forecasts-asset) (#221, done) → the
+> [local dress rehearsal](#deployment-workstream-1-the-production-job-local-dress-rehearsal)
+> (#208) → [S3-capable data paths](#deployment-workstream-2-s3-capable-data-paths) (#121, #50)
+> → the [champion-model container](#production-model-artifacts) (#222) → the
+> [AWS infrastructure](#aws-architecture) (#206) → smaller cleanup (#197, #63, #246) →
+> [the v0.1 version bump](#related-github-issues) (#209).
+> [Production monitoring](#production-monitoring) (#224) is tracked separately and deferred
+> past v0.1. Forecast *quality* deliberately does not matter yet — the science work
 > ([baselines](metrics-and-leaderboard.md#baseline-forecasters),
 > [XGBoost improvements](xgboost-improvements.md)) waits until v0.1 is live.
 
@@ -441,34 +446,14 @@ Container verification:
    disk and executes the entrypoint — this is the critical test.
 3. Image labels show the run ID and git SHA (`docker inspect`).
 
-### Deployment workstream 1 — S3-capable data paths (the biggest unknown; start first)
-
-Issues: [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121),
-[#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50)
-
-Every data location in `Settings` is a local `Path`
-(`packages/contracts/src/contracts/settings.py:104-135`) and all IO assumes a local
-filesystem. delta-rs/Polars read and write `s3://` URIs fine, but the plumbing has to allow it:
-
-- Change the data-location fields (`nwp_data_path`, `power_forecasts_data_path`,
-  `forecast_metrics_data_path`, `eligible_time_series_data_path`,
-  `effective_capacity_data_path`, NGED power/metadata paths) from `Path` to `str` URIs
-  (local paths remain valid `str`s; dev defaults unchanged). Keep genuinely-local paths
-  (`model_cache_base_path`, `plots_data_path`, `cv_config_path`) as `Path`.
-- Audit every consumer (`scan_delta`, `write_delta`, `DeltaTable(...)`, parquet read/write)
-  for `Path`-only operations (`.exists()`, `/` joins, `mkdir`) and route them through
-  URI-safe helpers; pass `storage_options` where delta-rs needs credentials (prefer IAM
-  roles — no static keys — so `storage_options` stays empty on AWS and only dev needs any).
-- Verify **predicate pushdown / partition pruning still works over S3** (the whole memory
-  design depends on it): run the existing `.explain()`-based pruning test pattern against an
-  S3 URI.
-- Test tier: unit tests with local paths as today, plus one integration test against MinIO (or
-  a dev bucket) exercising Delta round-trip + partition-pruned scan through the changed
-  settings.
-
-### Deployment workstream 2 — the production job
+### Deployment workstream 1 — the production job (local dress rehearsal)
 
 Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)
+
+Ordered first to match the #137 sub-issue order: unlike the other two workstreams, this one
+needs no S3, Docker, or AWS account at all, so it runs now, against the laptop's local Delta
+tables (this is what the `promoted_model`/`live_forecasts` assets and 6-hourly schedules
+already do, and what the [local dress rehearsal](#deployment-verification) below exercises).
 
 A new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
 
@@ -490,6 +475,32 @@ partition keys come from Dagster natively, and missed slots are backfilled from 
 `availability_mode="replay"`. The op-level freshness check stays regardless: it is cheap
 idempotence insurance, and it keeps the job runnable one-shot for the local dress rehearsal
 ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
+
+### Deployment workstream 2 — S3-capable data paths
+
+Issues: [#121](https://github.com/openclimatefix/nged-substation-forecast/issues/121),
+[#50](https://github.com/openclimatefix/nged-substation-forecast/issues/50)
+
+The biggest unknown of the three workstreams, but not a blocker for workstream 1 above — start
+this once the local dress rehearsal is underway. Every data location in `Settings` is a local
+`Path` (`packages/contracts/src/contracts/settings.py:104-135`) and all IO assumes a local
+filesystem. delta-rs/Polars read and write `s3://` URIs fine, but the plumbing has to allow it:
+
+- Change the data-location fields (`nwp_data_path`, `power_forecasts_data_path`,
+  `forecast_metrics_data_path`, `eligible_time_series_data_path`,
+  `effective_capacity_data_path`, NGED power/metadata paths) from `Path` to `str` URIs
+  (local paths remain valid `str`s; dev defaults unchanged). Keep genuinely-local paths
+  (`model_cache_base_path`, `plots_data_path`, `cv_config_path`) as `Path`.
+- Audit every consumer (`scan_delta`, `write_delta`, `DeltaTable(...)`, parquet read/write)
+  for `Path`-only operations (`.exists()`, `/` joins, `mkdir`) and route them through
+  URI-safe helpers; pass `storage_options` where delta-rs needs credentials (prefer IAM
+  roles — no static keys — so `storage_options` stays empty on AWS and only dev needs any).
+- Verify **predicate pushdown / partition pruning still works over S3** (the whole memory
+  design depends on it): run the existing `.explain()`-based pruning test pattern against an
+  S3 URI.
+- Test tier: unit tests with local paths as today, plus one integration test against MinIO (or
+  a dev bucket) exercising Delta round-trip + partition-pruned scan through the changed
+  settings.
 
 ### Deployment workstream 3 — AWS infrastructure
 
@@ -524,16 +535,20 @@ Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` 
 
 ### Related GitHub issues
 
+Row order matches the sub-issue order on the #137 epic itself (the OCF project board), not the
+order issues were opened.
+
 | Issue | Where it lands in this plan |
 |---|---|
-| [#221 Add the `live_forecasts` Dagster asset](https://github.com/openclimatefix/nged-substation-forecast/issues/221) | [The `live_forecasts` asset](#the-live_forecasts-asset) |
+| [#221 Add the `live_forecasts` Dagster asset](https://github.com/openclimatefix/nged-substation-forecast/issues/221) | [The `live_forecasts` asset](#the-live_forecasts-asset) — done |
+| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Workstream 1 + the local dress rehearsal (also exercises the replay mode) |
+| [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | Workstream 2 |
+| [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Workstream 2 |
 | [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) + the container-build notes above |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
-| [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | Workstream 1 |
-| [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | Workstream 1 |
-| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Workstream 2 + the local dress rehearsal (also exercises the replay mode) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
+| [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |
 | [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)); largely superseded once S3 is the primary store |
