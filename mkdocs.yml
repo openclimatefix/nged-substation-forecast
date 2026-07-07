@@ -57,9 +57,9 @@ nav:
       - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md
       - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
-  - Live Forecasts:
-      - Overview: live_forecasts/index.md
-      - Running live forecasts end-to-end: live_forecasts/dagster-workflow.md
+  - Live Service:
+      - Overview: live_service/index.md
+      - Running live forecasts end-to-end: live_service/dagster-workflow.md
   - Roadmap:
       - Overview: roadmap/index.md
       - Live Service: roadmap/live-service.md

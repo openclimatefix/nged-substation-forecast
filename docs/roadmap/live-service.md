@@ -63,10 +63,10 @@ Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > 6-hourly automation (`dg dev` + persistent `DAGSTER_HOME`, part of
 > [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). For the
 > operational runbook — promoting a model, running the schedule, backfilling a missed slot — see
-> [Live Forecasts](../live_forecasts/index.md), the permanent home for this once-shipped
-> material. Remaining work on this page — the
-> [container build](#production-model-artifacts) and [AWS infrastructure](#aws-architecture) —
-> is unaffected.
+> [Live Service](../live_service/index.md), the permanent home this page's shipped material moves
+> to (and, eventually, this whole page, once every section below has landed). Remaining work on
+> this page — the [container build](#production-model-artifacts) and
+> [AWS infrastructure](#aws-architecture) — is unaffected.
 
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
 asset is what the deployed container runs every 6 hours: load the production model, forecast
