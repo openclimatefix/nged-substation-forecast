@@ -209,7 +209,7 @@ Identical under every option, so counted once and folded into each headline rang
   GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
   beyond).
 
-### Option A — Level 1: nothing always-on — ~£12–22/month
+### Option A — Level 1: nothing always-on ~£12–22/month
 
 Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
 throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
@@ -224,7 +224,7 @@ Dynamical availability, never Dagster's records (they evaporate with the throwaw
   replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
   always-on home (+£6/month Fargate service) anyway.
 
-### Option B — small EC2 control-plane box + `EcsRunLauncher` — ~£25–35/month ← recommended
+### Option B — **recommended** — small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
 reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
@@ -241,7 +241,7 @@ to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
-### Option C — one big box, everything on it (the OCF pattern) — ~£56–86/month
+### Option C — one big box with everything on it ~£56–86/month
 
 Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
 `t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
@@ -253,7 +253,7 @@ OCF runs everything else (with Airflow).
 - **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
   variants mean static AWS keys and burst-credit accounting; biggest pet.
 
-### Option D — serverless control plane (no pets) — ~£41–45/month
+### Option D — serverless control plane (no pets) ~£41–45/month
 
 Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
 `db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
@@ -264,7 +264,7 @@ tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
   ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
   in practice.
 
-### Option E — Dagster+ Solo, Hybrid — ~£37–45/month typical
+### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
 
 £7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
 pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
