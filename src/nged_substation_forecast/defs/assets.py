@@ -1,7 +1,7 @@
 import ast
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, Final, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
@@ -12,6 +12,7 @@ from dagster import (
     AssetExecutionContext,
     DailyPartitionsDefinition,
     MetadataValue,
+    RetryRequested,
     TableMetadataValue,
     TableRecord,
     asset,
@@ -20,7 +21,7 @@ from delta_store.nwp import write_nwp
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
-from dynamical_data.ecmwf_ens.download import download_ecmwf_ens_run
+from dynamical_data.ecmwf_ens.download import NwpRunNotYetAvailable, download_ecmwf_ens_run
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
 from nged_data.read_nged_json import _H3_RESOLUTION
@@ -138,8 +139,24 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     )
 
 
+ecmwf_ens_partitions = DailyPartitionsDefinition(
+    start_date="2024-04-01", timezone="UTC", end_offset=1
+)
+"""One partition per day of ECMWF ENS 00Z runs. ``end_offset=1`` makes today's key exist before
+its 00Z run has actually landed, matching Dynamical's publication lag; shared with
+``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
+
+_ECMWF_ENS_MAX_RETRIES: Final[int] = 8
+"""Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≈ 4h of coverage past the 08:30 UTC schedule
+(``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time. Only applies to
+``NwpRunNotYetAvailable``; a genuine bug fails immediately instead of retrying for hours."""
+
+_ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
+"""How long to wait between retries of a not-yet-published ECMWF run."""
+
+
 @asset(
-    partitions_def=DailyPartitionsDefinition(start_date="2024-04-01", timezone="UTC", end_offset=1),
+    partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
     # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
@@ -163,7 +180,12 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
 
     # Download and convert
-    ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
+    try:
+        ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
+    except NwpRunNotYetAvailable as exc:
+        raise RetryRequested(
+            max_retries=_ECMWF_ENS_MAX_RETRIES, seconds_to_wait=_ECMWF_ENS_RETRY_DELAY_SECONDS
+        ) from exc
     nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
 
     context.log.info(f"Columns: {nwp.columns}")

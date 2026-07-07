@@ -13,6 +13,10 @@ from contracts.settings import Settings
 _SETTINGS = Settings()
 
 
+class NwpRunNotYetAvailable(Exception):
+    """Raised when ``nwp_init_time`` isn't in the catalog yet (Dynamical hasn't published it)."""
+
+
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "temperature_2m",
     "dew_point_temperature_2m",
@@ -56,7 +60,7 @@ def download_ecmwf_ens_run(
     ds = cast(xr.Dataset, ds[list(_ECMWF_ENS_VARS_TO_DOWNLOAD)])
 
     if utc_nwp_init_time not in ds.init_time.values:
-        raise ValueError(f"{utc_nwp_init_time} is not in ds.init_time.values")
+        raise NwpRunNotYetAvailable(f"{utc_nwp_init_time} is not in ds.init_time.values")
 
     # Check for empty coordinates before computing bounds to fail gracefully.
     if ds.longitude.size == 0 or ds.latitude.size == 0:

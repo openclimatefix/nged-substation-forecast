@@ -78,6 +78,7 @@ def write_power_forecasts(
     table_uri: str | Path,
     *,
     replace_partition: tuple[str, str] | None = None,
+    replace_predicate_extra: str | None = None,
 ) -> None:
     """Write ``PowerForecast`` rows to the ``power_forecasts`` Delta table in its storage format.
 
@@ -97,6 +98,13 @@ def write_power_forecasts(
         replace_partition: ``(experiment_name, fold_id)`` to overwrite, or ``None`` to append.
             Passed explicitly rather than derived from ``forecasts`` so an *empty* first chunk
             still clears the partition.
+        replace_predicate_extra: An additional ``AND``-ed SQL predicate clause narrowing the
+            overwrite below the ``(experiment_name, fold_id)`` partition — e.g.
+            ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` so ``live_forecasts`` can
+            replace one 6-hourly slot's rows without wiping the rest of the ``"live"`` fold's
+            partition. delta-rs' ``replaceWhere`` supports predicates on non-partition columns
+            (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
+            against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.
     """
     prepared = (
         forecasts.with_columns(
@@ -109,11 +117,14 @@ def write_power_forecasts(
     )
     if replace_partition is not None:
         experiment_name, fold_id = replace_partition
+        predicate = f"experiment_name = '{experiment_name}' AND fold_id = '{fold_id}'"
+        if replace_predicate_extra is not None:
+            predicate = f"{predicate} AND {replace_predicate_extra}"
         write_deltalake(
             table_or_uri=table_uri,
             data=prepared,
             mode="overwrite",
-            predicate=f"experiment_name = '{experiment_name}' AND fold_id = '{fold_id}'",
+            predicate=predicate,
             partition_by=["experiment_name", "fold_id"],
             writer_properties=POWER_FORECASTS_WRITER_PROPERTIES,
         )

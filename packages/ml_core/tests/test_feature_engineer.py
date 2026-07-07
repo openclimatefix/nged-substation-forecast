@@ -9,7 +9,9 @@ from contracts.weather_schemas import Nwp
 from ml_core.features.tabular_feature_engineer import (
     TabularFeatureEngineer,
     _attach_nearest_nwp_cell,
+    _engineer_features,
 )
+from polars.testing import assert_frame_equal
 
 
 def _nwp_two_cells() -> pt.LazyFrame[Nwp]:
@@ -90,3 +92,49 @@ def test_tabular_feature_engineer_returns_all_features_shape() -> None:
     # ts1's row picks up cell-10 weather (10.0); the join keyed on time_series_id.
     ts1 = collected.filter(pl.col("time_series_id") == 1)
     assert ts1["temperature_2m"].to_list() == [10.0]
+
+
+def test_tabular_feature_engineer_single_run_params_reach_engineer_features() -> None:
+    """``TabularFeatureEngineer.engineer``'s single-run kwargs pass through unchanged.
+
+    The public ``engineer()`` interface doesn't implement single-run mode itself — it just
+    forwards to ``_engineer_features``, which already does. This locks that passthrough: calling
+    through ``engineer()`` must equal calling ``_engineer_features`` directly with the same
+    single-run args on the same (already cell-mapped) NWP.
+    """
+    power_fcst_init_time = datetime(2024, 6, 1, 12, 0)
+    nwp_init_time = datetime(2024, 6, 1, 0, 0)
+    power = pt.LazyFrame.from_existing(
+        pl.DataFrame(
+            {"time_series_id": [1], "time": [power_fcst_init_time], "power": [100.0]}
+        ).lazy()
+    ).set_model(PowerTimeSeries)
+    metadata = _metadata_two_series()
+    nwp = _nwp_two_cells()
+
+    via_engineer = (
+        TabularFeatureEngineer()
+        .engineer(
+            selected_features={"temperature_2m"},
+            power_time_series=power,
+            time_series_metadata=metadata,
+            nwp=nwp,
+            power_fcst_init_time=power_fcst_init_time,
+            nwp_init_time=nwp_init_time,
+        )
+        .collect()
+    )
+
+    nwp_per_time_series = _attach_nearest_nwp_cell(nwp, metadata)
+    direct = _engineer_features(
+        {"temperature_2m"},
+        power,
+        metadata,
+        nwp=nwp_per_time_series,
+        power_fcst_init_time=power_fcst_init_time,
+        nwp_init_time=nwp_init_time,
+    ).collect()
+
+    assert_frame_equal(
+        via_engineer.sort("time_series_id"), direct.sort("time_series_id"), check_dtypes=False
+    )

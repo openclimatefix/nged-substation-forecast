@@ -59,6 +59,15 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 
 Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/221)
 
+> **Status: ✅ Implemented**, alongside the `promoted_model` promotion asset (below) and local
+> 6-hourly automation (`dg dev` + persistent `DAGSTER_HOME`, part of
+> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). For the
+> operational runbook — promoting a model, running the schedule, backfilling a missed slot — see
+> [Live Service](../live_service/index.md), the permanent home this page's shipped material moves
+> to (and, eventually, this whole page, once every section below has landed). Remaining work on
+> this page — the [container build](#production-model-artifacts) and
+> [AWS infrastructure](#aws-architecture) — is unaffected.
+
 Everything up to the CV leaderboard loop is built; the production inference path is not. This
 asset is what the deployed container runs every 6 hours: load the production model, forecast
 the latest NWP, write to `power_forecasts` with `fold_id="live"`.
@@ -75,21 +84,21 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
   the saved model's `meta.json`.
 - **Population:** forecast **only** the `trained_time_series_ids` recorded in the production
   model's `meta.json` — never a series the model has not seen (the train==predict invariant).
-- **Inference mode:** **single-run** feature engineering
-  (`engineer_features(power_fcst_init_time=t0, …)`) across **all 51 NWP ensemble members**,
-  where `t0` is the partition's scheduled time. Deliberately *not* bulk mode: production
-  forecasts one explicit `power_fcst_init_time`, not one-per-NWP-run.
+- **Inference mode:** **single-run** feature engineering (`engineer_features(power_fcst_init_time=…)`)
+  across **all 51 NWP ensemble members**, where `power_fcst_init_time` is the partition's
+  scheduled time. Deliberately *not* bulk mode: production forecasts one explicit
+  `power_fcst_init_time`, not one-per-NWP-run.
 - **NWP availability semantics** via a `RunConfig` field
   `availability_mode: Literal["live", "replay"]` (default `"live"`):
-    - `"live"` — the scheduled path. `t0 = now`; join the **freshest NWP run actually present**
-      in Delta with `nwp_init_time <= t0`. **No** modelled publication delay: reality already
-      constrains the table to genuinely published runs, so if the provider speeds up we
-      automatically use fresher data.
+    - `"live"` — the scheduled path. `power_fcst_init_time = now`; join the **freshest NWP run
+      actually present** in Delta with `nwp_init_time <= power_fcst_init_time`. **No** modelled
+      publication delay: reality already constrains the table to genuinely published runs, so if
+      the provider speeds up we automatically use fresher data.
     - `"replay"` — re-running a *past* slot (e.g. yesterday's failed run, today).
-      `t0 = the historical partition time`; join the freshest run with
-      `nwp_init_time <= t0 − nwp_publication_delay_hours`. The delay reconstructs what was
-      actually *available* at the historical `t0` — without it we would leak NWP runs that only
-      landed afterwards.
+      `power_fcst_init_time = the historical partition time`; join the freshest run with
+      `nwp_init_time <= power_fcst_init_time − nwp_publication_delay_hours`. The delay
+      reconstructs what was actually *available* at the historical `power_fcst_init_time` —
+      without it we would leak NWP runs that only landed afterwards.
     - The scheduled sensor/schedule always uses `"live"` for the current partition; manual
       backfills of past partitions use `"replay"`. The explicit flag is the source of truth (an
       automatic live-iff-recent rule is a possible later convenience).
@@ -128,6 +137,14 @@ production wants to pick up a new champion without a rebuild + redeploy (e.g. af
 champion model from MLflow dynamically — at that point `load_from_mlflow`'s local-disk cache
 becomes the production-resilience mechanism again (serving from disk on a cache hit so the live
 service survives an MLflow outage), exactly as it does for CV today.
+
+**Local operation (implemented):** for running on Jack's laptop, the "researcher downloads
+artifacts" step above is a manually-triggered Dagster asset, `promoted_model` (config
+`mlflow_run_id`), rather than a bare script — promotion becomes a materialisation, giving an
+audit trail and lineage for free. The download logic itself
+(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
+the eventual `scripts/fetch_model.py` wrapper for the Docker build (below) stays a thin call
+into the same function.
 
 ## AWS architecture
 
@@ -374,36 +391,6 @@ Any metric added to `compute_metrics` flows through this scope automatically —
 free. No coupling needed; the ordering is flexible.
 
 ## Implementation details (deleted when this ships)
-
-### `live_forecasts` — implementation notes, tests, verification
-
-Implementation notes:
-
-- Keep the asset a thin shell over pure helpers (repo convention): the freshest-NWP-run
-  selection given `(t0, availability_mode, delay)` belongs in `ml_core._cv_helpers` (or a
-  sibling), unit-tested with an injected clock — `now` is passed in, never read inside the
-  asset.
-- Reuse the identity-stamping tail shared with `cv_power_forecasts` (predict → stamp →
-  validate) rather than duplicating it; extract a shared helper if one doesn't already exist.
-- File placement: `defs/cv_assets.py` is already 898 lines — put this in a new
-  `defs/production_assets.py` (the split formalised in
-  [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup)).
-
-Tests:
-
-- `live` vs `replay` select **different NWP runs** for the same `t0` when a fresher run exists
-  (replay applies `nwp_publication_delay_hours`; live does not).
-- Only `trained_time_series_ids` are forecast.
-- All 51 ensemble members present in the output.
-- Idempotency: materialise the same partition twice → row count unchanged.
-- Injected-clock unit tests for the run-selection helper.
-
-Verification: point `production_model_path` at a smoke-test model's saved directory, materialise
-`live_forecasts` for the current partition, and confirm `fold_id="live"` rows in
-`power_forecasts` — then plot them via `plot_power_forecast_job` (`fold_id: "live"`). Running
-the job 6-hourly on a workstation for a few days, then back-filling any missed slots with
-`replay`, is exactly the test described in
-[#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208).
 
 ### Container build
 
