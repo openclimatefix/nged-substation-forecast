@@ -115,6 +115,14 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     # (S3 rate limiting or connection-pool starvation): most variables finish in 5-20s, but a few
     # straggle for minutes, making the whole download 600s+. Capping at 4 removed the stragglers
     # entirely and cut a real download from 645s to 22.5s.
+    #
+    # This is a recent regression, not a pre-existing property of the download: Dagster's run
+    # history shows per-partition downloads holding a steady ~0.8-0.9 min right up to 2026-06-30
+    # 12:26 UTC, then every run afterwards (2026-07-01 onwards) taking 3-12 min. That boundary
+    # lines up exactly with an `icechunk` 2.0.6 -> 2.1.0 bump in the same `uv.lock` update
+    # (commit b46d145, 2026-06-30 12:26:50 UTC) — the leading theory is a change in icechunk's
+    # underlying S3 client (connection pooling/concurrency handling) between those two versions,
+    # though this hasn't been confirmed by pinning back to 2.0.6 and re-testing.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
