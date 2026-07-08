@@ -21,7 +21,11 @@ from delta_store.nwp import write_nwp
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
-from dynamical_data.ecmwf_ens.download import NwpRunNotYetAvailable, download_ecmwf_ens_run
+from dynamical_data.ecmwf_ens.download import (
+    NwpRunNotYetAvailable,
+    download_ecmwf_ens_data,
+    open_ecmwf_ens_run,
+)
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
 from nged_data.read_nged_json import _H3_RESOLUTION
@@ -181,17 +185,22 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     # Download and convert
     try:
-        ds = download_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
+        ds_lazy = open_ecmwf_ens_run(nwp_init_time=nwp_init_time, h3_grid=h3_grid)
     except NwpRunNotYetAvailable as exc:
         raise RetryRequested(
             max_retries=_ECMWF_ENS_MAX_RETRIES, seconds_to_wait=_ECMWF_ENS_RETRY_DELAY_SECONDS
         ) from exc
-    nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+    context.log.info("Lazily opened Icechunk store.")
 
-    context.log.info(f"Columns: {nwp.columns}")
+    ds = download_ecmwf_ens_data(ds_lazy)
+    context.log.info("Downloaded Icechunk data.")
+
+    nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
+    context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
     settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
     write_nwp(nwp, settings.nwp_data_path)
+    context.log.info(f"Saved NWP data to Delta table at {settings.nwp_data_path}.")
 
     context.add_output_metadata(
         {

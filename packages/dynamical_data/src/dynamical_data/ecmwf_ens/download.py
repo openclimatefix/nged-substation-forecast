@@ -34,14 +34,17 @@ _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
 )
 
 
-def download_ecmwf_ens_run(
+def open_ecmwf_ens_run(
     nwp_init_time: datetime,
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> xr.Dataset:
-    """Download and process ECMWF data for a specific initialization time.
+    """Lazily open the ECMWF ENS Icechunk store and slice it to the requested run and H3 grid.
+
+    No data is downloaded: the returned dataset is still backed by lazy Dask/Zarr arrays.
+    Call :func:`download_ecmwf_ens_data` to actually fetch the data.
 
     Args:
-        nwp_init_time: The initialization time to download. Must be timezone aware.
+        nwp_init_time: The initialization time to open. Must be timezone aware.
         h3_grid: The H3 grid to use for spatial bounds.
     """
     if h3_grid.is_empty():
@@ -89,6 +92,16 @@ def download_ecmwf_ens_run(
     # This prevents downstream KeyErrors during DataFrame conversion.
     if ds_sliced.longitude.size == 0 or ds_sliced.latitude.size == 0:
         raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
+
+    return ds_sliced
+
+
+def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
+    """Download (compute) a lazily-opened, already-sliced ECMWF ENS dataset.
+
+    Args:
+        ds_sliced: A lazy dataset as returned by :func:`open_ecmwf_ens_run`.
+    """
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
         return {var_name: ds_sliced[var_name].compute()}
