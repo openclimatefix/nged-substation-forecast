@@ -55,6 +55,7 @@ dev = [
     "mkdocs-include-markdown-plugin>=7.2.2",
     "pymarkdownlnt>=0.9.13",
     "mlflow>=3.14.0",
+    "moto[server]>=5.0.0",
 ]
 
 [project.urls]

@@ -64,3 +64,35 @@ def test_explicit_path_overrides_derivation():
     assert settings.nwp_data_path == "/mnt/fast/NWP"
     # Siblings still derive normally.
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
+
+
+def test_storage_options_empty_without_dev_credentials():
+    """With no ``data_store_*`` credentials set, ``storage_options`` is empty (the AWS default)."""
+    settings = Settings(
+        data_path="s3://bucket/data",
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    )
+    assert settings.storage_options == {}
+
+
+def test_storage_options_populated_from_dev_credentials():
+    """The ``data_store_*`` settings map onto the shared ``aws_*`` object_store option keys."""
+    settings = Settings(
+        data_path="s3://bucket/data",
+        data_store_endpoint_url="http://localhost:9000",
+        data_store_access_key_id="minio",
+        data_store_secret_access_key="minio123",
+        data_store_region="us-east-1",
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    )
+    assert settings.storage_options == {
+        "aws_endpoint_url": "http://localhost:9000",
+        "aws_allow_http": "true",
+        "aws_access_key_id": "minio",
+        "aws_secret_access_key": "minio123",
+        "aws_region": "us-east-1",
+    }

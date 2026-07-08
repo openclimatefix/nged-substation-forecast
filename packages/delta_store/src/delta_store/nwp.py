@@ -53,7 +53,11 @@ NWP_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
 that choice, which won for ``power_forecasts``, measures worse here."""
 
 
-def write_nwp(nwp: pt.DataFrame[Nwp], table_uri: str | Path) -> None:
+def write_nwp(
+    nwp: pt.DataFrame[Nwp],
+    table_uri: str | Path,
+    storage_options: dict[str, str] | None = None,
+) -> None:
     """Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
 
     Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts
@@ -71,6 +75,8 @@ def write_nwp(nwp: pt.DataFrame[Nwp], table_uri: str | Path) -> None:
     Args:
         nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition.
         table_uri: Path or URI of the ``nwp`` Delta table.
+        storage_options: delta-rs object-store options (credentials/endpoint) for a remote
+            ``table_uri``; ``None``/empty for a local path.
     """
     continuous_vars = sorted(Nwp.continuous_var_names())
     rounded = nwp.with_columns(
@@ -93,4 +99,5 @@ def write_nwp(nwp: pt.DataFrame[Nwp], table_uri: str | Path) -> None:
         mode="append",
         partition_by=["nwp_model_id", "init_time"],
         writer_properties=NWP_WRITER_PROPERTIES,
+        storage_options=storage_options,
     )

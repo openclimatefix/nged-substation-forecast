@@ -1,11 +1,11 @@
 import ast
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Final, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
+from contracts._uri import ensure_local_parent
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
@@ -60,8 +60,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     to just check what's available on NGED's S3 bucket and append to our local Delta table.
     """
     settings = Settings()
-    delta_path = Path(settings.power_time_series_data_path)
-    metadata_path = Path(settings.metadata_path)
+    delta_path = settings.power_time_series_data_path
+    metadata_path = settings.metadata_path
+    storage_options = settings.storage_options
 
     # Fetch new data from S3, using the existing delta table to determine what's new.
     # We are deliberately keeping the code simple for now, but may move the S3 store
@@ -69,7 +70,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     store = settings.get_nged_s3_store()
     list_of_all_json_files = list_timeseries_json_files(store)
     list_of_large_json_files = remove_small_files_from_listing(list_of_all_json_files)
-    list_of_new_json_files = select_new_rows(list_of_large_json_files, delta_path)
+    list_of_new_json_files = select_new_rows(list_of_large_json_files, delta_path, storage_options)
 
     # Log statistics to be shown in Dagster's UI.
     context.add_output_metadata(
@@ -92,16 +93,18 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         return
 
     # Save TimeSeriesMetadata:
-    upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path)
+    upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path, storage_options)
     context.add_output_metadata(upsert_metadata_stats)
 
     # Save PowerTimeSeries:
-    new_power_ts_deduped = select_new_rows(new_power_ts, delta_path)
+    new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
-        # FIXME: mkdir won't work when delta_path is on S3!
-        delta_path.parent.mkdir(parents=True, exist_ok=True)
+        ensure_local_parent(delta_path)
         new_power_ts_deduped.write_delta(
-            delta_path, mode="append", delta_write_options={"partition_by": "time_series_id"}
+            delta_path,
+            mode="append",
+            storage_options=storage_options,
+            delta_write_options={"partition_by": "time_series_id"},
         )
 
     # Log statistics to be shown in Dagster's UI.
@@ -131,16 +134,15 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     )
 
     # Save to parquet
-    h3_grid_weights_path = Path(settings.h3_grid_weights_path)
-    # FIXME: mkdir won't work when we're saving to S3!
-    h3_grid_weights_path.parent.mkdir(parents=True, exist_ok=True)
-    weights.write_parquet(h3_grid_weights_path)
+    h3_grid_weights_path = settings.h3_grid_weights_path
+    ensure_local_parent(h3_grid_weights_path)
+    weights.write_parquet(h3_grid_weights_path, storage_options=settings.storage_options)
 
     # Add metadata to Dagster context
     context.add_output_metadata(
         {
             "n_rows": len(weights),
-            "path": str(h3_grid_weights_path),
+            "path": h3_grid_weights_path,
         }
     )
 
@@ -179,13 +181,14 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     ``delta_store.nwp.write_nwp`` (Float32, significand-rounded).
     """
     settings = Settings()
+    storage_options = settings.storage_options
     partition_date_str = context.partition_key
     nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
     # Load dependencies
-    h3_grid = pt.DataFrame(pl.read_parquet(Path(settings.h3_grid_weights_path))).set_model(
-        H3GridWeights
-    )
+    h3_grid = pt.DataFrame(
+        pl.read_parquet(settings.h3_grid_weights_path, storage_options=storage_options)
+    ).set_model(H3GridWeights)
 
     # Download and convert
     try:
@@ -202,15 +205,15 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
-    nwp_data_path = Path(settings.nwp_data_path)
-    nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
-    write_nwp(nwp, nwp_data_path)
+    nwp_data_path = settings.nwp_data_path
+    ensure_local_parent(nwp_data_path)
+    write_nwp(nwp, nwp_data_path, storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
     context.add_output_metadata(
         {
             "n_rows": len(nwp),
-            "path": str(nwp_data_path),
+            "path": nwp_data_path,
             "init_time": str(nwp_init_time),
         }
     )

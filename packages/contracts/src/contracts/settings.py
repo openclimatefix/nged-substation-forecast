@@ -122,6 +122,54 @@ class Settings(BaseSettings):
         ),
     )
 
+    # --- Object-store credentials for the data tables (used only when data_path is remote) --
+    #
+    # All empty by default. On AWS nothing needs setting: delta-rs' object_store discovers the
+    # Fargate task's IAM-role credentials and region automatically. Populate these (via env)
+    # only for a dev / MinIO / S3-compatible endpoint that needs an explicit endpoint + keys.
+    # Separate from the nged_s3_bucket_* creds above, which authenticate reads of NGED's source
+    # bucket (a different account/bucket from our own managed data tables).
+
+    data_store_endpoint_url: str = Field(
+        default="",
+        description=(
+            "S3-compatible endpoint URL for the data tables (e.g. a MinIO/dev endpoint). Empty on"
+            " AWS, where the endpoint is inferred. When set, the store is also allowed to use"
+            " plain HTTP (dev endpoints rarely have TLS)."
+        ),
+    )
+    data_store_access_key_id: str = Field(
+        default="", description="Access key for the data-table object store; empty on AWS (IAM)."
+    )
+    data_store_secret_access_key: str = Field(
+        default="", description="Secret key for the data-table object store; empty on AWS (IAM)."
+    )
+    data_store_region: str = Field(
+        default="", description="Region for the data-table object store; empty to auto-discover."
+    )
+
+    @property
+    def storage_options(self) -> dict[str, str]:
+        """delta-rs / polars / obstore ``storage_options`` for the managed data tables.
+
+        Empty on AWS — object_store auto-discovers the Fargate task's IAM-role credentials and
+        region — and empty for a local ``data_path`` (delta-rs ignores it there). Populated from
+        the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
+        keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
+        obstore alike, so one dict feeds every IO site.
+        """
+        options: dict[str, str] = {}
+        if self.data_store_endpoint_url:
+            options["aws_endpoint_url"] = self.data_store_endpoint_url
+            options["aws_allow_http"] = "true"
+        if self.data_store_access_key_id:
+            options["aws_access_key_id"] = self.data_store_access_key_id
+        if self.data_store_secret_access_key:
+            options["aws_secret_access_key"] = self.data_store_secret_access_key
+        if self.data_store_region:
+            options["aws_region"] = self.data_store_region
+        return options
+
     # --- Managed data tables (derive from data_path unless explicitly set) ----------------
     #
     # Each defaults to "" as a sentinel meaning "derive from data_path in _derive_unset_paths".

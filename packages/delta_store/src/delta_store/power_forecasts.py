@@ -79,6 +79,7 @@ def write_power_forecasts(
     *,
     replace_partition: tuple[str, str] | None = None,
     replace_predicate_extra: str | None = None,
+    storage_options: dict[str, str] | None = None,
 ) -> None:
     """Write ``PowerForecast`` rows to the ``power_forecasts`` Delta table in its storage format.
 
@@ -105,6 +106,8 @@ def write_power_forecasts(
             partition. delta-rs' ``replaceWhere`` supports predicates on non-partition columns
             (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
             against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.
+        storage_options: delta-rs object-store options (credentials/endpoint) for a remote
+            ``table_uri``; ``None``/empty for a local path.
     """
     prepared = (
         forecasts.with_columns(
@@ -127,6 +130,7 @@ def write_power_forecasts(
             predicate=predicate,
             partition_by=["experiment_name", "fold_id"],
             writer_properties=POWER_FORECASTS_WRITER_PROPERTIES,
+            storage_options=storage_options,
         )
     else:
         write_deltalake(
@@ -135,4 +139,5 @@ def write_power_forecasts(
             mode="append",
             partition_by=["experiment_name", "fold_id"],
             writer_properties=POWER_FORECASTS_WRITER_PROPERTIES,
+            storage_options=storage_options,
         )

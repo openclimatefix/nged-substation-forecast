@@ -31,7 +31,9 @@ with app.setup:
 @app.cell
 def _():
     metadata_path = settings.metadata_path
-    df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
+    df = TimeSeriesMetadata.validate(
+        pl.read_parquet(metadata_path, storage_options=settings.storage_options)
+    )
     return (df,)
 
 
@@ -92,7 +94,7 @@ def _(arrow_table):
 
 @app.cell
 def _():
-    delta_df = pl.scan_delta(str(BASE_DELTA_PATH)).filter(
+    delta_df = pl.scan_delta(BASE_DELTA_PATH, storage_options=settings.storage_options).filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
         pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
     )

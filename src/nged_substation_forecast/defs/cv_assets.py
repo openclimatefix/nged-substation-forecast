@@ -12,6 +12,7 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
+from contracts._uri import delta_table_exists, ensure_local_parent
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
@@ -106,11 +107,12 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     rows rather than duplicating them.
     """
     settings = Settings()
+    storage_options = settings.storage_options
     fold_id = context.partition_key
     fold = _cv_config.get_fold(fold_id)
 
     coverage = (
-        pl.scan_delta(settings.power_time_series_data_path)
+        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
         .group_by("time_series_id")
         .agg(
             first_time=pl.col("time").min(),
@@ -131,13 +133,14 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
         )
     )
 
-    Path(settings.eligible_time_series_data_path).parent.mkdir(parents=True, exist_ok=True)
+    ensure_local_parent(settings.eligible_time_series_data_path)
     write_deltalake(
         table_or_uri=settings.eligible_time_series_data_path,
         data=eligible_df.to_arrow(),
         mode="overwrite",
         predicate=f"fold_id = '{fold_id}'",
         partition_by=["fold_id"],
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -208,16 +211,18 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     ``time_series_id`` alone (same doc section).
     """
     settings = Settings()
+    storage_options = settings.storage_options
     power_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(settings.power_time_series_data_path)
+        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
     ).set_model(PowerTimeSeries)
     capacity_df = _compute_effective_capacity(power_lf)
 
-    Path(settings.effective_capacity_data_path).parent.mkdir(parents=True, exist_ok=True)
+    ensure_local_parent(settings.effective_capacity_data_path)
     write_deltalake(
         table_or_uri=settings.effective_capacity_data_path,
         data=capacity_df.to_arrow(),
         mode="overwrite",
+        storage_options=storage_options,
     )
 
     context.add_output_metadata(
@@ -289,7 +294,10 @@ def _load_engineering_inputs(
         init_time_start = window_start - _MAX_NWP_LEAD
     if init_time_end is None:
         init_time_end = window_end
-    power_lf = pl.scan_delta(settings.power_time_series_data_path).filter(
+    storage_options = settings.storage_options
+    power_lf = pl.scan_delta(
+        settings.power_time_series_data_path, storage_options=storage_options
+    ).filter(
         pl.col("time_series_id").is_in(time_series_ids),
         pl.col("time") >= window_start,
         pl.col("time") <= window_end,
@@ -297,7 +305,7 @@ def _load_engineering_inputs(
     power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
 
     metadata_df = pt.DataFrame(
-        pl.read_parquet(settings.metadata_path).filter(
+        pl.read_parquet(settings.metadata_path, storage_options=storage_options).filter(
             pl.col("time_series_id").is_in(time_series_ids)
         )
     ).set_model(TimeSeriesMetadata)
@@ -305,7 +313,7 @@ def _load_engineering_inputs(
     # The H3 cells the requested series sit in (many series may share one cell).
     cells = metadata_df["h3_res_5"].unique().to_list()
 
-    nwp_scan = Nwp.scan_delta(settings.nwp_data_path).filter(
+    nwp_scan = Nwp.scan_delta(settings.nwp_data_path, storage_options=storage_options).filter(
         # init_time is the partition key — this prunes whole partitions, not just row groups.
         pl.col("init_time") >= init_time_start,
         pl.col("init_time") <= init_time_end,
@@ -350,7 +358,9 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     train_end = date_to_utc_datetime(fold.train_end, end_of_day=True)
 
     eligible_ids = (
-        pl.scan_delta(str(settings.eligible_time_series_data_path))
+        pl.scan_delta(
+            settings.eligible_time_series_data_path, storage_options=settings.storage_options
+        )
         .filter(pl.col("fold_id") == fold_id)
         .select("time_series_id")
         .collect()["time_series_id"]
@@ -468,7 +478,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "nothing to forecast. Re-materialise `trained_cv_model` for this fold."
         )
 
-    Path(settings.power_forecasts_data_path).parent.mkdir(parents=True, exist_ok=True)
+    ensure_local_parent(settings.power_forecasts_data_path)
     n_rows = 0
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
@@ -508,6 +518,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             forecasts,
             settings.power_forecasts_data_path,
             replace_partition=(experiment_name, fold_id) if is_first else None,
+            storage_options=settings.storage_options,
         )
         is_first = False
         n_rows += forecasts.height
@@ -647,10 +658,11 @@ def _resolve_eval_window(
 
 
 def _write_metrics_to_delta(
-    path: Path,
+    path: str,
     enriched: pt.DataFrame[Metrics],
     exp_name: str,
     fold_id: str,
+    storage_options: dict[str, str] | None = None,
 ) -> None:
     """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
 
@@ -661,12 +673,13 @@ def _write_metrics_to_delta(
     so re-materialising the asset replaces rows rather than duplicating them.
 
     Args:
-        path: Filesystem path to the ``forecast_metrics`` Delta table.
+        path: Local path or remote URI of the ``forecast_metrics`` Delta table.
         enriched: Fully populated ``Metrics`` rows, with all provenance columns set by
             ``enrich_metrics_rows()``.
         exp_name: Experiment name; used in the Delta overwrite predicate to scope the
             replacement to this ``(experiment_name, fold_id)`` partition.
         fold_id: Fold identifier; used alongside ``exp_name`` in the predicate.
+        storage_options: Object-store options for a remote ``path``; ``None``/empty for local.
     """
     enum_cols = [c for c, dtype in enriched.schema.items() if isinstance(dtype, pl.Enum)]
     delta_data = enriched.with_columns(pl.col(c).cast(pl.String) for c in enum_cols).to_arrow()
@@ -676,6 +689,7 @@ def _write_metrics_to_delta(
         mode="overwrite",
         predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
         partition_by=["experiment_name", "fold_id"],
+        storage_options=storage_options,
     )
 
 
@@ -713,8 +727,9 @@ def _score_forecast_group(
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     capacity_df: pt.DataFrame[EffectiveCapacity],
     evaluation_scope: EvalScopeType,
-    metrics_path: Path,
+    metrics_path: str,
     now: datetime,
+    storage_options: dict[str, str] | None = None,
 ) -> tuple[int, dict[str, float] | None]:
     """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
     optionally log to MLflow.
@@ -731,9 +746,11 @@ def _score_forecast_group(
             ``compute_metrics()``; must cover every scored series.
         evaluation_scope: ``"leaderboard"`` logs per-fold metrics to MLflow; ``"ad_hoc"``
             skips MLflow entirely.
-        metrics_path: Filesystem path to the ``forecast_metrics`` Delta table.
+        metrics_path: Local path or remote URI of the ``forecast_metrics`` Delta table.
         now: UTC timestamp stamped on every row as ``computed_at`` (injected so all rows in
             one asset materialisation share the same timestamp).
+        storage_options: Object-store options for a remote ``metrics_path``; ``None``/empty
+            for local.
 
     Returns:
         A ``(n_rows_written, fold_metric_dict)`` tuple where:
@@ -764,7 +781,7 @@ def _score_forecast_group(
         now,
         mlflow_run_id,
     )
-    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id)
+    _write_metrics_to_delta(metrics_path, enriched, exp_name, fold_id, storage_options)
 
     if evaluation_scope == "leaderboard":
         fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
@@ -794,6 +811,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             no filter and ``"leaderboard"`` scope.
     """
     settings = Settings()
+    storage_options = settings.storage_options
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     # Apply the population filter to the scan so its predicates push into the Delta scan
@@ -801,7 +819,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # columns are String in PowerForecast, matching how delta-rs stores them, so no dtype cast
     # sits between scan_delta and the filter to defeat pushdown. See PopulationFilter.apply.
     scan = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.power_forecasts_data_path))
+        pl.scan_delta(settings.power_forecasts_data_path, storage_options=storage_options)
     ).set_model(PowerForecast)
     pruned_scan = config.population_filter.apply(scan)
 
@@ -821,25 +839,25 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         return
 
     actuals_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(settings.power_time_series_data_path)
+        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
     ).set_model(PowerTimeSeries)
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
     metadata_df = TimeSeriesMetadata.validate(
-        pl.read_parquet(settings.metadata_path),
+        pl.read_parquet(settings.metadata_path, storage_options=storage_options),
         allow_superfluous_columns=True,
     )
 
     # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
-    if not Path(settings.effective_capacity_data_path).exists():
+    if not delta_table_exists(settings.effective_capacity_data_path, storage_options):
         raise FileNotFoundError(
             f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
             "materialise the effective_capacity asset before running metrics."
         )
     capacity_df = EffectiveCapacity.validate(
-        pl.read_delta(str(settings.effective_capacity_data_path))
+        pl.read_delta(settings.effective_capacity_data_path, storage_options=storage_options)
     )
 
-    Path(settings.forecast_metrics_data_path).parent.mkdir(parents=True, exist_ok=True)
+    ensure_local_parent(settings.forecast_metrics_data_path)
     now = datetime.now(timezone.utc)
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
@@ -858,8 +876,9 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             metadata_df,
             capacity_df,
             config.evaluation_scope,
-            Path(settings.forecast_metrics_data_path),
+            settings.forecast_metrics_data_path,
             now,
+            storage_options,
         )
         total_rows += n_rows
         if fold_metric_dict is not None:

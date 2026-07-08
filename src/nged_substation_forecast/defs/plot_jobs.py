@@ -63,13 +63,14 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
     directly, so it plots whatever forecasts already exist on disk.
     """
     settings = Settings()
+    storage_options = settings.storage_options
     init_time = datetime.fromisoformat(config.power_fcst_init_time)
     if init_time.tzinfo is None:
         init_time = init_time.replace(tzinfo=UTC)
     window_end = init_time + FORECAST_HORIZON
 
     forecasts = (
-        pl.scan_delta(str(settings.power_forecasts_data_path))
+        pl.scan_delta(settings.power_forecasts_data_path, storage_options=storage_options)
         .filter(
             pl.col("experiment_name") == config.experiment_name,
             pl.col("fold_id") == config.fold_id,
@@ -88,7 +89,7 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
 
     ground_truth = (
-        pl.scan_delta(settings.power_time_series_data_path)
+        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
         .filter(
             pl.col("time_series_id").is_in(config.time_series_ids),
             pl.col("time") >= init_time,
@@ -96,7 +97,7 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
         .collect()
     )
-    metadata = pl.read_parquet(settings.metadata_path).filter(
+    metadata = pl.read_parquet(settings.metadata_path, storage_options=storage_options).filter(
         pl.col("time_series_id").is_in(config.time_series_ids)
     )
 
