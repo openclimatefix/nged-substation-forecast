@@ -17,3 +17,50 @@ def test_settings_validation_invalid_url():
             nged_s3_bucket_access_key="key",
             nged_s3_bucket_secret="secret",
         )
+
+
+def test_paths_derive_from_data_root():
+    """Unset data-table paths derive from data_path; nested tables sit under nged_data_path."""
+    settings = Settings(
+        data_path="/srv/data",
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    )
+    assert settings.nwp_data_path == "/srv/data/NWP"
+    assert settings.nged_data_path == "/srv/data/NGED"
+    assert settings.power_time_series_data_path == "/srv/data/NGED/power_time_series.delta"
+    assert settings.metadata_path == "/srv/data/NGED/metadata.parquet"
+    assert settings.h3_grid_weights_path == "/srv/data/h3_grid_weights.parquet"
+
+
+def test_remote_data_path_keeps_artifacts_local():
+    """A remote data_path yields s3:// data tables while artifacts stay under local_artifacts_path."""
+    settings = Settings(
+        data_path="s3://bucket/data",
+        local_artifacts_path="/local/artifacts",
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    )
+    assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
+    assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
+    assert settings.model_cache_base_path == "/local/artifacts/model_cache"
+    assert settings.production_model_path == "/local/artifacts/production_model"
+    assert settings.plots_data_path == "/local/artifacts/plots"
+
+
+def test_explicit_path_overrides_derivation():
+    """An explicitly set path wins over derivation from its root."""
+    settings = Settings(
+        data_path="s3://bucket/data",
+        plots_data_path="s3://other-bucket/plots",
+        nwp_data_path="/mnt/fast/NWP",
+        nged_s3_bucket_url="https://example.com",
+        nged_s3_bucket_access_key="key",
+        nged_s3_bucket_secret="secret",
+    )
+    assert settings.plots_data_path == "s3://other-bucket/plots"
+    assert settings.nwp_data_path == "/mnt/fast/NWP"
+    # Siblings still derive normally.
+    assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"

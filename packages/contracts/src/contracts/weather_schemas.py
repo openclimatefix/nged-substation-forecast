@@ -2,19 +2,14 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from enum import StrEnum, auto
 from pathlib import Path
-from typing import ClassVar, Final, Literal, Self
+from typing import ClassVar, Literal, Self
 
 import patito as pt
 import polars as pl
 
-from contracts.settings import PROJECT_ROOT, Settings
+from contracts.settings import Settings
 
 from .common import UTC_DATETIME_DTYPE
-
-# TODO: These paths should be moved to `contracts.settings`.
-_METADATA_PATH: Final[Path] = PROJECT_ROOT / "metadata"
-_NWP_METADATA_CSV_PATH: Final[Path] = _METADATA_PATH / "nwp_metadata.csv"
-
 
 SETTINGS = Settings()
 
@@ -65,7 +60,7 @@ class NwpMetaData(pt.Model):
     is_ensemble: bool = pt.Field(description="Whether this NWP model produces ensemble forecasts.")
 
     @classmethod
-    def load(cls, csv_path: Path = _NWP_METADATA_CSV_PATH) -> pt.DataFrame[Self]:
+    def load(cls, csv_path: str | Path = SETTINGS.nwp_metadata_csv_path) -> pt.DataFrame[Self]:
         """Load NWP metadata from a static CSV file."""
         df = pl.read_csv(csv_path)
         # Patito's .cast() will handle the conversion to the Enum type defined in the model
@@ -325,7 +320,7 @@ class Nwp(pt.Model):
             )
 
     @classmethod
-    def scan_delta(cls, path: Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
+    def scan_delta(cls, path: str | Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
         The table stores physical-unit `Float32` directly (see `delta_store.nwp.write_nwp`),
