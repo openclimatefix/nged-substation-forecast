@@ -91,6 +91,14 @@ class Settings(BaseSettings):
             " shared leaderboard evaluation protocol; read them from here, never hard-coded."
         ),
     )
+    nwp_metadata_csv_path: Path = Field(
+        default=PROJECT_ROOT / "metadata" / "nwp_metadata.csv",
+        description=(
+            "Static CSV of per-NWP-model metadata (H3 resolution, provider, ensemble flag),"
+            " checked into the repo and read by NwpMetaData.load. A code-relative resource"
+            " (like cv_config_path), so it stays a local Path even when data_path is a remote URI."
+        ),
+    )
 
     # --- Storage roots -------------------------------------------------------------------
     #
