@@ -193,6 +193,13 @@ Estimated total for the recommended Option B: **~£25–35/month**, made up of:
 | Data transfer (ingress + egress) | ≈0 |
 | Backtests | ~£0.65 per run, as needed |
 
+[Access phasing](#access-phasing) (below) adds negligible spend on top of this Option B estimate:
+Stage 2's Caddy and oauth2-proxy, and Stage 3's wake-proxy, all run as plain processes on the
+existing control-plane box — zero new billable resources. The only new billable resource across
+all three stages is the second Fargate task/service for Stage 3's public Marimo instance, already
+roughly priced by the same-shaped workload in [Option D](#option-d-serverless-control-plane-no-pets-4145month)
+(~£6.20/month for Marimo as its own tiny Fargate service).
+
 The other options range from ~£12–22/month (Option A, which fails two requirements) to
 ~£56–86/month (Option C). The detailed analysis follows: the
 [workload model](#workload-model), [storage & data transfer](#storage-data-transfer-common-to-all-options)
@@ -320,7 +327,80 @@ tax for purism; E's 1-user cap rules it out.
 **Future work (post-v0.1):** once an always-on control-plane box exists (Option B or later), it's also
 a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing the
 local file-store) and a **"development dashboard"** (a Marimo app for researchers). Neither is
-needed to ship v0.1; revisit once the box exists.
+needed to ship v0.1; revisit once the box exists — see [Access phasing](#access-phasing) below for
+how each one's exposure rolls out once it does.
+
+### Access phasing
+
+The sections above decide *where* Option B's pieces run; this one decides *who can reach them,
+when*. Three stages, each additive on top of the last — nothing built in an earlier stage is
+reworked in a later one.
+
+#### Stage 1 — solo, Tailscale only
+
+This is exactly what the [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+section above already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below
+have something to say "additive on top of."
+
+- Daemon, full-access Dagster webserver, and the Marimo dashboard all run on the `t4g.medium`
+  control-plane box, alongside MLflow once its tracking server lands (the "Future work" item
+  just above, issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235))
+  — MLflow-on-the-box is not itself a new v0.1 commitment, only its access tier is decided here.
+- Security group: no public inbound ports at all. Everything is reached over Tailscale.
+
+#### Stage 2 — team gets read-only Dagster access; MLflow stays private
+
+- A **second** `dagster-webserver --read-only` process on the same box, against the same
+  Postgres + code location — cheap: just another process, no new daemon, no new infra beyond
+  this.
+- **Caddy** in front of it, handling TLS via Let's Encrypt automatically.
+- **oauth2-proxy** in front of the read-only webserver for Google sign-in, using
+  `--authenticated-emails-file` (not `--email-domain` — NGED/NIA collaborators aren't on one
+  Workspace domain).
+- Security group opens port 443 for the first time — this is the real milestone of this stage.
+- One DNS subdomain (e.g. `dagster.<domain>`).
+- **MLflow is explicitly not exposed in this stage** — it stays Tailscale-only, unchanged from
+  Stage 1. There is no native read-only public/gated MLflow mode without either the
+  still-experimental auth plugin or allowlisting specific endpoints at the proxy — not worth it
+  unless there's a real need.
+- The full-access Dagster webserver, Marimo, and MLflow remain exactly as in Stage 1.
+
+#### Stage 3 — public Marimo dashboard, curated public data
+
+- A **separate** Marimo instance, not the private one — reads only a public-safe subset of data
+  (ideally its own S3 prefix), runs as its own ECS Fargate task/service, no ALB.
+- **No CloudFront/Lambda@Edge** — instead, exploit the fact that the control-plane box is
+  already always-on and already running Caddy:
+    - Caddy gets one more route, pointed at a small custom **wake-proxy** service (not a direct
+      backend).
+    - Wake-proxy: checks whether the Fargate task/service is running (`ecs describe-services`);
+      if not, sets desired count to 1 and polls until healthy, then reverse-proxies the request
+      through.
+    - A background loop in the wake-proxy scales desired count back to 0 after an idle period
+      (e.g. 15 min).
+    - UX: don't hold the connection open for the full ~30–60s cold start — serve an immediate
+      "warming up" holding page that polls a `/ready` endpoint every 2–3s, then redirects once
+      healthy.
+- One more DNS subdomain (e.g. `dashboard.<domain>`), no oauth2-proxy — fully public, no login.
+- **Trade-off:** this couples the public dashboard's *availability* to the control-plane box's
+  uptime. Compute isolation is preserved — a Marimo bug can't touch the Dagster daemon, since
+  it's a separate task — but if the box goes down, the public dashboard becomes unreachable too,
+  not just the private Dagster/MLflow. Accepted trade-off for solo-project simplicity over
+  running a fourth AWS service (an ALB) just for this.
+- Rejected alternative: Marimo's WASM/Pyodide static export (zero server, hosted on
+  S3+CloudFront). Ruled out based on direct prior experience — ~30s browser-side cold start on a
+  similar personal project, and clunkier than a thin server-side wake mechanism.
+- Rejected alternative: the CloudFront + Lambda@Edge wake-proxy pattern (the "textbook" AWS
+  scale-to-zero workaround). Ruled out in favour of reusing the existing box's Caddy plus a
+  custom script — fewer AWS services (no ALB, no CloudFront distribution, no Lambda@Edge), since
+  compute is already sitting there.
+
+**Sequencing:** Stage 1 is built and run solo, by hand — not enough moving parts yet to justify
+infrastructure-as-code. Stage 2 (the read-only webserver, Caddy, oauth2-proxy, the
+security-group change) is the natural point to start writing infra-as-code, since that's when
+IAM roles, security groups, and multiple processes start accumulating enough to be worth
+codifying and reproducing — see the open Terraform-vs-CDK question in
+[Deployment workstream 3](#deployment-workstream-3-aws-infrastructure).
 
 ## Production monitoring
 
@@ -366,7 +446,7 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 `evaluation_scope="production_monitoring"` over `fold_id="live"` for both trailing windows.
 Sensor preferred over a schedule so it fires on the actual data update.
 
-Note this sensor needs a running Dagster daemon — [Option B](#option-b-small-ec2-control-plane-box-ecsrunlauncher-2535month-recommended)
+Note this sensor needs a running Dagster daemon — [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
 (the direction we're leaning) provides one. If the deployment instead ships Option A (nothing
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
@@ -516,9 +596,16 @@ Common to all options:
   peak ~9 GB); a bigger (e.g. 8 vCPU / 32 GB) definition for backtests. Right-size after a
   week of CloudWatch metrics.
 - **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
-- Codify as a small Terraform module (one file is fine); document the few one-time manual
-  steps (SNS subscription confirm, Tailscale join) in a runbook page
-  (`docs/architecture/production-deployment.md`, extending the promotion runbook above).
+- Codify as infra-as-code once there's enough to justify it — per the
+  [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
+  **Open question, not yet decided:** this section originally specified a small Terraform
+  module (one file), but a later conversation argued for **AWS CDK (Python)** instead —
+  specifically for this project, since it's single-cloud (AWS-only), so there's no cross-cloud
+  benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
+  language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
+  does not pick one.
+- Document the few one-time manual steps (SNS subscription confirm, Tailscale join) in a runbook
+  page (`docs/architecture/production-deployment.md`, extending the promotion runbook above).
 
 Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` cron):
 
