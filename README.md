@@ -41,7 +41,15 @@ Optional: To allow Dagster to remember its state after you shut it down:
 
     concurrency:
       pools:
-        default_limit: 2  # Used to limit concurrency of ecmwf_ens asset.
+        default_limit: 1  # Used to limit concurrency of ecmwf_ens asset.
+
+    run_monitoring:
+      # Without this, a crashed/killed run can leak its concurrency-pool slot (e.g. the pool
+      # above) forever, since nothing else frees a slot held by a run that never reached a
+      # normal finally-block exit. This lets the daemon self-heal: any run finished (in any
+      # terminal status) for longer than the threshold has its slots freed automatically.
+      enabled: true
+      free_slots_after_run_end_seconds: 300
 
     python_logs:
       managed_python_loggers:
@@ -50,6 +58,9 @@ Optional: To allow Dagster to remember its state after you shut it down:
     ```
 
 3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
+
+Note: `dagster.yaml` is only read at process startup, so restart `dg dev` (and the daemon) after
+editing it for changes to take effect.
 
 ### Linting & Formatting
 
