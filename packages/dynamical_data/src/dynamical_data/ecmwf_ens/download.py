@@ -109,8 +109,14 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     # The download is I/O bound (S3 network requests). We use a ThreadPoolExecutor to parallelize
     # network latency across multiple variables. A ProcessPoolExecutor would be less efficient here
     # due to the high serialization overhead of Xarray objects between processes.
+    #
+    # max_workers is capped rather than left at the default (one thread per variable, i.e. 13).
+    # Investigation of issue #276 found that 13 concurrent chunked-zarr fetches self-contend badly
+    # (S3 rate limiting or connection-pool starvation): most variables finish in 5-20s, but a few
+    # straggle for minutes, making the whole download 600s+. Capping at 4 removed the stragglers
+    # entirely and cut a real download from 645s to 22.5s.
     data_arrays: dict[str, xr.DataArray] = {}
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [
             executor.submit(download_array, str(name)) for name in ds_sliced.data_vars.keys()
         ]
