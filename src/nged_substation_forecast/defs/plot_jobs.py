@@ -88,7 +88,7 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
 
     ground_truth = (
-        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
+        pl.scan_delta(settings.power_time_series_data_path)
         .filter(
             pl.col("time_series_id").is_in(config.time_series_ids),
             pl.col("time") >= init_time,
@@ -96,18 +96,19 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
         .collect()
     )
-    metadata = pl.read_parquet(settings.nged_data_path / "metadata.parquet").filter(
+    metadata = pl.read_parquet(settings.metadata_path).filter(
         pl.col("time_series_id").is_in(config.time_series_ids)
     )
 
     chart = build_forecast_chart(forecasts, ground_truth, metadata, config.time_series_ids)
 
-    settings.plots_data_path.mkdir(parents=True, exist_ok=True)
+    plots_data_path = Path(settings.plots_data_path)
+    plots_data_path.mkdir(parents=True, exist_ok=True)
     ids_label = "-".join(str(i) for i in config.time_series_ids)
     filename = (
         f"{config.experiment_name}__{config.fold_id}__{init_time:%Y%m%dT%H%MZ}__ts-{ids_label}.html"
     )
-    out_path: Path = settings.plots_data_path / filename
+    out_path: Path = plots_data_path / filename
     chart.save(str(out_path))
 
     context.add_output_metadata(

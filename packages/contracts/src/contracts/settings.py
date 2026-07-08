@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Final
+from typing import Final, Self
 
 import obstore
-from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator
+from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from contracts._uri import uri_join
 
 url_adapter = TypeAdapter(AnyHttpUrl)
 
@@ -90,21 +92,48 @@ class Settings(BaseSettings):
         ),
     )
 
-    # Paths to the data we manage
-    nged_data_path: Path = PROJECT_ROOT / "data" / "NGED"
-    nwp_data_path: Path = PROJECT_ROOT / "data" / "NWP"
-    power_forecasts_data_path: Path = PROJECT_ROOT / "data" / "power_forecasts"
-    forecast_metrics_data_path: Path = PROJECT_ROOT / "data" / "forecast_metrics"
-    plots_data_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "plots",
+    # --- Storage roots -------------------------------------------------------------------
+    #
+    # Two roots, because model/plot artifacts must stay on a local filesystem (XGBoost
+    # save_model/load_model, shutil, Altair) even when the data tables move to S3.
+
+    data_path: str = Field(
+        default=str(PROJECT_ROOT / "data"),
         description=(
-            "Directory where plot_power_forecast writes interactive forecast HTML files, one per"
-            " materialisation (filename derived from experiment, fold, init time, and the plotted"
-            " time_series_ids)."
+            "Root of the managed data tables (NWP, power, forecasts, metrics, …). A local path"
+            " by default; may be a remote URI (e.g. 's3://bucket/data') so the data tables live"
+            " on S3. Every *_data_path below that is left unset derives from this root."
         ),
     )
-    eligible_time_series_data_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "eligible_time_series",
+    local_artifacts_path: str = Field(
+        default=str(PROJECT_ROOT / "data"),
+        description=(
+            "Root of the always-local artifacts (model cache, production model, plots). Kept"
+            " separate from data_path because these back local-filesystem-only libraries and"
+            " must stay local even when data_path is a remote URI."
+        ),
+    )
+
+    # --- Managed data tables (derive from data_path unless explicitly set) ----------------
+    #
+    # Each defaults to "" as a sentinel meaning "derive from data_path in _derive_unset_paths".
+    # Set any one explicitly (e.g. NWP_DATA_PATH=s3://other-bucket/NWP) to override just that
+    # table. After validation every field below is a concrete, non-empty path string.
+
+    nged_data_path: str = ""
+    """Directory holding the NGED power_time_series Delta table and metadata parquet."""
+    nwp_data_path: str = ""
+    """Delta table of NWP weather data."""
+    power_forecasts_data_path: str = ""
+    """Delta table of power forecasts (partitioned by experiment_name, fold_id)."""
+    forecast_metrics_data_path: str = ""
+    """Delta table of forecast evaluation metrics."""
+    power_time_series_data_path: str = ""
+    """Delta table of half-hourly power observations (under nged_data_path)."""
+    metadata_path: str = ""
+    """Parquet file of per-series substation metadata (under nged_data_path)."""
+    eligible_time_series_data_path: str = Field(
+        default="",
         description=(
             "Delta table of the canonical per-fold eligible time_series_id population, written"
             " by the eligible_time_series asset (partitioned by fold_id) and read by"
@@ -112,18 +141,29 @@ class Settings(BaseSettings):
             " identical, experiment-independent population."
         ),
     )
-    effective_capacity_data_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "effective_capacity",
+    effective_capacity_data_path: str = Field(
+        default="",
         description=(
             "Delta table of per-series effective capacity (v0.1: full-history P99 of |power|),"
             " written by the effective_capacity asset and read by the metrics asset as the NMAE"
             " denominator."
         ),
     )
-    trained_ml_model_params_base_path: Path = PROJECT_ROOT / "data" / "trained_ML_model_params"
-    h3_grid_weights_path: Path = PROJECT_ROOT / "data" / "h3_grid_weights.parquet"
-    model_cache_base_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "model_cache",
+    h3_grid_weights_path: str = ""
+    """Parquet file of fractional H3 cell overlap with the GB boundary."""
+
+    # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
+
+    plots_data_path: str = Field(
+        default="",
+        description=(
+            "Directory where plot_power_forecast writes interactive forecast HTML files, one per"
+            " materialisation (filename derived from experiment, fold, init time, and the plotted"
+            " time_series_ids)."
+        ),
+    )
+    model_cache_base_path: str = Field(
+        default="",
         description=(
             "Root of the local-disk model cache, keyed by MLflow run ID, used by"
             " BaseForecaster.load_from_mlflow. Currently only the CV pipeline"
@@ -132,8 +172,8 @@ class Settings(BaseSettings):
             " container image instead)."
         ),
     )
-    production_model_path: Path = Field(
-        default=PROJECT_ROOT / "data" / "production_model",
+    production_model_path: str = Field(
+        default="",
         description=(
             "Directory holding the current production model, written by the promoted_model"
             " asset (ml_core._production_helpers.fetch_model_artifacts) and read by"
@@ -141,6 +181,45 @@ class Settings(BaseSettings):
             " time. Later COPY'd into the container image at build time (issue #222)."
         ),
     )
+
+    @model_validator(mode="after")
+    def _derive_unset_paths(self) -> Self:
+        """Fill any unset ("") path from its root, so callers always see a concrete path.
+
+        The default layout lives here and nowhere else. A field set explicitly (e.g. via its
+        env var) keeps its value; only the "" sentinels are derived.
+        """
+        self.nged_data_path = self.nged_data_path or uri_join(self.data_path, "NGED")
+        self.nwp_data_path = self.nwp_data_path or uri_join(self.data_path, "NWP")
+        self.power_forecasts_data_path = self.power_forecasts_data_path or uri_join(
+            self.data_path, "power_forecasts"
+        )
+        self.forecast_metrics_data_path = self.forecast_metrics_data_path or uri_join(
+            self.data_path, "forecast_metrics"
+        )
+        self.eligible_time_series_data_path = self.eligible_time_series_data_path or uri_join(
+            self.data_path, "eligible_time_series"
+        )
+        self.effective_capacity_data_path = self.effective_capacity_data_path or uri_join(
+            self.data_path, "effective_capacity"
+        )
+        self.h3_grid_weights_path = self.h3_grid_weights_path or uri_join(
+            self.data_path, "h3_grid_weights.parquet"
+        )
+        # Derived from nged_data_path (itself derived above).
+        self.power_time_series_data_path = self.power_time_series_data_path or uri_join(
+            self.nged_data_path, "power_time_series.delta"
+        )
+        self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
+        # Always-local artifacts.
+        self.plots_data_path = self.plots_data_path or uri_join(self.local_artifacts_path, "plots")
+        self.model_cache_base_path = self.model_cache_base_path or uri_join(
+            self.local_artifacts_path, "model_cache"
+        )
+        self.production_model_path = self.production_model_path or uri_join(
+            self.local_artifacts_path, "production_model"
+        )
+        return self
 
     # Tell Pydantic to override defaults with fields set in the .env file.
     model_config = SettingsConfigDict(

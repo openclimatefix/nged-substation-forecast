@@ -8,7 +8,7 @@ app = marimo.App(width="full")
 with app.setup:
     from typing import cast
 
-    from contracts.settings import PROJECT_ROOT, Settings
+    from contracts.settings import Settings
 
     settings = Settings()
 
@@ -25,12 +25,12 @@ with app.setup:
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
     from plotting.ocf_theme import BLUE
 
-    BASE_DELTA_PATH = PROJECT_ROOT / settings.nged_data_path / "power_time_series.delta"
+    BASE_DELTA_PATH = settings.power_time_series_data_path
 
 
 @app.cell
 def _():
-    metadata_path = PROJECT_ROOT / settings.nged_data_path / "metadata.parquet"
+    metadata_path = settings.metadata_path
     df = TimeSeriesMetadata.validate(pl.read_parquet(metadata_path))
     return (df,)
 

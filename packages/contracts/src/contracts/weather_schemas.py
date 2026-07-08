@@ -325,7 +325,7 @@ class Nwp(pt.Model):
             )
 
     @classmethod
-    def scan_delta(cls, path: Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
+    def scan_delta(cls, path: str | Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
         The table stores physical-unit `Float32` directly (see `delta_store.nwp.write_nwp`),

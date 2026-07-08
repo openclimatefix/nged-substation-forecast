@@ -109,9 +109,8 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     fold_id = context.partition_key
     fold = _cv_config.get_fold(fold_id)
 
-    power_path = settings.nged_data_path / "power_time_series.delta"
     coverage = (
-        pl.scan_delta(str(power_path))
+        pl.scan_delta(settings.power_time_series_data_path)
         .group_by("time_series_id")
         .agg(
             first_time=pl.col("time").min(),
@@ -132,7 +131,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
         )
     )
 
-    settings.eligible_time_series_data_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.eligible_time_series_data_path).parent.mkdir(parents=True, exist_ok=True)
     write_deltalake(
         table_or_uri=settings.eligible_time_series_data_path,
         data=eligible_df.to_arrow(),
@@ -210,11 +209,11 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     """
     settings = Settings()
     power_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
+        pl.scan_delta(settings.power_time_series_data_path)
     ).set_model(PowerTimeSeries)
     capacity_df = _compute_effective_capacity(power_lf)
 
-    settings.effective_capacity_data_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.effective_capacity_data_path).parent.mkdir(parents=True, exist_ok=True)
     write_deltalake(
         table_or_uri=settings.effective_capacity_data_path,
         data=capacity_df.to_arrow(),
@@ -290,7 +289,7 @@ def _load_engineering_inputs(
         init_time_start = window_start - _MAX_NWP_LEAD
     if init_time_end is None:
         init_time_end = window_end
-    power_lf = pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta")).filter(
+    power_lf = pl.scan_delta(settings.power_time_series_data_path).filter(
         pl.col("time_series_id").is_in(time_series_ids),
         pl.col("time") >= window_start,
         pl.col("time") <= window_end,
@@ -298,7 +297,7 @@ def _load_engineering_inputs(
     power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
 
     metadata_df = pt.DataFrame(
-        pl.read_parquet(settings.nged_data_path / "metadata.parquet").filter(
+        pl.read_parquet(settings.metadata_path).filter(
             pl.col("time_series_id").is_in(time_series_ids)
         )
     ).set_model(TimeSeriesMetadata)
@@ -461,7 +460,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-    forecaster = forecaster_cls.load_from_mlflow(fold_run_id, settings.model_cache_base_path)
+    forecaster = forecaster_cls.load_from_mlflow(fold_run_id, Path(settings.model_cache_base_path))
     trained_ids = forecaster.trained_time_series_ids
     if not trained_ids:
         raise ValueError(
@@ -469,7 +468,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "nothing to forecast. Re-materialise `trained_cv_model` for this fold."
         )
 
-    settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.power_forecasts_data_path).parent.mkdir(parents=True, exist_ok=True)
     n_rows = 0
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
@@ -822,16 +821,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         return
 
     actuals_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(str(settings.nged_data_path / "power_time_series.delta"))
+        pl.scan_delta(settings.power_time_series_data_path)
     ).set_model(PowerTimeSeries)
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
     metadata_df = TimeSeriesMetadata.validate(
-        pl.read_parquet(settings.nged_data_path / "metadata.parquet"),
+        pl.read_parquet(settings.metadata_path),
         allow_superfluous_columns=True,
     )
 
     # The full-history effective capacity is the NMAE denominator (a declared dep of this asset).
-    if not settings.effective_capacity_data_path.exists():
+    if not Path(settings.effective_capacity_data_path).exists():
         raise FileNotFoundError(
             f"effective_capacity Delta not found at {settings.effective_capacity_data_path}; "
             "materialise the effective_capacity asset before running metrics."
@@ -840,7 +839,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         pl.read_delta(str(settings.effective_capacity_data_path))
     )
 
-    settings.forecast_metrics_data_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.forecast_metrics_data_path).parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
@@ -859,7 +858,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             metadata_df,
             capacity_df,
             config.evaluation_scope,
-            settings.forecast_metrics_data_path,
+            Path(settings.forecast_metrics_data_path),
             now,
         )
         total_rows += n_rows

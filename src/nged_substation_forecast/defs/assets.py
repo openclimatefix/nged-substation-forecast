@@ -1,6 +1,7 @@
 import ast
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Final, Generic, Self, TypeVar
 
 import patito as pt
@@ -55,8 +56,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     to just check what's available on NGED's S3 bucket and append to our local Delta table.
     """
     settings = Settings()
-    delta_path = settings.nged_data_path / "power_time_series.delta"
-    metadata_path = settings.nged_data_path / "metadata.parquet"
+    delta_path = Path(settings.power_time_series_data_path)
+    metadata_path = Path(settings.metadata_path)
 
     # Fetch new data from S3, using the existing delta table to determine what's new.
     # We are deliberately keeping the code simple for now, but may move the S3 store
@@ -126,15 +127,16 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     )
 
     # Save to parquet
+    h3_grid_weights_path = Path(settings.h3_grid_weights_path)
     # FIXME: mkdir won't work when we're saving to S3!
-    settings.h3_grid_weights_path.parent.mkdir(parents=True, exist_ok=True)
-    weights.write_parquet(settings.h3_grid_weights_path)
+    h3_grid_weights_path.parent.mkdir(parents=True, exist_ok=True)
+    weights.write_parquet(h3_grid_weights_path)
 
     # Add metadata to Dagster context
     context.add_output_metadata(
         {
             "n_rows": len(weights),
-            "path": str(settings.h3_grid_weights_path),
+            "path": str(h3_grid_weights_path),
         }
     )
 
@@ -177,7 +179,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     nwp_init_time = datetime.strptime(partition_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
     # Load dependencies
-    h3_grid = pt.DataFrame(pl.read_parquet(settings.h3_grid_weights_path)).set_model(H3GridWeights)
+    h3_grid = pt.DataFrame(pl.read_parquet(Path(settings.h3_grid_weights_path))).set_model(
+        H3GridWeights
+    )
 
     # Download and convert
     try:
@@ -190,13 +194,14 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     context.log.info(f"Columns: {nwp.columns}")
 
-    settings.nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
-    write_nwp(nwp, settings.nwp_data_path)
+    nwp_data_path = Path(settings.nwp_data_path)
+    nwp_data_path.parent.mkdir(parents=True, exist_ok=True)
+    write_nwp(nwp, nwp_data_path)
 
     context.add_output_metadata(
         {
             "n_rows": len(nwp),
-            "path": str(settings.nwp_data_path),
+            "path": str(nwp_data_path),
             "init_time": str(nwp_init_time),
         }
     )

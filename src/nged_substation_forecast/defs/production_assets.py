@@ -8,6 +8,7 @@ that reads it). Both stay thin shells over the pure/IO-light helpers in
 
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Final
 
 import mlflow
@@ -124,9 +125,10 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    fetch_model_artifacts(config.mlflow_run_id, settings.production_model_path)
+    production_model_path = Path(settings.production_model_path)
+    fetch_model_artifacts(config.mlflow_run_id, production_model_path)
 
-    meta = json.loads((settings.production_model_path / "meta.json").read_text())
+    meta = json.loads((production_model_path / "meta.json").read_text())
     model_params = meta.get("model_params", {})
     context.add_output_metadata(
         {
@@ -134,7 +136,7 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
             "model_class": meta.get("model_class"),
             "experiment_name": model_params.get("experiment_name"),
             "n_trained_time_series": len(meta.get("trained_time_series_ids", [])),
-            "path": str(settings.production_model_path),
+            "path": str(production_model_path),
         }
     )
 
@@ -217,7 +219,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     settings = Settings()
     power_fcst_init_time = context.partition_time_window.end
 
-    forecaster = load_forecaster_from_dir(settings.production_model_path)
+    forecaster = load_forecaster_from_dir(Path(settings.production_model_path))
     trained_ids = forecaster.trained_time_series_ids
     if not trained_ids:
         raise ValueError(
@@ -272,7 +274,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
             "NWP coverage and the model's trained population."
         )
 
-    settings.power_forecasts_data_path.parent.mkdir(parents=True, exist_ok=True)
+    Path(settings.power_forecasts_data_path).parent.mkdir(parents=True, exist_ok=True)
     write_power_forecasts(
         forecasts,
         settings.power_forecasts_data_path,
