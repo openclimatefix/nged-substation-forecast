@@ -7,17 +7,17 @@ from contracts.weather_schemas import Nwp
 
 
 def test_categorical_precipitation_type_surface_validation():
-    # Test case 1: Valid data (all null before 2024-11-13, not null after)
+    # Test case 1: Valid data (all null before 2024-11-12, not null after)
     df_valid = pl.DataFrame(
         {
             "nwp_model_id": ["ECMWF_ENS_0_25_degree", "ECMWF_ENS_0_25_degree"],
             "init_time": [
+                datetime(2024, 11, 12, tzinfo=timezone.utc),
                 datetime(2024, 11, 13, tzinfo=timezone.utc),
-                datetime(2024, 11, 14, tzinfo=timezone.utc),
             ],
             "valid_time": [
-                datetime(2024, 11, 13, 0, tzinfo=timezone.utc),
-                datetime(2024, 11, 14, 1, tzinfo=timezone.utc),
+                datetime(2024, 11, 12, 0, tzinfo=timezone.utc),
+                datetime(2024, 11, 13, 1, tzinfo=timezone.utc),
             ],
             "ensemble_member": [1, 1],
             "h3_index": [1, 1],
@@ -40,16 +40,16 @@ def test_categorical_precipitation_type_surface_validation():
     # This should pass
     Nwp.validate(pt.DataFrame(df_valid).set_model(Nwp).cast())
 
-    # Test case 2: Invalid data (not null before 2024-11-13)
+    # Test case 2: Invalid data (not null before 2024-11-12)
     df_invalid_before = df_valid.with_columns(
         pl.Series("categorical_precipitation_type_surface", [1, 1])
     )
-    with pytest.raises(ValueError, match="must be all null for init_time <= 2024-11-13"):
+    with pytest.raises(ValueError, match="must be all null for init_time <= 2024-11-12"):
         Nwp.validate(pt.DataFrame(df_invalid_before).set_model(Nwp).cast())
 
-    # Test case 3: Invalid data (null after 2024-11-13)
+    # Test case 3: Invalid data (null after 2024-11-12)
     df_invalid_after = df_valid.with_columns(
         pl.Series("categorical_precipitation_type_surface", [None, None])
     )
-    with pytest.raises(ValueError, match="must not be null for init_time > 2024-11-13"):
+    with pytest.raises(ValueError, match="must not be null for init_time > 2024-11-12"):
         Nwp.validate(pt.DataFrame(df_invalid_after).set_model(Nwp).cast())

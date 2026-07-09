@@ -200,9 +200,9 @@ class Nwp(pt.Model):
     categorical_precipitation_type_surface: int | None = pt.Field(
         dtype=pl.UInt8,
         description=(
-            "This field is always NaN for init_times on and before 2024-11-13. Derived from"
-            " ECMWF's `ptype` field, which was added to ECMWF's Open Data dataset when IFS Cycle"
-            " 49r1 was released in Nov 2024. See https://codes.ecmwf.int/grib/param-db/260015"
+            "This field is always NaN for init_times on and before 2024-11-12, and populated from"
+            " the 2024-11-13 00Z run onwards (confirmed by direct inspection of the source data)."
+            " Derived from ECMWF's `ptype` field. See https://codes.ecmwf.int/grib/param-db/260015"
             " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
             " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
             " 10=Hail; 11=Drizzle; 12=Freezing drizzle; 13=Hail (less than 5 mm);"
@@ -289,11 +289,13 @@ class Nwp(pt.Model):
         cls, dataframe: pt.DataFrame[Self]
     ) -> None:
         """Check that `categorical_precipitation_type_surface` is all-null when
-        init_time <= 2024-11-13, and is never null afterwards.
+        init_time <= 2024-11-12, and is never null afterwards.
 
-        ECMWF only introduced `ptype` into their public data on 2024-11-14.
+        Confirmed by direct inspection of the source data: the 2024-11-13 00Z run is the first
+        run with `ptype` populated (0% null across all lead times), while 2024-11-12 and earlier
+        are 100% null.
         """
-        threshold_date = datetime(2024, 11, 13, tzinfo=timezone.utc)
+        threshold_date = datetime(2024, 11, 12, tzinfo=timezone.utc)
 
         # Partition the dataframe based on the threshold date
         partition_col = "is_before_or_on_threshold"
@@ -310,13 +312,13 @@ class Nwp(pt.Model):
         if not before_or_on["categorical_precipitation_type_surface"].is_null().all():
             raise ValueError(
                 "categorical_precipitation_type_surface must be all null for "
-                "init_time <= 2024-11-13"
+                "init_time <= 2024-11-12"
             )
 
         # Check after threshold
         if after["categorical_precipitation_type_surface"].is_null().any():
             raise ValueError(
-                "categorical_precipitation_type_surface must not be null for init_time > 2024-11-13"
+                "categorical_precipitation_type_surface must not be null for init_time > 2024-11-12"
             )
 
     @classmethod
