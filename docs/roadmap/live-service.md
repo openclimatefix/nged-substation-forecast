@@ -270,6 +270,18 @@ reserved**) runs the Dagster daemon + webserver + code-location server + Postgre
 UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized
 to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
 
+**One image, four roles.** The daemon, webserver, and code-location server all run from the
+*same* [production image](../architecture/production-deployment.md) the ephemeral Fargate runs
+use (harmless — the baked-in champion model is dead weight for the first three, only a run's
+actual execution touches it) — a `docker-compose.yml` on the box just launches each as a
+separate service with a different command override. One gotcha worth recording now, before
+that compose file gets written: `dagster-webserver` and `dagster-daemon` are **separate
+console-script binaries**, not subcommands of the `dagster` CLI, so those two services need
+`entrypoint: ["dagster-webserver"]` / `["dagster-daemon"]` overrides, not just a `command:`
+override — unlike `dagster code-server start` (the code-location-server role) and `dagster job
+execute`/`dagster asset materialize` (the ephemeral-run role), which are both ordinary `dagster`
+subcommands and work with the image's existing `ENTRYPOINT ["dagster"]` unchanged.
+
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
   centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
   roles (no static keys); the textbook Dagster-OSS-on-AWS deployment.
