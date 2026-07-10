@@ -8,7 +8,7 @@
 > (matches #137's sub-issue order): the
 > [inference asset](#the-live_forecasts-asset) (#221, done) → the
 > [local dress rehearsal](#deployment-workstream-1-the-production-job-local-dress-rehearsal)
-> (#208) → S3-capable data paths (#121, #50, done)
+> (#208, done) → S3-capable data paths (#121, #50, done)
 > → the [champion-model container](#production-model-artifacts) (#222) → the
 > [AWS infrastructure](#aws-architecture) (#206) → smaller cleanup (#197, #63, #246) →
 > [the v0.1 version bump](#related-github-issues) (#209).
@@ -514,10 +514,12 @@ written when this ships):
 
 Also record the two issue-#206 subtleties the review surfaced, so they're not lost when the
 Fargate work starts: (a) whenever the job executes one-shot without persistent Dagster state
-(Option A, or the local dress rehearsal), "which `ecmwf_ens` partitions need materialising"
-must be derived from Delta contents vs Dynamical availability, not Dagster's materialisation
-records; (b) Delta commits already give the atomic "outputs are the freshness record" property
-— just ensure the forecast Delta write is the run's final write.
+(Option A), "which `ecmwf_ens` partitions need materialising" must be derived from Delta
+contents vs Dynamical availability, not Dagster's materialisation records — the local dress
+rehearsal below sidestepped this by running the daemon with a *persistent* `DAGSTER_HOME`, so
+Dagster's own records were fine to rely on there; (b) Delta commits already give the atomic
+"outputs are the freshness record" property — just ensure the forecast Delta write is the
+run's final write.
 
 Container verification:
 
@@ -530,12 +532,24 @@ Container verification:
 
 Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)
 
-Ordered first to match the #137 sub-issue order: unlike the other two workstreams, this one
-needs no S3, Docker, or AWS account at all, so it runs now, against the laptop's local Delta
-tables (this is what the `promoted_model`/`live_forecasts` assets and 6-hourly schedules
-already do, and what the [local dress rehearsal](#deployment-verification) below exercises).
+> **Status: ✅ Done** (closed 2026-07-10). It shipped differently than the original sketch
+> below: no hand-rolled freshness op or one-shot `live_pipeline_job` was built. The native
+> per-asset Dagster schedules that ship with
+> [The `live_forecasts` asset](#the-live_forecasts-asset)
+> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
+> did the whole job: run under `dg dev` with a persistent `DAGSTER_HOME` for several days,
+> confirmed 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable
+> in replay mode. The one-shot-job design kept below is **not needed under Option B** (the
+> daemon-driven schedules above already cover it) — it remains relevant only if
+> [Option A](#option-a-level-1-nothing-always-on-1222month) is chosen for the AWS deployment
+> instead, since Option A has no daemon to hold schedules on.
 
-A new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
+Ordered first to match the #137 sub-issue order: unlike the other two workstreams, this one
+needed no S3, Docker, or AWS account at all, so it ran against the laptop's local Delta tables.
+
+**If Option A is chosen** (not the current recommendation — see
+[AWS architecture](#aws-architecture)), it would still need a new Dagster job (e.g.
+`live_pipeline_job`) chaining, in order:
 
 1. **Freshness op** — latest Dynamical init vs latest forecast's NWP init in S3; early-exit.
 2. **Ingest** — materialise `power_time_series_and_metadata`, and the missing `ecmwf_ens`
@@ -545,16 +559,12 @@ A new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
 4. *(after monitoring lands)* — the `metrics(production_monitoring)` step; not a blocker.
 
 Keep each op a thin shell over unit-tested pure helpers (freshness comparison, missing-
-partition computation).
-
-How the trigger differs by option: under **A**, the job is the hourly one-shot and the wrapper
-computes the current time-window partition key from the clock (injected `now`, per repo
-convention). Under **B/C/D**, the daemon runs it — the freshness decision moves up into a
+partition computation). Under **A**, the job is the hourly one-shot and the wrapper computes
+the current time-window partition key from the clock (injected `now`, per repo convention).
+Under **B/C/D**, the daemon runs it instead — the freshness decision moves up into a
 schedule/sensor evaluation (return a `SkipReason` when nothing is new; evaluations are free),
 partition keys come from Dagster natively, and missed slots are backfilled from the UI with
-`availability_mode="replay"`. The op-level freshness check stays regardless: it is cheap
-idempotence insurance, and it keeps the job runnable one-shot for the local dress rehearsal
-([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
+`availability_mode="replay"` — exactly what shipped for the local dress rehearsal above.
 
 ### Deployment workstream 3 — AWS infrastructure
 
@@ -602,7 +612,7 @@ order issues were opened.
 | Issue | Where it lands in this plan |
 |---|---|
 | [#221 Add the `live_forecasts` Dagster asset](https://github.com/openclimatefix/nged-substation-forecast/issues/221) | [The `live_forecasts` asset](#the-live_forecasts-asset) — done |
-| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | Workstream 1 + the local dress rehearsal (also exercises the replay mode) |
+| [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | [Deployment workstream 1](#deployment-workstream-1-the-production-job-local-dress-rehearsal) — done, via native per-asset schedules |
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
 | [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) + the container-build notes above |
