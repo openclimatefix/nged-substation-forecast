@@ -325,7 +325,7 @@ class Nwp(pt.Model):
     def scan_delta(
         cls,
         path: str | Path = SETTINGS.nwp_data_path,
-        storage_options: ObjectStoreOptions | None = None,
+        storage_options: ObjectStoreOptions = SETTINGS.storage_options,
     ) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
@@ -335,11 +335,9 @@ class Nwp(pt.Model):
         Args:
             path: Path or URI of the ``nwp`` Delta table.
             storage_options: delta-rs object-store options (credentials/endpoint) for a remote
-                ``path``. ``None`` falls back to ``Settings().storage_options``; empty for a
-                local ``path``.
+                ``path``; defaults to the ``SETTINGS`` singleton's options (empty for a local
+                ``path``). Read-only — never mutated here (shared mutable default).
         """
-        if storage_options is None:
-            storage_options = SETTINGS.storage_options
         return (
             pt.LazyFrame.from_existing(
                 pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))
