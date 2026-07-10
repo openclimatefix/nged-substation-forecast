@@ -102,13 +102,9 @@ class Settings(BaseSettings):
 
     # --- Storage roots -------------------------------------------------------------------
     #
-    # Two roots because nothing under local_artifacts_path is part of the S3-backed data plane:
-    # the model cache is a node-local scratch cache used only by the (laptop) CV pipeline; the
-    # production model is distributed via the container image, not shared storage (this dir is its
-    # build-time staging area); and plot HTML is a local-dev convenience (the dashboard, reading
-    # power_forecasts from data_path, is the deployed way to view forecasts). So the deployed
-    # runtime reads its model from the image, data from S3, and writes forecasts to S3 — it never
-    # uses local_artifacts_path as shared storage. See docs/live_service/setup.md.
+    # data_path holds the (S3-capable) data tables; local_artifacts_path holds the always-local
+    # model cache, production model, and plots. Why they are split, and what belongs in each:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
@@ -129,11 +125,10 @@ class Settings(BaseSettings):
 
     # --- Object-store credentials for the data tables (used only when data_path is remote) --
     #
-    # All empty by default. On AWS nothing needs setting: delta-rs' object_store discovers the
-    # Fargate task's IAM-role credentials and region automatically. Populate these (via env)
-    # only for a dev / MinIO / S3-compatible endpoint that needs an explicit endpoint + keys.
-    # Separate from the nged_s3_bucket_* creds above, which authenticate reads of NGED's source
-    # bucket (a different account/bucket from our own managed data tables).
+    # All empty by default; unset on AWS (object_store auto-discovers the IAM-role credentials),
+    # set only for a dev/MinIO endpoint. The AWS/dev split, and how these differ from the
+    # nged_s3_bucket_* source-bucket creds above:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_store_endpoint_url: str = Field(
         default="",
@@ -179,9 +174,9 @@ class Settings(BaseSettings):
 
     # --- Managed data tables (derive from data_path unless explicitly set) ----------------
     #
-    # Each defaults to "" as a sentinel meaning "derive from data_path in _derive_unset_paths".
-    # Set any one explicitly (e.g. NWP_DATA_PATH=s3://other-bucket/NWP) to override just that
-    # table. After validation every field below is a concrete, non-empty path string.
+    # Each defaults to "" — a sentinel meaning "derive from data_path in _derive_unset_paths".
+    # The derive-from-root convention and per-table overrides:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     nged_data_path: str = ""
     """Directory holding the NGED power_time_series Delta table and metadata parquet."""
