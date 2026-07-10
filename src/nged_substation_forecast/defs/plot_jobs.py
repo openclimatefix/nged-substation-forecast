@@ -14,6 +14,7 @@ from typing import Final
 
 import polars as pl
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from dagster import Config, MetadataValue, OpExecutionContext, job, op
 from plotting.forecast_chart import build_forecast_chart
 from pydantic import Field
@@ -70,7 +71,9 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
     window_end = init_time + FORECAST_HORIZON
 
     forecasts = (
-        pl.scan_delta(settings.power_forecasts_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_forecasts_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
         .filter(
             pl.col("experiment_name") == config.experiment_name,
             pl.col("fold_id") == config.fold_id,
@@ -89,7 +92,9 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
 
     ground_truth = (
-        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
         .filter(
             pl.col("time_series_id").is_in(config.time_series_ids),
             pl.col("time") >= init_time,
@@ -97,9 +102,9 @@ def plot_power_forecast(context: OpExecutionContext, config: PlotPowerForecastCo
         )
         .collect()
     )
-    metadata = pl.read_parquet(settings.metadata_path, storage_options=storage_options).filter(
-        pl.col("time_series_id").is_in(config.time_series_ids)
-    )
+    metadata = pl.read_parquet(
+        settings.metadata_path, storage_options=typeddict_to_dict(storage_options)
+    ).filter(pl.col("time_series_id").is_in(config.time_series_ids))
 
     chart = build_forecast_chart(forecasts, ground_truth, metadata, config.time_series_ids)
 

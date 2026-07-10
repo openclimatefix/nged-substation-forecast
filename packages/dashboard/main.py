@@ -23,6 +23,7 @@ with app.setup:
     import polars as pl
     import pyarrow
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+    from contracts.typing_utils import typeddict_to_dict
     from plotting.ocf_theme import BLUE
 
     BASE_DELTA_PATH = settings.power_time_series_data_path
@@ -32,7 +33,7 @@ with app.setup:
 def _():
     metadata_path = settings.metadata_path
     df = TimeSeriesMetadata.validate(
-        pl.read_parquet(metadata_path, storage_options=settings.storage_options)
+        pl.read_parquet(metadata_path, storage_options=typeddict_to_dict(settings.storage_options))
     )
     return (df,)
 
@@ -94,7 +95,9 @@ def _(arrow_table):
 
 @app.cell
 def _():
-    delta_df = pl.scan_delta(BASE_DELTA_PATH, storage_options=settings.storage_options).filter(
+    delta_df = pl.scan_delta(
+        BASE_DELTA_PATH, storage_options=typeddict_to_dict(settings.storage_options)
+    ).filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
         pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
     )

@@ -9,6 +9,7 @@ from contracts._uri import ensure_local_parent
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from dagster import (
     AssetExecutionContext,
     DailyPartitionsDefinition,
@@ -103,7 +104,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
         new_power_ts_deduped.write_delta(
             delta_path,
             mode="append",
-            storage_options=storage_options,
+            storage_options=typeddict_to_dict(storage_options),
             delta_write_options={"partition_by": "time_series_id"},
         )
 
@@ -136,7 +137,9 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     # Save to parquet
     h3_grid_weights_path = settings.h3_grid_weights_path
     ensure_local_parent(h3_grid_weights_path)
-    weights.write_parquet(h3_grid_weights_path, storage_options=settings.storage_options)
+    weights.write_parquet(
+        h3_grid_weights_path, storage_options=typeddict_to_dict(settings.storage_options)
+    )
 
     # Add metadata to Dagster context
     context.add_output_metadata(
@@ -187,7 +190,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
 
     # Load dependencies
     h3_grid = pt.DataFrame(
-        pl.read_parquet(settings.h3_grid_weights_path, storage_options=storage_options)
+        pl.read_parquet(
+            settings.h3_grid_weights_path, storage_options=typeddict_to_dict(storage_options)
+        )
     ).set_model(H3GridWeights)
 
     # Download and convert

@@ -23,6 +23,8 @@ from typing import Final
 
 import patito as pt
 import polars as pl
+from contracts._uri import ObjectStoreOptions
+from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import Nwp
 from deltalake import WriterProperties, write_deltalake
 
@@ -56,7 +58,7 @@ that choice, which won for ``power_forecasts``, measures worse here."""
 def write_nwp(
     nwp: pt.DataFrame[Nwp],
     table_uri: str | Path,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> None:
     """Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.
 
@@ -99,5 +101,5 @@ def write_nwp(
         mode="append",
         partition_by=["nwp_model_id", "init_time"],
         writer_properties=NWP_WRITER_PROPERTIES,
-        storage_options=storage_options,
+        storage_options=typeddict_to_dict(storage_options),
     )

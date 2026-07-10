@@ -4,9 +4,10 @@ from typing import Final, Sequence, TypedDict, overload
 import obstore
 import patito as pt
 import polars as pl
-from contracts._uri import delta_table_exists, object_exists
+from contracts._uri import ObjectStoreOptions, delta_table_exists, object_exists
 from contracts.common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.typing_utils import typeddict_to_dict
 
 from nged_data.read_nged_json import (
     _extract_power_time_series,
@@ -196,7 +197,7 @@ class _MaxTimePerTimeSeriesId(pt.Model):
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
     delta_path: str,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
@@ -206,14 +207,14 @@ def select_new_rows(
 def select_new_rows(
     time_series: pt.DataFrame[_ProcessedFileListing],
     delta_path: str,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[_ProcessedFileListing]: ...
 
 
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing],
     delta_path: str,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """
     Return rows in `time_series` that are more recent than the most recent
@@ -229,7 +230,7 @@ def select_new_rows(
 
     # Scan the existing delta table and find the most recent time per time_series_id
     max_times = (
-        pl.scan_delta(delta_path, storage_options=storage_options)
+        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
         .group_by("time_series_id")
         .agg(max_time=pl.max("time"))
         .collect()
@@ -280,7 +281,7 @@ class UpsertMetadataStats(TypedDict, total=False):
 def upsert_metadata(
     new_metadata: pt.DataFrame[TimeSeriesMetadata],
     metadata_path: str,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> UpsertMetadataStats:
     """
     Upserts metadata to a Parquet file.
@@ -309,7 +310,9 @@ def upsert_metadata(
     if not object_exists(metadata_path, storage_options):
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
         new_metadata.write_parquet(
-            metadata_path, compression=COMPRESSION, storage_options=storage_options
+            metadata_path,
+            compression=COMPRESSION,
+            storage_options=typeddict_to_dict(storage_options),
         )
         return UpsertMetadataStats(
             metadata_n_new_TimeSeriesIDs=new_metadata.height,
@@ -317,7 +320,9 @@ def upsert_metadata(
         )
 
     # Read existing metadata
-    existing_metadata = pl.read_parquet(metadata_path, storage_options=storage_options)
+    existing_metadata = pl.read_parquet(
+        metadata_path, storage_options=typeddict_to_dict(storage_options)
+    )
     TimeSeriesMetadata.validate(existing_metadata)
 
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
@@ -349,7 +354,7 @@ def upsert_metadata(
     TimeSeriesMetadata.validate(merged_metadata)
 
     merged_metadata.write_parquet(
-        metadata_path, compression=COMPRESSION, storage_options=storage_options
+        metadata_path, compression=COMPRESSION, storage_options=typeddict_to_dict(storage_options)
     )
 
     # Compute stats

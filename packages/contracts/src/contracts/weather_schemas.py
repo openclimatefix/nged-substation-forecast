@@ -7,7 +7,9 @@ from typing import ClassVar, Literal, Self
 import patito as pt
 import polars as pl
 
+from contracts._uri import ObjectStoreOptions
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 
 from .common import UTC_DATETIME_DTYPE
 
@@ -323,7 +325,7 @@ class Nwp(pt.Model):
     def scan_delta(
         cls,
         path: str | Path = SETTINGS.nwp_data_path,
-        storage_options: dict[str, str] | None = None,
+        storage_options: ObjectStoreOptions | None = None,
     ) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
@@ -339,7 +341,9 @@ class Nwp(pt.Model):
         if storage_options is None:
             storage_options = SETTINGS.storage_options
         return (
-            pt.LazyFrame.from_existing(pl.scan_delta(path, storage_options=storage_options))
+            pt.LazyFrame.from_existing(
+                pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))
+            )
             .set_model(cls)
             .cast()
         )

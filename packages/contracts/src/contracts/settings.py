@@ -5,7 +5,7 @@ import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from contracts._uri import uri_join
+from contracts._uri import ObjectStoreOptions, uri_join
 
 url_adapter = TypeAdapter(AnyHttpUrl)
 
@@ -154,16 +154,18 @@ class Settings(BaseSettings):
     )
 
     @property
-    def storage_options(self) -> dict[str, str]:
+    def storage_options(self) -> ObjectStoreOptions:
         """delta-rs / polars / obstore ``storage_options`` for the managed data tables.
 
         Empty on AWS — object_store auto-discovers the Fargate task's IAM-role credentials and
         region — and empty for a local ``data_path`` (delta-rs ignores it there). Populated from
         the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
         keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
-        obstore alike, so one dict feeds every IO site.
+        obstore alike, so one value feeds every IO site. Returned as an ``ObjectStoreOptions``
+        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a plain
+        ``dict`` at each IO boundary with ``typeddict_to_dict``.
         """
-        options: dict[str, str] = {}
+        options: ObjectStoreOptions = {}
         if self.data_store_endpoint_url:
             options["aws_endpoint_url"] = self.data_store_endpoint_url
             options["aws_allow_http"] = "true"

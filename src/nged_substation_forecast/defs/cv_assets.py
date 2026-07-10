@@ -12,7 +12,7 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
-from contracts._uri import delta_table_exists, ensure_local_parent
+from contracts._uri import ObjectStoreOptions, delta_table_exists, ensure_local_parent
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
@@ -22,6 +22,7 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import Nwp
 from dagster import (
     AssetExecutionContext,
@@ -112,7 +113,9 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     fold = _cv_config.get_fold(fold_id)
 
     coverage = (
-        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
         .group_by("time_series_id")
         .agg(
             first_time=pl.col("time").min(),
@@ -140,7 +143,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
         mode="overwrite",
         predicate=f"fold_id = '{fold_id}'",
         partition_by=["fold_id"],
-        storage_options=storage_options,
+        storage_options=typeddict_to_dict(storage_options),
     )
 
     context.add_output_metadata(
@@ -213,7 +216,9 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     settings = Settings()
     storage_options = settings.storage_options
     power_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
     ).set_model(PowerTimeSeries)
     capacity_df = _compute_effective_capacity(power_lf)
 
@@ -222,7 +227,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
         table_or_uri=settings.effective_capacity_data_path,
         data=capacity_df.to_arrow(),
         mode="overwrite",
-        storage_options=storage_options,
+        storage_options=typeddict_to_dict(storage_options),
     )
 
     context.add_output_metadata(
@@ -296,7 +301,7 @@ def _load_engineering_inputs(
         init_time_end = window_end
     storage_options = settings.storage_options
     power_lf = pl.scan_delta(
-        settings.power_time_series_data_path, storage_options=storage_options
+        settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
     ).filter(
         pl.col("time_series_id").is_in(time_series_ids),
         pl.col("time") >= window_start,
@@ -305,9 +310,9 @@ def _load_engineering_inputs(
     power_ts = pt.LazyFrame.from_existing(power_lf).set_model(PowerTimeSeries)
 
     metadata_df = pt.DataFrame(
-        pl.read_parquet(settings.metadata_path, storage_options=storage_options).filter(
-            pl.col("time_series_id").is_in(time_series_ids)
-        )
+        pl.read_parquet(
+            settings.metadata_path, storage_options=typeddict_to_dict(storage_options)
+        ).filter(pl.col("time_series_id").is_in(time_series_ids))
     ).set_model(TimeSeriesMetadata)
 
     # The H3 cells the requested series sit in (many series may share one cell).
@@ -359,7 +364,8 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 
     eligible_ids = (
         pl.scan_delta(
-            settings.eligible_time_series_data_path, storage_options=settings.storage_options
+            settings.eligible_time_series_data_path,
+            storage_options=typeddict_to_dict(settings.storage_options),
         )
         .filter(pl.col("fold_id") == fold_id)
         .select("time_series_id")
@@ -662,7 +668,7 @@ def _write_metrics_to_delta(
     enriched: pt.DataFrame[Metrics],
     exp_name: str,
     fold_id: str,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> None:
     """Write enriched Metrics rows to the ``forecast_metrics`` Delta table.
 
@@ -689,7 +695,7 @@ def _write_metrics_to_delta(
         mode="overwrite",
         predicate=f"experiment_name = '{exp_name}' AND fold_id = '{fold_id}'",
         partition_by=["experiment_name", "fold_id"],
-        storage_options=storage_options,
+        storage_options=typeddict_to_dict(storage_options),
     )
 
 
@@ -729,7 +735,7 @@ def _score_forecast_group(
     evaluation_scope: EvalScopeType,
     metrics_path: str,
     now: datetime,
-    storage_options: dict[str, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> tuple[int, dict[str, float] | None]:
     """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
     optionally log to MLflow.
@@ -819,7 +825,9 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     # columns are String in PowerForecast, matching how delta-rs stores them, so no dtype cast
     # sits between scan_delta and the filter to defeat pushdown. See PopulationFilter.apply.
     scan = pt.LazyFrame.from_existing(
-        pl.scan_delta(settings.power_forecasts_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_forecasts_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
     ).set_model(PowerForecast)
     pruned_scan = config.population_filter.apply(scan)
 
@@ -839,11 +847,13 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         return
 
     actuals_lf = pt.LazyFrame.from_existing(
-        pl.scan_delta(settings.power_time_series_data_path, storage_options=storage_options)
+        pl.scan_delta(
+            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
+        )
     ).set_model(PowerTimeSeries)
     # allow_superfluous_columns because the parquet also carries h3_res_5 and other geo columns.
     metadata_df = TimeSeriesMetadata.validate(
-        pl.read_parquet(settings.metadata_path, storage_options=storage_options),
+        pl.read_parquet(settings.metadata_path, storage_options=typeddict_to_dict(storage_options)),
         allow_superfluous_columns=True,
     )
 
@@ -854,7 +864,10 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "materialise the effective_capacity asset before running metrics."
         )
     capacity_df = EffectiveCapacity.validate(
-        pl.read_delta(settings.effective_capacity_data_path, storage_options=storage_options)
+        pl.read_delta(
+            settings.effective_capacity_data_path,
+            storage_options=typeddict_to_dict(storage_options),
+        )
     )
 
     ensure_local_parent(settings.forecast_metrics_data_path)

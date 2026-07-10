@@ -17,6 +17,7 @@ import polars as pl
 from contracts._uri import ensure_local_parent
 from contracts.ml_schemas import AllFeatures
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from dagster import (
     AssetDep,
     AssetExecutionContext,
@@ -149,7 +150,9 @@ def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     the ``init_time`` partition values — naive ``"YYYY-MM-DD HH:MM:SS.ffffff"`` strings on disk —
     into tz-aware UTC datetimes.
     """
-    delta_table = DeltaTable(settings.nwp_data_path, storage_options=settings.storage_options)
+    delta_table = DeltaTable(
+        settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
+    )
     raw_values = {partition["init_time"] for partition in delta_table.partitions()}
     return [
         datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)

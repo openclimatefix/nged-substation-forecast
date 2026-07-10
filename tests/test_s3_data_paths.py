@@ -30,6 +30,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts._uri import object_exists
+from contracts.typing_utils import typeddict_to_dict
 from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.weather_schemas import Nwp
@@ -186,14 +187,14 @@ def test_power_forecasts_round_trip_and_pruning_over_s3(s3_endpoint: str) -> Non
         storage_options=opts,
     )
 
-    both = pl.read_delta(uri, storage_options=opts)
+    both = pl.read_delta(uri, storage_options=typeddict_to_dict(opts))
     assert set(both["experiment_name"].unique()) == {"expA", "expB"}
     assert both.height == 8
 
     # Partition pruning must survive over S3: the explain plan lists only expA's path.
-    scan = pt.LazyFrame.from_existing(pl.scan_delta(uri, storage_options=opts)).set_model(
-        PowerForecast
-    )
+    scan = pt.LazyFrame.from_existing(
+        pl.scan_delta(uri, storage_options=typeddict_to_dict(opts))
+    ).set_model(PowerForecast)
     plan = PopulationFilter(experiment_name="expA").apply(scan).explain()
     assert "experiment_name=expA" in plan
     assert "experiment_name=expB" not in plan
@@ -225,7 +226,7 @@ def test_metadata_parquet_round_trip_over_s3(s3_endpoint: str) -> None:
     assert stats["metadata_n_new_TimeSeriesIDs"] == 3
 
     assert object_exists(uri, opts)
-    back = pl.read_parquet(uri, storage_options=opts)
+    back = pl.read_parquet(uri, storage_options=typeddict_to_dict(opts))
     assert back.height == 3
 
     # A second upsert of identical rows is a no-op (exercises the read-existing S3 path).
