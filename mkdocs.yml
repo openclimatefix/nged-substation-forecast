@@ -59,6 +59,7 @@ nav:
       - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
   - Live Service:
       - Overview: live_service/index.md
+      - Environment & storage setup: live_service/setup.md
       - Running live forecasts end-to-end: live_service/dagster-workflow.md
   - Roadmap:
       - Overview: roadmap/index.md
