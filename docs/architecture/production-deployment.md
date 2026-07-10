@@ -53,13 +53,23 @@ inference has no MLflow dependency at runtime:
 
 ```bash
 docker run --network=none nged-forecast:<tag> \
-  job execute -m nged_substation_forecast.definitions -j live_forecasts_job --partition <key>
+  job execute -m nged_substation_forecast.definitions -j live_forecasts_job \
+  --tags '{"dagster/partition": "<key>"}'
 ```
 
-If this loads the model and only fails later on data access (no `DATA_PATH` reachable inside
-`--network=none`), that's expected — the point is confirming the model load itself needs no
-network call. A full end-to-end run needs a real `DATA_PATH` (local mount or S3 credentials)
-supplied via environment variables, per
+Partition selection uses `--tags`, not `--select`/`--partition`: `dagster job execute` has no
+`--partition` flag at all, and `dagster asset materialize --select <asset>` (which does) hits a
+pre-existing, unrelated `antlr4-python3-runtime`/Python 3.14 incompatibility in Dagster's own
+asset-selection-string parser — reproduces identically outside Docker, on a plain `dg dev`
+checkout, so it's an upstream/environment issue, not something introduced by this image.
+Selecting by job name (`-j`) skips that parser entirely.
+
+**Verified 2026-07-10** against a real promoted model: the run reaches
+`load_forecaster_from_dir` and loads the model successfully (confirmed via the step ordering in
+`production_assets.py` — model load happens before the NWP-availability lookup) with zero
+`mlflow` mentions anywhere in the log, then fails only on missing NWP data access (expected —
+no `DATA_PATH` was mounted for this isolated test). A full end-to-end run needs a real
+`DATA_PATH` (local mount or S3 credentials) supplied via environment variables, per
 [Environment & storage setup](../live_service/setup.md).
 
 ## Two subtleties for the AWS deployment (not yet built)

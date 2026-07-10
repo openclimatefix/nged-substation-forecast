@@ -18,3 +18,9 @@
 !/data
 !/data/production_model
 !/data/production_model/**
+
+!/conf
+!/conf/**
+
+!/metadata
+!/metadata/**

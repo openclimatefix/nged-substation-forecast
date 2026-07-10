@@ -46,17 +46,35 @@ LABEL org.opencontainers.image.source="https://github.com/openclimatefix/nged-su
 
 ENV GIT_SHA="${GIT_SHA}" \
     PATH="/app/.venv/bin:${PATH}" \
-    PRODUCTION_MODEL_PATH="/app/data/production_model"
+    PRODUCTION_MODEL_PATH="/app/data/production_model" \
+    CV_CONFIG_PATH="/app/conf/cv/default.yaml" \
+    NWP_METADATA_CSV_PATH="/app/metadata/nwp_metadata.csv"
+# CV_CONFIG_PATH/NWP_METADATA_CSV_PATH override contracts.settings.Settings' PROJECT_ROOT-
+# relative defaults, which resolve to a path *inside* .venv under this --no-editable install
+# (PROJECT_ROOT = Path(__file__).parents[4] assumes an editable-install directory depth) —
+# empirically confirmed necessary: without them, importing nged_substation_forecast.definitions
+# (which eagerly loads the CV config at module scope, in defs/cv_assets.py) fails with
+# FileNotFoundError: /app/.venv/conf/cv/default.yaml. cv_assets.py now reads CV_CONFIG_PATH
+# directly (not via a Settings() instance, to stay credential-free at import time), so this env
+# var is honoured; nwp_metadata_csv_path was already read via an instantiated Settings and so
+# needed no source change.
 
 WORKDIR /app
 
 COPY --from=builder /app/.venv /app/.venv
 COPY data/production_model/ data/production_model/
+COPY conf/ conf/
+COPY metadata/ metadata/
 
 ENTRYPOINT ["dagster"]
 # The default target: live_forecasts_job is the real, already-existing partitioned job
 # (defs/schedules.py). Under Option B, EcsRunLauncher overrides this command per run, and the
 # same image separately serves as the code-location server — this default only matters for
-# `docker run` smoke tests. Requires --partition <key> at run time, e.g.:
-#   docker run --network=none <image> job execute -j live_forecasts_job --partition <key>
+# `docker run` smoke tests. Partition selection is via --tags, not --select/--partition:
+# `dagster job execute` has no --partition flag at all, and `--select <asset>` hits a pre-
+# existing, unrelated antlr4-python3-runtime/Python-3.14 incompatibility in Dagster's own
+# asset-selection-string parser (confirmed reproducing outside Docker too, on plain `dg dev`).
+# Job-name selection (-j) skips that parser entirely, so this is the reliable invocation:
+#   docker run --network=none <image> job execute -j live_forecasts_job \
+#     --tags '{"dagster/partition": "<key>"}'
 CMD ["job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job"]
