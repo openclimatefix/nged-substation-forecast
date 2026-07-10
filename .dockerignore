@@ -1,0 +1,20 @@
+# Ignore everything, then explicitly un-ignore only what the build needs, so the context stays
+# small (in particular: never the rest of data/ — NWP/power/forecasts tables can be huge — only
+# data/production_model/, the promoted champion model). Docker's ignore-then-allow semantics
+# require every ancestor directory of an allowed path to be un-ignored too, not just the final
+# glob, hence the repeated entries below.
+*
+
+!/pyproject.toml
+!/uv.lock
+!/README.md
+
+!/packages
+!/packages/**
+
+!/src
+!/src/**
+
+!/data
+!/data/production_model
+!/data/production_model/**

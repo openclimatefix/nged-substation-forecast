@@ -9,7 +9,7 @@
 > [inference asset](#the-live_forecasts-asset) (#221, done) → the
 > [local dress rehearsal](#deployment-workstream-1-the-production-job-local-dress-rehearsal)
 > (#208, done) → S3-capable data paths (#121, #50, done)
-> → the [champion-model container](#production-model-artifacts) (#222) → the
+> → the [champion-model container](#production-model-artifacts) (#222, done) → the
 > [AWS infrastructure](#aws-architecture) (#206) → smaller cleanup (#197, #63, #246) →
 > [the v0.1 version bump](#related-github-issues) (#209).
 > [Production monitoring](#production-monitoring) (#224) is tracked separately and deferred
@@ -119,6 +119,11 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
 
 Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)
 
+> **Status: ✅ Implemented.** The `Dockerfile` (repo root) and the promotion runbook now live at
+> [Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/),
+> the permanent home this section's shipped material moves to. Remaining work on this page —
+> the [AWS infrastructure](#aws-architecture) itself — is unaffected.
+
 The deployment below runs forecasts as ephemeral Fargate tasks under every architecture
 option. An ephemeral container has no persistent disk and, under some architecture options, no
 reachable tracking server — so without a decision here, production inference has no way to get
@@ -147,9 +152,13 @@ service survives an MLflow outage), exactly as it does for CV today.
 artifacts" step above is a manually-triggered Dagster asset, `promoted_model` (config
 `mlflow_run_id`), rather than a bare script — promotion becomes a materialisation, giving an
 audit trail and lineage for free. The download logic itself
-(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
-the eventual `scripts/fetch_model.py` wrapper for the Docker build (below) stays a thin call
-into the same function.
+(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper.
+**The Docker build reuses this same asset** (headlessly, via `dagster asset materialize`) —
+no separate fetch script was built; see
+[Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
+for why a bare script would have been redundant, and why the `docker build` step itself stays
+outside Dagster (it would only ever run on a laptop, and image build/push is a CI-shaped
+concern once an MLflow tracking server and AWS infra exist).
 
 ## AWS architecture
 
@@ -477,57 +486,6 @@ free. No coupling needed; the ordering is flexible.
 
 ## Implementation details (deleted when this ships)
 
-### Container build
-
-Dockerfile (repo root):
-
-- Multi-stage `uv` build (standard pattern: `ghcr.io/astral-sh/uv` image, `uv sync --frozen
-  --no-dev`, copy `.venv` + source into a slim `python:3.14` runtime stage).
-- Build args: `MODEL_RUN_ID` (the champion fold run ID, stamped only as an OCI label for
-  traceability — the build never contacts MLflow with it), `GIT_SHA` (stamped as an OCI label
-  and env var; complements
-  [reproducibility stamping](engineering-health.md#reproducibility-stamp-git-sha-and-delta-table-versions-on-mlflow-runs)).
-- Model injection: keep the image build hermetic — the build **copies** a plain model
-  directory from the build context (`data/production_model/`, populated beforehand by a small
-  script, e.g. `scripts/fetch_model.py`, that downloads the champion run's artifacts straight
-  from MLflow — a one-off, researcher-run step, not the `load_from_mlflow` cache wrapper).
-  `COPY` it to a fixed in-image path that the entrypoint passes straight to `ForecasterClass.load`.
-  Downloading from inside `docker build` is rejected (needs tracking credentials in the build).
-- Entrypoint: `dagster job execute` one-shot (the exact job comes with the `live_forecasts`
-  asset; until that exists, the entrypoint can materialise the data-ingestion assets so the
-  image is testable now). Under Option B the same image also serves as the code-location
-  server on the control-plane box and as the `EcsRunLauncher` run image — the launcher
-  overrides the command, so the one-shot entrypoint stays the default either way. Build for
-  **arm64** (ARM Fargate is 20% cheaper and the candidate control-plane boxes are Graviton).
-
-Settings: add a simple fixed path (e.g. `Settings.production_model_path`) for where the
-in-image model directory lives — no MLflow-related setting is needed for v0.1.
-
-Promotion runbook — short page `docs/architecture/production-deployment.md` (permanent docs,
-written when this ships):
-
-1. Pick the champion fold run ID from the MLflow leaderboard.
-2. `uv run python scripts/fetch_model.py --run-id <id>` → populates `data/production_model/`.
-3. `docker build --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD)
-   -t nged-forecast:<id-short> .` and push to ECR.
-4. Point the ECS task definition at the new tag.
-
-Also record the two issue-#206 subtleties the review surfaced, so they're not lost when the
-Fargate work starts: (a) whenever the job executes one-shot without persistent Dagster state
-(Option A), "which `ecmwf_ens` partitions need materialising" must be derived from Delta
-contents vs Dynamical availability, not Dagster's materialisation records — the local dress
-rehearsal below sidestepped this by running the daemon with a *persistent* `DAGSTER_HOME`, so
-Dagster's own records were fine to rely on there; (b) Delta commits already give the atomic
-"outputs are the freshness record" property — just ensure the forecast Delta write is the
-run's final write.
-
-Container verification:
-
-1. `docker build` with a smoke-test-fold run ID succeeds.
-2. `docker run` **with no network access to any MLflow store** loads the model straight from
-   disk and executes the entrypoint — this is the critical test.
-3. Image labels show the run ID and git SHA (`docker inspect`).
-
 ### Deployment workstream 1 — the production job (local dress rehearsal)
 
 Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)
@@ -615,7 +573,7 @@ order issues were opened.
 | [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | [Deployment workstream 1](#deployment-workstream-1-the-production-job-local-dress-rehearsal) — done, via native per-asset schedules |
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
-| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) + the container-build notes above |
+| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)) |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
 | [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
