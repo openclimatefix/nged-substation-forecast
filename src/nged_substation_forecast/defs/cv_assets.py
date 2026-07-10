@@ -12,7 +12,11 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
-from contracts._uri import ObjectStoreOptions, delta_table_exists, ensure_local_parent
+from contracts._uri import (
+    ObjectStoreOptions,
+    delta_table_exists,
+    if_local_path_then_make_parent_dir,
+)
 from contracts.hydra_schemas import load_cv_config
 from contracts.ml_schemas import EligibleTimeSeries, EvalScopeType, Metrics
 from contracts.power_schemas import (
@@ -136,7 +140,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
         )
     )
 
-    ensure_local_parent(settings.eligible_time_series_data_path)
+    if_local_path_then_make_parent_dir(settings.eligible_time_series_data_path)
     write_deltalake(
         table_or_uri=settings.eligible_time_series_data_path,
         data=eligible_df.to_arrow(),
@@ -222,7 +226,7 @@ def effective_capacity(context: AssetExecutionContext) -> None:
     ).set_model(PowerTimeSeries)
     capacity_df = _compute_effective_capacity(power_lf)
 
-    ensure_local_parent(settings.effective_capacity_data_path)
+    if_local_path_then_make_parent_dir(settings.effective_capacity_data_path)
     write_deltalake(
         table_or_uri=settings.effective_capacity_data_path,
         data=capacity_df.to_arrow(),
@@ -484,7 +488,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
             "nothing to forecast. Re-materialise `trained_cv_model` for this fold."
         )
 
-    ensure_local_parent(settings.power_forecasts_data_path)
+    if_local_path_then_make_parent_dir(settings.power_forecasts_data_path)
     n_rows = 0
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
@@ -870,7 +874,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         )
     )
 
-    ensure_local_parent(settings.forecast_metrics_data_path)
+    if_local_path_then_make_parent_dir(settings.forecast_metrics_data_path)
     now = datetime.now(timezone.utc)
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).

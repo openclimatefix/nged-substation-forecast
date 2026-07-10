@@ -9,7 +9,7 @@ from pathlib import Path
 import polars as pl
 from contracts._uri import (
     delta_table_exists,
-    ensure_local_parent,
+    if_local_path_then_make_parent_dir,
     is_remote_uri,
     object_exists,
     uri_join,
@@ -32,16 +32,16 @@ def test_uri_join_local_and_remote():
     assert uri_join("/srv/data", "NWP") == "/srv/data/NWP"
 
 
-def test_ensure_local_parent_creates_local_dir(tmp_path: Path):
+def test_if_local_path_then_make_parent_dir_creates_local_dir(tmp_path: Path):
     target = tmp_path / "nested" / "dir" / "table"
     assert not target.parent.exists()
-    ensure_local_parent(str(target))
+    if_local_path_then_make_parent_dir(str(target))
     assert target.parent.is_dir()
 
 
-def test_ensure_local_parent_noop_for_remote():
+def test_if_local_path_then_make_parent_dir_noop_for_remote():
     # Must not raise or touch the filesystem for a remote URI.
-    ensure_local_parent("s3://bucket/data/table")
+    if_local_path_then_make_parent_dir("s3://bucket/data/table")
 
 
 def test_object_exists_local(tmp_path: Path):

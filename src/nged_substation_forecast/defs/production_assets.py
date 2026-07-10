@@ -14,7 +14,7 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
-from contracts._uri import ensure_local_parent
+from contracts._uri import if_local_path_then_make_parent_dir
 from contracts.ml_schemas import AllFeatures
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
@@ -278,7 +278,7 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
             "NWP coverage and the model's trained population."
         )
 
-    ensure_local_parent(settings.power_forecasts_data_path)
+    if_local_path_then_make_parent_dir(settings.power_forecasts_data_path)
     write_power_forecasts(
         forecasts,
         settings.power_forecasts_data_path,

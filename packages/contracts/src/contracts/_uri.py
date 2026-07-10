@@ -58,7 +58,7 @@ def uri_join(base: str, *parts: str) -> str:
     return str(Path(base).joinpath(*parts))
 
 
-def ensure_local_parent(uri: str) -> None:
+def if_local_path_then_make_parent_dir(uri: str) -> None:
     """Create the parent directory of a *local* ``uri``; a no-op for a remote URI.
 
     Local filesystems need a table/file's parent directory to exist before a write; object

@@ -5,7 +5,7 @@ from typing import Any, Final, Generic, Self, TypeVar
 
 import patito as pt
 import polars as pl
-from contracts._uri import ensure_local_parent
+from contracts._uri import if_local_path_then_make_parent_dir
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
@@ -100,7 +100,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # Save PowerTimeSeries:
     new_power_ts_deduped = select_new_rows(new_power_ts, delta_path, storage_options)
     if not new_power_ts_deduped.is_empty():
-        ensure_local_parent(delta_path)
+        if_local_path_then_make_parent_dir(delta_path)
         new_power_ts_deduped.write_delta(
             delta_path,
             mode="append",
@@ -136,7 +136,7 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
 
     # Save to parquet
     h3_grid_weights_path = settings.h3_grid_weights_path
-    ensure_local_parent(h3_grid_weights_path)
+    if_local_path_then_make_parent_dir(h3_grid_weights_path)
     weights.write_parquet(
         h3_grid_weights_path, storage_options=typeddict_to_dict(settings.storage_options)
     )
@@ -211,7 +211,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     context.log.info(f"Converted NWP data to Polars. Columns: {nwp.columns}")
 
     nwp_data_path = settings.nwp_data_path
-    ensure_local_parent(nwp_data_path)
+    if_local_path_then_make_parent_dir(nwp_data_path)
     write_nwp(nwp, nwp_data_path, storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
