@@ -5,6 +5,7 @@ thin orchestration shell delegating its logic to the pure helpers in ``ml_core._
 the logic stays fast to unit-test and the assets stay readable.
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Final
@@ -52,10 +53,16 @@ from ml_core._mlflow_runs import (
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
 # (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
-# the partition keys are available when Dagster builds the asset graph. PROJECT_ROOT is used here
-# (rather than Settings, which needs the .env secrets) so the partition set can be built without
-# any credentials.
-_cv_config = load_cv_config(Settings.model_fields["cv_config_path"].default)
+# the partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH
+# env var is read directly here (rather than instantiating Settings, which needs the .env
+# secrets) so the partition set can be built without any credentials — while still respecting
+# the same env var Settings' cv_config_path field would use, unlike reading
+# Settings.model_fields["cv_config_path"].default directly, which silently ignores it (that
+# default is also PROJECT_ROOT-relative, which only resolves correctly for an editable install;
+# a production image built with `uv sync --no-editable` must set CV_CONFIG_PATH explicitly).
+_cv_config = load_cv_config(
+    Path(os.environ.get("CV_CONFIG_PATH", Settings.model_fields["cv_config_path"].default))
+)
 
 cv_fold_partitions = StaticPartitionsDefinition(_cv_config.fold_ids)
 """One partition per canonical CV fold (by fold year, e.g. "2022"). Experiment-independent."""

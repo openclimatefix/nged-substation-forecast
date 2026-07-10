@@ -113,11 +113,11 @@ against an in-process `moto` server.)
 
 > **Scope: data tables on S3, not the full unattended deployment.** This section covers pointing the
 > **data tables** at S3 — which is all the ephemeral-compute deployment needs from the storage layer,
-> and is enough to run the stack from your laptop against an S3 `DATA_PATH` today. Running the
-> forecast itself as an unattended, scheduled **Fargate task** (the container build, ECR, EventBridge
-> scheduling) is a separate, not-yet-built roadmap item — see
-> [Live service roadmap → Production model artifacts](https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#production-model-artifacts)
-> ([#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)) and the
+> and is enough to run the stack from your laptop against an S3 `DATA_PATH` today. Building the
+> production container itself is covered by
+> [Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/);
+> running it as an unattended, scheduled **Fargate task** (ECR, EventBridge scheduling) is a
+> separate, not-yet-built roadmap item — see the
 > [AWS architecture](https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#aws-architecture)
 > section for that plan.
 
