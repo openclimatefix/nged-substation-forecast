@@ -917,6 +917,7 @@ version = "0.1.0"
 source = { virtual = "packages/dashboard" }
 dependencies = [
     { name = "altair" },
+    { name = "contracts" },
     { name = "geoarrow-pyarrow" },
     { name = "lonboard" },
     { name = "marimo" },
@@ -936,6 +937,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
+    { name = "contracts", editable = "packages/contracts" },
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
     { name = "lonboard", specifier = ">=0.13.0" },
     { name = "marimo", specifier = ">=0.19.7" },
@@ -2502,6 +2504,7 @@ name = "nged-data"
 version = "0.0.1"
 source = { editable = "packages/nged_data" }
 dependencies = [
+    { name = "contracts" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars" },
@@ -2510,6 +2513,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "contracts", editable = "packages/contracts" },
     { name = "obstore" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
