@@ -16,7 +16,7 @@ image.
 ## The promotion runbook
 
 1. **Pick the champion fold run ID** from the MLflow leaderboard — see
-   [Running live forecasts end-to-end → Step 1](../live_service/dagster-workflow.md#step-1--pick-a-champion-model).
+   [Running live forecasts end-to-end → Step 1](../live_service/dagster-workflow.md#step-1-pick-a-champion-model).
 
 2. **Materialise `promoted_model`** to populate `data/production_model/` on disk. This is the
    same asset the local workflow uses — no separate script — either from the Dagster UI
