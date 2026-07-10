@@ -41,7 +41,7 @@ def test_upsert_metadata_new_file(tmp_path: Path):
         .validate()
     )
 
-    upsert_metadata(metadata, metadata_path)
+    upsert_metadata(metadata, str(metadata_path))
 
     assert metadata_path.exists()
 
@@ -102,7 +102,7 @@ def test_upsert_metadata_merge(tmp_path: Path):
         .validate()
     )
 
-    upsert_metadata(new_metadata, metadata_path)
+    upsert_metadata(new_metadata, str(metadata_path))
 
     # Read back and verify
     read_metadata = pl.read_parquet(metadata_path)
@@ -188,7 +188,7 @@ def test_upsert_metadata_returns_diff(tmp_path: Path):
     new_metadata = pt.DataFrame(new_data).set_model(TimeSeriesMetadata).cast().validate()
 
     # 3. Call upsert_metadata
-    stats = upsert_metadata(new_metadata, metadata_path)
+    stats = upsert_metadata(new_metadata, str(metadata_path))
 
     # 4. Assertions
     assert stats["metadata_n_new_TimeSeriesIDs"] == 1
@@ -271,7 +271,7 @@ def test_select_new_rows_file_listing(tmp_path: Path):
     )
     file_listing = pt.DataFrame(raw).set_model(_ProcessedFileListing).validate()
 
-    result = select_new_rows(file_listing, delta_path)
+    result = select_new_rows(file_listing, str(delta_path))
 
     assert result.height == 2
     assert set(result["path"].to_list()) == {"new_ts1.json", "new_ts2.json"}
@@ -304,7 +304,7 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
         )
     )
 
-    result = select_new_rows(input_power, delta_path)
+    result = select_new_rows(input_power, str(delta_path))
 
     assert result.height == 1
     assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)

@@ -5,7 +5,7 @@ import obstore
 from pydantic import AnyHttpUrl, Field, TypeAdapter, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from contracts._uri import uri_join
+from contracts._uri import ObjectStoreOptions, uri_join
 
 url_adapter = TypeAdapter(AnyHttpUrl)
 
@@ -102,8 +102,9 @@ class Settings(BaseSettings):
 
     # --- Storage roots -------------------------------------------------------------------
     #
-    # Two roots, because model/plot artifacts must stay on a local filesystem (XGBoost
-    # save_model/load_model, shutil, Altair) even when the data tables move to S3.
+    # data_path holds the (S3-capable) data tables; local_artifacts_path holds the always-local
+    # model cache, production model, and plots. Why they are split, and what belongs in each:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
@@ -122,11 +123,60 @@ class Settings(BaseSettings):
         ),
     )
 
+    # --- Object-store credentials for the data tables (used only when data_path is remote) --
+    #
+    # All empty by default; unset on AWS (object_store auto-discovers the IAM-role credentials),
+    # set only for a dev/MinIO endpoint. The AWS/dev split, and how these differ from the
+    # nged_s3_bucket_* source-bucket creds above:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
+
+    data_store_endpoint_url: str = Field(
+        default="",
+        description=(
+            "S3-compatible endpoint URL for the data tables (e.g. a MinIO/dev endpoint). Empty on"
+            " AWS, where the endpoint is inferred. When set, the store is also allowed to use"
+            " plain HTTP (dev endpoints rarely have TLS)."
+        ),
+    )
+    data_store_access_key_id: str = Field(
+        default="", description="Access key for the data-table object store; empty on AWS (IAM)."
+    )
+    data_store_secret_access_key: str = Field(
+        default="", description="Secret key for the data-table object store; empty on AWS (IAM)."
+    )
+    data_store_region: str = Field(
+        default="", description="Region for the data-table object store; empty to auto-discover."
+    )
+
+    @property
+    def storage_options(self) -> ObjectStoreOptions:
+        """delta-rs / polars / obstore ``storage_options`` for the managed data tables.
+
+        Empty on AWS — object_store auto-discovers the Fargate task's IAM-role credentials and
+        region — and empty for a local ``data_path`` (delta-rs ignores it there). Populated from
+        the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
+        keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
+        obstore alike, so one value feeds every IO site. Returned as an ``ObjectStoreOptions``
+        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a plain
+        ``dict`` at each IO boundary with ``typeddict_to_dict``.
+        """
+        options: ObjectStoreOptions = {}
+        if self.data_store_endpoint_url:
+            options["aws_endpoint_url"] = self.data_store_endpoint_url
+            options["aws_allow_http"] = "true"
+        if self.data_store_access_key_id:
+            options["aws_access_key_id"] = self.data_store_access_key_id
+        if self.data_store_secret_access_key:
+            options["aws_secret_access_key"] = self.data_store_secret_access_key
+        if self.data_store_region:
+            options["aws_region"] = self.data_store_region
+        return options
+
     # --- Managed data tables (derive from data_path unless explicitly set) ----------------
     #
-    # Each defaults to "" as a sentinel meaning "derive from data_path in _derive_unset_paths".
-    # Set any one explicitly (e.g. NWP_DATA_PATH=s3://other-bucket/NWP) to override just that
-    # table. After validation every field below is a concrete, non-empty path string.
+    # Each defaults to "" — a sentinel meaning "derive from data_path in _derive_unset_paths".
+    # The derive-from-root convention and per-table overrides:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     nged_data_path: str = ""
     """Directory holding the NGED power_time_series Delta table and metadata parquet."""

@@ -14,8 +14,10 @@ from typing import Final
 import mlflow
 import patito as pt
 import polars as pl
+from contracts._uri import if_local_path_then_make_parent_dir
 from contracts.ml_schemas import AllFeatures
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 from dagster import (
     AssetDep,
     AssetExecutionContext,
@@ -148,7 +150,9 @@ def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     the ``init_time`` partition values — naive ``"YYYY-MM-DD HH:MM:SS.ffffff"`` strings on disk —
     into tz-aware UTC datetimes.
     """
-    delta_table = DeltaTable(str(settings.nwp_data_path))
+    delta_table = DeltaTable(
+        settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
+    )
     raw_values = {partition["init_time"] for partition in delta_table.partitions()}
     return [
         datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f").replace(tzinfo=timezone.utc)
@@ -274,12 +278,13 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
             "NWP coverage and the model's trained population."
         )
 
-    Path(settings.power_forecasts_data_path).parent.mkdir(parents=True, exist_ok=True)
+    if_local_path_then_make_parent_dir(settings.power_forecasts_data_path)
     write_power_forecasts(
         forecasts,
         settings.power_forecasts_data_path,
         replace_partition=(forecaster.model_params.experiment_name, "live"),
         replace_predicate_extra=f"power_fcst_init_time = '{power_fcst_init_time.isoformat()}'",
+        storage_options=settings.storage_options,
     )
 
     context.add_output_metadata(

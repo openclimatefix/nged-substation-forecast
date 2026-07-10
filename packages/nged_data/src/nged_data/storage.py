@@ -1,12 +1,13 @@
 import logging
-from pathlib import Path
 from typing import Final, Sequence, TypedDict, overload
 
 import obstore
 import patito as pt
 import polars as pl
+from contracts._uri import ObjectStoreOptions, delta_table_exists, object_exists
 from contracts.common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.typing_utils import typeddict_to_dict
 
 from nged_data.read_nged_json import (
     _extract_power_time_series,
@@ -195,7 +196,8 @@ class _MaxTimePerTimeSeriesId(pt.Model):
 @overload
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries],
-    delta_path: Path,
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries]: ...
 
 
@@ -204,26 +206,34 @@ def select_new_rows(
 @overload
 def select_new_rows(
     time_series: pt.DataFrame[_ProcessedFileListing],
-    delta_path: Path,
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[_ProcessedFileListing]: ...
 
 
 def select_new_rows(
     time_series: pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing],
-    delta_path: Path,
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """
     Return rows in `time_series` that are more recent than the most recent
     data already in our Delta table, on a time_series_id by time_series_id basis.
+
+    `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
+    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
     """
 
-    if not delta_path.exists():
+    if not delta_table_exists(delta_path, storage_options):
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
 
     # Scan the existing delta table and find the most recent time per time_series_id
     max_times = (
-        pl.scan_delta(delta_path).group_by("time_series_id").agg(max_time=pl.max("time")).collect()
+        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+        .group_by("time_series_id")
+        .agg(max_time=pl.max("time"))
+        .collect()
     )
 
     log.info(
@@ -269,7 +279,9 @@ class UpsertMetadataStats(TypedDict, total=False):
 
 
 def upsert_metadata(
-    new_metadata: pt.DataFrame[TimeSeriesMetadata], metadata_path: Path
+    new_metadata: pt.DataFrame[TimeSeriesMetadata],
+    metadata_path: str,
+    storage_options: ObjectStoreOptions | None = None,
 ) -> UpsertMetadataStats:
     """
     Upserts metadata to a Parquet file.
@@ -284,8 +296,10 @@ def upsert_metadata(
 
     Args:
         new_metadata: The new metadata DataFrame.
-        metadata_path: The path to the Parquet file where we store our local version of the
-            metadata.
+        metadata_path: Local path or remote URI of the Parquet file where we store our version
+            of the metadata.
+        storage_options: Object-store credentials/endpoint for a remote `metadata_path`;
+            ``None``/empty for a local path.
 
     Returns stats about new metadata
     """
@@ -293,17 +307,22 @@ def upsert_metadata(
 
     new_metadata = TimeSeriesMetadata.validate(new_metadata.sort("time_series_id"))
 
-    # FIXME: `path.exists()` won't work when metadata_path is on S3!
-    if not metadata_path.exists():
+    if not object_exists(metadata_path, storage_options):
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
-        new_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+        new_metadata.write_parquet(
+            metadata_path,
+            compression=COMPRESSION,
+            storage_options=typeddict_to_dict(storage_options),
+        )
         return UpsertMetadataStats(
             metadata_n_new_TimeSeriesIDs=new_metadata.height,
             metadata_n_updated_TimeSeriesIDs=0,
         )
 
     # Read existing metadata
-    existing_metadata = pl.read_parquet(metadata_path)
+    existing_metadata = pl.read_parquet(
+        metadata_path, storage_options=typeddict_to_dict(storage_options)
+    )
     TimeSeriesMetadata.validate(existing_metadata)
 
     # Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an
@@ -334,7 +353,9 @@ def upsert_metadata(
 
     TimeSeriesMetadata.validate(merged_metadata)
 
-    merged_metadata.write_parquet(metadata_path, compression=COMPRESSION)
+    merged_metadata.write_parquet(
+        metadata_path, compression=COMPRESSION, storage_options=typeddict_to_dict(storage_options)
+    )
 
     # Compute stats
     new_ids = set(new_metadata["time_series_id"]) - set(existing_metadata["time_series_id"])

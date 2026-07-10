@@ -7,7 +7,9 @@ from typing import ClassVar, Literal, Self
 import patito as pt
 import polars as pl
 
+from contracts._uri import ObjectStoreOptions
 from contracts.settings import Settings
+from contracts.typing_utils import typeddict_to_dict
 
 from .common import UTC_DATETIME_DTYPE
 
@@ -322,10 +324,26 @@ class Nwp(pt.Model):
             )
 
     @classmethod
-    def scan_delta(cls, path: str | Path = SETTINGS.nwp_data_path) -> pt.LazyFrame[Self]:
+    def scan_delta(
+        cls,
+        path: str | Path = SETTINGS.nwp_data_path,
+        storage_options: ObjectStoreOptions = SETTINGS.storage_options,
+    ) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
         The table stores physical-unit `Float32` directly (see `delta_store.nwp.write_nwp`),
         so no rescale step is needed.
+
+        Args:
+            path: Path or URI of the ``nwp`` Delta table.
+            storage_options: delta-rs object-store options (credentials/endpoint) for a remote
+                ``path``; defaults to the ``SETTINGS`` singleton's options (empty for a local
+                ``path``). Read-only — never mutated here (shared mutable default).
         """
-        return pt.LazyFrame.from_existing(pl.scan_delta(path)).set_model(cls).cast()
+        return (
+            pt.LazyFrame.from_existing(
+                pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))
+            )
+            .set_model(cls)
+            .cast()
+        )

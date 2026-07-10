@@ -15,6 +15,9 @@ of those candidates as the running production model and keeping live forecasts f
 
 ## Documents
 
+- [Environment & storage setup](setup.md) — where the data tables and local artifacts live, and
+  how to configure credentials for running locally, against a local MinIO, or with the data tables
+  on AWS S3.
 - [Running live forecasts end-to-end](dagster-workflow.md) — step-by-step recipe: promote a
   champion model to `promoted_model`, let the 6-hourly `live_forecasts` schedule run (or
   materialise a slot by hand), inspect a forecast, and backfill a missed slot in replay mode.
