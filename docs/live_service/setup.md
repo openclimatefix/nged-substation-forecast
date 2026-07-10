@@ -30,13 +30,31 @@ The single most important idea is that there are **two** roots, not one:
 | Data tables | `DATA_PATH` | **Yes** | NWP, power observations, forecasts, metrics, metadata, H3 weights |
 | Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | Trained-model cache, the promoted production model, plot HTML |
 
-They are split because the artifacts back local-filesystem-only libraries — XGBoost's
-`save_model`/`load_model`, `shutil`, Altair — that cannot write to an object store. So even when the
-data tables move to S3, the model and plot paths must stay on a real filesystem. Deriving them from
-a possibly-remote `DATA_PATH` would break inference; hence two independent roots.
+They are split for an **architectural** reason, not merely because XGBoost and Altair happen to
+write to local files (a library that can't write to S3 can always be bridged — write to a tempdir,
+upload — as MLflow does internally). The real reason is that **nothing under `LOCAL_ARTIFACTS_PATH`
+is part of the S3-backed data plane**. Each item belongs to the laptop/CV workflow or to the
+container image, not to shared storage:
 
-Both default to `<repo>/data`, so out of the box everything lives under one local directory and the
-distinction is invisible. It only matters once `DATA_PATH` becomes an `s3://` URI.
+- **Trained-model cache** — a local-disk *cache* keyed by MLflow run id, filled by
+  `BaseForecaster.load_from_mlflow` to avoid re-downloading artifacts. A cache is node-local by
+  definition, and only the CV pipeline (which runs on a laptop) uses it; production inference never
+  touches it.
+- **Promoted production model** — distributed via the **container image**, not shared storage: the
+  v0.1 deployment bakes the champion into the image at build time and loads it with a plain disk
+  `load()` (see
+  [roadmap: Production model artifacts](https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#production-model-artifacts),
+  [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local
+  directory is the build-time staging area that gets copied into the image; on the deployed task the
+  model is read from the image's own filesystem.
+- **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see the note
+  under [Running on AWS](#viewing-forecasts-on-aws) for why it is not the way to view forecasts in a
+  deployed service.
+
+So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
+to S3 — it never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. Both roots default to
+`<repo>/data`, so out of the box everything lives under one local directory and the distinction is
+invisible; it only matters once `DATA_PATH` becomes an `s3://` URI.
 
 ### The "derive from root" convention
 
@@ -177,6 +195,18 @@ from the Dagster UI, then confirm the objects appear under `s3://nged-flexpectat
 the S3 console. Because `LOCAL_ARTIFACTS_PATH` stayed local, a subsequent `promoted_model`
 materialisation still writes the model to `<repo>/data/production_model/` on disk — the two roots
 behaving independently is exactly what you want to see.
+
+### Viewing forecasts on AWS
+
+Do **not** rely on the `plot_power_forecast` asset in a deployed service. It writes Altair HTML to
+`LOCAL_ARTIFACTS_PATH`, which on an ephemeral Fargate task is a disk that is discarded when the task
+exits — the file would never be seen. `plot_power_forecast` is a **local-development convenience**:
+materialise it on your laptop, open the HTML in a browser.
+
+The durable, S3-native way to look at forecasts is the **dashboard**
+(`packages/dashboard/main.py`), which reads the `power_forecasts` and metadata tables directly from
+`DATA_PATH` (with the same `storage_options`) and renders on demand — no plot files to persist.
+Point it at the same `Settings` and it works identically whether `DATA_PATH` is local or `s3://`.
 
 ### At-a-glance: which settings for which environment
 

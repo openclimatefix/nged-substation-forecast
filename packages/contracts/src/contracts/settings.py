@@ -102,8 +102,13 @@ class Settings(BaseSettings):
 
     # --- Storage roots -------------------------------------------------------------------
     #
-    # Two roots, because model/plot artifacts must stay on a local filesystem (XGBoost
-    # save_model/load_model, shutil, Altair) even when the data tables move to S3.
+    # Two roots because nothing under local_artifacts_path is part of the S3-backed data plane:
+    # the model cache is a node-local scratch cache used only by the (laptop) CV pipeline; the
+    # production model is distributed via the container image, not shared storage (this dir is its
+    # build-time staging area); and plot HTML is a local-dev convenience (the dashboard, reading
+    # power_forecasts from data_path, is the deployed way to view forecasts). So the deployed
+    # runtime reads its model from the image, data from S3, and writes forecasts to S3 — it never
+    # uses local_artifacts_path as shared storage. See docs/live_service/setup.md.
 
     data_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
