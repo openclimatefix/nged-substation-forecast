@@ -119,46 +119,13 @@ deps: [ecmwf_ens, power_time_series_and_metadata]
 
 Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)
 
-> **Status: ✅ Implemented.** The `Dockerfile` (repo root) and the promotion runbook now live at
-> [Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/),
-> the permanent home this section's shipped material moves to. Remaining work on this page —
-> the [AWS infrastructure](#aws-architecture) itself — is unaffected.
-
-The deployment below runs forecasts as ephemeral Fargate tasks under every architecture
-option. An ephemeral container has no persistent disk and, under some architecture options, no
-reachable tracking server — so without a decision here, production inference has no way to get
-a model. This must be decided before writing the Dockerfile.
-
-**Decision: bake the champion model into the image at build time, loaded via a plain
-`save`/`load` — no MLflow, run ID, or cache involved at runtime.** The model directory is
-produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard
-and downloads its artifacts to local disk), then `COPY`'d into the image at build time.
-Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow
-completely out of the production runtime under every architecture option. Rejected
-alternative: MLflow artifact root on S3 fetched at container startup — more runtime moving
-parts, needs tracking-store access from prod, and slower cold starts.
-
-This is deliberately simpler than reusing `BaseForecaster.load_from_mlflow`'s cache (the
-mechanism the CV pipeline already uses — see
-[ML orchestration](../architecture/ml-orchestration.md#model-artifacts-mlflow-artifact-store-immutable-local-cache)):
-v0.1 has no MLflow dependency to cache against in the first place. **Future work:** once
-production wants to pick up a new champion without a rebuild + redeploy (e.g. after the
-[XGBoost quick wins](xgboost-improvements.md) start landing regularly), switch to fetching the
-champion model from MLflow dynamically — at that point `load_from_mlflow`'s local-disk cache
-becomes the production-resilience mechanism again (serving from disk on a cache hit so the live
-service survives an MLflow outage), exactly as it does for CV today.
-
-**Local operation (implemented):** for running on Jack's laptop, the "researcher downloads
-artifacts" step above is a manually-triggered Dagster asset, `promoted_model` (config
-`mlflow_run_id`), rather than a bare script — promotion becomes a materialisation, giving an
-audit trail and lineage for free. The download logic itself
-(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper.
-**The Docker build reuses this same asset** (headlessly, via `dagster asset materialize`) —
-no separate fetch script was built; see
-[Production Deployment](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)
-for why a bare script would have been redundant, and why the `docker build` step itself stays
-outside Dagster (it would only ever run on a laptop, and image build/push is a CI-shaped
-concern once an MLflow tracking server and AWS infra exist).
+> **Status: ✅ Done.** The design decision (bake the champion model into the image at build
+> time; no MLflow at runtime) and its rationale now live at
+> [Production Deployment — Design](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/);
+> the promotion/build/verify runbook lives at
+> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/).
+> Remaining work on this page — the [AWS infrastructure](#aws-architecture) itself — is
+> unaffected.
 
 ## AWS architecture
 
@@ -559,7 +526,7 @@ Common to all options:
   language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
   does not pick one.
 - Document the few one-time manual steps (SNS subscription confirm, Tailscale join) in a runbook
-  page (`docs/architecture/production-deployment.md`, extending the promotion runbook above).
+  page (`docs/live_service/deployment.md`, extending the promotion runbook above).
 
 Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` cron):
 
@@ -585,7 +552,7 @@ order issues were opened.
 | [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | [Deployment workstream 1](#deployment-workstream-1-the-production-job-local-dress-rehearsal) — done, via native per-asset schedules |
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
-| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/)) |
+| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/)) |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
 | [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
