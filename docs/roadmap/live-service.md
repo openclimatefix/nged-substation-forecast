@@ -144,9 +144,9 @@ filesystem). Two requirements also firmed up that Level 1 does not serve:
 2. **An always-on dev dashboard** (a simple Marimo web app showing the latest forecasts) —
    so *something* must be always-on regardless.
 
-**Current decision status: leaning Option B (small EC2 control-plane box + `EcsRunLauncher`),
-final call pending.** The five options researched are recorded below so the decision has a
-durable record. The implementation workstreams are identical under every option except the
+**Decision: Option B (small EC2 control-plane box + `EcsRunLauncher`), decided 2026-07-11.** The
+five options researched are recorded below so the decision has a durable record. The
+implementation workstreams are identical under every option except the
 infrastructure one.
 
 ### Cost summary
@@ -435,7 +435,7 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 Sensor preferred over a schedule so it fires on the actual data update.
 
 Note this sensor needs a running Dagster daemon — [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
-(the direction we're leaning) provides one. If the deployment instead ships Option A (nothing
+(the decided direction) provides one. If the deployment instead ships Option A (nothing
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
 
@@ -505,19 +505,31 @@ partition keys come from Dagster natively, and missed slots are backfilled from 
 
 ### Deployment workstream 3 — AWS infrastructure
 
+> **Status: partially done.** The pieces common to every architecture option — ECR, IAM task
+> roles, and a Fargate task definition, all set up by hand in the AWS console, plus a manual
+> `RunTask` to verify the whole path end-to-end — are ✅ implemented; see
+> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-4-create-the-ecr-repository)
+> (steps 4–8). The Option B–specific pieces below (the always-on EC2 box, `EcsRunLauncher`,
+> scheduling) and infra-as-code are still 🚧, tracked as follow-up work.
+
 Common to all options:
 
-- **ECR** repository; image pushed by the CI/container build (tag = model run-id + git SHA).
-- **S3**: one data bucket mirroring the local `data/` layout (`nwp_data/`,
-  `power_forecasts/`, …). NGED-delivery bucket/prefix is a later step (v0.1 is "forecast
-  running", not "delivery contract live").
-- **IAM task role**: S3 read/write on the data bucket, ECR pull, CloudWatch Logs — no static
-  AWS keys anywhere.
-- **Fargate task definitions**: start 4 vCPU / 16 GB ARM for live runs (measured inference
-  peak ~9 GB); a bigger (e.g. 8 vCPU / 32 GB) definition for backtests. Right-size after a
-  week of CloudWatch metrics.
-- **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
-- Codify as infra-as-code once there's enough to justify it — per the
+- ✅ **ECR** repository; image pushed by hand for now (tag = model run-id + git SHA) — a CI
+  container build is a later, infra-as-code-era step.
+- ✅ **S3**: one data bucket mirroring the local `data/` layout (`nwp_data/`,
+  `power_forecasts/`, …) — see [Environment & storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/#running-on-aws-manual-point-and-click).
+  NGED-delivery bucket/prefix is a later step (v0.1 is "forecast running", not "delivery
+  contract live").
+- ✅ **IAM roles**: turned out to be **two** roles, not one — a task *execution* role
+  (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role (the S3
+  read/write policy from `setup.md`) — see
+  [Deploying a new production image: Step 6](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-6-iam-roles-for-the-task)
+  for why they're split. No static AWS keys anywhere.
+- ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
+  ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
+  Right-size the live definition after a week of CloudWatch metrics.
+- 🚧 **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
+- 🚧 Codify as infra-as-code once there's enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
   **Open question, not yet decided:** this section originally specified a small Terraform
   module (one file), but a later conversation argued for **AWS CDK (Python)** instead —
@@ -525,8 +537,9 @@ Common to all options:
   benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
   language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
   does not pick one.
-- Document the few one-time manual steps (SNS subscription confirm, Tailscale join) in a runbook
-  page (`docs/live_service/deployment.md`, extending the promotion runbook above).
+- 🚧 Document the few one-time manual steps still to come (SNS subscription confirm, Tailscale
+  join) in the same runbook page (`docs/live_service/deployment.md`) once Option B's control-
+  plane box is built.
 
 Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` cron):
 
@@ -554,6 +567,7 @@ order issues were opened.
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
 | [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/)) |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
+| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; Option B's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
 | [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
