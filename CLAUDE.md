@@ -35,9 +35,11 @@ hook.
 
 `docs/` contains a lot of useful information beyond API reference: forward-looking plans and
 their ordering (`docs/roadmap/`), durable explainers of solution methods (`docs/techniques/`),
-background/requirements context (`docs/background/`), and architecture notes
-(`docs/architecture/`). When planning new features, check `docs/` for relevant prior discussion
-before proposing an approach.
+background/requirements context (`docs/background/`), design rationale for what's already built
+(`docs/architecture/`), and step-by-step operational how-to for what's already built
+(`docs/ml_experimentation/`, `docs/live_service/` — design and how-to are deliberately separate
+pages, cross-linked via "See also"). When planning new features, check `docs/` for relevant prior
+discussion before proposing an approach.
 
 The docs are published at <https://openclimatefix.github.io/nged-substation-forecast>. When
 linking to a docs page from anywhere outside `docs/` itself (GitHub issues, PR bodies, code
@@ -163,7 +165,7 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Comments must reflect current state only** — never reference previous iterations of the
   code or deleted files.
 - **Code links only to durable docs** — `docs/background/`, `docs/techniques/`,
-  `docs/architecture/`, `docs/ml_experimentation/`. Never link from code *or* docs to `plans/`
+  `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never link from code *or* docs to `plans/`
   files, and never from code to `docs/roadmap/` pages or to any
   "Implementation details (deleted when this ships)" section — all of those are deleted when
   the work lands, so the reference rots. (Docs-to-docs links into `docs/roadmap/` are fine;

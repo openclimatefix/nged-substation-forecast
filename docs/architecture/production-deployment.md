@@ -1,76 +1,52 @@
-# Production Deployment — the Container Build
+# Production Deployment — Design
 
-How the champion model gets from an MLflow leaderboard to a running production container.
-Design rationale lives in
-[Live service → Production model artifacts](../roadmap/live-service.md#production-model-artifacts):
-**bake the champion model into the image at build time**, loaded via a plain `save`/`load` — no
-MLflow, run ID, or cache lookup at runtime. Promotion is therefore rebuild + redeploy, which is
-auditable via image tags and keeps MLflow completely out of the production runtime.
+How the champion model gets from an MLflow leaderboard into a running production container, and
+why. For the step-by-step recipe — promote a model, build the image, verify it, push it — see
+[Deploying a new production image](../live_service/deployment.md).
 
-This page assumes you've already read
-[Running live forecasts end-to-end](../live_service/dagster-workflow.md), which covers
-promoting a model and running `live_forecasts` **locally**. This page covers the one extra step
-needed to run the same thing as an unattended container: getting the promoted model *into* an
-image.
+## Baking the model into the image at build time
 
-## The promotion runbook
+Production forecasts run as ephemeral Fargate tasks under every AWS architecture option being
+considered (see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture)).
+An ephemeral container has no persistent disk and, under some architecture options, no reachable
+tracking server — so production inference needs some way to get a model without depending on
+either.
 
-1. **Pick the champion fold run ID** from the MLflow leaderboard — see
-   [Running live forecasts end-to-end → Step 1](../live_service/dagster-workflow.md#step-1-pick-a-champion-model).
+**Decision: bake the champion model into the image at build time, loaded via a plain
+`save`/`load` — no MLflow, run ID, or cache involved at runtime.** The model directory is
+produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard and
+downloads its artifacts to local disk), then `COPY`'d into the image at build time. Promotion
+becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow completely out of
+the production runtime under every architecture option.
 
-2. **Materialise `promoted_model`** to populate `data/production_model/` on disk. This is the
-   same asset the local workflow uses — no separate script — either from the Dagster UI
-   ("Materialize" with `PromotedModelConfig.mlflow_run_id` filled in), or headlessly:
+**Rejected alternative:** MLflow artifact root on S3 fetched at container startup — more runtime
+moving parts, needs tracking-store access from prod, and slower cold starts.
 
-   ```bash
-   uv run dagster asset materialize -m nged_substation_forecast.definitions --select promoted_model \
-     --config-json '{"ops": {"promoted_model": {"config": {"mlflow_run_id": "<run-id>"}}}}'
-   ```
+This is deliberately simpler than reusing `BaseForecaster.load_from_mlflow`'s cache (the
+mechanism the CV pipeline already uses — see
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-immutable-local-cache)):
+v0.1 has no MLflow dependency to cache against in the first place.
 
-3. **Build the image.** The build never contacts MLflow — it only `COPY`s the directory step 2
-   just populated, so it stays hermetic:
+**Future work:** once production wants to pick up a new champion without a rebuild + redeploy
+(e.g. after the [XGBoost quick wins](../roadmap/xgboost-improvements.md) start landing
+regularly), switch to fetching the champion model from MLflow dynamically — at that point
+`load_from_mlflow`'s local-disk cache becomes the production-resilience mechanism again (serving
+from disk on a cache hit so the live service survives an MLflow outage), exactly as it does for
+CV today.
 
-   ```bash
-   docker build \
-     --build-arg MODEL_RUN_ID=<run-id> \
-     --build-arg GIT_SHA=$(git rev-parse HEAD) \
-     -t nged-forecast:<run-id-short> .
-   ```
+## Why promotion is a Dagster asset, not a script
 
-   `MODEL_RUN_ID` and `GIT_SHA` are stamped as OCI labels (and `GIT_SHA` also as a runtime env
-   var) purely for traceability — confirm with `docker inspect nged-forecast:<tag>`.
+The "researcher downloads artifacts" step above is a manually-triggered Dagster asset,
+`promoted_model` (config `mlflow_run_id`), rather than a bare script — promotion becomes a
+materialisation, giving an audit trail and lineage for free. The download logic itself
+(`ml_core._production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so
+nothing about this decision couples it to Dagster.
 
-4. **Push to ECR and point the ECS task definition at the new tag.** (ECR repository and ECS
-   task definitions are provisioned by the AWS infrastructure work,
-   [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) — not yet
-   built at the time this page was written.)
-
-## Verifying a build locally
-
-Before trusting a new image, confirm it actually runs with **zero network access** — this is
-the test that matters, since the entire point of baking the model in is that production
-inference has no MLflow dependency at runtime:
-
-```bash
-docker run --network=none nged-forecast:<tag> \
-  job execute -m nged_substation_forecast.definitions -j live_forecasts_job \
-  --tags '{"dagster/partition": "<key>"}'
-```
-
-Partition selection uses `--tags`, not `--select`/`--partition`: `dagster job execute` has no
-`--partition` flag at all, and `dagster asset materialize --select <asset>` (which does) hits a
-pre-existing, unrelated `antlr4-python3-runtime`/Python 3.14 incompatibility in Dagster's own
-asset-selection-string parser — reproduces identically outside Docker, on a plain `dg dev`
-checkout, so it's an upstream/environment issue, not something introduced by this image.
-Selecting by job name (`-j`) skips that parser entirely.
-
-**Verified 2026-07-10** against a real promoted model: the run reaches
-`load_forecaster_from_dir` and loads the model successfully (confirmed via the step ordering in
-`production_assets.py` — model load happens before the NWP-availability lookup) with zero
-`mlflow` mentions anywhere in the log, then fails only on missing NWP data access (expected —
-no `DATA_PATH` was mounted for this isolated test). A full end-to-end run needs a real
-`DATA_PATH` (local mount or S3 credentials) supplied via environment variables, per
-[Environment & storage setup](../live_service/setup.md).
+**The Docker build reuses this same asset** (headlessly, via `dagster asset materialize`) — no
+separate fetch script was built, since a bare script would have duplicated the asset's audit
+trail for no benefit. The `docker build` step itself stays outside Dagster: it only ever runs on
+a laptop today, and image build/push becomes a CI-shaped concern once an MLflow tracking server
+and AWS infra exist — not something worth orchestrating through Dagster in the meantime.
 
 ## Two subtleties for the AWS deployment (not yet built)
 
@@ -90,8 +66,10 @@ Recorded here so they aren't lost when the Fargate work
 
 ## See also
 
-- [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including AWS
-  architecture options still being decided.
+- [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
+  AWS architecture options still being decided.
+- [Deploying a new production image](../live_service/deployment.md) — the step-by-step
+  promotion/build/push runbook.
 - [Environment & storage setup](../live_service/setup.md) — where data tables and local
   artifacts live, and how to point `Settings` at S3.
 - [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the

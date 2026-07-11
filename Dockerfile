@@ -2,8 +2,8 @@
 
 # Production image for the live-forecast service. Bakes the champion model into the image at
 # build time and loads it via a plain save/load — no MLflow, run ID, or cache lookup at
-# runtime. See docs/architecture/production-deployment.md for the promotion runbook and
-# docs/roadmap/live-service.md#production-model-artifacts for why this design was chosen.
+# runtime. See docs/live_service/deployment.md for the promotion runbook and
+# docs/architecture/production-deployment.md for why this design was chosen.
 #
 # Build (arm64 — ARM Fargate is ~20% cheaper and the candidate control-plane boxes are
 # Graviton; add --platform linux/arm64 if building on an x86 host):
