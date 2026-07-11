@@ -45,4 +45,7 @@ operational systems, rather than us silently working around the gap.
 - [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting a champion model and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders
 
-> Documentation convention: `roadmap/` holds **only not-yet-implemented** design. Once a feature ships, its docs move out to a permanent home (e.g. `architecture/` or `ml_experimentation/`), leaving a one-line pointer behind.
+> New to this repo? See the [Documentation Guide](documentation-guide.md) for how these sections
+> relate to each other and to GitHub issues — including the rule that `roadmap/` holds **only
+> not-yet-implemented** design, moving out to a permanent home (`architecture/` for design
+> rationale, `ml_experimentation/`/`live_service/` for step-by-step how-to) once a feature ships.

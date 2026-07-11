@@ -49,7 +49,7 @@ never to a `github.com/.../blob/main/docs/...` path.
 
 ## How planning works
 
-Full description and a "which place do I use?" table: `docs/roadmap/index.md`. In brief:
+Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
 
 - **GitHub** (issues + the OCF Project board) is the *complete, ordered* task list — task-level
   priority lives only there. When current priorities matter, query it with `gh` (epics map 1:1
