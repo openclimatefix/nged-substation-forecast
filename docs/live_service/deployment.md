@@ -65,7 +65,7 @@ no `DATA_PATH` was mounted for this isolated test). A full end-to-end run needs 
 ## Step 4 — Create the ECR repository
 
 In the AWS console → **ECR** → **Create repository** (same `eu-west-2` region as the S3 bucket
-in [Environment & storage setup: Step 1](setup.md#step-1-create-the-s3-bucket)):
+in [Environment & storage setup: Step 1](setup.md#step-1-create-the-s3-buckets)):
 
 1. **Visibility** Private.
 2. **Name** `nged-forecast` (matches the local image tag used in [Step 2](#step-2-build-the-image)
@@ -102,11 +102,12 @@ Fargate tasks need **two** separate roles, not one — they serve different prin
   AWS-managed `AmazonECSTaskExecutionRolePolicy` — it already covers exactly these two things, so
   no custom policy is needed.
 - **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
-  lets the container read and write the data bucket. Reuse the same S3 policy from
+  lets the container read and write **both** data buckets (delivery and internal). Reuse the same
+  S3 policy from
   [Environment & storage setup: Step 2](setup.md#step-2-grant-access-with-iam), attached to a
   second role (also trusted by `ecs-tasks.amazonaws.com`). Nothing else is needed — with this
   role attached, delta-rs' `object_store` auto-discovers temporary credentials at runtime, so
-  `DATA_STORE_*` stays unset (see [setup.md's IAM-role row](setup.md#step-3-point-settings-at-the-bucket)).
+  `DATA_STORE_*` stays unset (see [setup.md's IAM-role row](setup.md#step-3-point-settings-at-the-buckets)).
 
 No static AWS keys anywhere in either role — this is the same IAM-role auto-discovery setup.md
 already relies on for compute running on AWS.
@@ -125,8 +126,12 @@ already relies on for compute running on AWS.
    - **Container**: image URI `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
      from [Step 5](#step-5-push-the-image-to-ecr); log configuration → **awslogs**, a new
      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
-   - **Environment variables**: at minimum `DATA_PATH=s3://nged-forecast-data/data` (see
-     [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-bucket)) — leave
+   - **Environment variables**: `DATA_PATH=s3://nged-forecast-internal/data`,
+     `POWER_FORECASTS_DATA_PATH=s3://nged-forecast-delivery/data/power_forecasts`, and
+     `EFFECTIVE_CAPACITY_DATA_PATH=s3://nged-forecast-delivery/data/effective_capacity` — all
+     three are needed, since the delivery tables live in a separate bucket from everything
+     `DATA_PATH` derives by default (see
+     [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-buckets)). Leave
      `DATA_STORE_*` unset, since the task role supplies credentials.
 
 ## Step 8 — Verify: run the task manually
@@ -158,7 +163,9 @@ egress for its ECR pull and S3/CloudWatch calls without a NAT gateway; revisit o
 always-on control-plane box (and its VPC design) exists. Follow the run in **ECS** → the
 cluster → **Tasks**, then **CloudWatch Logs** for the container's output — confirm it reaches
 `load_forecaster_from_dir` and a new forecast lands under
-`s3://nged-forecast-data/data/power_forecasts/…`.
+`s3://nged-forecast-delivery/data/power_forecasts/…` — the delivery bucket, not the internal one,
+since `power_forecasts` is one of the five NGED-facing tables (see
+[setup.md: Step 3](setup.md#step-3-point-settings-at-the-buckets)).
 
 ## See also
 

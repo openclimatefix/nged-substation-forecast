@@ -264,11 +264,28 @@ to spend on the forecasts themselves instead.
 
 ## Securing it
 
-The bucket holds data about NGED's customers, so it is not public: it is protected with
+Both buckets hold data about NGED's customers, so neither is public: both are protected with
 standard S3/IAM authentication. With a single consumer this is straightforward — one
 authenticated principal, no entitlement matrix — and it mirrors exactly how NGED protect their
 own time-series JSON bucket, which we read the same way. Every tool named above supports
-authenticated S3 access natively.
+authenticated S3 access natively. That "single authenticated principal" is a dedicated IAM
+**user**, not a cross-account role: Excel and Power BI, both named above as expected clients,
+have no support for AWS role-assumption — they need a plain access key and secret, which only an
+IAM user (not a role) provides.
+
+**Two buckets, not one.** OCF shares more than the five delivery tables with NGED — there's no
+reason to withhold the NWP and raw-telemetry tables OCF's own pipeline works with day to day, and
+NGED are already finding uses for data beyond the minimal contract (see
+[Evolving requirements](#evolving-requirements) above). But those internal tables are not a
+contract: their schemas may change shape at any time, with no deprecation cycle, exactly because
+nothing external is supposed to depend on them staying stable. Splitting them into a second,
+separately-named S3 bucket makes that distinction impossible to miss — a bucket name in a URI
+survives being pasted into a script or a Slack message even out of context, where a path prefix
+within one bucket is easier to skim past. The same single IAM user reads both buckets; the
+split is a naming/documentation signal, not an access-control boundary. See [Environment &
+storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/#running-on-aws-manual-point-and-click)
+for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
+exactly which five tables are the stable contract.
 
 ## Strict data contracts (machine-verifiable)
 
