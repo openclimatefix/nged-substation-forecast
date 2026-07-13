@@ -318,6 +318,15 @@ the bucket and query it like a database. The same mechanism powers our own pipel
 [lazy evaluation strategy](overview.md#lazy-evaluation-strategy) that keeps our training memory
 bounded is exactly what keeps NGED's reads cheap.
 
+One caveat for anyone querying the *whole* table with Polars: default Polars builds cap any
+single row count or materialised frame at 2³² (~4.29 billion) rows, and a count past the cap
+**silently wraps** rather than erroring — so once a table passes that size (our internal NWP
+table already has, and `power_forecasts` will at V2 scale), whole-table row counts must come from
+the Delta transaction log (`DeltaTable(path).count()`), not `pl.len()` over an unfiltered scan.
+Filtered queries whose results stay under the cap — i.e. every read pattern described above —
+are unaffected. Details in
+[Architecture Overview → The other hard ceiling](overview.md#the-other-hard-ceiling-polars-32-bit-row-index).
+
 ## An established industry pattern
 
 We're also in good company. "Analytical data as cloud-optimised files on object storage,
