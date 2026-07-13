@@ -287,6 +287,31 @@ storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_se
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
 exactly which five tables are the stable contract.
 
+**Why `eu-west-2`, not the cheaper `eu-west-1`?** AWS Price List API data (2026-07-03) shows
+Ireland (`eu-west-1`) consistently cheaper than London (`eu-west-2`) — not hugely for the
+always-on control-plane box, but noticeably for the Fargate compute that actually runs
+inference:
+
+| SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
+|---|---|---|---|
+| EC2 `t4g.medium` on-demand | $0.0368/hr | $0.0376/hr | +2.2% |
+| Fargate ARM vCPU-hour | $0.03238/hr | $0.03725/hr | +15.0% |
+| Fargate ARM GB-hour | $0.00356/hr | $0.00409/hr | +14.9% |
+| S3 Standard storage (first 50 TB) | $0.023/GB-mo | $0.024/GB-mo | +4.3% |
+
+At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
+[AWS architecture: Cost summary](../roadmap/live-service.md#cost-summary)). It matters more at
+v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
+reach on the order of a **trillion rows** (~100 billion rows/year/model × several years ×
+several models) — at that volume, a per-GB storage premium compounds into real money rather
+than staying a rounding error.
+
+`eu-west-2` is picked **now**, mainly because NGED's own S3 bucket is already in `eu-west-2` —
+keeping OCF and NGED in the same region avoids cross-region transfer cost/latency if NGED ever
+reads directly from our buckets. This is provisional: NGED haven't yet confirmed whether a
+GB-resident region is a hard requirement for this data, and we're waiting on their reply before
+treating the region choice as final.
+
 ## Strict data contracts (machine-verifiable)
 
 The project makes strict use of Patito data contracts (defined in the
