@@ -11,10 +11,9 @@ from dataclasses import dataclass
 from typing import Annotated, ClassVar, Final, Literal, Self, cast, get_args
 
 import polars as pl
-from pydantic import BaseModel, ConfigDict, Field
-
 from contracts.ml_schemas import SafeInputBaseColumn, TimeFeature
 from contracts.weather_schemas import WeatherFeature
+from pydantic import BaseModel, ConfigDict, Field
 
 StaticFeature = Literal["windchill"]
 
@@ -181,7 +180,7 @@ class ParsedFeatures:
                 rolling_means.append(RollingFeature.from_str(feature_name))
 
             elif feature_name in STATIC_FEATURE_REGISTRY:
-                static_features.append(cast(StaticFeature, feature_name))
+                static_features.append(feature_name)
 
             elif feature_name in get_args(TimeFeature):
                 time_features.append(cast(TimeFeature, feature_name))
