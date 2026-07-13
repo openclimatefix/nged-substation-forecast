@@ -64,56 +64,18 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 
 Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/221)
 
-> **Status: ✅ Implemented**, alongside the `promoted_model` promotion asset (below) and local
-> 6-hourly automation (`dg dev` + persistent `DAGSTER_HOME`, part of
-> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). For the
-> operational runbook — promoting a model, running the schedule, backfilling a missed slot — see
-> [Live Service](../live_service/index.md), the permanent home this page's shipped material moves
-> to (and, eventually, this whole page, once every section below has landed). Remaining work on
-> this page — the [container build](#production-model-artifacts) and
-> [AWS infrastructure](#aws-architecture) — is unaffected.
-
-Everything up to the CV leaderboard loop is built; the production inference path is not. This
-asset is what the deployed container runs every 6 hours: load the production model, forecast
-the latest NWP, write to `power_forecasts` with `fold_id="live"`.
-
-```text
-partitions_def: TimeWindowPartitionsDefinition(cron="0 0,6,12,18 * * *", ...)
-deps: [ecmwf_ens, power_time_series_and_metadata]
-```
-
-- **Model loading:** `ForecasterClass.load(path)` — a plain disk load of the model directory
-  baked into the container image at build time (see
-  [Production model artifacts](#production-model-artifacts)); no MLflow client, run ID, or
-  cache lookup involved. The concrete class is reconstructed from the `model_class` field in
-  the saved model's `meta.json`.
-- **Population:** forecast **only** the `trained_time_series_ids` recorded in the production
-  model's `meta.json` — never a series the model has not seen (the train==predict invariant).
-- **Inference mode:** **single-run** feature engineering (`engineer_features(power_fcst_init_time=…)`)
-  across **all 51 NWP ensemble members**, where `power_fcst_init_time` is the partition's
-  scheduled time. Deliberately *not* bulk mode: production forecasts one explicit
-  `power_fcst_init_time`, not one-per-NWP-run.
-- **NWP availability semantics** via a `RunConfig` field
-  `availability_mode: Literal["live", "replay"]` (default `"live"`):
-    - `"live"` — the scheduled path. `power_fcst_init_time = now`; join the **freshest NWP run
-      actually present** in Delta with `nwp_init_time <= power_fcst_init_time`. **No** modelled
-      publication delay: reality already constrains the table to genuinely published runs, so if
-      the provider speeds up we automatically use fresher data.
-    - `"replay"` — re-running a *past* slot (e.g. yesterday's failed run, today).
-      `power_fcst_init_time = the historical partition time`; join the freshest run with
-      `nwp_init_time <= power_fcst_init_time − nwp_publication_delay_hours`. The delay
-      reconstructs what was actually *available* at the historical `power_fcst_init_time` —
-      without it we would leak NWP runs that only landed afterwards.
-    - The scheduled sensor/schedule always uses `"live"` for the current partition; manual
-      backfills of past partitions use `"replay"`. The explicit flag is the source of truth (an
-      automatic live-iff-recent rule is a possible later convenience).
-- Load the needed NWP via `TimeWindowPartitionMapping` against the daily-partitioned
-  `ecmwf_ens`.
-- **Write:** `forecaster.predict(..., fold_id="live")`, then an **idempotent overwrite** of
-  this run's `power_fcst_init_time` rows in `power_forecasts` (`replaceWhere`), so re-running a
-  6-hourly partition (or a replay) never duplicates rows.
-- **Logs nothing to MLflow.** A 6-hourly forecast run is not an experiment; live performance
-  is tracked by [production monitoring](#production-monitoring), never by this asset.
+> **Status: ✅ Implemented**, alongside the `promoted_model` promotion asset and local 6-hourly
+> automation (`dg dev` + persistent `DAGSTER_HOME`, part of
+> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). The design
+> rationale (single-run vs. bulk mode, the `live`/`replay` asymmetry, the trained-population
+> invariant) now lives at
+> [Production Deployment — Design: Live inference](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#live-inference-is-single-run-not-bulk);
+> the operational runbook — promoting a model, running the schedule, backfilling a missed slot —
+> is [Running live forecasts end-to-end](../live_service/dagster-workflow.md), the permanent home
+> this page's shipped material moves to (and, eventually, this whole page, once every section
+> below has landed). Remaining work on this page — the
+> [container build](#production-model-artifacts) and [AWS infrastructure](#aws-architecture) — is
+> unaffected.
 
 ## Production model artifacts
 

@@ -34,6 +34,40 @@ regularly), switch to fetching the champion model from MLflow dynamically — at
 from disk on a cache hit so the live service survives an MLflow outage), exactly as it does for
 CV today.
 
+## Live inference is single-run, not bulk
+
+The `live_forecasts` asset engineers features in **single-run mode** — an explicit
+`power_fcst_init_time` supplied by the partition, joined across all 51 NWP ensemble members —
+never bulk mode's one-`power_fcst_init_time`-per-NWP-run derivation (see
+[ML orchestration: forecast cadence under-sampling](ml-orchestration.md#known-limitation-forecast-cadence-under-sampling-in-cv)
+for where bulk mode's per-NWP-run derivation matters instead: CV/backtesting, not live inference).
+A production run issues one forecast for one explicit init time every 6 hours; bulk mode's
+derivation has no meaning for a single live materialisation.
+
+## NWP availability: `live` vs `replay` is asymmetric by design
+
+`live_forecasts`' `availability_mode` config resolves which NWP run to join against, and the two
+modes are deliberately asymmetric:
+
+- **`"live"`** joins the freshest NWP run actually present in Delta, with **no modelled
+  publication delay** — reality already constrains the table to genuinely published runs, so a
+  faster provider is used automatically without a config change.
+- **`"replay"`** joins the freshest run at least `nwp_publication_delay_hours` old, reconstructing
+  what was genuinely available at that historical init time. Without the delay, a replay would
+  leak NWP runs that only landed after the fact — a lookahead-bias bug, not just an inaccuracy.
+
+The scheduled path always uses `"live"`; backfills of missed or historical partitions use
+`"replay"`. The mode is an explicit, manually-set flag rather than an automatic
+live-iff-recent rule — the ambiguity of "recent" isn't worth resolving for a backfill path that's
+already manually triggered.
+
+## Serving only the trained population
+
+`live_forecasts` forecasts exactly the production model's `trained_time_series_ids` (recorded in
+`meta.json`), never the current day's eligibility set. This is the train==predict population
+invariant: a time series the model never saw during training must never receive a live forecast,
+even if it would otherwise qualify today.
+
 ## Why promotion is a Dagster asset, not a script
 
 The "researcher downloads artifacts" step above is a manually-triggered Dagster asset,
