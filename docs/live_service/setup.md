@@ -19,22 +19,23 @@ credentials reach them**.
 Everything here is driven by [`Settings`](../api/contracts/index.md) (in
 `packages/contracts/src/contracts/settings.py`), populated from a `.env` file in the repo root and
 from environment variables. Environment variables win over `.env`, which wins over the defaults;
-every field name maps to an upper-case env var (`data_path` → `DATA_PATH`).
+every field name maps to an upper-case env var (`data_path_internal` → `DATA_PATH_INTERNAL`).
 
-### Two storage roots
+### Three storage roots
 
-The single most important idea is that there are **two** roots, not one:
+The single most important idea is that there are **three** roots, not one:
 
 | Root | Env var | May be `s3://`? | Holds |
 |---|---|---|---|
-| Data tables | `DATA_PATH` | **Yes** | NWP, power observations, forecasts, metrics, metadata, H3 weights |
+| Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
+| Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecast`, `effective_capacity`, …) |
 | Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | Trained-model cache, the promoted production model, plot HTML |
 
-> **On AWS, "data tables" itself splits across two buckets** — the five NGED-facing delivery
-> tables live separately from everything else, via the per-table path overrides described in the
-> "derive from root" convention just below. See [Running on AWS: Step
-> 3](#step-3-point-settings-at-the-buckets) for the concrete setup, and [Forecast Delivery:
-> Securing it](../architecture/forecast-delivery.md#securing-it) for why.
+> **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
+> hard-codes the five NGED-facing delivery tables (see the "derive from root" convention just
+> below), so shipping a new delivery table can't silently leave it in the internal bucket. See
+> [Running on AWS: Step 3](#step-3-point-settings-at-the-buckets) for the concrete setup, and
+> [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for why.
 
 They are split for an **architectural** reason, not merely because XGBoost and Altair happen to
 write to local files (a library that can't write to S3 can always be bridged — write to a tempdir,
@@ -58,24 +59,27 @@ container image, not to shared storage:
   deployed service.
 
 So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
-to S3 — it never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. Both roots default to
+to S3 — it never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
 `<repo>/data`, so out of the box everything lives under one local directory and the distinction is
-invisible; it only matters once `DATA_PATH` becomes an `s3://` URI.
+invisible; it only matters once `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
 
 ### The "derive from root" convention
 
 Each individual table has its own setting (`NWP_DATA_PATH`, `POWER_FORECASTS_DATA_PATH`, …), but you
 almost never set them. Each defaults to an empty string, a sentinel meaning *derive me from my
-root*: after validation, `NWP_DATA_PATH` becomes `<DATA_PATH>/NWP`, `METADATA_PATH` becomes
-`<DATA_PATH>/NGED/metadata.parquet`, and so on. The full default layout lives in
-`Settings._derive_unset_paths` and nowhere else.
+root*: after validation, `NWP_DATA_PATH` becomes `<DATA_PATH_INTERNAL>/NWP`, `METADATA_PATH` becomes
+`<DATA_PATH_INTERNAL>/NGED/metadata.parquet`, and so on. The NGED-facing delivery tables are the
+exception: `POWER_FORECASTS_DATA_PATH` and `EFFECTIVE_CAPACITY_DATA_PATH` derive from
+`DATA_PATH_DELIVERY` instead — hard-coded in `Settings._derive_unset_paths`, which is the full
+default layout and the only place it lives.
 
-Set `DATA_PATH` alone and all nine data tables move together. Setting an individual table (e.g.
+Set `DATA_PATH_INTERNAL` alone and every non-delivery table moves together; set `DATA_PATH_DELIVERY`
+alone and both delivery tables move together. Setting an individual table (e.g.
 `NWP_DATA_PATH=s3://other-bucket/NWP`) overrides just that one — useful for keeping one big table on
 a separate bucket, and nothing else needs to change. [Running on AWS: Step
-3](#step-3-point-settings-at-the-buckets) is exactly this pattern applied on purpose: `DATA_PATH`
-defaults to OCF's internal bucket, and the delivery tables are individually overridden to a
-second, NGED-facing bucket.
+3](#step-3-point-settings-at-the-buckets) is exactly this pattern applied on purpose: on AWS,
+`DATA_PATH_INTERNAL` points at OCF's internal bucket and `DATA_PATH_DELIVERY` points at the
+NGED-facing bucket — no per-table override needed for either of today's two delivery tables.
 
 ### The `.env` file and NGED source credentials
 
@@ -101,12 +105,13 @@ then [run the workflow](dagster-workflow.md). Nothing in this section is needed 
 
 ### Optional: rehearse S3 locally with MinIO
 
-To exercise the exact S3 read/write code paths without touching AWS, point `DATA_PATH` at a local
-[MinIO](https://min.io/) (or any S3-compatible) endpoint and supply all four `DATA_STORE_*`
-settings:
+To exercise the exact S3 read/write code paths without touching AWS, point both `DATA_PATH_INTERNAL`
+and `DATA_PATH_DELIVERY` at the same local [MinIO](https://min.io/) (or any S3-compatible) endpoint
+and supply all four `DATA_STORE_*` settings:
 
 ```dotenv
-DATA_PATH=s3://my-bucket/data
+DATA_PATH_INTERNAL=s3://my-bucket/data
+DATA_PATH_DELIVERY=s3://my-bucket/data
 DATA_STORE_ENDPOINT_URL=http://localhost:9000
 DATA_STORE_ACCESS_KEY_ID=minioadmin
 DATA_STORE_SECRET_ACCESS_KEY=minioadmin
@@ -122,7 +127,7 @@ against an in-process `moto` server.)
 
 > **Scope: data tables on S3, not the full unattended deployment.** This section covers pointing the
 > **data tables** at S3 — which is all the ephemeral-compute deployment needs from the storage layer,
-> and is enough to run the stack from your laptop against an S3 `DATA_PATH` today. Building the
+> and is enough to run the stack from your laptop against S3 data-table roots today. Building the
 > production container itself is covered by
 > [Deploying a new production image](deployment.md);
 > running it as an unattended, scheduled **Fargate task** (ECR, EventBridge scheduling) is a
@@ -216,18 +221,19 @@ Attach it to **whichever identity runs the code**:
 
 ### Step 3 — Point `Settings` at the buckets
 
-Unlike a single-bucket setup, this now needs `DATA_PATH` **plus** an explicit override per
-delivery table, rather than one setting:
+Unlike a single-bucket setup, this now needs **both** data-table roots set, one per bucket:
 
 | Setting | Bucket | Why |
 |---|---|---|
-| `DATA_PATH` (root) | `nged-forecast-internal` | Every table derives from this unless overridden below — deliberately **fails closed**: forgetting to override a new delivery table just leaves it in the internal bucket (invisible to NGED, a functional bug to catch in testing), rather than a forgotten override on a new internal table accidentally exposing it in the delivery bucket. |
-| `POWER_FORECASTS_DATA_PATH` | `nged-forecast-delivery` | Table 1, `power_forecast` — see the caveat below. |
-| `EFFECTIVE_CAPACITY_DATA_PATH` | `nged-forecast-delivery` | Table 4, `effective_capacity`. |
+| `DATA_PATH_INTERNAL` (root) | `nged-forecast-internal` | Every non-delivery table derives from this. |
+| `DATA_PATH_DELIVERY` (root) | `nged-forecast-delivery` | `power_forecasts_data_path` and `effective_capacity_data_path` derive from this, hard-coded in `Settings._derive_unset_paths` — deliberately **fails closed**: a new delivery table added to the schema but not wired into that derivation stays on `DATA_PATH_INTERNAL` (invisible to NGED, a functional bug caught by `test_settings.py`'s guard test), rather than a forgotten override on a new internal table accidentally exposing it in the delivery bucket. |
 
 The other three delivery tables (`power_forecast_warnings`, `asset_health_history`,
 `substation_switching`) don't have `Settings` fields yet — none are implemented in code. When
-they land, their paths need the same explicit override to `nged-forecast-delivery`.
+they land, they need to be wired into `Settings._derive_unset_paths` to derive from
+`DATA_PATH_DELIVERY` alongside the two above (the per-field env var override — e.g.
+`POWER_FORECASTS_DATA_PATH`, still works as an escape valve for a one-off case, but is no longer
+the primary mechanism for the delivery/internal split).
 
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
 > `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
@@ -240,19 +246,17 @@ they land, their paths need the same explicit override to `nged-forecast-deliver
 **On AWS compute (IAM role)** — credentials and region are auto-discovered, so just:
 
 ```dotenv
-DATA_PATH=s3://nged-forecast-internal/data
-POWER_FORECASTS_DATA_PATH=s3://nged-forecast-delivery/data/power_forecasts
-EFFECTIVE_CAPACITY_DATA_PATH=s3://nged-forecast-delivery/data/effective_capacity
+DATA_PATH_INTERNAL=s3://nged-forecast-internal/data
+DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
 ```
 
-**From your laptop (IAM user access key)** — same three paths, plus the key, secret, and region,
+**From your laptop (IAM user access key)** — same two roots, plus the key, secret, and region,
 but **not** an endpoint URL (that is only for non-AWS/MinIO endpoints, and it would wrongly allow
 plain HTTP):
 
 ```dotenv
-DATA_PATH=s3://nged-forecast-internal/data
-POWER_FORECASTS_DATA_PATH=s3://nged-forecast-delivery/data/power_forecasts
-EFFECTIVE_CAPACITY_DATA_PATH=s3://nged-forecast-delivery/data/effective_capacity
+DATA_PATH_INTERNAL=s3://nged-forecast-internal/data
+DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
 DATA_STORE_ACCESS_KEY_ID=<access key id>
 DATA_STORE_SECRET_ACCESS_KEY=<secret access key>
 DATA_STORE_REGION=eu-west-2
@@ -305,10 +309,10 @@ persist, and no need to know or care which bucket a given table resolves to. Poi
 
 ### At-a-glance: which settings for which environment
 
-| Environment | `DATA_PATH` | Delivery-table overrides | `DATA_STORE_*` |
+| Environment | `DATA_PATH_INTERNAL` | `DATA_PATH_DELIVERY` | `DATA_STORE_*` |
 |---|---|---|---|
-| Local (default) | unset → `<repo>/data` | unset | none |
-| Local MinIO rehearsal | `s3://…` | unset (single bucket) | all four, incl. `ENDPOINT_URL` |
+| Local (default) | unset → `<repo>/data` | unset → `<repo>/data` | none |
+| Local MinIO rehearsal | `s3://…` | same `s3://…` (single bucket) | all four, incl. `ENDPOINT_URL` |
 | Laptop → real S3 (pipeline) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read/write IAM user (no endpoint) |
 | Laptop → real S3 (dashboard only) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read-only IAM user (no endpoint) |
 | Compute on AWS (IAM role) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | none (auto-discovered) |

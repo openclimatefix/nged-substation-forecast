@@ -58,8 +58,8 @@ Selecting by job name (`-j`) skips that parser entirely.
 `load_forecaster_from_dir` and loads the model successfully (confirmed via the step ordering in
 `production_assets.py` — model load happens before the NWP-availability lookup) with zero
 `mlflow` mentions anywhere in the log, then fails only on missing NWP data access (expected —
-no `DATA_PATH` was mounted for this isolated test). A full end-to-end run needs a real
-`DATA_PATH` (local mount or S3 credentials) supplied via environment variables, per
+no `DATA_PATH_INTERNAL` was mounted for this isolated test). A full end-to-end run needs real
+data-table roots (local mount or S3 credentials) supplied via environment variables, per
 [Environment & storage setup](setup.md).
 
 ## Step 4 — Create the ECR repository
@@ -126,11 +126,9 @@ already relies on for compute running on AWS.
    - **Container**: image URI `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
      from [Step 5](#step-5-push-the-image-to-ecr); log configuration → **awslogs**, a new
      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
-   - **Environment variables**: `DATA_PATH=s3://nged-forecast-internal/data`,
-     `POWER_FORECASTS_DATA_PATH=s3://nged-forecast-delivery/data/power_forecasts`, and
-     `EFFECTIVE_CAPACITY_DATA_PATH=s3://nged-forecast-delivery/data/effective_capacity` — all
-     three are needed, since the delivery tables live in a separate bucket from everything
-     `DATA_PATH` derives by default (see
+   - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
+     `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
+     tables live in a separate bucket from everything else (see
      [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-buckets)). Leave
      `DATA_STORE_*` unset, since the task role supplies credentials.
 

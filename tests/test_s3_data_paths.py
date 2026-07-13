@@ -1,7 +1,7 @@
 """S3 integration tests for the managed data tables (issue #121).
 
 Exercises the data-table IO layer against a real S3 endpoint — an in-process ``moto`` server, so
-no Docker or network — driven entirely through ``Settings`` pointed at an ``s3://`` ``data_path``.
+no Docker or network — driven entirely through ``Settings`` pointed at an ``s3://`` data-path root.
 Proves the two things the S3 migration must guarantee and that the local test suite cannot:
 
 1. Delta and parquet tables round-trip over ``s3://`` through the production write/read helpers
@@ -87,12 +87,14 @@ def s3_endpoint() -> Iterator[str]:
 def _s3_settings(endpoint: str, prefix: str) -> Settings:
     """A ``Settings`` whose data tables live under ``s3://{_BUCKET}/{prefix}`` on the moto server.
 
-    Only ``data_path`` and the ``data_store_*`` credentials are set; every ``*_data_path`` derives
-    from ``data_path`` through the normal validator, so the test drives the real derivation +
+    Only ``data_path_internal``/``data_path_delivery`` and the ``data_store_*`` credentials are
+    set (both roots point at the same prefix, as in local dev); every ``*_data_path`` derives from
+    one of the two roots through the normal validator, so the test drives the real derivation +
     ``storage_options`` chain rather than hand-built URIs.
     """
     return Settings(
-        data_path=f"s3://{_BUCKET}/{prefix}",
+        data_path_internal=f"s3://{_BUCKET}/{prefix}",
+        data_path_delivery=f"s3://{_BUCKET}/{prefix}",
         data_store_endpoint_url=endpoint,
         data_store_access_key_id="test",
         data_store_secret_access_key="test",
