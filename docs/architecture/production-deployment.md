@@ -82,22 +82,6 @@ trail for no benefit. The `docker build` step itself stays outside Dagster: it o
 a laptop today, and image build/push becomes a CI-shaped concern once an MLflow tracking server
 and AWS infra exist — not something worth orchestrating through Dagster in the meantime.
 
-## Two subtleties for the AWS deployment (not yet built)
-
-Recorded here so they aren't lost when the Fargate work
-([#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)) starts:
-
-- **Freshness without persistent Dagster state.** If the eventual AWS deployment runs the
-  container one-shot with no daemon behind it (the "nothing always-on" architecture option),
-  "which `ecmwf_ens` partitions need materialising" must be derived from **Delta table
-  contents vs Dynamical.org availability**, not from Dagster's own materialisation records —
-  those evaporate with a throwaway, non-persistent `DAGSTER_HOME`. This doesn't apply to a
-  daemon-backed deployment (persistent `DAGSTER_HOME`), where Dagster's records are reliable.
-- **Delta commits as the freshness record.** Delta table commits already give an atomic
-  "outputs are the freshness record" property for free — just ensure the forecast Delta write
-  is a run's *final* write, so a run that fails after writing forecasts but before some later
-  step doesn't get treated as stale on the next freshness check.
-
 ## See also
 
 - [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
