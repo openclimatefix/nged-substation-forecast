@@ -140,18 +140,28 @@ for exactly which five tables count as "delivery."
 
 In the AWS console → **S3** → **Create bucket**, twice:
 
-1. **Region** `eu-west-2` (London) for both — keep every resource in one region so S3 ↔ compute
-   transfer stays free. It isn't the cheapest region available (`eu-west-1` runs meaningfully
-   cheaper for Fargate); see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
-   for the price comparison and why `eu-west-2` is picked anyway, provisionally, pending NGED
-   confirmation.
-2. **Names**: `nged-forecast-delivery` (the 5 NGED-facing tables) and `nged-forecast-internal`
-   (NWP, raw power telemetry, forecast metrics, and everything else OCF's pipeline needs but
-   hasn't promised to keep stable). Bucket names are globally unique; pick your own if these are
-   taken.
-3. Leave **Block all public access** **on**, and default **SSE-S3** encryption on, for both.
-   Nothing here is public.
-4. **Versioning** is optional and not required by the app, for either bucket.
+- **Region** `eu-west-2` (London) for both — keep every resource in one region so S3 ↔ compute
+  transfer stays free. It isn't the cheapest region available (`eu-west-1` runs meaningfully
+  cheaper for Fargate); see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
+  for the price comparison and why `eu-west-2` is picked anyway, provisionally, pending NGED
+  confirmation.
+- **Names**: `nged-forecast-delivery` (the 5 NGED-facing tables) and `nged-forecast-internal`
+  (NWP, raw power telemetry, forecast metrics, and everything else OCF's pipeline needs but
+  hasn't promised to keep stable). Bucket names are globally unique; pick your own if these are
+  taken.
+- **Every other setting on the create-bucket form can stay at its console default:**
+    - **Bucket namespace** — leave at **Global namespace**; do not switch to "Account Regional
+      namespace", even though the console marks it "(recommended)". That option changes the
+      bucket's ARN shape and scopes name-uniqueness to your account/region instead of globally,
+      which the IAM policies below (Step 2) and the `deltalake`/`object_store` machinery all
+      assume it isn't.
+    - **Object Ownership** (ACLs disabled) — access is controlled entirely by IAM/bucket policy;
+      ACLs stay off.
+    - **Block Public Access** (all four boxes on) — nothing here is public.
+    - **Bucket Versioning** (disabled) — not required by the app.
+    - **Default encryption** (SSE-S3) — the app needs no more than this; **Bucket Key** only
+      affects SSE-KMS, so it's irrelevant here either way.
+    - **Object Lock**, **Tags** — unused by the app.
 
 No DynamoDB lock table is needed for either bucket. The `deltalake` version we use commits via
 S3's native conditional-put, so concurrent-safe Delta writes work on plain S3 with no lock table
@@ -180,39 +190,58 @@ training; delivery tables at forecast time), so one IAM policy covers both:
 }
 ```
 
-Attach it to **whichever identity runs the code**:
+**Create it once**, in the AWS console → **IAM** → **Policies** → **Create policy** → switch to the
+**JSON** editor → paste the JSON above → **Next** → name it (e.g. `nged-forecast-read-and-write`) → **Create
+policy**. IAM is global, so there's no region selector to worry about.
+
+Then attach it to **whichever identity runs the code**:
 
 - **Compute running on AWS** (an EC2 box or Fargate task) → attach the policy to that resource's
-  **IAM role**. Nothing else is needed: delta-rs' object_store auto-discovers the role's temporary
-  credentials and region at runtime, so you leave all four `DATA_STORE_*` settings **empty**.
-- **Your laptop, running the pipeline** (ingestion, training, backfilling) → attach the read/write
-  policy above to an **IAM user**, create an access key for it, and set the credentials via
-  `DATA_STORE_*` (Step 3).
+  **IAM role**. Nothing else is needed: `object_store` (used by `delta-rs`) auto-discovers the role's temporary
+  credentials and region at runtime, so you leave all four `DATA_STORE_*` settings **empty**. See
+  [Deploying a new production image: Step 6](deployment.md#step-6-iam-roles-for-the-task) for the
+  concrete console steps for that role.
+- **Your laptop, running the pipeline** — **not set up yet, deliberately**: for now, only AWS
+  compute gets write access, so there's exactly one writer touching the buckets at a time. Running
+  Dagster from both a laptop and AWS against the same tables risks two instances racing on the
+  same Delta commits. If a one-off laptop write is ever needed (e.g. hand-patching bad data), it
+  can reuse the same read/write policy above via its own **IAM user**, created the same way as the
+  dashboard user below — just with `nged-forecast-read-and-write` attached instead of
+  `nged-forecast-read-only`.
 - **Your laptop, running only the dashboard** (`packages/dashboard/main.py` — see
   [#283](https://github.com/openclimatefix/nged-substation-forecast/issues/283)) → it only ever
-  reads, so give it a separate, read-only **IAM user** instead of reusing the pipeline's read/write
+  reads, so give it a separate, read-only **IAM user** instead of reusing the read/write
   credential:
 
-  ```json
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": ["s3:GetObject", "s3:ListBucket"],
-        "Resource": [
-          "arn:aws:s3:::nged-forecast-delivery",
-          "arn:aws:s3:::nged-forecast-delivery/*",
-          "arn:aws:s3:::nged-forecast-internal",
-          "arn:aws:s3:::nged-forecast-internal/*"
-        ]
-      }
-    ]
-  }
-  ```
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject", "s3:ListBucket"],
+          "Resource": [
+            "arn:aws:s3:::nged-forecast-delivery",
+            "arn:aws:s3:::nged-forecast-delivery/*",
+            "arn:aws:s3:::nged-forecast-internal",
+            "arn:aws:s3:::nged-forecast-internal/*"
+          ]
+        }
+      ]
+    }
+    ```
 
-  Same `DATA_STORE_*` shape as the pipeline laptop (Step 3), just backed by a narrower key —
-  losing this key can't corrupt any table, only leak read access to it.
+    Same console flow as the read/write policy above for the policy: **IAM** → **Policies** →
+    **Create policy** → **JSON** editor → paste the JSON above → **Next** → name it (e.g.
+    `nged-forecast-read-only`) → **Create policy**. Then create the user: **IAM** → **Users** →
+    **Create user** → name it (e.g. `nged-forecast-dashboard`) → leave **Provide user access to the
+    AWS Management Console** unchecked (programmatic-only) → **Next** → **Attach policies
+    directly** → select the policy → **Next** → **Create user**. Then its access key: open the
+    user → **Security credentials** tab → **Access keys** → **Create access key** → use case
+    **Application running outside AWS** → acknowledge the warning → **Create access key** → copy
+    the **Access key ID** and **Secret access key** immediately (shown once) into `DATA_STORE_*`
+    (Step 3). Same `DATA_STORE_*` shape as any laptop IAM user, just backed by a narrower key —
+    losing this key can't corrupt any table, only leak read access to it.
 
 ### Step 3 — Point `Settings` at the buckets
 
@@ -309,6 +338,6 @@ persist, and no need to know or care which bucket a given table resolves to. Poi
 |---|---|---|---|
 | Local (default) | unset → `<repo>/data` | unset | none |
 | Local MinIO rehearsal | `s3://…` | unset (single bucket) | all four, incl. `ENDPOINT_URL` |
-| Laptop → real S3 (pipeline) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read/write IAM user (no endpoint) |
+| Laptop → real S3 (pipeline) — **not set up yet; may add later for one-off writes** (Step 2) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read/write IAM user (no endpoint) |
 | Laptop → real S3 (dashboard only) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read-only IAM user (no endpoint) |
 | Compute on AWS (IAM role) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | none (auto-discovered) |
