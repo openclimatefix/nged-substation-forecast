@@ -96,13 +96,13 @@ or `aws sts get-caller-identity --query Account --output text`).
 
 Fargate tasks need **two** separate roles, not one — they serve different principals:
 
-- **Task execution role** — used by the *ECS agent* itself, before your code ever runs: pulling
-  the image from ECR and shipping container output to CloudWatch Logs. Create a role for the
-  `ecs-tasks.amazonaws.com` service and attach the AWS-managed
-  `AmazonECSTaskExecutionRolePolicy` — it already covers exactly these two things, so no custom
-  policy is needed.
-- **Task role** — used by *your code* once it's running: this is what lets the container read
-  and write the data bucket. Reuse the same S3 policy from
+- **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
+  before your code ever runs: pulling the image from ECR and shipping container output to
+  CloudWatch Logs. Create a role for the `ecs-tasks.amazonaws.com` service and attach the
+  AWS-managed `AmazonECSTaskExecutionRolePolicy` — it already covers exactly these two things, so
+  no custom policy is needed.
+- **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
+  lets the container read and write the data bucket. Reuse the same S3 policy from
   [Environment & storage setup: Step 2](setup.md#step-2-grant-access-with-iam), attached to a
   second role (also trusted by `ecs-tasks.amazonaws.com`). Nothing else is needed — with this
   role attached, delta-rs' `object_store` auto-discovers temporary credentials at runtime, so
@@ -125,7 +125,7 @@ already relies on for compute running on AWS.
    - **Container**: image URI `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
      from [Step 5](#step-5-push-the-image-to-ecr); log configuration → **awslogs**, a new
      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
-   - **Environment variables**: at minimum `DATA_PATH=s3://<your-bucket>/data` (see
+   - **Environment variables**: at minimum `DATA_PATH=s3://nged-forecast-data/data` (see
      [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-bucket)) — leave
      `DATA_STORE_*` unset, since the task role supplies credentials.
 
@@ -138,6 +138,7 @@ fallback verification path regardless of the eventual always-on architecture:
 
 ```bash
 aws ecs run-task \
+  --region eu-west-2 \
   --cluster nged-forecast \
   --task-definition nged-forecast \
   --launch-type FARGATE \
@@ -148,11 +149,16 @@ aws ecs run-task \
   ]}]}'
 ```
 
+> **Region matters here.** Unlike the `docker` commands above (region is baked into the ECR
+> URI), the AWS CLI falls back to your configured default region if `--region` is omitted —
+> check yours with `aws configure get region` and don't assume it's `eu-west-2`.
+
 `assignPublicIp=ENABLED` (with a public subnet) is the simplest way to give the task internet
 egress for its ECR pull and S3/CloudWatch calls without a NAT gateway; revisit once the
 always-on control-plane box (and its VPC design) exists. Follow the run in **ECS** → the
 cluster → **Tasks**, then **CloudWatch Logs** for the container's output — confirm it reaches
-`load_forecaster_from_dir` and a new forecast lands under `s3://<your-bucket>/data/power_forecasts/…`.
+`load_forecaster_from_dir` and a new forecast lands under
+`s3://nged-forecast-data/data/power_forecasts/…`.
 
 ## See also
 
