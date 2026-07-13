@@ -127,7 +127,7 @@ In the AWS console → **S3** → **Create bucket**:
 
 1. **Region** `eu-west-2` (London) — keep every resource in one region so S3 ↔ compute transfer
    stays free.
-2. **Name** e.g. `nged-flexpectation-data` (bucket names are globally unique; pick your own).
+2. **Name** e.g. `nged-forecast-data` (bucket names are globally unique; pick your own).
 3. Leave **Block all public access** **on**, and default **SSE-S3** encryption on. Nothing here is
    public.
 4. **Versioning** is optional and not required by the app.
@@ -148,8 +148,8 @@ Create an IAM policy scoped to just this bucket:
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
       "Resource": [
-        "arn:aws:s3:::nged-flexpectation-data",
-        "arn:aws:s3:::nged-flexpectation-data/*"
+        "arn:aws:s3:::nged-forecast-data",
+        "arn:aws:s3:::nged-forecast-data/*"
       ]
     }
   ]
@@ -172,14 +172,14 @@ local disk. What else you set depends on Step 2:
 **On AWS compute (IAM role)** — credentials and region are auto-discovered, so just:
 
 ```dotenv
-DATA_PATH=s3://nged-flexpectation-data/data
+DATA_PATH=s3://nged-forecast-data/data
 ```
 
 **From your laptop (IAM user access key)** — supply the key and region, but **not** an endpoint URL
 (that is only for non-AWS/MinIO endpoints, and it would wrongly allow plain HTTP):
 
 ```dotenv
-DATA_PATH=s3://nged-flexpectation-data/data
+DATA_PATH=s3://nged-forecast-data/data
 DATA_STORE_ACCESS_KEY_ID=<access key id>
 DATA_STORE_SECRET_ACCESS_KEY=<secret access key>
 DATA_STORE_REGION=eu-west-2
@@ -191,7 +191,7 @@ Polars, and obstore all understand, so this one dict feeds every read and write.
 ### Step 4 — Verify
 
 With the above in place, materialise any data-writing asset (e.g. `power_time_series_and_metadata`)
-from the Dagster UI, then confirm the objects appear under `s3://nged-flexpectation-data/data/…` in
+from the Dagster UI, then confirm the objects appear under `s3://nged-forecast-data/data/…` in
 the S3 console. Because `LOCAL_ARTIFACTS_PATH` stayed local, a subsequent `promoted_model`
 materialisation still writes the model to `<repo>/data/production_model/` on disk — the two roots
 behaving independently is exactly what you want to see.
