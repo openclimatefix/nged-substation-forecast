@@ -310,6 +310,23 @@ def apply(self, scan: pt.LazyFrame[MySchema]) -> pt.LazyFrame[MySchema]:
     return pt.LazyFrame.from_existing(lf).set_model(MySchema)  # zero-copy re-wrap
 ```
 
+### Polars Gotcha: row counts silently wrap past 2³² rows (32-bit `IdxSize`)
+
+Default Polars builds use a 32-bit row index (`IdxSize`), capping any single materialised frame,
+row count, or row index at 2³² (~4.29 billion) rows. Past the cap there is **no error** — counts
+wrap modulo 2³²: `pl.len()` over the 5.9-billion-row NWP dev table returns 1,652,180,189
+(= 5,947,147,485 mod 2³²), and `group_by(...).agg(pl.len())` wraps identically for any single
+group past the cap, streaming engine included. Full analysis:
+[Architecture Overview → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#the-other-hard-ceiling-polars-32-bit-row-index).
+
+- **Never row-count a table that can exceed 2³² rows with Polars.** Use the Delta log instead —
+  `DeltaTable(path).count()`, or sum `num_records` over `get_add_actions(flatten=True)` — both
+  metadata-only and exact.
+- Filtered/partition-pruned queries whose *result* stays under 2³² rows are correct even when the
+  underlying scan is bigger, and value aggregations (`sum`, `min`/`max`, quantiles) over >2³² rows
+  are unaffected — only row counts and row indices wrap. Both verified empirically.
+- Tables past the cap today: NWP (~5.9B rows). `power_forecasts` will pass it at V2 scale.
+
 ## This is a young project
 
 The project is a new, green-field project. No one else is using this code yet. Which means:

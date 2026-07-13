@@ -71,6 +71,47 @@ What actually prunes the NWP scan — verified with `LazyFrame.explain()`:
 
 Prediction is bounded by chunking on **`init_time`** (`_PREDICT_INIT_CHUNK`, 14 days), *not* by cell. `init_time` is both the partition key and the axis that fans the output out across runs, so a chunk's forecast frame stays small while each partition is read exactly once and all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction (~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
 
+### The other hard ceiling: Polars' 32-bit row index
+
+RAM is not the only bound a Polars query must respect. Default Polars builds use a 32-bit row
+index (`IdxSize`), so any single materialised frame, row count, or row index is capped at
+**2³² ≈ 4.29 billion rows** — and crossing the cap raises **no error**. Row counts wrap modulo
+2³²: `pl.scan_delta` over the ~5.9-billion-row NWP dev table reports
+1,652,180,189 rows via `.select(pl.len())` (= 5,947,147,485 mod 2³², exactly), and
+`group_by(...).agg(pl.len())` wraps identically for any single group past the cap, streaming
+engine included. This was investigated and empirically pinned down in
+[issue #293](https://github.com/openclimatefix/nged-substation-forecast/issues/293): the
+wraparound reproduces on plain Parquet scans (it is not a Delta Lake bug), and the
+`polars-u64-idx` build (64-bit index, lags mainline releases) returns correct counts on the same
+queries.
+
+What is and isn't affected — each verified empirically on 5-billion-row scans:
+
+| Operation on a >2³²-row scan | Outcome |
+|---|---|
+| `pl.len()` / `group_by(...).agg(pl.len())` where a count exceeds 2³² | **Silently wraps mod 2³²** |
+| Materialising a single frame of ≥2³² rows | Unsupported (in practice RAM is exhausted first, which at least fails loudly) |
+| Filtered / partition-pruned query whose *result* is < 2³² rows | Correct |
+| Value aggregations (`sum`, `min`/`max`, quantiles) over > 2³² rows | Correct — values aren't indices |
+
+The rules that follow:
+
+* **Never row-count a table that can exceed 2³² rows with Polars.** Whole-table counts and
+  data-completeness checks must come from the Delta transaction log — `DeltaTable(path).count()`,
+  or summing `num_records` over `get_add_actions(flatten=True)` — which is metadata-only, exact,
+  and reads no data files.
+* The [lazy evaluation strategy](#lazy-evaluation-strategy) above already keeps every production
+  collect far below the cap (input pruning + `init_time` chunking), so pipeline reads are
+  unaffected. The cap is a second, independent reason that rule exists: an unbounded collect of a
+  V2-scale table wouldn't just OOM, its row accounting would be wrong.
+* Tables past the cap today: **NWP** (~5.9B rows). **`power_forecasts`** will pass it at V2 scale
+  (~1 trillion rows — see [forecast delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)).
+  The one code path that must be re-chunked before then is the `metrics` asset, which currently
+  collects a whole `(experiment_name, fold_id)` group of `power_forecasts` at once and discovers
+  groups via a full-table `unique()` — fine at V1 (≤ ~414M rows/fold), but a V2 fold is tens of
+  billions of rows, so scoring will need to chunk within a fold (e.g. by `valid_time` window or
+  `time_series_id` batch) for RAM reasons anyway; the index cap makes it correctness-critical too.
+
 ## The Universal Model Interface
 
 All forecasting models subclass `BaseForecaster` (defined in `ml_core`), which provides a common `train` / `predict` / `save` / `load` interface. The model wrapper encapsulates the model weights and all translation logic, keeping Dagster assets completely agnostic to the underlying implementation. Each subclass of `BaseForecaster` is responsible for defining:
