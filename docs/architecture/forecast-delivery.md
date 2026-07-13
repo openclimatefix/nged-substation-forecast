@@ -306,11 +306,29 @@ reach on the order of a **trillion rows** (~100 billion rows/year/model × sever
 several models) — at that volume, a per-GB storage premium compounds into real money rather
 than staying a rounding error.
 
-`eu-west-2` is picked **now**, mainly because NGED's own S3 bucket is already in `eu-west-2` —
-keeping OCF and NGED in the same region avoids cross-region transfer cost/latency if NGED ever
-reads directly from our buckets. This is provisional: NGED haven't yet confirmed whether a
-GB-resident region is a hard requirement for this data, and we're waiting on their reply before
-treating the region choice as final.
+`eu-west-2` is picked **now**, mainly because NGED's own S3 bucket is already in `eu-west-2`.
+The benefit that matters here is **data transfer**, not the compute/storage premium above — and
+it depends on *how* NGED reads, which the AWS Price List API pins down precisely:
+
+| Read path | Rate |
+|---|---|
+| S3 → another AWS service, **same region** (even a different account) | **$0** |
+| S3 → another AWS service, **`eu-west-1` ↔ `eu-west-2`** (cross-region) | $0.02/GB |
+| S3 → public internet ("data transfer out"), **either region** | $0.09/GB (first 10 TB/month) — identical in both regions |
+
+Same-region AWS-to-AWS transfer is free even across accounts, but internet-egress pricing
+doesn't vary by region at all — so matching regions only pays off if NGED reads via **their own
+AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not if they read via
+a desktop client like Excel or Power BI over the public internet, where the region choice makes
+no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
+Excel caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
+NGED pulling "a sizeable chunk" of it stops being something a spreadsheet can do at all — they
+would need their own query engine against our bucket, and running that in `eu-west-2` is what
+turns those reads free instead of $0.02–0.09/GB.
+
+This is still provisional: NGED haven't yet confirmed whether a GB-resident region is a hard
+requirement for this data, and we're waiting on their reply before treating the region choice as
+final.
 
 ## Strict data contracts (machine-verifiable)
 
