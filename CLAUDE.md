@@ -47,6 +47,11 @@ docstrings), link to that rendered site (e.g.
 `https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#anchor`),
 never to a `github.com/.../blob/main/docs/...` path.
 
+**Prose style — write full sentences, don't drop the subject.** Don't clip words for terseness
+if it leaves a sentence without a clear subject/verb. Prefer "We split storage across two
+buckets so that..." over "Two buckets, not one — split so that...". The full form is more
+readable and no less concise in practice.
+
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
