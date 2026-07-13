@@ -182,8 +182,34 @@ Attach it to **whichever identity runs the code**:
 - **Compute running on AWS** (an EC2 box or Fargate task) → attach the policy to that resource's
   **IAM role**. Nothing else is needed: delta-rs' object_store auto-discovers the role's temporary
   credentials and region at runtime, so you leave all four `DATA_STORE_*` settings **empty**.
-- **Your laptop, against the real buckets** → attach the policy to an **IAM user**, create an
-  access key for it, and set the credentials via `DATA_STORE_*` (Step 3).
+- **Your laptop, running the pipeline** (ingestion, training, backfilling) → attach the read/write
+  policy above to an **IAM user**, create an access key for it, and set the credentials via
+  `DATA_STORE_*` (Step 3).
+- **Your laptop, running only the dashboard** (`packages/dashboard/main.py` — see
+  [#283](https://github.com/openclimatefix/nged-substation-forecast/issues/283)) → it only ever
+  reads, so give it a separate, read-only **IAM user** instead of reusing the pipeline's read/write
+  credential:
+
+  ```json
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["s3:GetObject", "s3:ListBucket"],
+        "Resource": [
+          "arn:aws:s3:::nged-forecast-delivery",
+          "arn:aws:s3:::nged-forecast-delivery/*",
+          "arn:aws:s3:::nged-forecast-internal",
+          "arn:aws:s3:::nged-forecast-internal/*"
+        ]
+      }
+    ]
+  }
+  ```
+
+  Same `DATA_STORE_*` shape as the pipeline laptop (Step 3), just backed by a narrower key —
+  losing this key can't corrupt any table, only leak read access to it.
 
 ### Step 3 — Point `Settings` at the buckets
 
@@ -200,14 +226,13 @@ The other three delivery tables (`power_forecast_warnings`, `asset_health_histor
 `substation_switching`) don't have `Settings` fields yet — none are implemented in code. When
 they land, their paths need the same explicit override to `nged-forecast-delivery`.
 
-> **Caveat: `power_forecasts` isn't purely delivery data.** The table holds every CV/backtest
-> experiment alongside live production forecasts, distinguished only by `fold_id` (`"live"` for
-> production — see [Running live forecasts end-to-end](dagster-workflow.md)). Pointing the whole
-> table at the delivery bucket means OCF's own experiment churn is physically stored there too —
-> not a new problem this split introduces (it's one table today regardless of bucket), and NGED
-> already needs to filter on `fold_id="live"`. Splitting the table itself by `fold_id` across
-> buckets would need an actual code change to the write path, not just a `Settings` override, so
-> it's out of scope here.
+> **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
+> `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
+> distinguished by `fold_id` (`"live"` for production — see
+> [Running live forecasts end-to-end](dagster-workflow.md)). Pointing the whole table at the
+> delivery bucket is deliberate, not an accidental side effect of the bucket split: it lets NGED
+> see how each of OCF's model versions actually behaves, not just whichever one is currently
+> promoted. NGED filters on `fold_id="live"` when it only wants the current production forecast.
 
 **On AWS compute (IAM role)** — credentials and region are auto-discovered, so just:
 
@@ -281,5 +306,6 @@ persist, and no need to know or care which bucket a given table resolves to. Poi
 |---|---|---|---|
 | Local (default) | unset → `<repo>/data` | unset | none |
 | Local MinIO rehearsal | `s3://…` | unset (single bucket) | all four, incl. `ENDPOINT_URL` |
-| Laptop → real S3 | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region (no endpoint) |
+| Laptop → real S3 (pipeline) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read/write IAM user (no endpoint) |
+| Laptop → real S3 (dashboard only) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | key + secret + region, read-only IAM user (no endpoint) |
 | Compute on AWS (IAM role) | `s3://nged-forecast-internal/…` | `s3://nged-forecast-delivery/…` | none (auto-discovered) |
