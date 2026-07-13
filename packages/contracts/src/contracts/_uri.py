@@ -8,7 +8,7 @@ The existence/parent helpers below give the asset IO layer a single local-or-rem
 call for the two things it does around every Delta/parquet write: make sure the parent
 directory exists (a no-op on object stores, which have no directories) and check whether a
 table/object is already there. Remote calls go through delta-rs / obstore with the caller's
-``storage_options`` so the same code path serves both a local ``data_path`` and an ``s3://`` one.
+``storage_options`` so the same code path serves both a local data-path root and an ``s3://`` one.
 """
 
 import posixpath
@@ -31,7 +31,7 @@ class ObjectStoreOptions(TypedDict, total=False):
     Authored as a ``TypedDict`` (rather than a bare ``dict[str, str]``) so ``ty`` checks every key
     where it is written — see ``Settings.storage_options``. Widen it to the plain ``dict`` the IO
     libraries expect with ``typeddict_to_dict`` at each call boundary. Empty on AWS (object_store
-    auto-discovers the IAM-role credentials and region) and for a local ``data_path``.
+    auto-discovers the IAM-role credentials and region) and for a local data-path root.
     """
 
     aws_endpoint_url: str
