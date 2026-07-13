@@ -98,65 +98,9 @@ JackKelly` right after creating the PR.
 `main`, so use a merge commit (`gh pr merge --merge`) or rebase (`gh pr merge --rebase`), not
 `gh pr merge --squash`.
 
-**GitHub GraphQL cheatsheet** — concrete `gh api graphql` calls for the mutations referenced
-above. All of them need **node IDs**, not issue/PR numbers or URLs — get one with `gh issue view
-<number> --json id --jq .id` (works for PRs too via `gh pr view`).
-
-- **Attach a sub-issue to its parent** — `addSubIssue` (not referenced above, but needed before
-  `reprioritizeSubIssue` can reorder it):
-
-  ```bash
-  gh api graphql -f query='
-    mutation($issueId: ID!, $subIssueId: ID!) {
-      addSubIssue(input: {issueId: $issueId, subIssueId: $subIssueId}) {
-        subIssue { number }
-      }
-    }' -f issueId="<parent node id>" -f subIssueId="<child node id>"
-  ```
-
-- **Reorder a sub-issue** in its parent's list — `reprioritizeSubIssue`. `afterId`/`beforeId`
-  take a *sibling sub-issue's* node ID (not the parent's), and are mutually exclusive:
-
-  ```bash
-  gh api graphql -f query='
-    mutation($issueId: ID!, $subIssueId: ID!, $afterId: ID) {
-      reprioritizeSubIssue(input: {issueId: $issueId, subIssueId: $subIssueId, afterId: $afterId}) {
-        issue { number }
-      }
-    }' -f issueId="<parent node id>" -f subIssueId="<child node id>" -f afterId="<sibling node id>"
-  ```
-
-- **Set an issue's Type** — `updateIssueIssueType`. Look up the type IDs once per repo (they're
-  stable, so worth keeping handy):
-
-  ```bash
-  gh api graphql -f query='
-    { repository(owner: "openclimatefix", name: "nged-substation-forecast") {
-        issueTypes(first: 10) { nodes { id name } }
-    } }'
-  ```
-
-  then:
-
-  ```bash
-  gh api graphql -f query='
-    mutation($issueId: ID!, $issueTypeId: ID!) {
-      updateIssueIssueType(input: {issueId: $issueId, issueTypeId: $issueTypeId}) {
-        issue { number }
-      }
-    }' -f issueId="<issue node id>" -f issueTypeId="<issue type node id>"
-  ```
-
-- **Set a project field** — prefer `gh project item-edit` (it wraps `updateProjectV2ItemFieldValue`
-  for you; drop to raw GraphQL only if it doesn't cover the field type you need). Get the
-  project's node ID with `gh project view 33 --owner openclimatefix --format json --jq .id`, the
-  field/option IDs with `gh project field-list 33 --owner openclimatefix --format json`, and the
-  item's ID from `gh project item-add`'s own JSON output (`--format json --jq .id`):
-
-  ```bash
-  gh project item-edit --id <item node id> --project-id <project node id> \
-    --field-id <field node id> --single-select-option-id <option id>
-  ```
+**GitHub GraphQL calls** (attaching/reordering sub-issues, setting an issue's Type, setting a
+project field) — see the `github-graphql` skill (`.claude/skills/github-graphql/`) for exact
+`gh api graphql` invocations and how to obtain the node IDs they need.
 
 **Ship-time triage** — when a PR lands a roadmap item, that PR (or an immediate follow-up)
 must also:

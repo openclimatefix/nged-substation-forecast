@@ -64,3 +64,9 @@ test.parquet
 example_data/
 packages/dynamical_data/example_data
 site/
+
+#######################
+# Claude Code
+
+# Personal permission allowlist — local to this machine, not project config.
+.claude/settings.local.json

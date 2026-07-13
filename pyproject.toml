@@ -132,3 +132,7 @@ plugins.md024.siblings_only = true
 # sub-list as nested when it's indented a full 4 spaces; 2-space indent (this rule's default)
 # silently renders as a flat, unnested list instead. Match the renderer, not the default.
 plugins.md007.indent = 4
+# Front matter: Claude Code skills (.claude/skills/*/SKILL.md) require a YAML frontmatter block.
+# Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext
+# heading underline), producing spurious heading-style/blank-line errors.
+extensions.front-matter.enabled = true
