@@ -2,14 +2,30 @@
 #
 # Build the production image and smoke-test it with zero network access.
 #
-# This is Steps 2-3 of the deployment runbook rolled into one command. The runbook explains the
-# *why* behind every choice made here — dummy-but-present NGED creds, --network=none, selecting
-# the job with -j rather than a --partition flag — and is the source of truth:
-#   docs/live_service/deployment.md
+# This is Step 2 of the deployment runbook (docs/live_service/deployment.md) as one command:
+# build the image with the champion model baked in, then prove it runs hermetically. This header
+# is the source of truth for *why* each choice below is made.
 #
 # Usage:
 #   scripts/build_and_verify_image.sh <partition-key>
 #   e.g. scripts/build_and_verify_image.sh 2026-07-04-00:00
+#
+# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 1's
+# `promoted_model` asset) into the image, so it stays hermetic. The MODEL_RUN_ID and GIT_SHA
+# build args become OCI labels purely for traceability (inspect with `docker inspect`).
+#
+# The smoke test choices:
+#   - Dummy NGED creds: `Settings` requires NGED_S3_BUCKET_* at import (several modules
+#     instantiate Settings() at import time), so the code location fails to import without them.
+#     They must be PRESENT but need not be real or reachable — passing dummies proves the image
+#     needs only their *presence* at import, never valid credentials and never the network. The
+#     deployed task gets the real values as secrets (runbook Step 6).
+#   - --network=none: proves runtime inference needs no network at all — the whole point of
+#     baking the model in.
+#   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
+#     --partition flag, and `dagster asset materialize --select` hits an unrelated antlr4 / Python
+#     3.14 incompatibility in Dagster's own asset-selection parser. Selecting by job name and
+#     passing the partition via --tags skips that parser entirely.
 #
 # What it gates on, and what it does not:
 #   - HARD FAIL (exit 1) if the runtime touches MLflow. Baking the model in exists precisely so
@@ -20,7 +36,7 @@
 #     EXPECTED to exit non-zero here — no NWP table is mounted for this isolated test, so it fails
 #     at the NWP-availability lookup, which runs *after* the model has already loaded. That
 #     ordering is the proof the model loaded; there is no reliable log string to grep for it. Read
-#     the printed log and confirm by eye, per deployment.md Step 3.
+#     the printed log and confirm by eye.
 
 set -euo pipefail
 
@@ -82,9 +98,9 @@ if grep -qi "mlflow" "$LOG_FILE"; then
 fi
 echo "  [PASS] zero MLflow mentions — runtime is hermetic."
 echo
-echo "  Confirm by eye (deployment.md Step 3) that the log above shows:"
+echo "  Confirm by eye that the log above shows:"
 echo "    - the model loading, then failing ONLY at the NWP-availability lookup, and"
 echo "    - missing NWP data (no DATA_PATH_INTERNAL mounted) as the sole cause — nothing else."
 echo "  A non-zero container exit (${RUN_EXIT}) is EXPECTED here; a zero exit would be suspicious."
 echo
-echo "==> ${IMAGE} passed the automated hermeticity check. Push it with deployment.md Step 5."
+echo "==> ${IMAGE} passed the automated hermeticity check. Push it with the runbook's next step."

@@ -558,8 +558,8 @@ dress rehearsal above.
 > **Status: partially done.** The pieces common to every architecture option — ECR, IAM task
 > roles, and a Fargate task definition, all set up by hand in the AWS console, plus a manual
 > `RunTask` to verify the whole path end-to-end — are ✅ implemented; see
-> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-4-create-the-ecr-repository)
-> (steps 4–8). The accepted option's specific pieces below (the always-on EC2 box,
+> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-3-create-the-ecr-repository)
+> (steps 3–8). The accepted option's specific pieces below (the always-on EC2 box,
 > `EcsRunLauncher`, scheduling) and infra-as-code are still 🚧, tracked as follow-up work.
 
 Common to all options:
@@ -573,7 +573,7 @@ Common to all options:
 - ✅ **IAM roles**: turned out to be **two** roles, not one — a task *execution* role
   (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role (the S3
   read/write policy from `setup.md`) — see
-  [Deploying a new production image: Step 6](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-6-iam-roles-for-the-task)
+  [Deploying a new production image: Step 5](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-5-iam-roles-for-the-task)
   for why they're split. No static AWS keys anywhere.
 - ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
   ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.

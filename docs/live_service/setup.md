@@ -205,7 +205,7 @@ Then attach it to **whichever identity runs the code**:
 - **Compute running on AWS** (an EC2 box or Fargate task) → attach the policy to that resource's
   **IAM role**. Nothing else is needed: `object_store` (used by `delta-rs`) auto-discovers the role's temporary
   credentials and region at runtime, so you leave all four `DATA_STORE_*` settings **empty**. See
-  [Deploying a new production image: Step 6](deployment.md#step-6-iam-roles-for-the-task) for the
+  [Deploying a new production image: Step 5](deployment.md#step-5-iam-roles-for-the-task) for the
   concrete console steps for that role.
 - **Your laptop, running the pipeline** — **not set up yet, deliberately**: for now, only AWS
   compute gets write access, so there's exactly one writer touching the buckets at a time. Running
@@ -285,7 +285,7 @@ DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
 file, so they are set as plain **environment variables on the container in the ECS task
 definition** — not secrets, since bucket URIs are safe to store in clear text (unlike the NGED
 source credentials, which are injected from Parameter Store). [Deploying a new production image:
-Step 8](deployment.md#step-8-create-the-ecs-cluster-and-fargate-task-definition) shows exactly where
+Step 7](deployment.md#step-7-create-the-ecs-cluster-and-fargate-task-definition) shows exactly where
 in the console. On an EC2 box running the code directly, use the same repo-root `.env` file as the
 laptop case below instead. Either way [`Settings`](#the-configuration-model) reads them identically
 — an environment variable and a `.env` line are interchangeable, and an environment variable wins if
