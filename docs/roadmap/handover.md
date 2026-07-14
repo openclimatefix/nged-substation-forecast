@@ -55,44 +55,41 @@ those boundaries.
 
 ### 1. The operator contract
 
-Write an explicit, short **operator contract**: an enumeration of every action the NGED
-operator is ever expected to take — acknowledge an alert, backfill a missed slot via replay
-mode, restart the daemon, rebuild the control-plane box, escalate to OCF. Keep it to roughly
-**ten items or fewer**, each one a documented button-press or a single command with a runbook
-page in [`docs/live_service/`](../live_service/index.md).
+Write an explicit, short **operator contract**: an enumeration of every action the NGED operator is
+ever expected to take — acknowledge an alert, backfill a missed slot via replay mode, restart the
+daemon, rebuild the control-plane box, escalate to OCF. Keep it to roughly **ten items or fewer**,
+each one a documented button-press or a single command with a runbook page in
+[`docs/live_service/`](../live_service/index.md).
 
-Everything *not* on that list — model promotion, dependency upgrades, schema changes,
-infrastructure changes — is OCF's job by definition, handled on a scheduled maintenance
-cadence (and, post-NIA, under whatever support arrangement is agreed).
+Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
+changes — is OCF's job by definition, handled on a scheduled maintenance cadence (and, post-NIA,
+under whatever support arrangement is agreed).
 
-The existing `docs/live_service/` runbooks are the natural home for this material, but they
-are currently written for *us* (Python-literate researchers). Before handover they need an
-editing pass with the NGED operator as the audience, plus a top-level "operator contract" page
-that indexes them.
+The existing [`docs/live_service/`](../live_service/index.md) runbooks are the natural home for this
+material, but the docs are currently written for *OCF* (Python-literate researchers). Before
+handover they need an editing pass with the NGED operator as the audience, plus a top-level
+"operator contract" page that indexes them.
 
 ### 2. Alert on absence, not just failure
 
-Per-task failure alerts miss whole
-classes of silent failure: a hung daemon, a full disk, an expired credential, a schedule that
-simply stopped firing. The fix is a **dead-man's switch**: an alarm that fires when *no
-successful forecast has landed in N hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus
-margin), regardless of why. The planned mechanism is **Sentry cron monitoring**
-([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
-run checks in with Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the
-service being watched (a dead daemon simply stops checking in), and check-in pings are plain
-portable code. Details:
-[the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch). The handover
-consideration: the Sentry account is OCF's today, so at handover the alert routing (and
+Per-task failure alerts miss whole classes of silent failure: a hung daemon, a full disk, an expired
+credential, a schedule that simply stopped firing. The fix is a **dead-man's switch**: an alarm that
+fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one missed 6-hourly
+slot plus margin), regardless of why. The planned mechanism is **Sentry cron monitoring**
+([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful run
+checks in with Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the service
+being watched (a dead daemon simply stops checking in), and check-in pings are plain portable code.
+Details: [the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch). The
+handover consideration: the Sentry account is OCF's today, so at handover the alert routing (and
 possibly the account itself) moves to NGED.
 
-The [production monitoring plan](live-service.md#production-monitoring) already sketches a
-"no fresh forecast" staleness alarm; this workstream promotes it from a nice-to-have to the
-**primary** alert, because it is the one alert whose false-negative rate a non-expert operator
-cannot compensate for.
+The [production monitoring plan](live-service.md#production-monitoring) already sketches a "no fresh
+forecast" staleness alarm; this workstream promotes it from a nice-to-have to the **primary** alert,
+because it is the one alert whose false-negative rate a non-expert operator cannot compensate for.
 
-Every alert — dead-man's switch and per-task alike — must link directly to a runbook that ends
-in either a specific operator action or "escalate to OCF". An alert without a runbook is a bug
-in the operator contract.
+Every alert — dead-man's switch and per-task alike — must link directly to a runbook that ends in
+either a specific operator action or "escalate to OCF". An alert without a runbook is a bug in the
+operator contract.
 
 ### 3. De-pet the control-plane box
 
