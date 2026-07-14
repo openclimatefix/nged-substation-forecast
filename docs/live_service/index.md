@@ -34,8 +34,10 @@ driving is identical in both environments, so it lives on one shared page:
 - [Running the whole stack locally](local.md) — bring the entire service up on a laptop:
   `.env`, a persistent `DAGSTER_HOME`, `dg dev`, and the optional MinIO rehearsal.
 - [Setting up the live service on AWS](aws.md) — every step to stand the service up on AWS, in
-  order: S3 buckets and IAM, promote a champion and build/verify/push its image, the Fargate
-  task, the always-on control-plane box, and connecting to the Dagster UI over Tailscale.
+  order: S3 buckets and IAM (AWS's storage and permissions services; every AWS acronym is
+  spelled out on first use there), promote a champion and build/verify/push its image, the
+  Fargate task, the always-on control-plane box, and connecting to the Dagster UI over
+  Tailscale.
 - [Operating the live service](operations.md) — driving a running stack day to day: promote a
   champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by
   hand), inspect a forecast, and backfill a missed slot in replay mode.

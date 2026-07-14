@@ -1,15 +1,17 @@
 # Configuration reference
 
 What the live service's storage and credential settings mean: **where the bytes live** (a local
-disk, or S3) and **what credentials reach them**. This page is the reference; the step-by-step
-journeys that *use* these settings live elsewhere and deliberately aren't repeated here:
+disk, or S3 — Simple Storage Service, AWS's object store) and **what credentials reach them**.
+This page is the reference; the step-by-step journeys that *use* these settings live elsewhere
+and deliberately aren't repeated here:
 
 - [The repository README](https://github.com/openclimatefix/nged-substation-forecast#setup) owns
   first-time repo setup — installing `uv`, `uv sync`, pre-commit hooks.
 - [Running the whole stack locally](local.md) owns the laptop bring-up (persistent
   `DAGSTER_HOME`, `dg dev`, the optional MinIO rehearsal).
-- [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM,
-  the container image, and the control-plane box.
+- [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM
+  (Identity and Access Management — AWS's permissions system), the container image, and the
+  control-plane box.
 - [Operating the live service](operations.md) owns how to *drive* the assets once an
   environment is up (picking a champion, the 6-hourly schedule, backfilling).
 
@@ -120,7 +122,8 @@ understand, so this one dict feeds every read and write — to both buckets alik
 choice is entirely a matter of which URI each path setting resolves to. Which of them to set
 depends on where the code runs:
 
-- **Compute on AWS (an EC2 box or Fargate task)** — set **none of them**: `object_store`
+- **Compute on AWS (an EC2 — Elastic Compute Cloud — virtual machine, or a Fargate container
+  task)** — set **none of them**: `object_store`
   auto-discovers the attached IAM role's temporary credentials and region at runtime.
 - **A laptop reaching real S3** — set key + secret + region from an IAM user (see
   [Setting up the live service on AWS: Step 2](aws.md#step-2-grant-data-access-with-iam) for
@@ -142,7 +145,8 @@ depends on where the code runs:
 *How* the values are set differs by compute, but `Settings` reads them identically — an
 environment variable and a `.env` line are interchangeable, and an environment variable wins if
 both are set. A Fargate task has no repo checkout and no `.env` file, so its values are plain
-environment variables on the container in the ECS task definition (bucket URIs are safe in clear
+environment variables on the container in the ECS (Elastic Container Service) task definition
+(bucket URIs are safe in clear
 text; the NGED source credentials are injected from Parameter Store instead — see
 [Setting up the live service on AWS: Steps 8–9](aws.md#step-8-store-secrets-in-parameter-store)).
 On an EC2 box or a laptop, use a `.env` file.

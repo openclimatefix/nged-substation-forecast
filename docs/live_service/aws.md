@@ -1,10 +1,11 @@
 # Setting up the live service on AWS
 
 Every step to stand up the v0.1 live service on AWS, in order, ending with the full stack
-running unattended: data tables on S3, the champion model baked into a container image, an
-always-on control-plane box running Dagster behind Tailscale, and 6-hourly forecasts executing
-on ephemeral Fargate tasks. When you finish this page, you open the Dagster UI from your laptop
-over Tailscale and watch forecasts land.
+running unattended: data tables on S3 (Simple Storage Service, AWS's object store), the champion
+model baked into a container image, an always-on control-plane box running Dagster behind
+Tailscale, and 6-hourly forecasts executing on ephemeral Fargate (AWS's serverless container
+compute) tasks. When you finish this page, you open the Dagster UI from your laptop over
+Tailscale and watch forecasts land.
 
 This is one-time setup (per AWS environment). Day-to-day driving of the running service —
 promoting a champion, backfilling a missed slot, inspecting a forecast — lives in
@@ -14,7 +15,8 @@ roots, the derive-from-root convention) lives in the
 bake the model in at build time, an always-on control plane rather than EventBridge — lives in
 [Production Deployment — Design](../architecture/production-deployment.md).
 
-> **Scope: everything here is done by hand** — AWS console plus SSH; no Terraform/CDK yet.
+> **Scope: everything here is done by hand** — AWS console plus SSH; no infrastructure-as-code
+> (Terraform, or CDK — AWS's Cloud Development Kit) yet.
 > That's deliberate: this is Stage 1 ("solo, Tailscale only") of the
 > [access-phasing plan](../roadmap/live-service.md#access-phasing), and infrastructure-as-code
 > is scheduled to start at Stage 2, when team access adds enough moving parts to justify it.
@@ -43,15 +45,17 @@ In the AWS console → **S3** → **Create bucket**, twice:
 - **Every other setting on the create-bucket form can stay at its console default:**
     - **Bucket namespace** — leave at **Global namespace**; do not switch to "Account Regional
       namespace", even though the console marks it "(recommended)". That option changes the
-      bucket's ARN shape and scopes name-uniqueness to your account/region instead of globally,
-      which the IAM policies below (Step 2) and the `deltalake`/`object_store` machinery all
-      assume it isn't.
+      bucket's ARN (Amazon Resource Name — AWS's canonical resource identifier) shape and scopes
+      name-uniqueness to your account/region instead of globally, which the IAM (Identity and
+      Access Management — AWS's permissions system) policies below (Step 2) and the
+      `deltalake`/`object_store` machinery all assume it isn't.
     - **Object Ownership** (ACLs disabled) — access is controlled entirely by IAM/bucket policy;
-      ACLs stay off.
+      ACLs (legacy per-object access-control lists) stay off.
     - **Block Public Access** (all four boxes on) — nothing here is public.
     - **Bucket Versioning** (disabled) — not required by the app.
-    - **Default encryption** (SSE-S3) — the app needs no more than this; **Bucket Key** only
-      affects SSE-KMS, so it's irrelevant here either way.
+    - **Default encryption** (SSE-S3 — server-side encryption with S3-managed keys) — the app
+      needs no more than this; **Bucket Key** only affects SSE-KMS (encryption via AWS KMS, the
+      Key Management Service), so it's irrelevant here either way.
     - **Object Lock**, **Tags** — unused by the app.
 
 No DynamoDB lock table is needed for either bucket. The `deltalake` version we use commits via
@@ -171,7 +175,9 @@ documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 5 — Create the ECR repository
 
-In the AWS console → **ECR** → **Create repository** (same `eu-west-2` region as the S3 buckets
+ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just
+built gets pushed so AWS compute can pull it. In the AWS console → **ECR** →
+**Create repository** (same `eu-west-2` region as the S3 buckets
 in [Step 1](#step-1-create-the-s3-buckets)):
 
 1. **Visibility** Private.
@@ -202,7 +208,9 @@ or `aws sts get-caller-identity --query Account --output text`).
 
 ## Step 7 — IAM roles for the Fargate task
 
-Fargate tasks need **two** separate roles, not one — they serve different principals:
+Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches
+and supervises containers), and they need **two** separate IAM roles, not one — they serve
+different principals:
 
 - **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
   before your code ever runs: pulling the image from ECR, shipping container output to
@@ -248,8 +256,9 @@ hourly `power_time_series_and_metadata` schedule pulls fresh telemetry from NGED
 They are also the one credential in this deployment that can't come from an IAM role: NGED's
 bucket lives in NGED's AWS account, so these are unavoidably static third-party keys. Don't
 paste them into the task definition as plain-text environment values — anyone with ECS
-describe access could read them there. Store them in **SSM Parameter Store** as SecureStrings
-and let ECS inject them at container start:
+describe access could read them there. Store them in **SSM Parameter Store** (SSM is AWS
+Systems Manager; Parameter Store is its encrypted key-value configuration service) as
+SecureStrings and let ECS inject them at container start:
 
 In the AWS console → **Systems Manager** → **Parameter Store** → **Create parameter**, four
 times, in `eu-west-2` (same region as everything else):
@@ -283,9 +292,9 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 9 — Create the ECS cluster and Fargate task definition
 
-1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 instances to
-   manage) — a bare cluster is just a namespace, so a single `nged-forecast` cluster is enough
-   for now.
+1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 — Elastic
+   Compute Cloud, AWS's virtual machines — instances to manage) — a bare cluster is just a
+   namespace, so a single `nged-forecast` cluster is enough for now.
 2. **ECS** → **Task definitions** → **Create new task definition** → *Fargate*:
     - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task).
     - **Task execution role**: the execution role from
@@ -412,19 +421,21 @@ definition depending on config — harmless to grant, confusing to debug when mi
 Then **EC2** → **Launch instance**:
 
 - **Name**: `nged-forecast-ctrl`.
-- **AMI**: Ubuntu Server 24.04 LTS, **64-bit (Arm)**.
+- **AMI** (Amazon Machine Image — the operating-system image the instance boots from): Ubuntu
+  Server 24.04 LTS, **64-bit (Arm)**.
 - **Instance type**: `t4g.medium` (2 vCPU / 4 GB — comfortable for daemon + webserver +
   code server + Postgres; the costed sizing is in the roadmap link above).
 - **Key pair**: create one. It's only needed for the first SSH below — Tailscale SSH takes over
   in [Step 12](#step-12-join-the-tailnet).
-- **Network settings**: the same VPC and **public subnet** as
+- **Network settings**: the same VPC (Virtual Private Cloud — the private network AWS resources
+  share) and **public subnet** as
   [Step 10](#step-10-verify-run-a-forecast-task-manually)'s task; **Auto-assign public IP**
   enabled (internet egress for apt/ECR/S3/Tailscale without a NAT gateway). Create a new
   security group `nged-forecast-ctrl-sg` with **no inbound rules at all** — Tailscale needs
   none (it dials out), and "no public inbound ports" is a load-bearing security decision, since
   the Dagster UI has no authentication of its own. One inbound rule is added later, for
   Postgres ([Step 14](#step-14-configure-dagster-on-the-box)).
-- **Storage**: 20 GiB gp3.
+- **Storage**: 20 GiB gp3 (general-purpose SSD).
 - **Advanced details**:
     - **IAM instance profile**: `nged-forecast-ctrl-role`.
     - **Metadata version**: V2 only (token required), and — easy to miss, breaks everything
@@ -713,8 +724,9 @@ If a slot gets missed (box down, failed run), backfill it from the same UI —
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-The remaining operational safety nets — per-task failure alerts (SNS → email) and the
-missed-check-in alarm that catches a silently-dead daemon — are still to come; see
+The remaining operational safety nets — per-task failure alerts (email via SNS, the Simple
+Notification Service) and the missed-check-in alarm that catches a silently-dead daemon — are
+still to come; see
 [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Redeploying a new champion model

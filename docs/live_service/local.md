@@ -51,7 +51,8 @@ produce forecasts — [Operating the live service](operations.md).
 
 ## Optional — rehearse S3 locally with MinIO
 
-To exercise the exact S3 read/write code paths without touching AWS, point both `DATA_PATH_INTERNAL`
+To exercise the exact S3 (Simple Storage Service — AWS's object store) read/write code paths
+without touching AWS, point both `DATA_PATH_INTERNAL`
 and `DATA_PATH_DELIVERY` at the same local [MinIO](https://min.io/) (or any S3-compatible) endpoint
 and supply all four `DATA_STORE_*` settings:
 

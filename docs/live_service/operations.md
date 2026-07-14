@@ -137,8 +137,9 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 
 `plot_power_forecast` is a **local-development convenience**: it writes Altair HTML to
 `LOCAL_ARTIFACTS_PATH`, which on an ephemeral Fargate task is a disk that is discarded when the
-task exits — the file would never be seen. The durable, S3-native way to look at a deployed
-service's forecasts is the **dashboard** (`packages/dashboard/main.py`), which reads whichever
+task exits — the file would never be seen. The durable, S3-native (S3 is AWS's object store) way
+to look at a deployed service's forecasts is the **dashboard**
+(`packages/dashboard/main.py`), which reads whichever
 tables it needs directly via their `Settings` paths and renders on demand — point it at the same
 `Settings` and it works identically whether each path is local or `s3://` (see
 [Configuration reference](setup.md#at-a-glance-which-settings-for-which-environment) for the
