@@ -19,6 +19,8 @@ dependencies = [
     "altair>=6.0.0",
     "contracts",
     "dagster>=1.12.11",
+    "dagster-aws>=0.28.11",
+    "dagster-postgres>=0.28.11",
     "dagster-webserver>=1.12.11",
     "delta_store",
     "deltalake",
