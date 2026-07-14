@@ -7,14 +7,13 @@
 # is the source of truth for *why* each choice below is made.
 #
 # Usage:
-#   scripts/build_and_verify_image.sh <partition-key>
-#   e.g. scripts/build_and_verify_image.sh 2026-07-04-00:00
+#   scripts/build_and_verify_image.sh          # no arguments — everything is derived
 #
-# <partition-key> only has to PARSE as YYYY-MM-DD-HH:MM; it need not name a partition that exists.
-# The smoke test dies at the NWP lookup long before the slot matters, so off-cadence / out-of-range
-# keys work fine and only a malformed key fails (fast, with a clear "time data ... does not match
-# format" error). Real slots — for a genuine run — are the 6-hourly UTC boundaries from the
-# `live_forecasts` partition start onward, browsable in the Dagster UI.
+# The smoke test's partition key is HARD-CODED and arbitrary. It only has to parse as
+# YYYY-MM-DD-HH:MM: the offline run dies at the NWP lookup long before the slot's validity could
+# matter, so no real partition is needed and there is no decision worth pushing onto the user.
+# (Real slots matter only for genuine runs against real data tables — see the partition-semantics
+# note in docs/live_service/operations.md.)
 #
 # The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 3's
 # `promoted_model` asset) into the image, so it stays hermetic. The MODEL_RUN_ID and GIT_SHA
@@ -46,11 +45,9 @@
 
 set -euo pipefail
 
-PARTITION_KEY="${1:-}"
-if [[ -z "$PARTITION_KEY" ]]; then
-  echo "usage: $0 <partition-key>   e.g. $0 2026-07-04-00:00" >&2
-  exit 2
-fi
+# Arbitrary but well-formed (YYYY-MM-DD-HH:MM) — see the header: the offline smoke test never
+# reaches the point where the slot's validity could matter.
+PARTITION_KEY="2026-01-01-00:00"
 
 PROMOTION_JSON="data/production_model/promotion.json"
 if [[ ! -f "$PROMOTION_JSON" ]]; then
