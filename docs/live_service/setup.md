@@ -273,12 +273,23 @@ delivery/internal split is driven by root derivation, not per-table overrides).
 > see how each of OCF's model versions actually behaves, not just whichever one is currently
 > promoted. NGED filters on `fold_id="live"` when it only wants the current production forecast.
 
-**On AWS compute (IAM role)** — credentials and region are auto-discovered, so just:
+**On AWS compute (IAM role)** — credentials and region are auto-discovered, so only the two roots
+are needed:
 
 ```dotenv
 DATA_PATH_INTERNAL=s3://nged-forecast-internal/data
 DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
 ```
+
+*How* you set these two depends on the compute. A Fargate task has no repo checkout and no `.env`
+file, so they are set as plain **environment variables on the container in the ECS task
+definition** — not secrets, since bucket URIs are safe to store in clear text (unlike the NGED
+source credentials, which are injected from Parameter Store). [Deploying a new production image:
+Step 8](deployment.md#step-8-create-the-ecs-cluster-and-fargate-task-definition) shows exactly where
+in the console. On an EC2 box running the code directly, use the same repo-root `.env` file as the
+laptop case below instead. Either way [`Settings`](#the-configuration-model) reads them identically
+— an environment variable and a `.env` line are interchangeable, and an environment variable wins if
+both are set.
 
 **From your laptop (IAM user access key)** — same two roots, plus the key, secret, and region,
 but **not** an endpoint URL (that is only for non-AWS/MinIO endpoints, and it would wrongly allow
