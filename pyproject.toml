@@ -131,6 +131,12 @@ plugins.md024.siblings_only = true
 # Nested list indent: MkDocs' renderer (Python-Markdown, no sane-lists extension) only treats a
 # sub-list as nested when it's indented a full 4 spaces; 2-space indent (this rule's default)
 # silently renders as a flat, unnested list instead. Match the renderer, not the default.
+# Caveat this setting can't fix: for bullets nested under an *ordered* item, MD007 hard-codes an
+# expectation of alignment with the parent's content column (3 spaces for a "1. " marker) and
+# ignores this indent setting — but Python-Markdown still needs the full 4 spaces to nest there,
+# so 3-space renders flat. Keep the 4-space indent and suppress the false positive with a
+# "pyml disable-num-lines N ul-indent" pragma above the list (see docs/live_service/deployment.md
+# for an example).
 plugins.md007.indent = 4
 # Front matter: Claude Code skills (.claude/skills/*/SKILL.md) require a YAML frontmatter block.
 # Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext

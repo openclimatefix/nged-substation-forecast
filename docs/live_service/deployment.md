@@ -185,29 +185,33 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 8 — Create the ECS cluster and Fargate task definition
 
+<!--- 4-space bullet indent nests correctly under a numbered item in MkDocs; MD007 wrongly
+      expects 3-space there — see the md007 note in pyproject.toml's [tool.pymarkdown]. --->
+<!--- pyml disable-num-lines 25 ul-indent--->
+
 1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 instances to
    manage) — a bare cluster is just a namespace, so a single `nged-forecast` cluster is enough
    for now.
 2. **ECS** → **Task definitions** → **Create new task definition** → *Fargate*:
-   - **Task role**: the task role from [Step 6](#step-6-iam-roles-for-the-task).
-   - **Task execution role**: the execution role from [Step 6](#step-6-iam-roles-for-the-task).
-   - **Task size**: 4 vCPU / 16 GB, **ARM64** (`linux/arm64`) — matches the measured inference
-     peak (~9 GB) and the image's own build target (see the Dockerfile's ARM build note); ARM
-     Fargate is also ~20% cheaper than x86 for the same size.
-   - **Container**: image URI `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
-     from [Step 5](#step-5-push-the-image-to-ecr); log configuration → **awslogs**, a new
-     CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
-   - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
-     `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
-     tables live in a separate bucket from everything else (see
-     [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-buckets)). Leave
-     `DATA_STORE_*` unset, since the task role supplies credentials.
-   - **Secrets — the three NGED source-bucket credentials.** Add each Parameter Store entry
-     from [Step 7](#step-7-store-the-nged-source-credentials-in-parameter-store) as an
-     environment variable of type **ValueFrom** (the console's "Secrets" mechanism): the
-     env-var name exactly as `Settings` expects (`NGED_S3_BUCKET_URL`,
-     `NGED_S3_BUCKET_ACCESS_KEY`, `NGED_S3_BUCKET_SECRET`), the value the matching parameter
-     name (e.g. `/nged-forecast/nged-s3-bucket-url`).
+    - **Task role**: the task role from [Step 6](#step-6-iam-roles-for-the-task).
+    - **Task execution role**: the execution role from [Step 6](#step-6-iam-roles-for-the-task).
+    - **Task size**: 4 vCPU / 16 GB, **ARM64** (`linux/arm64`) — matches the measured inference
+      peak (~9 GB) and the image's own build target (see the Dockerfile's ARM build note); ARM
+      Fargate is also ~20% cheaper than x86 for the same size.
+    - **Container**: image URI `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
+      from [Step 5](#step-5-push-the-image-to-ecr); log configuration → **awslogs**, a new
+      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
+    - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
+      `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
+      tables live in a separate bucket from everything else (see
+      [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-buckets)). Leave
+      `DATA_STORE_*` unset, since the task role supplies credentials.
+    - **Secrets — the three NGED source-bucket credentials.** Add each Parameter Store entry
+      from [Step 7](#step-7-store-the-nged-source-credentials-in-parameter-store) as an
+      environment variable of type **ValueFrom** (the console's "Secrets" mechanism): the
+      env-var name exactly as `Settings` expects (`NGED_S3_BUCKET_URL`,
+      `NGED_S3_BUCKET_ACCESS_KEY`, `NGED_S3_BUCKET_SECRET`), the value the matching parameter
+      name (e.g. `/nged-forecast/nged-s3-bucket-url`).
 
 ## Step 9 — Verify: run the task manually
 

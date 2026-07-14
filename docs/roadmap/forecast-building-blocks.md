@@ -22,16 +22,20 @@ are the **normal operation forecast** and the **prevailing conditions forecast**
 
 The blocks are:
 
+<!--- 4-space bullet indent nests correctly under a numbered item in MkDocs; MD007 wrongly
+      expects 3-space there — see the md007 note in pyproject.toml's [tool.pymarkdown]. --->
+<!--- pyml disable-num-lines 13 ul-indent--->
+
 1. **Power forecasts scaled to [−1, +1]** (the [`power_forecast`](delivery-tables.md#table-1-power_forecast)
    table). These **always assume a "normal running arrangement" and perfect health** of generators
    and substations — i.e. a worst-case network-constraint planning view. Producing this
    topology-normalised signal in the presence of historical switching events is the subject of
    [switching events & latent demand](switching-events.md) (v0.6 detector → v2 mixture models).
    "Normal" means:
-   - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
-     open.
-   - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
-     operating at full capacity.
+    - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
+      open.
+    - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
+      operating at full capacity.
 2. **Dynamically changing effective capacity of generators** (the
    [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table). E.g. if a wind
    turbine breaks in a wind farm, we estimate the reduced effective capacity over time.
