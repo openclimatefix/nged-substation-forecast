@@ -10,8 +10,9 @@ promote a model, build the image, verify it, push it — see
 **Decision (July 2026): keep the Dagster control plane — daemon + webserver + code-location
 server — running continuously on one small VM, alongside MLflow and Marimo, managed via Docker
 Compose. Do not adopt AWS EventBridge Scheduler (or the related Step Functions pattern) for
-triggering live forecast runs.** This pressure-tested and confirmed the roadmap's Option B (see
-[Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the costed
+triggering live forecast runs.** This pressure-tested and confirmed the roadmap's
+[accepted architecture](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month)
+(see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the costed
 options); the box dispatches every run — live schedules and UI-launched backtests alike — to an
 ephemeral Fargate task via `EcsRunLauncher`.
 
@@ -168,7 +169,7 @@ and AWS infra exist — not something worth orchestrating through Dagster in the
 ## See also
 
 - [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
-  costed AWS architecture options behind the decided Option B (small control-plane box +
+  costed AWS architecture options behind the accepted architecture (small control-plane box +
   `EcsRunLauncher`) and its implementation workstreams.
 - [Deploying a new production image](../live_service/deployment.md) — the step-by-step
   promotion/build/push runbook.
