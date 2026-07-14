@@ -1,23 +1,97 @@
 # Production Deployment — Design
 
-How the champion model gets from an MLflow leaderboard into a running production container, and
-why. For the step-by-step recipe — promote a model, build the image, verify it, push it — see
+How the live service is orchestrated, and how the champion model gets from an MLflow
+leaderboard into a running production container — and why. For the step-by-step recipe —
+promote a model, build the image, verify it, push it — see
 [Deploying a new production image](../live_service/deployment.md).
+
+## Orchestration: an always-on Dagster control plane, not EventBridge
+
+**Decision (July 2026): keep the Dagster control plane — daemon + webserver + code-location
+server — running continuously on one small VM, alongside MLflow and Marimo, managed via Docker
+Compose. Do not adopt AWS EventBridge Scheduler (or the related Step Functions pattern) for
+triggering live forecast runs.** This pressure-tested and confirmed the roadmap's Option B (see
+[Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the costed
+options); the box dispatches every run — live schedules and UI-launched backtests alike — to an
+ephemeral Fargate task via `EcsRunLauncher`.
+
+**The rejected alternative** was a "no control plane" architecture: EventBridge Scheduler fires
+on the 6-hourly cadence and launches an ECS `RunTask` that executes `dagster asset materialize`
+(or `dagster job execute`) directly in the production image. In that pattern, Dagster acts
+purely as the in-process execution framework, EventBridge acts as the scheduler, and compute is
+paid per run with nothing always-on; run history could still be inspected by pointing an
+on-demand `dagster-webserver` at shared Postgres run storage. We rejected it for four reasons:
+
+1. **Portability is a hard requirement.** The entire stack must run on a local laptop (or any
+   cloud) without AWS-specific services. Once the schedule lives in EventBridge and run-level
+   retry lives in Step Functions, the stack no longer runs with `docker compose up`. The
+   Dagster-on-a-VM design keeps the laptop and the cloud deployment the same artifact.
+
+2. **Handover to NGED is simpler without AWS coupling.** A Dagster deployment NGED can run
+   anywhere is an easier handover than an EventBridge + Step Functions + ECS arrangement they
+   would have to recreate inside their own AWS account. (This reverses an earlier assumption
+   that "a cron and a container" would be the easier handover — that only holds if the
+   receiving organisation is committed to AWS.)
+
+3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics
+   matter when the alternative is an idle fleet, but our alternative is one small VM that must
+   exist anyway to host MLflow and Marimo. Splitting the scheduler out of that box would save
+   roughly \$10–15/month while adding architectural surface area.
+
+4. **Run-level retry is no better under EventBridge.** EventBridge Scheduler retries the
+   *invocation* of a task (with backoff, a configurable max age/attempt count, and an SQS
+   dead-letter queue for failed invocations), but once ECS accepts the task, EventBridge
+   considers its job done — it does not notice a run that starts and then crashes. Relaunching
+   a whole crashed run would have required wrapping the task in a Step Functions state machine
+   using the `.sync` integration, while failures *inside* a run are already handled by
+   Dagster's `RetryPolicy` on individual assets/ops, which works in-process with or without a
+   daemon. So neither design gives run-level retry out of the box, and at four runs per day the
+   existing replay/backfill mode plus alerting is a sufficient answer in both worlds.
+
+EventBridge is also graph-blind: it fires a cron and passes a payload, so asset dependency
+ordering would have been handled entirely by Dagster within a single self-contained run of the
+full asset selection, and cross-run coordination — sensors, declarative automation,
+freshness-driven materialisation — would not have been available without the daemon.
+
+**Also rejected — a periodically-woken control plane** (running the daemon only, say, hourly to
+save cost): the daemon's schedule catch-up (`max_catchup_runs`, default 5) would technically
+fire missed 6-hourly ticks, but sensors, run monitoring, and retries all assume an always-on
+daemon, the web UI would be unavailable most of the time, and something else would still need
+to reliably wake the daemon — which reintroduces the scheduling problem one level up.
+
+### Accepted trade-offs and mitigations
+
+- **Single point of failure.** The daemon on one VM has no managed scheduler watching it; a
+  quiet box failure could silently miss slots. Mitigation: an external dead-man's-switch
+  heartbeat — the 6-hourly run pings a hosted health-check service (e.g.
+  [healthchecks.io](https://healthchecks.io)) on success, and an alert fires when the pings
+  stop. The heartbeat is the only component that lives outside the box, and the stack does not
+  depend on it to function.
+
+- **No run-level auto-retry after a hard crash.** Accepted; covered by the existing
+  replay/backfill mode for missed slots plus the heartbeat alert.
+
+### Door left open
+
+EventBridge remains usable later as a *pure trigger* — an external service that pokes an
+otherwise portable stack (e.g. S3 event → EventBridge rule → webhook or task launch) — provided
+the stack never depends on it to run. Event-driven behaviour (e.g. "run when NGED drops a new
+file") can alternatively be handled natively by Dagster sensors, which the always-on daemon
+supports.
 
 ## Baking the model into the image at build time
 
-Production forecasts run as ephemeral Fargate tasks under every AWS architecture option being
-considered (see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture)).
-An ephemeral container has no persistent disk and, under some architecture options, no reachable
-tracking server — so production inference needs some way to get a model without depending on
-either.
+Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster
+control plane described [above](#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
+An ephemeral container has no persistent disk and, for v0.1, no MLflow tracking server to reach
+— so production inference needs some way to get a model without depending on either.
 
 **Decision: bake the champion model into the image at build time, loaded via a plain
 `save`/`load` — no MLflow, run ID, or cache involved at runtime.** The model directory is
 produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard and
 downloads its artifacts to local disk), then `COPY`'d into the image at build time. Promotion
 becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow completely out of
-the production runtime under every architecture option.
+the production runtime.
 
 **Rejected alternative:** MLflow artifact root on S3 fetched at container startup — more runtime
 moving parts, needs tracking-store access from prod, and slower cold starts.
@@ -85,7 +159,8 @@ and AWS infra exist — not something worth orchestrating through Dagster in the
 ## See also
 
 - [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
-  AWS architecture options still being decided.
+  costed AWS architecture options behind the decided Option B (small control-plane box +
+  `EcsRunLauncher`) and its implementation workstreams.
 - [Deploying a new production image](../live_service/deployment.md) — the step-by-step
   promotion/build/push runbook.
 - [Environment & storage setup](../live_service/setup.md) — where data tables and local

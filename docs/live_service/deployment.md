@@ -246,7 +246,8 @@ since `power_forecasts` is one of the five NGED-facing tables (see
 ## See also
 
 - [Production Deployment — Design](../architecture/production-deployment.md) — why the image is
-  built this way.
+  built this way, and why the control plane that will schedule it is an always-on box rather
+  than EventBridge.
 - [Running live forecasts end-to-end](dagster-workflow.md) — driving the promoted model day to
   day once it's live, and backfilling missed slots.
 - [Environment & storage setup](setup.md) — where data tables and local artifacts live, and the
