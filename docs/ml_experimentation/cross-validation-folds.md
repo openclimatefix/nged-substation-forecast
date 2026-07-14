@@ -75,42 +75,7 @@ is a training-time technique, distinct from the validation folds described here.
 
 ## Alternatives considered
 
-We considered three other ways to slice the limited honest data and chose the single fold above.
-These are recorded so the decision is auditable and so we can revisit them as more data lands.
-
-### Monthly expanding CV — rejected (redundant folds)
-
-Slide a 12-month validation window forward by one month per fold, expanding training by one month
-each time (fold 1 validates 2025-04→2026-03, fold 2 validates 2025-05→2026-04, …). This "buys"
-several folds from today's data, but consecutive folds share **11/12 of the validation window** and
->90% of the training data, so their metrics are correlated ~0.9+. The effective number of
-independent folds is barely more than one; the small spread across them **understates** true
-sampling variance (false confidence in stability), at N× the compute for almost-duplicate
-information. One month is too small a change to make the folds meaningfully different.
-
-### Quarterly non-overlapping walk-forward — deferred (the sound multi-fold option)
-
-Expanding training, but validate on the **next 3 months, non-overlapping**:
-
-| Fold | Train | Validate (3 mo, non-overlapping) |
-|---|---|---|
-| 2025-Q2 | 2024-04-01 → 2025-03-31 | 2025-04 → 2025-06 |
-| 2025-Q3 | 2024-04-01 → 2025-06-30 | 2025-07 → 2025-09 |
-| 2025-Q4 | 2024-04-01 → 2025-09-30 | 2025-10 → 2025-12 |
-| 2026-Q1 | 2024-04-01 → 2025-12-31 | 2026-01 → 2026-03 |
-
-Because the validation windows do not overlap, the folds are **genuinely independent**
-measurements, and the set covers all four seasons (so you see seasonal skill variation, then report
-per-season and the mean). This is the statistically sound version of what monthly CV reaches for.
-We deferred it to keep the initial CV setup minimal; it is the recommended next step if we want
-multiple folds
-*before* the ECMWF back-fill enables the full yearly protocol.
-
-### Yearly folds backed by CERRA — rejected for validation
-
-Keep the yearly 2022–2025 folds now by training on **CERRA reanalysis** for the pre-2024-04-01
-years. Rejected: CERRA is *reanalysis* (it ingests future observations), so validating on it
-measures the model's response to near-perfect weather, not **forecast** skill — systematically
-misleading — and a leaderboard mixing CERRA folds and ECMWF folds is apples-to-oranges. It would
-also pull a large CERRA-ingestion effort forward. CERRA is valuable, but for **pre-training**
-(above), not for validation.
+We weighed three other ways to slice the limited honest data — monthly expanding CV, quarterly
+non-overlapping walk-forward, and yearly folds backed by CERRA reanalysis — before settling on the
+single fold above. The reasoning for rejecting or deferring each is recorded in
+[ML Experiment Orchestration — Design Decisions](../architecture/ml-orchestration.md#fold-design-alternatives-considered).

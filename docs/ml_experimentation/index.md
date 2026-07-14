@@ -13,5 +13,5 @@ roadmap.
 - [Model configuration](model-configuration.md) — how to set hyperparameters and choose
   features; the full feature vocabulary and the lookahead-bias guardrails.
 - [Cross-validation folds](cross-validation-folds.md) — the expanding-window CV protocol, the
-  current single fold and why the data constrains us to it, the target multiple-yearly-fold
-  protocol, and the fold-design alternatives we considered.
+  current single fold and why the data constrains us to it, and the target multiple-yearly-fold
+  protocol.
