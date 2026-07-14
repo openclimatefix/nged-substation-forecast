@@ -10,6 +10,12 @@
 #   scripts/build_and_verify_image.sh <partition-key>
 #   e.g. scripts/build_and_verify_image.sh 2026-07-04-00:00
 #
+# <partition-key> only has to PARSE as YYYY-MM-DD-HH:MM; it need not name a partition that exists.
+# The smoke test dies at the NWP lookup long before the slot matters, so off-cadence / out-of-range
+# keys work fine and only a malformed key fails (fast, with a clear "time data ... does not match
+# format" error). Real slots — for a genuine run — are the 6-hourly UTC boundaries from the
+# `live_forecasts` partition start onward, browsable in the Dagster UI.
+#
 # The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 1's
 # `promoted_model` asset) into the image, so it stays hermetic. The MODEL_RUN_ID and GIT_SHA
 # build args become OCI labels purely for traceability (inspect with `docker inspect`).

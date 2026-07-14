@@ -30,10 +30,16 @@ that production inference has no MLflow dependency at runtime:
 scripts/build_and_verify_image.sh <partition-key>   # e.g. 2026-07-04-00:00
 ```
 
-The `<partition-key>` is any recent 6-hourly key (see
-[the partition-semantics note](dagster-workflow.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand));
-it only drives the smoke test's one-shot run. The script builds the image tagged with the
-promoted model's run id, runs it offline, and prints the container log with a pass/fail summary.
+The `<partition-key>` only has to be **well-formed** (`YYYY-MM-DD-HH:MM`, e.g. `2026-07-04-00:00`);
+it need not name a partition that already exists. The smoke test fails at the NWP lookup long
+before the slot's validity could matter, so any correctly-formatted key works — off-cadence or
+out-of-range is fine, and only a malformed key fails (fast, with a clear `time data … does not
+match format` error). If you would rather pass a genuine slot: real slots are the 6-hourly
+boundaries at 00:00/06:00/12:00/18:00 UTC from the partition's start date onward; browse the exact
+list under the `live_forecasts` asset in the Dagster UI (see also
+[the partition-semantics note](dagster-workflow.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)).
+The script builds the image tagged with the promoted model's run id, runs it offline, and prints
+the container log with a pass/fail summary.
 It hard-fails only if the runtime touches MLflow — the hermeticity guarantee worth automating —
 and otherwise asks you to confirm by eye that the run loaded the model and failed *only* on
 missing NWP data (expected: no data tables are mounted for this isolated test). The script header
