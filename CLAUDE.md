@@ -346,6 +346,28 @@ for speed, but give each test a **function-scoped** fixture that `POST`s to `/mo
 recreates the bucket before the test body runs, so every test starts pristine and independent of
 execution order. `tests/test_s3_data_paths.py` is the canonical pattern.
 
+### Marimo Notebooks
+
+Marimo notebooks (`packages/dashboard/main.py`, `packages/notebooks/*.py`) are reactive: each
+`@app.cell` function is a separate cell, and the `with app.setup:` block holds names shared by
+every cell. Two authoring rules follow from how Marimo scopes names and how ruff sees them.
+
+- **Never give a leading underscore to anything you want to reuse across cells.** Marimo treats
+  any name starting with `_` (a variable *or* a function) as *cell-local* — it is not exported to
+  other cells, so a `_helper()` defined in one cell (or in `app.setup`) is invisible everywhere
+  else and the call fails at runtime. A helper that multiple cells call must have a public name
+  (no leading underscore). This is the opposite of the usual `_private` convention, so it is easy
+  to get wrong; the leading-underscore-means-private habit does not apply inside a Marimo
+  notebook.
+
+- **Put every import in the `with app.setup:` block, never at module top level and never let
+  Marimo thread them through cell signatures.** When imports live in `app.setup`, they are real
+  `import` statements that ruff analyses, so ruff flags a missing or unused import. If you instead
+  scatter imports into individual cells, Marimo passes the imported names into the cells that use
+  them as function parameters (`def _(pl, mo): ...`), and ruff treats a parameter as always
+  defined — so a genuinely missing import is invisible to the linter and only blows up at runtime.
+  Keeping all imports in `app.setup` keeps them statically checkable and available to every cell.
+
 ## This is a young project
 
 The project is a new, green-field project. No one else is using this code yet. Which means:

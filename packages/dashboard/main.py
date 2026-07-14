@@ -1,17 +1,12 @@
 import marimo
-from anywidget import AnyWidget
-from contracts.common import UTC_DATETIME_DTYPE
 
-__generated_with = "0.23.6"
+__generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 with app.setup:
+    from datetime import datetime
     from pathlib import Path
     from typing import cast
-
-    from contracts.settings import PROJECT_ROOT, Settings
-
-    from datetime import datetime
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
@@ -21,7 +16,10 @@ with app.setup:
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
     import pyarrow
+    from anywidget import AnyWidget
+    from contracts.common import UTC_DATETIME_DTYPE
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+    from contracts.settings import PROJECT_ROOT, Settings
     from contracts.typing_utils import typeddict_to_dict
     from plotting.ocf_theme import BLUE
 
@@ -30,7 +28,7 @@ with app.setup:
     DASHBOARD_S3_ENV: Path = PROJECT_ROOT / "packages" / "dashboard" / ".env.s3"
     """Git-ignored S3-mode overrides, layered on top of ROOT_ENV when the toggle is 's3'."""
 
-    def _settings_for_source(source: str) -> Settings:
+    def settings_for_source(source: str) -> Settings:
         """Instantiate Settings for the dashboard's selected data source.
 
         "local" reads only the root .env (the local pipeline, same as the rest of the app).
@@ -65,7 +63,7 @@ def _():
 
 @app.cell
 def _(source):
-    settings = _settings_for_source(source.value)
+    settings = settings_for_source(source.value)
     if source.value == "s3" and not DASHBOARD_S3_ENV.exists():
         status = mo.callout(
             mo.md(
@@ -152,7 +150,7 @@ def _(settings):
         storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
-        pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
+        pl.col("time") > pl.lit(datetime(2026, 5, 1)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
 
