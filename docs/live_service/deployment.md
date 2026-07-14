@@ -135,6 +135,7 @@ Fargate tasks need **two** separate roles, not one — they serve different prin
     ```
 
     (No KMS statement needed as long as the parameters use the default `aws/ssm` key.)
+
 - **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
   lets the container read and write **both** data buckets (delivery and internal). Reuse the same
   S3 policy from
