@@ -18,8 +18,9 @@ training and backtesting candidate models against historical data; this area cov
 of those candidates as the running production model and keeping live forecasts flowing from it.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers), but
-after the NIA project the day-to-day operator will be a non-expert at NGED — NGED confirmed
-(2026-07-14) they intend to run the service themselves, on their own AWS account. Every routine
+after the NIA project the day-to-day operator is expected to be a non-expert at NGED — NGED's
+stated preference (2026-07-14, pending their internal sign-off) is to run the service
+themselves, on their own AWS account. Every routine
 operator action must therefore eventually reduce to a dashboard check, a button in the Dagster
 UI, or a runbook a non-Python-expert can follow; before handover, these pages get an editing
 pass with that operator as the audience, plus a top-level "operator contract" page indexing

@@ -378,7 +378,7 @@ codifying and reproducing — see the open Terraform-vs-CDK question in
 
 **Handover caveat (added 2026-07-14):** all three stages are designed for the phase in which
 *OCF* runs the service on OCF's AWS account. Once the service moves to NGED's own AWS account
-(the confirmed post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
+(the preferred post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
 specifically may not survive NGED's security review, and because the network layer is the auth
 layer here, that would require an NGED-compatible replacement for the whole access design, not
 just a component swap. This is a reason to

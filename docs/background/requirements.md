@@ -27,7 +27,9 @@
 
 NGED confirmed (2026-07-14) that their preference for running Flexpectation business-as-usual
 *after* the NIA project is for **NGED to run our code themselves, on NGED's own AWS
-infrastructure**. This sets a standing design requirement for everything we build:
+infrastructure**. This is a statement of preference, not yet a commitment: NGED still need to
+check with their DSO, Cyber, and IT&D teams before giving a concrete answer. Even so, it sets
+a standing design requirement for everything we build:
 
 * **The service must be operable day to day by a non-expert at NGED** — every routine action
   reduced to a dashboard check, a button in the Dagster UI, or a runbook. See

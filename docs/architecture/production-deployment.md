@@ -22,8 +22,8 @@ the production runtime under every architecture option.
 **Rejected alternative:** MLflow artifact root on S3 fetched at container startup — more runtime
 moving parts, needs tracking-store access from prod, and slower cold starts.
 
-This decision also serves the post-NIA operating model, in which a non-expert at NGED operates
-the service day to day (see
+This decision also serves the preferred post-NIA operating model, in which a non-expert at
+NGED operates the service day to day (see
 [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover)):
 there is no tracking server on the hot path to break, and the model simply freezes between
 OCF's scheduled expert interventions — under a vendor-develops / operator-runs split, that is a

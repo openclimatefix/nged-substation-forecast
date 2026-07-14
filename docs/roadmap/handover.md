@@ -1,8 +1,10 @@
 # Handover to NGED
 
 > **Status: 🚧 Planned.** This page is the design record for the post-NIA operating model NGED
-> confirmed on **2026-07-14**: NGED will run Flexpectation themselves, on NGED's own AWS
-> account, after the NIA project ends. The requirement itself is recorded in
+> stated as their preference on **2026-07-14**: NGED running Flexpectation themselves, on
+> NGED's own AWS account, after the NIA project ends. This is a preference, not yet a
+> commitment — NGED's DSO, Cyber, and IT&D teams still need to sign off — but we design for it
+> from now on. The requirement itself is recorded in
 > [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover);
 > this page holds the engineering consequences and the handover workstreams. Epic:
 > [#309](https://github.com/openclimatefix/nged-substation-forecast/issues/309).
@@ -140,6 +142,9 @@ Concrete steps:
 
 - Raise landing-zone constraints with NGED early: what can and can't run in their account,
   what network ingress/egress is permitted, how their teams authenticate to internal web UIs.
+  These conversations overlap with the internal sign-off NGED needs anyway — their DSO,
+  Cyber, and IT&D teams must approve the operating model before NGED can commit to it — so
+  they double as progress on turning the stated preference into a concrete answer.
 - Clarify **who the operator actually is**. NGED has IT/infrastructure teams; the realistic
   split may be a domain person doing the Dagster-level operating while their infrastructure
   team owns OS- and AWS-level issues. That split changes what the runbooks need to cover (and

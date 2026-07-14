@@ -22,8 +22,9 @@ Each forecast is:
 
 **Version 2** (future): Scale to approximately 2,500 time series covering all of NGED's primary substations and most customer meters.
 
-**After the NIA project**: NGED intends to run the service themselves, on NGED's own AWS
-infrastructure — so the service is being built to be operable day to day by a non-expert. See
+**After the NIA project**: NGED's stated preference (pending sign-off from their internal
+teams) is to run the service themselves, on NGED's own AWS infrastructure — so the service is
+being built to be operable day to day by a non-expert. See
 [Requirements → Operating model & handover](background/requirements.md#operating-model-handover)
 and the [Handover to NGED](roadmap/handover.md) design page.
 

@@ -29,10 +29,10 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
 - [Live service](live-service.md) — the v0.1 deployment: the `live_forecasts` inference
   asset, the champion-model container, the costed AWS architecture options, and production
   monitoring.
-- [Handover to NGED](handover.md) — the post-NIA operating model (NGED runs the service
-  themselves, on NGED's AWS; confirmed 2026-07-14): the operator-contract design constraint,
-  and the handover workstreams (runbooks, alert-on-absence, infra-as-code, NGED landing-zone
-  probing, game days).
+- [Handover to NGED](handover.md) — the preferred post-NIA operating model (NGED runs the
+  service themselves, on NGED's AWS — their stated preference as of 2026-07-14, pending NGED
+  internal sign-off): the operator-contract design constraint, and the handover workstreams
+  (runbooks, alert-on-absence, infra-as-code, NGED landing-zone probing, game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP
@@ -230,8 +230,9 @@ delivery of the v2 live service)*
 *Epic: [#309](https://github.com/openclimatefix/nged-substation-forecast/issues/309) — see
 [Handover to NGED](handover.md) for the design.*
 
-NGED confirmed (2026-07-14) that after the NIA project they intend to **run Flexpectation
-themselves, on NGED's own AWS infrastructure** (see
+NGED confirmed (2026-07-14) that their *preference* is to **run Flexpectation themselves, on
+NGED's own AWS infrastructure** after the NIA project — not yet a commitment; NGED's DSO,
+Cyber, and IT&D teams still need to sign off (see
 [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover)).
 This is not a single late milestone: it sets a standing design constraint from today (the
 service must be operable day to day by a non-expert — the
