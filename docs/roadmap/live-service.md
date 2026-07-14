@@ -326,11 +326,15 @@ have something to say "additive on top of."
   Caddy, oauth2-proxy, DNS, and the security-group change entirely by inviting them into the
   tailnet instead — Tailscale already authenticates members with their Google accounts, and a
   Tailscale ACL can expose just the read-only webserver's port to the team while the full-access
-  webserver stays restricted. Trade-offs: everyone must run the Tailscale client (fine for
-  colleagues, wrong for browser-only NGED/NIA collaborators), and past the free tier's ~3 users
-  Tailscale bills per user, whereas oauth2-proxy is free. So treat tailnet-sharing as a cheap
-  Stage-1.5 for OCF-internal read access; the Caddy + oauth2-proxy build above remains the
-  destination once anyone outside the tailnet needs the UI.
+  webserver stays restricted. Worth checking whether OCF already runs an organisation tailnet
+  before building this — if so, most of the setup (and the per-user pricing question below) is
+  already settled. Trade-offs: everyone must run the Tailscale client (fine for colleagues, wrong
+  for browser-only NGED/NIA collaborators), and past the free tier's ~3 users Tailscale bills per
+  user, whereas oauth2-proxy is free. So treat tailnet-sharing as a cheap Stage-1.5 for
+  OCF-internal read access; the Caddy + oauth2-proxy build above remains the destination once
+  anyone outside the tailnet needs the UI. The two aren't mutually exclusive: starting with
+  tailnet-sharing and adding the proxy later loses nothing, since Stage 1.5 builds none of the
+  pieces Stage 2's proxy needs but also breaks none of them.
 
 #### Stage 3 — public Marimo dashboard, curated public data
 
