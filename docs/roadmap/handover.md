@@ -95,13 +95,13 @@ operator contract.
 
 ### 3. De-pet the control-plane box
 
-The always-on EC2 control-plane box ([Option B](live-service.md#aws-architecture)) is the
-riskiest element under a non-expert operating model: an unattended pet VM accumulates entropy —
-disks fill, instances get retirement notices, OS patches drift. Mitigations, roughly in build
-order:
+The always-on EC2 control-plane box ([the accepted option](live-service.md#aws-architecture)) is
+the riskiest element under a non-expert operating model: an unattended pet VM accumulates
+entropy — disks fill, instances get retirement notices, OS patches drift. Mitigations, roughly in
+build order:
 
 - EC2 auto-recovery alarm and instance status-check alarm (some of this is already sketched in
-  the Option B plan).
+  the accepted-option plan).
 - Log rotation and scheduled disk-cleanup jobs on the box.
 - Most importantly: a **tested, unattended rebuild-from-scratch script**, so the runbook
   answer to "the box is sick" is *destroy and recreate*, never *diagnose*. This is the point

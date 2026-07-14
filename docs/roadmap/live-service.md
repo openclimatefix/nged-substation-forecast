@@ -114,9 +114,10 @@ filesystem). Two requirements also firmed up that Level 1 does not serve:
 2. **An always-on dev dashboard** (a simple Marimo web app showing the latest forecasts) —
    so *something* must be always-on regardless.
 
-**Decision: Option B (small EC2 control-plane box + `EcsRunLauncher`), decided 2026-07-11.** The
-five options researched are recorded below so the decision has a durable record. The
-implementation workstreams are identical under every option except the
+**Decision: small EC2 control-plane box + `EcsRunLauncher`, decided 2026-07-11 — the
+[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) below.**
+The four alternatives considered and rejected are recorded further down so the decision has a
+durable record. The implementation workstreams are identical under every option except the
 infrastructure one.
 
 The decision was pressure-tested again in July 2026 against the fully serverless alternative —
@@ -136,7 +137,7 @@ the AWS price-list API (2026-07-03). AWS bills in USD; figures here are converte
 training to run on our own laptops; the only training AWS would see is an optional
 UI-launched backtest (~£0.65/run, priced below).
 
-Estimated total for the recommended Option B: **~£25–35/month**, made up of:
+Estimated total for the accepted option: **~£25–35/month**, made up of:
 
 | Component | £/month |
 |---|---|
@@ -146,17 +147,19 @@ Estimated total for the recommended Option B: **~£25–35/month**, made up of:
 | Data transfer (ingress + egress) | ≈0 |
 | Backtests | ~£0.65 per run, as needed |
 
-[Access phasing](#access-phasing) (below) adds negligible spend on top of this Option B estimate:
-Stage 2's Caddy and oauth2-proxy, and Stage 3's wake-proxy, all run as plain processes on the
-existing control-plane box — zero new billable resources. The only new billable resource across
-all three stages is the second Fargate task/service for Stage 3's public Marimo instance, already
-roughly priced by the same-shaped workload in [Option D](#option-d-serverless-control-plane-no-pets-4145month)
-(~£6.20/month for Marimo as its own tiny Fargate service).
+[Access phasing](#access-phasing) (below) adds negligible spend on top of this accepted-option
+estimate: Stage 2's Caddy and oauth2-proxy, and Stage 3's wake-proxy, all run as plain processes on
+the existing control-plane box — zero new billable resources. The only new billable resource
+across all three stages is the second Fargate task/service for Stage 3's public Marimo instance,
+already roughly priced by the same-shaped workload in
+[Option D](#option-d-serverless-control-plane-no-pets-4145month) (~£6.20/month for Marimo as its
+own tiny Fargate service).
 
-The other options range from ~£12–22/month (Option A, which fails two requirements) to
+The rejected alternatives range from ~£12–22/month (Option A, which fails two requirements) to
 ~£56–86/month (Option C). The detailed analysis follows: the
 [workload model](#workload-model), [storage & data transfer](#storage-data-transfer-common-to-all-options)
-(common to every option), then the per-option compute costs.
+(common to every option), then the accepted option's cost breakdown, then the rejected
+alternatives' costs.
 
 ### Workload model
 
@@ -191,22 +194,7 @@ Identical under every option, so counted once and folded into each headline rang
   GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
   beyond).
 
-### Option A — Level 1: nothing always-on ~£12–22/month
-
-Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
-throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
-vs the NWP init behind the newest forecast in `power_forecasts` on S3); failure recovery is
-the cron (stale outputs → next tick re-runs); Delta commits provide the atomicity the
-freshness logic needs; "which partitions need materialising" derived from Delta contents vs
-Dynamical availability, never Dagster's records (they evaporate with the throwaway SQLite).
-
-- **Pros:** cheapest; zero servers; self-healing by construction; everything it builds is
-  needed by B/C/D anyway.
-- **Cons:** fails both new requirements — no run history, hand-rolled backfills (issue #208
-  replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
-  always-on home (+£6/month Fargate service) anyway.
-
-### Option B — **recommended** — small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
+### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront
 reserved**) runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker +
@@ -238,7 +226,27 @@ subcommands and work with the image's existing `ENTRYPOINT ["dagster"]` unchange
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
-### Option C — one big box with everything on it ~£56–86/month
+### Considered but rejected
+
+The four alternatives below were researched alongside the accepted option above and rejected in
+its favour. They're kept here as a durable record of the decision, not as live options.
+
+#### Option A — Level 1: nothing always-on ~£12–22/month
+
+Hourly EventBridge Scheduler → one-shot Fargate task → `dagster job execute` against a
+throwaway local `DAGSTER_HOME` → exit. Freshness check is the first op (latest Dynamical init
+vs the NWP init behind the newest forecast in `power_forecasts` on S3); failure recovery is
+the cron (stale outputs → next tick re-runs); Delta commits provide the atomicity the
+freshness logic needs; "which partitions need materialising" derived from Delta contents vs
+Dynamical availability, never Dagster's records (they evaporate with the throwaway SQLite).
+
+- **Pros:** cheapest; zero servers; self-healing by construction; everything it builds is
+  needed by the accepted option (and C/D) anyway.
+- **Cons:** fails both new requirements — no run history, hand-rolled backfills (issue #208
+  replay), backtests stay on the workstation, and the Marimo dashboard needs a separate
+  always-on home (+£6/month Fargate service) anyway.
+
+#### Option C — one big box with everything on it ~£56–86/month
 
 Dagster + Postgres + Marimo + *all compute* (inference peaks ~9 GB → 16 GB box): EC2
 `t4g.xlarge` £82.20 on-demand / £51.90 reserved-1yr; Lightsail 16 GB £61.70 (4 vCPU, 40% CPU
@@ -250,7 +258,7 @@ OCF runs everything else (with Airflow).
 - **Cons:** priciest; backtests capped at 2–4 vCPU (slower than the workstation); Lightsail
   variants mean static AWS keys and burst-credit accounting; biggest pet.
 
-### Option D — serverless control plane (no pets) ~£41–45/month
+#### Option D — serverless control plane (no pets) ~£41–45/month
 
 Daemon + webserver as one always-on 0.5 vCPU / 2 GB ARM Fargate service (£14.70), RDS
 `db.t4g.micro` Postgres (£10–12, approximate — the one unverified price), Marimo as its own
@@ -261,7 +269,7 @@ tiny Fargate service (approx £6.20), runs on ephemeral Fargate.
   ALB (+~£16.50/month) or a Tailscale-sidecar hack; the most Terraform. Cleaner on paper than
   in practice.
 
-### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
+#### Option E — Dagster+ Solo, Hybrid ~£37–45/month typical
 
 £7.50/month base + £0.030/credit (1 credit = 1 materialisation or op execution; May 2026
 pricing). Live cadence ≈ 395 credits ≈ £12/month; backtests £0.15–0.52 each (a heavy
@@ -277,7 +285,7 @@ no serverless charge; sensor evaluations are free (an hourly freshness *op* woul
 
 ### Comparison
 
-| | A: Level 1 | B: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
+| | A: Level 1 | Accepted: small box + Fargate | C: one big box | D: serverless CP | E: Dagster+ Solo |
 |---|---|---|---|---|---|
 | £/month | 12–22 | **25–35** | 56–86 | ~41–45 (+ALB) | 37–45 |
 | Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
@@ -287,12 +295,13 @@ no serverless charge; sensor evaluations are free (an hourly freshness *op* woul
 | No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
 | Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
 
-**Recommendation: Option B** — the only shape giving full Dagster *and* workstation-beating
-backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1. Option C is the
-fallback if operational simplicity trumps backtest speed and ~£30/month. D pays an RDS+ALB
-tax for purism; E's 1-user cap rules it out.
+**Recommendation (accepted): the small-box option** — the only shape giving full Dagster *and*
+workstation-beating backtest compute *and* a free dashboard home, for ~£13–15/month over Level 1.
+Option C is the fallback if operational simplicity trumps backtest speed and ~£30/month. D pays
+an RDS+ALB tax for purism; E's 1-user cap rules it out.
 
-**Future work (post-v0.1):** once an always-on control-plane box exists (Option B or later), it's also
+**Future work (post-v0.1):** once an always-on control-plane box exists (the accepted option or
+later), it's also
 a natural home for an **MLflow tracking server** (network-reachable, persistent — replacing the
 local file-store) and a **"development dashboard"** (a Marimo app for researchers). Neither is
 needed to ship v0.1; revisit once the box exists — see [Access phasing](#access-phasing) below for
@@ -300,9 +309,9 @@ how each one's exposure rolls out once it does.
 
 ### Access phasing
 
-The sections above decide *where* Option B's pieces run; this one decides *who can reach them,
-when*. Three stages, each additive on top of the last — nothing built in an earlier stage is
-reworked in a later one.
+The sections above decide *where* the accepted option's pieces run; this one decides *who can
+reach them, when*. Three stages, each additive on top of the last — nothing built in an earlier
+stage is reworked in a later one.
 
 The constraint driving all three stages: **none of the three web UIs has any built-in
 authentication.** Open-source `dagster-webserver` has no users, roles, or login (auth/RBAC is a
@@ -313,9 +322,10 @@ pattern in Stage 2 are load-bearing security decisions, not tidiness.
 
 #### Stage 1 — solo, Tailscale only
 
-This is exactly what the [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
-section above already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below
-have something to say "additive on top of."
+This is exactly what the
+[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) section
+above already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have
+something to say "additive on top of."
 
 - Daemon, full-access Dagster webserver, and the Marimo dashboard all run on the `t4g.medium`
   control-plane box, alongside MLflow once its tracking server lands (the "Future work" item
@@ -443,10 +453,11 @@ A Dagster sensor that fires on each `power_time_series_and_metadata` materialisa
 `evaluation_scope="production_monitoring"` over `fold_id="live"` for both trailing windows.
 Sensor preferred over a schedule so it fires on the actual data update.
 
-Note this sensor needs a running Dagster daemon — [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
-(the decided direction) provides one. If the deployment instead ships Option A (nothing
-always-on), skip the sensor and run the monitoring step as the final op of the one-shot
-production job (the production-job workstream below already reserves that slot).
+Note this sensor needs a running Dagster daemon — the
+[accepted option](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month) provides
+one. If the deployment instead ships Option A (nothing always-on), skip the sensor and run the
+monitoring step as the final op of the one-shot production job (the production-job workstream
+below already reserves that slot).
 
 ### Alert on absence: the missed-check-in alarm
 
@@ -456,8 +467,8 @@ full disk, an expired credential, a schedule that stopped firing. The **primary*
 alert is therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires
 when **no successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot
 plus margin), regardless of cause.
-Option B's "daemon silently dead" staleness alarm (mentioned under
-[the architecture options](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month))
+The accepted option's "daemon silently dead" staleness alarm (mentioned under
+[the architecture options](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.
 
@@ -515,17 +526,16 @@ Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
 > did the whole job: run under `dg dev` with a persistent `DAGSTER_HOME` for several days,
 > confirmed 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable
-> in replay mode. The one-shot-job design kept below is **not needed under Option B** (the
-> daemon-driven schedules above already cover it) — it remains relevant only if
+> in replay mode. The one-shot-job design kept below is **not needed under the accepted option**
+> (the daemon-driven schedules above already cover it) — it remains relevant only if
 > [Option A](#option-a-level-1-nothing-always-on-1222month) is chosen for the AWS deployment
 > instead, since Option A has no daemon to hold schedules on.
 
 Ordered first to match the #137 sub-issue order: unlike the other two workstreams, this one
 needed no S3, Docker, or AWS account at all, so it ran against the laptop's local Delta tables.
 
-**If Option A is chosen** (not the current recommendation — see
-[AWS architecture](#aws-architecture)), it would still need a new Dagster job (e.g.
-`live_pipeline_job`) chaining, in order:
+**If Option A were chosen instead** (it was not — see [AWS architecture](#aws-architecture)), it
+would still need a new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
 
 1. **Freshness op** — latest Dynamical init vs latest forecast's NWP init in S3; early-exit.
 2. **Ingest** — materialise `power_time_series_and_metadata`, and the missing `ecmwf_ens`
@@ -537,10 +547,11 @@ needed no S3, Docker, or AWS account at all, so it ran against the laptop's loca
 Keep each op a thin shell over unit-tested pure helpers (freshness comparison, missing-
 partition computation). Under **A**, the job is the hourly one-shot and the wrapper computes
 the current time-window partition key from the clock (injected `now`, per repo convention).
-Under **B/C/D**, the daemon runs it instead — the freshness decision moves up into a
-schedule/sensor evaluation (return a `SkipReason` when nothing is new; evaluations are free),
-partition keys come from Dagster natively, and missed slots are backfilled from the UI with
-`availability_mode="replay"` — exactly what shipped for the local dress rehearsal above.
+Under **the accepted option, C, or D**, the daemon runs it instead — the freshness decision
+moves up into a schedule/sensor evaluation (return a `SkipReason` when nothing is new;
+evaluations are free), partition keys come from Dagster natively, and missed slots are
+backfilled from the UI with `availability_mode="replay"` — exactly what shipped for the local
+dress rehearsal above.
 
 ### Deployment workstream 3 — AWS infrastructure
 
@@ -548,8 +559,8 @@ partition keys come from Dagster natively, and missed slots are backfilled from 
 > roles, and a Fargate task definition, all set up by hand in the AWS console, plus a manual
 > `RunTask` to verify the whole path end-to-end — are ✅ implemented; see
 > [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-4-create-the-ecr-repository)
-> (steps 4–8). The Option B–specific pieces below (the always-on EC2 box, `EcsRunLauncher`,
-> scheduling) and infra-as-code are still 🚧, tracked as follow-up work.
+> (steps 4–8). The accepted option's specific pieces below (the always-on EC2 box,
+> `EcsRunLauncher`, scheduling) and infra-as-code are still 🚧, tracked as follow-up work.
 
 Common to all options:
 
@@ -570,8 +581,8 @@ Common to all options:
 - 🚧 **Alerting**: basic per-task failure alerting (a failed run → email). Decided 2026-07-14:
   prefer **portable alerting logic over AWS-native glue** (no EventBridge rules) — the checks
   should be plain code that runs end-to-end on a laptop or any cloud, with only the thin
-  notification edge (SNS, SMTP, …) being platform-specific. Under Option B, Dagster's own
-  run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
+  notification edge (SNS, SMTP, …) being platform-specific. Under the accepted option, Dagster's
+  own run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
   failure alerts are necessary but not sufficient — the
   [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) catches the
   silent-failure classes they miss.
@@ -589,10 +600,10 @@ Common to all options:
   allowed to run matters as much as what suits OCF — worth asking them before deciding. By
   handover time, infra-as-code is mandatory, not optional.
 - 🚧 Document the few one-time manual steps still to come (SNS subscription confirm, Tailscale
-  join) in the same runbook page (`docs/live_service/deployment.md`) once Option B's control-
-  plane box is built.
+  join) in the same runbook page (`docs/live_service/deployment.md`) once the accepted option's
+  control-plane box is built.
 
-Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` cron):
+The accepted option adds (instead of Option A's hourly EventBridge Scheduler → `RunTask` cron):
 
 - **EC2 `t4g.medium`** (IAM instance role; EBS gp3 ~20 GB) running Docker Compose:
   `dagster-daemon`, `dagster-webserver`, the code-location server (same image as the runs),
@@ -620,7 +631,7 @@ order issues were opened.
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
 | [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/)) |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
-| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; Option B's control-plane box still 🚧 |
+| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; the accepted option's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
 | [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring provides the planned [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), plus error telemetry |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
@@ -639,7 +650,7 @@ order issues were opened.
 3. **Self-healing**: kill a run mid-flight; confirm the next scheduled tick (A) or a one-click
    UI backfill of the missed partition (B) redoes the work with no duplicate rows (Delta
    overwrite semantics).
-4. **Option B extras**: reboot the box → daemon, webserver, Postgres, and Marimo all come back
+4. **Accepted-option extras**: reboot the box → daemon, webserver, Postgres, and Marimo all come back
    unattended; launch a backtest from the UI → it runs on the big Fargate task definition;
    Marimo dashboard shows the latest live forecasts over Tailscale.
 5. **Alerting**: force a failure (bad env var), confirm the SNS email.
