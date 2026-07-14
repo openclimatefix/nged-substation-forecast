@@ -2,7 +2,7 @@
 
 # Production image for the live-forecast service. Bakes the champion model into the image at
 # build time and loads it via a plain save/load — no MLflow, run ID, or cache lookup at
-# runtime. See docs/live_service/deployment.md for the promotion runbook and
+# runtime. See docs/live_service/aws.md for the promotion/deployment runbook and
 # docs/architecture/production-deployment.md for why this design was chosen.
 #
 # Build (arm64 — ARM Fargate is ~20% cheaper and the candidate control-plane boxes are
@@ -67,8 +67,13 @@ COPY conf/ conf/
 COPY metadata/ metadata/
 
 ENTRYPOINT ["dagster"]
+# This ENTRYPOINT exists for `docker run` smoke-test ergonomics. In the deployed service every
+# command spells the full argv instead: EcsRunLauncher's generated run command itself starts
+# with "dagster", so the ECS task definition neutralises this ENTRYPOINT with /usr/bin/env
+# (docs/live_service/aws.md, Step 9), and the control-plane services override it outright.
+#
 # The default target: live_forecasts_job is the real, already-existing partitioned job
-# (defs/schedules.py). Under Option B, EcsRunLauncher overrides this command per run, and the
+# (defs/schedules.py). EcsRunLauncher overrides this command per run, and the
 # same image separately serves as the code-location server — this default only matters for
 # `docker run` smoke tests. Partition selection is via --tags, not --select/--partition:
 # `dagster job execute` has no --partition flag at all, and `--select <asset>` hits a pre-

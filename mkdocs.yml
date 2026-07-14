@@ -61,9 +61,10 @@ nav:
       - Evaluating new data sources: ml_experimentation/evaluating-new-data-sources.md
   - Live Service:
       - Overview: live_service/index.md
-      - Environment & storage setup: live_service/setup.md
-      - Deploying a new production image: live_service/deployment.md
-      - Running live forecasts end-to-end: live_service/dagster-workflow.md
+      - Running the whole stack locally: live_service/local.md
+      - Setting up the live service on AWS: live_service/aws.md
+      - Operating the live service: live_service/operations.md
+      - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
       - Live Service: roadmap/live-service.md

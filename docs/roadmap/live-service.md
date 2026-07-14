@@ -79,7 +79,7 @@ Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > invariant) now lives at
 > [Production Deployment — Design: Live inference](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#live-inference-is-single-run-not-bulk);
 > the operational runbook — promoting a model, running the schedule, backfilling a missed slot —
-> is [Running live forecasts end-to-end](../live_service/dagster-workflow.md), the permanent home
+> is [Operating the live service](../live_service/operations.md), the permanent home
 > this page's shipped material moves to (and, eventually, this whole page, once every section
 > below has landed). Remaining work on this page — the
 > [container build](#production-model-artifacts) and [AWS infrastructure](#aws-architecture) — is
@@ -93,7 +93,7 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > time; no MLflow at runtime) and its rationale now live at
 > [Production Deployment — Design](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/);
 > the promotion/build/verify runbook lives at
-> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/).
+> [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/).
 > Remaining work on this page — the [AWS infrastructure](#aws-architecture) itself — is
 > unaffected.
 
@@ -206,13 +206,12 @@ to the job. Add ~£1.80 EBS, £5–7/month live Fargate, ~£0.65/backtest.
 *same* [production image](../architecture/production-deployment.md) the ephemeral Fargate runs
 use (harmless — the baked-in champion model is dead weight for the first three, only a run's
 actual execution touches it) — a `docker-compose.yml` on the box just launches each as a
-separate service with a different command override. One gotcha worth recording now, before
-that compose file gets written: `dagster-webserver` and `dagster-daemon` are **separate
-console-script binaries**, not subcommands of the `dagster` CLI, so those two services need
-`entrypoint: ["dagster-webserver"]` / `["dagster-daemon"]` overrides, not just a `command:`
-override — unlike `dagster code-server start` (the code-location-server role) and `dagster job
-execute`/`dagster asset materialize` (the ephemeral-run role), which are both ordinary `dagster`
-subcommands and work with the image's existing `ENTRYPOINT ["dagster"]` unchanged.
+separate service with a different command override. The compose file, and the entrypoint
+gotchas it has to navigate (`dagster-webserver`/`dagster-daemon` are separate console-script
+binaries, not `dagster` subcommands; and `EcsRunLauncher` generates a run command that itself
+starts with `dagster`, so the run task definition must neutralise the image's
+`ENTRYPOINT ["dagster"]`), are now written up in the runbook —
+[Setting up the live service on AWS: Steps 9 and 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
 
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced
   centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
@@ -558,22 +557,24 @@ dress rehearsal above.
 > **Status: partially done.** The pieces common to every architecture option — ECR, IAM task
 > roles, and a Fargate task definition, all set up by hand in the AWS console, plus a manual
 > `RunTask` to verify the whole path end-to-end — are ✅ implemented; see
-> [Deploying a new production image](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-3-create-the-ecr-repository)
-> (steps 3–8). The accepted option's specific pieces below (the always-on EC2 box,
-> `EcsRunLauncher`, scheduling) and infra-as-code are still 🚧, tracked as follow-up work.
+> [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-5-create-the-ecr-repository)
+> (steps 5–10). The accepted option's specific pieces below (the always-on EC2 box,
+> `EcsRunLauncher`, scheduling, Tailscale) now have their full bring-up runbook written —
+> [steps 11–16 of the same page](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-11-launch-the-control-plane-box)
+> — and executing it is in progress; infra-as-code is still 🚧, tracked as follow-up work.
 
 Common to all options:
 
 - ✅ **ECR** repository; image pushed by hand for now (tag = model run-id + git SHA) — a CI
   container build is a later, infra-as-code-era step.
 - ✅ **S3**: one data bucket mirroring the local `data/` layout (`nwp_data/`,
-  `power_forecasts/`, …) — see [Environment & storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/#running-on-aws-manual-point-and-click).
+  `power_forecasts/`, …) — see [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets).
   NGED-delivery bucket/prefix is a later step (v0.1 is "forecast running", not "delivery
   contract live").
 - ✅ **IAM roles**: turned out to be **two** roles, not one — a task *execution* role
   (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role (the S3
   read/write policy from `setup.md`) — see
-  [Deploying a new production image: Step 5](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/#step-5-iam-roles-for-the-task)
+  [Setting up the live service on AWS: Step 7](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-7-iam-roles-for-the-fargate-task)
   for why they're split. No static AWS keys anywhere.
 - ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
   ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
@@ -599,9 +600,10 @@ Common to all options:
   network assumptions baked in), and what NGED's infrastructure teams already know and are
   allowed to run matters as much as what suits OCF — worth asking them before deciding. By
   handover time, infra-as-code is mandatory, not optional.
-- 🚧 Document the few one-time manual steps still to come (SNS subscription confirm, Tailscale
-  join) in the same runbook page (`docs/live_service/deployment.md`) once the accepted option's
-  control-plane box is built.
+- ✅ Document the one-time manual bring-up steps (EC2 launch, Tailscale join, Docker Compose,
+  schedules on) — written as
+  [Setting up the live service on AWS: Steps 11–16](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-11-launch-the-control-plane-box).
+  🚧 The SNS-subscription-confirm step joins that page once alerting (above) is built.
 
 The accepted option adds (instead of Option A's hourly EventBridge Scheduler → `RunTask` cron):
 
@@ -629,7 +631,7 @@ order issues were opened.
 | [#208 Run every 6 hours locally and backfill missing runs (as a test)](https://github.com/openclimatefix/nged-substation-forecast/issues/208) | [Deployment workstream 1](#deployment-workstream-1-the-production-job-local-dress-rehearsal) — done, via native per-asset schedules |
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
-| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/deployment/)) |
+| [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/)) |
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; the accepted option's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |

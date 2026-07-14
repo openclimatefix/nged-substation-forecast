@@ -2,8 +2,8 @@
 
 How the live service is orchestrated, and how the champion model gets from an MLflow
 leaderboard into a running production container — and why. For the step-by-step recipe —
-promote a model, build the image, verify it, push it — see
-[Deploying a new production image](../live_service/deployment.md).
+promote a model, build the image, verify it, push it, and stand up the AWS deployment around
+it — see [Setting up the live service on AWS](../live_service/aws.md).
 
 ## Orchestration: an always-on Dagster control plane, not EventBridge
 
@@ -171,9 +171,9 @@ and AWS infra exist — not something worth orchestrating through Dagster in the
 - [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
   costed AWS architecture options behind the accepted architecture (small control-plane box +
   `EcsRunLauncher`) and its implementation workstreams.
-- [Deploying a new production image](../live_service/deployment.md) — the step-by-step
-  promotion/build/push runbook.
-- [Environment & storage setup](../live_service/setup.md) — where data tables and local
+- [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:
+  promotion, image build/push, and the full AWS bring-up including the control-plane box.
+- [Configuration reference](../live_service/setup.md) — where data tables and local
   artifacts live, and how to point `Settings` at S3.
 - [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the
   CV pipeline's MLflow-artifact cache.

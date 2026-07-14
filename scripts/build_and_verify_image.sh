@@ -2,7 +2,7 @@
 #
 # Build the production image and smoke-test it with zero network access.
 #
-# This is Step 2 of the deployment runbook (docs/live_service/deployment.md) as one command:
+# This is Step 4 of the AWS setup runbook (docs/live_service/aws.md) as one command:
 # build the image with the champion model baked in, then prove it runs hermetically. This header
 # is the source of truth for *why* each choice below is made.
 #
@@ -16,7 +16,7 @@
 # format" error). Real slots — for a genuine run — are the 6-hourly UTC boundaries from the
 # `live_forecasts` partition start onward, browsable in the Dagster UI.
 #
-# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 1's
+# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 3's
 # `promoted_model` asset) into the image, so it stays hermetic. The MODEL_RUN_ID and GIT_SHA
 # build args become OCI labels purely for traceability (inspect with `docker inspect`).
 #
@@ -25,7 +25,7 @@
 #     instantiate Settings() at import time), so the code location fails to import without them.
 #     They must be PRESENT but need not be real or reachable — passing dummies proves the image
 #     needs only their *presence* at import, never valid credentials and never the network. The
-#     deployed task gets the real values as secrets (runbook Step 6).
+#     deployed task gets the real values as secrets (runbook Step 8).
 #   - --network=none: proves runtime inference needs no network at all — the whole point of
 #     baking the model in.
 #   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no

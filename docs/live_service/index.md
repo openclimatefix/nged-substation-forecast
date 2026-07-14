@@ -8,10 +8,10 @@ already built — once each piece ships. Design rationale (the *why*) lives in
 [Production Deployment — Design](../architecture/production-deployment.md) page for this area's
 counterpart.
 [The roadmap's Live Service page](../roadmap/live-service.md) sends readers here as its sections
-land (so far: the `live_forecasts` and `promoted_model` assets, local 6-hourly automation, and
-the container build/verify runbook; still to come: production monitoring, AWS compute). Once the
-whole v0.1 epic ships, the roadmap page is deleted and this section is the sole home for how the
-live service works.
+land (so far: the `live_forecasts` and `promoted_model` assets, local 6-hourly automation, the
+container build/verify runbook, and the AWS bring-up runbook; still to come: production
+monitoring, alerting). Once the whole v0.1 epic ships, the roadmap page is deleted and this
+section is the sole home for how the live service works.
 
 This is distinct from [ML Experimentation](../ml_experimentation/index.md): that area covers
 training and backtesting candidate models against historical data; this area covers picking one
@@ -28,11 +28,16 @@ them. See [Handover to NGED](../roadmap/handover.md).
 
 ## Documents
 
-- [Environment & storage setup](setup.md) — where the data tables and local artifacts live, and
-  how to configure credentials for running locally, against a local MinIO, or with the data tables
-  on AWS S3.
-- [Deploying a new production image](deployment.md) — step-by-step recipe: promote a champion
-  model, build the image, verify it runs with zero MLflow dependency.
-- [Running live forecasts end-to-end](dagster-workflow.md) — step-by-step recipe: promote a
-  champion model to `promoted_model`, let the 6-hourly `live_forecasts` schedule run (or
-  materialise a slot by hand), inspect a forecast, and backfill a missed slot in replay mode.
+The pages split by *which environment you're bringing up* and then *how to drive it* — the
+driving is identical in both environments, so it lives on one shared page:
+
+- [Running the whole stack locally](local.md) — bring the entire service up on a laptop:
+  `.env`, a persistent `DAGSTER_HOME`, `dg dev`, and the optional MinIO rehearsal.
+- [Setting up the live service on AWS](aws.md) — every step to stand the service up on AWS, in
+  order: S3 buckets and IAM, promote a champion and build/verify/push its image, the Fargate
+  task, the always-on control-plane box, and connecting to the Dagster UI over Tailscale.
+- [Operating the live service](operations.md) — driving a running stack day to day: promote a
+  champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by
+  hand), inspect a forecast, and backfill a missed slot in replay mode.
+- [Configuration reference](setup.md) — what the storage roots, the derive-from-root
+  convention, and the credential settings mean, and which combination each environment uses.

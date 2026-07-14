@@ -25,7 +25,7 @@ additional benefit.
   reason to withhold the internal tables — but only the five below are a **stable contract**: the
   internal bucket's tables may change shape at any time with no notice. See
   [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for why, and
-  [Environment & storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/#running-on-aws-manual-point-and-click)
+  [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets)
   for the concrete bucket/IAM setup.
 - **Access**: both buckets hold data about NGED's customers, so neither is public — both are
   protected with S3 authentication (mirroring how NGED protects their own time-series JSON
