@@ -73,13 +73,15 @@ handover they need an editing pass with the NGED operator as the audience, plus 
 ### 2. Alert on absence, not just failure
 
 Per-task failure alerts miss whole classes of silent failure: a hung daemon, a full disk, an expired
-credential, a schedule that simply stopped firing. The fix is a **dead-man's switch**: an alarm that
-fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one missed 6-hourly
-slot plus margin), regardless of why. The planned mechanism is **Sentry cron monitoring**
+credential, a schedule that simply stopped firing. The fix is a **missed-check-in alarm** (Sentry's
+cron-monitoring terminology): an alarm that fires when *no successful forecast has landed in N
+hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus margin), regardless of why. The planned
+mechanism is **Sentry cron monitoring**
 ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful run
 checks in with Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the service
 being watched (a dead daemon simply stops checking in), and check-in pings are plain portable code.
-Details: [the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch). The
+Details:
+[the missed-check-in alarm](live-service.md#alert-on-absence-the-missed-check-in-alarm). The
 handover consideration: the Sentry account is OCF's today, so at handover the alert routing (and
 possibly the account itself) moves to NGED.
 
@@ -87,7 +89,7 @@ The [production monitoring plan](live-service.md#production-monitoring) already 
 forecast" staleness alarm; this workstream promotes it from a nice-to-have to the **primary** alert,
 because it is the one alert whose false-negative rate a non-expert operator cannot compensate for.
 
-Every alert — dead-man's switch and per-task alike — must link directly to a runbook that ends in
+Every alert — missed-check-in and per-task alike — must link directly to a runbook that ends in
 either a specific operator action or "escalate to OCF". An alert without a runbook is a bug in the
 operator contract.
 

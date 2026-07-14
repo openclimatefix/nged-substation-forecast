@@ -54,7 +54,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - Telemetry to Sentry.io
   ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — including
   Sentry cron monitoring as the
-  [dead-man's switch](#alert-on-absence-the-dead-mans-switch); basic per-task failure
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm); basic per-task failure
   alerting covers v0.1 first.
 - An **MLflow tracking server** (issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate **development dashboard** ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on the
   always-on control-plane box once it exists — see the [note below](#aws-architecture).
@@ -436,21 +436,22 @@ Note this sensor needs a running Dagster daemon — [Option B](#option-b-recomme
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
 
-### Alert on absence: the dead-man's switch
+### Alert on absence: the missed-check-in alarm
 
 Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
 only fire when something runs and fails. Whole classes of failure are silent: a hung daemon, a
 full disk, an expired credential, a schedule that stopped firing. The **primary** production
-alert is therefore a dead-man's switch: an alarm that fires when **no successful forecast has
-landed in N hours** (e.g. 8 hours — one missed 6-hourly slot plus margin), regardless of cause.
+alert is therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires
+when **no successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot
+plus margin), regardless of cause.
 Option B's "daemon silently dead" staleness alarm (mentioned under
 [the architecture options](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.
 
 The alarm's *evaluation and delivery* must sit **outside** the service being watched, because
-a dead daemon cannot report itself — a Dagster sensor alone can never be the dead-man's
-switch. The planned mechanism is **Sentry cron monitoring**
+a dead daemon cannot report itself — a Dagster sensor alone can never provide this alarm.
+The planned mechanism is **Sentry cron monitoring**
 ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
 forecast run checks in with Sentry, and Sentry alerts when an expected check-in fails to
 arrive. This satisfies both the outside-the-service requirement and the portability preference
@@ -560,8 +561,8 @@ Common to all options:
   notification edge (SNS, SMTP, …) being platform-specific. Under Option B, Dagster's own
   run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
   failure alerts are necessary but not sufficient — the
-  [dead-man's switch](#alert-on-absence-the-dead-mans-switch) catches the silent-failure
-  classes they miss.
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) catches the
+  silent-failure classes they miss.
 - 🚧 Codify as infra-as-code once there's enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
   **Open question, not yet decided:** this section originally specified a small Terraform
@@ -607,7 +608,7 @@ order issues were opened.
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; Option B's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring is the planned [dead-man's switch](#alert-on-absence-the-dead-mans-switch), plus error telemetry |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring provides the planned [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), plus error telemetry |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |
