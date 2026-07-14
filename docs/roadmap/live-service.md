@@ -52,8 +52,10 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)) — v0.1 is
   "forecast running", not "delivery contract live".
 - Telemetry to Sentry.io
-  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — CloudWatch +
-  SNS cover alerting first.
+  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — including
+  Sentry cron monitoring as the
+  [dead-man's switch](#alert-on-absence-the-dead-mans-switch); basic per-task failure
+  alerting covers v0.1 first.
 - An **MLflow tracking server** (issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate **development dashboard** ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on the
   always-on control-plane box once it exists — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
@@ -446,13 +448,17 @@ Option B's "daemon silently dead" staleness alarm (mentioned under
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
 side note.
 
-The freshness check itself is plain portable code — compare the newest forecast in
-`power_forecasts` against the clock — in line with the portability preference in
-[Deployment workstream 3](#deployment-workstream-3-aws-infrastructure). But the check's
-*trigger and delivery* are the one deliberate exception to "no platform glue": they must sit
-**outside** the service being watched, because a dead daemon cannot report itself. Cron on a
-laptop, a scheduled alarm on AWS, or an external dead-man's receiver (a healthchecks-style
-service the pipeline pings on success) all satisfy this; a Dagster sensor alone does not.
+The alarm's *evaluation and delivery* must sit **outside** the service being watched, because
+a dead daemon cannot report itself — a Dagster sensor alone can never be the dead-man's
+switch. The planned mechanism is **Sentry cron monitoring**
+([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
+forecast run checks in with Sentry, and Sentry alerts when an expected check-in fails to
+arrive. This satisfies both the outside-the-service requirement and the portability preference
+in [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — Sentry is external
+to the whole deployment, and a check-in ping is plain code that works identically from a
+laptop, AWS, or any other cloud. One handover consideration: the Sentry account is OCF's
+today, so at handover the alert routing (and possibly the account itself) moves to NGED — see
+[Handover to NGED](handover.md#2-alert-on-absence-not-just-failure).
 
 Every alert must link to a runbook that ends in either a specific operator action or
 "escalate" — a requirement that matters doubly under the post-NIA operating model, where the
@@ -601,7 +607,7 @@ order issues were opened.
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; Option B's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring is the planned [dead-man's switch](#alert-on-absence-the-dead-mans-switch), plus error telemetry |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |

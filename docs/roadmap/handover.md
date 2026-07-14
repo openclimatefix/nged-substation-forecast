@@ -76,10 +76,14 @@ Per-task failure alerts miss whole
 classes of silent failure: a hung daemon, a full disk, an expired credential, a schedule that
 simply stopped firing. The fix is a **dead-man's switch**: an alarm that fires when *no
 successful forecast has landed in N hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus
-margin), regardless of why. Per the portability preference (below), the freshness check is
-plain code runnable on a laptop; only its trigger and delivery must sit outside the service
-being watched — a dead daemon cannot report itself. Details:
-[the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch).
+margin), regardless of why. The planned mechanism is **Sentry cron monitoring**
+([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
+run checks in with Sentry, and Sentry alerts on a missed check-in — Sentry sits outside the
+service being watched (a dead daemon simply stops checking in), and check-in pings are plain
+portable code. Details:
+[the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch). The handover
+consideration: the Sentry account is OCF's today, so at handover the alert routing (and
+possibly the account itself) moves to NGED.
 
 The [production monitoring plan](live-service.md#production-monitoring) already sketches a
 "no fresh forecast" staleness alarm; this workstream promotes it from a nice-to-have to the
