@@ -66,7 +66,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
   windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire
   stale experiment partitions.
-- For more plans for post-v0.1, please see [the milestones (v0.2 onwards)](..#milestones).
+- For more plans for post-v0.1, please see [the milestones (v0.2 onwards)](index.md#milestones).
 
 ## The `live_forecasts` asset
 
