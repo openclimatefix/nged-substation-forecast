@@ -6,11 +6,10 @@ __generated_with = "0.23.6"
 app = marimo.App(width="full")
 
 with app.setup:
+    from pathlib import Path
     from typing import cast
 
-    from contracts.settings import Settings
-
-    settings = Settings()
+    from contracts.settings import PROJECT_ROOT, Settings
 
     from datetime import datetime
 
@@ -26,11 +25,64 @@ with app.setup:
     from contracts.typing_utils import typeddict_to_dict
     from plotting.ocf_theme import BLUE
 
-    BASE_DELTA_PATH = settings.power_time_series_data_path
+    ROOT_ENV: Path = PROJECT_ROOT / ".env"
+    """Root .env — the local-pipeline config shared with the rest of the app."""
+    DASHBOARD_S3_ENV: Path = PROJECT_ROOT / "packages" / "dashboard" / ".env.s3"
+    """Git-ignored S3-mode overrides, layered on top of ROOT_ENV when the toggle is 's3'."""
+
+    def _settings_for_source(source: str) -> Settings:
+        """Instantiate Settings for the dashboard's selected data source.
+
+        "local" reads only the root .env (the local pipeline, same as the rest of the app).
+        "s3" layers packages/dashboard/.env.s3 on top of the root .env, overriding the
+        data-path roots and object-store credentials to point at the real S3 buckets, so
+        production data can be viewed without restarting marimo.
+
+        Only the data tables follow the toggle: .env.s3 sets DATA_PATH_INTERNAL,
+        DATA_PATH_DELIVERY and the DATA_STORE_* credentials. It deliberately does not set
+        LOCAL_ARTIFACTS_PATH, so the model cache and production model stay laptop-local in
+        both modes. A missing .env.s3 is silently skipped by pydantic-settings, so "s3"
+        then falls back to the root .env's local paths (the UI flags this).
+        """
+        if source == "s3":
+            # _env_file is a pydantic-settings builtin kwarg not modelled by ty's synthesised
+            # BaseModel __init__; the list layers .env.s3 over the root .env (later file wins).
+            return Settings(_env_file=[ROOT_ENV, DASHBOARD_S3_ENV])  # ty: ignore[unknown-argument]
+        return Settings()
 
 
 @app.cell
 def _():
+    source = mo.ui.radio(
+        options=["local", "s3"],
+        value="local",
+        label="Data source",
+        inline=True,
+    )
+    source
+    return (source,)
+
+
+@app.cell
+def _(source):
+    settings = _settings_for_source(source.value)
+    if source.value == "s3" and not DASHBOARD_S3_ENV.exists():
+        status = mo.callout(
+            mo.md(
+                f"No `{DASHBOARD_S3_ENV.name}` found next to `main.py`. Copy "
+                f"`{DASHBOARD_S3_ENV.name}.example` to `{DASHBOARD_S3_ENV.name}` and fill in "
+                "the S3 buckets and credentials. Falling back to local data."
+            ),
+            kind="warn",
+        )
+    else:
+        status = mo.md(f"Reading **{source.value}** data from `{settings.nged_data_path}`.")
+    status
+    return (settings,)
+
+
+@app.cell
+def _(settings):
     metadata_path = settings.metadata_path
     df = TimeSeriesMetadata.validate(
         pl.read_parquet(metadata_path, storage_options=typeddict_to_dict(settings.storage_options))
@@ -94,9 +146,10 @@ def _(arrow_table):
 
 
 @app.cell
-def _():
+def _(settings):
     delta_df = pl.scan_delta(
-        BASE_DELTA_PATH, storage_options=typeddict_to_dict(settings.storage_options)
+        settings.power_time_series_data_path,
+        storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
         pl.col("time") > pl.lit(datetime(2026, 3, 1)).cast(UTC_DATETIME_DTYPE)
