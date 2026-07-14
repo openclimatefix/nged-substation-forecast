@@ -21,6 +21,8 @@ __marimo__/
 # Environment variables & secrets
 .env
 .env.backup
+# Dashboard S3-mode overrides (issue #297); the committed .env.s3.example documents the keys.
+packages/dashboard/.env.s3
 
 #######################
 # Data storage
