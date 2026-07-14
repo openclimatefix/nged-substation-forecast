@@ -57,8 +57,10 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)) — v0.1 is
   "forecast running", not "delivery contract live".
 - Telemetry to Sentry.io
-  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — CloudWatch +
-  SNS cover alerting first.
+  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — including
+  Sentry cron monitoring as the
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm); basic per-task failure
+  alerting covers v0.1 first.
 - An **MLflow tracking server** (issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate **development dashboard** ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on the
   always-on control-plane box once it exists — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
@@ -120,7 +122,8 @@ infrastructure one.
 The decision was pressure-tested again in July 2026 against the fully serverless alternative —
 EventBridge Scheduler firing an ECS `RunTask` directly, with no always-on control plane — and
 stands. The durable rationale (portability, NGED handover, illusory cost saving, retry parity)
-and the accepted trade-offs (including the external dead-man's-switch heartbeat) are recorded at
+and the accepted trade-offs (mitigated by the external
+[missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm)) are recorded at
 [Production Deployment — Design: Orchestration](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
 
 ### Cost summary
@@ -227,9 +230,11 @@ subcommands and work with the image's existing `ENTRYPOINT ["dagster"]` unchange
   centrally); backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance
   roles (no static keys); the textbook Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
-  policies, an external dead-man's-switch heartbeat, and the monitoring plan's "no fresh
-  forecast" alarm); dagster.yaml/run-launcher config work; 4 GB is comfortable but not roomy
-  (watch Marimo's Delta scans).
+  policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
+  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
+  risk grows once a non-expert operates the service — the full mitigation list (auto-recovery
+  alarms, disk hygiene, a tested rebuild-from-scratch script) is
+  [Handover workstream 3](handover.md#3-de-pet-the-control-plane-box).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
@@ -385,6 +390,15 @@ IAM roles, security groups, and multiple processes start accumulating enough to 
 codifying and reproducing — see the open Terraform-vs-CDK question in
 [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure).
 
+**Handover caveat (added 2026-07-14):** all three stages are designed for the phase in which
+*OCF* runs the service on OCF's AWS account. Once the service moves to NGED's own AWS account
+(the preferred post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
+specifically may not survive NGED's security review, and because the network layer is the auth
+layer here, that would require an NGED-compatible replacement for the whole access design, not
+just a component swap. This is a reason to
+[probe NGED's landing-zone constraints early](handover.md#5-probe-ngeds-aws-landing-zone-early)
+— not a reason to change Stages 1–3, which remain correct for the OCF-run phase.
+
 ## Production monitoring
 
 Issue: [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)
@@ -433,6 +447,36 @@ Note this sensor needs a running Dagster daemon — [Option B](#option-b-recomme
 (the decided direction) provides one. If the deployment instead ships Option A (nothing
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
+
+### Alert on absence: the missed-check-in alarm
+
+Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
+only fire when something runs and fails. Whole classes of failure are silent: a hung daemon, a
+full disk, an expired credential, a schedule that stopped firing. The **primary** production
+alert is therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires
+when **no successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot
+plus margin), regardless of cause.
+Option B's "daemon silently dead" staleness alarm (mentioned under
+[the architecture options](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month))
+is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
+side note.
+
+The alarm's *evaluation and delivery* must sit **outside** the service being watched, because
+a dead daemon cannot report itself — a Dagster sensor alone can never provide this alarm.
+The planned mechanism is **Sentry cron monitoring**
+([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): each successful
+forecast run checks in with Sentry, and Sentry alerts when an expected check-in fails to
+arrive. This satisfies both the outside-the-service requirement and the portability preference
+in [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — Sentry is external
+to the whole deployment, and a check-in ping is plain code that works identically from a
+laptop, AWS, or any other cloud. One handover consideration: the Sentry account is OCF's
+today, so at handover the alert routing (and possibly the account itself) moves to NGED — see
+[Handover to NGED](handover.md#2-alert-on-absence-not-just-failure).
+
+Every alert must link to a runbook that ends in either a specific operator action or
+"escalate" — a requirement that matters doubly under the post-NIA operating model, where the
+day-to-day operator is a non-expert at NGED (see
+[Handover to NGED](handover.md#2-alert-on-absence-not-just-failure)).
 
 ### The `retire_experiment_job`
 
@@ -523,7 +567,14 @@ Common to all options:
 - ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
   ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
   Right-size the live definition after a week of CloudWatch metrics.
-- 🚧 **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
+- 🚧 **Alerting**: basic per-task failure alerting (a failed run → email). Decided 2026-07-14:
+  prefer **portable alerting logic over AWS-native glue** (no EventBridge rules) — the checks
+  should be plain code that runs end-to-end on a laptop or any cloud, with only the thin
+  notification edge (SNS, SMTP, …) being platform-specific. Under Option B, Dagster's own
+  run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
+  failure alerts are necessary but not sufficient — the
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) catches the
+  silent-failure classes they miss.
 - 🚧 Codify as infra-as-code once there's enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
   **Open question, not yet decided:** this section originally specified a small Terraform
@@ -531,7 +582,12 @@ Common to all options:
   specifically for this project, since it's single-cloud (AWS-only), so there's no cross-cloud
   benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
   language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
-  does not pick one.
+  does not pick one. The post-NIA operating model (NGED runs the service on NGED's AWS — see
+  [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account)) adds two
+  inputs to that call: the infra-as-code must be **account-portable** (no OCF-specific names or
+  network assumptions baked in), and what NGED's infrastructure teams already know and are
+  allowed to run matters as much as what suits OCF — worth asking them before deciding. By
+  handover time, infra-as-code is mandatory, not optional.
 - 🚧 Document the few one-time manual steps still to come (SNS subscription confirm, Tailscale
   join) in the same runbook page (`docs/live_service/deployment.md`) once Option B's control-
   plane box is built.
@@ -547,12 +603,9 @@ Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` 
 - **Schedules/sensors**: the 6-hourly `live_forecasts` schedule and `ecmwf_ens`
   daily-partition sensor replace the hourly external cron (freshness via `SkipReason`).
 - systemd unit (or Compose `restart: always`) + unattended-upgrades on the box; an EC2
-  instance-status-check alarm; the monitoring staleness alarm covers "daemon silently dead".
-- **Dead-man's-switch heartbeat**: the 6-hourly run pings a hosted health-check service (e.g.
-  healthchecks.io) on success, and an alert fires when the pings stop — catching a quiet box
-  failure that silently misses slots. This is the only component that lives outside the box,
-  and the stack does not depend on it to function (rationale:
-  [the orchestration decision](../architecture/production-deployment.md#accepted-trade-offs-and-mitigations)).
+  instance-status-check alarm; the
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) covers "daemon
+  silently dead".
 
 ### Related GitHub issues
 
@@ -569,7 +622,7 @@ order issues were opened.
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
 | [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; Option B's control-plane box still 🚧 |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — CloudWatch + SNS first; Sentry as the follow-up |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring provides the planned [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), plus error telemetry |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |

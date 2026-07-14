@@ -67,6 +67,7 @@ nav:
   - Roadmap:
       - Overview: roadmap/index.md
       - Live Service: roadmap/live-service.md
+      - Handover to NGED: roadmap/handover.md
       - Delivery Tables: roadmap/delivery-tables.md
       - Forecast Building Blocks: roadmap/forecast-building-blocks.md
       - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md

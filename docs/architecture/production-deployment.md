@@ -31,7 +31,8 @@ on-demand `dagster-webserver` at shared Postgres run storage. We rejected it for
    anywhere is an easier handover than an EventBridge + Step Functions + ECS arrangement they
    would have to recreate inside their own AWS account. (This reverses an earlier assumption
    that "a cron and a container" would be the easier handover — that only holds if the
-   receiving organisation is committed to AWS.)
+   receiving organisation is committed to AWS.) See
+   [Handover to NGED](../roadmap/handover.md) for the full handover plan.
 
 3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics
    matter when the alternative is an idle fleet, but our alternative is one small VM that must
@@ -62,14 +63,15 @@ to reliably wake the daemon — which reintroduces the scheduling problem one le
 ### Accepted trade-offs and mitigations
 
 - **Single point of failure.** The daemon on one VM has no managed scheduler watching it; a
-  quiet box failure could silently miss slots. Mitigation: an external dead-man's-switch
-  heartbeat — the 6-hourly run pings a hosted health-check service (e.g.
-  [healthchecks.io](https://healthchecks.io)) on success, and an alert fires when the pings
-  stop. The heartbeat is the only component that lives outside the box, and the stack does not
+  quiet box failure could silently miss slots. Mitigation: the
+  [missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
+  — each successful 6-hourly run checks in with an external monitoring service (Sentry cron
+  monitoring is the planned mechanism), and an alert fires when an expected check-in fails to
+  arrive. The alarm is the only component that lives outside the box, and the stack does not
   depend on it to function.
 
 - **No run-level auto-retry after a hard crash.** Accepted; covered by the existing
-  replay/backfill mode for missed slots plus the heartbeat alert.
+  replay/backfill mode for missed slots plus the missed-check-in alarm.
 
 ### Door left open
 
@@ -95,6 +97,13 @@ the production runtime.
 
 **Rejected alternative:** MLflow artifact root on S3 fetched at container startup — more runtime
 moving parts, needs tracking-store access from prod, and slower cold starts.
+
+This decision also serves the preferred post-NIA operating model, in which a non-expert at
+NGED operates the service day to day (see
+[Requirements → Operating model & handover](../background/requirements.md#operating-model-handover)):
+there is no tracking server on the hot path to break, and the model simply freezes between
+OCF's scheduled expert interventions — under a vendor-develops / operator-runs split, that is a
+feature, not a limitation.
 
 This is deliberately simpler than reusing `BaseForecaster.load_from_mlflow`'s cache (the
 mechanism the CV pipeline already uses — see
