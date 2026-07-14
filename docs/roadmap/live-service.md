@@ -40,6 +40,11 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   partitions, and the ability to launch backtests on AWS whenever the model improves.
 - **Multi-user access** to the Dagster UI (and, later, to the dev dashboard) (rules out single-user tracking
   services).
+- **Portability**: the entire stack must also run on a local laptop (or any cloud) via
+  `docker compose up` — no AWS-specific service (EventBridge, Step Functions) may be
+  load-bearing for scheduling or orchestration. This is both a development convenience and a
+  handover requirement — see
+  [the orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
   failure (SNS → email), and cost-conscious operation (~£25–35/month target).
 
@@ -113,6 +118,13 @@ filesystem). Two requirements also firmed up that Level 1 does not serve:
 five options researched are recorded below so the decision has a durable record. The
 implementation workstreams are identical under every option except the
 infrastructure one.
+
+The decision was pressure-tested again in July 2026 against the fully serverless alternative —
+EventBridge Scheduler firing an ECS `RunTask` directly, with no always-on control plane — and
+stands. The durable rationale (portability, NGED handover, illusory cost saving, retry parity)
+and the accepted trade-offs (mitigated by the external
+[missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm)) are recorded at
+[Production Deployment — Design: Orchestration](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
 
 ### Cost summary
 
@@ -591,7 +603,9 @@ Option B adds (instead of option A's hourly EventBridge Scheduler → `RunTask` 
 - **Schedules/sensors**: the 6-hourly `live_forecasts` schedule and `ecmwf_ens`
   daily-partition sensor replace the hourly external cron (freshness via `SkipReason`).
 - systemd unit (or Compose `restart: always`) + unattended-upgrades on the box; an EC2
-  instance-status-check alarm; the monitoring staleness alarm covers "daemon silently dead".
+  instance-status-check alarm; the
+  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) covers "daemon
+  silently dead".
 
 ### Related GitHub issues
 

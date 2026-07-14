@@ -130,7 +130,8 @@ against an in-process `moto` server.)
 > and is enough to run the stack from your laptop against S3 data-table roots today. Building the
 > production container itself is covered by
 > [Deploying a new production image](deployment.md);
-> running it as an unattended, scheduled **Fargate task** (ECR, EventBridge scheduling) is a
+> running it as an unattended, scheduled **Fargate task** (dispatched by the always-on Dagster
+> control-plane box via `EcsRunLauncher`) is a
 > separate, not-yet-built roadmap item — see the
 > [AWS architecture](https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#aws-architecture)
 > section for that plan.
