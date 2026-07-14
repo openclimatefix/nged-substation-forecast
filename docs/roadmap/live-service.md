@@ -217,7 +217,10 @@ subcommands and work with the image's existing `ENTRYPOINT ["dagster"]` unchange
   roles (no static keys); the textbook Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher
-  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans).
+  config work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The pet-server
+  risk grows once a non-expert operates the service — the full mitigation list (auto-recovery
+  alarms, disk hygiene, a tested rebuild-from-scratch script) is
+  [Handover workstream 3](handover.md#3-de-pet-the-control-plane-box).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and
   £10.30/£6.50 after, if everything squeezes into 2 GB — likely too tight with Marimo.
 
@@ -373,6 +376,15 @@ IAM roles, security groups, and multiple processes start accumulating enough to 
 codifying and reproducing — see the open Terraform-vs-CDK question in
 [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure).
 
+**Handover caveat (added 2026-07-14):** all three stages are designed for the phase in which
+*OCF* runs the service on OCF's AWS account. Once the service moves to NGED's own AWS account
+(the confirmed post-NIA operating model — see [Handover to NGED](handover.md)), Tailscale
+specifically may not survive NGED's security review, and because the network layer is the auth
+layer here, that would require an NGED-compatible replacement for the whole access design, not
+just a component swap. This is a reason to
+[probe NGED's landing-zone constraints early](handover.md#5-probe-ngeds-aws-landing-zone-early)
+— not a reason to change Stages 1–3, which remain correct for the OCF-run phase.
+
 ## Production monitoring
 
 Issue: [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)
@@ -421,6 +433,22 @@ Note this sensor needs a running Dagster daemon — [Option B](#option-b-recomme
 (the decided direction) provides one. If the deployment instead ships Option A (nothing
 always-on), skip the sensor and run the monitoring step as the final op of the one-shot
 production job (the production-job workstream below already reserves that slot).
+
+### Alert on absence: the dead-man's switch
+
+Per-task failure alerts (the EventBridge → SNS rule in
+[Deployment workstream 3](#deployment-workstream-3-aws-infrastructure)) only fire when
+something runs and fails. Whole classes of failure are silent: a hung daemon, a full disk, an
+expired credential, a schedule that stopped firing. The **primary** production alert is
+therefore a dead-man's switch: an alarm that fires when **no successful forecast has landed in
+N hours** (e.g. 8 hours — one missed 6-hourly slot plus margin), regardless of cause. Option B's
+"daemon silently dead" staleness alarm (mentioned under
+[the architecture options](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month))
+is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
+side note. Every alert must link to a runbook that ends in either a specific operator action or
+"escalate" — a requirement that matters doubly under the post-NIA operating model, where the
+day-to-day operator is a non-expert at NGED (see
+[Handover to NGED](handover.md#2-alert-on-absence-not-just-failure)).
 
 ### The `retire_experiment_job`
 
@@ -511,7 +539,10 @@ Common to all options:
 - ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
   ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
   Right-size the live definition after a week of CloudWatch metrics.
-- 🚧 **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email.
+- 🚧 **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email. Per-task
+  failure alerts are necessary but not sufficient — the
+  [dead-man's switch](#alert-on-absence-the-dead-mans-switch) below catches the silent-failure
+  classes they miss.
 - 🚧 Codify as infra-as-code once there's enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
   **Open question, not yet decided:** this section originally specified a small Terraform
@@ -519,7 +550,12 @@ Common to all options:
   specifically for this project, since it's single-cloud (AWS-only), so there's no cross-cloud
   benefit from HCL, and CDK lets the infra be written in Python rather than learning a new
   language for it. Terraform vs CDK is Jack's call to make when Stage 2 work starts; this page
-  does not pick one.
+  does not pick one. The post-NIA operating model (NGED runs the service on NGED's AWS — see
+  [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account)) adds two
+  inputs to that call: the infra-as-code must be **account-portable** (no OCF-specific names or
+  network assumptions baked in), and what NGED's infrastructure teams already know and are
+  allowed to run matters as much as what suits OCF — worth asking them before deciding. By
+  handover time, infra-as-code is mandatory, not optional.
 - 🚧 Document the few one-time manual steps still to come (SNS subscription confirm, Tailscale
   join) in the same runbook page (`docs/live_service/deployment.md`) once Option B's control-
   plane box is built.
