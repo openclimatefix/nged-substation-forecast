@@ -368,6 +368,23 @@ every cell. Two authoring rules follow from how Marimo scopes names and how ruff
   defined — so a genuinely missing import is invisible to the linter and only blows up at runtime.
   Keeping all imports in `app.setup` keeps them statically checkable and available to every cell.
 
+### MkDocs Gotcha: a list item needs a blank line before it if it follows an indented continuation
+
+Python-Markdown (MkDocs' renderer) doesn't let a list item interrupt a paragraph the way
+GitHub-flavored Markdown does. If a bullet's continuation content ends with an indented
+paragraph (e.g. a clarifying sentence after a fenced code block inside the item) and the next
+sibling bullet immediately follows with no blank line in between, Python-Markdown treats the new
+list-marker line as more paragraph text rather than a new list item — the marker renders as a
+literal hyphen, merged into the previous sentence's prose. `pymarkdown scan` does **not** catch
+this: a markdown source with the missing blank line lints clean.
+
+**How to apply:** always put a blank line between a list item's continuation content (paragraphs,
+fenced code blocks) and the next sibling item. For any non-trivial list item — one that embeds a
+code block or multiple paragraphs — spot-check with `uv run mkdocs build --strict` and inspect
+the rendered HTML rather than trusting the linter alone. See also the nested-sub-bullet indent
+gotcha (4 spaces, not 2) tracked in memory — same root cause class: Python-Markdown's list
+parsing is stricter than CommonMark and stricter than `pymarkdown`'s default checks.
+
 ## This is a young project
 
 The project is a new, green-field project. No one else is using this code yet. Which means:
