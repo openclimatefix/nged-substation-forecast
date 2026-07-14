@@ -190,21 +190,22 @@ in [Step 1](#step-1-create-the-s3-buckets)):
 
 ## Step 6 — Push the image to ECR
 
-Authenticate Docker against the new repository, then tag and push the image built in
-[Step 4](#step-4-build-and-verify-the-image):
+One script pushes the image built in [Step 4](#step-4-build-and-verify-the-image) and — on
+later redeploys — points the ECS task definition at it:
 
 ```bash
-aws ecr get-login-password --region eu-west-2 \
-  | docker login --username AWS --password-stdin <account-id>.dkr.ecr.eu-west-2.amazonaws.com
-
-docker tag nged-forecast:<run-id-short> \
-  <account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<run-id-short>
-
-docker push <account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<run-id-short>
+scripts/push_and_deploy_image.sh    # no arguments — everything is derived
 ```
 
-`<account-id>` is the 12-digit AWS account ID (visible in the console's top-right account menu,
-or `aws sts get-caller-identity --query Account --output text`).
+It takes no arguments by design, so nothing can be mistyped: the tag is derived from
+`data/production_model/promotion.json` exactly as Step 4's build script derives it (so only an
+image that was built and verified can be pushed), and the AWS account id comes from
+`aws sts get-caller-identity`. The script logs Docker into ECR, tags, and pushes; then, if the
+`nged-forecast` task-definition family already exists
+([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new
+revision pointing at the new image. On this first pass through the runbook the family doesn't
+exist yet — the script says so and exits cleanly, and the push is all this step needs. The
+script header documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 7 — IAM roles for the Fargate task
 
@@ -330,6 +331,10 @@ keep the old values until they next start, since injection happens once per cont
       `DAGSTER_PG_PASSWORD`), the value the matching parameter name (e.g.
       `/nged-forecast/nged-s3-bucket-url`).
 
+Creating the task definition in the console is one-time. Later image changes never repeat it —
+`scripts/push_and_deploy_image.sh` registers new revisions of this family automatically (see
+[Redeploying a new champion model](#redeploying-a-new-champion-model)).
+
 ## Step 10 — Verify: run a forecast task manually
 
 Before building the control plane, trigger one task directly and confirm the compute path
@@ -352,9 +357,10 @@ aws ecs run-task \
 Note the command starts with `dagster` — Step 9's `/usr/bin/env` entry point means every command
 spells out the full argv.
 
-> **Region matters here.** Unlike the `docker` commands above (region is baked into the ECR
-> URI), the AWS CLI falls back to your configured default region if `--region` is omitted —
-> check yours with `aws configure get region` and don't assume it's `eu-west-2`.
+> **Region matters here.** Unlike [Step 6](#step-6-push-the-image-to-ecr)'s script (which
+> passes `--region` explicitly on every call), a hand-typed AWS CLI command falls back to your
+> configured default region if `--region` is omitted — check yours with
+> `aws configure get region` and don't assume it's `eu-west-2`.
 
 `assignPublicIp=ENABLED` (with a public subnet) is the simplest way to give the task internet
 egress for its ECR pull and S3/CloudWatch calls without a NAT gateway. Keep this `<subnet-id>`
@@ -764,11 +770,12 @@ Once the service is live, shipping a better model is a repeat of a slice of this
 
 1. Promote the new champion locally —
    [Operating the live service: Steps 1–2](operations.md#step-1-pick-a-champion-model).
-2. Build and verify the new image ([Step 4](#step-4-build-and-verify-the-image)), then push it
-   ([Step 6](#step-6-push-the-image-to-ecr)) — it gets a new tag (the new model's run id).
-3. **ECS** → **Task definitions** → `nged-forecast` → **Create new revision** → update the
-   image URI to the new tag. The run launcher resolves the family's latest revision at launch
-   time, so the next scheduled run picks it up with no restart on the box.
+2. Build and verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a
+   new tag (the new model's run id).
+3. `scripts/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
+   that pushes the new tag and registers a new task-definition revision pointing at it. The
+   run launcher resolves the family's latest revision at launch time, so the next scheduled
+   run picks it up with no restart on the box.
 4. The control-plane containers can keep running the old image — the baked-in model is dead
    weight to them, so a *model* change doesn't affect them. When the *code* changes (assets,
    schedules, a Dagster upgrade), also update the box: `docker login` + `docker pull` the new

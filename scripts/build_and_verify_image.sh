@@ -55,7 +55,7 @@ fi
 PROMOTION_JSON="data/production_model/promotion.json"
 if [[ ! -f "$PROMOTION_JSON" ]]; then
   echo "error: $PROMOTION_JSON not found — materialise the promoted_model asset first" >&2
-  echo "       (deployment.md Step 1), so the model this build bakes in exists on disk." >&2
+  echo "       (aws.md Step 3), so the model this build bakes in exists on disk." >&2
   exit 2
 fi
 
@@ -109,4 +109,5 @@ echo "    - the model loading, then failing ONLY at the NWP-availability lookup,
 echo "    - missing NWP data (no DATA_PATH_INTERNAL mounted) as the sole cause — nothing else."
 echo "  A non-zero container exit (${RUN_EXIT}) is EXPECTED here; a zero exit would be suspicious."
 echo
-echo "==> ${IMAGE} passed the automated hermeticity check. Push it with the runbook's next step."
+echo "==> ${IMAGE} passed the automated hermeticity check."
+echo "    Push + deploy it with scripts/push_and_deploy_image.sh (aws.md Step 6)."
