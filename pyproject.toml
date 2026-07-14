@@ -129,15 +129,20 @@ plugins.md013.enabled = false
 # the whole file (e.g. "Usage" appearing under two different top-level sections).
 plugins.md024.siblings_only = true
 # Nested list indent: MkDocs' renderer (Python-Markdown, no sane-lists extension) only treats a
-# sub-list as nested when it's indented a full 4 spaces; 2-space indent (this rule's default)
+# sub-list as nested when it's indented a full 4 spaces; 2-space indent (a bare list's default)
 # silently renders as a flat, unnested list instead. Match the renderer, not the default.
-# Caveat this setting can't fix: for bullets nested under an *ordered* item, MD007 hard-codes an
-# expectation of alignment with the parent's content column (3 spaces for a "1. " marker) and
-# ignores this indent setting — but Python-Markdown still needs the full 4 spaces to nest there,
-# so 3-space renders flat. Keep the 4-space indent and suppress the false positive with a
-# "pyml disable-num-lines N ul-indent" pragma above the list (see docs/live_service/deployment.md
-# for an example).
-plugins.md007.indent = 4
+#
+# Use PML101 ("anchored list indentation"), not the more common MD007 ("ul-indent"), to enforce
+# this: MD007 hard-codes bullets nested under an *ordered* item to align with the parent's
+# content column (3 spaces for a "1. " marker) and ignores its own `indent` setting for that
+# case — but Python-Markdown still needs a full 4 spaces to nest there, so MD007's own preferred
+# indent renders flat. It also never checks a numbered sublist's indentation at all. PML101
+# anchors every level at (depth − 1) × indent regardless of parent marker width, which is exactly
+# Python-Markdown's model, so it accepts 4-space nesting under both bullet and numbered parents
+# with no pragmas — and catches under-indented numbered sublists that MD007 misses entirely.
+plugins.md007.enabled = false
+plugins.pml101.enabled = true
+plugins.pml101.indent = 4
 # Front matter: Claude Code skills (.claude/skills/*/SKILL.md) require a YAML frontmatter block.
 # Without this, pymarkdown misreads the frontmatter as document content (e.g. "---" as a setext
 # heading underline), producing spurious heading-style/blank-line errors.

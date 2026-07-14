@@ -185,10 +185,6 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 8 — Create the ECS cluster and Fargate task definition
 
-<!--- 4-space bullet indent nests correctly under a numbered item in MkDocs; MD007 wrongly
-      expects 3-space there — see the md007 note in pyproject.toml's [tool.pymarkdown]. --->
-<!--- pyml disable-num-lines 25 ul-indent--->
-
 1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 instances to
    manage) — a bare cluster is just a namespace, so a single `nged-forecast` cluster is enough
    for now.

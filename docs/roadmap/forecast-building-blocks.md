@@ -22,10 +22,6 @@ are the **normal operation forecast** and the **prevailing conditions forecast**
 
 The blocks are:
 
-<!--- 4-space bullet indent nests correctly under a numbered item in MkDocs; MD007 wrongly
-      expects 3-space there — see the md007 note in pyproject.toml's [tool.pymarkdown]. --->
-<!--- pyml disable-num-lines 13 ul-indent--->
-
 1. **Power forecasts scaled to [−1, +1]** (the [`power_forecast`](delivery-tables.md#table-1-power_forecast)
    table). These **always assume a "normal running arrangement" and perfect health** of generators
    and substations — i.e. a worst-case network-constraint planning view. Producing this
