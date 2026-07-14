@@ -74,7 +74,11 @@ ENTRYPOINT ["dagster"]
 # `dagster job execute` has no --partition flag at all, and `--select <asset>` hits a pre-
 # existing, unrelated antlr4-python3-runtime/Python-3.14 incompatibility in Dagster's own
 # asset-selection-string parser (confirmed reproducing outside Docker too, on plain `dg dev`).
-# Job-name selection (-j) skips that parser entirely, so this is the reliable invocation:
-#   docker run --network=none <image> job execute -j live_forecasts_job \
-#     --tags '{"dagster/partition": "<key>"}'
+# Job-name selection (-j) skips that parser entirely. The three NGED_S3_BUCKET_* values must be
+# present (Settings requires them at import) but dummies suffice for an offline smoke test, so
+# this is the reliable invocation:
+#   docker run --network=none \
+#     -e NGED_S3_BUCKET_URL=https://example.com/outbound/ \
+#     -e NGED_S3_BUCKET_ACCESS_KEY=dummy -e NGED_S3_BUCKET_SECRET=dummy \
+#     <image> job execute -j live_forecasts_job --tags '{"dagster/partition": "<key>"}'
 CMD ["job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job"]

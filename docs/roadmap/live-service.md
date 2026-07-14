@@ -287,6 +287,13 @@ The sections above decide *where* Option B's pieces run; this one decides *who c
 when*. Three stages, each additive on top of the last — nothing built in an earlier stage is
 reworked in a later one.
 
+The constraint driving all three stages: **none of the three web UIs has any built-in
+authentication.** Open-source `dagster-webserver` has no users, roles, or login (auth/RBAC is a
+Dagster+ feature) — anyone who can reach the port can launch and terminate runs and wipe
+materialisations; MLflow's tracking UI and the Marimo dashboard are equally open. So the network
+layer *is* the auth layer: "no public inbound ports" in Stage 1 and the read-only-second-webserver
+pattern in Stage 2 are load-bearing security decisions, not tidiness.
+
 #### Stage 1 — solo, Tailscale only
 
 This is exactly what the [Option B](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month)
@@ -315,6 +322,19 @@ have something to say "additive on top of."
   still-experimental auth plugin or allowlisting specific endpoints at the proxy — not worth it
   unless there's a real need.
 - The full-access Dagster webserver, Marimo, and MLflow remain exactly as in Stage 1.
+- **Lighter alternative if (and only if) the audience is a couple of OCF colleagues:** skip
+  Caddy, oauth2-proxy, DNS, and the security-group change entirely by inviting them into the
+  tailnet instead — Tailscale already authenticates members with their Google accounts, and a
+  Tailscale ACL can expose just the read-only webserver's port to the team while the full-access
+  webserver stays restricted. Worth checking whether OCF already runs an organisation tailnet
+  before building this — if so, most of the setup (and the per-user pricing question below) is
+  already settled. Trade-offs: everyone must run the Tailscale client (fine for colleagues, wrong
+  for browser-only NGED/NIA collaborators), and past the free tier's ~3 users Tailscale bills per
+  user, whereas oauth2-proxy is free. So treat tailnet-sharing as a cheap Stage-1.5 for
+  OCF-internal read access; the Caddy + oauth2-proxy build above remains the destination once
+  anyone outside the tailnet needs the UI. The two aren't mutually exclusive: starting with
+  tailnet-sharing and adding the proxy later loses nothing, since Stage 1.5 builds none of the
+  pieces Stage 2's proxy needs but also breaks none of them.
 
 #### Stage 3 — public Marimo dashboard, curated public data
 

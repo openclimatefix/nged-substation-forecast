@@ -28,10 +28,10 @@ The blocks are:
    topology-normalised signal in the presence of historical switching events is the subject of
    [switching events & latent demand](switching-events.md) (v0.6 detector → v2 mixture models).
    "Normal" means:
-   - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
-     open.
-   - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
-     operating at full capacity.
+    - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
+      open.
+    - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
+      operating at full capacity.
 2. **Dynamically changing effective capacity of generators** (the
    [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table). E.g. if a wind
    turbine breaks in a wind farm, we estimate the reduced effective capacity over time.

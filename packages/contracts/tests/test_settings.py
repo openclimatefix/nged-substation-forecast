@@ -1,6 +1,25 @@
+from typing import cast
+
 import pytest
 from contracts.settings import DataQualitySettings, Settings
 from pydantic import ValidationError
+
+
+@pytest.fixture(autouse=True)
+def _isolate_settings_from_ambient_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every settings construction in this module hermetic.
+
+    ``Settings`` reads ``PROJECT_ROOT/.env`` and process environment variables by default, so a
+    developer's real local configuration — e.g. the ``DATA_STORE_*`` credentials that
+    ``docs/live_service/setup.md`` has them put in ``.env`` — would otherwise leak into tests
+    that assert on unset-field defaults (``storage_options == {}``, path derivation, …).
+    """
+    # cast: SettingsConfigDict is a TypedDict, whose per-key value types don't unify with
+    # monkeypatch.setitem's Mapping[K, V] signature.
+    monkeypatch.setitem(cast("dict[str, object]", Settings.model_config), "env_file", None)
+    for settings_cls in (Settings, DataQualitySettings):
+        for field_name in settings_cls.model_fields:
+            monkeypatch.delenv(field_name.upper(), raising=False)
 
 
 def test_data_quality_settings_defaults():
