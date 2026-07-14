@@ -4,8 +4,8 @@
 > confirmed on **2026-07-14**: NGED will run Flexpectation themselves, on NGED's own AWS
 > account, after the NIA project ends. The requirement itself is recorded in
 > [Requirements → Operating model & handover](../background/requirements.md#operating-model-handover);
-> this page holds the engineering consequences and the handover workstreams. A GitHub epic for
-> this milestone is still to be created — until it exists, this page is the plan of record.
+> this page holds the engineering consequences and the handover workstreams. Epic:
+> [#309](https://github.com/openclimatefix/nged-substation-forecast/issues/309).
 
 ## What this changes (and what it doesn't)
 
@@ -35,6 +35,11 @@ explicit so we don't accidentally undo them:
   registry for an operator to mis-drive.
 - **No static AWS keys** (IAM roles throughout) removes a whole class of credential-expiry
   incidents, and matches the constraints corporate AWS environments typically impose anyway.
+- **The pipeline runs end-to-end on a laptop** — the live schedules were dress-rehearsed
+  locally under `dg dev` before any AWS compute existed, and the standing preference is
+  portable application logic over cloud-native glue (e.g. no EventBridge rules) wherever a
+  portable option exists. Portability is what makes the service cheap to move into NGED's
+  account — or anyone else's.
 - **Lenient uptime requirements**: nothing very bad happens if the service misses a day,
   because NGED can always read the previous forecasts from S3 (forecasts extend 14 days
   ahead). Recovery can therefore always be "next business day, via runbook", never "2am page".
@@ -65,11 +70,14 @@ that indexes them.
 
 ### 2. Alert on absence, not just failure
 
-Per-task failure alerts (the planned EventBridge → SNS rule on non-zero task exit) miss whole
+Per-task failure alerts miss whole
 classes of silent failure: a hung daemon, a full disk, an expired credential, a schedule that
 simply stopped firing. The fix is a **dead-man's switch**: an alarm that fires when *no
 successful forecast has landed in N hours* (e.g. 8 hours, i.e. one missed 6-hourly slot plus
-margin), regardless of why.
+margin), regardless of why. Per the portability preference (below), the freshness check is
+plain code runnable on a laptop; only its trigger and delivery must sit outside the service
+being watched — a dead daemon cannot report itself. Details:
+[the dead-man's switch](live-service.md#alert-on-absence-the-dead-mans-switch).
 
 The [production monitoring plan](live-service.md#production-monitoring) already sketches a
 "no fresh forecast" staleness alarm; this workstream promotes it from a nice-to-have to the
@@ -153,10 +161,16 @@ These are not engineering workstreams, but NIA projects most often fail at the t
 business-as-usual for exactly these reasons, so they are recorded here alongside the technical
 work:
 
-- A **named owner at NGED** with allocated time to operate the service.
+- A **named owner at NGED** with allocated time to operate the service. Our current NGED
+  contacts are very engaged, and if they stay the owner question answers itself — the real
+  risk is staff turnover. The mitigation is to institutionalise rather than rely on
+  individuals: everything needed to operate lives in the written runbooks (no tribal
+  knowledge), and the game days train more than one person.
 - A **budget line** at NGED for the AWS spend and for any OCF support retainer.
 - A written support agreement defining what OCF does post-NIA (scheduled maintenance,
   emergency fixes, model updates) — the details are TBD, but "in writing" is the requirement.
+  This also hedges the staff-turnover risk above: an agreement survives the departure of the
+  individuals who championed it.
 
 ## Timing and decision gates
 

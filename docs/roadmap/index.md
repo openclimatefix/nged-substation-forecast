@@ -227,7 +227,8 @@ delivery of the v2 live service)*
 
 ## Handover to NGED (post-NIA operating model)
 
-*Epic: to be created — see [Handover to NGED](handover.md), currently the plan of record.*
+*Epic: [#309](https://github.com/openclimatefix/nged-substation-forecast/issues/309) — see
+[Handover to NGED](handover.md) for the design.*
 
 NGED confirmed (2026-07-14) that after the NIA project they intend to **run Flexpectation
 themselves, on NGED's own AWS infrastructure** (see

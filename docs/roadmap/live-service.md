@@ -436,16 +436,25 @@ production job (the production-job workstream below already reserves that slot).
 
 ### Alert on absence: the dead-man's switch
 
-Per-task failure alerts (the EventBridge → SNS rule in
-[Deployment workstream 3](#deployment-workstream-3-aws-infrastructure)) only fire when
-something runs and fails. Whole classes of failure are silent: a hung daemon, a full disk, an
-expired credential, a schedule that stopped firing. The **primary** production alert is
-therefore a dead-man's switch: an alarm that fires when **no successful forecast has landed in
-N hours** (e.g. 8 hours — one missed 6-hourly slot plus margin), regardless of cause. Option B's
-"daemon silently dead" staleness alarm (mentioned under
+Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
+only fire when something runs and fails. Whole classes of failure are silent: a hung daemon, a
+full disk, an expired credential, a schedule that stopped firing. The **primary** production
+alert is therefore a dead-man's switch: an alarm that fires when **no successful forecast has
+landed in N hours** (e.g. 8 hours — one missed 6-hourly slot plus margin), regardless of cause.
+Option B's "daemon silently dead" staleness alarm (mentioned under
 [the architecture options](#option-b-recommended-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a
-side note. Every alert must link to a runbook that ends in either a specific operator action or
+side note.
+
+The freshness check itself is plain portable code — compare the newest forecast in
+`power_forecasts` against the clock — in line with the portability preference in
+[Deployment workstream 3](#deployment-workstream-3-aws-infrastructure). But the check's
+*trigger and delivery* are the one deliberate exception to "no platform glue": they must sit
+**outside** the service being watched, because a dead daemon cannot report itself. Cron on a
+laptop, a scheduled alarm on AWS, or an external dead-man's receiver (a healthchecks-style
+service the pipeline pings on success) all satisfy this; a Dagster sensor alone does not.
+
+Every alert must link to a runbook that ends in either a specific operator action or
 "escalate" — a requirement that matters doubly under the post-NIA operating model, where the
 day-to-day operator is a non-expert at NGED (see
 [Handover to NGED](handover.md#2-alert-on-absence-not-just-failure)).
@@ -539,9 +548,13 @@ Common to all options:
 - ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
   ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
   Right-size the live definition after a week of CloudWatch metrics.
-- 🚧 **Alerting**: EventBridge rule on task stopped with non-zero exit → SNS → email. Per-task
+- 🚧 **Alerting**: basic per-task failure alerting (a failed run → email). Decided 2026-07-14:
+  prefer **portable alerting logic over AWS-native glue** (no EventBridge rules) — the checks
+  should be plain code that runs end-to-end on a laptop or any cloud, with only the thin
+  notification edge (SNS, SMTP, …) being platform-specific. Under Option B, Dagster's own
+  run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
   failure alerts are necessary but not sufficient — the
-  [dead-man's switch](#alert-on-absence-the-dead-mans-switch) below catches the silent-failure
+  [dead-man's switch](#alert-on-absence-the-dead-mans-switch) catches the silent-failure
   classes they miss.
 - 🚧 Codify as infra-as-code once there's enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
