@@ -138,9 +138,9 @@ against an in-process `moto` server.)
 
 ### Step 1 — Create the S3 buckets
 
-**Two** buckets, not one — split so the five tables that form NGED's stable delivery contract are
-physically separate from OCF's own working data, which may change shape at any time with no
-notice. See [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
+We split storage across **two** buckets so the five tables that form NGED's stable delivery
+contract are physically separate from OCF's own working data, which may change shape at any time
+with no notice. See [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
 for why this split exists, and [Delivery tables](https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/)
 for exactly which five tables count as "delivery."
 
@@ -251,7 +251,7 @@ Then attach it to **whichever identity runs the code**:
 
 ### Step 3 — Point `Settings` at the buckets
 
-Unlike a single-bucket setup, this now needs **both** data-table roots set, one per bucket:
+This needs **both** data-table roots set, one per bucket:
 
 | Setting | Bucket | Why |
 |---|---|---|
@@ -262,8 +262,8 @@ The other three delivery tables (`power_forecast_warnings`, `asset_health_histor
 `substation_switching`) don't have `Settings` fields yet — none are implemented in code. When
 they land, they need to be wired into `Settings._derive_unset_paths` to derive from
 `DATA_PATH_DELIVERY` alongside the two above (the per-field env var override — e.g.
-`POWER_FORECASTS_DATA_PATH`, still works as an escape valve for a one-off case, but is no longer
-the primary mechanism for the delivery/internal split).
+`POWER_FORECASTS_DATA_PATH` — still works as an escape valve for a one-off case, but the
+delivery/internal split is driven by root derivation, not per-table overrides).
 
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
 > `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
