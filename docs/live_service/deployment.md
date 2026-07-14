@@ -22,24 +22,46 @@ image build below `COPY`s from.
 
 ## Step 2 — Build the image
 
+This step and [Step 3](#step-3-verify-the-build-locally) are wrapped in one script — with a
+champion model on disk (Step 1), it builds the image and smoke-tests it in a single command:
+
+```bash
+scripts/build_and_verify_image.sh <partition-key>   # e.g. 2026-07-04-00:00
+```
+
+The `<partition-key>` is only used by the Step 3 smoke test; any recent 6-hourly key works (see
+[the partition-semantics note](dagster-workflow.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)).
+The script hard-fails only if the runtime touches MLflow — the one hermeticity guarantee worth
+automating — and prints the container log for you to confirm the rest by eye (see Step 3). The
+remainder of this step and Step 3 explain what it does and why, and give the raw commands if you
+would rather run them by hand.
+
 The build never contacts MLflow — it only `COPY`s the directory Step 1 just populated, so it
 stays hermetic:
 
 ```bash
+RUN_ID=$(jq -r .mlflow_run_id data/production_model/promotion.json)
 docker build \
-  --build-arg MODEL_RUN_ID=<run-id> \
+  --build-arg MODEL_RUN_ID="$RUN_ID" \
   --build-arg GIT_SHA=$(git rev-parse HEAD) \
-  -t nged-forecast:<run-id-short> .
+  -t nged-forecast:"${RUN_ID:0:12}" .
 ```
+
+The run id comes from the directory the build `COPY`s from: Step 1 recorded it in
+`data/production_model/promotion.json` as `mlflow_run_id` (the same value you entered as
+`PromotedModelConfig.mlflow_run_id` when materialising `promoted_model`). Reading it back from
+that file — rather than pasting it — guarantees the label matches the model actually baked in.
+The image tag is just its first 12 hex characters, enough to be unique and human-readable.
 
 `MODEL_RUN_ID` and `GIT_SHA` are stamped as OCI labels (and `GIT_SHA` also as a runtime env
 var) purely for traceability — confirm with `docker inspect nged-forecast:<tag>`.
 
 ## Step 3 — Verify the build locally
 
-Before trusting a new image, confirm it actually runs with **zero network access** — this is
-the test that matters, since the entire point of baking the model in is that production
-inference has no MLflow dependency at runtime:
+The [Step 2](#step-2-build-the-image) script already runs this verification; do it by hand only
+when running the raw commands. Before trusting a new image, confirm it actually runs with **zero
+network access** — this is the test that matters, since the entire point of baking the model in
+is that production inference has no MLflow dependency at runtime:
 
 ```bash
 docker run --network=none \
@@ -87,8 +109,8 @@ in [Environment & storage setup: Step 1](setup.md#step-1-create-the-s3-buckets))
 2. **Name** `nged-forecast` (matches the local image tag used in [Step 2](#step-2-build-the-image)
    above — keeps `docker build -t nged-forecast:<tag>` and the ECR URI consistent).
 3. **Scan on push** on — free vulnerability scanning, no reason not to.
-4. Leave tag immutability off; image tags here are already unique per `git rev-parse HEAD`
-   short-SHA, so nothing relies on retagging.
+4. Leave tag immutability off; image tags here are already unique per promoted model (the
+   run id's short prefix from [Step 2](#step-2-build-the-image)), so nothing relies on retagging.
 
 ## Step 5 — Push the image to ECR
 
