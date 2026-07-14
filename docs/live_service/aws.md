@@ -1,0 +1,809 @@
+# Setting up the live service on AWS
+
+Every step to stand up the v0.1 live service on AWS, in order, ending with the full stack
+running unattended: data tables on S3 (Simple Storage Service, AWS's object store), the champion
+model baked into a container image, an always-on control-plane box running Dagster behind
+Tailscale, and 6-hourly forecasts executing on ephemeral Fargate (AWS's serverless container
+compute) tasks. When you finish this page, you open the Dagster UI from your laptop over
+Tailscale and watch forecasts land.
+
+This is one-time setup (per AWS environment). Day-to-day driving of the running service —
+promoting a champion, backfilling a missed slot, inspecting a forecast — lives in
+[Operating the live service](operations.md). What each `Settings` field means (the three storage
+roots, the derive-from-root convention) lives in the
+[Configuration reference](setup.md). Design rationale for *why* the deployment looks like this —
+bake the model in at build time, an always-on control plane rather than EventBridge — lives in
+[Production Deployment — Design](../architecture/production-deployment.md).
+
+> **Scope: everything here is done by hand** — AWS console plus SSH; no infrastructure-as-code
+> (Terraform, or CDK — AWS's Cloud Development Kit) yet.
+> That's deliberate: this is Stage 1 ("solo, Tailscale only") of the
+> [access-phasing plan](../roadmap/live-service.md#access-phasing), and infrastructure-as-code
+> is scheduled to start at Stage 2, when team access adds enough moving parts to justify it.
+> Alerting (per-task failure emails, the missed-check-in alarm) is also still to come — see
+> [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+
+## Step 1 — Create the S3 buckets
+
+We split storage across **two** buckets so the five tables that form NGED's stable delivery
+contract are physically separate from OCF's own working data, which may change shape at any time
+with no notice. See [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
+for why this split exists, and [Delivery tables](https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/)
+for exactly which five tables count as "delivery."
+
+In the AWS console → **S3** → **Create bucket**, twice:
+
+- **Region** `eu-west-2` (London) for both — keep every resource in one region so S3 ↔ compute
+  transfer stays free. It isn't the cheapest region available (`eu-west-1` runs meaningfully
+  cheaper for Fargate); see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
+  for the price comparison and why `eu-west-2` is picked anyway, provisionally, pending NGED
+  confirmation.
+- **Names**: `nged-forecast-delivery` (the 5 NGED-facing tables) and `nged-forecast-internal`
+  (NWP, raw power telemetry, forecast metrics, and everything else OCF's pipeline needs but
+  hasn't promised to keep stable). Bucket names are globally unique; pick your own if these are
+  taken.
+- **Every other setting on the create-bucket form can stay at its console default:**
+    - **Bucket namespace** — leave at **Global namespace**; do not switch to "Account Regional
+      namespace", even though the console marks it "(recommended)". That option changes the
+      bucket's ARN (Amazon Resource Name — AWS's canonical resource identifier) shape and scopes
+      name-uniqueness to your account/region instead of globally, which the IAM (Identity and
+      Access Management — AWS's permissions system) policies below (Step 2) and the
+      `deltalake`/`object_store` machinery all assume it isn't.
+    - **Object Ownership** (ACLs disabled) — access is controlled entirely by IAM/bucket policy;
+      ACLs (legacy per-object access-control lists) stay off.
+    - **Block Public Access** (all four boxes on) — nothing here is public.
+    - **Bucket Versioning** (disabled) — not required by the app.
+    - **Default encryption** (SSE-S3 — server-side encryption with S3-managed keys) — the app
+      needs no more than this; **Bucket Key** only affects SSE-KMS (encryption via AWS KMS, the
+      Key Management Service), so it's irrelevant here either way.
+    - **Object Lock**, **Tags** — unused by the app.
+
+No DynamoDB lock table is needed for either bucket. The `deltalake` version we use commits via
+S3's native conditional-put, so concurrent-safe Delta writes work on plain S3 with no lock table
+and no `AWS_S3_ALLOW_UNSAFE_RENAME` flag.
+
+## Step 2 — Grant data access with IAM
+
+OCF's own pipeline needs to read and write **both** buckets (internal tables during ingestion and
+training; delivery tables at forecast time), so one IAM policy covers both:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
+      "Resource": [
+        "arn:aws:s3:::nged-forecast-delivery",
+        "arn:aws:s3:::nged-forecast-delivery/*",
+        "arn:aws:s3:::nged-forecast-internal",
+        "arn:aws:s3:::nged-forecast-internal/*"
+      ]
+    }
+  ]
+}
+```
+
+**Create it once**, in the AWS console → **IAM** → **Policies** → **Create policy** → switch to the
+**JSON** editor → paste the JSON above → **Next** → name it (e.g. `nged-forecast-read-and-write`) →
+**Create policy**. IAM is global, so there's no region selector to worry about.
+
+Then attach it to **whichever identity runs the code**:
+
+- **Compute running on AWS** → attach the policy to that resource's **IAM role**. This page does
+  that twice: the Fargate **task role** ([Step 7](#step-7-iam-roles-for-the-fargate-task)) and the
+  control-plane box's **instance role** ([Step 11](#step-11-launch-the-control-plane-box)). Nothing
+  else is needed: `object_store` (used by `delta-rs`) auto-discovers the role's temporary
+  credentials and region at runtime, so all four `DATA_STORE_*` settings stay **empty** (see the
+  [Configuration reference](setup.md#the-configuration-model)).
+- **Your laptop, running the pipeline** — **not set up yet, deliberately**: for now, only AWS
+  compute gets write access, so there's exactly one writer touching the buckets at a time. Running
+  Dagster from both a laptop and AWS against the same tables risks two instances racing on the
+  same Delta commits. If a one-off laptop write is ever needed (e.g. hand-patching bad data), it
+  can reuse the same read/write policy above via its own **IAM user**, created the same way as the
+  dashboard user below — just with `nged-forecast-read-and-write` attached instead of
+  `nged-forecast-read-only`.
+- **Your laptop, running only the dashboard** (`packages/dashboard/main.py` — see
+  [#283](https://github.com/openclimatefix/nged-substation-forecast/issues/283)) → it only ever
+  reads, so give it a separate, read-only **IAM user** instead of reusing the read/write
+  credential:
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject", "s3:ListBucket"],
+          "Resource": [
+            "arn:aws:s3:::nged-forecast-delivery",
+            "arn:aws:s3:::nged-forecast-delivery/*",
+            "arn:aws:s3:::nged-forecast-internal",
+            "arn:aws:s3:::nged-forecast-internal/*"
+          ]
+        }
+      ]
+    }
+    ```
+
+    Same console flow as the read/write policy above for the policy: **IAM** → **Policies** →
+    **Create policy** → **JSON** editor → paste the JSON above → **Next** → name it (e.g.
+    `nged-forecast-read-only`) → **Create policy**. Then create the user: **IAM** → **Users** →
+    **Create user** → name it (e.g. `nged-forecast-dashboard`) → leave **Provide user access to the
+    AWS Management Console** unchecked (programmatic-only) → **Next** → **Attach policies
+    directly** → select the policy → **Next** → **Create user**. Then its access key: open the
+    user → **Security credentials** tab → **Access keys** → **Create access key** → use case
+    **Application running outside AWS** → acknowledge the warning → **Create access key** → copy
+    the **Access key ID** and **Secret access key** immediately (shown once) into the laptop's
+    `.env` as `DATA_STORE_*` values (see the
+    [at-a-glance table](setup.md#at-a-glance-which-settings-for-which-environment) for the exact
+    shape). Losing this key can't corrupt any table, only leak read access to it.
+
+## Step 3 — Pick and promote a champion model
+
+Follow [Operating the live service: Step 1](operations.md#step-1-pick-a-champion-model)
+and [Step 2](operations.md#step-2-materialise-promoted_model) to materialise
+`promoted_model`. Promotion always happens **on your laptop** — the candidate models live in the
+laptop's local MLflow file store — and populates `data/production_model/` on disk, the same
+directory the image build below `COPY`s from.
+
+## Step 4 — Build and verify the image
+
+With a champion model on disk (Step 3), one script builds the image and smoke-tests it with
+**zero network access** — the test that matters, since the entire point of baking the model in is
+that production inference has no MLflow dependency at runtime:
+
+```bash
+scripts/build_and_verify_image.sh    # no arguments — everything is derived
+```
+
+The script builds the image tagged with the promoted model's run id, runs it offline, and prints
+the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded,
+arbitrary partition key — the offline run fails at the NWP lookup long before the slot's
+validity could matter, so there is no key worth choosing.)
+It hard-fails only if the runtime touches MLflow — the hermeticity guarantee worth automating —
+and otherwise asks you to confirm by eye that the run loaded the model and failed *only* on
+missing NWP data (expected: no data tables are mounted for this isolated test). The script header
+documents every choice it makes and is the source of truth for the mechanics.
+
+## Step 5 — Create the ECR repository
+
+ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just
+built gets pushed so AWS compute can pull it. In the AWS console → **ECR** →
+**Create repository** (same `eu-west-2` region as the S3 buckets
+in [Step 1](#step-1-create-the-s3-buckets)):
+
+1. **Visibility** Private.
+2. **Name** `nged-forecast` (matches the local image tag `nged-forecast:<tag>` from
+   [Step 4](#step-4-build-and-verify-the-image), keeping it and the ECR URI consistent).
+3. **Scan on push** on — free vulnerability scanning, no reason not to.
+4. Leave tag immutability off; image tags here are already unique per promoted model (the
+   run id's short prefix from [Step 4](#step-4-build-and-verify-the-image)), so nothing relies
+   on retagging.
+
+## Step 6 — Push the image to ECR
+
+One script pushes the image built in [Step 4](#step-4-build-and-verify-the-image) and — on
+later redeploys — points the ECS task definition at it:
+
+```bash
+scripts/push_and_deploy_image.sh    # no arguments — everything is derived
+```
+
+It takes no arguments by design, so nothing can be mistyped: the tag is derived from
+`data/production_model/promotion.json` exactly as Step 4's build script derives it (so only an
+image that was built and verified can be pushed), and the AWS account id comes from
+`aws sts get-caller-identity`. The script logs Docker into ECR, tags, and pushes; then, if the
+`nged-forecast` task-definition family already exists
+([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new
+revision pointing at the new image. On this first pass through the runbook the family doesn't
+exist yet — the script says so and exits cleanly, and the push is all this step needs. The
+script header documents every choice it makes and is the source of truth for the mechanics.
+
+## Step 7 — IAM roles for the Fargate task
+
+Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches
+and supervises containers), and they need **two** separate IAM roles, not one — they serve
+different principals:
+
+- **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
+  before your code ever runs: pulling the image from ECR, shipping container output to
+  CloudWatch Logs, and injecting the secrets from
+  [Step 8](#step-8-store-secrets-in-parameter-store). Create a role for the
+  `ecs-tasks.amazonaws.com` service and attach the AWS-managed
+  `AmazonECSTaskExecutionRolePolicy` (covers ECR + CloudWatch), plus one small inline policy for
+  the secrets — it's the *execution* role that reads them, not the task role, because the ECS
+  agent resolves secrets before the container starts:
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": "ssm:GetParameters",
+          "Resource": "arn:aws:ssm:eu-west-2:<account-id>:parameter/nged-forecast/*"
+        }
+      ]
+    }
+    ```
+
+    (No KMS statement needed as long as the parameters use the default `aws/ssm` key.)
+
+- **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
+  lets the container read and write **both** data buckets (delivery and internal). Reuse the same
+  S3 policy from [Step 2](#step-2-grant-data-access-with-iam), attached to a
+  second role (also trusted by `ecs-tasks.amazonaws.com`). Nothing else is needed — with this
+  role attached, delta-rs' `object_store` auto-discovers temporary credentials at runtime, so
+  `DATA_STORE_*` stays unset.
+
+No static AWS keys anywhere in either role — the same IAM-role auto-discovery
+[Step 2](#step-2-grant-data-access-with-iam) relies on for all compute running on AWS.
+
+## Step 8 — Store secrets in Parameter Store
+
+The container can't start without `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, and
+`NGED_S3_BUCKET_SECRET` (`Settings` requires them at import — see the smoke test in
+[Step 4](#step-4-build-and-verify-the-image)), and the deployed service genuinely uses them: the
+hourly `power_time_series_and_metadata` schedule pulls fresh telemetry from NGED's bucket.
+
+They are also the one credential in this deployment that can't come from an IAM role: NGED's
+bucket lives in NGED's AWS account, so these are unavoidably static third-party keys. Don't
+paste them into the task definition as plain-text environment values — anyone with ECS
+describe access could read them there. Store them in **SSM Parameter Store** (SSM is AWS
+Systems Manager; Parameter Store is its encrypted key-value configuration service) as
+SecureStrings and let ECS inject them at container start:
+
+In the AWS console → **Systems Manager** → **Parameter Store** → **Create parameter**, four
+times, in `eu-west-2` (same region as everything else):
+
+- **Name**: `/nged-forecast/nged-s3-bucket-url`, `/nged-forecast/nged-s3-bucket-access-key`,
+  `/nged-forecast/nged-s3-bucket-secret`, and `/nged-forecast/dagster-pg-password`
+  respectively. The shared `/nged-forecast/` prefix is exactly what
+  [Step 7](#step-7-iam-roles-for-the-fargate-task)'s execution-role policy grants
+  access to, so a new secret added under the same prefix later needs no IAM change.
+- **Tier**: Standard (free; these values are tiny, nowhere near the 4 KB limit).
+- **Type**: **SecureString**, with the default `aws/ssm` KMS key — using the default key is
+  what lets Step 7's inline policy skip a `kms:Decrypt` statement.
+- **Value**: the three `nged-s3-bucket-*` values are copied from the matching lines of your
+  local `.env`. `dagster-pg-password` is the password for the control-plane box's Postgres
+  ([Step 14](#step-14-configure-dagster-on-the-box)) — it doesn't exist yet, so mint it now
+  (e.g. `openssl rand -hex 24`) and reuse the same value on the box in Step 14. It's stored
+  here because every launched run connects back to that Postgres to record its events, so the
+  Fargate containers need it injected exactly like the NGED credentials.
+
+There is no wiring to do in this step — that happens in the task definition
+([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), where each parameter is
+referenced as a **ValueFrom** environment variable. The ECS agent, authenticated as the
+*execution* role, fetches and decrypts the values just before the container starts; they never
+appear in the task definition, the ECS console, or CloudWatch.
+
+Parameter Store is picked over Secrets Manager deliberately: Standard parameters are free
+(Secrets Manager is $0.40/secret/month), and these credentials don't need Secrets Manager's
+flagship feature, automatic rotation — NGED's keys rotate on NGED's schedule, not ours. When
+NGED does rotate them, just update the parameter values (and your local `.env`); running tasks
+keep the old values until they next start, since injection happens once per container launch.
+
+## Step 9 — Create the ECS cluster and Fargate task definition
+
+1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 — Elastic
+   Compute Cloud, AWS's virtual machines — instances to manage) — a bare cluster is just a
+   namespace, so a single `nged-forecast` cluster is enough for now.
+2. **ECS** → **Task definitions** → **Create new task definition** → *Fargate*:
+    - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task).
+    - **Task execution role**: the execution role from
+      [Step 7](#step-7-iam-roles-for-the-fargate-task).
+    - **Task size**: 4 vCPU / 16 GB, **ARM64** (`linux/arm64`) — matches the measured inference
+      peak (~9 GB) and the image's own build target (see the Dockerfile's ARM build note); ARM
+      Fargate is also ~20% cheaper than x86 for the same size.
+    - **Container name**: `nged-forecast` — [Step 14](#step-14-configure-dagster-on-the-box)'s
+      run-launcher config names this container, so keep it predictable.
+    - **Container image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
+      from [Step 6](#step-6-push-the-image-to-ecr); log configuration → **awslogs**, a new
+      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
+    - **Entry point**: `/usr/bin/env` — this **overrides the image's own `ENTRYPOINT
+      ["dagster"]`**, and matters more than it looks. ECS concatenates entry point + command
+      into one argv, and both the manual verification in
+      [Step 10](#step-10-verify-run-a-forecast-task-manually) and the `EcsRunLauncher` in
+      [Step 14](#step-14-configure-dagster-on-the-box) supply a *full* command that already
+      starts with `dagster` (the launcher generates `dagster api execute_run …` and can't be
+      told otherwise). With the image's default entry point, the argv would come out as
+      `dagster dagster api execute_run …` and fail; `/usr/bin/env dagster …` simply resolves
+      `dagster` from `PATH` and runs it. The image's own entry point remains convenient for
+      local `docker run` smoke tests, which is why it isn't changed in the Dockerfile itself.
+    - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
+      `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
+      tables live in a separate bucket from everything else (see the
+      [Configuration reference](setup.md#the-configuration-model)). Leave
+      `DATA_STORE_*` unset, since the task role supplies credentials. These are plain
+      environment values, not secrets — bucket URIs are safe in clear text.
+    - **Secrets — the four Parameter Store entries.** Add each parameter from
+      [Step 8](#step-8-store-secrets-in-parameter-store) as an environment variable of type
+      **ValueFrom** (the console's "Secrets" mechanism): the env-var name exactly as the code
+      expects (`NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, `NGED_S3_BUCKET_SECRET`,
+      `DAGSTER_PG_PASSWORD`), the value the matching parameter name (e.g.
+      `/nged-forecast/nged-s3-bucket-url`).
+
+Creating the task definition in the console is one-time. Later image changes never repeat it —
+`scripts/push_and_deploy_image.sh` registers new revisions of this family automatically (see
+[Redeploying a new champion model](#redeploying-a-new-champion-model)).
+
+## Step 10 — Verify: run a forecast task manually
+
+Before building the control plane, trigger one task directly and confirm the compute path
+end-to-end — this manual `RunTask` also remains the fallback verification path once the
+schedules exist:
+
+```bash
+aws ecs run-task \
+  --region eu-west-2 \
+  --cluster nged-forecast \
+  --task-definition nged-forecast \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[<subnet-id>],securityGroups=[<sg-id>],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides": [{"name": "nged-forecast", "command": [
+    "dagster", "job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job",
+    "--tags", "{\"dagster/partition\": \"<key>\"}"
+  ]}]}'
+```
+
+Note the command starts with `dagster` — Step 9's `/usr/bin/env` entry point means every command
+spells out the full argv.
+
+> **Region matters here.** Unlike [Step 6](#step-6-push-the-image-to-ecr)'s script (which
+> passes `--region` explicitly on every call), a hand-typed AWS CLI command falls back to your
+> configured default region if `--region` is omitted — check yours with
+> `aws configure get region` and don't assume it's `eu-west-2`.
+
+`assignPublicIp=ENABLED` (with a public subnet) is the simplest way to give the task internet
+egress for its ECR pull and S3/CloudWatch calls without a NAT gateway. Keep this `<subnet-id>`
+and `<sg-id>` to hand — the run launcher in
+[Step 14](#step-14-configure-dagster-on-the-box) launches tasks with exactly the same network
+configuration. Follow the run in **ECS** → the cluster → **Tasks**, then **CloudWatch Logs** for
+the container's output — confirm it reaches `load_forecaster_from_dir` and a new forecast lands
+under `s3://nged-forecast-delivery/data/power_forecasts/…` — the delivery bucket, not the
+internal one, since `power_forecasts` is one of the five NGED-facing tables.
+
+## Step 11 — Launch the control-plane box
+
+One small always-on EC2 instance runs the Dagster daemon (schedules, sensors, run dispatch),
+the Dagster webserver (the UI), the code-location server, and Postgres (run/event/schedule
+history) — everything except the actual forecast compute, which stays on ephemeral Fargate.
+Why an always-on box at all, and why this shape, is the
+[orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge);
+the sizing and cost are the roadmap's
+[accepted option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).
+
+First create its IAM role: **IAM** → **Roles** → **Create role** → trusted entity **AWS service
+/ EC2** → attach `nged-forecast-read-and-write` ([Step 2](#step-2-grant-data-access-with-iam))
+and the AWS-managed `AmazonEC2ContainerRegistryReadOnly` (pull the image) → name it
+`nged-forecast-ctrl-role`. Then add one inline policy (e.g. `nged-forecast-launch-runs`) so the
+daemon can dispatch runs to Fargate:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecs:RunTask",
+        "ecs:StopTask",
+        "ecs:DescribeTasks",
+        "ecs:DescribeTaskDefinition",
+        "ecs:RegisterTaskDefinition",
+        "ecs:TagResource",
+        "ecs:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::<account-id>:role/nged-forecast-task-role",
+        "arn:aws:iam::<account-id>:role/nged-forecast-task-execution-role"
+      ],
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" }
+      }
+    }
+  ]
+}
+```
+
+(`iam:PassRole` is what lets the daemon hand [Step 7](#step-7-iam-roles-for-the-fargate-task)'s
+roles to the tasks it launches; the condition stops the box passing them to anything but ECS.
+`ecs:RegisterTaskDefinition` is included because `EcsRunLauncher` may register a derived task
+definition depending on config — harmless to grant, confusing to debug when missing.)
+
+Then **EC2** → **Launch instance**:
+
+- **Name**: `nged-forecast-ctrl`.
+- **AMI** (Amazon Machine Image — the operating-system image the instance boots from): Ubuntu
+  Server 24.04 LTS, **64-bit (Arm)**.
+- **Instance type**: `t4g.medium` (2 vCPU / 4 GB — comfortable for daemon + webserver +
+  code server + Postgres; the costed sizing is in the roadmap link above).
+- **Key pair**: create one. It's only needed for the first SSH below — Tailscale SSH takes over
+  in [Step 12](#step-12-join-the-tailnet).
+- **Network settings**: the same VPC (Virtual Private Cloud — the private network AWS resources
+  share) and **public subnet** as
+  [Step 10](#step-10-verify-run-a-forecast-task-manually)'s task; **Auto-assign public IP**
+  enabled (internet egress for apt/ECR/S3/Tailscale without a NAT gateway). Create a new
+  security group `nged-forecast-ctrl-sg` with **no inbound rules at all** — Tailscale needs
+  none (it dials out), and "no public inbound ports" is a load-bearing security decision, since
+  the Dagster UI has no authentication of its own. One inbound rule is added later, for
+  Postgres ([Step 14](#step-14-configure-dagster-on-the-box)).
+- **Storage**: 20 GiB gp3 (general-purpose SSD).
+- **Advanced details**:
+    - **IAM instance profile**: `nged-forecast-ctrl-role`.
+    - **Metadata version**: V2 only (token required), and — easy to miss, breaks everything
+      quietly if skipped — **Metadata response hop limit: 2**. The Dagster containers fetch the
+      instance role's credentials from the instance metadata service, and Docker's bridge adds a
+      network hop; with the default hop limit of 1, boto3 and `object_store` inside the
+      containers silently find no credentials.
+
+## Step 12 — Join the tailnet
+
+SSH in once with the key pair (or use EC2 Instance Connect from the console), then install
+Tailscale and join the same tailnet your laptop is on:
+
+```bash
+ssh -i <key.pem> ubuntu@<public-ip>
+
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up --ssh --hostname=nged-forecast-ctrl
+```
+
+Open the authentication URL that `tailscale up` prints and sign in. `--ssh` enables Tailscale
+SSH, so from now on any device on the tailnet can `ssh ubuntu@nged-forecast-ctrl` with no key
+management; `--hostname` gives the box a stable MagicDNS name. Confirm from your laptop:
+
+```bash
+tailscale ping nged-forecast-ctrl
+ssh ubuntu@nged-forecast-ctrl
+```
+
+The security group's inbound rules stay empty — Tailscale establishes its connections outbound.
+
+## Step 13 — Install Docker and pull the image
+
+On the box:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker.io docker-compose-v2
+sudo systemctl enable --now docker
+sudo usermod -aG docker ubuntu    # then log out and back in for it to take effect
+
+sudo snap install aws-cli --classic
+aws ecr get-login-password --region eu-west-2 \
+  | docker login --username AWS --password-stdin <account-id>.dkr.ecr.eu-west-2.amazonaws.com
+docker pull <account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>
+```
+
+No `aws configure` is needed — the instance role from
+[Step 11](#step-11-launch-the-control-plane-box) supplies credentials. The ECR login token
+expires after 12 hours, which is fine: image pulls here are a manual, per-deploy event, so just
+re-run the `docker login` line whenever you pull a new tag.
+
+## Step 14 — Configure Dagster on the box
+
+Everything lives in one directory:
+
+```text
+~/nged-forecast/
+├── docker-compose.yml
+├── .env                     # chmod 600
+└── dagster_home/
+    ├── dagster.yaml
+    └── workspace.yaml
+```
+
+### One image, four roles
+
+The deployment runs two kinds of job — the always-on Dagster control plane on this box, and the
+6-hourly forecast run on ephemeral Fargate — yet the repository builds a **single Dockerfile**.
+There is no contradiction: a container image is not a program, it's a packaged **filesystem** —
+here, the Python environment (with every dependency installed), the `nged_substation_forecast`
+code, and the baked-in champion model. *Which program runs* is chosen per container, by the
+command each one is started with. The same image therefore plays four roles:
+
+| Role | Runs where | Started as | What it uses from the image |
+|---|---|---|---|
+| Code-location server | this box (compose) | `dagster code-server start …` | the Python env + project code, served to the other services over gRPC |
+| Webserver (the UI) | this box (compose) | `dagster-webserver …` | just the installed `dagster-webserver` binary — it asks the code server for definitions |
+| Daemon | this box (compose) | `dagster-daemon run …` | the `dagster-daemon` binary, plus `dagster-aws` for the run launcher |
+| Forecast run | ephemeral Fargate task | `dagster api execute_run …` (generated by the launcher) | everything: env, code, **and the champion model** — the only role that loads it |
+
+One image rather than a slim control-plane image plus a fat run image is deliberate:
+
+- **No version skew.** The code location that evaluates schedules and the Fargate worker that
+  executes the run see byte-identical code and dependencies, because they are literally the
+  same image tag. With two images, a partial deploy could leave the control plane and the run
+  worker disagreeing about what `live_forecasts` *is* — a failure mode this design cannot have.
+- **One pipeline.** A single build/verify/push ([Steps 4](#step-4-build-and-verify-the-image)
+  [–6](#step-6-push-the-image-to-ecr)) and a single tag to reason about, instead of two builds
+  to keep in lockstep.
+- The only cost is that the three control-plane containers carry the champion model as dead
+  weight — a few megabytes of XGBoost files they never load. Cheap, and harmless.
+
+The one place the single-image design needs care is **entrypoints**, because the image can only
+declare one default (`ENTRYPOINT ["dagster"]`) while the four roles start three different
+executables: `dagster code-server start` is an ordinary `dagster` subcommand, so the image's
+entrypoint stands for it; `dagster-webserver` and `dagster-daemon` are **separate
+console-script binaries**, not `dagster` subcommands, so those two compose services carry
+`entrypoint:` overrides; and the Fargate run container neutralises the entrypoint with
+`/usr/bin/env` because the launcher's generated command already starts with `dagster` (the
+[Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition) gotcha).
+
+`~/nged-forecast/.env` (readable by you alone — `chmod 600 .env`):
+
+```dotenv
+IMAGE=<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>
+DATA_PATH_INTERNAL=s3://nged-forecast-internal/data
+DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
+NGED_S3_BUCKET_URL=<same value as the Parameter Store entry>
+NGED_S3_BUCKET_ACCESS_KEY=<same value as the Parameter Store entry>
+NGED_S3_BUCKET_SECRET=<same value as the Parameter Store entry>
+DAGSTER_PG_PASSWORD=<same value as /nged-forecast/dagster-pg-password from Step 8>
+```
+
+(The Fargate containers get these injected from Parameter Store; the box's containers read this
+file instead — Stage-1 simplicity, one hand-managed box.)
+
+`~/nged-forecast/docker-compose.yml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    restart: always
+    environment:
+      POSTGRES_USER: dagster
+      POSTGRES_PASSWORD: ${DAGSTER_PG_PASSWORD}
+      POSTGRES_DB: dagster
+    ports:
+      - "5432:5432"   # reachable by the Fargate run workers; see the security-group rule below
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  code-server:
+    image: ${IMAGE}
+    restart: always
+    # `code-server start` is a `dagster` subcommand, so the image's ENTRYPOINT ["dagster"] stands
+    command:
+      ["code-server", "start", "--host", "0.0.0.0", "--port", "4266",
+       "-m", "nged_substation_forecast.definitions"]
+    env_file: .env
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - ./dagster_home:/opt/dagster/dagster_home
+    depends_on: [postgres]
+
+  webserver:
+    image: ${IMAGE}
+    restart: always
+    entrypoint: ["dagster-webserver"]   # separate binary, NOT a `dagster` subcommand
+    command: ["-h", "0.0.0.0", "-p", "3000", "-w", "workspace.yaml"]
+    working_dir: /opt/dagster/dagster_home
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - ./dagster_home:/opt/dagster/dagster_home
+    depends_on: [postgres, code-server]
+
+  daemon:
+    image: ${IMAGE}
+    restart: always
+    entrypoint: ["dagster-daemon"]      # separate binary, NOT a `dagster` subcommand
+    command: ["run", "-w", "workspace.yaml"]
+    working_dir: /opt/dagster/dagster_home
+    env_file: .env
+    environment:
+      DAGSTER_HOME: /opt/dagster/dagster_home
+    volumes:
+      - ./dagster_home:/opt/dagster/dagster_home
+    depends_on: [postgres, code-server]
+
+volumes:
+  pgdata:
+```
+
+`~/nged-forecast/dagster_home/workspace.yaml` — tells the webserver and daemon where user code
+lives (only ever read on the box, so the compose-network hostname is fine here):
+
+```yaml
+load_from:
+  - grpc_server:
+      host: code-server
+      port: 4266
+      location_name: nged_substation_forecast
+```
+
+`~/nged-forecast/dagster_home/dagster.yaml` — the instance config. The `concurrency`,
+`run_monitoring`, and `python_logs` blocks are the same ones the local `dagster.yaml` in the
+[repository README](https://github.com/openclimatefix/nged-substation-forecast#setup) uses, and
+for the same reasons; what's new is Postgres storage and the run launcher:
+
+```yaml
+storage:
+  postgres:
+    postgres_db:
+      hostname: <box-private-ip>   # NOT "postgres" — see note below
+      port: 5432
+      username: dagster
+      password:
+        env: DAGSTER_PG_PASSWORD
+      db_name: dagster
+
+run_launcher:
+  module: dagster_aws.ecs
+  class: EcsRunLauncher
+  config:
+    task_definition: nged-forecast    # the family from Step 9; latest revision is used
+    container_name: nged-forecast     # must match Step 9's container name
+    use_current_ecs_task_config: false   # the daemon runs on EC2, not inside an ECS task
+    run_task_kwargs:                  # boto3 RunTask kwargs, hence the camelCase
+      cluster: nged-forecast
+      launchType: FARGATE
+      networkConfiguration:
+        awsvpcConfiguration:
+          subnets: ["<subnet-id>"]          # same as Step 10's manual run-task
+          securityGroups: ["<sg-id>"]       # same as Step 10's manual run-task
+          assignPublicIp: ENABLED
+
+concurrency:
+  pools:
+    default_limit: 1  # Used to limit concurrency of the ecmwf_ens asset.
+
+run_monitoring:
+  # Without this, a crashed/killed run can leak its concurrency-pool slot (e.g. the pool
+  # above) forever, since nothing else frees a slot held by a run that never reached a
+  # normal finally-block exit. This lets the daemon self-heal: any run finished (in any
+  # terminal status) for longer than the threshold has its slots freed automatically.
+  enabled: true
+  free_slots_after_run_end_seconds: 300
+
+python_logs:
+  managed_python_loggers:
+    - nged_data
+  python_log_level: DEBUG
+```
+
+Two things in `dagster.yaml` deserve explanation:
+
+- **The Postgres hostname is the box's private IP** (find it with `hostname -I` on the box, or
+  in the EC2 console), *not* the compose service name `postgres`. This instance config is not
+  only read on the box: the daemon serializes it into every run it launches, and the **Fargate
+  run worker connects back to this same Postgres** to record its events and heartbeats. The
+  compose-network alias only resolves on the box, whereas the private IP is reachable both from
+  Fargate (same VPC) and from the box's own containers (via the published port). A private IPv4
+  persists across stop/start — it only changes if the instance is terminated and replaced, at
+  which point this file needs the new IP.
+- Because the run workers connect in, **add the one inbound security-group rule now**: EC2 →
+  `nged-forecast-ctrl-sg` → edit inbound rules → allow **PostgreSQL (TCP 5432)** with source =
+  the security group used by the Fargate tasks (`<sg-id>` from
+  [Step 10](#step-10-verify-run-a-forecast-task-manually)). Scoped to that security group —
+  the box still has no publicly-reachable ports. This is also why `DAGSTER_PG_PASSWORD` was
+  added to the task definition's secrets in
+  [Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition): `dagster.yaml`
+  references it as `env:`, so the run worker resolves it at startup from its own environment.
+
+The authoritative schema for the `EcsRunLauncher` block is
+[Dagster's ECS deployment docs](https://docs.dagster.io/deployment/oss/deployment-options/aws) —
+if the daemon fails to start with a config-validation error after a Dagster upgrade, check there
+first.
+
+## Step 15 — Start the stack and connect over Tailscale
+
+```bash
+cd ~/nged-forecast
+docker compose up -d
+docker compose ps            # all four services should be Up
+docker compose logs -f daemon    # watch it start its schedule/sensor loops
+```
+
+From your laptop, open **`http://nged-forecast-ctrl:3000`** (Tailscale MagicDNS; the raw
+Tailscale IP works too). This is safe without any login because of the network design: the
+webserver's port 3000 is published on the box's interfaces, but the security group allows no
+inbound traffic — the only way in is through the Tailscale tunnel, and tailnet membership *is*
+the authentication (the open-source Dagster webserver has none of its own — see
+[the access-phasing plan](../roadmap/live-service.md#access-phasing)).
+
+In the UI, confirm the box is healthy: **Deployment** should show the
+`nged_substation_forecast` code location loaded, and **Deployment → Daemons** should show the
+scheduler and run-monitoring daemons with green heartbeats.
+
+## Step 16 — Turn on the schedules and verify end-to-end
+
+1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`,
+   `ecmwf_ens_schedule`, and `live_forecasts_schedule`. Schedule state lives in Postgres, so
+   this is a one-time action — it survives restarts and reboots.
+2. **Kick a run now rather than waiting for a tick**: materialise the latest `live_forecasts`
+   partition from the UI (see
+   [Operating the live service: Step 3](operations.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)).
+   Watch the run get dispatched by the launcher: it appears in the Dagster UI, a Fargate task
+   spins up in the ECS console, its logs stream to CloudWatch, and forecast rows land under
+   `s3://nged-forecast-delivery/data/power_forecasts/…`.
+3. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always`
+   must bring all four services back unattended; the UI comes back over Tailscale with run
+   history intact.
+4. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a
+   fresh NWP ingest after each daily 00Z publication; check Cost Explorer against the
+   [roadmap's cost model](../roadmap/live-service.md#cost-summary).
+
+If a slot gets missed (box down, failed run), backfill it from the same UI —
+[Operating the live service: Backfilling a missed slot](operations.md#backfilling-a-missed-slot).
+
+### Optional hardening
+
+- **Nightly Postgres dump to S3** — Dagster's run history is rebuildable in principle but nice
+  to keep. On the box, `crontab -e`:
+
+    ```cron
+    15 2 * * * docker compose -f /home/ubuntu/nged-forecast/docker-compose.yml exec -T postgres pg_dump -U dagster dagster | gzip | aws s3 cp - s3://nged-forecast-internal/backups/dagster-$(date +\%F).sql.gz
+    ```
+
+- **Security patches**: Ubuntu Server installs security updates automatically via
+  `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
+
+The remaining operational safety nets — per-task failure alerts (email via SNS, the Simple
+Notification Service) and the missed-check-in alarm that catches a silently-dead daemon — are
+still to come; see
+[the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+
+## Redeploying a new champion model
+
+Once the service is live, shipping a better model is a repeat of a slice of this page:
+
+1. Promote the new champion locally —
+   [Operating the live service: Steps 1–2](operations.md#step-1-pick-a-champion-model).
+2. Build and verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a
+   new tag (the new model's run id).
+3. `scripts/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
+   that pushes the new tag and registers a new task-definition revision pointing at it. The
+   run launcher resolves the family's latest revision at launch time, so the next scheduled
+   run picks it up with no restart on the box.
+4. The control-plane containers can keep running the old image — the baked-in model is dead
+   weight to them, so a *model* change doesn't affect them. When the *code* changes (assets,
+   schedules, a Dagster upgrade), also update the box: `docker login` + `docker pull` the new
+   tag ([Step 13](#step-13-install-docker-and-pull-the-image)), update `IMAGE` in
+   `~/nged-forecast/.env`, and `docker compose up -d`.
+
+## Granting NGED read access (recommended; confirm before doing this)
+
+> This step hasn't been agreed as final yet — recorded here as the current recommendation so it
+> isn't lost, but check before actually creating anything.
+
+[Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) already
+assumes **a single authenticated AWS user** for NGED, with no per-user entitlement matrix needed
+— NGED is the only consumer. That points at a dedicated **IAM user** (not a cross-account role):
+Excel and Power BI are named as expected client tools in that same page, and neither supports
+AWS role-assumption — they need a plain access key and secret, the same shape of credential an
+IAM user provides.
+
+Recommended shape: **one** IAM user (not one per bucket — the stability signal comes from the
+bucket split itself, not from access segmentation), with a read-only policy across both bucket
+ARNs (`s3:GetObject`, `s3:ListBucket` — no `PutObject`/`DeleteObject`), and an access key handed
+to NGED the same way [Step 2](#step-2-grant-data-access-with-iam)'s dashboard credentials are
+configured. Rotate the key periodically once this is live.
+
+## See also
+
+- [Operating the live service](operations.md) — driving the deployed service day to day:
+  promotion, the 6-hourly schedule, inspecting forecasts, backfilling missed slots.
+- [Running the whole stack locally](local.md) — the same service end-to-end on a laptop, no
+  AWS involved.
+- [Configuration reference](setup.md) — what the storage roots and `DATA_STORE_*`/credential
+  settings mean, and which combination each environment uses.
+- [Production Deployment — Design](../architecture/production-deployment.md) — why the image is
+  built this way, and why the control plane is an always-on box rather than EventBridge.
+- [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) — the costed
+  options behind this design, access phasing (team read-only access, the public dashboard), and
+  the still-to-come alerting and infra-as-code work.

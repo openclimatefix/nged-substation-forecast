@@ -36,7 +36,7 @@ Each `architecture/` design page names its how-to counterpart (and vice versa) i
 section — e.g. [ML Orchestration Design](architecture/ml-orchestration.md) ↔
 [ML Experimentation](ml_experimentation/index.md), and
 [Production Deployment — Design](architecture/production-deployment.md) ↔
-[Deploying a new production image](live_service/deployment.md). A page mixing the two — design
+[Setting up the live service on AWS](live_service/aws.md). A page mixing the two — design
 rationale followed by a runbook with literal commands — is a sign it should split along this line.
 The `docs/roadmap/` folder therefore contains **only design for work that is not yet implemented**,
 and is never a mirror of the code. Because roadmap pages are deletable, **code must never link into

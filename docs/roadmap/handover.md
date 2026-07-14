@@ -32,7 +32,7 @@ explicit so we don't accidentally undo them:
   and the model simply *freezes* between OCF's scheduled interventions.
 - **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an
   engineer reconstructing state — see
-  [Running live forecasts end-to-end](../live_service/dagster-workflow.md).
+  [Operating the live service](../live_service/operations.md).
 - **Promotion is rebuild + redeploy**, auditable via image tags — no live mutable model
   registry for an operator to mis-drive.
 - **No static AWS keys** (IAM roles throughout) removes a whole class of credential-expiry

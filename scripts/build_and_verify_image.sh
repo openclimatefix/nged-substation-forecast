@@ -2,21 +2,20 @@
 #
 # Build the production image and smoke-test it with zero network access.
 #
-# This is Step 2 of the deployment runbook (docs/live_service/deployment.md) as one command:
+# This is Step 4 of the AWS setup runbook (docs/live_service/aws.md) as one command:
 # build the image with the champion model baked in, then prove it runs hermetically. This header
 # is the source of truth for *why* each choice below is made.
 #
 # Usage:
-#   scripts/build_and_verify_image.sh <partition-key>
-#   e.g. scripts/build_and_verify_image.sh 2026-07-04-00:00
+#   scripts/build_and_verify_image.sh          # no arguments — everything is derived
 #
-# <partition-key> only has to PARSE as YYYY-MM-DD-HH:MM; it need not name a partition that exists.
-# The smoke test dies at the NWP lookup long before the slot matters, so off-cadence / out-of-range
-# keys work fine and only a malformed key fails (fast, with a clear "time data ... does not match
-# format" error). Real slots — for a genuine run — are the 6-hourly UTC boundaries from the
-# `live_forecasts` partition start onward, browsable in the Dagster UI.
+# The smoke test's partition key is HARD-CODED and arbitrary. It only has to parse as
+# YYYY-MM-DD-HH:MM: the offline run dies at the NWP lookup long before the slot's validity could
+# matter, so no real partition is needed and there is no decision worth pushing onto the user.
+# (Real slots matter only for genuine runs against real data tables — see the partition-semantics
+# note in docs/live_service/operations.md.)
 #
-# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 1's
+# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 3's
 # `promoted_model` asset) into the image, so it stays hermetic. The MODEL_RUN_ID and GIT_SHA
 # build args become OCI labels purely for traceability (inspect with `docker inspect`).
 #
@@ -25,7 +24,7 @@
 #     instantiate Settings() at import time), so the code location fails to import without them.
 #     They must be PRESENT but need not be real or reachable — passing dummies proves the image
 #     needs only their *presence* at import, never valid credentials and never the network. The
-#     deployed task gets the real values as secrets (runbook Step 6).
+#     deployed task gets the real values as secrets (runbook Step 8).
 #   - --network=none: proves runtime inference needs no network at all — the whole point of
 #     baking the model in.
 #   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
@@ -46,16 +45,14 @@
 
 set -euo pipefail
 
-PARTITION_KEY="${1:-}"
-if [[ -z "$PARTITION_KEY" ]]; then
-  echo "usage: $0 <partition-key>   e.g. $0 2026-07-04-00:00" >&2
-  exit 2
-fi
+# Arbitrary but well-formed (YYYY-MM-DD-HH:MM) — see the header: the offline smoke test never
+# reaches the point where the slot's validity could matter.
+PARTITION_KEY="2026-01-01-00:00"
 
 PROMOTION_JSON="data/production_model/promotion.json"
 if [[ ! -f "$PROMOTION_JSON" ]]; then
   echo "error: $PROMOTION_JSON not found — materialise the promoted_model asset first" >&2
-  echo "       (deployment.md Step 1), so the model this build bakes in exists on disk." >&2
+  echo "       (aws.md Step 3), so the model this build bakes in exists on disk." >&2
   exit 2
 fi
 
@@ -109,4 +106,5 @@ echo "    - the model loading, then failing ONLY at the NWP-availability lookup,
 echo "    - missing NWP data (no DATA_PATH_INTERNAL mounted) as the sole cause — nothing else."
 echo "  A non-zero container exit (${RUN_EXIT}) is EXPECTED here; a zero exit would be suspicious."
 echo
-echo "==> ${IMAGE} passed the automated hermeticity check. Push it with the runbook's next step."
+echo "==> ${IMAGE} passed the automated hermeticity check."
+echo "    Push + deploy it with scripts/push_and_deploy_image.sh (aws.md Step 6)."

@@ -1,4 +1,4 @@
-# Running live forecasts end-to-end
+# Operating the live service
 
 How to get a champion model producing live, 6-hourly forecasts, and how to backfill a slot that
 was missed.
@@ -16,16 +16,16 @@ why this was chosen over reusing the CV pipeline's MLflow-cache mechanism.
 
 ---
 
-## Prerequisites — a persistent Dagster instance
+## Prerequisites — a running Dagster instance
 
-The 6-hourly schedule only fires while Dagster's daemon is running continuously, so `uv run dg
-dev` needs to keep running (rather than being started and stopped around each manual step) and
-needs a persistent `DAGSTER_HOME` so its schedule state survives a restart:
+Everything on this page is driven from the Dagster UI, and is the same whichever environment
+the stack runs in — bring one up first:
 
-1. `mkdir ~/dagster_home/` and put the `dagster.yaml` shown in the repository README's
-   [Setup](https://github.com/openclimatefix/nged-substation-forecast#setup) section into it.
-2. `export DAGSTER_HOME=~/dagster_home` (add to `.bashrc` so it persists across terminals).
-3. `uv run dg dev`, and leave it running. Open `http://localhost:3000` to use the UI.
+- **Locally on a laptop** — [Running the whole stack locally](local.md); the UI is at
+  `http://localhost:3000` and runs execute on your machine.
+- **Deployed on AWS** — [Setting up the live service on AWS](aws.md); the UI is at
+  `http://nged-forecast-ctrl:3000` over Tailscale, and each run executes on an ephemeral
+  Fargate task.
 
 ## Step 1 — Pick a champion model
 
@@ -42,6 +42,11 @@ leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` �
 [ML Experimentation: Viewing results in the MLflow UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
 
 Copy the `run_id` of the fold you want to promote.
+
+Promotion (this step and the next) always happens **on your laptop**, whichever environment
+serves the forecasts: the candidate models live in the laptop's local MLflow file store, and
+the promoted artifacts land in a local directory (`data/production_model/`) that the AWS
+deployment bakes into its container image at build time.
 
 ## Step 2 — Materialise `promoted_model`
 
@@ -61,6 +66,11 @@ Promotion is a Dagster materialisation rather than a bare script, so every promo
 in Dagster's run history — an audit trail for free. Re-promoting with a different `mlflow_run_id`
 **replaces** the directory outright; artifacts from the previous champion are not merged in.
 
+On the local stack, the next scheduled run picks the new champion up immediately (the asset
+loads it from disk). In the AWS deployment there is one more leg: rebuild and push the image,
+then point the task definition at the new tag — see
+[Setting up the live service on AWS: Redeploying a new champion model](aws.md#redeploying-a-new-champion-model).
+
 ## Step 3 — Let the schedule run, or materialise `live_forecasts` by hand
 
 Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours —
@@ -69,8 +79,8 @@ at 00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_
 itself scheduled 5 minutes *before* each hour so that hour's pull has landed by the time
 `live_forecasts` ticks — a cheap mitigation, not a guarantee; see
 `power_time_series_and_metadata_schedule`'s docstring (`defs/schedules.py`) for the more rigorous
-fix still to explore. This needs the Dagster daemon running (part of `dg dev`; see
-[Prerequisites](#prerequisites-a-persistent-dagster-instance) above) to fire on time.
+fix still to explore. This needs the Dagster daemon running (see
+[Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time.
 
 To materialise one 6-hourly slot yourself — e.g. right after promoting a model, so you don't have
 to wait for the next tick, or to inspect a specific partition — go to Dagster UI → Assets →
@@ -124,6 +134,16 @@ uses to inspect backtest forecasts — with `fold_id="live"`:
 | `fold_id` | `"live"` | Always `"live"` for a production forecast |
 | `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's forecast init time — see the partition-semantics note in step 3 |
 | `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each drawn on its own panel |
+
+`plot_power_forecast` is a **local-development convenience**: it writes Altair HTML to
+`LOCAL_ARTIFACTS_PATH`, which on an ephemeral Fargate task is a disk that is discarded when the
+task exits — the file would never be seen. The durable, S3-native (S3 is AWS's object store) way
+to look at a deployed service's forecasts is the **dashboard**
+(`packages/dashboard/main.py`), which reads whichever
+tables it needs directly via their `Settings` paths and renders on demand — point it at the same
+`Settings` and it works identically whether each path is local or `s3://` (see
+[Configuration reference](setup.md#at-a-glance-which-settings-for-which-environment) for the
+read-only laptop credentials).
 
 ## Backfilling a missed slot
 

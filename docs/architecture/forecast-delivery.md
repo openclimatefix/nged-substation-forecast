@@ -380,8 +380,8 @@ nothing external is supposed to depend on them staying stable. Splitting them in
 separately-named S3 bucket makes that distinction impossible to miss — a bucket name in a URI
 survives being pasted into a script or a Slack message even out of context, where a path prefix
 within one bucket is easier to skim past. The same single IAM user reads both buckets; the
-split is a naming/documentation signal, not an access-control boundary. See [Environment &
-storage setup](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/#running-on-aws-manual-point-and-click)
+split is a naming/documentation signal, not an access-control boundary. See [Setting up the live
+service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets)
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
 exactly which five tables are the stable contract.
 
