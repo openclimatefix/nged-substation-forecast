@@ -42,10 +42,23 @@ the test that matters, since the entire point of baking the model in is that pro
 inference has no MLflow dependency at runtime:
 
 ```bash
-docker run --network=none nged-forecast:<tag> \
+docker run --network=none \
+  -e NGED_S3_BUCKET_URL=https://example.com/outbound/ \
+  -e NGED_S3_BUCKET_ACCESS_KEY=dummy \
+  -e NGED_S3_BUCKET_SECRET=dummy \
+  nged-forecast:<tag> \
   job execute -m nged_substation_forecast.definitions -j live_forecasts_job \
   --tags '{"dagster/partition": "<key>"}'
 ```
+
+The three `NGED_S3_BUCKET_*` values must be **present but don't need to be real**. `Settings`
+declares them as required fields, and several modules instantiate `Settings()` at import time
+(`contracts/weather_schemas.py`, `nged_substation_forecast/definitions.py`, …), so importing
+the code location fails with a pydantic `ValidationError` before Dagster even starts if they
+are missing. Passing dummies keeps the test honest: it proves the image needs only the
+*presence* of these settings at import — never valid credentials, and never the network. The
+deployed task gets the real values as secrets instead (see
+[Step 7](#step-7-create-the-ecs-cluster-and-fargate-task-definition)).
 
 Partition selection uses `--tags`, not `--select`/`--partition`: `dagster job execute` has no
 `--partition` flag at all, and `dagster asset materialize --select <asset>` (which does) hits a
@@ -54,11 +67,14 @@ asset-selection-string parser — reproduces identically outside Docker, on a pl
 checkout, so it's an upstream/environment issue, not something introduced by this image.
 Selecting by job name (`-j`) skips that parser entirely.
 
-**Verified 2026-07-10** against a real promoted model: the run reaches
-`load_forecaster_from_dir` and loads the model successfully (confirmed via the step ordering in
-`production_assets.py` — model load happens before the NWP-availability lookup) with zero
-`mlflow` mentions anywhere in the log, then fails only on missing NWP data access (expected —
-no `DATA_PATH_INTERNAL` was mounted for this isolated test). A full end-to-end run needs real
+**Verified 2026-07-14** against a real promoted model, with exactly the dummy-credential
+command above: the run reaches `load_forecaster_from_dir` and loads the model successfully
+(confirmed via the step ordering in `production_assets.py` — model load happens before the
+NWP-availability lookup) with zero `mlflow` mentions anywhere in the log, then fails only on
+missing NWP data access (expected — no `DATA_PATH_INTERNAL` was mounted for this isolated
+test). Omitting the dummy `NGED_S3_BUCKET_*` values instead fails at import with the pydantic
+`ValidationError` described above — also verified, so if you see that error, it's the env
+vars, not the image. A full end-to-end run needs real
 data-table roots (local mount or S3 credentials) supplied via environment variables, per
 [Environment & storage setup](setup.md).
 
@@ -97,10 +113,28 @@ or `aws sts get-caller-identity --query Account --output text`).
 Fargate tasks need **two** separate roles, not one — they serve different principals:
 
 - **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
-  before your code ever runs: pulling the image from ECR and shipping container output to
-  CloudWatch Logs. Create a role for the `ecs-tasks.amazonaws.com` service and attach the
-  AWS-managed `AmazonECSTaskExecutionRolePolicy` — it already covers exactly these two things, so
-  no custom policy is needed.
+  before your code ever runs: pulling the image from ECR, shipping container output to
+  CloudWatch Logs, and injecting the NGED credential secrets from
+  [Step 7](#step-7-create-the-ecs-cluster-and-fargate-task-definition). Create a role for the
+  `ecs-tasks.amazonaws.com` service and attach the AWS-managed
+  `AmazonECSTaskExecutionRolePolicy` (covers ECR + CloudWatch), plus one small inline policy for
+  the secrets — it's the *execution* role that reads them, not the task role, because the ECS
+  agent resolves secrets before the container starts:
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": "ssm:GetParameters",
+          "Resource": "arn:aws:ssm:eu-west-2:<account-id>:parameter/nged-forecast/*"
+        }
+      ]
+    }
+    ```
+
+    (No KMS statement needed as long as the parameters use the default `aws/ssm` key.)
 - **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
   lets the container read and write **both** data buckets (delivery and internal). Reuse the same
   S3 policy from
@@ -131,6 +165,23 @@ already relies on for compute running on AWS.
      tables live in a separate bucket from everything else (see
      [setup.md's on-AWS settings](setup.md#step-3-point-settings-at-the-buckets)). Leave
      `DATA_STORE_*` unset, since the task role supplies credentials.
+   - **Secrets — the three NGED source-bucket credentials.** The container can't start without
+     `NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, and `NGED_S3_BUCKET_SECRET` (`Settings`
+     requires them at import — see the smoke test in
+     [Step 3](#step-3-verify-the-build-locally)), and the deployed service genuinely uses them:
+     the hourly `power_time_series_and_metadata` schedule pulls fresh telemetry from NGED's
+     bucket. These are static third-party credentials, so don't paste them as plain-text
+     environment values (readable by anyone with ECS describe access). Instead, first create
+     three parameters via **Systems Manager** → **Parameter Store** → **Create parameter** (in
+     `eu-west-2`): names `/nged-forecast/nged-s3-bucket-url`,
+     `/nged-forecast/nged-s3-bucket-access-key`, and `/nged-forecast/nged-s3-bucket-secret`,
+     type **SecureString** with the default `aws/ssm` key, values copied from your local `.env`
+     (the `/nged-forecast/` prefix is what Step 6's execution-role policy grants access to).
+     Then, back in the container definition, add each one as an environment variable of type
+     **ValueFrom** (the console's "Secrets" mechanism): env-var name exactly as `Settings`
+     expects (e.g. `NGED_S3_BUCKET_URL`), value the parameter name from above. The ECS agent
+     injects the decrypted values just before the container starts; they never appear in the
+     task definition itself.
 
 ## Step 8 — Verify: run the task manually
 
