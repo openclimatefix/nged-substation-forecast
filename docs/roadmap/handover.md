@@ -44,12 +44,15 @@ explicit so we don't accidentally undo them:
   account — or anyone else's.
 - **Lenient uptime requirements**: nothing very bad happens if the service misses a day,
   because NGED can always read the previous forecasts from S3 (forecasts extend 14 days
-  ahead). Recovery can therefore always be "next business day, via runbook", never "2am page".
+  ahead), and can fall back to their legacy forecasting approach for a few hours while
+  Flexpectation is fixed. Recovery can therefore always be "next business day, via runbook",
+  never "2am page".
 
 The honest caveat: the failures a non-expert can't handle mostly live at the *boundaries*, not
 in our code — an NWP provider changing formats, NGED SCADA feed schema drift, credential and
-certificate expiry, and AWS account plumbing. The workstreams below are aimed squarely at
-those boundaries.
+certificate expiry, and AWS account plumbing. We expect the most common failure mode to be
+"bad" input data, whose fix lives upstream of the forecasting service rather than in the
+service itself. The workstreams below are aimed squarely at those boundaries.
 
 ## Workstreams
 
@@ -63,7 +66,25 @@ each one a documented button-press or a single command with a runbook page in
 
 Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
 changes — is OCF's job by definition, handled on a scheduled maintenance cadence (and, post-NIA,
-under whatever support arrangement is agreed).
+under whatever support arrangement is agreed). Model re-training sits in this category too: the
+re-training pipeline is automated end-to-end, so "re-training" means triggering and reviewing an
+automated run — something OCF could do on a regular cadence (say, monthly) post-NIA, or NGED could
+take on themselves if they choose.
+
+One **optional tier** sits between "follow a runbook" and "escalate to OCF", for the more
+mysterious bugs that fall outside the contract but that NGED may want to try fixing themselves:
+
+1. Reproduce the issue locally — the pipeline runs end-to-end on a laptop, precisely to make
+   this possible.
+2. Give an AI coding tool (e.g. Claude Code) the bug report and access to the code, and let it
+   attempt a fix.
+3. Run the full test suite; if it passes, push the fix to production.
+4. If any of that fails, escalate to OCF.
+
+This tier is a permitted shortcut, not an obligation — "escalate to OCF" is always an acceptable
+answer. It is, however, where most of the in-person handover training (workstream 6) is expected
+to focus, because routine operation should need very little training if the operator contract is
+doing its job.
 
 The existing [`docs/live_service/`](../live_service/index.md) runbooks are the natural home for this
 material, but the docs are currently written for *OCF* (Python-literate researchers). Before
@@ -155,13 +176,18 @@ Concrete steps:
 - Stand up a **staging copy in NGED's account well before handover** — discovering in the
   final months that our networking approach is prohibited would be painful.
 
-### 6. Game days
+### 6. Game days and in-person training
 
 Before handover, run deliberate failure exercises with the actual NGED operator, using only
 the runbooks: break the NWP feed, fill the disk, kill the daemon, expire a credential, let a
 forecast slot get missed. The operator recovers each one unaided (or the runbook gets fixed).
 Game days find documentation gaps faster than any amount of review, and they double as
 operator training.
+
+Game days sit alongside an **in-person training visit**: OCF spending up to a week on-site with
+the NGED team around handover time. Most of that training is expected to cover the bug-fixing
+escalation tier described in workstream 1 rather than routine operation — the service should be
+simple enough to run that routine operation needs far less than a week.
 
 ### 7. Organisational prerequisites (recorded so they're not forgotten)
 
@@ -192,3 +218,7 @@ work:
   they get up to speed, run the game days. NGED then decides whether to run it themselves.
 - **Post-NIA**: OCF is no longer on call; NGED handles day-to-day operations. OCF may continue
   developing the software and models (the hybrid model), possibly under a retainer — all TBD.
+- **The decision is reversible.** The NIA project's original plan was for OCF to deliver
+  recommendations informing an RFP, through which NGED would procure a forecast service from a
+  third party. That remains the fallback throughout: NGED can treat self-operation as an
+  experiment, and if running the service proves too burdensome, revert to publishing the RFP.
