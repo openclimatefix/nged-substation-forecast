@@ -70,18 +70,35 @@ def _free_port() -> int:
 
 
 @pytest.fixture(scope="module")
-def s3_endpoint() -> Iterator[str]:
-    """Start an in-process moto S3 server and create the test bucket (no boto3, no Docker)."""
+def _moto_server() -> Iterator[str]:
+    """Start one in-process moto S3 server for the module (no boto3, no Docker)."""
     port = _free_port()
     server = ThreadedMotoServer(port=port)
     server.start()
-    endpoint = f"http://127.0.0.1:{port}"
-    # Create the bucket with a bare HTTP PUT — object_store never creates buckets itself.
-    urllib.request.urlopen(urllib.request.Request(f"{endpoint}/{_BUCKET}", method="PUT")).close()
     try:
-        yield endpoint
+        yield f"http://127.0.0.1:{port}"
     finally:
         server.stop()
+
+
+@pytest.fixture
+def s3_endpoint(_moto_server: str) -> str:
+    """Reset moto to a pristine state and (re)create the test bucket for each test.
+
+    moto's S3 backend is process-global and outlives the server object, so it is *not* reset
+    when the module-scoped server is reused across tests. Without a per-test reset, any test
+    whose write path runs a second time — a re-run, or state left by an earlier test — would
+    read leftover objects (a doubled Delta table, a pre-existing metadata parquet) and fail.
+    Resetting before every test makes each test independent of execution order and prior state.
+    """
+    urllib.request.urlopen(
+        urllib.request.Request(f"{_moto_server}/moto-api/reset", method="POST")
+    ).close()
+    # Create the bucket with a bare HTTP PUT — object_store never creates buckets itself.
+    urllib.request.urlopen(
+        urllib.request.Request(f"{_moto_server}/{_BUCKET}", method="PUT")
+    ).close()
+    return _moto_server
 
 
 def _s3_settings(endpoint: str, prefix: str) -> Settings:

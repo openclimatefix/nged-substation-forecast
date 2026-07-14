@@ -335,6 +335,17 @@ group past the cap, streaming engine included. Full analysis:
   are unaffected — only row counts and row indices wrap. Both verified empirically.
 - Tables past the cap today: NWP (~5.9B rows). `power_forecasts` will pass it at V2 scale.
 
+### Testing Gotcha: moto's S3 backend is process-global — reset it per test
+
+The in-process `moto` server used for the S3 tests keeps its bucket contents in a **process-global
+backend that outlives the `ThreadedMotoServer` object**, so a module-scoped server does not hand
+each test a clean slate. A test whose write path runs twice against that server — a re-run, or
+state left behind by an earlier test — reads stale data: an appended Delta table returns double the
+rows, and an `object_exists` precondition sees a leftover parquet. Keep the *server* module-scoped
+for speed, but give each test a **function-scoped** fixture that `POST`s to `/moto-api/reset` and
+recreates the bucket before the test body runs, so every test starts pristine and independent of
+execution order. `tests/test_s3_data_paths.py` is the canonical pattern.
+
 ### Marimo Notebooks
 
 Marimo notebooks (`packages/dashboard/main.py`, `packages/notebooks/*.py`) are reactive: each
