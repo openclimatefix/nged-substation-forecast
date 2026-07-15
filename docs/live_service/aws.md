@@ -306,20 +306,50 @@ Manager**](https://eu-west-2.console.aws.amazon.com/systems-manager/home?region=
 Store**](https://eu-west-2.console.aws.amazon.com/systems-manager/parameters?region=eu-west-2) →
 **Create parameter**, four times, in `eu-west-2` (same region as everything else):
 
-- **Name**: `/nged-forecast/nged-s3-bucket-url`, `/nged-forecast/nged-s3-bucket-access-key`,
-  `/nged-forecast/nged-s3-bucket-secret`, and `/nged-forecast/dagster-pg-password`
-  respectively. The shared `/nged-forecast/` prefix is exactly what
-  [Step 7](#step-7-iam-roles-for-the-fargate-task)'s execution-role policy grants
-  access to, so a new secret added under the same prefix later needs no IAM change.
+- **Name** — one parameter each. The shared `/nged-forecast/` prefix is exactly what
+  [Step 7](#step-7-iam-roles-for-the-fargate-task)'s execution-role policy grants access to,
+  so a new secret added under the same prefix later needs no IAM change.
+    - `/nged-forecast/nged-s3-bucket-url` — the URL of NGED's source S3 bucket, which the
+      hourly `power_time_series_and_metadata` schedule pulls raw telemetry from (the
+      `nged_s3_bucket_url` field of `Settings`).
+    - `/nged-forecast/nged-s3-bucket-access-key` — the access-key ID for NGED's bucket
+      (`nged_s3_bucket_access_key`) - a static credential issued by NGED, since the bucket
+      lives in NGED's AWS account.
+    - `/nged-forecast/nged-s3-bucket-secret` — the secret access key paired with NGED's
+      access-key ID (`nged_s3_bucket_secret`).
+    - `/nged-forecast/dagster-pg-password` — the password for the control-plane box's
+      Postgres ([Step 14](#step-14-configure-dagster-on-the-box)). It's stored here because
+      every launched run connects back to that Postgres to record its events, so the Fargate
+      containers need it injected exactly like the NGED credentials.
 - **Tier**: Standard (free; these values are tiny, nowhere near the 4 KB limit).
 - **Type**: **SecureString**, with the default `aws/ssm` KMS key — using the default key is
   what lets Step 7's inline policy skip a `kms:Decrypt` statement.
-- **Value**: the three `nged-s3-bucket-*` values are copied from the matching lines of your
-  local `.env`. `dagster-pg-password` is the password for the control-plane box's Postgres
-  ([Step 14](#step-14-configure-dagster-on-the-box)) — it doesn't exist yet, so mint it now
-  (e.g. `openssl rand -hex 24`) and reuse the same value on the box in Step 14. It's stored
-  here because every launched run connects back to that Postgres to record its events, so the
-  Fargate containers need it injected exactly like the NGED credentials.
+- **KMS key source** and **KMS Key ID** — these two fields appear once **SecureString** is
+  selected; leave both at their defaults: **My current account** and `alias/aws/ssm`.
+  (`alias/aws/ssm` is the console's name for the default `aws/ssm` key the Type bullet just
+  referred to.) The console shows a blue notice that the default AWS-managed key "cannot be
+  shared with other AWS accounts, and all users in this AWS account and Region have access to
+  the key" — both limitations are fine here: nothing outside this account ever reads these
+  parameters, and having access to the *key* doesn't grant access to the *parameters* — reading
+  them still requires the `ssm:GetParameters` permission that
+  [Step 7](#step-7-iam-roles-for-the-fargate-task)'s policy grants only to the execution role.
+- **Value**:
+    - The three `nged-s3-bucket-*` values are copied from the matching
+      `NGED_S3_BUCKET_*` lines of your local `.env`.
+    - `dagster-pg-password` can't be copied from anywhere, because it doesn't exist yet:
+      Postgres isn't installed until [Step 14](#step-14-configure-dagster-on-the-box), and
+      when it is, *you* choose its password rather than receiving one. So mint it now: run
+      `openssl rand -hex 24` in a terminal on your laptop (any machine with `openssl` works —
+      the command just prints 48 random hex characters and touches nothing), and paste the
+      output straight into this parameter's **Value** field. That's the whole minting step:
+      this parameter *is* the authoritative copy, and there is nowhere else to record the
+      password now — no need to keep it in a password manager or a local file. It gets read
+      back in two places later: [Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)
+      injects it into every Fargate run as the `DAGSTER_PG_PASSWORD` environment variable,
+      and in Step 14 you copy the same value (view it again in the Parameter Store console
+      via **Show decrypted value**) into `~/nged-forecast/.env` on the box — whose
+      `docker-compose.yml` hands it to Postgres as `POSTGRES_PASSWORD` on first start, which
+      is the moment the password actually gets *set* on a real database.
 
 There is no wiring to do in this step — that happens in the task definition
 ([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), where each parameter is
