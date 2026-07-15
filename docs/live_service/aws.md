@@ -300,8 +300,11 @@ describe access could read them there. Store them in **SSM Parameter Store** (SS
 Systems Manager; Parameter Store is its encrypted key-value configuration service) as
 SecureStrings and let ECS inject them at container start:
 
-In the AWS console → **Systems Manager** → **Parameter Store** → **Create parameter**, four
-times, in `eu-west-2` (same region as everything else):
+In the AWS console → [**Systems
+Manager**](https://eu-west-2.console.aws.amazon.com/systems-manager/home?region=eu-west-2) →
+**Application Tools** → [**Parameter
+Store**](https://eu-west-2.console.aws.amazon.com/systems-manager/parameters?region=eu-west-2) →
+**Create parameter**, four times, in `eu-west-2` (same region as everything else):
 
 - **Name**: `/nged-forecast/nged-s3-bucket-url`, `/nged-forecast/nged-s3-bucket-access-key`,
   `/nged-forecast/nged-s3-bucket-secret`, and `/nged-forecast/dagster-pg-password`
