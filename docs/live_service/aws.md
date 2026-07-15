@@ -965,6 +965,7 @@ services:
     env_file: .env
     environment:
       DAGSTER_HOME: /opt/dagster/dagster_home
+      AWS_DEFAULT_REGION: eu-west-2   # boto3 has no other region source on the box; see note below
     volumes:
       - ./dagster_home:/opt/dagster/dagster_home
     depends_on: [postgres]
@@ -980,6 +981,7 @@ services:
     env_file: .env
     environment:
       DAGSTER_HOME: /opt/dagster/dagster_home
+      AWS_DEFAULT_REGION: eu-west-2   # boto3 has no other region source on the box; see note below
     volumes:
       - ./dagster_home:/opt/dagster/dagster_home
     depends_on: [postgres, code-server]
@@ -993,6 +995,7 @@ services:
     env_file: .env
     environment:
       DAGSTER_HOME: /opt/dagster/dagster_home
+      AWS_DEFAULT_REGION: eu-west-2   # boto3 has no other region source on the box; see note below
     volumes:
       - ./dagster_home:/opt/dagster/dagster_home
     depends_on: [postgres, code-server]
@@ -1000,6 +1003,14 @@ services:
 volumes:
   pgdata:
 ```
+
+**`AWS_DEFAULT_REGION` is set on every box container** because boto3 does not fall back to
+instance metadata for its *region* the way it does for credentials. The instance role
+([Step 11](#step-11-launch-the-control-plane-box)) supplies credentials over IMDS, but region has
+no such fallback — so without this the daemon's `EcsRunLauncher` fails the moment it tries to launch
+a run, with `botocore.exceptions.NoRegionError: You must specify a region`, and the box's other
+boto3 calls (S3) would fail the same way. The Fargate run workers don't need it: a task reads its
+region from the ECS task metadata automatically, so this gap is box-only.
 
 `~/nged-forecast/dagster_home/workspace.yaml` — tells the webserver and daemon where user code
 lives (only ever read on the box, so the compose-network hostname is fine here):
@@ -1035,6 +1046,7 @@ run_launcher:
     task_definition: nged-forecast    # the family from Step 9; latest revision is used
     container_name: nged-forecast     # must match Step 9's container name
     use_current_ecs_task_config: false   # the daemon runs on EC2, not inside an ECS task
+    secrets_tag: null                 # we use Parameter Store, not Secrets Manager; see note below
     run_task_kwargs:                  # boto3 RunTask kwargs, hence the camelCase
       cluster: nged-forecast
       launchType: FARGATE
@@ -1062,7 +1074,15 @@ python_logs:
   python_log_level: DEBUG
 ```
 
-Three things in `dagster.yaml` deserve explanation:
+Four things in `dagster.yaml` deserve explanation:
+
+- **`secrets_tag: null` disables Secrets Manager enumeration.** `EcsRunLauncher.secrets_tag`
+  defaults to `"dagster"`, which makes the launcher call `secretsmanager:ListSecrets` (filtered by
+  that tag) on every run launch to inject matching secrets as env vars. This stack uses Parameter
+  Store, not Secrets Manager ([Step 8](#step-8-store-secrets-in-parameter-store)), so that
+  call finds nothing useful and the instance role deliberately doesn't grant the permission —
+  leaving the default in place fails run launch with `AccessDeniedException ... secretsmanager:ListSecrets`.
+  Setting it to `null` skips the lookup entirely.
 
 - **The Postgres hostname is the box's VPC private IP** — the `172.31.x.x` address on its primary
   network interface (it matches the box's `ip-172-31-…` hostname), *not* the compose service name
