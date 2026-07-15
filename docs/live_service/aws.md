@@ -365,9 +365,59 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 9 — Create the ECS cluster and Fargate task definition
 
-1. **ECS** → **Clusters** → **Create cluster** → *Networking only* (Fargate; no EC2 — Elastic
-   Compute Cloud, AWS's virtual machines — instances to manage) — a bare cluster is just a
-   namespace, so a single `nged-forecast` cluster is enough for now.
+First, a reminder of the deployment's shape, because from this step onwards it matters which half
+of it you're building. The stack runs **two different kinds of compute**, on two different AWS
+technologies:
+
+- The **always-on control plane** — the Dagster daemon, webserver, code-location server, and
+  Postgres — runs on a plain **EC2 virtual machine** (EC2 is Elastic Compute Cloud), launched by
+  hand in [Step 11](#step-11-launch-the-control-plane-box) and managed with Docker Compose. ECS
+  and Fargate play no part in running it. This is the **only compute in the deployment whose
+  operating system we install and maintain ourselves**: [Step 11](#step-11-launch-the-control-plane-box)
+  chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
+  installing software on it ([Step 12](#step-12-join-the-tailnet) and
+  [Step 13](#step-13-install-docker-and-pull-the-image)) and keeping it patched (Ubuntu's
+  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)). (Running the
+  control plane on Fargate too would have removed even that OS burden — why we don't is covered
+  in [Considered but rejected designs](../architecture/production-deployment.md#an-always-on-fargate-service-for-the-control-plane).)
+  That maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
+  every 6 hours, and NGED reads published forecasts straight from S3, so the gap between one
+  forecast run and the next is a built-in maintenance window in which the box can be stopped,
+  patched, and rebooted — see
+  [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
+- The **ephemeral forecast worker** — each 6-hourly forecast run — runs as an **ECS task on
+  Fargate**: a container that is created for one run and destroyed when it exits. The control
+  plane *dispatches* these tasks but never executes a forecast itself. Here there is **no
+  operating system for us to install or maintain**: AWS owns and patches the machines Fargate
+  tasks run on, and everything we are responsible for travels inside the container image from
+  [Step 6](#step-6-push-the-image-to-ecr).
+
+This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
+the task definition describing how to run them. Why the compute is split this way is the
+[orchestration design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
+
+Two AWS terms do a lot of work in this step, so it's worth being precise about how they relate.
+**ECS** (Elastic Container Service) is AWS's container orchestrator: it takes a **task definition**
+— a recipe naming the container image to run plus the CPU, memory, IAM roles, environment variables,
+and secrets to run it with — and launches and supervises containers from that recipe. **Fargate** is
+one of ECS's two "launch types" — the two ways of providing the compute the containers run on. The
+other launch type (named "EC2") has ECS place containers onto EC2 instances that you provision and
+patch yourself. In contrast, with Fargate, AWS conjures right-sized compute for each task when it
+launches and tears it down when the task exits, billed by the second. We use ECS on Fargate so that
+each 6-hourly forecast run gets a fresh, ephemeral machine and nothing sits idle between runs.
+
+**Why create a "cluster" when nothing here auto-scales?** On the EC2 launch type, a cluster
+really is a fleet — the pool of instances that tasks get placed onto. On Fargate there are no
+instances, so the cluster is purely a **logical namespace for running tasks**, and we need one
+only because every task has to launch *into* a cluster: it's the `--cluster` that
+[Step 10](#step-10-verify-run-a-forecast-task-manually)'s manual `run-task` call targets and the
+`cluster:` the `EcsRunLauncher` config in
+[Step 14](#step-14-configure-dagster-on-the-box) names, and it's where the console groups the
+running tasks you'll watch. An empty cluster manages no capacity and costs nothing, so a single
+`nged-forecast` cluster is all this deployment ever needs.
+
+1. [**ECS**](https://eu-west-2.console.aws.amazon.com/ecs?region=eu-west-2) → **Clusters** → **Create cluster** → name it `nged-forecast` → *Networking only*
+   (i.e. Fargate: no EC2 instances to manage, per the explanation above).
 2. **ECS** → **Task definitions** → **Create new task definition** → *Fargate*:
     - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task).
     - **Task execution role**: the execution role from
@@ -449,7 +499,7 @@ One small always-on EC2 instance runs the Dagster daemon (schedules, sensors, ru
 the Dagster webserver (the UI), the code-location server, and Postgres (run/event/schedule
 history) — everything except the actual forecast compute, which stays on ephemeral Fargate.
 Why an always-on box at all, and why this shape, is the
-[orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge);
+[orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
 the sizing and cost are the roadmap's
 [accepted option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).
 

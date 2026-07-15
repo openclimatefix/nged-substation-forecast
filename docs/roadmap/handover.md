@@ -42,11 +42,11 @@ explicit so we don't accidentally undo them:
   portable application logic over cloud-native glue (e.g. no EventBridge rules) wherever a
   portable option exists. Portability is what makes the service cheap to move into NGED's
   account — or anyone else's.
-- **Lenient uptime requirements**: nothing very bad happens if the service misses a day,
-  because NGED can always read the previous forecasts from S3 (forecasts extend 14 days
-  ahead), and can fall back to their legacy forecasting approach for a few hours while
-  Flexpectation is fixed. Recovery can therefore always be "next business day, via runbook",
-  never "2am page".
+- **Lenient uptime requirements** mean recovery can always be "next business day, via
+  runbook", never "2am page" — see
+  [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design)
+  for why an outage costs so little (the 14-day forecast horizon, S3 delivery decoupled from
+  compute, and NGED's legacy fallback).
 
 The honest caveat: the failures a non-expert can't handle mostly live at the *boundaries*, not
 in our code — an NWP provider changing formats, NGED SCADA feed schema drift, credential and
