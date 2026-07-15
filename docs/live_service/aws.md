@@ -173,10 +173,11 @@ documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 5 — Create the ECR repository
 
-ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just
-built gets pushed so AWS compute can pull it. In the AWS console → **ECR** →
-**Create repository** (same `eu-west-2` region as the S3 buckets
-in [Step 1](#step-1-create-the-s3-buckets)):
+ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just built
+gets pushed so AWS compute can pull it. In the [AWS
+console](https://eu-west-2.console.aws.amazon.com) →
+**[ECR](https://eu-west-2.console.aws.amazon.com/ecr)** → **Create repository** (same `eu-west-2`
+region as the S3 buckets in [Step 1](#step-1-create-the-s3-buckets)):
 
 1. **Visibility** Private.
 2. **Name** `nged-forecast` (matches the local image tag `nged-forecast:<tag>` from
