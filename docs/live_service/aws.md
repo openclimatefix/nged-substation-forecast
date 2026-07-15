@@ -641,8 +641,20 @@ or use case** dropdown, then select the **EC2** radio button (the plain *EC2* va
 *EC2 - Spot Instances* or the other sub-options — it's what puts `ec2.amazonaws.com` in the role's
 trust policy, so the instance can assume the role) → **Next** → attach `nged-forecast-read-and-write`
 ([Step 2](#step-2-grant-data-access-with-iam)) and the AWS-managed
-`AmazonEC2ContainerRegistryReadOnly` (pull the image) → name it `nged-forecast-ctrl-role`. Then add
-one inline policy (e.g. `nged-forecast-launch-runs`) so the daemon can dispatch runs to Fargate:
+`AmazonEC2ContainerRegistryReadOnly` (pull the image) → **Next**. On the final **Name, review, and
+create** page, set **Role name** `nged-forecast-ctrl-role` and a **Description** such as *"Control-plane
+box for the NGED forecast service: runs the Dagster daemon/webserver, reads and writes the forecast S3
+buckets, pulls the image from ECR, and dispatches forecast runs to Fargate."* Leave the auto-generated
+**Trust policy** (the `ec2.amazonaws.com` principal) exactly as shown — it's correct and never
+hand-edited here. Then **Create role**.
+
+Now add one inline policy (e.g. `nged-forecast-launch-runs`) so the daemon can dispatch runs to
+Fargate — this is a *permissions* policy, separate from the trust policy above, and it's added after
+the role exists, exactly as in [Step 7](#step-7-iam-roles-for-the-fargate-task). Open the role you
+just created → **Permissions** tab → **Add permissions** → **Create inline policy** → switch to the
+**JSON** editor → paste the JSON below, replacing `<account-id>` with your 12-digit AWS account id
+(the account menu at the top right of the console, or
+`aws sts get-caller-identity --query Account --output text`) → **Next** → name it → **Create policy**:
 
 ```json
 {
@@ -680,6 +692,13 @@ one inline policy (e.g. `nged-forecast-launch-runs`) so the daemon can dispatch 
 roles to the tasks it launches; the condition stops the box passing them to anything but ECS.
 `ecs:RegisterTaskDefinition` is included because `EcsRunLauncher` may register a derived task
 definition depending on config — harmless to grant, confusing to debug when missing.)
+
+Leave the role's **Maximum session duration** at its 1-hour default — it's irrelevant to how this
+role is used. `MaxSessionDuration` only bounds sessions created by an explicit `sts:AssumeRole` call
+that requests a duration (a human assuming a role, or role chaining). An **EC2 instance profile**
+takes neither path: the Instance Metadata Service auto-issues and auto-rotates the role's temporary
+credentials on the instance's behalf, refreshing them before expiry for as long as the box runs, so
+this field is never consulted and the box's credentials never lapse.
 
 Then **EC2** → **Launch instance**:
 
