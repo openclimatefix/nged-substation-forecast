@@ -525,7 +525,11 @@ Creating the task definition in the console is one-time. Later image changes nev
 
 Before building the control plane, trigger one task directly and confirm the compute path
 end-to-end — this manual `RunTask` also remains the fallback verification path once the
-schedules exist:
+schedules exist.
+
+**This command is a template — it will not run as pasted.** It contains three placeholders you
+must replace first: `<subnet-id>`, `<sg-id>`, and the partition key `<key>`. How to fill in each
+one is explained below the command.
 
 ```bash
 aws ecs run-task \
@@ -542,6 +546,37 @@ aws ecs run-task \
 
 Note the command starts with `dagster` — Step 9's `/usr/bin/env` entry point means every command
 spells out the full argv.
+
+Fill in the three placeholders:
+
+- **`<subnet-id>`** — a **public** subnet in the VPC the task will run in. Unless you have built
+  custom networking in this account, that VPC is the default VPC, and every subnet in a default
+  VPC is public (it routes to the internet gateway and auto-assigns public IPs). List them in
+  the console under **VPC → Subnets**, or with:
+
+    ```bash
+    aws ec2 describe-subnets --region eu-west-2 \
+      --filters Name=default-for-az,Values=true \
+      --query 'Subnets[].[SubnetId,AvailabilityZone]' --output table
+    ```
+
+    Any one of them will do.
+
+- **`<sg-id>`** — the security group the Fargate tasks run with. Create a dedicated one now:
+  **EC2 → Security Groups → Create security group** → name `nged-forecast-task-sg`, any
+  description, and the same VPC as the subnet above → leave **Inbound rules** empty (the task
+  only dials *out*: ECR, S3, CloudWatch, and later Postgres on the control-plane box) → keep
+  the default allow-all **Outbound rules** → **Create**. The id (`sg-…`) is shown on the
+  group's detail page. Don't reuse the VPC's `default` group:
+  [Step 14](#step-14-configure-dagster-on-the-box) opens the control-plane box's Postgres port
+  to exactly this group, so a dedicated group keeps that inbound rule tightly scoped.
+
+- **`<key>`** — the `live_forecasts` partition to run, formatted `YYYY-MM-DD-HH:MM` with the
+  time at a 6-hourly boundary (e.g. `2026-07-04-00:00`). A key names the *start* of its 6-hour
+  window, and the forecast init time is that window's *end* — read the
+  [partition-semantics note](operations.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)
+  before picking one; the most recent *completed* window is the natural choice for this
+  verification run.
 
 > **Region matters here.** Unlike [Step 6](#step-6-push-the-image-to-ecr)'s script (which
 > passes `--region` explicitly on every call), a hand-typed AWS CLI command falls back to your
