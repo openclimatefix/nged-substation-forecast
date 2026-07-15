@@ -4,7 +4,7 @@ The entire live service — telemetry ingestion, NWP download, the 6-hourly fore
 and the Dagster UI — runs on a laptop with no AWS involved. This is a deliberate portability
 requirement, not just a development convenience: no cloud-specific service may be load-bearing
 for scheduling or orchestration (see
-[the orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge)).
+[the orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).
 This page brings the local stack up; once it's running,
 [Operating the live service](operations.md) drives it — promotion, schedules, backfills are
 identical to the AWS deployment.

@@ -44,7 +44,7 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
   `docker compose up` — no AWS-specific service (EventBridge, Step Functions) may be
   load-bearing for scheduling or orchestration. This is both a development convenience and a
   handover requirement — see
-  [the orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
+  [the orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 - AWS infrastructure with **no static AWS keys** (IAM roles throughout), basic alerting on task
   failure (SNS → email), and cost-conscious operation (~£25–35/month target).
 
@@ -77,7 +77,7 @@ Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). The design
 > rationale (single-run vs. bulk mode, the `live`/`replay` asymmetry, the trained-population
 > invariant) now lives at
-> [Production Deployment — Design: Live inference](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#live-inference-is-single-run-not-bulk);
+> [Production Deployment — Design: Live inference](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#run-live-inference-in-single-run-mode-not-bulk);
 > the operational runbook — promoting a model, running the schedule, backfilling a missed slot —
 > is [Operating the live service](../live_service/operations.md), the permanent home
 > this page's shipped material moves to (and, eventually, this whole page, once every section
@@ -125,7 +125,7 @@ EventBridge Scheduler firing an ECS `RunTask` directly, with no always-on contro
 stands. The durable rationale (portability, NGED handover, illusory cost saving, retry parity)
 and the accepted trade-offs (mitigated by the external
 [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm)) are recorded at
-[Production Deployment — Design: Orchestration](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
+[Production Deployment — Design: Orchestration](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 
 ### Cost summary
 

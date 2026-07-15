@@ -379,7 +379,7 @@ technologies:
 
 This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
 the task definition describing how to run them. Why the compute is split this way is the
-[orchestration design](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
+[orchestration design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm).
 
 Two AWS terms do a lot of work in this step, so it's worth being precise about how they relate.
 **ECS** (Elastic Container Service) is AWS's container orchestrator: it takes a **task definition**
@@ -484,7 +484,7 @@ One small always-on EC2 instance runs the Dagster daemon (schedules, sensors, ru
 the Dagster webserver (the UI), the code-location server, and Postgres (run/event/schedule
 history) — everything except the actual forecast compute, which stays on ephemeral Fargate.
 Why an always-on box at all, and why this shape, is the
-[orchestration decision](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge);
+[orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
 the sizing and cost are the roadmap's
 [accepted option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).
 
