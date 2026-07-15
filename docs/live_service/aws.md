@@ -1132,6 +1132,20 @@ docker compose ps            # all four services should be Up
 docker compose logs -f daemon    # watch it start its schedule/sensor loops
 ```
 
+> **Expected on a cold start: one `Could not reach user code server` warning.** The first daemon
+> log lines often include a `UserWarning: Error loading repository location
+> nged_substation_forecast` with a gRPC `UNAVAILABLE` / `Connection refused` traceback pointing at
+> the code-server's port 4266. This is a harmless startup race, not a failure. The daemon and
+> webserver `depends_on` the code-server, but plain Compose `depends_on` waits only for the
+> code-server *container to start*, not for its gRPC server to be *ready* — and the code-server
+> has to import the whole project (all code plus the baked-in champion model) before it binds
+> 4266, which takes several seconds. The daemon starts sooner, polls once too early, logs the
+> warning, and retries. You can confirm it self-healed a few seconds later: a
+> `Received LocationStateChangeEventType.LOCATION_UPDATED event for location
+> nged_substation_forecast, refreshing` line means the location loaded successfully. Only treat it
+> as a real problem if the UI (checked below) shows a *persistent* load error on the code
+> location, or the daemon keeps logging the failure with no `LOCATION_UPDATED` recovery.
+
 From your laptop, open **`http://nged-forecast-ctrl:3000`** (Tailscale MagicDNS; the raw
 Tailscale IP works too). This is safe without any login because of the network design: the
 webserver's port 3000 is published on the box's interfaces, but the security group allows no
