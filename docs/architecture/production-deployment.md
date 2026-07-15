@@ -201,7 +201,7 @@ Postgres — as a long-running ECS service on Fargate, instead of on an EC2 VM. 
 real: Fargate has no operating system for us to install or patch (AWS owns and maintains the
 hosts), so the one piece of self-maintained OS in the deployment would disappear.
 
-**Why we rejected it.** Four reasons:
+**Why we rejected it.** Five reasons:
 
 1. **Fargate's premium pays off exactly where this workload can't use it.** Fargate's
    per-second billing wins for compute that runs a few minutes per day — which is why the
@@ -211,13 +211,22 @@ hosts), so the one piece of self-maintained OS in the deployment would disappear
    Fargate and EC2 rates in the
    [region price table](forecast-delivery.md#securing-it)).
 
-2. **Postgres needs a disk that Fargate doesn't have.** A Fargate task has no persistent local
+2. **The box is planned to host more than the control plane.** The same VM is the intended
+   home of the MLflow tracking server and the Marimo dashboard — which is why the
+   [EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) counts
+   the VM as a cost that exists anyway. A VM absorbs each additional long-running service as
+   one more entry in the same `docker-compose.yml`, using headroom already paid for; as Fargate
+   services, each would be its own always-on task paying the premium above over again — and
+   MLflow brings its own persistence needs (its backend store and artifact root), running into
+   the disk problem below a second time.
+
+3. **Postgres needs a disk that Fargate doesn't have.** A Fargate task has no persistent local
    storage, so the Postgres container (run, event, and schedule history) could not come along.
    It would have to move to managed RDS — more cost, and one more AWS-specific service to
    recreate at handover — or onto EFS, a network filesystem that Postgres tolerates poorly. On
    the VM, Postgres's data is simply a Docker volume on the instance's own disk.
 
-3. **It trades a portable artifact for AWS-specific glue.** The control plane's deployment
+4. **It trades a portable artifact for AWS-specific glue.** The control plane's deployment
    description *is* its `docker-compose.yml`: the laptop and the cloud run the same artifact.
    As an ECS service, that description becomes task definitions, service configuration, and
    (per the previous point) RDS — the same AWS coupling that helped reject the
@@ -226,7 +235,7 @@ hosts), so the one piece of self-maintained OS in the deployment would disappear
    version of the same friction: on the VM, joining the tailnet is one `tailscale up`, whereas
    a Fargate service needs a Tailscale sidecar container with its own state management.
 
-4. **The benefit is smaller than it looks.** The OS burden Fargate would remove is one Ubuntu
+5. **The benefit is smaller than it looks.** The OS burden Fargate would remove is one Ubuntu
    box that patches itself (`unattended-upgrades`), can be stopped for maintenance in any of
    the built-in 6-hourly maintenance windows
    ([above](#run-the-dagster-control-plane-continuously-on-one-small-vm)), and is slated for a
