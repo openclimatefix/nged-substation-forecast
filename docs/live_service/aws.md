@@ -377,8 +377,10 @@ technologies:
   chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
   installing software on it ([Step 12](#step-12-join-the-tailnet) and
   [Step 13](#step-13-install-docker-and-pull-the-image)) and keeping it patched (Ubuntu's
-  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)). That
-  maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
+  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)). (Running the
+  control plane on Fargate too would have removed even that OS burden — why we don't is covered
+  in [Considered but rejected designs](../architecture/production-deployment.md#an-always-on-fargate-service-for-the-control-plane).)
+  That maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
   every 6 hours, and NGED reads published forecasts straight from S3, so the gap between one
   forecast run and the next is a built-in maintenance window in which the box can be stopped,
   patched, and rebooted — see

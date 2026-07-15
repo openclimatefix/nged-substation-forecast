@@ -194,6 +194,46 @@ would fire any 6-hourly ticks missed while it slept.
 the web UI would be unavailable most of the time; and something else would still need to
 reliably wake the daemon — which reintroduces the scheduling problem one level up.
 
+### An always-on Fargate service for the control plane
+
+**The design.** Run the always-on control plane — daemon, webserver, code-location server, and
+Postgres — as a long-running ECS service on Fargate, instead of on an EC2 VM. The appeal is
+real: Fargate has no operating system for us to install or patch (AWS owns and maintains the
+hosts), so the one piece of self-maintained OS in the deployment would disappear.
+
+**Why we rejected it.** Four reasons:
+
+1. **Fargate's premium pays off exactly where this workload can't use it.** Fargate's
+   per-second billing wins for compute that runs a few minutes per day — which is why the
+   forecast worker runs there. For a box that runs 24/7, the same premium just compounds: at
+   `eu-west-2` on-demand rates, an always-on 2 vCPU / 4 GB Fargate service costs roughly
+   **2.4× the `t4g.medium` VM** it would replace (~\$66/month vs ~\$27/month, from the ARM
+   Fargate and EC2 rates in the
+   [region price table](forecast-delivery.md#securing-it)).
+
+2. **Postgres needs a disk that Fargate doesn't have.** A Fargate task has no persistent local
+   storage, so the Postgres container (run, event, and schedule history) could not come along.
+   It would have to move to managed RDS — more cost, and one more AWS-specific service to
+   recreate at handover — or onto EFS, a network filesystem that Postgres tolerates poorly. On
+   the VM, Postgres's data is simply a Docker volume on the instance's own disk.
+
+3. **It trades a portable artifact for AWS-specific glue.** The control plane's deployment
+   description *is* its `docker-compose.yml`: the laptop and the cloud run the same artifact.
+   As an ECS service, that description becomes task definitions, service configuration, and
+   (per the previous point) RDS — the same AWS coupling that helped reject the
+   [EventBridge design](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks), in both
+   its portability and its handover form. The Tailscale-based access design adds a quieter
+   version of the same friction: on the VM, joining the tailnet is one `tailscale up`, whereas
+   a Fargate service needs a Tailscale sidecar container with its own state management.
+
+4. **The benefit is smaller than it looks.** The OS burden Fargate would remove is one Ubuntu
+   box that patches itself (`unattended-upgrades`), can be stopped for maintenance in any of
+   the built-in 6-hourly maintenance windows
+   ([above](#run-the-dagster-control-plane-continuously-on-one-small-vm)), and is slated for a
+   tested rebuild-from-scratch script (see
+   [Handover: de-pet the control-plane box](../roadmap/handover.md#3-de-pet-the-control-plane-box))
+   so that the answer to a sick box is *destroy and recreate*, never *diagnose*.
+
 ### Fetching the champion model from MLflow at container startup
 
 **The design.** Host the MLflow artifact root on S3 and have each production container fetch
