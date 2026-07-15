@@ -7,6 +7,12 @@ Tailscale, and 6-hourly forecasts executing on ephemeral Fargate (AWS's serverle
 compute) tasks. When you finish this page, you open the Dagster UI from your laptop over
 Tailscale and watch forecasts land.
 
+You can point a coding agent (e.g. Claude Code) at this page and have it drive the console steps
+alongside you. It's also worth asking the agent to check your work as you go: after completing a
+step (or a run of steps), ask it to verify what you just did using the `aws` CLI — e.g. "check
+that I've completed all steps up to and including step 7" — rather than trusting a screenshot or
+your own memory of which button you clicked.
+
 This is one-time setup (per AWS environment). Day-to-day driving of the running service —
 promoting a champion, backfilling a missed slot, inspecting a forecast — lives in
 [Operating the live service](operations.md). What each `Settings` field means (the three storage
