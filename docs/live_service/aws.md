@@ -176,16 +176,31 @@ documents every choice it makes and is the source of truth for the mechanics.
 ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just built
 gets pushed so AWS compute can pull it. In the [AWS
 console](https://eu-west-2.console.aws.amazon.com) →
-**[ECR](https://eu-west-2.console.aws.amazon.com/ecr)** → **Create repository** (same `eu-west-2`
-region as the S3 buckets in [Step 1](#step-1-create-the-s3-buckets)):
+**[ECR](https://eu-west-2.console.aws.amazon.com/ecr)** → **Create repository** → private (same
+`eu-west-2` region as the S3 buckets in [Step 1](#step-1-create-the-s3-buckets)):
 
-1. **Visibility** Private.
-2. **Name** `nged-forecast` (matches the local image tag `nged-forecast:<tag>` from
-   [Step 4](#step-4-build-and-verify-the-image), keeping it and the ECR URI consistent).
-3. **Scan on push** on — free vulnerability scanning, no reason not to.
-4. Leave tag immutability off; image tags here are already unique per promoted model (the
-   run id's short prefix from [Step 4](#step-4-build-and-verify-the-image)), so nothing relies
-   on retagging.
+1. **Repository name**: `nged-forecast`, with **no namespace prefix**. The scripts hard-code this
+   exact flat name — `scripts/push_and_deploy_image.sh` derives the remote URI as
+   `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` — and it matches the local
+   image tag `nged-forecast:<tag>` from [Step 4](#step-4-build-and-verify-the-image). A namespace
+   is only an optional `prefix/` for grouping many repositories; adding one would break that
+   derived URI.
+2. **Image tag mutability**: leave at **Mutable** (the default), and leave **Mutable tag
+   exclusions** empty. Image tags here are already unique per promoted model (the run id's short
+   prefix from [Step 4](#step-4-build-and-verify-the-image)), so nothing relies on retagging —
+   but nothing needs immutability enforced, either.
+3. **Encryption settings**: leave at **AES-256** (the default). The console warns this can't be
+   changed after creation, which is fine — the app has no KMS requirement, for the same reason
+   the S3 buckets in [Step 1](#step-1-create-the-s3-buckets) stay on SSE-S3.
+4. **Image scanning settings**: leave the **Scan on push** toggle **off**. The console marks this
+   per-repository setting deprecated — scanning is now configured once at the *registry* level,
+   which is done right after creating the repository (next step below).
+5. Click **Create**, then turn on registry-level scanning so every push still gets free
+   vulnerability scanning: **ECR** → **Private registry** → **Settings** → **Scanning
+   configuration** → keep the scan type at **Basic** (free; **Enhanced** hands scanning to Amazon
+   Inspector, which costs money) → add a **scan on push** filter of `*` (or `nged-forecast`).
+   This is a one-time registry setting, so it also covers any repository created later under a
+   matching filter.
 
 ## Step 6 — Push the image to ECR
 
