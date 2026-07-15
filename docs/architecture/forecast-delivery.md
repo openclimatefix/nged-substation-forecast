@@ -355,7 +355,12 @@ Choosing Delta Lake over a bespoke REST API removes an entire service from the p
 - no authentication microservice or token lifecycle to manage;
 - no client SDK for NGED to install and for us to maintain;
 - availability is S3's SLA, not something we are on call for: The on-call engineer _only_ has to
-  check the forecast has run at 00, 06, 12, and 18 hours. They aren't _constantly_ on call.
+  check the forecast has run at 00, 06, 12, and 18 hours. They aren't _constantly_ on call;
+- no maintenance windows to negotiate with NGED: because NGED reads forecasts from S3 rather
+  than from any OCF-run service, and new forecasts land only every 6 hours, the gap between one
+  forecast run and the next is a built-in maintenance window — OCF compute can be stopped,
+  patched, or rebuilt between runs without interrupting NGED's reads (see
+  [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design)).
 
 For a small team whose mission is forecast quality, that's a lot of engineering effort we get
 to spend on the forecasts themselves instead.

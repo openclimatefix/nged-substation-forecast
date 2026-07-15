@@ -36,6 +36,14 @@ The design accepts two trade-offs:
 - **No run-level auto-retry after a hard crash.** Accepted; covered by the existing
   replay/backfill mode for missed slots plus the missed-check-in alarm.
 
+"Always-on" is also less demanding than it sounds, because the box comes with **built-in
+maintenance windows**: forecasts are produced only every 6 hours, and NGED reads published
+forecasts directly from S3 (see [Forecast Delivery](forecast-delivery.md)), so the gap between
+one forecast run and the next is a regular window in which the VM can be stopped, patched, or
+rebuilt without NGED noticing — and even an overrun costs only a single slot, recoverable via
+replay-mode backfill. See
+[Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
+
 Several other orchestration shapes were considered and rejected — see
 [Considered but rejected designs](#considered-but-rejected-designs).
 

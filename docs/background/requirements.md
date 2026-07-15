@@ -79,6 +79,14 @@ Missed forecasts are also not lost for evaluation purposes: once the service is 
 slots are backfilled in replay mode, reconstructing what would have been forecast at the time —
 see [Operating the live service: Backfilling a missed slot](../live_service/operations.md#backfilling-a-missed-slot).
 
+The same properties give the service **built-in maintenance windows**. New forecasts are
+produced only once every 6 hours, and NGED reads published forecasts directly from S3 rather
+than from any OCF-run service — so the gap between one forecast run and the next is a regular,
+roughly six-hour window in which OCF can stop, patch, upgrade, or even rebuild its compute
+(most notably the always-on control-plane VM) without NGED noticing. No downtime needs to be
+negotiated or announced, and even a maintenance overrun costs only a missed slot, recovered by
+the replay-mode backfill above.
+
 This requirement shapes the architecture: it is why a single always-on control-plane VM is an
 acceptable single point of failure (see
 [Production Deployment — Design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)),

@@ -377,7 +377,12 @@ technologies:
   chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
   installing software on it ([Step 12](#step-12-join-the-tailnet) and
   [Step 13](#step-13-install-docker-and-pull-the-image)) and keeping it patched (Ubuntu's
-  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)).
+  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)). That
+  maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
+  every 6 hours, and NGED reads published forecasts straight from S3, so the gap between one
+  forecast run and the next is a built-in maintenance window in which the box can be stopped,
+  patched, and rebooted — see
+  [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
 - The **ephemeral forecast worker** — each 6-hourly forecast run — runs as an **ECS task on
   Fargate**: a container that is created for one run and destroyed when it exits. The control
   plane *dispatches* these tasks but never executes a forecast itself. Here there is **no
