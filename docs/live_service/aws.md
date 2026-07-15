@@ -974,7 +974,9 @@ services:
     image: ${IMAGE}
     restart: always
     entrypoint: ["dagster-webserver"]   # separate binary, NOT a `dagster` subcommand
-    command: ["-h", "0.0.0.0", "-p", "3000", "-w", "workspace.yaml"]
+    # --db-pool-max-overflow lifts the Postgres pool ceiling above its default of 20; see note below
+    command:
+      ["-h", "0.0.0.0", "-p", "3000", "-w", "workspace.yaml", "--db-pool-max-overflow", "40"]
     working_dir: /opt/dagster/dagster_home
     ports:
       - "3000:3000"
@@ -1011,6 +1013,18 @@ no such fallback — so without this the daemon's `EcsRunLauncher` fails the mom
 a run, with `botocore.exceptions.NoRegionError: You must specify a region`, and the box's other
 boto3 calls (S3) would fail the same way. The Fargate run workers don't need it: a task reads its
 region from the ECS task metadata automatically, so this gap is box-only.
+
+**`--db-pool-max-overflow 40` on the webserver** raises its Postgres connection-pool ceiling. Every
+`dagster-postgres` storage hard-codes `pool_size: 1`, and the webserver's overflow defaults to 20 —
+a 21-connection ceiling. The UI's live asset-status poll (`AssetGraphLiveQuery`) fans out one
+connection per asset node across a threadpool, and on this small box those queries hold their
+connections long enough (Postgres shares 2 vCPU / 4 GiB with the daemon, webserver, and code-server)
+that concurrent polling drains the pool. When it does, connection checkouts wait 30 s, time out, and
+the GraphQL query dies with `too many retries for DB connection` /
+`QueuePool limit of size 1 overflow 20 reached`. Lifting the overflow to 40 (41 connections) clears
+it with headroom, still well under `postgres:17`'s default `max_connections` of 100 — leaving room
+for the daemon, code-server, and the Fargate run workers that also connect back. Only the webserver
+takes this flag; the daemon and code-server don't run the live query, so they don't need it.
 
 `~/nged-forecast/dagster_home/workspace.yaml` — tells the webserver and daemon where user code
 lives (only ever read on the box, so the compose-network hostname is fine here):
