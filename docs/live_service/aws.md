@@ -225,15 +225,15 @@ script header documents every choice it makes and is the source of truth for the
 
 ## Step 7 — IAM roles for the Fargate task
 
-Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches
-and supervises containers), and they need **two** separate IAM roles, not one — they serve
-different principals. Both roles are created with the same console flow — **IAM** → **Roles** →
-**Create role** → trusted entity type **AWS service** → under **Use case**, search for and pick
-**Elastic Container Service**, then select the **Elastic Container Service Task** radio button
-(the *Task* variant is what puts `ecs-tasks.amazonaws.com` in the role's trust policy, so that
-ECS tasks can assume the role) → **Next**. As with [Step 2](#step-2-grant-data-access-with-iam),
-IAM is global, so there's no region selector to worry about. From the **Add permissions** page
-onwards the two roles diverge:
+Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches and
+supervises containers), and they need **two** separate IAM roles, not one — they serve different
+principals. Both roles are created with the same console flow — [**IAM** → **Roles** → **Create
+role**](https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles/create) → trusted
+entity type **AWS service** → under **Use case**, search for and pick **Elastic Container Service**,
+then select the **Elastic Container Service Task** radio button (the *Task* variant is what puts
+`ecs-tasks.amazonaws.com` in the role's trust policy, so that ECS tasks can assume the role) →
+**Next**. As with [Step 2](#step-2-grant-data-access-with-iam), IAM is global, so there's no region
+selector to worry about. From the **Add permissions** page onwards the two roles diverge:
 
 - **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
   before your code ever runs: pulling the image from ECR, shipping container output to
@@ -248,9 +248,9 @@ onwards the two roles diverge:
     them, not the task role, because the ECS agent resolves secrets before the container
     starts. Open the role you just created → **Permissions** tab → **Add permissions** →
     **Create inline policy** → switch to the **JSON** editor → paste the JSON below, replacing
-    `<account-id>` with your 12-digit AWS account id (shown in the account menu at the top
-    right of the console, or from `aws sts get-caller-identity`) → **Next** → name it (e.g.
-    `nged-forecast-read-ssm-parameters`) → **Create policy**:
+    `<account-id>` with your 12-digit AWS account id (shown in the account menu at the top right of
+    the console, or run this locally: `aws sts get-caller-identity | grep Account`) → **Next** →
+    name it (e.g. `nged-forecast-read-ssm-parameters`) → **Create policy**:
 
     ```json
     {
