@@ -1,21 +1,28 @@
 # Live service (v0.1 AWS deployment)
 
-> **Status: 🚧 Planned — the current focus.** Epic:
-> [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) (deploy the
-> naive forecast on AWS); see also
-> [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) and
-> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208). **Build order**
-> (matches #137's sub-issue order): the
-> [inference asset](#the-live_forecasts-asset) (#221, done) → the
-> [local dress rehearsal](#deployment-workstream-1-the-production-job-local-dress-rehearsal)
-> (#208, done) → S3-capable data paths (#121, #50, done)
-> → the [champion-model container](#production-model-artifacts) (#222, done) → the
-> [AWS infrastructure](#aws-architecture) (#206) → smaller cleanup (#197, #63, #246) →
-> [the v0.1 version bump](#related-github-issues) (#209).
-> [Production monitoring](#production-monitoring) (#224) is tracked separately and deferred
-> past v0.1. Forecast *quality* deliberately does not matter yet — the science work
-> ([baselines](metrics-and-leaderboard.md#baseline-forecasters),
-> [XGBoost improvements](xgboost-improvements.md)) waits until v0.1 is live.
+> **Status: ✅ v0.1 shipped (July 2026, `v0.1.0`) — the naive forecast is deployed and running
+> on AWS.** Epic [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137)
+> is closed. The shipped design now lives in
+> [Production Deployment — Design](../architecture/production-deployment.md) (the orchestration
+> and champion-model decisions), and the step-by-step operational recipes in the
+> [live-service runbooks](../live_service/index.md) (promotion, AWS bring-up, day-to-day
+> operation).
+>
+> This page is **not** retired yet: it remains the home of the post-v0.1 work still tracked as
+> open issues — [production monitoring](#production-monitoring)
+> ([#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)), the
+> [access-phasing](#access-phasing) Stages 2–3
+> ([#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328),
+> [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/329)),
+> infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)),
+> the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), and the
+> MLflow-server / dev-dashboard future work
+> ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
+> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)) — plus the
+> durable record of the costed [AWS-architecture decision](#aws-architecture) behind the
+> deployment. It is retired in full once production monitoring lands and its design is promoted,
+> per the ship-time triage tracked in
+> [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup).
 
 *History: the inference-asset and monitoring designs were absorbed from the Dagster ML-assets
 plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives in
@@ -81,9 +88,7 @@ Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > the operational runbook — promoting a model, running the schedule, backfilling a missed slot —
 > is [Operating the live service](../live_service/operations.md), the permanent home
 > this page's shipped material moves to (and, eventually, this whole page, once every section
-> below has landed). Remaining work on this page — the
-> [container build](#production-model-artifacts) and [AWS infrastructure](#aws-architecture) — is
-> unaffected.
+> below has landed).
 
 ## Production model artifacts
 
@@ -94,12 +99,17 @@ Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > [Production Deployment — Design](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/);
 > the promotion/build/verify runbook lives at
 > [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/).
-> Remaining work on this page — the [AWS infrastructure](#aws-architecture) itself — is
-> unaffected.
 
 ## AWS architecture
 
-Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206)
+Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/206) (done)
+
+> **Status: ✅ Built and running (`v0.1.0`).** The accepted option below is deployed on AWS; the
+> bring-up is documented in
+> [Setting up the live service on AWS](../live_service/aws.md). The costed comparison and the
+> rejected alternatives are kept below as the durable record of the decision. The
+> [access-phasing](#access-phasing) Stages 2–3 and the future-work items (MLflow server, dev
+> dashboard) remain post-v0.1.
 
 An earlier version of this plan committed to the Level 1 ("nothing always-on") design from
 issue #206. A
@@ -522,79 +532,59 @@ free. No coupling needed; the ordering is flexible.
 
 ### Deployment workstream 1 — the production job (local dress rehearsal)
 
-Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)
+Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) (done)
 
-> **Status: ✅ Done** (closed 2026-07-10). It shipped differently than the original sketch
-> below: no hand-rolled freshness op or one-shot `live_pipeline_job` was built. The native
-> per-asset Dagster schedules that ship with
-> [The `live_forecasts` asset](#the-live_forecasts-asset)
+> **Status: ✅ Done** (closed 2026-07-10). It shipped differently than originally sketched: no
+> hand-rolled freshness op or one-shot `live_pipeline_job` was built. The native per-asset
+> Dagster schedules that ship with [The `live_forecasts` asset](#the-live_forecasts-asset)
 > (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, `live_forecasts_schedule`)
 > did the whole job: run under `dg dev` with a persistent `DAGSTER_HOME` for several days,
-> confirmed 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable
-> in replay mode. The one-shot-job design kept below is **not needed under the accepted option**
-> (the daemon-driven schedules above already cover it) — it remains relevant only if
-> [Option A](#option-a-level-1-nothing-always-on-1222month) is chosen for the AWS deployment
-> instead, since Option A has no daemon to hold schedules on.
-
-Ordered first to match the #137 sub-issue order: unlike the other two workstreams, this one
-needed no S3, Docker, or AWS account at all, so it ran against the laptop's local Delta tables.
-
-**If Option A were chosen instead** (it was not — see [AWS architecture](#aws-architecture)), it
-would still need a new Dagster job (e.g. `live_pipeline_job`) chaining, in order:
-
-1. **Freshness op** — latest Dynamical init vs latest forecast's NWP init in S3; early-exit.
-2. **Ingest** — materialise `power_time_series_and_metadata`, and the missing `ecmwf_ens`
-   daily partitions **computed from the Delta table's max `init_time` vs Dynamical
-   availability** (an explicit op input).
-3. **Forecast** — `live_forecasts` for the current slot, `availability_mode="live"`.
-4. *(after monitoring lands)* — the `metrics(production_monitoring)` step; not a blocker.
-
-Keep each op a thin shell over unit-tested pure helpers (freshness comparison, missing-
-partition computation). Under **A**, the job is the hourly one-shot and the wrapper computes
-the current time-window partition key from the clock (injected `now`, per repo convention).
-Under **the accepted option, C, or D**, the daemon runs it instead — the freshness decision
-moves up into a schedule/sensor evaluation (return a `SkipReason` when nothing is new;
-evaluations are free), partition keys come from Dagster natively, and missed slots are
-backfilled from the UI with `availability_mode="replay"` — exactly what shipped for the local
-dress rehearsal above.
+> confirming 6-hourly forecasts landing with no duplicate rows and a missed slot backfillable in
+> replay mode. The one-shot `live_pipeline_job` that [Option A](#considered-but-rejected) would
+> have needed (Option A has no daemon to hold schedules) was never required, and is not
+> reproduced here now that Option A is rejected.
 
 ### Deployment workstream 3 — AWS infrastructure
 
-> **Status: partially done.** The pieces common to every architecture option — ECR, IAM task
-> roles, and a Fargate task definition, all set up by hand in the AWS console, plus a manual
-> `RunTask` to verify the whole path end-to-end — are ✅ implemented; see
-> [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-5-create-the-ecr-repository)
-> (steps 5–10). The accepted option's specific pieces below (the always-on EC2 box,
-> `EcsRunLauncher`, scheduling, Tailscale) now have their full bring-up runbook written —
-> [steps 11–16 of the same page](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-11-launch-the-control-plane-box)
-> — and executing it is in progress; infra-as-code is still 🚧, tracked as
-> [#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326).
+> **Status: ✅ v0.1 infrastructure built and running.** ECR, the two IAM roles, the Fargate
+> task definition, the always-on EC2 control-plane box (`EcsRunLauncher`, Postgres-in-Docker,
+> schedules, Tailscale, Marimo), and S3 are all stood up by hand and documented step-by-step in
+> [Setting up the live service on AWS](../live_service/aws.md). The items further down are what
+> remains 🚧 after v0.1.
 
-Common to all options:
+Built for v0.1 (see the [runbook](../live_service/aws.md) for the exact console steps):
 
-- ✅ **ECR** repository; image pushed by hand for now (tag = model run-id + git SHA) — a CI
-  container build is a later, infra-as-code-era step.
-- ✅ **S3**: one data bucket mirroring the local `data/` layout (`nwp_data/`,
-  `power_forecasts/`, …) — see [Setting up the live service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets).
-  NGED-delivery bucket/prefix is a later step (v0.1 is "forecast running", not "delivery
+- **ECR** repository; image pushed by hand (tag = model run-id + git SHA) — a CI container build
+  is a later, infra-as-code-era step.
+- **S3** data bucket mirroring the local `data/` layout (`nwp_data/`, `power_forecasts/`, …).
+  The NGED-delivery bucket/prefix is a later step (v0.1 is "forecast running", not "delivery
   contract live").
-- ✅ **IAM roles**: turned out to be **two** roles, not one — a task *execution* role
-  (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role (the S3
-  read/write policy from `setup.md`) — see
-  [Setting up the live service on AWS: Step 7](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-7-iam-roles-for-the-fargate-task)
-  for why they're split. No static AWS keys anywhere.
-- ✅ **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak
-  ~9 GB). 🚧 A bigger (e.g. 8 vCPU / 32 GB) definition for backtests is not yet built.
-  Right-size the live definition after a week of CloudWatch metrics.
-- 🚧 **Alerting**: basic per-task failure alerting (a failed run → email). Decided 2026-07-14:
-  prefer **portable alerting logic over AWS-native glue** (no EventBridge rules) — the checks
-  should be plain code that runs end-to-end on a laptop or any cloud, with only the thin
-  notification edge (SNS, SMTP, …) being platform-specific. Under the accepted option, Dagster's
-  own run-failure sensors are the natural portable mechanism (the daemon evaluates them). Per-task
-  failure alerts are necessary but not sufficient — the
-  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) catches the
-  silent-failure classes they miss.
-- 🚧 Codify as infra-as-code
+- **Two IAM roles**, not one — a task *execution* role
+  (`AmazonECSTaskExecutionRolePolicy`: ECR pull + CloudWatch Logs) and a task role carrying the
+  S3 read/write policy. No static AWS keys anywhere.
+- **Fargate task definition**: 4 vCPU / 16 GB ARM for live runs (measured inference peak ~9 GB).
+- **EC2 `t4g.medium` control-plane box** (IAM instance role; ~20 GB gp3 EBS) running the Dagster
+  daemon, webserver, code-location server, Postgres (run/event/schedule storage, `pg_dump` to S3
+  nightly), and the Marimo dashboard under Docker Compose, dispatching every run to Fargate via
+  `EcsRunLauncher` (`dagster.yaml` also carries the `pool="ECMWF"` concurrency limit, now
+  enforced centrally). The 6-hourly `live_forecasts` schedule and `ecmwf_ens` daily-partition
+  automation run on the daemon (freshness via `SkipReason`); `restart: always` +
+  unattended-upgrades keep the box up. Reached over Tailscale — no public ingress.
+
+Still 🚧 after v0.1:
+
+- **A bigger backtest task definition** (e.g. 8 vCPU / 32 GB) — the live 4 vCPU / 16 GB
+  definition exists; right-size it after a week of CloudWatch metrics.
+- **Alerting** ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)):
+  basic per-task failure alerting (a failed run → email). Decided 2026-07-14: prefer **portable
+  alerting logic over AWS-native glue** (no EventBridge rules) — the checks should be plain code
+  that runs end-to-end on a laptop or any cloud, with only the thin notification edge (SNS,
+  SMTP, …) being platform-specific. Under the accepted option, Dagster's own run-failure sensors
+  are the natural portable mechanism (the daemon evaluates them); an EC2 instance-status-check
+  alarm and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) cover the
+  silent-failure classes ("daemon silently dead") that per-task alerts miss. The
+  SNS-subscription-confirm step joins the [runbook](../live_service/aws.md) once this lands.
+- **Infra-as-code**
   ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) once there's
   enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
@@ -609,25 +599,6 @@ Common to all options:
   network assumptions baked in), and what NGED's infrastructure teams already know and are
   allowed to run matters as much as what suits OCF — worth asking them before deciding. By
   handover time, infra-as-code is mandatory, not optional.
-- ✅ Document the one-time manual bring-up steps (EC2 launch, Tailscale join, Docker Compose,
-  schedules on) — written as
-  [Setting up the live service on AWS: Steps 11–16](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-11-launch-the-control-plane-box).
-  🚧 The SNS-subscription-confirm step joins that page once alerting (above) is built.
-
-The accepted option adds (instead of Option A's hourly EventBridge Scheduler → `RunTask` cron):
-
-- **EC2 `t4g.medium`** (IAM instance role; EBS gp3 ~20 GB) running Docker Compose:
-  `dagster-daemon`, `dagster-webserver`, the code-location server (same image as the runs),
-  Postgres (run/event/schedule storage on the local volume, `pg_dump` to S3 nightly), and the
-  Marimo dashboard. Tailscale for webserver/dashboard access — no public ingress.
-- **`dagster.yaml`**: Postgres storage + `EcsRunLauncher` (cluster, task-definition family,
-  network config); the existing `pool="ECMWF"` concurrency limit now enforced centrally.
-- **Schedules/sensors**: the 6-hourly `live_forecasts` schedule and `ecmwf_ens`
-  daily-partition sensor replace the hourly external cron (freshness via `SkipReason`).
-- systemd unit (or Compose `restart: always`) + unattended-upgrades on the box; an EC2
-  instance-status-check alarm; the
-  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) covers "daemon
-  silently dead".
 
 ### Related GitHub issues
 
@@ -641,32 +612,15 @@ order issues were opened.
 | [#121 Use obstore instead of pathlib](https://github.com/openclimatefix/nged-substation-forecast/issues/121) | S3-capable data paths — done ([setup guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/)) |
 | [#50 Define all paths in Settings](https://github.com/openclimatefix/nged-substation-forecast/issues/50) | S3-capable data paths — done |
 | [#222 Build the production Docker image](https://github.com/openclimatefix/nged-substation-forecast/issues/222) | [Production model artifacts](#production-model-artifacts) — done ([promotion runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/)) |
-| [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis; the issue links back here) |
-| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — the option-agnostic pieces (ECR, IAM roles, Fargate task definition) done; the accepted option's control-plane box still 🚧 |
+| [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis) — done; deployed and running |
+| [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — done; the option-agnostic pieces and the control-plane box are all in the [AWS runbook](../live_service/aws.md). Infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is a separate 🚧 follow-up |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
 | [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring provides the planned [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), plus error telemetry |
-| [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not yet detailed on this page — decided 2026-07-03 (see the issue for the full worklist); slot in before the version bump below |
+| [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not detailed on this page — decided 2026-07-03 (see the issue for the full worklist); an open follow-up, not required for v0.1 |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |
 | [#5 Backup procedure for data & models on Jack's workstation](https://github.com/openclimatefix/nged-substation-forecast/issues/5) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)); largely superseded once S3 is the primary store |
-| [#209 Bump version number to v0.1](https://github.com/openclimatefix/nged-substation-forecast/issues/209) | The final ship step |
-
-### Deployment verification
-
-1. **Local dress rehearsal**: run the container against the real S3 bucket from a laptop
-   (`docker run` with the task role's permissions via assumed credentials); confirm a forecast
-   lands in `power_forecasts` on S3 and the next run early-exits on freshness.
-2. **On AWS**: (A) manual `RunTask` / (B) "Materialize" from the webserver — watch the run
-   launch a Fargate task, follow CloudWatch Logs end-to-end, confirm forecast rows.
-3. **Self-healing**: kill a run mid-flight; confirm the next scheduled tick (A) or a one-click
-   UI backfill of the missed partition (B) redoes the work with no duplicate rows (Delta
-   overwrite semantics).
-4. **Accepted-option extras**: reboot the box → daemon, webserver, Postgres, and Marimo all come back
-   unattended; launch a backtest from the UI → it runs on the big Fargate task definition;
-   Marimo dashboard shows the latest live forecasts over Tailscale.
-5. **Alerting**: force a failure (bad env var), confirm the SNS email.
-6. Leave it running for several days; check forecasts appear after each daily 00Z NWP and
-   costs match the model above (Cost Explorer).
+| [#209 Bump version number to v0.1](https://github.com/openclimatefix/nged-substation-forecast/issues/209) | The final ship step — done (`v0.1.0` tagged July 2026) |
 
 ### Monitoring — tests and verification
 
