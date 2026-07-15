@@ -250,10 +250,21 @@ the champion model from it at startup, instead of
 [baking the model into the image](#bake-the-model-into-the-image-at-build-time).
 
 **Why we rejected it.** It adds runtime moving parts, needs tracking-store access from
-production, and slows cold starts — baking the model in has none of those costs. The idea may
-still return in a stronger form: the **future work** note in the baking section describes
-fetching the champion dynamically once redeploys become frequent, with `load_from_mlflow`'s
-local-disk cache as the production-resilience mechanism.
+production, and slows cold starts — baking the model in has none of those costs. The rejection
+gets stronger under the preferred post-NIA operating model, in which NGED run this code
+themselves (see
+[Requirements → Operating model & handover](../background/requirements.md#operating-model-handover)):
+with the model baked in, NGED never has to run — or depend on — an MLflow tracking server at
+all, and the model simply freezes until a new image arrives. (OCF may well continue developing
+the model post-NIA and release new container images for NGED to test, but that arrangement is
+TBD — and either way it only changes which *image* NGED runs, never whether their production
+runtime needs MLflow.)
+
+The idea may still return in a stronger form: the **future work** note at the end of
+[Bake the model into the image at build time](#bake-the-model-into-the-image-at-build-time) —
+the section describing the accepted design this one lost to — describes fetching the champion
+dynamically once redeploys become frequent, with `load_from_mlflow`'s local-disk cache as the
+production-resilience mechanism.
 
 ## See also
 
