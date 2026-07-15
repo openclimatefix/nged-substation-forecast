@@ -25,7 +25,8 @@ bake the model in at build time, an always-on control plane rather than EventBri
 > (Terraform, or CDK — AWS's Cloud Development Kit) yet.
 > That's deliberate: this is Stage 1 ("solo, Tailscale only") of the
 > [access-phasing plan](../roadmap/live-service.md#access-phasing), and infrastructure-as-code
-> is scheduled to start at Stage 2, when team access adds enough moving parts to justify it.
+> ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is scheduled
+> to start at Stage 2, when team access adds enough moving parts to justify it.
 > Alerting (per-task failure emails, the missed-check-in alarm) is also still to come — see
 > [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 

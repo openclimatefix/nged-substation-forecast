@@ -132,8 +132,9 @@ build order:
 ### 4. Infrastructure-as-code, portable to NGED's account
 
 The live-service plan already defers infra-as-code to
-[Access-phasing Stage 2](live-service.md#access-phasing) — that sequencing stands. What the
-handover requirement adds:
+[Access-phasing Stage 2](live-service.md#access-phasing) — that sequencing stands, and the work
+is tracked as [#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326).
+What the handover requirement adds:
 
 - **By handover time, IaC is mandatory, not optional.** The rebuild-from-scratch runbook
   (workstream 3) and the deployment into NGED's account (workstream 5) both depend on it.
