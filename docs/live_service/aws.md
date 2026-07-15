@@ -1062,7 +1062,7 @@ python_logs:
   python_log_level: DEBUG
 ```
 
-Two things in `dagster.yaml` deserve explanation:
+Three things in `dagster.yaml` deserve explanation:
 
 - **The Postgres hostname is the box's VPC private IP** — the `172.31.x.x` address on its primary
   network interface (it matches the box's `ip-172-31-…` hostname), *not* the compose service name
@@ -1084,6 +1084,27 @@ Two things in `dagster.yaml` deserve explanation:
     IP is reachable both from Fargate (same VPC) and from the box's own containers (via the
     published port). A private IPv4 persists across stop/start — it only changes if the instance is
     terminated and replaced, at which point this file needs the new IP.
+
+- **`<subnet-id>` and `<sg-id>` in the run launcher** are the public subnet and security group the
+  Fargate run workers launch into — the same pair
+  [Step 10](#step-10-verify-run-a-forecast-task-manually)'s manual `run-task` used: the
+  `nged-forecast-task-sg` group, and any public subnet in the default VPC. Read them off the
+  console (**EC2 → Security Groups →** `nged-forecast-task-sg` for the group id; **VPC → Subnets**
+  for a subnet id), or from the CLI:
+
+    ```bash
+    # <sg-id> — the Fargate task security group
+    aws ec2 describe-security-groups --region eu-west-2 \
+      --filters Name=group-name,Values=nged-forecast-task-sg \
+      --query 'SecurityGroups[0].GroupId' --output text
+
+    # <subnet-id> — any public subnet in the default VPC (all default-VPC subnets are public)
+    aws ec2 describe-subnets --region eu-west-2 \
+      --filters Name=default-for-az,Values=true \
+      --query 'Subnets[].[SubnetId,AvailabilityZone]' --output table
+    ```
+
+    The same `<sg-id>` is used twice: here, and as the source of the Postgres inbound rule below.
 
 - Because the run workers connect in, **add the one inbound security-group rule now**: EC2 →
   `nged-forecast-ctrl-sg` → edit inbound rules → allow **PostgreSQL (TCP 5432)** with source =
