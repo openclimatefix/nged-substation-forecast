@@ -625,13 +625,14 @@ data has been ingested yet:
 
 ## Step 11 — Launch the control-plane box
 
-One small always-on EC2 instance runs the Dagster daemon (schedules, sensors, run dispatch),
-the Dagster webserver (the UI), the code-location server, and Postgres (run/event/schedule
-history) — everything except the actual forecast compute, which stays on ephemeral Fargate.
-Why an always-on box at all, and why this shape, is the
-[orchestration decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
-the sizing and cost are the roadmap's
-[accepted option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).
+We will now set up one small always-on EC2 instance to run the Dagster daemon (schedules, sensors,
+run dispatch), the Dagster webserver (the UI), the code-location server, and Postgres
+(run/event/schedule history) — everything except the actual forecast compute and data fetching jobs,
+which stay on ephemeral Fargate. (To read about why we're using an always-on box, and why this
+shape, see the [orchestration
+decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
+the sizing and cost are the roadmap's [accepted
+option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).)
 
 First create its IAM role: **IAM** → **Roles** → **Create role** → trusted entity **AWS service
 / EC2** → attach `nged-forecast-read-and-write` ([Step 2](#step-2-grant-data-access-with-iam))
