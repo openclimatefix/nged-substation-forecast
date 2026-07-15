@@ -35,10 +35,9 @@ a standing design requirement for everything we build:
   reduced to a dashboard check, a button in the Dagster UI, or a runbook. See
   [Handover to NGED](../roadmap/handover.md) for the engineering consequences and the handover
   workstreams.
-* **Uptime requirements are deliberately lenient.** Nothing very bad happens if the service
-  misses a day: NGED can always read the previous forecasts from S3, and each forecast extends
-  14 days ahead. We still aim for a highly robust service, but recovery is "next business day,
-  via runbook", never a 2am page.
+* **Uptime requirements are deliberately lenient** — recovery is "next business day, via
+  runbook", never a 2am page. See [Uptime: lenient by design](#uptime-lenient-by-design) below
+  for exactly why an outage costs so little.
 
 The phasing:
 
@@ -56,6 +55,36 @@ to develop the code and ML models, and perhaps runs a second service instance of
 adapted for other DNOs, or feeding OCF's substation forecasts into a commercial demand-forecast
 product). This makes account-portable infrastructure doubly valuable — see
 [Handover to NGED](../roadmap/handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
+
+## Uptime: lenient by design
+
+Flexpectation carries **no hard availability target**. We aim for a highly robust service, but
+the requirement when something breaks is recovery "next business day, via runbook" — never a
+2am page, and no on-call rota. This leniency is a property of how NGED consumes the forecasts,
+not an aspiration; three things bound the damage of an outage:
+
+1. **Every forecast extends 14 days ahead**, refreshed every 6 hours, and users mostly act on
+   the forecast roughly 1 to 10 days ahead (see [Core Objectives](#core-objectives)). If the
+   service stops producing new forecasts for a few hours — or even a day — the most recent
+   forecast remains useful; it merely ages, degrading skill gradually rather than cutting NGED
+   off.
+2. **Delivery is decoupled from compute.** Forecasts are delivered as Delta tables on S3 (see
+   [Forecast Delivery](#forecast-delivery) below), so every previously published forecast stays
+   readable even while all of OCF's compute is down — the read path never touches our
+   infrastructure.
+3. **A legacy fallback exists.** In the worst case, NGED can temporarily fall back to their
+   legacy forecasting approach while Flexpectation is fixed.
+
+Missed forecasts are also not lost for evaluation purposes: once the service is back, missed
+slots are backfilled in replay mode, reconstructing what would have been forecast at the time —
+see [Operating the live service: Backfilling a missed slot](../live_service/operations.md#backfilling-a-missed-slot).
+
+This requirement shapes the architecture: it is why a single always-on control-plane VM is an
+acceptable single point of failure (see
+[Production Deployment — Design](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)),
+and why the primary production alert is a
+[missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
+feeding a runbook rather than any paging or failover machinery.
 
 ## Forecast Delivery
 

@@ -465,7 +465,9 @@ only fire when something runs and fails. Whole classes of failure are silent: a 
 full disk, an expired credential, a schedule that stopped firing. The **primary** production
 alert is therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires
 when **no successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot
-plus margin), regardless of cause.
+plus margin), regardless of cause. An alert feeding a runbook — rather than paging or automatic
+failover — is a proportionate response because the project's
+[uptime requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design).
 The accepted option's "daemon silently dead" staleness alarm (mentioned under
 [the architecture options](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month))
 is this alarm; recording it here makes it a first-class monitoring deliverable rather than a

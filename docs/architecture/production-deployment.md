@@ -23,7 +23,10 @@ that only a daemon can: schedules, sensors, run monitoring, and declarative auto
 The design accepts two trade-offs:
 
 - **Single point of failure.** The daemon on one VM has no managed scheduler watching it; a
-  quiet box failure could silently miss slots. Mitigation: the
+  quiet box failure could silently miss slots. The blast radius is small, because the project's
+  [uptime requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design):
+  previously published forecasts stay readable from S3 and extend 14 days ahead, so a missed
+  slot degrades forecast freshness rather than cutting NGED off. Mitigation: the
   [missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
   — each successful 6-hourly run checks in with an external monitoring service (Sentry cron
   monitoring is the planned mechanism), and an alert fires when an expected check-in fails to
