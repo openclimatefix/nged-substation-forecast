@@ -752,11 +752,20 @@ Check the **Summary** panel on the right (it should read Ubuntu 26.04, `t4g.medi
 
 ## Step 12 — Join the tailnet
 
-SSH in once with the key pair (or use EC2 Instance Connect from the console), then install
-Tailscale and join the same tailnet your laptop is on:
+[Step 11](#step-11-launch-the-control-plane-box)'s security group has **no inbound rules**, so
+there is no way in yet: a plain `ssh` from your laptop *and* the console's browser **EC2 Instance
+Connect** both fail with *"Port 22 (SSH) is not authorized"*. Open **one temporary inbound rule**
+for this single bootstrap login, then delete it the moment Tailscale is up (from then on Tailscale
+dials out and the box needs no inbound SSH ever again).
+
+Add the rule scoped to your laptop's current public IP — **EC2** → **Security Groups** →
+`nged-forecast-ctrl-sg` → **Inbound rules** → **Edit inbound rules** → **Add rule**: **Type**
+`SSH`, **Source** **My IP** (the console fills in your laptop's `/32`) → **Save rules**. Then SSH
+in with [Step 11](#step-11-launch-the-control-plane-box)'s key pair and bring up Tailscale, joining
+the same tailnet your laptop is on:
 
 ```bash
-ssh -i <key.pem> ubuntu@<public-ip>
+ssh -i ~/.ssh/nged-forecast-ctrl.pem ubuntu@<public-ip>
 
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --ssh --hostname=nged-forecast-ctrl
@@ -771,7 +780,17 @@ tailscale ping nged-forecast-ctrl
 ssh ubuntu@nged-forecast-ctrl
 ```
 
-The security group's inbound rules stay empty — Tailscale establishes its connections outbound.
+Now **delete the temporary inbound rule** (**Edit inbound rules** → **Delete** → **Save rules**),
+returning `nged-forecast-ctrl-sg` to zero inbound rules — Tailscale establishes its connections
+outbound, so nothing else needs the port open. The only inbound rule the box ever keeps is the
+Postgres one added in [Step 14](#step-14-configure-dagster-on-the-box).
+
+> **Prefer never opening a public port, even briefly?** Two alternatives keep the group at zero
+> inbound rules throughout, at the cost of more setup: create an **EC2 Instance Connect Endpoint**
+> in the subnet and connect through it, or attach the AWS-managed `AmazonSSMManagedInstanceCore`
+> policy to `nged-forecast-ctrl-role` and use **SSM Session Manager** — a browser shell needing no
+> keys and no inbound ports (the Ubuntu AMI ships the SSM agent by default). For a single
+> bootstrap login the temporary rule above is the least work.
 
 ## Step 13 — Install Docker and pull the image
 
