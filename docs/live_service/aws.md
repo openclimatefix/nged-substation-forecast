@@ -158,6 +158,10 @@ that production inference has no MLflow dependency at runtime:
 scripts/build_and_verify_image.sh    # no arguments — everything is derived
 ```
 
+> Note that, during the smoke test, **Dagster is EXPECTED halt with the exception**
+> `_internal.TableNotFoundError: Local path
+"/app/.venv/data/NWP" does not exist or you don't have access!`. That is correct behaviour.
+
 The script builds the image tagged with the promoted model's run id, runs it offline, and prints
 the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded,
 arbitrary partition key — the offline run fails at the NWP lookup long before the slot's
