@@ -365,19 +365,31 @@ keep the old values until they next start, since injection happens once per cont
 
 ## Step 9 — Create the ECS cluster and Fargate task definition
 
+First, a reminder of the deployment's shape, because from this step onwards it matters which half
+of it you're building. The stack runs **two different kinds of compute**, on two different AWS
+technologies:
+
+- The **always-on control plane** — the Dagster daemon, webserver, code-location server, and
+  Postgres — runs on a plain **EC2 virtual machine** (EC2 is Elastic Compute Cloud), launched by
+  hand in [Step 11](#step-11-launch-the-control-plane-box) and managed with Docker Compose. ECS
+  and Fargate play no part in running it.
+- The **ephemeral forecast worker** — each 6-hourly forecast run — runs as an **ECS task on
+  Fargate**: a container that is created for one run and destroyed when it exits. The control
+  plane *dispatches* these tasks but never executes a forecast itself.
+
+This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
+the task definition describing how to run them. Why the compute is split this way is the
+[orchestration design](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge).
+
 Two AWS terms do a lot of work in this step, so it's worth being precise about how they relate.
 **ECS** (Elastic Container Service) is AWS's container orchestrator: it takes a **task definition**
 — a recipe naming the container image to run plus the CPU, memory, IAM roles, environment variables,
 and secrets to run it with — and launches and supervises containers from that recipe. **Fargate** is
 one of ECS's two "launch types" — the two ways of providing the compute the containers run on. The
-other launch type, ECS, places containers onto EC2 (Elastic Compute Cloud — AWS's virtual machines)
-instances that you provision and patch yourself. In contrast, with Fargate, AWS conjures right-sized
-compute for each task when it launches and tears it down when the task exits, billed by the second.
-We use ECS on Fargate so that each 6-hourly forecast run gets a fresh, ephemeral machine and nothing
-sits idle between runs — the ephemeral-worker half of the [orchestration
-design](../architecture/production-deployment.md#orchestration-an-always-on-dagster-control-plane-not-eventbridge)
-(the always-on half is the control-plane box of [Step 11](#step-11-launch-the-control-plane-box),
-which *dispatches* these tasks).
+other launch type (named "EC2") has ECS place containers onto EC2 instances that you provision and
+patch yourself. In contrast, with Fargate, AWS conjures right-sized compute for each task when it
+launches and tears it down when the task exits, billed by the second. We use ECS on Fargate so that
+each 6-hourly forecast run gets a fresh, ephemeral machine and nothing sits idle between runs.
 
 **Why create a "cluster" when nothing here auto-scales?** On the EC2 launch type, a cluster
 really is a fleet — the pool of instances that tasks get placed onto. On Fargate there are no
