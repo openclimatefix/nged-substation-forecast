@@ -260,6 +260,16 @@ the model post-NIA and release new container images for NGED to test, but that a
 TBD — and either way it only changes which *image* NGED runs, never whether their production
 runtime needs MLflow.)
 
+Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
+experimentation: training runs log their models, configs, and metrics to it, and the champion
+is *chosen* from an MLflow leaderboard (see
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-immutable-local-cache)
+for the design, and [ML experimentation](../ml_experimentation/index.md) for the day-to-day
+workflow). The boundary this rejection draws is between ML R&D and production: research uses
+MLflow constantly, while production's hot path never touches it. MLflow's job ends at the
+moment of promotion, when the chosen champion is copied out of the tracking store and baked
+into the image.
+
 The idea may still return in a stronger form: the **future work** note at the end of
 [Bake the model into the image at build time](#bake-the-model-into-the-image-at-build-time) —
 the section describing the accepted design this one lost to — describes fetching the champion
