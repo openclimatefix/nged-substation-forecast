@@ -860,6 +860,15 @@ aws ecr get-login-password --region eu-west-2 \
 docker pull <account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>
 ```
 
+**Note that you have to replace `<account-id>` (twice) and `<tag>`!** Run these on your laptop, not on the VM:
+
+- Get `<account-id>` by running `aws sts get-caller-identity --query Account --output text`
+- `<tag>` is the first 12 characters of the promoted model's MLflow run id. Step 6's script prints
+  the full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console,
+  or run `jq -r '.mlflow_run_id[:12]' data/production_model/promotion.json` on the machine that
+  built the image.
+
+
 No `aws configure` is needed — the instance role from
 [Step 11](#step-11-launch-the-control-plane-box) supplies credentials. The ECR login token
 expires after 12 hours, which is fine: image pulls here are a manual, per-deploy event, so just
