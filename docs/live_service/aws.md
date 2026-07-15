@@ -1106,11 +1106,14 @@ Three things in `dagster.yaml` deserve explanation:
 
     The same `<sg-id>` is used twice: here, and as the source of the Postgres inbound rule below.
 
-- Because the run workers connect in, **add the one inbound security-group rule now**: EC2 →
-  `nged-forecast-ctrl-sg` → edit inbound rules → allow **PostgreSQL (TCP 5432)** with source =
-  the security group used by the Fargate tasks (`<sg-id>` from
-  [Step 10](#step-10-verify-run-a-forecast-task-manually)). Scoped to that security group —
-  the box still has no publicly-reachable ports. This is also why `DAGSTER_PG_PASSWORD` was
+- Because the run workers connect in, **add the one inbound security-group rule now**. It lives on
+  the *security group's* own page, not the instance's **Networking** tab: **EC2 → Security Groups**
+  (left sidebar, under *Network & Security*) → open `nged-forecast-ctrl-sg` → the **Inbound rules**
+  tab → **Edit inbound rules** → **Add rule**: **Type** `PostgreSQL` (fills in TCP 5432), **Source**
+  `Custom` → the Fargate task security group `nged-forecast-task-sg` (`<sg-id>` from
+  [Step 10](#step-10-verify-run-a-forecast-task-manually)) → **Save rules**. (From the instance's
+  **Security** tab you can click the `nged-forecast-ctrl-sg` link to jump straight to that page.)
+  Scoped to that security group — the box still has no publicly-reachable ports. This is also why `DAGSTER_PG_PASSWORD` was
   added to the task definition's secrets in
   [Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition): `dagster.yaml`
   references it as `env:`, so the run worker resolves it at startup from its own environment.
