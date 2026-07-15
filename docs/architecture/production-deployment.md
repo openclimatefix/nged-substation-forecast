@@ -22,8 +22,15 @@ costed options.
 
 Because scheduling lives inside Dagster rather than in any cloud-specific service, the entire
 stack stays portable: the laptop deployment and the cloud deployment are the same artifact,
-started with `docker compose up`. The always-on daemon also provides the cross-run coordination
-that only a daemon can: schedules, sensors, run monitoring, and declarative automation.
+started with `docker compose up`. What switches a deployment between local and Fargate
+execution is not code but **Dagster instance configuration**: the run launcher is declared in
+`dagster.yaml`, which lives outside the image. The laptop's `dagster.yaml` declares no run
+launcher, so runs execute as local subprocesses (Dagster's `DefaultRunLauncher`); the box's
+declares `EcsRunLauncher`
+([Step 14 of the runbook](../live_service/aws.md#step-14-configure-dagster-on-the-box)), so
+runs launch as Fargate tasks. The code and image are byte-identical either way. The always-on
+daemon also provides the cross-run coordination that only a daemon can: schedules, sensors, run
+monitoring, and declarative automation.
 
 The design accepts two trade-offs:
 
@@ -256,6 +263,14 @@ directly on the always-on box instead of each being dispatched to its own Fargat
 would save the per-run Fargate cost and the minute or so of task-provisioning latency each
 dispatch pays.
 
+One sizing fact frames the whole question: Dagster launches **runs, not assets**, onto Fargate.
+A schedule tick launches one job run, which becomes one Fargate task, and every asset in that
+job's selection executes inside that single task — so a tiny asset only pays for a task of its
+own if it has a schedule of its own (the one-off `h3_grid_weights`, materialised by hand, never
+does). The question is therefore about the recurring scheduled runs, and only one of them is
+genuinely tiny: the hourly NGED telemetry poll — which, because NGED publishes new files only
+roughly every 5 hours, spends most of its ticks discovering there is nothing to do.
+
 **Why we rejected it.** Five reasons:
 
 1. **Dagster has one run launcher per instance.** The `EcsRunLauncher` configured in
@@ -289,16 +304,35 @@ dispatch pays.
    that is a task-size change; on the box it is another round of resizing the component that
    is hardest to touch.
 
-**What the accepted design costs, and the door left open.** Every ingest run currently
-inherits the task definition's 4 vCPU / 16 GB — sized for inference's ~9 GB peak, and
-oversized for an hourly telemetry pull. At the `eu-west-2` ARM rates in the
-[region price table](forecast-delivery.md#securing-it) (~\$0.21/hour for that task size),
-~720 hourly runs of a few minutes each come to on the order of **\$5–10/month** — the same
-magnitude of saving the [EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks)
-dismissed as "not real for this workload". If that figure ever starts to matter, the fix is a
-config change, not an architecture change: `EcsRunLauncher` supports per-run `ecs/cpu` and
-`ecs/memory` tags, so the ingest jobs can declare a small task size while forecasts keep
-4 vCPU / 16 GB. Shrink the ingest tasks; don't move the work onto the box.
+**What the accepted design costs.** Every ingest run currently inherits the task definition's
+4 vCPU / 16 GB — sized for inference's ~9 GB peak, and oversized for an hourly telemetry pull.
+At the `eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it)
+(~\$0.21/hour for that task size), ~720 hourly runs of a few minutes each — most of them the
+no-ops described above — come to on the order of **\$5–10/month**: the same magnitude of saving
+the [EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks)
+dismissed as "not real for this workload". A second, quieter cost: `ecmwf_ens`'s
+not-yet-published retry loop (`RetryRequested`, 30-minute waits) retries *inside the same run*,
+so on a late-publication day its 16 GB task sits idle for up to 4 hours, billed the whole time
+(still well under \$1).
+
+**Door left open.** If those figures ever start to matter, two fixes exist inside the accepted
+architecture, and neither moves work onto the box:
+
+- **Right-size the ingest tasks.** `EcsRunLauncher` supports per-run `ecs/cpu` and `ecs/memory`
+  tags, so the ingest jobs can declare a small task size while forecasts keep 4 vCPU / 16 GB —
+  a config change, not an architecture change.
+- **Replace polling schedules with Dagster sensors**
+  ([#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)). Sensor
+  evaluation functions run **on the daemon** — that is, on the always-on box — while only
+  genuine *runs* go through the launcher. A sensor that cheaply lists NGED's bucket every few
+  minutes and fires the ingest job only when new files actually exist puts the seconds-of-work
+  detection on the box, where Dagster runs it natively, and launches Fargate only for the ~5
+  real ingests a day; the same pattern lets a sensor watch for NWP publication instead of
+  holding a Fargate task idle through the retry loop. This is the hybrid that reason 1 said
+  would need a custom launcher — except Dagster already ships it, because the tiny recurring
+  work here is *detection*, and detection is what sensors are for.
+
+Either way: shrink or skip the ingest tasks; don't move the work onto the box.
 
 ### Fetching the champion model from MLflow at container startup
 
