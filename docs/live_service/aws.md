@@ -776,23 +776,61 @@ aws ec2 describe-instances --region eu-west-2 \
 A stop/start reassigns this address, but you only need it for this one login — Tailscale's stable
 MagicDNS name takes over afterwards. SSH in with
 [Step 11](#step-11-launch-the-control-plane-box)'s key pair, substituting that address for
-`<public-ip>`, and bring up Tailscale, joining the same tailnet your laptop is on:
+`<public-ip>`:
 
 ```bash
 ssh -i ~/.ssh/nged-forecast-ctrl.pem ubuntu@<public-ip>
+```
 
+**First, bring the box fully up to date.** Now — before anything runs on it — is the clean moment,
+because an `apt upgrade` can pull a new kernel that only takes effect on reboot, and it's far
+nicer to bounce an empty box than one running Dagster and Postgres. A fresh cloud image runs
+`cloud-init` and `unattended-upgrades` at first boot, which hold the dpkg lock, so wait for those
+to finish first:
+
+```bash
+sudo cloud-init status --wait          # returns once first-boot automation releases the dpkg lock
+sudo apt update && sudo apt upgrade -y
+```
+
+If that upgraded the kernel or libc, `sudo reboot` and reconnect (`ssh -i
+~/.ssh/nged-forecast-ctrl.pem ubuntu@<public-ip>` again) before continuing.
+
+**Then install Tailscale and join the tailnet.** Use Tailscale's install script rather than
+`apt install tailscale`: the script adds Tailscale's *own* APT repository and installs from it, so
+the box tracks Tailscale's current stable release and keeps getting it through `apt upgrade`;
+Ubuntu's `universe` package is frozen at the release's snapshot and lags. (If you'd rather not pipe
+a script to a shell, Tailscale's [manual APT repo
+steps](https://tailscale.com/kb/1476/install-ubuntu-2404) do exactly what the script automates.)
+
+```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --ssh --hostname=nged-forecast-ctrl
 ```
 
-Open the authentication URL that `tailscale up` prints and sign in. `--ssh` enables Tailscale
-SSH, so from now on any device on the tailnet can `ssh ubuntu@nged-forecast-ctrl` with no key
-management; `--hostname` gives the box a stable MagicDNS name. Confirm from your laptop:
+Open the authentication URL that `tailscale up` prints and sign in **with the OCF Google Workspace
+account (`…@openclimatefix.org`)**, so the box joins the shared OCF org tailnet rather than a
+personal one. `--ssh` enables Tailscale SSH, so from now on any device on the tailnet can
+`ssh ubuntu@nged-forecast-ctrl` with no key management; `--hostname` gives the box a stable MagicDNS
+name. Confirm from your laptop:
 
 ```bash
 tailscale ping nged-forecast-ctrl
 ssh ubuntu@nged-forecast-ctrl
 ```
+
+**Disable key expiry for this node.** A device authenticated as a *user* inherits Tailscale's
+default node-key expiry (~180 days); when it lapses, an always-on box silently drops off the
+tailnet and you lose SSH and UI access until someone re-authenticates it. In the
+[Tailscale admin console](https://login.tailscale.com/admin/machines), open the
+`nged-forecast-ctrl` machine → **Disable key expiry**. (The tidier long-term option is to re-auth
+the box with a *tagged* auth key, e.g. `tag:nged-forecast`, which makes it org-owned and
+non-expiring in one step; disabling expiry on the user-owned node is the quick fix.)
+
+Because the tailnet is the *only* way in and the Dagster UI has no authentication of its own,
+anyone who can reach this box over the OCF tailnet gets its UI and — via `--ssh` — a shell as
+`ubuntu`, governed by the tailnet's ACLs. That is intended here (OCF-wide access is fine for this
+box); tighten it later with Tailscale ACLs or tags if that ever changes.
 
 Now **delete the temporary inbound rule** (**Edit inbound rules** → **Delete** → **Save rules**),
 returning `nged-forecast-ctrl-sg` to zero inbound rules — Tailscale establishes its connections
