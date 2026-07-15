@@ -2,8 +2,6 @@ site_name: NGED Substation Forecast
 theme:
   name: material
   features:
-    - navigation.sections
-    - navigation.expand
     - content.code.copy
 
 markdown_extensions:
