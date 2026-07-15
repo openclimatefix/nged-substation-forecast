@@ -196,12 +196,13 @@ console](https://eu-west-2.console.aws.amazon.com) →
     - **Scan on push** (off) — the console marks this per-repository setting deprecated; scanning
       is now configured once at the *registry* level, which is done right after creating the
       repository (next bullet).
-- Click **Create**, then turn on registry-level scanning so every push still gets free
-  vulnerability scanning: **ECR** → **Private registry** → **Settings** → **Scanning
-  configuration** → keep the scan type at **Basic** (free; **Enhanced** hands scanning to Amazon
-  Inspector, which costs money) → add a **scan on push** filter of `*` (or `nged-forecast`).
-  This is a one-time registry setting, so it also covers any repository created later under a
-  matching filter.
+- Click **Create**, then turn on registry-level scanning so every push still gets free vulnerability
+  scanning: **ECR** → **Private registry** → **Features & Settings** → [**Scanning** →
+  **configure**](https://eu-west-2.console.aws.amazon.com/ecr/private-registry/edit-scanning) → keep
+  the scan type at **Basic** ("basic" is free; Enhanced hands scanning to Amazon Inspector, which
+  costs money) → either check the **Scan on push all repositories** check box _or_ add a filter of
+  `nged-forecast`. This is a one-time registry setting, so it also covers any repository created
+  later under a matching filter.
 
 ## Step 6 — Push the image to ECR
 
