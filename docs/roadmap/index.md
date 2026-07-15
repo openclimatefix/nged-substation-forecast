@@ -172,13 +172,29 @@ only for first month, then shared with NGED.*
 
 ---
 
+## v0.8 — Improve Live Service
+
+*Epic: [#323](https://github.com/openclimatefix/nged-substation-forecast/issues/323)*
+
+The bucket for **operational improvements to the running live service** — efficiency,
+robustness, and operability polish discovered during early live running, as distinct from the
+forecast-skill milestones above. First item:
+
+- Replace the polling schedules with Dagster sensors
+  ([#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)): cheap
+  "is there new data?" detection runs on the control-plane box, and Fargate tasks launch only
+  when there is real work to do. Design context:
+  [Production Deployment — Design](../architecture/production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm).
+
+---
+
 ## v1.0 — Stable Live Service for NGED's Trial Area
 
 *Epic: [#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)*
 
 Target: **January 2027**
 
-- All features listed above (v0.1–v0.7), plus fixes discovered during live running
+- All features listed above (v0.1–v0.8), plus fixes discovered during live running
 - 32 time series in the NGED trial area: 16 primary substations, 6 solar PV farms, 3 wind farms, 2 GSPs, 2 BSPs, 1 biofuel generator, 1 BESS, 1 reciprocating gas generator
 - Five Delta Lake output tables delivered to NGED every 6 hours:
     1. `power_forecast` — [−1, +1] ensemble power forecasts
