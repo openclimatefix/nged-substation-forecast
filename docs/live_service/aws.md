@@ -165,6 +165,16 @@ that production inference has no MLflow dependency at runtime:
 scripts/build_and_verify_image.sh    # no arguments — everything is derived
 ```
 
+The script always builds for **linux/arm64**, whatever the host is, because the deployment is
+ARM end-to-end: the Fargate task definition declares ARM64
+([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)) and the control-plane box
+is a Graviton instance ([Step 11](#step-11-launch-the-control-plane-box)), so an amd64 image
+would push fine but then fail every task launch with `image Manifest does not contain
+descriptor matching platform 'linux/arm64 v8'`. On an x86 laptop the build and smoke test run
+under QEMU emulation — noticeably slower than native, but correct. The script checks the
+emulator is registered and prints the one-time fix
+(`docker run --privileged --rm tonistiigi/binfmt --install arm64`) if it isn't.
+
 > Note that, during the smoke test, **Dagster is EXPECTED halt with the exception**
 > `_internal.TableNotFoundError: Local path
 "/app/.venv/data/NWP" does not exist or you don't have access!`. That is correct behaviour.
@@ -448,9 +458,9 @@ running tasks you'll watch. An empty cluster manages no capacity and costs nothi
       config, and the family `scripts/push_and_deploy_image.sh` registers new revisions into.
     - **Launch type**: keep **AWS Fargate**, the pre-ticked default.
     - **Operating system/Architecture**: **Linux/ARM64** — the console defaults to
-      `Linux/X86_64`, but the image is built for ARM (see the Dockerfile's ARM build note), and
-      ARM Fargate is also ~20% cheaper than x86 for the same task size. (**Network mode** is
-      greyed out at `awsvpc` — the only mode Fargate supports.)
+      `Linux/X86_64`, but [Step 4](#step-4-build-and-verify-the-image)'s script always builds
+      the image for ARM, and ARM Fargate is also ~20% cheaper than x86 for the same task size.
+      (**Network mode** is greyed out at `awsvpc` — the only mode Fargate supports.)
     - **Task size**: **4 vCPU** / **16 GB** — comfortably above the measured inference peak
       (~9 GB).
     - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task), e.g.
@@ -588,10 +598,30 @@ Fill in the three placeholders:
 egress for its ECR pull and S3/CloudWatch calls without a NAT gateway. Keep this `<subnet-id>`
 and `<sg-id>` to hand — the run launcher in
 [Step 14](#step-14-configure-dagster-on-the-box) launches tasks with exactly the same network
-configuration. Follow the run in **ECS** → the cluster → **Tasks**, then **CloudWatch Logs** for
-the container's output — confirm it reaches `load_forecaster_from_dir` and a new forecast lands
-under `s3://nged-forecast-delivery/data/power_forecasts/…` — the delivery bucket, not the
-internal one, since `power_forecasts` is one of the five NGED-facing tables.
+configuration.
+
+Follow the run in **ECS** → the cluster → **Tasks**, then **CloudWatch Logs** (log group
+`/ecs/nged-forecast`) for the container's output. What counts as a pass depends on whether any
+data has been ingested yet:
+
+- **On the first pass through this runbook, the buckets are still empty** — nothing ingests
+  data until [Step 16](#step-16-turn-on-the-schedules-and-verify-end-to-end)'s schedules turn
+  on — so the run *cannot* produce a forecast. The pass here is the cloud twin of
+  [Step 4](#step-4-build-and-verify-the-image)'s offline smoke test: the task starts (proving
+  the image pulled and all four secrets resolved), its logs stream to CloudWatch, and the run
+  fails *only* at the NWP-availability lookup — a traceback ending in `TableNotFoundError`,
+  raised from `_available_nwp_init_times`. Loading the model writes no log line, so that
+  specific failure *is* the proof the model loaded: the `live_forecasts` asset loads the model
+  first and checks NWP availability second, so dying at the lookup means
+  `load_forecaster_from_dir` already succeeded. This exercises every AWS-side link in the
+  chain — cluster, task definition, IAM roles, secrets, networking, logging — which is exactly
+  what this step exists to verify.
+
+- **Once data exists** (after [Step 16](#step-16-turn-on-the-schedules-and-verify-end-to-end),
+  when this command is the fallback verification path), additionally confirm the run succeeds
+  and a new forecast lands under `s3://nged-forecast-delivery/data/power_forecasts/…` — the
+  delivery bucket, not the internal one, since `power_forecasts` is one of the five NGED-facing
+  tables.
 
 ## Step 11 — Launch the control-plane box
 

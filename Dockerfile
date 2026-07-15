@@ -5,9 +5,11 @@
 # runtime. See docs/live_service/aws.md for the promotion/deployment runbook and
 # docs/architecture/production-deployment.md for why this design was chosen.
 #
-# Build (arm64 — ARM Fargate is ~20% cheaper and the candidate control-plane boxes are
-# Graviton; add --platform linux/arm64 if building on an x86 host):
-#   docker build --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
+# Build (always linux/arm64 — ARM Fargate is ~20% cheaper and the control-plane box is
+# Graviton, so an amd64 image cannot run anywhere in the deployment; on an x86 host this
+# needs QEMU registered, which scripts/build_and_verify_image.sh checks for):
+#   docker build --platform linux/arm64 \
+#     --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
 #     -t nged-forecast:<id-short> .
 #
 # The champion model must already be promoted to data/production_model/ (via the

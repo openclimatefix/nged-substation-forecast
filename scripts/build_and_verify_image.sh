@@ -9,6 +9,14 @@
 # Usage:
 #   scripts/build_and_verify_image.sh          # no arguments — everything is derived
 #
+# The image is built for linux/arm64 REGARDLESS of the host architecture: the ECS task
+# definition declares ARM64 (ARM Fargate is ~20% cheaper) and the control-plane box is a
+# Graviton instance, so an amd64 image cannot run anywhere in the deployment — a native x86
+# build pushes fine but every task launch then dies with "image Manifest does not contain
+# descriptor matching platform 'linux/arm64 v8'" (aws.md Steps 9-11). On an x86 host both the
+# build and the smoke test therefore run under QEMU user-mode emulation — slower than native
+# but correct; the script checks the emulator is registered and prints the fix if it isn't.
+#
 # The smoke test's partition key is HARD-CODED and arbitrary. It only has to parse as
 # YYYY-MM-DD-HH:MM: the offline run dies at the NWP lookup long before the slot's validity could
 # matter, so no real partition is needed and there is no decision worth pushing onto the user.
@@ -62,8 +70,19 @@ fi
 RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
 IMAGE="nged-forecast:${RUN_ID:0:12}"
 
-echo "==> Building ${IMAGE}  (MODEL_RUN_ID=${RUN_ID})"
+# See the header: the deployment is ARM end-to-end, so the build always targets linux/arm64.
+# On a non-ARM host that needs a QEMU binfmt handler registered with the kernel; fail fast
+# with the fix rather than letting the build die mid-way with "exec format error".
+if [[ "$(uname -m)" != "aarch64" && ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]]; then
+  echo "error: this host is $(uname -m) and no arm64 emulator is registered, so the required" >&2
+  echo "       linux/arm64 build cannot run. Register QEMU (once per boot) with:" >&2
+  echo "         docker run --privileged --rm tonistiigi/binfmt --install arm64" >&2
+  exit 2
+fi
+
+echo "==> Building ${IMAGE} for linux/arm64  (MODEL_RUN_ID=${RUN_ID})"
 docker build \
+  --platform linux/arm64 \
   --build-arg MODEL_RUN_ID="$RUN_ID" \
   --build-arg GIT_SHA="$(git rev-parse HEAD)" \
   -t "$IMAGE" .
@@ -75,7 +94,7 @@ echo "==> Smoke-testing ${IMAGE} with zero network access (partition ${PARTITION
 LOG_FILE="$(mktemp)"
 trap 'rm -f "$LOG_FILE"' EXIT
 set +e
-docker run --network=none \
+docker run --network=none --platform linux/arm64 \
   -e NGED_S3_BUCKET_URL=https://example.com/outbound/ \
   -e NGED_S3_BUCKET_ACCESS_KEY=dummy \
   -e NGED_S3_BUCKET_SECRET=dummy \
