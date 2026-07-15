@@ -636,10 +636,13 @@ option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-e
 
 First create its IAM role: **IAM** →
 [**Roles**](https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles) → **Create
-role** → trusted entity **AWS service / EC2** → attach `nged-forecast-read-and-write` ([Step
-2](#step-2-grant-data-access-with-iam)) and the AWS-managed `AmazonEC2ContainerRegistryReadOnly`
-(pull the image) → name it `nged-forecast-ctrl-role`. Then add one inline policy (e.g.
-`nged-forecast-launch-runs`) so the daemon can dispatch runs to Fargate:
+role** → trusted entity type **AWS service** → under **Use case**, pick **EC2** from the **Service
+or use case** dropdown, then select the **EC2** radio button (the plain *EC2* variant, not
+*EC2 - Spot Instances* or the other sub-options — it's what puts `ec2.amazonaws.com` in the role's
+trust policy, so the instance can assume the role) → **Next** → attach `nged-forecast-read-and-write`
+([Step 2](#step-2-grant-data-access-with-iam)) and the AWS-managed
+`AmazonEC2ContainerRegistryReadOnly` (pull the image) → name it `nged-forecast-ctrl-role`. Then add
+one inline policy (e.g. `nged-forecast-launch-runs`) so the daemon can dispatch runs to Fargate:
 
 ```json
 {
