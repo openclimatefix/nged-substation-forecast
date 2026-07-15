@@ -324,6 +324,15 @@ Store**](https://eu-west-2.console.aws.amazon.com/systems-manager/parameters?reg
 - **Tier**: Standard (free; these values are tiny, nowhere near the 4 KB limit).
 - **Type**: **SecureString**, with the default `aws/ssm` KMS key — using the default key is
   what lets Step 7's inline policy skip a `kms:Decrypt` statement.
+- **KMS key source** and **KMS Key ID** — these two fields appear once **SecureString** is
+  selected; leave both at their defaults: **My current account** and `alias/aws/ssm`.
+  (`alias/aws/ssm` is the console's name for the default `aws/ssm` key the Type bullet just
+  referred to.) The console shows a blue notice that the default AWS-managed key "cannot be
+  shared with other AWS accounts, and all users in this AWS account and Region have access to
+  the key" — both limitations are fine here: nothing outside this account ever reads these
+  parameters, and having access to the *key* doesn't grant access to the *parameters* — reading
+  them still requires the `ssm:GetParameters` permission that
+  [Step 7](#step-7-iam-roles-for-the-fargate-task)'s policy grants only to the execution role.
 - **Value**:
     - The three `nged-s3-bucket-*` values are copied from the matching
       `NGED_S3_BUCKET_*` lines of your local `.env`.
