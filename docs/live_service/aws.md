@@ -1194,9 +1194,11 @@ scheduler and run-monitoring daemons with green heartbeats.
     2. the latest `ecmwf_ens` partition — gives `live_forecasts` an NWP run to forecast from.
     3. `power_time_series_and_metadata` (unpartitioned) — the power spine and substation metadata.
 
-    (`promoted_model` is the fourth parent, already handled back in
-    [Step 3](#step-3-pick-and-promote-a-champion-model) — its artifacts are baked into the image,
-    so there is nothing to materialise for it here.) Once
+    (The production model is not in this list. It is deliberately *not* a Dagster dependency of
+    `live_forecasts`: its artifacts were promoted back in
+    [Step 3](#step-3-pick-and-promote-a-champion-model) and baked into the image, so there is
+    nothing to materialise for it here — do not materialise `promoted_model` on the box, which has
+    no MLflow.) Once
     the schedules from step 1 are on, each of these upstream assets is kept fresh by its own
     schedule; this manual pass is only to seed the empty tables for the first tick.
 
