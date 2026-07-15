@@ -249,7 +249,8 @@ selector to worry about. From the **Add permissions** page onwards the two roles
     starts. Open the role you just created → **Permissions** tab → **Add permissions** →
     **Create inline policy** → switch to the **JSON** editor → paste the JSON below, replacing
     `<account-id>` with your 12-digit AWS account id (shown in the account menu at the top right of
-    the console, or run this locally: `aws sts get-caller-identity | grep Account`) → **Next** →
+    the console, or run this locally:
+    `aws sts get-caller-identity --query Account --output text`) → **Next** →
     name it (e.g. `nged-forecast-read-ssm-parameters`) → **Create policy**:
 
     ```json
