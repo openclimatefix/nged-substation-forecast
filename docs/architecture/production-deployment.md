@@ -8,9 +8,12 @@ it — see [Setting up the live service on AWS](../live_service/aws.md).
 ## Run the Dagster control plane continuously on one small VM
 
 The Dagster control plane — daemon + webserver + code-location server — runs continuously on
-one small VM, alongside MLflow and Marimo, managed via Docker Compose. The box does no forecast
-compute of its own: it dispatches every run — live schedules and UI-launched backtests alike —
-to an ephemeral Fargate task via `EcsRunLauncher`. This is the roadmap's
+one small VM, alongside MLflow and Marimo, managed via Docker Compose. Its schedules are
+responsible for the entire recurring pipeline, not just the forecasts: pulling fresh telemetry
+from NGED's bucket (hourly), downloading the ECMWF ensemble NWP from Dynamical.org (daily), and
+issuing the forecasts themselves (6-hourly). The box does none of that pipeline compute of its
+own, though: it dispatches every run — those schedules and UI-launched backtests alike — to an
+ephemeral Fargate task via `EcsRunLauncher`. This is the roadmap's
 [accepted architecture](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
 see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the
 costed options.
