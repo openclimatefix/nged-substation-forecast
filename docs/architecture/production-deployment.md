@@ -13,7 +13,9 @@ responsible for the entire recurring pipeline, not just the forecasts: pulling f
 from NGED's bucket (hourly), downloading the ECMWF ensemble NWP from Dynamical.org (daily), and
 issuing the forecasts themselves (6-hourly). The box does none of that pipeline compute of its
 own, though: it dispatches every run — those schedules and UI-launched backtests alike — to an
-ephemeral Fargate task via `EcsRunLauncher`. This is the roadmap's
+ephemeral Fargate task via `EcsRunLauncher`. Even the light data-ingest runs go to Fargate;
+the reasoning is in
+[Running the data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm). This is the roadmap's
 [accepted architecture](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
 see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the
 costed options.
@@ -245,6 +247,58 @@ hosts), so the one piece of self-maintained OS in the deployment would disappear
    tested rebuild-from-scratch script (see
    [Handover: de-pet the control-plane box](../roadmap/handover.md#3-de-pet-the-control-plane-box))
    so that the answer to a sick box is *destroy and recreate*, never *diagnose*.
+
+### Running the data-ingest runs on the control-plane VM
+
+**The design.** The recurring data-ingest jobs — the hourly NGED telemetry pull and the daily
+Dynamical.org NWP download — are deliberately much lighter than inference, so they could run
+directly on the always-on box instead of each being dispatched to its own Fargate task. That
+would save the per-run Fargate cost and the minute or so of task-provisioning latency each
+dispatch pays.
+
+**Why we rejected it.** Five reasons:
+
+1. **Dagster has one run launcher per instance.** The `EcsRunLauncher` configured in
+   `dagster.yaml` applies to *every* run the daemon launches — there is no per-job "run this
+   one locally" switch. "Ingest on the box, forecasts on Fargate" would therefore mean writing
+   a custom hybrid launcher that reads a run tag and delegates to one of two launchers. That is
+   only a few dozen lines, but it is bespoke glue on the critical path of every run — exactly
+   what the [handover constraint](../roadmap/handover.md) says to avoid.
+
+2. **Blast-radius isolation.** The box's only job is to always be up, and it is deliberately
+   tiny: a `t4g.medium` whose 4 GB is shared by the daemon, webserver, code-location server,
+   and Postgres, with MLflow and Marimo planned on top. The ingest jobs are lighter than
+   inference but not negligible — the NWP ingest decodes a full daily ENS run (~7 million
+   rows) and is CPU-hungry enough that its download once starved *itself* through thread
+   contention ([#276](https://github.com/openclimatefix/nged-substation-forecast/issues/276)).
+   Several busy worker threads on a 2-vCPU box would starve daemon heartbeats and the UI, and
+   a memory spike (upstream format drift, an unusually large file) risks the OOM killer taking
+   out Postgres or the daemon. A bad data file killing an ephemeral task is a shrug; killing
+   the control plane is the exact failure this architecture exists to avoid.
+
+3. **The box would have to grow.** Hosting ingest means sizing the box for ingest peaks rather
+   than for coordination — realistically a `t4g.large` at roughly double the `t4g.medium`'s
+   ~\$27/month, which roughly cancels the Fargate saving.
+
+4. **One execution path.** With everything on Fargate, every run has the same image, the same
+   log destination (CloudWatch), the same IAM story (the task role), and the same debugging
+   experience. Two execution environments means two sets of failure modes for an operator who
+   is, post-NIA, a non-expert at NGED.
+
+5. **V2 scaling.** At ~2,500 time series the ingest workload grows roughly 78×. On Fargate
+   that is a task-size change; on the box it is another round of resizing the component that
+   is hardest to touch.
+
+**What the accepted design costs, and the door left open.** Every ingest run currently
+inherits the task definition's 4 vCPU / 16 GB — sized for inference's ~9 GB peak, and
+oversized for an hourly telemetry pull. At the `eu-west-2` ARM rates in the
+[region price table](forecast-delivery.md#securing-it) (~\$0.21/hour for that task size),
+~720 hourly runs of a few minutes each come to on the order of **\$5–10/month** — the same
+magnitude of saving the [EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks)
+dismissed as "not real for this workload". If that figure ever starts to matter, the fix is a
+config change, not an architecture change: `EcsRunLauncher` supports per-run `ecs/cpu` and
+`ecs/memory` tags, so the ingest jobs can declare a small task size while forecasts keep
+4 vCPU / 16 GB. Shrink the ingest tasks; don't move the work onto the box.
 
 ### Fetching the champion model from MLflow at container startup
 
