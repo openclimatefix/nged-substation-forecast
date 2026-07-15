@@ -634,11 +634,12 @@ decision](../architecture/production-deployment.md#run-the-dagster-control-plane
 the sizing and cost are the roadmap's [accepted
 option](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month).)
 
-First create its IAM role: **IAM** → **Roles** → **Create role** → trusted entity **AWS service
-/ EC2** → attach `nged-forecast-read-and-write` ([Step 2](#step-2-grant-data-access-with-iam))
-and the AWS-managed `AmazonEC2ContainerRegistryReadOnly` (pull the image) → name it
-`nged-forecast-ctrl-role`. Then add one inline policy (e.g. `nged-forecast-launch-runs`) so the
-daemon can dispatch runs to Fargate:
+First create its IAM role: **IAM** →
+[**Roles**](https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles) → **Create
+role** → trusted entity **AWS service / EC2** → attach `nged-forecast-read-and-write` ([Step
+2](#step-2-grant-data-access-with-iam)) and the AWS-managed `AmazonEC2ContainerRegistryReadOnly`
+(pull the image) → name it `nged-forecast-ctrl-role`. Then add one inline policy (e.g.
+`nged-forecast-launch-runs`) so the daemon can dispatch runs to Fargate:
 
 ```json
 {
