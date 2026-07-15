@@ -421,23 +421,90 @@ only because every task has to launch *into* a cluster: it's the `--cluster` tha
 running tasks you'll watch. An empty cluster manages no capacity and costs nothing, so a single
 `nged-forecast` cluster is all this deployment ever needs.
 
-1. [**ECS**](https://eu-west-2.console.aws.amazon.com/ecs?region=eu-west-2) → **Clusters** → **Create cluster** → name it `nged-forecast` → *Networking only*
-   (i.e. Fargate: no EC2 instances to manage, per the explanation above).
-2. **ECS** → **Task definitions** → **Create new task definition** → *Fargate*:
-    - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task).
+1. [**ECS**](https://eu-west-2.console.aws.amazon.com/ecs?region=eu-west-2) → **Clusters** →
+   **Create cluster** → **Cluster name** `nged-forecast` → under **Infrastructure**, keep
+   **Fargate only**, the pre-selected default (no EC2 instances to manage, per the explanation
+   above). **Every other section on the create-cluster form can stay at its console default:**
+    - **Service Connect defaults** (unset) — Service Connect wires long-running ECS *services*
+      to each other; this deployment runs only standalone tasks, so it has nothing to connect.
+    - **Monitoring → Container Insights** (turned off) — the default CloudWatch metrics are
+      enough at this scale, and both Container Insights options bill for the extra metrics they
+      ingest, which is why the console's "Recommended" tag on the enhanced option is ignored
+      here.
+    - **ECS Exec encryption and logging** (no KMS key; logging **Default**) — nothing in this
+      deployment uses ECS Exec (interactive shells into running containers).
+    - **Encryption** (both KMS fields empty) — no KMS requirement, for the same reason the S3
+      buckets in [Step 1](#step-1-create-the-s3-buckets) stay on SSE-S3.
+    - **Tags** (none) — unused, as everywhere else on this page.
+
+    Then click **Create**.
+
+2. **ECS** → [**Task definitions**](https://eu-west-2.console.aws.amazon.com/ecs/v2/task-definitions?region=eu-west-2) → **Create new task definition**.
+   Work down the form; anything not named below stays at its console default:
+    - **Task definition family**: `nged-forecast` — not a free choice: it's the
+      `--task-definition` in [Step 10](#step-10-verify-run-a-forecast-task-manually)'s manual
+      run, the `task_definition:` in [Step 14](#step-14-configure-dagster-on-the-box)'s launcher
+      config, and the family `scripts/push_and_deploy_image.sh` registers new revisions into.
+    - **Launch type**: keep **AWS Fargate**, the pre-ticked default.
+    - **Operating system/Architecture**: **Linux/ARM64** — the console defaults to
+      `Linux/X86_64`, but the image is built for ARM (see the Dockerfile's ARM build note), and
+      ARM Fargate is also ~20% cheaper than x86 for the same task size. (**Network mode** is
+      greyed out at `awsvpc` — the only mode Fargate supports.)
+    - **Task size**: **4 vCPU** / **16 GB** — comfortably above the measured inference peak
+      (~9 GB).
+    - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task), e.g.
+      `nged-forecast-task-role`.
     - **Task execution role**: the execution role from
-      [Step 7](#step-7-iam-roles-for-the-fargate-task).
-    - **Task size**: 4 vCPU / 16 GB, **ARM64** (`linux/arm64`) — matches the measured inference
-      peak (~9 GB) and the image's own build target (see the Dockerfile's ARM build note); ARM
-      Fargate is also ~20% cheaper than x86 for the same size.
-    - **Container name**: `nged-forecast` — [Step 14](#step-14-configure-dagster-on-the-box)'s
-      run-launcher config names this container, so keep it predictable.
-    - **Container image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>`
-      from [Step 6](#step-6-push-the-image-to-ecr); log configuration → **awslogs**, a new
-      CloudWatch log group (e.g. `/ecs/nged-forecast`), region `eu-west-2`.
-    - **Entry point**: `/usr/bin/env` — this **overrides the image's own `ENTRYPOINT
-      ["dagster"]`**, and matters more than it looks. ECS concatenates entry point + command
-      into one argv, and both the manual verification in
+      [Step 7](#step-7-iam-roles-for-the-fargate-task), e.g. `nged-forecast-task-execution-role`.
+      The field defaults to **Create default role** — don't leave it there: the generic role the
+      console would mint has no Parameter Store access, so the secrets injection below would
+      fail at container start.
+    - **Container – 1 → Name**: `nged-forecast` — [Step 14](#step-14-configure-dagster-on-the-box)'s
+      run-launcher config names this container, so keep it predictable. Leave **Essential
+      container** at **Yes**.
+    - **Image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` from
+      [Step 6](#step-6-push-the-image-to-ecr) — `<tag>` is the first 12 characters of the
+      promoted model's MLflow run id. Step 6's script prints the full URI as it pushes; to
+      recover it later, copy it from the pushed image in the ECR console, or run
+      `jq -r '.mlflow_run_id[:12]' data/production_model/promotion.json` on the machine that
+      built the image.
+    - **Port mappings**: **Remove** the pre-filled port-80/HTTP row — every task here is a batch
+      run that listens on nothing; port mappings are for services that accept traffic.
+    - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
+      `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
+      tables live in a separate bucket from everything else (see the
+      [Configuration reference](setup.md#the-configuration-model)). Leave
+      `DATA_STORE_*` unset, since the task role supplies credentials. These are plain
+      environment values (**Value type** = **Value**), not secrets — bucket URIs are safe in
+      clear text.
+    - **Secrets — the four Parameter Store entries.** In the same **Environment variables**
+      section, add each parameter from [Step 8](#step-8-store-secrets-in-parameter-store) as a
+      variable whose **Value type** is **ValueFrom** (the console's secrets mechanism). The
+      **Key** is the env-var name exactly as the code expects; the **Value** is the matching
+      Parameter Store name:
+        - **Key** `NGED_S3_BUCKET_URL` — **Value** `/nged-forecast/nged-s3-bucket-url`
+        - **Key** `NGED_S3_BUCKET_ACCESS_KEY` — **Value**
+          `/nged-forecast/nged-s3-bucket-access-key`
+        - **Key** `NGED_S3_BUCKET_SECRET` — **Value** `/nged-forecast/nged-s3-bucket-secret`
+        - **Key** `DAGSTER_PG_PASSWORD` — **Value** `/nged-forecast/dagster-pg-password`
+    - **Logging**: keep **Use log collection** ticked with destination **Amazon CloudWatch** and
+      the pre-filled options, setting **awslogs-group** to `/ecs/nged-forecast`. (The blue
+      "sidecar" notice concerns the *other* destinations, which route logs through an extra
+      container; the CloudWatch option is a plain Docker log driver — no sidecar.) One catch:
+      the pre-filled `awslogs-create-group: true` asks the *ECS agent* to create the log group
+      at first task start, which needs `logs:CreateLogGroup` — a permission neither the
+      AWS-managed `AmazonECSTaskExecutionRolePolicy` nor
+      [Step 7](#step-7-iam-roles-for-the-fargate-task)'s inline policy grants. Rather than widen
+      the role, create the log group yourself now: **CloudWatch** → **Logs** → [**Log
+      Management**](https://eu-west-2.console.aws.amazon.com/cloudwatch/home?region=eu-west-2#logsV2:log-groups) (the console's name for the log-groups list) → **Create log group** → name
+      `/ecs/nged-forecast`, region `eu-west-2` — or in one CLI call:
+      `aws logs create-log-group --log-group-name /ecs/nged-forecast --region eu-west-2`. With
+      the group already in place the agent never attempts creation, so the missing permission is
+      never exercised.
+    - **Docker configuration** (a collapsed section near the bottom of the container panel) →
+      **Entry point**: `/usr/bin/env`; leave **Command** and **Working directory** empty. This
+      **overrides the image's own `ENTRYPOINT ["dagster"]`**, and matters more than it looks.
+      ECS concatenates entry point + command into one argv, and both the manual verification in
       [Step 10](#step-10-verify-run-a-forecast-task-manually) and the `EcsRunLauncher` in
       [Step 14](#step-14-configure-dagster-on-the-box) supply a *full* command that already
       starts with `dagster` (the launcher generates `dagster api execute_run …` and can't be
@@ -445,18 +512,10 @@ running tasks you'll watch. An empty cluster manages no capacity and costs nothi
       `dagster dagster api execute_run …` and fail; `/usr/bin/env dagster …` simply resolves
       `dagster` from `PATH` and runs it. The image's own entry point remains convenient for
       local `docker run` smoke tests, which is why it isn't changed in the Dockerfile itself.
-    - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
-      `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` — both are needed, since the delivery
-      tables live in a separate bucket from everything else (see the
-      [Configuration reference](setup.md#the-configuration-model)). Leave
-      `DATA_STORE_*` unset, since the task role supplies credentials. These are plain
-      environment values, not secrets — bucket URIs are safe in clear text.
-    - **Secrets — the four Parameter Store entries.** Add each parameter from
-      [Step 8](#step-8-store-secrets-in-parameter-store) as an environment variable of type
-      **ValueFrom** (the console's "Secrets" mechanism): the env-var name exactly as the code
-      expects (`NGED_S3_BUCKET_URL`, `NGED_S3_BUCKET_ACCESS_KEY`, `NGED_S3_BUCKET_SECRET`,
-      `DAGSTER_PG_PASSWORD`), the value the matching parameter name (e.g.
-      `/nged-forecast/nged-s3-bucket-url`).
+
+    Everything else — **Task placement**, **Fault injection**, the container's **Restart
+    policy** / **HealthCheck** / timeouts, **Storage** (the 20 GiB ephemeral default is
+    plenty), **Monitoring**, **Tags** — stays at its default. Then click **Create**.
 
 Creating the task definition in the console is one-time. Later image changes never repeat it —
 `scripts/push_and_deploy_image.sh` registers new revisions of this family automatically (see
