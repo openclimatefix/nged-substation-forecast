@@ -688,7 +688,7 @@ wheels = [
 
 [[package]]
 name = "contracts"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "packages/contracts" }
 dependencies = [
     { name = "deltalake" },
@@ -1086,7 +1086,7 @@ wheels = [
 
 [[package]]
 name = "delta-store"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "packages/delta_store" }
 dependencies = [
     { name = "contracts" },
@@ -2527,7 +2527,7 @@ wheels = [
 
 [[package]]
 name = "ml-core"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "packages/ml_core" }
 dependencies = [
     { name = "contracts" },
@@ -2763,7 +2763,7 @@ wheels = [
 
 [[package]]
 name = "nged-data"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "packages/nged_data" }
 dependencies = [
     { name = "contracts" },
@@ -2784,7 +2784,7 @@ requires-dist = [
 
 [[package]]
 name = "nged-substation-forecast"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "altair" },

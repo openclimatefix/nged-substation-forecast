@@ -1,6 +1,6 @@
 [project]
 name = "nged_data"
-version = "0.0.1"
+version = "0.1.0"
 description = "Package for handling NGED JSON data"
 requires-python = ">=3.14"
 dependencies = [

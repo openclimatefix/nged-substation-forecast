@@ -1,6 +1,6 @@
 [project]
 name = "delta_store"
-version = "0.0.1"
+version = "0.1.0"
 description = "Physical storage policy for the project's Delta tables: parquet writer properties, compression-friendly sort orders, and significand-precision rounding"
 readme = "README.md"
 authors = [

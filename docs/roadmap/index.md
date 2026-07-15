@@ -59,13 +59,13 @@ GitHub epic issue.
 ## v0.1 — "Naive" MVP (internal only)
 
 *Epic: [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) — deploy the
-naive forecast on AWS. **This is the current focus.***
+naive forecast on AWS. **✅ Shipped July 2026** (`v0.1.0`) — running on AWS.*
 
 **Goal**: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a
 baseline. Intentionally does not detect switching events or estimate effective capacity — hence
 "naive" (assumes the grid is always in perfect health). The data pipeline, per-series XGBoost
-models, and CV leaderboard are already built; the remaining work is deployment — see
-[Live service](live-service.md).
+models, and CV leaderboard were already built; the remaining work was deployment, now running on
+AWS — see [Live service](live-service.md).
 
 ![v0.1 Naive forecast](assets/v0.1_naive_forecast_flow_diagram.png)
 
