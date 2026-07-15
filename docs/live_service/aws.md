@@ -372,10 +372,18 @@ technologies:
 - The **always-on control plane** — the Dagster daemon, webserver, code-location server, and
   Postgres — runs on a plain **EC2 virtual machine** (EC2 is Elastic Compute Cloud), launched by
   hand in [Step 11](#step-11-launch-the-control-plane-box) and managed with Docker Compose. ECS
-  and Fargate play no part in running it.
+  and Fargate play no part in running it. This is the **only compute in the deployment whose
+  operating system we install and maintain ourselves**: [Step 11](#step-11-launch-the-control-plane-box)
+  chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
+  installing software on it ([Step 12](#step-12-join-the-tailnet) and
+  [Step 13](#step-13-install-docker-and-pull-the-image)) and keeping it patched (Ubuntu's
+  `unattended-upgrades`, checked in [Optional hardening](#optional-hardening)).
 - The **ephemeral forecast worker** — each 6-hourly forecast run — runs as an **ECS task on
   Fargate**: a container that is created for one run and destroyed when it exits. The control
-  plane *dispatches* these tasks but never executes a forecast itself.
+  plane *dispatches* these tasks but never executes a forecast itself. Here there is **no
+  operating system for us to install or maintain**: AWS owns and patches the machines Fargate
+  tasks run on, and everything we are responsible for travels inside the container image from
+  [Step 6](#step-6-push-the-image-to-ecr).
 
 This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
 the task definition describing how to run them. Why the compute is split this way is the
