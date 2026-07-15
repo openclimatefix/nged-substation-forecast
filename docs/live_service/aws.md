@@ -227,16 +227,30 @@ script header documents every choice it makes and is the source of truth for the
 
 Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches
 and supervises containers), and they need **two** separate IAM roles, not one — they serve
-different principals:
+different principals. Both roles are created with the same console flow — **IAM** → **Roles** →
+**Create role** → trusted entity type **AWS service** → under **Use case**, search for and pick
+**Elastic Container Service**, then select the **Elastic Container Service Task** radio button
+(the *Task* variant is what puts `ecs-tasks.amazonaws.com` in the role's trust policy, so that
+ECS tasks can assume the role) → **Next**. As with [Step 2](#step-2-grant-data-access-with-iam),
+IAM is global, so there's no region selector to worry about. From the **Add permissions** page
+onwards the two roles diverge:
 
 - **Task execution role**, `nged-forecast-task-execution-role` — used by the *ECS agent* itself,
   before your code ever runs: pulling the image from ECR, shipping container output to
   CloudWatch Logs, and injecting the secrets from
-  [Step 8](#step-8-store-secrets-in-parameter-store). Create a role for the
-  `ecs-tasks.amazonaws.com` service and attach the AWS-managed
-  `AmazonECSTaskExecutionRolePolicy` (covers ECR + CloudWatch), plus one small inline policy for
-  the secrets — it's the *execution* role that reads them, not the task role, because the ECS
-  agent resolves secrets before the container starts:
+  [Step 8](#step-8-store-secrets-in-parameter-store).
+
+    On the **Add permissions** page, search for and tick the AWS-managed
+    **`AmazonECSTaskExecutionRolePolicy`** (covers the ECR pull + CloudWatch Logs) → **Next** →
+    **Role name** `nged-forecast-task-execution-role` → **Create role**.
+
+    Then add one small inline policy for the secrets — it's the *execution* role that reads
+    them, not the task role, because the ECS agent resolves secrets before the container
+    starts. Open the role you just created → **Permissions** tab → **Add permissions** →
+    **Create inline policy** → switch to the **JSON** editor → paste the JSON below, replacing
+    `<account-id>` with your 12-digit AWS account id (shown in the account menu at the top
+    right of the console, or from `aws sts get-caller-identity`) → **Next** → name it (e.g.
+    `nged-forecast-read-ssm-parameters`) → **Create policy**:
 
     ```json
     {
@@ -254,11 +268,13 @@ different principals:
     (No KMS statement needed as long as the parameters use the default `aws/ssm` key.)
 
 - **Task role**, `nged-forecast-task-role` — used by *your code* once it's running: this is what
-  lets the container read and write **both** data buckets (delivery and internal). Reuse the same
-  S3 policy from [Step 2](#step-2-grant-data-access-with-iam), attached to a
-  second role (also trusted by `ecs-tasks.amazonaws.com`). Nothing else is needed — with this
-  role attached, delta-rs' `object_store` auto-discovers temporary credentials at runtime, so
-  `DATA_STORE_*` stays unset.
+  lets the container read and write **both** data buckets (delivery and internal). Run the whole
+  create-role flow a second time (trusted entity **AWS service** → **Elastic Container Service
+  Task**), but on the **Add permissions** page reuse the same S3 policy from
+  [Step 2](#step-2-grant-data-access-with-iam): search for and tick the customer-managed
+  `nged-forecast-read-and-write` policy → **Next** → **Role name** `nged-forecast-task-role` →
+  **Create role**. Nothing else is needed — with this role attached, delta-rs' `object_store`
+  auto-discovers temporary credentials at runtime, so `DATA_STORE_*` stays unset.
 
 No static AWS keys anywhere in either role — the same IAM-role auto-discovery
 [Step 2](#step-2-grant-data-access-with-iam) relies on for all compute running on AWS.
