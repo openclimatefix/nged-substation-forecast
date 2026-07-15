@@ -312,10 +312,10 @@ Store**](https://eu-west-2.console.aws.amazon.com/systems-manager/parameters?reg
     - `/nged-forecast/nged-s3-bucket-url` — the URL of NGED's source S3 bucket, which the
       hourly `power_time_series_and_metadata` schedule pulls raw telemetry from (the
       `nged_s3_bucket_url` field of `Settings`).
-    - `/nged-forecast/nged-s3-bucket-access-key` — the access-key ID for that bucket
-      (`nged_s3_bucket_access_key`) — a static credential issued by NGED, since the bucket
+    - `/nged-forecast/nged-s3-bucket-access-key` — the access-key ID for NGED's bucket
+      (`nged_s3_bucket_access_key`) - a static credential issued by NGED, since the bucket
       lives in NGED's AWS account.
-    - `/nged-forecast/nged-s3-bucket-secret` — the secret access key paired with that
+    - `/nged-forecast/nged-s3-bucket-secret` — the secret access key paired with NGED's
       access-key ID (`nged_s3_bucket_secret`).
     - `/nged-forecast/dagster-pg-password` — the password for the control-plane box's
       Postgres ([Step 14](#step-14-configure-dagster-on-the-box)). It's stored here because
