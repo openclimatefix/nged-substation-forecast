@@ -700,31 +700,55 @@ takes neither path: the Instance Metadata Service auto-issues and auto-rotates t
 credentials on the instance's behalf, refreshing them before expiry for as long as the box runs, so
 this field is never consulted and the box's credentials never lapse.
 
-Then **EC2** → **Launch instance**:
+Then **EC2** → **Instances** → **Launch instance**. Nearly every default the wizard pre-fills —
+Amazon Linux, 64-bit x86, `t3.micro`, an 8 GiB volume, and a security group that allows SSH from
+anywhere — is *not* what we want, so work through each section and change it:
 
-- **Name**: `nged-forecast-ctrl`.
-- **AMI** (Amazon Machine Image — the operating-system image the instance boots from): Ubuntu
-  Server 24.04 LTS, **64-bit (Arm)**.
-- **Instance type**: `t4g.medium` (2 vCPU / 4 GB — comfortable for daemon + webserver +
-  code server + Postgres; the costed sizing is in the roadmap link above).
-- **Key pair**: create one. It's only needed for the first SSH below — Tailscale SSH takes over
-  in [Step 12](#step-12-join-the-tailnet).
-- **Network settings**: the same VPC (Virtual Private Cloud — the private network AWS resources
-  share) and **public subnet** as
-  [Step 10](#step-10-verify-run-a-forecast-task-manually)'s task; **Auto-assign public IP**
-  enabled (internet egress for apt/ECR/S3/Tailscale without a NAT gateway). Create a new
-  security group `nged-forecast-ctrl-sg` with **no inbound rules at all** — Tailscale needs
-  none (it dials out), and "no public inbound ports" is a load-bearing security decision, since
-  the Dagster UI has no authentication of its own. One inbound rule is added later, for
-  Postgres ([Step 14](#step-14-configure-dagster-on-the-box)).
-- **Storage**: 20 GiB gp3 (general-purpose SSD).
-- **Advanced details**:
+- **Name and tags** → **Name**: `nged-forecast-ctrl`.
+- **Application and OS Images (Amazon Machine Image)**: click the **Ubuntu** quick-start tile,
+  set the **Architecture** dropdown to **64-bit (Arm)** *first* (it defaults to x86, and the AMI
+  ID and the entire OS image change when you switch it), then in the **Amazon Machine Image
+  (AMI)** dropdown choose **Ubuntu Server 26.04 LTS**. Confirm the panel then shows
+  **Username: ubuntu** — that is the login name [Step 12](#step-12-join-the-tailnet)'s SSH uses.
+- **Instance type**: `t4g.medium` (2 vCPU / 4 GiB — comfortable for daemon + webserver + code
+  server + Postgres; the costed sizing is in the roadmap link above). The `t4g` family is
+  Graviton (Arm), which is why the Arm AMI above is required — an x86 AMI won't offer these types.
+- **Key pair (login)** → **Create new key pair**: name it `nged-forecast-ctrl`, **Key pair
+  type** **ED25519**, **Private key file format** **.pem**, then **Create key pair** and the
+  browser downloads `nged-forecast-ctrl.pem`. ED25519 over RSA: shorter keys, faster handshakes,
+  and every client in this runbook supports it. Move the file somewhere durable and lock it down
+  — `mv ~/Downloads/nged-forecast-ctrl.pem ~/.ssh/ && chmod 400 ~/.ssh/nged-forecast-ctrl.pem`
+  (`ssh` refuses a private key with group/other-readable permissions). It's only needed for the
+  first login below — Tailscale SSH takes over in [Step 12](#step-12-join-the-tailnet).
+- **Network settings** → **Edit** (the collapsed summary can't set the subnet or edit the
+  security-group rules, so you must expand it):
+    - **VPC**: the same one (the default `vpc-…`) as
+      [Step 10](#step-10-verify-run-a-forecast-task-manually)'s task.
+    - **Subnet**: change it from **No preference** to a specific **public subnet** in that VPC —
+      the same subnet Step 10's task ran in is the natural pick (every default-VPC subnet is
+      public, so any of them works).
+    - **Auto-assign public IP**: **Enable** (internet egress for apt/ECR/S3/Tailscale without a
+      NAT gateway).
+    - **Firewall (security groups)**: keep **Create security group** and set its **Security
+      group name** to `nged-forecast-ctrl-sg`. The wizard pre-adds one inbound rule — **Allow SSH
+      traffic from Anywhere** — so **delete it**, leaving **no inbound rules at all**. Tailscale
+      needs none (it dials out), and "no public inbound ports" is a load-bearing security
+      decision, since the Dagster UI has no authentication of its own. Leave the default
+      allow-all **outbound** rule untouched. One inbound rule is added later, for Postgres
+      ([Step 14](#step-14-configure-dagster-on-the-box)).
+
+- **Configure storage**: change the single **Root volume** from the default 8 GiB to **20 GiB**,
+  volume type **gp3** (general-purpose SSD). Leave **File systems** at **None**.
+- **Advanced details** (expand this section near the bottom of the form):
     - **IAM instance profile**: `nged-forecast-ctrl-role`.
-    - **Metadata version**: V2 only (token required), and — easy to miss, breaks everything
+    - **Metadata version**: **V2 only (token required)**, and — easy to miss, breaks everything
       quietly if skipped — **Metadata response hop limit: 2**. The Dagster containers fetch the
       instance role's credentials from the instance metadata service, and Docker's bridge adds a
       network hop; with the default hop limit of 1, boto3 and `object_store` inside the
       containers silently find no credentials.
+
+Check the **Summary** panel on the right (it should read Ubuntu 26.04, `t4g.medium`, your new
+`nged-forecast-ctrl-sg`, 20 GiB gp3), then **Launch instance**.
 
 ## Step 12 — Join the tailnet
 
