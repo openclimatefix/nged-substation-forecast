@@ -1162,16 +1162,34 @@ scheduler and run-monitoring daemons with green heartbeats.
 1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`,
    `ecmwf_ens_schedule`, and `live_forecasts_schedule`. Schedule state lives in Postgres, so
    this is a one-time action — it survives restarts and reboots.
-2. **Kick a run now rather than waiting for a tick**: materialise the latest `live_forecasts`
+2. **First time only — materialise the upstream assets once so `live_forecasts` has something
+   to read.** A Dagster `deps=[...]` declaration records lineage; it does *not* make
+   materialising `live_forecasts` reach back and build its parents first. On a brand-new box the
+   Delta tables are empty, so the very first `live_forecasts` run has no NWP, no telemetry, and no
+   grid weights to consume. Materialise these once, from the UI, in order (each is its own asset
+   because they run on different cadences and, for `ecmwf_ens` vs `live_forecasts`, different
+   partition definitions — so there is no single run that can build the whole chain):
+
+    1. `h3_grid_weights` (unpartitioned) — `ecmwf_ens` depends on it, so do this first.
+    2. the latest `ecmwf_ens` partition — gives `live_forecasts` an NWP run to forecast from.
+    3. `power_time_series_and_metadata` (unpartitioned) — the power spine and substation metadata.
+
+    (`promoted_model` is the fourth parent, already handled back in
+    [Step 3](#step-3-pick-and-promote-a-champion-model) — its artifacts are baked into the image,
+    so there is nothing to materialise for it here.) Once
+    the schedules from step 1 are on, each of these upstream assets is kept fresh by its own
+    schedule; this manual pass is only to seed the empty tables for the first tick.
+
+3. **Kick a run now rather than waiting for a tick**: materialise the latest `live_forecasts`
    partition from the UI (see
    [Operating the live service: Step 3](operations.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)).
    Watch the run get dispatched by the launcher: it appears in the Dagster UI, a Fargate task
    spins up in the ECS console, its logs stream to CloudWatch, and forecast rows land under
    `s3://nged-forecast-delivery/data/power_forecasts/…`.
-3. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always`
+4. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always`
    must bring all four services back unattended; the UI comes back over Tailscale with run
    history intact.
-4. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a
+5. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a
    fresh NWP ingest after each daily 00Z publication; check Cost Explorer against the
    [roadmap's cost model](../roadmap/live-service.md#cost-summary).
 
