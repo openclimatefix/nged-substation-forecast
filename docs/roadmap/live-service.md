@@ -334,6 +334,8 @@ something to say "additive on top of."
 
 #### Stage 2 — team gets read-only Dagster access; MLflow stays private
 
+Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328)
+
 - A **second** `dagster-webserver --read-only` process on the same box, against the same
   Postgres + code location — cheap: just another process, no new daemon, no new infra beyond
   this.
@@ -363,6 +365,8 @@ something to say "additive on top of."
   pieces Stage 2's proxy needs but also breaks none of them.
 
 #### Stage 3 — public Marimo dashboard, curated public data
+
+Issue: [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/329)
 
 - A **separate** Marimo instance, not the private one — reads only a public-safe subset of data
   (ideally its own S3 prefix), runs as its own ECS Fargate task/service, no ALB.
