@@ -219,8 +219,8 @@ image that was built and verified can be pushed), and the AWS account id comes f
 `aws sts get-caller-identity`. The script logs Docker into ECR, tags, and pushes; then, if the
 `nged-forecast` task-definition family already exists
 ([Step 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new
-revision pointing at the new image. On this first pass through the runbook the family doesn't
-exist yet — the script says so and exits cleanly, and the push is all this step needs. The
+revision pointing at the new image. If this is the first pass through the runbook then the family
+doesn't exist yet — the script says so and exits cleanly, and the push is all this step needs. The
 script header documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 7 — IAM roles for the Fargate task
