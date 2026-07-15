@@ -178,13 +178,19 @@ only for first month, then shared with NGED.*
 
 The bucket for **operational improvements to the running live service** — efficiency,
 robustness, and operability polish discovered during early live running, as distinct from the
-forecast-skill milestones above. First item:
+forecast-skill milestones above. Items so far:
 
 - Replace the polling schedules with Dagster sensors
   ([#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)): cheap
   "is there new data?" detection runs on the control-plane box, and Fargate tasks launch only
   when there is real work to do. Design context:
   [Production Deployment — Design](../architecture/production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm).
+- Codify the AWS infrastructure as infra-as-code
+  ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)): the
+  Terraform-vs-CDK question and the sequencing (start at access-phasing Stage 2) are in the
+  [live-service plan](live-service.md#deployment-workstream-3-aws-infrastructure); the
+  account-portability requirement is in
+  [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
 
 ---
 

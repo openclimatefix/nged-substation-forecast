@@ -563,7 +563,8 @@ dress rehearsal above.
 > (steps 5–10). The accepted option's specific pieces below (the always-on EC2 box,
 > `EcsRunLauncher`, scheduling, Tailscale) now have their full bring-up runbook written —
 > [steps 11–16 of the same page](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-11-launch-the-control-plane-box)
-> — and executing it is in progress; infra-as-code is still 🚧, tracked as follow-up work.
+> — and executing it is in progress; infra-as-code is still 🚧, tracked as
+> [#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326).
 
 Common to all options:
 
@@ -589,7 +590,9 @@ Common to all options:
   failure alerts are necessary but not sufficient — the
   [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) catches the
   silent-failure classes they miss.
-- 🚧 Codify as infra-as-code once there's enough to justify it — per the
+- 🚧 Codify as infra-as-code
+  ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) once there's
+  enough to justify it — per the
   [Access phasing sequencing note](#access-phasing), that point is Stage 2, not Stage 1.
   **Open question, not yet decided:** this section originally specified a small Terraform
   module (one file), but a later conversation argued for **AWS CDK (Python)** instead —
