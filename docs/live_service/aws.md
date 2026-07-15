@@ -1064,14 +1064,27 @@ python_logs:
 
 Two things in `dagster.yaml` deserve explanation:
 
-- **The Postgres hostname is the box's private IP** (find it with `hostname -I` on the box, or
-  in the EC2 console), *not* the compose service name `postgres`. This instance config is not
-  only read on the box: the daemon serializes it into every run it launches, and the **Fargate
-  run worker connects back to this same Postgres** to record its events and heartbeats. The
-  compose-network alias only resolves on the box, whereas the private IP is reachable both from
-  Fargate (same VPC) and from the box's own containers (via the published port). A private IPv4
-  persists across stop/start — it only changes if the instance is terminated and replaced, at
-  which point this file needs the new IP.
+- **The Postgres hostname is the box's VPC private IP** — the `172.31.x.x` address on its primary
+  network interface (it matches the box's `ip-172-31-…` hostname), *not* the compose service name
+  `postgres`, and *not* the Tailscale (`100.x` / `fd7a:…`) or Docker-bridge (`172.17.x`) addresses
+  that `hostname -I` also lists now that Tailscale and Docker are installed. To read just that one
+  address, ask the instance metadata service (an IMDSv2 token is required, because
+  [Step 11](#step-11-launch-the-control-plane-box) set token-required):
+
+    ```bash
+    TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+    curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+      http://169.254.169.254/latest/meta-data/local-ipv4
+    ```
+
+    This instance config is not only read on the box: the daemon serializes it into every run it
+    launches, and the **Fargate run worker connects back to this same Postgres** to record its
+    events and heartbeats. The compose-network alias only resolves on the box, whereas the private
+    IP is reachable both from Fargate (same VPC) and from the box's own containers (via the
+    published port). A private IPv4 persists across stop/start — it only changes if the instance is
+    terminated and replaced, at which point this file needs the new IP.
+
 - Because the run workers connect in, **add the one inbound security-group rule now**: EC2 →
   `nged-forecast-ctrl-sg` → edit inbound rules → allow **PostgreSQL (TCP 5432)** with source =
   the security group used by the Fargate tasks (`<sg-id>` from
