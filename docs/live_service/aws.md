@@ -760,9 +760,23 @@ dials out and the box needs no inbound SSH ever again).
 
 Add the rule scoped to your laptop's current public IP — **EC2** → **Security Groups** →
 `nged-forecast-ctrl-sg` → **Inbound rules** → **Edit inbound rules** → **Add rule**: **Type**
-`SSH`, **Source** **My IP** (the console fills in your laptop's `/32`) → **Save rules**. Then SSH
-in with [Step 11](#step-11-launch-the-control-plane-box)'s key pair and bring up Tailscale, joining
-the same tailnet your laptop is on:
+`SSH`, **Source** **My IP** (the console fills in your laptop's `/32`) → **Save rules**.
+
+Now find the address to SSH *to*: the **control-plane box's own public IPv4 address** — the one
+AWS auto-assigned the instance at launch (Step 11's *Auto-assign public IP*), **not** your laptop's
+IP from the rule you just added. Read it off **EC2** → **Instances** → select `nged-forecast-ctrl`
+→ the **Details** tab → **Public IPv4 address**, or from the CLI:
+
+```bash
+aws ec2 describe-instances --region eu-west-2 \
+  --filters Name=tag:Name,Values=nged-forecast-ctrl Name=instance-state-name,Values=running \
+  --query 'Reservations[].Instances[].PublicIpAddress' --output text
+```
+
+A stop/start reassigns this address, but you only need it for this one login — Tailscale's stable
+MagicDNS name takes over afterwards. SSH in with
+[Step 11](#step-11-launch-the-control-plane-box)'s key pair, substituting that address for
+`<public-ip>`, and bring up Tailscale, joining the same tailnet your laptop is on:
 
 ```bash
 ssh -i ~/.ssh/nged-forecast-ctrl.pem ubuntu@<public-ip>
