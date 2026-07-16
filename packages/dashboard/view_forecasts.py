@@ -311,8 +311,8 @@ def _(
         lags=[
             lag
             for box, lag in (
-                (show_lag_7d, LAG_OPTIONS["7-day lag"]),
-                (show_lag_14d, LAG_OPTIONS["14-day lag"]),
+                (show_lag_7d, LAG_OPTIONS["7-day lagged power"]),
+                (show_lag_14d, LAG_OPTIONS["14-day lagged power"]),
             )
             if box.value
         ],

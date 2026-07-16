@@ -5,7 +5,9 @@ as a thin grey line, observed power as a thick blue line, a vertical rule at
 ``power_fcst_init_time``, a faint shaded band behind each weekend (weekday/weekend structure
 dominates demand, so weekends should be findable at a glance), and optional lagged-power lines
 (observed power shifted forward by e.g. 7 days — the raw material of the models' power-lag
-features). The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at
+features). A colour legend beside the chart always lists every plottable line — its entry set is
+the shared colour scale's explicit domain, so it never changes as lines are toggled on and off.
+The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at
 local midnight only (day-of-week first — crucial for demand forecasting), with unlabelled minor
 ticks every 3 hours, all in Europe/London wall time.
 """
@@ -40,7 +42,7 @@ low-opacity grey ensemble lines.
 
 def _lag_label(lag: timedelta) -> str:
     """The display label for a power lag, used in the UI control and the chart legend alike."""
-    return f"{lag.days}-day lag"
+    return f"{lag.days}-day lagged power"
 
 
 LAG_OPTIONS: Final[dict[str, timedelta]] = {
@@ -55,6 +57,22 @@ defaults rather than pretending to read them from the model.
 
 _LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
 """Line colours assigned to lags in ascending-lag order; must cover ``len(LAG_OPTIONS)``."""
+
+_FORECAST_LABEL: Final[str] = "Forecast power"
+_ACTUALS_LABEL: Final[str] = "Actual power"
+_INIT_TIME_LABEL: Final[str] = "Forecast init time"
+
+_LINE_COLORS: Final[dict[str, str]] = {
+    _FORECAST_LABEL: ocf_theme.ENSEMBLE_LINE,
+    _ACTUALS_LABEL: ocf_theme.BLUE,
+    **dict(zip(LAG_OPTIONS, _LAG_COLORS, strict=True)),
+    _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
+}
+"""Legend label → line colour for everything the chart can draw, in legend order.
+
+Used as the explicit domain/range of the shared colour scale, so the legend always lists every
+entry — whichever lines are currently toggled on — and each line keeps a stable colour.
+"""
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
 """Vega expression: is this tick at (wall-clock) midnight?
@@ -229,11 +247,18 @@ def build_view_forecast_chart(
     # whichever subset of lines is toggled on.
     y_title = f"Power ({units})"
 
+    # The shared colour scale's explicit domain drives the legend, so the legend always lists
+    # every line — even ones currently toggled off — and colours never reshuffle. The scale and
+    # legend definitions ride on the field-encoded layers (lags and the always-present init-time
+    # rule); the single-colour layers reference the same scale via datum encodings.
+    line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
+    line_legend = alt.Legend(title=None, symbolType="stroke", symbolStrokeWidth=2, symbolOpacity=1)
+
     # Layers are appended in draw order: weekend bands at the back, then the forecast
     # ensemble, then lagged power (model *inputs*, which must not obscure observations), then
     # observed power, with the init-time rule on top of everything.
     layers: list[alt.Chart] = []
-    legend_parts: list[str] = []
+    subtitle_notes: list[str] = []
     if shade_weekends:
         # Drawn first so every other layer sits on top; no y encoding, so each band spans the
         # full chart height. Uses the shared x encoding (see _x_encoding's docstring for why
@@ -246,22 +271,20 @@ def build_view_forecast_chart(
                 x2="end:T",
             )
         )
-        legend_parts.append("Shaded: weekends")
+        subtitle_notes.append("Shaded: weekends")
     if show_forecast:
         layers.append(
             alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
-            .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
+            .mark_line(strokeWidth=1, opacity=0.3)
             .encode(
                 x=x,
                 y=alt.Y("power_fcst:Q", title=y_title),
+                color=alt.ColorDatum(_FORECAST_LABEL),
                 detail="ensemble_member:N",
                 tooltip=["ensemble_member", "valid_time", "power_fcst"],
             )
         )
-        legend_parts.append("Grey: ensemble members")
     if lags:
-        # The lag lines' colour legend doubles as the on-chart key, so the subtitle legend
-        # doesn't mention them.
         sorted_lags = sorted(lags)
         layers.append(
             alt.Chart(
@@ -277,14 +300,7 @@ def build_view_forecast_chart(
             .encode(
                 x=x,
                 y=alt.Y("power:Q", title=y_title),
-                color=alt.Color(
-                    "lag:N",
-                    title="Lagged power",
-                    scale=alt.Scale(
-                        domain=[_lag_label(lag) for lag in sorted_lags],
-                        range=list(_LAG_COLORS[: len(sorted_lags)]),
-                    ),
-                ),
+                color=alt.Color("lag:N", scale=line_color_scale, legend=line_legend),
                 tooltip=["lag", "valid_time", "power"],
             )
         )
@@ -299,23 +315,27 @@ def build_view_forecast_chart(
                 .rename({"time": "valid_time"})
                 .collect()
             )
-            .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
+            .mark_line(strokeWidth=2.5)
             .encode(
                 x=x,
                 y=alt.Y("power:Q", title=y_title),
+                color=alt.ColorDatum(_ACTUALS_LABEL),
                 tooltip=["valid_time", "power"],
             )
         )
-        legend_parts.append("Blue: observed power")
     layers.append(
-        alt.Chart(pl.DataFrame({"valid_time": [init_wall]}))
-        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4], color=ocf_theme.ORANGE_RED)
-        .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
+        alt.Chart(pl.DataFrame({"valid_time": [init_wall], "series": [_INIT_TIME_LABEL]}))
+        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4])
+        .encode(
+            x=x,
+            color=alt.Color("series:N", scale=line_color_scale, legend=line_legend),
+            tooltip=[alt.Tooltip("valid_time", title="Forecast init time")],
+        )
     )
     chart = alt.layer(*layers).properties(
         title=alt.TitleParams(
             text=title,
-            subtitle=[subtitle, " · ".join(legend_parts)],
+            subtitle=[subtitle, " · ".join(subtitle_notes)] if subtitle_notes else [subtitle],
         ),
         width="container",
         height=400,

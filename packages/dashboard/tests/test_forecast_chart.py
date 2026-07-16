@@ -88,7 +88,11 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     assert axes[0] is not None
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
+    # Single-colour layers take their colour from the shared scale via a datum encoding, so
+    # they participate in the always-shown legend without a constant column in their data.
+    assert ensemble["encoding"]["color"]["datum"] == "Forecast power"
     assert actuals["encoding"]["y"]["field"] == "power"
+    assert actuals["encoding"]["color"]["datum"] == "Actual power"
     assert rule["mark"]["type"] == "rule"
 
 
@@ -155,11 +159,42 @@ def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
     assert first_shifted["power"] == source.filter(pl.col("time") == source_time)["power"].item()
 
 
-def test_lag_colours_assigned_in_ascending_lag_order() -> None:
+def test_legend_always_lists_every_line() -> None:
+    # The always-drawn init-rule layer carries the shared colour scale, whose explicit domain
+    # drives the legend — so the legend is identical whichever lines are toggled on.
+    for spec in (
+        _build().to_dict(),
+        _build(show_forecast=False, show_actuals=False).to_dict(),
+        _build(lags=tuple(LAG_OPTIONS.values())).to_dict(),
+    ):
+        colour = spec["layer"][-1]["encoding"]["color"]
+        assert colour["field"] == "series"
+        assert colour["scale"]["domain"] == [
+            "Forecast power",
+            "Actual power",
+            "7-day lagged power",
+            "14-day lagged power",
+            "Forecast init time",
+        ]
+        assert colour["scale"]["range"] == [
+            ocf_theme.ENSEMBLE_LINE,
+            ocf_theme.BLUE,
+            ocf_theme.PURPLE,
+            ocf_theme.SPRING_GREEN,
+            ocf_theme.ORANGE_RED,
+        ]
+        assert colour["legend"]["symbolType"] == "stroke"
+
+
+def test_lag_lines_share_the_legend_colour_scale() -> None:
     spec = _build(lags=tuple(LAG_OPTIONS.values())).to_dict()
     colour = spec["layer"][2]["encoding"]["color"]
-    assert colour["scale"]["domain"] == ["7-day lag", "14-day lag"]
-    assert colour["scale"]["range"] == [ocf_theme.PURPLE, ocf_theme.SPRING_GREEN]
+    assert colour["field"] == "lag"
+    # Identical scale to the rule layer's, so Vega-Lite merges them without conflict and the
+    # lag lines pick up their (ascending-lag-ordered) colours from the shared domain.
+    assert colour["scale"] == spec["layer"][-1]["encoding"]["color"]["scale"]
+    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    assert {row["lag"] for row in lag_rows} == {"7-day lagged power", "14-day lagged power"}
 
 
 def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
@@ -174,10 +209,9 @@ def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
 def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
     no_forecast = _build(show_forecast=False).to_dict()
     assert len(no_forecast["layer"]) == 3  # weekend bands, actuals, init rule
-    assert "ensemble members" not in " ".join(no_forecast["title"]["subtitle"])
     no_actuals = _build(show_actuals=False).to_dict()
     assert len(no_actuals["layer"]) == 3  # weekend bands, ensemble, init rule
-    assert "observed power" not in " ".join(no_actuals["title"]["subtitle"])
+    assert no_actuals["layer"][1]["encoding"]["color"]["datum"] == "Forecast power"
     only_lags = _build(
         show_forecast=False,
         show_actuals=False,
