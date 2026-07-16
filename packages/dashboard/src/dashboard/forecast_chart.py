@@ -96,18 +96,23 @@ def _x_axis_ticks(window_start: datetime, window_end: datetime) -> list[datetime
     return pl.datetime_range(first_tick, window_end, interval="3h", eager=True).to_list()
 
 
-def _x_encoding(window_start: datetime, window_end: datetime) -> alt.X:
+def _x_encoding(window_start: datetime, window_end: datetime, field: str = "valid_time") -> alt.X:
     """The shared x encoding: explicit 3-hourly ticks, labels at midnight only.
 
     Altair's adaptive datetime ticks are hard to read; instead every property is pinned. Labelled
     major ticks (with gridlines) sit at each local midnight, formatted ``Mon 06 Jul``; shorter
     minor ticks every 3 hours carry no label and no gridline. The conditional-axis-property
     dicts are Vega-Lite's native encoding for "major vs minor tick" styling.
+
+    Every layer must use this same encoding (via ``field`` when its time column isn't
+    ``valid_time``): the x scale is shared across layers, so Vega-Lite merges the layers' axis
+    definitions, and one deviating definition (e.g. ``axis=None``) can suppress the merged axis
+    — labels, ticks, and gridlines — for the whole chart.
     """
     tick_size: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 7}, "value": 3}
     grid_opacity: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 1}, "value": 0}
     return alt.X(
-        "valid_time:T",
+        f"{field}:T",
         title=f"Time ({DISPLAY_TIME_ZONE})",
         scale=alt.Scale(domain=[window_start, window_end]),
         axis=alt.Axis(
@@ -160,16 +165,13 @@ def build_view_forecast_chart(
     x = _x_encoding(window_start, window_end)
 
     # Drawn first so every other layer sits on top; no y encoding, so each band spans the full
-    # chart height. The other layers carry the labelled x-axis, hence axis=None here.
+    # chart height. Uses the shared x encoding (see _x_encoding's docstring for why deviating
+    # from it would suppress the merged x-axis).
     weekend_layer = (
         alt.Chart(_weekend_bands(window_start, window_end))
         .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
         .encode(
-            x=alt.X(
-                "start:T",
-                scale=alt.Scale(domain=[window_start, window_end]),
-                axis=None,
-            ),
+            x=_x_encoding(window_start, window_end, field="start"),
             x2="end:T",
         )
     )

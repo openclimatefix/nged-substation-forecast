@@ -66,6 +66,12 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     weekends, ensemble, actuals, rule = spec["layer"]
     assert weekends["mark"]["type"] == "rect"  # drawn first, so every line sits on top of it
     assert weekends["encoding"]["x2"]["field"] == "end"
+    # Layers share the x scale, so Vega-Lite merges their axis definitions — one deviating
+    # definition (e.g. axis=None) suppresses labels, ticks, and gridlines for the whole chart.
+    # Guard that every layer carries the identical axis definition.
+    axes = [layer["encoding"]["x"].get("axis") for layer in spec["layer"]]
+    assert all(axis == axes[0] for axis in axes)
+    assert axes[0] is not None
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
     assert actuals["encoding"]["y"]["field"] == "power"
