@@ -61,6 +61,7 @@ nav:
       - Overview: live_service/index.md
       - Running the whole stack locally: live_service/local.md
       - Setting up the live service on AWS: live_service/aws.md
+      - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
       - Configuration reference: live_service/setup.md
   - Roadmap:
