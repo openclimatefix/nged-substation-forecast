@@ -227,18 +227,17 @@ def _(
     experiment_picker,
     fold_picker,
     no_runs_message,
-    nwp_variable_picker,
     run_picker,
     series_picker,
     show_actuals,
     show_forecast,
     show_lag_14d,
     show_lag_7d,
-    show_nwp_analysis,
     weekend_shading,
 ):
     # The run selectors (which forecast to look at) stack vertically as one visual unit;
-    # the display toggles (how to draw it) sit beside them.
+    # the display toggles (how to draw it) sit beside them. The NWP controls live with the
+    # NWP panel itself (see the NWP chart cell), not here.
     _run_selectors = [series_picker, fold_picker]
     if len(experiment_names) > 1:
         _run_selectors.append(experiment_picker)
@@ -253,7 +252,6 @@ def _(
         mo.vstack(_run_selectors, gap=0.5),
         _lines,
         weekend_shading,
-        mo.vstack([nwp_variable_picker, show_nwp_analysis], gap=0.5),
     ]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
@@ -451,7 +449,14 @@ def _(
         analysis=nwp_analysis.lazy() if show_nwp_analysis.value else None,
         shade_weekends=weekend_shading.value,
     )
-    mo.ui.altair_chart(nwp_chart, chart_selection=False, legend_selection=False)
+    # The NWP controls sit directly above the panel they affect (when the upstream cells stop
+    # because there is no NWP to plot, the controls rightly disappear with the panel).
+    mo.vstack(
+        [
+            mo.hstack([nwp_variable_picker, show_nwp_analysis], justify="start", gap=2),
+            mo.ui.altair_chart(nwp_chart, chart_selection=False, legend_selection=False),
+        ]
+    )
     return
 
 
