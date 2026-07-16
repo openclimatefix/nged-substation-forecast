@@ -50,6 +50,7 @@ nav:
       - Forecast Delivery: architecture/forecast-delivery.md
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Production Deployment Design: architecture/production-deployment.md
+      - Porting to Airflow: architecture/airflow-portability.md
       - Code Style: architecture/code-style.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
