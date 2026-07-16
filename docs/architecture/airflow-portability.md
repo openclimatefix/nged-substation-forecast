@@ -12,12 +12,13 @@ The short answer:
 - **A port is technically possible, and deliberately so.** The codebase keeps orchestrator
   lock-in shallow: all real logic lives in `packages/` with no Dagster imports, and the Dagster
   surface is a handful of thin files. Nothing about the data or ML design depends on Dagster.
-- **A full port would make day-to-day ML R&D materially worse**, because the experimentation
-  layer leans on Dagster capabilities (runtime-minted partitions, per-partition observability
-  and backfill) that Airflow does not replicate.
-- **Porting only the live service is the credible variant** — the R&D/production seam already
-  drawn by our architecture is exactly where an orchestrator boundary could sit — at the
-  permanent cost of running two orchestrators.
+- **A full port would cost day-to-day ML R&D some capabilities we lean on heavily** —
+  runtime-minted partitions, per-partition observability and backfill — which Airflow does not
+  currently replicate.
+- **Porting only the live service is the most promising variant** — the R&D/production seam
+  already drawn by our architecture is exactly where an orchestrator boundary could sit —
+  though it would mean running two orchestrators side by side, an ongoing cost weighed up
+  below.
 
 Airflow claims on this page were verified against Airflow 3.3.0 in July 2026 and are dated where
 they may drift.
@@ -59,9 +60,9 @@ The mapping is uneven, though:
 | Concurrency pool (`pool="ECMWF"`) | `ecmwf_ens` | Airflow pools | Direct equivalent |
 | In-run retry-with-wait (`RetryRequested`) | `ecmwf_ens` NWP wait | Deferrable sensor | Airflow is **better** (see below) |
 | Typed run config + Launchpad | `availability_mode`, `MetricsConfig`, `PromotedModelConfig` | DAG `params` with schema-validated trigger forms | Workable; less strongly typed |
-| `DynamicPartitionsDefinition` (`{experiment}__{fold}`) | CV layer | **None** | The blocking gap |
-| Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`, but with open correctness bugs | Risky (see below) |
-| `add_output_metadata` tables, asset catalog, lineage | every asset | Task logs / XCom; Airflow assets carry no materialisation metadata | Real observability loss |
+| `DynamicPartitionsDefinition` (`{experiment}__{fold}`) | CV layer | No direct equivalent yet | The main gap (see below) |
+| Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`, but with open correctness bugs | Needs careful verification (see below) |
+| `add_output_metadata` tables, asset catalog, lineage | every asset | Task logs / XCom; Airflow assets carry no materialisation metadata | A loss we would feel day to day |
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Sensors / run-status coordination (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest → forecast ordering | Asset-triggered DAGs, event-driven scheduling | Parity, arguably cleaner in Airflow |
 
@@ -72,9 +73,9 @@ configuration-defined — there is no equivalent of minting new partition keys a
 the feature is months old versus Dagster partitions' years of production maturity. Worth a
 fresh look whenever this page is revisited.
 
-## The three hard parts of a full port
+## The three trickiest parts of a full port
 
-### Runtime-minted experiment×fold partitions have no equivalent
+### Runtime-minted experiment×fold partitions have no direct equivalent yet
 
 The CV layer's core mechanic is that `register_experiment_job` mints
 `{experiment_name}__{fold_id}` partition keys at runtime, and `trained_cv_model` /
@@ -87,9 +88,9 @@ record for experiment progress, and the at-a-glance grid is gone.
 
 [ML Orchestration — rejected designs](ml-orchestration.md#rejected-designs) already records
 that a fold-loop-inside-one-run design was rejected precisely for losing per-fold observability
-and retry. A full Airflow port would be forced back toward the design we rejected.
+and retry. A full Airflow port would steer us back toward the design we had rejected.
 
-### Replay backfills are exactly where Airflow is least trustworthy
+### Replay backfills would need especially careful verification
 
 Recovering missed `live_forecasts` slots means backfilling selected 6-hourly partitions with
 `availability_mode="replay"` — and replay exists to prevent
@@ -110,12 +111,12 @@ asset catalog gives lineage from ingest through forecasts, and `promoted_model` 
 specifically so that
 [promotion is an audited materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script).
 Airflow has no per-materialisation metadata surface; the equivalents are structured logs or a
-hand-rolled reporting table. This loss is diffuse rather than blocking, but it is paid on every
-run, forever.
+hand-rolled reporting table. This loss is diffuse rather than blocking, but it would be felt on
+every run.
 
 ## Where Airflow would be genuinely better
 
-An honest port assessment cuts both ways. Four real advantages:
+The assessment cuts both ways — Airflow would bring some genuine improvements:
 
 - **The NWP publication wait.**
   [What the accepted design costs](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm)
@@ -142,17 +143,17 @@ An honest port assessment cuts both ways. Four real advantages:
 
 ## Three options
 
-### Option A: full port — possible, not recommended
+### Option A: full port — possible, but the hardest path
 
 Everything above applies. The translation itself is not the cost — assets are thin shells with
 their intended behaviour documented, so rewriting them as DAGs is days of work. The cost is the
 redesign of the CV layer around the missing dynamic partitions, the verification of
 orchestration behaviour (schedules ticking, backfills replaying without lookahead leakage, ECS
 dispatch — inherently wall-clock-bound), the docs rewrite, and the deployment cutover.
-Realistically several weeks end-to-end, landing on a *less capable* experimentation workflow
-than we have today.
+Realistically several weeks end-to-end, landing on an experimentation workflow with fewer of
+the affordances we rely on today.
 
-### Option B: port only the live service — credible, with a real duality cost
+### Option B: port only the live service — promising, with a real two-orchestrator cost
 
 Move the production side to Airflow — `power_time_series_and_metadata`, `ecmwf_ens`,
 `live_forecasts`, `h3_grid_weights`, and their schedules — and keep everything
@@ -170,17 +171,17 @@ OCF-style Airflow-orchestrated micro-service, while Flexpectation R&D stays a Da
 In favour:
 
 - Nearly all of the plausible benefit of a port (OCF alignment, MWAA option, deferrable NWP
-  wait, per-task sizing) at a fraction of the loss — the CV layer, where a port hurts most,
-  never moves, and R&D loses nothing.
+  wait, per-task sizing) at a fraction of the loss — the CV layer, where a port would cost
+  us most, never moves, and R&D loses nothing.
 - A handover to NGED becomes an Airflow-only production stack; NGED never needs to learn
   Dagster.
 
-Against (the duality tax — permanent, not one-off):
+Against (the cost of a second orchestrator, which is ongoing rather than one-off):
 
 - **Two orchestrators to deploy, monitor, secure, upgrade, and document**, with two mental
-  models and two sets of failure modes. Our own rejected-designs history repeatedly invokes
-  "one execution path" as a principle; this violates it at the architecture level even while
-  simplifying NGED's slice of it.
+  models and two sets of failure modes. Our own rejected-designs history repeatedly leans on
+  "one execution path" as a guiding principle; this option steps away from it at the
+  architecture level even while simplifying NGED's slice of it.
 - **The control-plane VM question reopens.** Today one `t4g.medium` runs the Dagster control
   plane and dispatches both scheduled runs and UI-launched backtests to Fargate. After a split,
   the box runs Airflow's control plane (scheduler, DAG processor, triggerer, webserver,
@@ -193,24 +194,25 @@ Against (the duality tax — permanent, not one-off):
   external/observed assets, enforced lineage is lost, and "is the NWP archive fresh through my
   backtest window?" becomes a cross-tool manual check. Extending the NWP archive for a new CV
   fold becomes an *Airflow* backfill run by a researcher.
-- Which exposes the asymmetry: NGED gets a Dagster-free world, but OCF researchers still live
-  in both tools. The boundary is clean for the operator and leaky for the developer.
+- There is an asymmetry worth noting: NGED would get a Dagster-free world, but OCF researchers
+  would still live in both tools. The boundary is clean for the operator and leakier for the
+  developer.
 - The audit trail fragments: production run history in Airflow, promotion and experiment
   history in Dagster/MLflow.
 - The Airflow backfill-conf bugs above sit exactly on the ported surface (replay mode), the
   most correctness-critical operation being moved.
 
-### Option C: stay on Dagster, keep the seam documented — recommended today
+### Option C: stay on Dagster, keep the seam documented — our recommendation for now
 
-There is currently no technical problem that Airflow solves for this project and Dagster does
-not, and a port (full or split) lands on a workflow that is somewhere between "equivalent" and
-"worse" for the people using it daily. The recommendation is therefore to stay, and to treat
-this page as the documented seam: it records exactly what would move, what it would cost, and
-what would justify paying that cost — so the option stays real rather than theoretical.
+We have not yet found a technical problem in this project that a port would solve, and either
+port lands somewhere between "equivalent" and "a little worse" for the people using the
+workflow daily. Our suggestion is therefore to stay put for now, and to treat this page as the
+documented seam: it records what would move, what it would cost, and what would justify paying
+that cost — so the option stays genuinely open rather than theoretical.
 
-## What would change the answer
+## What would change this assessment
 
-Any of the following should trigger a re-read of this page:
+We would happily revisit this page if any of the following happens:
 
 - **A concrete handover signal** — NGED (or a post-NIA operating agreement) indicating that
   they run Airflow or want MWAA-managed orchestration. This is the strongest trigger, and it
@@ -219,8 +221,8 @@ Any of the following should trigger a re-read of this page:
   infrastructure. Also points at Option B.
 - **Airflow's asset partitioning maturing** to cover runtime-minted partition keys with
   per-partition observability — this would remove the main blocker to Option A.
-- **Dagster itself becoming a liability** (maintenance burden, licensing or project-direction
-  concerns).
+- **Dagster itself becoming harder to sustain** (maintenance burden, licensing or
+  project-direction concerns).
 
 ## See also
 
@@ -228,6 +230,6 @@ Any of the following should trigger a re-read of this page:
   architecture and its rejected alternatives, several of which (EventBridge, Fargate control
   plane) rehearse the same portability arguments.
 - [ML Orchestration Design](ml-orchestration.md) — the experiment layer whose Dagster
-  capabilities are the main obstacle to a full port.
+  capabilities are the main challenge for a full port.
 - [Handover to NGED](../roadmap/handover.md) — the handover plan whose constraints (simplicity,
   no bespoke glue) weigh on both sides of this assessment.
