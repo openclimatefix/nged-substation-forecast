@@ -1,20 +1,27 @@
-"""Tests for the ``view_forecasts.py`` chart builder (``dashboard.forecast_chart``)."""
+"""Tests for the ``view_forecasts.py`` chart builders (``dashboard.forecast_chart``)."""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
 from altair import LayerChart
+from contracts.weather_schemas import Nwp
 from dashboard.forecast_chart import (
     LAG_OPTIONS,
+    NWP_PLOT_VARIABLES,
     PLOT_HISTORY,
     PLOT_HORIZON,
+    Y_AXIS_EXTENT,
+    build_nwp_ensemble_chart,
     build_view_forecast_chart,
 )
 from plotting import ocf_theme
 
 INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 """During British Summer Time, so wall time is UTC+1 — the axis tests below rely on that."""
+
+NWP_INIT_TIME = INIT_TIME - timedelta(hours=6)
+"""The NWP run feeding the forecast, published 6 h before the power init time."""
 
 
 def _forecasts(members: tuple[int, ...]) -> pl.LazyFrame:
@@ -221,6 +228,95 @@ def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
     # weekend bands, lag line, init rule — the y-axis title comes from the lag layer alone.
     assert len(only_lags["layer"]) == 3
     assert only_lags["layer"][1]["encoding"]["y"]["title"] == "Power (MW)"
+
+
+def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
+    valid_times = pl.datetime_range(
+        NWP_INIT_TIME,
+        NWP_INIT_TIME + timedelta(days=15),
+        interval="3h",
+        time_zone="UTC",
+        eager=True,
+    )
+    return pl.DataFrame(
+        {
+            "valid_time": pl.concat([valid_times for _ in members]),
+            "ensemble_member": pl.Series(
+                [m for m in members for _ in range(len(valid_times))], dtype=pl.UInt8
+            ),
+            "temperature_2m": pl.Series(
+                [float(m + i % 24) for m in members for i in range(len(valid_times))],
+                dtype=pl.Float32,
+            ),
+            "precipitation_surface": pl.Series(
+                [m * 1e-4 for m in members for _ in range(len(valid_times))], dtype=pl.Float32
+            ),
+        }
+    ).lazy()
+
+
+def _build_nwp(variable: str = "temperature_2m", **kwargs: bool) -> LayerChart:
+    return build_nwp_ensemble_chart(
+        _nwp(),
+        variable=variable,
+        power_fcst_init_time=INIT_TIME,
+        nwp_init_time=NWP_INIT_TIME,
+        **kwargs,
+    )
+
+
+def test_nwp_chart_horizontal_geometry_matches_the_power_chart() -> None:
+    power = _build().to_dict()
+    nwp = _build_nwp().to_dict()
+    assert len(nwp["layer"]) == 3  # weekend bands, ensemble members, init rule
+    # The two charts are stacked in the dashboard, so their x-axes must align: identical x
+    # encoding (same pinned domain, ticks, and labels) and identical pinned y-axis extents.
+    power_x = power["layer"][1]["encoding"]["x"]
+    nwp_x = nwp["layer"][1]["encoding"]["x"]
+    assert nwp_x["axis"] == power_x["axis"]
+    assert nwp_x["scale"] == power_x["scale"]
+    for spec in (power, nwp):
+        y_axis = spec["layer"][1]["encoding"]["y"]["axis"]
+        assert y_axis["minExtent"] == y_axis["maxExtent"] == Y_AXIS_EXTENT
+    # The power chart's legend must sit above the plot — a right-side legend would eat
+    # horizontal plot space that the legend-less NWP panel doesn't lose, breaking alignment.
+    assert power["layer"][-1]["encoding"]["color"]["legend"]["orient"] == "top"
+
+
+def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
+    spec = _build_nwp().to_dict()
+    ensemble = spec["layer"][1]
+    assert ensemble["encoding"]["y"]["title"] == "2 m temperature (°C)"
+    assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
+    # Weather variables have no meaningful zero baseline — a zero-based axis would squash
+    # e.g. surface pressure (~101,000 Pa) into a flat sliver.
+    assert ensemble["encoding"]["y"]["scale"]["zero"] is False
+    rows = spec["datasets"][ensemble["data"]["name"]]
+    assert {row["ensemble_member"] for row in rows} == {0, 1, 2}
+
+
+def test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars() -> None:
+    # Drift guard: adding a variable to the Nwp contract must be mirrored here (or this set
+    # comparison fails), and categorical variables must stay excluded.
+    assert set(NWP_PLOT_VARIABLES) == Nwp.continuous_var_names()
+
+
+def test_precipitation_is_displayed_in_mm_per_hour() -> None:
+    spec = _build_nwp(variable="precipitation_surface").to_dict()
+    assert spec["layer"][1]["encoding"]["y"]["title"] == "Precipitation rate (mm/h)"
+    rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
+    # Stored kg/m²/s values of 0, 1e-4, and 2e-4 (per member) become mm/h on display.
+    assert {row["precipitation_surface"] for row in rows} == {0.0, 0.36, 0.72}
+
+
+def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:
+    spec = _build_nwp().to_dict()
+    rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
+    times = sorted(row["valid_time"] for row in rows)
+    # The run starts 6 h before the power init (01:00 wall time) — the panel is empty before
+    # that — and the run's final day (out to +15 d) is clipped at the window end.
+    assert times[0] == "2026-07-04T01:00:00"
+    assert times[-1] == "2026-07-18T07:00:00"
 
 
 def test_chart_renders_to_html() -> None:
