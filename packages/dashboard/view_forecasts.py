@@ -331,7 +331,7 @@ def _(
             f" — id {series_picker.value}"
         ),
         subtitle=(
-            f"Forecast init {init_time:%a %d %b %Y %H:%M} UTC"
+            f"Power forecast init {init_time:%a %d %b %Y %H:%M} UTC"
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
         shade_weekends=weekend_shading.value,
