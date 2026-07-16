@@ -232,17 +232,24 @@ def _(
     show_lag_7d,
     weekend_shading,
 ):
-    _pickers = [series_picker, fold_picker]
+    # The run selectors (which forecast to look at) stack vertically as one visual unit;
+    # the display toggles (how to draw it) sit beside them.
+    _run_selectors = [series_picker, fold_picker]
     if len(experiment_names) > 1:
-        _pickers.append(experiment_picker)
-    _pickers.append(date_picker)
+        _run_selectors.append(experiment_picker)
+    _run_selectors.append(date_picker)
     if run_picker is not None:
-        _pickers.append(run_picker)
+        _run_selectors.append(run_picker)
     _lines = mo.vstack(
         [mo.md("**Lines**"), show_forecast, show_actuals, show_lag_7d, show_lag_14d],
         gap=0,
     )
-    _pickers += [_lines, weekend_shading, nwp_variable_picker]
+    _pickers = [
+        mo.vstack(_run_selectors, gap=0.5),
+        _lines,
+        weekend_shading,
+        nwp_variable_picker,
+    ]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
