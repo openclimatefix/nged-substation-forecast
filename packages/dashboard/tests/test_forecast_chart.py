@@ -182,7 +182,7 @@ def test_legend_always_lists_every_line() -> None:
             "Actual power",
             "7-day lagged power",
             "14-day lagged power",
-            "Forecast init time",
+            "Power forecast init time",
         ]
         assert colour["scale"]["range"] == [
             ocf_theme.ENSEMBLE_LINE,
@@ -414,7 +414,7 @@ def test_nwp_legend_always_lists_every_line() -> None:
         assert colour["scale"]["domain"] == [
             "NWP ensemble",
             "NWP proxy analysis",
-            "Forecast init time",
+            "Power forecast init time",
         ]
         assert colour["scale"]["range"] == [
             ocf_theme.ENSEMBLE_LINE,

@@ -137,7 +137,7 @@ _LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
 
 _FORECAST_LABEL: Final[str] = "Forecast power"
 _ACTUALS_LABEL: Final[str] = "Actual power"
-_INIT_TIME_LABEL: Final[str] = "Forecast init time"
+_INIT_TIME_LABEL: Final[str] = "Power forecast init time"
 _NWP_ENSEMBLE_LABEL: Final[str] = "NWP ensemble"
 _NWP_ANALYSIS_LABEL: Final[str] = "NWP proxy analysis"
 
@@ -439,7 +439,7 @@ def build_view_forecast_chart(
         .encode(
             x=x,
             color=alt.Color("series:N", scale=line_color_scale, legend=line_legend),
-            tooltip=[alt.Tooltip("valid_time", title="Forecast init time")],
+            tooltip=[alt.Tooltip("valid_time", title="Power forecast init time")],
         )
     )
     chart = alt.layer(*layers).properties(
@@ -577,7 +577,7 @@ def build_nwp_ensemble_chart(
         .encode(
             x=x,
             color=alt.Color("series:N", scale=nwp_color_scale, legend=nwp_legend),
-            tooltip=[alt.Tooltip("valid_time", title="Forecast init time")],
+            tooltip=[alt.Tooltip("valid_time", title="Power forecast init time")],
         )
     )
     subtitle = (
