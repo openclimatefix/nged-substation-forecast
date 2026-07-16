@@ -1,10 +1,25 @@
 # Dashboard
 
-Marimo web app for visualising power forecasts, telemetry, and evaluation metrics.
+Marimo web apps for visualising power forecasts, telemetry, and evaluation metrics. The apps live
+at the package root; their shared, unit-testable logic (the data-source toggle, the forecast
+chart builder) lives in the importable `dashboard` package under `src/`.
+
+- **`view_forecasts.py`** — inspect a single forecast run: pick a time series, a fold (`live` or
+  a CV fold), and a forecast init time, then see every forecast ensemble member (thin grey lines)
+  against the observed power (thick blue line), from 24 hours before the init time to 14 days
+  after it. The x-axis is labelled at Europe/London midnight with the day of week and date.
+- **`map_and_timeseries.py`** — a map of every time series in the trial area; click a dot to see
+  its observed power.
+
+Run an app with:
+
+```bash
+uv run marimo edit packages/dashboard/view_forecasts.py
+```
 
 ## Switching between local and S3 data sources
 
-The dashboard has a **Data source** toggle (`local` / `s3`) that switches which data tables it
+Each app has a **Data source** toggle (`local` / `s3`) that switches which data tables it
 reads without restarting marimo, so you can compare a fully local pipeline against production
 data in one session.
 

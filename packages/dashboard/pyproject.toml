@@ -1,12 +1,13 @@
 [project]
 name = "dashboard"
 version = "0.1.0"
-description = "Interactive dashboard web app for visualising NGED data"
+description = "Interactive dashboard web apps for visualising NGED data and forecasts"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "altair>=6.0.0",
     "contracts",
+    "deltalake",
     "lonboard>=0.13.0",
     "marimo>=0.19.7",
     "plotting",
@@ -15,6 +16,10 @@ dependencies = [
     "geoarrow-pyarrow>=0.2.0",
     "patito>=0.8.5",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
