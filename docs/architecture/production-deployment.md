@@ -378,3 +378,5 @@ production-resilience mechanism.
   artifacts live, and how to point `Settings` at S3.
 - [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the
   CV pipeline's MLflow-artifact cache.
+- [Porting to Airflow](airflow-portability.md) — what moving this orchestration to Airflow
+  would take, and why Dagster remains the better fit today.
