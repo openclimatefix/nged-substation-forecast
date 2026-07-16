@@ -178,6 +178,12 @@ def _(available_dates, available_init_times, date_picker):
 
 
 @app.cell
+def _():
+    weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
+    return (weekend_shading,)
+
+
+@app.cell
 def _(
     date_picker,
     experiment_names,
@@ -186,6 +192,7 @@ def _(
     no_runs_message,
     run_picker,
     series_picker,
+    weekend_shading,
 ):
     _pickers = [series_picker, fold_picker]
     if len(experiment_names) > 1:
@@ -193,6 +200,7 @@ def _(
     _pickers.append(date_picker)
     if run_picker is not None:
         _pickers.append(run_picker)
+    _pickers.append(weekend_shading)
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
@@ -246,6 +254,7 @@ def _(
     init_time,
     metadata_df,
     series_picker,
+    weekend_shading,
 ):
     _meta = metadata_df.filter(pl.col("time_series_id") == series_picker.value)
     chart = build_view_forecast_chart(
@@ -261,6 +270,7 @@ def _(
             f"Forecast init {init_time:%a %d %b %Y %H:%M} UTC"
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
+        shade_weekends=weekend_shading.value,
     )
     # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in
     # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —

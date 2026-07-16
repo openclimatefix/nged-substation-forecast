@@ -134,6 +134,7 @@ def build_view_forecast_chart(
     units: str,
     title: str,
     subtitle: str,
+    shade_weekends: bool = True,
 ) -> alt.LayerChart:
     """Build the single-panel forecast chart for one series and one forecast run.
 
@@ -147,6 +148,7 @@ def build_view_forecast_chart(
         units: ``"MW"`` or ``"MVA"``, from this series' ``TimeSeriesMetadata``.
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / experiment line).
+        shade_weekends: Whether to draw a faint background band behind each weekend.
 
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
@@ -164,17 +166,21 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
-    # Drawn first so every other layer sits on top; no y encoding, so each band spans the full
-    # chart height. Uses the shared x encoding (see _x_encoding's docstring for why deviating
-    # from it would suppress the merged x-axis).
-    weekend_layer = (
-        alt.Chart(_weekend_bands(window_start, window_end))
-        .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
-        .encode(
-            x=_x_encoding(window_start, window_end, field="start"),
-            x2="end:T",
+    layers: list[alt.Chart] = []
+    legend_parts = ["Grey: ensemble members", "Blue: observed power"]
+    if shade_weekends:
+        # Drawn first so every other layer sits on top; no y encoding, so each band spans the
+        # full chart height. Uses the shared x encoding (see _x_encoding's docstring for why
+        # deviating from it would suppress the merged x-axis).
+        layers.append(
+            alt.Chart(_weekend_bands(window_start, window_end))
+            .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
+            .encode(
+                x=_x_encoding(window_start, window_end, field="start"),
+                x2="end:T",
+            )
         )
-    )
+        legend_parts.append("Shaded: weekends")
     ensemble_layer = (
         alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
         .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
@@ -202,10 +208,11 @@ def build_view_forecast_chart(
         .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
     )
 
-    chart = alt.layer(weekend_layer, ensemble_layer, actuals_layer, init_time_rule).properties(
+    layers += [ensemble_layer, actuals_layer, init_time_rule]
+    chart = alt.layer(*layers).properties(
         title=alt.TitleParams(
             text=title,
-            subtitle=[subtitle, "Grey: ensemble members · Blue: observed power · Shaded: weekends"],
+            subtitle=[subtitle, " · ".join(legend_parts)],
         ),
         width="container",
         height=400,

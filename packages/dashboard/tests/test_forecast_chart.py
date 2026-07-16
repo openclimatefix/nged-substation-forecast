@@ -49,7 +49,7 @@ def _actuals() -> pl.LazyFrame:
     ).lazy()
 
 
-def _build() -> LayerChart:
+def _build(*, shade_weekends: bool = True) -> LayerChart:
     return build_view_forecast_chart(
         _forecasts((0, 1, 2)),
         _actuals(),
@@ -57,6 +57,7 @@ def _build() -> LayerChart:
         units="MW",
         title="Test series — PV — id 1",
         subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
+        shade_weekends=shade_weekends,
     )
 
 
@@ -76,6 +77,13 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
     assert actuals["encoding"]["y"]["field"] == "power"
     assert rule["mark"]["type"] == "rule"
+
+
+def test_shade_weekends_false_omits_the_band_layer() -> None:
+    spec = _build(shade_weekends=False).to_dict()
+    assert len(spec["layer"]) == 3  # ensemble members, actuals, init-time rule
+    assert all(layer["mark"]["type"] != "rect" for layer in spec["layer"])
+    assert "weekends" not in " ".join(spec["title"]["subtitle"])
 
 
 def test_weekend_bands_sit_at_wall_midnights_clipped_to_window() -> None:
