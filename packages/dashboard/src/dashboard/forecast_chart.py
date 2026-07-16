@@ -13,8 +13,8 @@ at the H3 cell containing the series) as a second panel stacked below the power 
 
 The two charts are separate Altair specs, so stacking them relies on identical horizontal
 geometry: they share the same pinned x encoding, both pin the y-axis region to ``Y_AXIS_EXTENT``
-pixels, and the power chart's legend sits *above* the plot (``orient="top"``) so it consumes no
-horizontal space that the legend-less NWP panel wouldn't also lose.
+pixels, and both charts' legends sit *above* the plot (``orient="top"``) so neither consumes
+horizontal plot space.
 
 The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at
 local midnight only (day-of-week first — crucial for demand forecasting), with unlabelled minor
@@ -138,6 +138,8 @@ _LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
 _FORECAST_LABEL: Final[str] = "Forecast power"
 _ACTUALS_LABEL: Final[str] = "Actual power"
 _INIT_TIME_LABEL: Final[str] = "Forecast init time"
+_NWP_ENSEMBLE_LABEL: Final[str] = "NWP ensemble"
+_NWP_ANALYSIS_LABEL: Final[str] = "NWP proxy analysis"
 
 _LINE_COLORS: Final[dict[str, str]] = {
     _FORECAST_LABEL: ocf_theme.ENSEMBLE_LINE,
@@ -145,10 +147,21 @@ _LINE_COLORS: Final[dict[str, str]] = {
     **dict(zip(LAG_OPTIONS, _LAG_COLORS, strict=True)),
     _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
 }
-"""Legend label → line colour for everything the chart can draw, in legend order.
+"""Legend label → line colour for everything the power chart can draw, in legend order.
 
 Used as the explicit domain/range of the shared colour scale, so the legend always lists every
 entry — whichever lines are currently toggled on — and each line keeps a stable colour.
+"""
+
+_NWP_LINE_COLORS: Final[dict[str, str]] = {
+    _NWP_ENSEMBLE_LABEL: ocf_theme.ENSEMBLE_LINE,
+    _NWP_ANALYSIS_LABEL: ocf_theme.BLUE,
+    _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
+}
+"""Legend label → line colour for the NWP panel — the counterpart of ``_LINE_COLORS``.
+
+The colours deliberately rhyme with the power chart's: grey for the model's view (ensemble),
+blue for the closest-to-truth line, orange-red for the shared init-time rule.
 """
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
@@ -354,7 +367,8 @@ def build_view_forecast_chart(
     # legend definitions ride on the field-encoded layers (lags and the always-present init-time
     # rule); the single-colour layers reference the same scale via datum encodings.
     # orient="top" keeps the legend out of the plot's horizontal space, so the x-axis aligns
-    # with the legend-less NWP panel stacked below (see the module docstring).
+    # with the NWP panel stacked below, whose legend sits on top for the same reason (see the
+    # module docstring).
     # (Swatch opacity is pinned to 1 in the OCF theme's legend config — a per-legend
     # ``symbolOpacity`` here would lose to the opacity Vega-Lite derives from the marks.)
     line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
@@ -518,39 +532,53 @@ def build_nwp_ensemble_chart(
         ).collect()
     )
 
+    # The same always-shown-legend construction as the power chart: the shared colour scale's
+    # explicit domain drives the legend (so it lists every entry whatever is toggled on), the
+    # scale and legend ride on the always-drawn init-time rule, and the single-colour layers
+    # join via datum encodings. orient="top" keeps both charts' plot areas the same width.
+    nwp_color_scale = alt.Scale(
+        domain=list(_NWP_LINE_COLORS), range=list(_NWP_LINE_COLORS.values())
+    )
+    nwp_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
+
     layers: list[alt.Chart] = []
     subtitle_notes: list[str] = []
     if shade_weekends:
         layers.append(_weekend_layer(window_start, window_end))
     layers.append(
         alt.Chart(data)
-        .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
+        .mark_line(strokeWidth=1, opacity=0.3)
         .encode(
             x=x,
             y=y,
+            color=alt.ColorDatum(_NWP_ENSEMBLE_LABEL),
             detail="ensemble_member:N",
             tooltip=["ensemble_member", "valid_time", variable],
         )
     )
     if analysis_data is not None and analysis_data.height > 0:
-        # BLUE deliberately matches the power panel's observed-truth colour; the stroke width
-        # matches the actual-power line's for the same reason.
+        # BLUE (via the shared scale) deliberately matches the power panel's observed-truth
+        # colour; the stroke width matches the actual-power line's for the same reason.
         layers.append(
             alt.Chart(analysis_data)
-            .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
-            .encode(x=x, y=y, tooltip=["valid_time", variable])
+            .mark_line(strokeWidth=2.5)
+            .encode(
+                x=x,
+                y=y,
+                color=alt.ColorDatum(_NWP_ANALYSIS_LABEL),
+                tooltip=["valid_time", variable],
+            )
         )
         analysis_hours = int(NWP_ANALYSIS_LEAD.total_seconds() // 3600)
-        subtitle_notes.append(
-            f"Blue: proxy analysis (each NWP run's first {analysis_hours} h, stitched)"
-        )
-    # The init-time rule matches the power chart's but takes its colour from the mark: this
-    # panel has no legend (the power chart's legend explains the rule), and a colour encoding
-    # here would conjure one up.
+        subtitle_notes.append(f"Proxy analysis: each NWP run's first {analysis_hours} h, stitched")
     layers.append(
-        alt.Chart(pl.DataFrame({"valid_time": [init_wall]}))
-        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4], color=ocf_theme.ORANGE_RED)
-        .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
+        alt.Chart(pl.DataFrame({"valid_time": [init_wall], "series": [_INIT_TIME_LABEL]}))
+        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4])
+        .encode(
+            x=x,
+            color=alt.Color("series:N", scale=nwp_color_scale, legend=nwp_legend),
+            tooltip=[alt.Tooltip("valid_time", title="Forecast init time")],
+        )
     )
     subtitle = (
         f"NWP init {nwp_init_time:%a %d %b %Y %H:%M} UTC · at the H3 cell containing this series"

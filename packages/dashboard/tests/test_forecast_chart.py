@@ -316,9 +316,9 @@ def test_nwp_chart_horizontal_geometry_matches_the_power_chart() -> None:
     for spec in (power, nwp):
         y_axis = spec["layer"][1]["encoding"]["y"]["axis"]
         assert y_axis["minExtent"] == y_axis["maxExtent"] == Y_AXIS_EXTENT
-    # The power chart's legend must sit above the plot — a right-side legend would eat
-    # horizontal plot space that the legend-less NWP panel doesn't lose, breaking alignment.
-    assert power["layer"][-1]["encoding"]["color"]["legend"]["orient"] == "top"
+        # Both legends must sit above their plot — a right-side legend would eat horizontal
+        # plot space and break the vertical alignment of the two stacked x-axes.
+        assert spec["layer"][-1]["encoding"]["color"]["legend"]["orient"] == "top"
 
 
 def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
@@ -326,6 +326,8 @@ def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
     ensemble = spec["layer"][1]
     assert ensemble["encoding"]["y"]["title"] == "2 m temperature (°C)"
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
+    # The grey takes its colour from the shared scale via a datum encoding, joining the legend.
+    assert ensemble["encoding"]["color"]["datum"] == "NWP ensemble"
     # Weather variables have no meaningful zero baseline — a zero-based axis would squash
     # e.g. surface pressure (~101,000 Pa) into a flat sliver.
     assert ensemble["encoding"]["y"]["scale"]["zero"] is False
@@ -353,13 +355,14 @@ def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
     ).to_dict()
     assert len(spec["layer"]) == 4  # weekend bands, ensemble members, analysis line, init rule
     analysis = spec["layer"][2]
-    # Blue and thick, deliberately matching the power panel's observed-truth line.
-    assert analysis["mark"]["color"] == ocf_theme.BLUE
+    # Thick, and blue via the shared scale — deliberately matching the power panel's
+    # observed-truth line.
+    assert analysis["encoding"]["color"]["datum"] == "NWP proxy analysis"
     assert analysis["mark"]["strokeWidth"] == 2.5
     # Identical y encoding to the ensemble layer's, so the axis definitions merge cleanly.
     assert analysis["encoding"]["y"] == spec["layer"][1]["encoding"]["y"]
     assert "detail" not in analysis["encoding"]  # one stitched line, not a line per member
-    assert any("proxy analysis" in line for line in spec["title"]["subtitle"])
+    assert any("Proxy analysis" in line for line in spec["title"]["subtitle"])
 
 
 def test_nwp_analysis_keeps_the_freshest_run_where_runs_overlap() -> None:
@@ -386,7 +389,7 @@ def test_nwp_analysis_line_is_omitted_when_absent_or_outside_the_window() -> Non
         analysis=_nwp_analysis([INIT_TIME - PLOT_HISTORY - timedelta(days=2)])
     ).to_dict()
     assert len(stale["layer"]) == 3
-    assert not any("proxy analysis" in line for line in stale["title"]["subtitle"])
+    assert not any("Proxy analysis" in line for line in stale["title"]["subtitle"])
 
 
 def test_nwp_analysis_uses_the_same_display_units_as_the_ensemble() -> None:
@@ -396,6 +399,29 @@ def test_nwp_analysis_uses_the_same_display_units_as_the_ensemble() -> None:
     rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
     # The stored 1e-4 kg/m²/s becomes 0.36 mm/h — same ×3600 display scale as the grey lines.
     assert {row["precipitation_surface"] for row in rows} == {0.36}
+
+
+def test_nwp_legend_always_lists_every_line() -> None:
+    # Same construction as the power chart's legend: the always-drawn init-rule layer carries
+    # the shared colour scale, whose explicit domain drives the legend — so the legend is
+    # identical whether or not the analysis line is currently drawn.
+    for spec in (
+        _build_nwp().to_dict(),
+        _build_nwp(analysis=_nwp_analysis([NWP_INIT_TIME])).to_dict(),
+    ):
+        colour = spec["layer"][-1]["encoding"]["color"]
+        assert colour["field"] == "series"
+        assert colour["scale"]["domain"] == [
+            "NWP ensemble",
+            "NWP proxy analysis",
+            "Forecast init time",
+        ]
+        assert colour["scale"]["range"] == [
+            ocf_theme.ENSEMBLE_LINE,
+            ocf_theme.BLUE,
+            ocf_theme.ORANGE_RED,
+        ]
+        assert colour["legend"]["symbolType"] == "stroke"
 
 
 def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:
