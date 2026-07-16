@@ -55,6 +55,8 @@ def _actuals(history: timedelta = PLOT_HISTORY) -> pl.LazyFrame:
 def _build(
     *,
     shade_weekends: bool = True,
+    show_forecast: bool = True,
+    show_actuals: bool = True,
     lags: Sequence[timedelta] = (),
     history: timedelta = PLOT_HISTORY,
 ) -> LayerChart:
@@ -66,6 +68,8 @@ def _build(
         title="Test series — PV — id 1",
         subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
         shade_weekends=shade_weekends,
+        show_forecast=show_forecast,
+        show_actuals=show_actuals,
         lags=lags,
     )
 
@@ -165,6 +169,24 @@ def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
     # start of the deeper history the dashboard now always loads.
     assert len(spec["layer"]) == 4
     assert min(row["valid_time"] for row in actuals_rows) == "2026-07-03T07:00:00"
+
+
+def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
+    no_forecast = _build(show_forecast=False).to_dict()
+    assert len(no_forecast["layer"]) == 3  # weekend bands, actuals, init rule
+    assert "ensemble members" not in " ".join(no_forecast["title"]["subtitle"])
+    no_actuals = _build(show_actuals=False).to_dict()
+    assert len(no_actuals["layer"]) == 3  # weekend bands, ensemble, init rule
+    assert "observed power" not in " ".join(no_actuals["title"]["subtitle"])
+    only_lags = _build(
+        show_forecast=False,
+        show_actuals=False,
+        lags=(timedelta(days=7),),
+        history=PLOT_HISTORY + max(LAG_OPTIONS.values()),
+    ).to_dict()
+    # weekend bands, lag line, init rule — the y-axis title comes from the lag layer alone.
+    assert len(only_lags["layer"]) == 3
+    assert only_lags["layer"][1]["encoding"]["y"]["title"] == "Power (MW)"
 
 
 def test_chart_renders_to_html() -> None:

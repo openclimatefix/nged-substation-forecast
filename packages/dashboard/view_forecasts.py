@@ -184,12 +184,20 @@ def _(available_dates, available_init_times, date_picker):
 
 @app.cell
 def _():
+    show_forecast = mo.ui.checkbox(value=True, label="Forecast power")
+    show_actuals = mo.ui.checkbox(value=True, label="Actual power")
+    # One checkbox per LAG_OPTIONS entry — explicit globals rather than a comprehension,
+    # because marimo only makes UI elements reactive when they are bound to top-level names.
+    show_lag_7d = mo.ui.checkbox(label="7-day lagged power")
+    show_lag_14d = mo.ui.checkbox(label="14-day lagged power")
     weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
-    lag_picker = mo.ui.multiselect(
-        options=LAG_OPTIONS,
-        label="Lagged power (illustrative model inputs)",
+    return (
+        show_actuals,
+        show_forecast,
+        show_lag_14d,
+        show_lag_7d,
+        weekend_shading,
     )
-    return lag_picker, weekend_shading
 
 
 @app.cell
@@ -198,10 +206,13 @@ def _(
     experiment_names,
     experiment_picker,
     fold_picker,
-    lag_picker,
     no_runs_message,
     run_picker,
     series_picker,
+    show_actuals,
+    show_forecast,
+    show_lag_14d,
+    show_lag_7d,
     weekend_shading,
 ):
     _pickers = [series_picker, fold_picker]
@@ -210,7 +221,11 @@ def _(
     _pickers.append(date_picker)
     if run_picker is not None:
         _pickers.append(run_picker)
-    _pickers += [lag_picker, weekend_shading]
+    _lines = mo.vstack(
+        [mo.md("**Lines**"), show_forecast, show_actuals, show_lag_7d, show_lag_14d],
+        gap=0,
+    )
+    _pickers += [_lines, weekend_shading]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
@@ -268,9 +283,12 @@ def _(
     fold_picker,
     forecasts,
     init_time,
-    lag_picker,
     metadata_df,
     series_picker,
+    show_actuals,
+    show_forecast,
+    show_lag_14d,
+    show_lag_7d,
     weekend_shading,
 ):
     _meta = metadata_df.filter(pl.col("time_series_id") == series_picker.value)
@@ -288,7 +306,16 @@ def _(
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
         shade_weekends=weekend_shading.value,
-        lags=lag_picker.value,
+        show_forecast=show_forecast.value,
+        show_actuals=show_actuals.value,
+        lags=[
+            lag
+            for box, lag in (
+                (show_lag_7d, LAG_OPTIONS["7-day lag"]),
+                (show_lag_14d, LAG_OPTIONS["14-day lag"]),
+            )
+            if box.value
+        ],
     )
     # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in
     # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —

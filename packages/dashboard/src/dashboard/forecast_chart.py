@@ -185,6 +185,8 @@ def build_view_forecast_chart(
     title: str,
     subtitle: str,
     shade_weekends: bool = True,
+    show_forecast: bool = True,
+    show_actuals: bool = True,
     lags: Sequence[timedelta] = (),
 ) -> alt.LayerChart:
     """Build the single-panel forecast chart for one series and one forecast run.
@@ -202,6 +204,8 @@ def build_view_forecast_chart(
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / experiment line).
         shade_weekends: Whether to draw a faint background band behind each weekend.
+        show_forecast: Whether to draw the grey forecast-ensemble lines.
+        show_actuals: Whether to draw the thick blue observed-power line.
         lags: Power lags to plot as coloured lines (observed power shifted forward by each lag,
             using only pre-init observations — see ``_lagged_power_frame``). Empty for none.
 
@@ -221,8 +225,15 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
+    # All power layers share the y title so Vega-Lite merges them into one clean y-axis
+    # whichever subset of lines is toggled on.
+    y_title = f"Power ({units})"
+
+    # Layers are appended in draw order: weekend bands at the back, then the forecast
+    # ensemble, then lagged power (model *inputs*, which must not obscure observations), then
+    # observed power, with the init-time rule on top of everything.
     layers: list[alt.Chart] = []
-    legend_parts = ["Grey: ensemble members", "Blue: observed power"]
+    legend_parts: list[str] = []
     if shade_weekends:
         # Drawn first so every other layer sits on top; no y encoding, so each band spans the
         # full chart height. Uses the shared x encoding (see _x_encoding's docstring for why
@@ -236,23 +247,23 @@ def build_view_forecast_chart(
             )
         )
         legend_parts.append("Shaded: weekends")
-    ensemble_layer = (
-        alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
-        .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
-        .encode(
-            x=x,
-            y=alt.Y("power_fcst:Q", title=f"Power ({units})"),
-            detail="ensemble_member:N",
-            tooltip=["ensemble_member", "valid_time", "power_fcst"],
+    if show_forecast:
+        layers.append(
+            alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
+            .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
+            .encode(
+                x=x,
+                y=alt.Y("power_fcst:Q", title=y_title),
+                detail="ensemble_member:N",
+                tooltip=["ensemble_member", "valid_time", "power_fcst"],
+            )
         )
-    )
-    lag_layer: alt.Chart | None = None
+        legend_parts.append("Grey: ensemble members")
     if lags:
-        # Layered between the ensemble (underneath) and the actuals (on top): the lag lines are
-        # model *inputs*, so they must not obscure the observations. Their colour legend doubles
-        # as the on-chart key, so the subtitle legend doesn't mention them.
+        # The lag lines' colour legend doubles as the on-chart key, so the subtitle legend
+        # doesn't mention them.
         sorted_lags = sorted(lags)
-        lag_layer = (
+        layers.append(
             alt.Chart(
                 _prepare_for_plot(
                     _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags),
@@ -265,7 +276,7 @@ def build_view_forecast_chart(
             .mark_line(strokeWidth=1.5, opacity=0.8)
             .encode(
                 x=x,
-                y=alt.Y("power:Q"),
+                y=alt.Y("power:Q", title=y_title),
                 color=alt.Color(
                     "lag:N",
                     title="Lagged power",
@@ -277,33 +288,30 @@ def build_view_forecast_chart(
                 tooltip=["lag", "valid_time", "power"],
             )
         )
-    actuals_layer = (
-        alt.Chart(
-            _prepare_for_plot(
-                actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY),
-                "time",
-                "power",
+    if show_actuals:
+        layers.append(
+            alt.Chart(
+                _prepare_for_plot(
+                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY),
+                    "time",
+                    "power",
+                )
+                .rename({"time": "valid_time"})
+                .collect()
             )
-            .rename({"time": "valid_time"})
-            .collect()
+            .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
+            .encode(
+                x=x,
+                y=alt.Y("power:Q", title=y_title),
+                tooltip=["valid_time", "power"],
+            )
         )
-        .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
-        .encode(
-            x=x,
-            y=alt.Y("power:Q"),
-            tooltip=["valid_time", "power"],
-        )
-    )
-    init_time_rule = (
+        legend_parts.append("Blue: observed power")
+    layers.append(
         alt.Chart(pl.DataFrame({"valid_time": [init_wall]}))
         .mark_rule(strokeWidth=1.5, strokeDash=[6, 4], color=ocf_theme.ORANGE_RED)
         .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
     )
-
-    layers.append(ensemble_layer)
-    if lag_layer is not None:
-        layers.append(lag_layer)
-    layers += [actuals_layer, init_time_rule]
     chart = alt.layer(*layers).properties(
         title=alt.TitleParams(
             text=title,
