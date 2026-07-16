@@ -11,8 +11,10 @@ with app.setup:
     from dashboard.data_source import settings_for_source, source_status_message
     from dashboard.forecast_chart import (
         LAG_OPTIONS,
+        NWP_PLOT_VARIABLES,
         PLOT_HISTORY,
         PLOT_HORIZON,
+        build_nwp_ensemble_chart,
         build_view_forecast_chart,
     )
     from deltalake import DeltaTable
@@ -25,7 +27,9 @@ def _():
 
     Pick a time series and a forecast run; the plot shows every forecast ensemble member
     (thin grey lines) against the observed power (thick blue line), from 24 hours before
-    the forecast init time to 14 days after it.
+    the forecast init time to 14 days after it. A second panel below shows the NWP ensemble
+    that fed the forecast — pick the weather variable to plot — on the same time axis, at
+    the H3 cell containing the series.
     """)
     return
 
@@ -196,7 +200,14 @@ def _():
     show_lag_7d = mo.ui.checkbox(label="7-day lagged power")
     show_lag_14d = mo.ui.checkbox(label="14-day lagged power")
     weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
+    nwp_variable_picker = mo.ui.dropdown(
+        options={v.label: name for name, v in NWP_PLOT_VARIABLES.items()},
+        value=NWP_PLOT_VARIABLES["temperature_2m"].label,
+        label="NWP variable",
+        searchable=True,
+    )
     return (
+        nwp_variable_picker,
         show_actuals,
         show_forecast,
         show_lag_14d,
@@ -212,6 +223,7 @@ def _(
     experiment_picker,
     fold_picker,
     no_runs_message,
+    nwp_variable_picker,
     run_picker,
     series_picker,
     show_actuals,
@@ -230,7 +242,7 @@ def _(
         [mo.md("**Lines**"), show_forecast, show_actuals, show_lag_7d, show_lag_14d],
         gap=0,
     )
-    _pickers += [_lines, weekend_shading]
+    _pickers += [_lines, weekend_shading, nwp_variable_picker]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
@@ -253,7 +265,9 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
             pl.col("power_fcst_init_time") == init_time,
             pl.col("valid_time") <= init_time + PLOT_HORIZON,
         )
-        .select("valid_time", "power_fcst", "ensemble_member")
+        # nwp_init_time identifies the NWP run for the panel below the power chart; the power
+        # chart cell drops it again so it isn't serialised into the 34k-row chart data.
+        .select("valid_time", "power_fcst", "ensemble_member", "nwp_init_time")
         .collect()
     )
     # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are
@@ -298,7 +312,7 @@ def _(
 ):
     _meta = metadata_df.filter(pl.col("time_series_id") == series_picker.value)
     chart = build_view_forecast_chart(
-        forecasts.lazy(),
+        forecasts.lazy().drop("nwp_init_time"),
         actuals.lazy(),
         power_fcst_init_time=init_time,
         units=_meta["units"].item(),
@@ -326,6 +340,74 @@ def _(
     # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —
     # the chart's own scale-bound zoom/pan is the intended interaction.
     mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+    return
+
+
+@app.cell
+def _(forecasts, metadata_df, series_picker, settings):
+    _nwp_init_times = forecasts.get_column("nwp_init_time").drop_nulls().unique()
+    mo.stop(
+        _nwp_init_times.is_empty(),
+        mo.callout(
+            mo.md(
+                "This forecast records no `nwp_init_time` (e.g. a model that uses no weather "
+                "data), so there is no NWP ensemble to plot."
+            ),
+            kind="info",
+        ),
+    )
+    # A forecast normally comes from a single NWP run; max() picks the freshest if a future
+    # experiment ever grows the ensemble with lagged NWP runs.
+    nwp_init_time = _nwp_init_times.max()
+
+    # All 51 members × ~85 steps × all variables is only ~4k rows, so load every variable for
+    # the run once — switching the NWP-variable dropdown then re-runs only the chart cell,
+    # never this Delta query. init_time is a partition column, so the filter prunes to one
+    # partition; h3_index selects the (resolution 5) cell containing this series.
+    _series_h3 = metadata_df.filter(pl.col("time_series_id") == series_picker.value)[
+        "h3_res_5"
+    ].item()
+    try:
+        nwp = (
+            pl.scan_delta(
+                settings.nwp_data_path,
+                storage_options=typeddict_to_dict(settings.storage_options),
+            )
+            .filter(
+                pl.col("init_time") == nwp_init_time,
+                pl.col("h3_index") == _series_h3,
+            )
+            .drop("nwp_model_id", "init_time", "h3_index")
+            .collect()
+        )
+    except Exception as error:
+        nwp = pl.DataFrame()
+        _load_error = f": `{error}`"
+    else:
+        _load_error = "."
+    mo.stop(
+        nwp.height == 0,
+        mo.callout(
+            mo.md(
+                f"No NWP rows found at `{settings.nwp_data_path}` for the run initialised at "
+                f"{nwp_init_time:%Y-%m-%d %H:%M} UTC at this series' H3 cell{_load_error}"
+            ),
+            kind="warn",
+        ),
+    )
+    return nwp, nwp_init_time
+
+
+@app.cell
+def _(init_time, nwp, nwp_init_time, nwp_variable_picker, weekend_shading):
+    nwp_chart = build_nwp_ensemble_chart(
+        nwp.lazy(),
+        variable=nwp_variable_picker.value,
+        power_fcst_init_time=init_time,
+        nwp_init_time=nwp_init_time,
+        shade_weekends=weekend_shading.value,
+    )
+    mo.ui.altair_chart(nwp_chart, chart_selection=False, legend_selection=False)
     return
 
 
