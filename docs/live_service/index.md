@@ -38,6 +38,9 @@ driving is identical in both environments, so it lives on one shared page:
   spelled out on first use there), promote a champion and build/verify/push its image, the
   Fargate task, the always-on control-plane box, and connecting to the Dagster UI over
   Tailscale.
+- [Connecting to the AWS control plane](connecting.md) — get a laptop onto the OCF tailnet to
+  reach an already-running deployment: install Tailscale, view the Dagster UI, and SSH into the
+  always-on box.
 - [Operating the live service](operations.md) — driving a running stack day to day: promote a
   champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by
   hand), inspect a forecast, and backfill a missed slot in replay mode.

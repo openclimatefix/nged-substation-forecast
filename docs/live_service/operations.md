@@ -25,7 +25,8 @@ the stack runs in — bring one up first:
   `http://localhost:3000` and runs execute on your machine.
 - **Deployed on AWS** — [Setting up the live service on AWS](aws.md); the UI is at
   `http://nged-forecast-ctrl:3000` over Tailscale, and each run executes on an ephemeral
-  Fargate task.
+  Fargate task. To get your laptop onto the tailnet and reach that UI, see
+  [Connecting to the AWS control plane](connecting.md).
 
 ## Step 1 — Pick a champion model
 
