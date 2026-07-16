@@ -251,8 +251,10 @@ def build_view_forecast_chart(
     # every line — even ones currently toggled off — and colours never reshuffle. The scale and
     # legend definitions ride on the field-encoded layers (lags and the always-present init-time
     # rule); the single-colour layers reference the same scale via datum encodings.
+    # (Swatch opacity is pinned to 1 in the OCF theme's legend config — a per-legend
+    # ``symbolOpacity`` here would lose to the opacity Vega-Lite derives from the marks.)
     line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
-    line_legend = alt.Legend(title=None, symbolType="stroke", symbolStrokeWidth=2, symbolOpacity=1)
+    line_legend = alt.Legend(title=None, symbolType="stroke", symbolStrokeWidth=2)
 
     # Layers are appended in draw order: weekend bands at the back, then the forecast
     # ensemble, then lagged power (model *inputs*, which must not obscure observations), then

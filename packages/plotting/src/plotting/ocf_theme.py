@@ -81,6 +81,11 @@ def _ocf_theme() -> dict[str, Any]:
             "legend": {
                 "labelColor": _TEXT,
                 "titleColor": _TEXT,
+                # Legend swatches must stay fully opaque whatever opacity the marks draw at.
+                # In a layered chart Vega-Lite derives swatch opacity from the layers' marks
+                # (washing the swatches out) and ignores a per-legend ``symbolOpacity`` — only
+                # this config-level setting wins.
+                "symbolOpacity": 1,
             },
         }
     }
