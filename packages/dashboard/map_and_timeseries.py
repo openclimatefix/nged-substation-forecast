@@ -20,7 +20,7 @@ with app.setup:
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
-    from plotting.ocf_theme import BLUE
+    from plotting.ocf_theme import BLUE, hex_to_rgb
 
 
 @app.cell
@@ -95,7 +95,7 @@ def _(arrow_table):
         pickable=True,
         # Styling
         auto_highlight=True,
-        get_fill_color=[0, 128, 255],
+        get_fill_color=hex_to_rgb(BLUE),
         get_radius=1000,
         radius_units="meters",
         stroked=False,  # No outline

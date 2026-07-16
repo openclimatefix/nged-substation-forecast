@@ -46,6 +46,16 @@ ENSEMBLE_LINE: Final[str] = "#808080"
 _TEXT: Final[str] = "#292B2B"
 
 
+def hex_to_rgb(hex_color: str) -> list[int]:
+    """RGB components of a ``#RRGGBB`` colour, for libraries taking ``[r, g, b]`` lists.
+
+    Lets non-Altair plotting libraries (e.g. lonboard, which styles map layers with RGB
+    lists) use the theme palette rather than hardcoding near-miss colours.
+    """
+    value = hex_color.removeprefix("#")
+    return [int(value[i : i + 2], 16) for i in (0, 2, 4)]
+
+
 @alt.theme.register("ocf", enable=True)
 def _ocf_theme() -> dict[str, Any]:
     palette = list(PALETTE)
