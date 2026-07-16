@@ -8,6 +8,7 @@ from altair import LayerChart
 from contracts.weather_schemas import Nwp
 from dashboard.forecast_chart import (
     LAG_OPTIONS,
+    NWP_ANALYSIS_LEAD,
     NWP_PLOT_VARIABLES,
     PLOT_HISTORY,
     PLOT_HORIZON,
@@ -255,12 +256,49 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
     ).lazy()
 
 
-def _build_nwp(variable: str = "temperature_2m", **kwargs: bool) -> LayerChart:
+def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
+    """The first ``NWP_ANALYSIS_LEAD`` of one run per element of ``inits``, control member only
+    — what the dashboard feeds ``build_nwp_ensemble_chart``'s ``analysis`` argument. The
+    temperature encodes the run's index so tests can see which run each plotted point came from.
+    """
+    frames = []
+    for index, run_init in enumerate(inits):
+        valid_times = pl.datetime_range(
+            run_init,
+            run_init + NWP_ANALYSIS_LEAD,
+            interval="3h",
+            closed="left",
+            time_zone="UTC",
+            eager=True,
+        )
+        frames.append(
+            pl.DataFrame(
+                {
+                    "init_time": [run_init] * len(valid_times),
+                    "valid_time": valid_times,
+                    "temperature_2m": pl.Series(
+                        [float(index)] * len(valid_times), dtype=pl.Float32
+                    ),
+                    "precipitation_surface": pl.Series(
+                        [1e-4 * (index + 1)] * len(valid_times), dtype=pl.Float32
+                    ),
+                }
+            )
+        )
+    return pl.concat(frames).lazy()
+
+
+def _build_nwp(
+    variable: str = "temperature_2m",
+    analysis: pl.LazyFrame | None = None,
+    **kwargs: bool,
+) -> LayerChart:
     return build_nwp_ensemble_chart(
         _nwp(),
         variable=variable,
         power_fcst_init_time=INIT_TIME,
         nwp_init_time=NWP_INIT_TIME,
+        analysis=analysis,
         **kwargs,
     )
 
@@ -307,6 +345,57 @@ def test_precipitation_is_displayed_in_mm_per_hour() -> None:
     rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
     # Stored kg/m²/s values of 0, 1e-4, and 2e-4 (per member) become mm/h on display.
     assert {row["precipitation_surface"] for row in rows} == {0.0, 0.36, 0.72}
+
+
+def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
+    spec = _build_nwp(
+        analysis=_nwp_analysis([NWP_INIT_TIME + timedelta(days=d) for d in range(3)])
+    ).to_dict()
+    assert len(spec["layer"]) == 4  # weekend bands, ensemble members, analysis line, init rule
+    analysis = spec["layer"][2]
+    # Blue and thick, deliberately matching the power panel's observed-truth line.
+    assert analysis["mark"]["color"] == ocf_theme.BLUE
+    assert analysis["mark"]["strokeWidth"] == 2.5
+    # Identical y encoding to the ensemble layer's, so the axis definitions merge cleanly.
+    assert analysis["encoding"]["y"] == spec["layer"][1]["encoding"]["y"]
+    assert "detail" not in analysis["encoding"]  # one stitched line, not a line per member
+    assert any("proxy analysis" in line for line in spec["title"]["subtitle"])
+
+
+def test_nwp_analysis_keeps_the_freshest_run_where_runs_overlap() -> None:
+    # Two runs 12 h apart, each contributing NWP_ANALYSIS_LEAD (24 h) of rows, so the second
+    # run's first 12 h of valid times appear in both — the freshest (shortest-lead) run must
+    # win there, collapsing each overlapped valid_time to a single point.
+    spec = _build_nwp(
+        analysis=_nwp_analysis([NWP_INIT_TIME, NWP_INIT_TIME + timedelta(hours=12)])
+    ).to_dict()
+    rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    by_time = {row["valid_time"]: row["temperature_2m"] for row in rows}
+    assert len(by_time) == len(rows) == 12  # 8 + 8 rows, 4 of them at shared valid times
+    # NWP_INIT_TIME is 04 Jul 00:00 UTC = 01:00 wall time (BST); the runs overlap from 13:00.
+    assert by_time["2026-07-04T04:00:00"] == 0.0  # before the overlap: only the first run
+    assert by_time["2026-07-04T16:00:00"] == 1.0  # inside the overlap: the second run wins
+    assert by_time["2026-07-05T10:00:00"] == 1.0  # after the first run's 24 h end
+
+
+def test_nwp_analysis_line_is_omitted_when_absent_or_outside_the_window() -> None:
+    assert len(_build_nwp().to_dict()["layer"]) == 3  # no analysis passed
+    # A run whose whole first 24 h predate the window contributes no rows, so the layer and
+    # the subtitle note both vanish rather than advertising a line that isn't drawn.
+    stale = _build_nwp(
+        analysis=_nwp_analysis([INIT_TIME - PLOT_HISTORY - timedelta(days=2)])
+    ).to_dict()
+    assert len(stale["layer"]) == 3
+    assert not any("proxy analysis" in line for line in stale["title"]["subtitle"])
+
+
+def test_nwp_analysis_uses_the_same_display_units_as_the_ensemble() -> None:
+    spec = _build_nwp(
+        variable="precipitation_surface", analysis=_nwp_analysis([NWP_INIT_TIME])
+    ).to_dict()
+    rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    # The stored 1e-4 kg/m²/s becomes 0.36 mm/h — same ×3600 display scale as the grey lines.
+    assert {row["precipitation_surface"] for row in rows} == {0.36}
 
 
 def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:

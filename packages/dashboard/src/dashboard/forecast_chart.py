@@ -100,6 +100,22 @@ Exactly the *continuous* ``Nwp`` variables (a test guards against drift):
 which a line chart would render as meaningless slopes.
 """
 
+NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=24)
+"""How much of each NWP run's start feeds the stitched proxy-analysis line.
+
+We hold no weather observations, so the closest available proxy for the *true* weather over
+historical times is each run's shortest-lead forecasts: the first day of every run across the
+window, stitched into one line. 24 hours matches the daily-00Z run cadence, so consecutive
+chunks tile into a continuous line with no gaps and no overlaps.
+"""
+
+NWP_ANALYSIS_MEMBER: Final[int] = 0
+"""The ensemble member the proxy-analysis line uses.
+
+Member 0 of ECMWF ENS is the control run — the unperturbed forecast started from the analysis
+itself — so its shortest leads are the closest thing to the analysis that the ensemble holds.
+"""
+
 
 def _lag_label(lag: timedelta) -> str:
     """The display label for a power lag, used in the UI control and the chart legend alike."""
@@ -431,6 +447,7 @@ def build_nwp_ensemble_chart(
     variable: str,
     power_fcst_init_time: datetime,
     nwp_init_time: datetime,
+    analysis: pl.LazyFrame | None = None,
     shade_weekends: bool = True,
 ) -> alt.LayerChart:
     """Build the NWP-ensemble panel stacked below the power chart, sharing its x-axis.
@@ -447,6 +464,12 @@ def build_nwp_ensemble_chart(
         nwp_init_time: When the plotted NWP run was initialised (tz-aware UTC); shown in the
             subtitle. The lines start here — the run has no earlier data — so the panel is
             deliberately empty between the window start and the NWP init time.
+        analysis: Short-lead ``Nwp`` rows from *every* run overlapping the window — the first
+            ``NWP_ANALYSIS_LEAD`` of each run, ``NWP_ANALYSIS_MEMBER`` only — with ``init_time``
+            and ``valid_time`` alongside the variable columns. Stitched (freshest run wins where
+            runs overlap a ``valid_time``) into a single thick blue line: our closest proxy for
+            the true weather, since we hold no weather observations. ``None``, or no rows in the
+            window, omits the line.
         shade_weekends: Whether to draw the same faint weekend bands as the power chart.
 
     Returns:
@@ -459,22 +482,44 @@ def build_nwp_ensemble_chart(
     window_start = init_wall - PLOT_HISTORY
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
+    plot_window = pl.col("valid_time").is_between(
+        power_fcst_init_time - PLOT_HISTORY, power_fcst_init_time + PLOT_HORIZON
+    )
+    # zero=False: weather variables have no meaningful zero baseline, and Vega-Lite's zero
+    # default would squash e.g. surface pressure (~101,000 Pa) into a flat sliver at the top of
+    # a zero-based axis. Shared by every value-carrying layer so the axis definitions merge.
+    y = alt.Y(
+        f"{variable}:Q",
+        title=f"{var.label} ({var.unit})",
+        axis=_y_axis(),
+        scale=alt.Scale(zero=False),
+    )
 
     # The display scale is applied before _prepare_for_plot so its 3-decimal-place rounding
     # happens in display units (raw precipitation ~1e-4 kg/m²/s would round to zero).
     data = _prepare_for_plot(
-        nwp.filter(
-            pl.col("valid_time").is_between(
-                power_fcst_init_time - PLOT_HISTORY, power_fcst_init_time + PLOT_HORIZON
-            )
-        )
+        nwp.filter(plot_window)
         .select("valid_time", "ensemble_member", variable)
         .with_columns(pl.col(variable) * var.scale),
         "valid_time",
         variable,
     ).collect()
+    analysis_data = (
+        None
+        if analysis is None
+        else _prepare_for_plot(
+            analysis.filter(plot_window)
+            # Where runs overlap a valid_time, keep the freshest run — the shortest lead.
+            .filter(pl.col("init_time") == pl.col("init_time").max().over("valid_time"))
+            .select("valid_time", variable)
+            .with_columns(pl.col(variable) * var.scale),
+            "valid_time",
+            variable,
+        ).collect()
+    )
 
     layers: list[alt.Chart] = []
+    subtitle_notes: list[str] = []
     if shade_weekends:
         layers.append(_weekend_layer(window_start, window_end))
     layers.append(
@@ -482,19 +527,23 @@ def build_nwp_ensemble_chart(
         .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
         .encode(
             x=x,
-            # zero=False: weather variables have no meaningful zero baseline, and Vega-Lite's
-            # zero default would squash e.g. surface pressure (~101,000 Pa) into a flat sliver
-            # at the top of a zero-based axis.
-            y=alt.Y(
-                f"{variable}:Q",
-                title=f"{var.label} ({var.unit})",
-                axis=_y_axis(),
-                scale=alt.Scale(zero=False),
-            ),
+            y=y,
             detail="ensemble_member:N",
             tooltip=["ensemble_member", "valid_time", variable],
         )
     )
+    if analysis_data is not None and analysis_data.height > 0:
+        # BLUE deliberately matches the power panel's observed-truth colour; the stroke width
+        # matches the actual-power line's for the same reason.
+        layers.append(
+            alt.Chart(analysis_data)
+            .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
+            .encode(x=x, y=y, tooltip=["valid_time", variable])
+        )
+        analysis_hours = int(NWP_ANALYSIS_LEAD.total_seconds() // 3600)
+        subtitle_notes.append(
+            f"Blue: proxy analysis (each NWP run's first {analysis_hours} h, stitched)"
+        )
     # The init-time rule matches the power chart's but takes its colour from the mark: this
     # panel has no legend (the power chart's legend explains the rule), and a colour encoding
     # here would conjure one up.
@@ -503,13 +552,13 @@ def build_nwp_ensemble_chart(
         .mark_rule(strokeWidth=1.5, strokeDash=[6, 4], color=ocf_theme.ORANGE_RED)
         .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
     )
+    subtitle = (
+        f"NWP init {nwp_init_time:%a %d %b %Y %H:%M} UTC · at the H3 cell containing this series"
+    )
     chart = alt.layer(*layers).properties(
         title=alt.TitleParams(
             text=f"NWP ensemble — {var.label}",
-            subtitle=(
-                f"NWP init {nwp_init_time:%a %d %b %Y %H:%M} UTC"
-                " · at the H3 cell containing this series"
-            ),
+            subtitle=[subtitle, *subtitle_notes],
         ),
         width="container",
         height=220,

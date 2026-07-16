@@ -11,6 +11,8 @@ with app.setup:
     from dashboard.data_source import settings_for_source, source_status_message
     from dashboard.forecast_chart import (
         LAG_OPTIONS,
+        NWP_ANALYSIS_LEAD,
+        NWP_ANALYSIS_MEMBER,
         NWP_PLOT_VARIABLES,
         PLOT_HISTORY,
         PLOT_HORIZON,
@@ -206,12 +208,14 @@ def _():
         label="NWP variable",
         searchable=True,
     )
+    show_nwp_analysis = mo.ui.checkbox(value=True, label="NWP proxy analysis")
     return (
         nwp_variable_picker,
         show_actuals,
         show_forecast,
         show_lag_14d,
         show_lag_7d,
+        show_nwp_analysis,
         weekend_shading,
     )
 
@@ -230,6 +234,7 @@ def _(
     show_forecast,
     show_lag_14d,
     show_lag_7d,
+    show_nwp_analysis,
     weekend_shading,
 ):
     # The run selectors (which forecast to look at) stack vertically as one visual unit;
@@ -248,7 +253,7 @@ def _(
         mo.vstack(_run_selectors, gap=0.5),
         _lines,
         weekend_shading,
-        nwp_variable_picker,
+        mo.vstack([nwp_variable_picker, show_nwp_analysis], gap=0.5),
     ]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
@@ -351,7 +356,7 @@ def _(
 
 
 @app.cell
-def _(forecasts, metadata_df, series_picker, settings):
+def _(forecasts, init_time, metadata_df, series_picker, settings):
     _nwp_init_times = forecasts.get_column("nwp_init_time").drop_nulls().unique()
     mo.stop(
         _nwp_init_times.is_empty(),
@@ -387,8 +392,31 @@ def _(forecasts, metadata_df, series_picker, settings):
             .drop("nwp_model_id", "init_time", "h3_index")
             .collect()
         )
+        # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping
+        # the plotted window (control member only) — see the constants' docstrings. Loading it
+        # here, unconditionally, keeps the "NWP proxy analysis" checkbox instant: toggling it
+        # re-runs only the chart cell, never this Delta query (~0.2 s across the ~17 pruned
+        # init_time partitions). Runs older than window_start − NWP_ANALYSIS_LEAD cannot reach
+        # the window, so the init_time filter starts there.
+        nwp_analysis = (
+            pl.scan_delta(
+                settings.nwp_data_path,
+                storage_options=typeddict_to_dict(settings.storage_options),
+            )
+            .filter(
+                pl.col("init_time").is_between(
+                    init_time - PLOT_HISTORY - NWP_ANALYSIS_LEAD, init_time + PLOT_HORIZON
+                ),
+                pl.col("h3_index") == _series_h3,
+                pl.col("ensemble_member") == NWP_ANALYSIS_MEMBER,
+                pl.col("valid_time") < pl.col("init_time") + NWP_ANALYSIS_LEAD,
+            )
+            .drop("nwp_model_id", "h3_index", "ensemble_member")
+            .collect()
+        )
     except Exception as error:
         nwp = pl.DataFrame()
+        nwp_analysis = pl.DataFrame()
         _load_error = f": `{error}`"
     else:
         _load_error = "."
@@ -402,16 +430,25 @@ def _(forecasts, metadata_df, series_picker, settings):
             kind="warn",
         ),
     )
-    return nwp, nwp_init_time
+    return nwp, nwp_analysis, nwp_init_time
 
 
 @app.cell
-def _(init_time, nwp, nwp_init_time, nwp_variable_picker, weekend_shading):
+def _(
+    init_time,
+    nwp,
+    nwp_analysis,
+    nwp_init_time,
+    nwp_variable_picker,
+    show_nwp_analysis,
+    weekend_shading,
+):
     nwp_chart = build_nwp_ensemble_chart(
         nwp.lazy(),
         variable=nwp_variable_picker.value,
         power_fcst_init_time=init_time,
         nwp_init_time=nwp_init_time,
+        analysis=nwp_analysis.lazy() if show_nwp_analysis.value else None,
         shade_weekends=weekend_shading.value,
     )
     mo.ui.altair_chart(nwp_chart, chart_selection=False, legend_selection=False)
