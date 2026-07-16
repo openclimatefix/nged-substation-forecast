@@ -49,7 +49,7 @@ def _actuals() -> pl.LazyFrame:
     ).lazy()
 
 
-def _build() -> LayerChart:
+def _build(*, shade_weekends: bool = True) -> LayerChart:
     return build_view_forecast_chart(
         _forecasts((0, 1, 2)),
         _actuals(),
@@ -57,31 +57,59 @@ def _build() -> LayerChart:
         units="MW",
         title="Test series — PV — id 1",
         subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
+        shade_weekends=shade_weekends,
     )
 
 
-def test_chart_layers_ensemble_actuals_and_init_rule() -> None:
+def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     spec = _build().to_dict()
-    assert len(spec["layer"]) == 3  # ensemble members, actuals, init-time rule
-    ensemble, actuals, rule = spec["layer"]
+    assert len(spec["layer"]) == 4  # weekend bands, ensemble members, actuals, init-time rule
+    weekends, ensemble, actuals, rule = spec["layer"]
+    assert weekends["mark"]["type"] == "rect"  # drawn first, so every line sits on top of it
+    assert weekends["encoding"]["x2"]["field"] == "end"
+    # Layers share the x scale, so Vega-Lite merges their axis definitions — one deviating
+    # definition (e.g. axis=None) suppresses labels, ticks, and gridlines for the whole chart.
+    # Guard that every layer carries the identical axis definition.
+    axes = [layer["encoding"]["x"].get("axis") for layer in spec["layer"]]
+    assert all(axis == axes[0] for axis in axes)
+    assert axes[0] is not None
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
     assert actuals["encoding"]["y"]["field"] == "power"
     assert rule["mark"]["type"] == "rule"
 
 
+def test_shade_weekends_false_omits_the_band_layer() -> None:
+    spec = _build(shade_weekends=False).to_dict()
+    assert len(spec["layer"]) == 3  # ensemble members, actuals, init-time rule
+    assert all(layer["mark"]["type"] != "rect" for layer in spec["layer"])
+    assert "weekends" not in " ".join(spec["title"]["subtitle"])
+
+
+def test_weekend_bands_sit_at_wall_midnights_clipped_to_window() -> None:
+    spec = _build().to_dict()
+    bands = spec["datasets"][spec["layer"][0]["data"]["name"]]
+    # Window is Fri 03 Jul 07:00 → Sat 18 Jul 07:00 wall time: two full weekends plus the
+    # opening hours of a third, clipped at the window's end.
+    assert [(b["start"], b["end"]) for b in bands] == [
+        ("2026-07-04T00:00:00", "2026-07-06T00:00:00"),
+        ("2026-07-11T00:00:00", "2026-07-13T00:00:00"),
+        ("2026-07-18T00:00:00", "2026-07-18T07:00:00"),
+    ]
+
+
 def test_times_are_rendered_as_europe_london_wall_time() -> None:
     spec = _build().to_dict()
     # 06:00 UTC during BST is 07:00 wall time; the rule layer's single datum carries it, naive.
-    (rule_datum,) = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    (rule_datum,) = spec["datasets"][spec["layer"][3]["data"]["name"]]
     assert rule_datum["valid_time"].startswith("2026-07-04T07:00:00")
     assert "+" not in rule_datum["valid_time"]  # naive — no zone for Vega to re-localise
-    assert spec["layer"][0]["encoding"]["x"]["title"] == "Time (Europe/London)"
+    assert spec["layer"][1]["encoding"]["x"]["title"] == "Time (Europe/London)"
 
 
 def test_x_axis_has_3_hourly_ticks_labelled_at_midnight_only() -> None:
     spec = _build().to_dict()
-    axis = spec["layer"][0]["encoding"]["x"]["axis"]
+    axis = spec["layer"][1]["encoding"]["x"]["axis"]
     # Altair omits an all-zero time-of-day, so a midnight tick has no "hours" key at all.
     tick_hours = [tick.get("hours", 0) for tick in axis["values"]]
     assert all(hour % 3 == 0 for hour in tick_hours)
