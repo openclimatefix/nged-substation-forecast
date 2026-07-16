@@ -1,14 +1,17 @@
 """Tests for the ``view_forecasts.py`` chart builder (``dashboard.forecast_chart``)."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
 from altair import LayerChart
 from dashboard.forecast_chart import (
+    LAG_OPTIONS,
     PLOT_HISTORY,
     PLOT_HORIZON,
     build_view_forecast_chart,
 )
+from plotting import ocf_theme
 
 INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 """During British Summer Time, so wall time is UTC+1 — the axis tests below rely on that."""
@@ -36,9 +39,9 @@ def _forecasts(members: tuple[int, ...]) -> pl.LazyFrame:
     ).lazy()
 
 
-def _actuals() -> pl.LazyFrame:
+def _actuals(history: timedelta = PLOT_HISTORY) -> pl.LazyFrame:
     times = pl.datetime_range(
-        INIT_TIME - PLOT_HISTORY,
+        INIT_TIME - history,
         INIT_TIME + timedelta(days=2),
         interval="30m",
         time_zone="UTC",
@@ -49,15 +52,21 @@ def _actuals() -> pl.LazyFrame:
     ).lazy()
 
 
-def _build(*, shade_weekends: bool = True) -> LayerChart:
+def _build(
+    *,
+    shade_weekends: bool = True,
+    lags: Sequence[timedelta] = (),
+    history: timedelta = PLOT_HISTORY,
+) -> LayerChart:
     return build_view_forecast_chart(
         _forecasts((0, 1, 2)),
-        _actuals(),
+        _actuals(history),
         power_fcst_init_time=INIT_TIME,
         units="MW",
         title="Test series — PV — id 1",
         subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
         shade_weekends=shade_weekends,
+        lags=lags,
     )
 
 
@@ -120,6 +129,42 @@ def test_x_axis_has_3_hourly_ticks_labelled_at_midnight_only() -> None:
     assert "%a %d %b" in axis["labelExpr"]
     assert axis["tickSize"]["condition"]["test"] == "hours(datum.value) == 0"
     assert axis["gridOpacity"]["condition"]["test"] == "hours(datum.value) == 0"
+
+
+def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
+    lag = timedelta(days=7)
+    spec = _build(lags=(lag,), history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
+    # Layer order: weekend bands, ensemble, lags, actuals, init rule — inputs must not obscure
+    # the observations.
+    assert len(spec["layer"]) == 5
+    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    times = sorted(row["valid_time"] for row in lag_rows)
+    # Wall-time window starts Fri 03 Jul 07:00; only pre-init observations are shifted, so the
+    # line ends exactly at init + lag (Sat 04 Jul 07:00 wall + 7 d) — where feature engineering
+    # nullifies the lag as leaky.
+    assert times[0] == "2026-07-03T07:00:00"
+    assert times[-1] == "2026-07-11T07:00:00"
+    # Shifted values equal the observation lag earlier: both frames index power by row order.
+    source = _actuals(PLOT_HISTORY + max(LAG_OPTIONS.values())).collect()
+    first_shifted = next(row for row in lag_rows if row["valid_time"] == times[0])
+    source_time = datetime(2026, 7, 3, 6, 0, tzinfo=UTC) - lag  # 07:00 wall = 06:00 UTC
+    assert first_shifted["power"] == source.filter(pl.col("time") == source_time)["power"].item()
+
+
+def test_lag_colours_assigned_in_ascending_lag_order() -> None:
+    spec = _build(lags=tuple(LAG_OPTIONS.values())).to_dict()
+    colour = spec["layer"][2]["encoding"]["color"]
+    assert colour["scale"]["domain"] == ["7-day lag", "14-day lag"]
+    assert colour["scale"]["range"] == [ocf_theme.PURPLE, ocf_theme.SPRING_GREEN]
+
+
+def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
+    spec = _build(history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
+    actuals_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    # No lags requested → 4 layers, and the blue line still starts at the window, not at the
+    # start of the deeper history the dashboard now always loads.
+    assert len(spec["layer"]) == 4
+    assert min(row["valid_time"] for row in actuals_rows) == "2026-07-03T07:00:00"
 
 
 def test_chart_renders_to_html() -> None:

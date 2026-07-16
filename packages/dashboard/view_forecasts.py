@@ -9,7 +9,12 @@ with app.setup:
     from contracts.power_schemas import TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
-    from dashboard.forecast_chart import PLOT_HISTORY, PLOT_HORIZON, build_view_forecast_chart
+    from dashboard.forecast_chart import (
+        LAG_OPTIONS,
+        PLOT_HISTORY,
+        PLOT_HORIZON,
+        build_view_forecast_chart,
+    )
     from deltalake import DeltaTable
 
 
@@ -180,7 +185,11 @@ def _(available_dates, available_init_times, date_picker):
 @app.cell
 def _():
     weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
-    return (weekend_shading,)
+    lag_picker = mo.ui.multiselect(
+        options=LAG_OPTIONS,
+        label="Lagged power (illustrative model inputs)",
+    )
+    return lag_picker, weekend_shading
 
 
 @app.cell
@@ -189,6 +198,7 @@ def _(
     experiment_names,
     experiment_picker,
     fold_picker,
+    lag_picker,
     no_runs_message,
     run_picker,
     series_picker,
@@ -200,7 +210,7 @@ def _(
     _pickers.append(date_picker)
     if run_picker is not None:
         _pickers.append(run_picker)
-    _pickers.append(weekend_shading)
+    _pickers += [lag_picker, weekend_shading]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
@@ -226,11 +236,17 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
         .select("valid_time", "power_fcst", "ensemble_member")
         .collect()
     )
+    # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are
+    # loaded whatever the lag picker says — toggling lags then re-runs only the chart cell,
+    # never this Delta query. The extra rows are trivial (one series, 14 more days).
     actuals = (
         pl.scan_delta(settings.power_time_series_data_path, storage_options=_storage)
         .filter(
             pl.col("time_series_id") == series_picker.value,
-            pl.col("time").is_between(init_time - PLOT_HISTORY, init_time + PLOT_HORIZON),
+            pl.col("time").is_between(
+                init_time - PLOT_HISTORY - max(LAG_OPTIONS.values()),
+                init_time + PLOT_HORIZON,
+            ),
         )
         .select("time", "power")
         .collect()
@@ -252,6 +268,7 @@ def _(
     fold_picker,
     forecasts,
     init_time,
+    lag_picker,
     metadata_df,
     series_picker,
     weekend_shading,
@@ -271,6 +288,7 @@ def _(
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
         shade_weekends=weekend_shading.value,
+        lags=lag_picker.value,
     )
     # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in
     # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —
