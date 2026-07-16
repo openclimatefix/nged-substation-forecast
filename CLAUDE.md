@@ -128,7 +128,7 @@ This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is t
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
-| `dashboard` | Marimo web app for visualisation |
+| `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
@@ -348,7 +348,7 @@ execution order. `tests/test_s3_data_paths.py` is the canonical pattern.
 
 ### Marimo Notebooks
 
-Marimo notebooks (`packages/dashboard/main.py`, `packages/notebooks/*.py`) are reactive: each
+Marimo notebooks (`packages/dashboard/*.py`, `packages/notebooks/*.py`) are reactive: each
 `@app.cell` function is a separate cell, and the `with app.setup:` block holds names shared by
 every cell. Two authoring rules follow from how Marimo scopes names and how ruff sees them.
 

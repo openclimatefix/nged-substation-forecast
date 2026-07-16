@@ -146,39 +146,35 @@ Experiment "xgboost_smoke_test"
 
 ---
 
-## Inspecting a forecast — `plot_power_forecast_job`
+## Inspecting a forecast — the `view_forecasts` dashboard
 
-Once forecasts exist in the `power_forecasts` Delta table, this job renders an interactive HTML
-plot of a single forecast so you can eyeball it. It is independent of the training flow above —
-launch it any time there are forecasts on disk to inspect.
+Once forecasts exist in the `power_forecasts` Delta table, the `view_forecasts` marimo app plots
+a single forecast so you can eyeball it. It is independent of the training flow above — launch it
+any time there are forecasts on disk to inspect:
 
-**Trigger:** Dagster UI → Jobs → `plot_power_forecast_job` → "Launch run". The default run config
-plots an existing smoke-test forecast, so you can launch it as-is; override the
-`PlotPowerForecastConfig` fields to plot a different forecast:
+```bash
+uv run marimo edit packages/dashboard/view_forecasts.py
+```
 
-| Field | Example | Notes |
-|---|---|---|
-| `experiment_name` | `"xgboost_smoke_test_3"` | Selects the `(experiment_name, fold_id)` Delta partition to read |
-| `fold_id` | `"smoke_test"` | Use `"live"` for a production forecast |
-| `power_fcst_init_time` | `"2025-01-29T06:00:00+00:00"` | ISO-8601 (Dagster config has no native datetime type); a naive value is read as UTC. The plot spans this time plus the 14-day horizon |
-| `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each is drawn on its own panel |
+Pick the population with the dropdowns: the **Fold** dropdown lists every `fold_id` present in
+the `power_forecasts` table (a CV fold label, a smoke-test fold, or `live` for production
+forecasts), and an **Experiment** dropdown appears when the chosen fold holds more than one
+`experiment_name`. Then choose a **time series** (the dropdown groups the 32 series by type, so
+all the PV sites or all the primaries sit together), a **forecast date**, and one of that day's
+**forecast runs**.
 
-**What the job does:**
+The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
+including past the init time) as a thick blue line, and a vertical rule at the forecast init
+time, spanning 24 hours before the init time to 14 days after it. The x-axis is labelled at
+midnight (Europe/London) with the day of week and date, with unlabelled minor ticks every 3
+hours. Scroll to zoom, drag to pan, hover for the `ensemble_member` and value.
 
-1. Reads `power_forecasts` for `(experiment_name, fold_id)` at the chosen `power_fcst_init_time`,
-   filtered to `time_series_ids`. Errors if no rows match — check the matching partition has been
-   materialised.
-2. Reads observed power over the 14-day horizon and the series metadata.
-3. Builds an Altair chart with one panel per `time_series_id`: all 51 ensemble members as thin
-   grey lines, ground truth (where available) as a thick blue line, and a shared, zoomable x-axis
-   so panning one panel moves them all.
-4. Saves it as a self-contained interactive HTML file under `plots_data_path` (`data/plots/`),
-   named `{experiment_name}__{fold_id}__{init_time}__ts-{ids}.html`. Open it in a browser to zoom
-   and hover (tooltips show the `ensemble_member` and value).
-
-This is a **job, not an asset**, because the plot is a throwaway artifact for human inspection —
-keyed by init time and series ids, with no lineage or durable catalog identity — rather than a
-tracked data object in the pipeline.
+The **Data source** radio switches the app between the local data tables (the root `.env`) and
+the production S3 buckets without restarting marimo — see the
+[dashboard README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard)
+for the `.env.s3` setup, and
+[Operating the live service: Inspecting a live forecast](../live_service/operations.md#inspecting-a-live-forecast)
+for the production workflow.
 
 ---
 
