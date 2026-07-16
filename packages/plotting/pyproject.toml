@@ -1,7 +1,7 @@
 [project]
 name = "plotting"
 version = "0.1.0"
-description = "OCF brand theme and chart-building utilities"
+description = "OCF brand Altair theme"
 requires-python = ">=3.14"
 dependencies = [
     "altair>=6.0.0",

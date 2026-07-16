@@ -78,7 +78,7 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     # Always-local artifacts derive from local_artifacts_path, not either data-table root, so
     # they're excluded from this internal-vs-delivery check even though their names also end in
     # "_data_path".
-    local_artifact_fields = {"plots_data_path", "model_cache_base_path", "production_model_path"}
+    local_artifact_fields = {"model_cache_base_path", "production_model_path"}
     settings = Settings(
         data_path_internal="/internal",
         data_path_delivery="/delivery",
@@ -114,7 +114,6 @@ def test_remote_data_path_keeps_artifacts_local():
     assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
     assert settings.model_cache_base_path == "/local/artifacts/model_cache"
     assert settings.production_model_path == "/local/artifacts/production_model"
-    assert settings.plots_data_path == "/local/artifacts/plots"
 
 
 def test_explicit_path_overrides_derivation():
@@ -122,13 +121,13 @@ def test_explicit_path_overrides_derivation():
     settings = Settings(
         data_path_internal="s3://bucket/data",
         data_path_delivery="s3://bucket/data",
-        plots_data_path="s3://other-bucket/plots",
+        production_model_path="/mnt/models/prod",
         nwp_data_path="/mnt/fast/NWP",
         nged_s3_bucket_url="https://example.com",
         nged_s3_bucket_access_key="key",
         nged_s3_bucket_secret="secret",
     )
-    assert settings.plots_data_path == "s3://other-bucket/plots"
+    assert settings.production_model_path == "/mnt/models/prod"
     assert settings.nwp_data_path == "/mnt/fast/NWP"
     # Siblings still derive normally.
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"

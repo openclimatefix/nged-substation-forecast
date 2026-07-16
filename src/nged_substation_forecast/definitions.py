@@ -7,7 +7,6 @@ from nged_substation_forecast.defs import (
     assets,
     cv_assets,
     jobs,
-    plot_jobs,
     production_assets,
     schedules,
 )
@@ -18,7 +17,7 @@ settings = Settings()
 
 defs = Definitions(
     assets=all_assets,
-    jobs=[jobs.register_experiment_job, plot_jobs.plot_power_forecast_job],
+    jobs=[jobs.register_experiment_job],
     schedules=[
         schedules.power_time_series_and_metadata_schedule,
         schedules.ecmwf_ens_schedule,

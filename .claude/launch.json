@@ -6,6 +6,21 @@
       "runtimeExecutable": "uv",
       "runtimeArgs": ["run", "mkdocs", "serve", "-a", "127.0.0.1:8765"],
       "port": 8765
+    },
+    {
+      "name": "view-forecasts",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "marimo",
+        "run",
+        "--headless",
+        "--no-token",
+        "--port",
+        "2719",
+        "packages/dashboard/view_forecasts.py"
+      ],
+      "port": 2719
     }
   ]
 }

@@ -104,7 +104,7 @@ class Settings(BaseSettings):
     # --- Storage roots -------------------------------------------------------------------
     #
     # data_path_internal and data_path_delivery hold the (S3-capable) data tables; local_
-    # artifacts_path holds the always-local model cache, production model, and plots. Why they
+    # artifacts_path holds the always-local model cache and production model. Why they
     # are split, and what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
@@ -130,7 +130,7 @@ class Settings(BaseSettings):
     local_artifacts_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
         description=(
-            "Root of the always-local artifacts (model cache, production model, plots). Kept"
+            "Root of the always-local artifacts (model cache, production model). Kept"
             " separate from the data-table roots because these back local-filesystem-only"
             " libraries and must stay local even when the data tables live on S3."
         ),
@@ -229,14 +229,6 @@ class Settings(BaseSettings):
 
     # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
 
-    plots_data_path: str = Field(
-        default="",
-        description=(
-            "Directory where plot_power_forecast writes interactive forecast HTML files, one per"
-            " materialisation (filename derived from experiment, fold, init time, and the plotted"
-            " time_series_ids)."
-        ),
-    )
     model_cache_base_path: str = Field(
         default="",
         description=(
@@ -290,7 +282,6 @@ class Settings(BaseSettings):
         )
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
         # Always-local artifacts.
-        self.plots_data_path = self.plots_data_path or uri_join(self.local_artifacts_path, "plots")
         self.model_cache_base_path = self.model_cache_base_path or uri_join(
             self.local_artifacts_path, "model_cache"
         )

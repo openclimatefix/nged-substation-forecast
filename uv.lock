@@ -1020,10 +1020,11 @@ wheels = [
 [[package]]
 name = "dashboard"
 version = "0.1.0"
-source = { virtual = "packages/dashboard" }
+source = { editable = "packages/dashboard" }
 dependencies = [
     { name = "altair" },
     { name = "contracts" },
+    { name = "deltalake" },
     { name = "geoarrow-pyarrow" },
     { name = "lonboard" },
     { name = "marimo" },
@@ -1044,6 +1045,7 @@ dev = [
 requires-dist = [
     { name = "altair", specifier = ">=6.0.0" },
     { name = "contracts", editable = "packages/contracts" },
+    { name = "deltalake" },
     { name = "geoarrow-pyarrow", specifier = ">=0.2.0" },
     { name = "lonboard", specifier = ">=0.13.0" },
     { name = "marimo", specifier = ">=0.19.7" },

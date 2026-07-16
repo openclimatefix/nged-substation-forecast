@@ -111,8 +111,8 @@ Then attach it to **whichever identity runs the code**:
   can reuse the same read/write policy above via its own **IAM user**, created the same way as the
   dashboard user below — just with `nged-forecast-read-and-write` attached instead of
   `nged-forecast-read-only`.
-- **Your laptop, running only the dashboard** (`packages/dashboard/main.py` — see
-  [#283](https://github.com/openclimatefix/nged-substation-forecast/issues/283)) → it only ever
+- **Your laptop, running only the dashboard** (the marimo apps at `packages/dashboard/`, e.g.
+  `view_forecasts.py`) → it only ever
   reads, so give it a separate, read-only **IAM user** instead of reusing the read/write
   credential:
 

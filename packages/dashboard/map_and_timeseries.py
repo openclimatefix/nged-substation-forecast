@@ -5,7 +5,6 @@ app = marimo.App(width="full")
 
 with app.setup:
     from datetime import datetime
-    from pathlib import Path
     from typing import cast
 
     import altair as alt
@@ -19,34 +18,9 @@ with app.setup:
     from anywidget import AnyWidget
     from contracts.common import UTC_DATETIME_DTYPE
     from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
-    from contracts.settings import PROJECT_ROOT, Settings
     from contracts.typing_utils import typeddict_to_dict
+    from dashboard.data_source import settings_for_source, source_status_message
     from plotting.ocf_theme import BLUE
-
-    ROOT_ENV: Path = PROJECT_ROOT / ".env"
-    """Root .env — the local-pipeline config shared with the rest of the app."""
-    DASHBOARD_S3_ENV: Path = PROJECT_ROOT / "packages" / "dashboard" / ".env.s3"
-    """Git-ignored S3-mode overrides, layered on top of ROOT_ENV when the toggle is 's3'."""
-
-    def settings_for_source(source: str) -> Settings:
-        """Instantiate Settings for the dashboard's selected data source.
-
-        "local" reads only the root .env (the local pipeline, same as the rest of the app).
-        "s3" layers packages/dashboard/.env.s3 on top of the root .env, overriding the
-        data-path roots and object-store credentials to point at the real S3 buckets, so
-        production data can be viewed without restarting marimo.
-
-        Only the data tables follow the toggle: .env.s3 sets DATA_PATH_INTERNAL,
-        DATA_PATH_DELIVERY and the DATA_STORE_* credentials. It deliberately does not set
-        LOCAL_ARTIFACTS_PATH, so the model cache and production model stay laptop-local in
-        both modes. A missing .env.s3 is silently skipped by pydantic-settings, so "s3"
-        then falls back to the root .env's local paths (the UI flags this).
-        """
-        if source == "s3":
-            # _env_file is a pydantic-settings builtin kwarg not modelled by ty's synthesised
-            # BaseModel __init__; the list layers .env.s3 over the root .env (later file wins).
-            return Settings(_env_file=[ROOT_ENV, DASHBOARD_S3_ENV])  # ty: ignore[unknown-argument]
-        return Settings()
 
 
 @app.cell
@@ -64,18 +38,8 @@ def _():
 @app.cell
 def _(source):
     settings = settings_for_source(source.value)
-    if source.value == "s3" and not DASHBOARD_S3_ENV.exists():
-        status = mo.callout(
-            mo.md(
-                f"No `{DASHBOARD_S3_ENV.name}` found next to `main.py`. Copy "
-                f"`{DASHBOARD_S3_ENV.name}.example` to `{DASHBOARD_S3_ENV.name}` and fill in "
-                "the S3 buckets and credentials. Falling back to local data."
-            ),
-            kind="warn",
-        )
-    else:
-        status = mo.md(f"Reading **{source.value}** data from `{settings.nged_data_path}`.")
-    status
+    status_message, is_warning = source_status_message(source.value, settings)
+    mo.callout(mo.md(status_message), kind="warn") if is_warning else mo.md(status_message)
     return (settings,)
 
 

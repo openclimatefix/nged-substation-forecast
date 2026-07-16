@@ -125,26 +125,24 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
 
 ## Inspecting a live forecast
 
-Use `plot_power_forecast_job` — the same job
-[ML Experimentation](../ml_experimentation/dagster-workflow.md#inspecting-a-forecast-plot_power_forecast_job)
-uses to inspect backtest forecasts — with `fold_id="live"`:
+Use the `view_forecasts` dashboard app — the same app
+[ML Experimentation](../ml_experimentation/dagster-workflow.md#inspecting-a-forecast-the-view_forecasts-dashboard)
+uses to inspect backtest forecasts — on your laptop:
 
-| Field | Example | Notes |
-|---|---|---|
-| `experiment_name` | `"xgboost_v1"` | The promoted model's experiment name (see `promoted_model`'s output metadata from step 2) |
-| `fold_id` | `"live"` | Always `"live"` for a production forecast |
-| `power_fcst_init_time` | `"2026-07-04T06:00:00+00:00"` | The partition's forecast init time — see the partition-semantics note in step 3 |
-| `time_series_ids` | `[1, 2, 3, 4]` | Between 1 and 4 ids; each drawn on its own panel |
+```bash
+uv run marimo edit packages/dashboard/view_forecasts.py
+```
 
-`plot_power_forecast` is a **local-development convenience**: it writes Altair HTML to
-`LOCAL_ARTIFACTS_PATH`, which on an ephemeral Fargate task is a disk that is discarded when the
-task exits — the file would never be seen. The durable, S3-native (S3 is AWS's object store) way
-to look at a deployed service's forecasts is the **dashboard**
-(`packages/dashboard/main.py`), which reads whichever
-tables it needs directly via their `Settings` paths and renders on demand — point it at the same
-`Settings` and it works identically whether each path is local or `s3://` (see
-[Configuration reference](setup.md#at-a-glance-which-settings-for-which-environment) for the
-read-only laptop credentials).
+Switch the **Data source** radio to `s3` (needs the git-ignored `packages/dashboard/.env.s3`
+holding the read-only laptop credentials — see the
+[Configuration reference](setup.md#at-a-glance-which-settings-for-which-environment)), keep the
+**Fold** dropdown on `live`, then pick a time series and a forecast date/run. The plot shows every
+forecast ensemble member against the observed power, from 24 hours before the forecast init time
+to 14 days after it.
+
+The dashboard reads whichever tables it needs directly via their `Settings` paths and renders on
+demand, so it works identically whether each path is local or `s3://` — nothing runs on AWS, and
+nothing is written anywhere.
 
 ## Backfilling a missed slot
 
