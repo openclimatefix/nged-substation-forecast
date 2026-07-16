@@ -65,9 +65,14 @@ def _(settings):
         ]
         for row in metadata_df.sort("time_series_type", "time_series_name").iter_rows(named=True)
     }
+    # Default to time_series_id 24 rather than the alphabetically-first option — id 20 (a BESS)
+    # sorts first but is mostly garbage data, which makes for a poor first impression.
+    _default_label = next(
+        (label for label, id_ in series_options.items() if id_ == 24), next(iter(series_options))
+    )
     series_picker = mo.ui.dropdown(
         options=series_options,
-        value=next(iter(series_options)),
+        value=_default_label,
         label="Time series",
         searchable=True,
     )
