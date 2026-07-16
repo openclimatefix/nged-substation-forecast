@@ -1,14 +1,17 @@
 """Tests for the ``view_forecasts.py`` chart builder (``dashboard.forecast_chart``)."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
 from altair import LayerChart
 from dashboard.forecast_chart import (
+    LAG_OPTIONS,
     PLOT_HISTORY,
     PLOT_HORIZON,
     build_view_forecast_chart,
 )
+from plotting import ocf_theme
 
 INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 """During British Summer Time, so wall time is UTC+1 — the axis tests below rely on that."""
@@ -36,9 +39,9 @@ def _forecasts(members: tuple[int, ...]) -> pl.LazyFrame:
     ).lazy()
 
 
-def _actuals() -> pl.LazyFrame:
+def _actuals(history: timedelta = PLOT_HISTORY) -> pl.LazyFrame:
     times = pl.datetime_range(
-        INIT_TIME - PLOT_HISTORY,
+        INIT_TIME - history,
         INIT_TIME + timedelta(days=2),
         interval="30m",
         time_zone="UTC",
@@ -49,15 +52,25 @@ def _actuals() -> pl.LazyFrame:
     ).lazy()
 
 
-def _build(*, shade_weekends: bool = True) -> LayerChart:
+def _build(
+    *,
+    shade_weekends: bool = True,
+    show_forecast: bool = True,
+    show_actuals: bool = True,
+    lags: Sequence[timedelta] = (),
+    history: timedelta = PLOT_HISTORY,
+) -> LayerChart:
     return build_view_forecast_chart(
         _forecasts((0, 1, 2)),
-        _actuals(),
+        _actuals(history),
         power_fcst_init_time=INIT_TIME,
         units="MW",
         title="Test series — PV — id 1",
         subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
         shade_weekends=shade_weekends,
+        show_forecast=show_forecast,
+        show_actuals=show_actuals,
+        lags=lags,
     )
 
 
@@ -75,7 +88,11 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     assert axes[0] is not None
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
+    # Single-colour layers take their colour from the shared scale via a datum encoding, so
+    # they participate in the always-shown legend without a constant column in their data.
+    assert ensemble["encoding"]["color"]["datum"] == "Forecast power"
     assert actuals["encoding"]["y"]["field"] == "power"
+    assert actuals["encoding"]["color"]["datum"] == "Actual power"
     assert rule["mark"]["type"] == "rule"
 
 
@@ -120,6 +137,90 @@ def test_x_axis_has_3_hourly_ticks_labelled_at_midnight_only() -> None:
     assert "%a %d %b" in axis["labelExpr"]
     assert axis["tickSize"]["condition"]["test"] == "hours(datum.value) == 0"
     assert axis["gridOpacity"]["condition"]["test"] == "hours(datum.value) == 0"
+
+
+def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
+    lag = timedelta(days=7)
+    spec = _build(lags=(lag,), history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
+    # Layer order: weekend bands, ensemble, lags, actuals, init rule — inputs must not obscure
+    # the observations.
+    assert len(spec["layer"]) == 5
+    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    times = sorted(row["valid_time"] for row in lag_rows)
+    # Wall-time window starts Fri 03 Jul 07:00; only pre-init observations are shifted, so the
+    # line ends exactly at init + lag (Sat 04 Jul 07:00 wall + 7 d) — where feature engineering
+    # nullifies the lag as leaky.
+    assert times[0] == "2026-07-03T07:00:00"
+    assert times[-1] == "2026-07-11T07:00:00"
+    # Shifted values equal the observation lag earlier: both frames index power by row order.
+    source = _actuals(PLOT_HISTORY + max(LAG_OPTIONS.values())).collect()
+    first_shifted = next(row for row in lag_rows if row["valid_time"] == times[0])
+    source_time = datetime(2026, 7, 3, 6, 0, tzinfo=UTC) - lag  # 07:00 wall = 06:00 UTC
+    assert first_shifted["power"] == source.filter(pl.col("time") == source_time)["power"].item()
+
+
+def test_legend_always_lists_every_line() -> None:
+    # The always-drawn init-rule layer carries the shared colour scale, whose explicit domain
+    # drives the legend — so the legend is identical whichever lines are toggled on.
+    for spec in (
+        _build().to_dict(),
+        _build(show_forecast=False, show_actuals=False).to_dict(),
+        _build(lags=tuple(LAG_OPTIONS.values())).to_dict(),
+    ):
+        colour = spec["layer"][-1]["encoding"]["color"]
+        assert colour["field"] == "series"
+        assert colour["scale"]["domain"] == [
+            "Forecast power",
+            "Actual power",
+            "7-day lagged power",
+            "14-day lagged power",
+            "Forecast init time",
+        ]
+        assert colour["scale"]["range"] == [
+            ocf_theme.ENSEMBLE_LINE,
+            ocf_theme.BLUE,
+            ocf_theme.PURPLE,
+            ocf_theme.SPRING_GREEN,
+            ocf_theme.ORANGE_RED,
+        ]
+        assert colour["legend"]["symbolType"] == "stroke"
+
+
+def test_lag_lines_share_the_legend_colour_scale() -> None:
+    spec = _build(lags=tuple(LAG_OPTIONS.values())).to_dict()
+    colour = spec["layer"][2]["encoding"]["color"]
+    assert colour["field"] == "lag"
+    # Identical scale to the rule layer's, so Vega-Lite merges them without conflict and the
+    # lag lines pick up their (ascending-lag-ordered) colours from the shared domain.
+    assert colour["scale"] == spec["layer"][-1]["encoding"]["color"]["scale"]
+    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    assert {row["lag"] for row in lag_rows} == {"7-day lagged power", "14-day lagged power"}
+
+
+def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
+    spec = _build(history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
+    actuals_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    # No lags requested → 4 layers, and the blue line still starts at the window, not at the
+    # start of the deeper history the dashboard now always loads.
+    assert len(spec["layer"]) == 4
+    assert min(row["valid_time"] for row in actuals_rows) == "2026-07-03T07:00:00"
+
+
+def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
+    no_forecast = _build(show_forecast=False).to_dict()
+    assert len(no_forecast["layer"]) == 3  # weekend bands, actuals, init rule
+    no_actuals = _build(show_actuals=False).to_dict()
+    assert len(no_actuals["layer"]) == 3  # weekend bands, ensemble, init rule
+    assert no_actuals["layer"][1]["encoding"]["color"]["datum"] == "Forecast power"
+    only_lags = _build(
+        show_forecast=False,
+        show_actuals=False,
+        lags=(timedelta(days=7),),
+        history=PLOT_HISTORY + max(LAG_OPTIONS.values()),
+    ).to_dict()
+    # weekend bands, lag line, init rule — the y-axis title comes from the lag layer alone.
+    assert len(only_lags["layer"]) == 3
+    assert only_lags["layer"][1]["encoding"]["y"]["title"] == "Power (MW)"
 
 
 def test_chart_renders_to_html() -> None:

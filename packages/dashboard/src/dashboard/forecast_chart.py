@@ -2,14 +2,18 @@
 
 Builds an Altair chart of one forecast run for one ``time_series_id``: every NWP ensemble member
 as a thin grey line, observed power as a thick blue line, a vertical rule at
-``power_fcst_init_time``, and a faint shaded band behind each weekend (weekday/weekend structure
-dominates demand, so weekends should be findable at a glance). The x-axis deliberately overrides
-Altair's adaptive datetime ticks: labels sit at local midnight only (day-of-week first — crucial
-for demand forecasting), with unlabelled minor ticks every 3 hours, all in Europe/London wall
-time.
+``power_fcst_init_time``, a faint shaded band behind each weekend (weekday/weekend structure
+dominates demand, so weekends should be findable at a glance), and optional lagged-power lines
+(observed power shifted forward by e.g. 7 days — the raw material of the models' power-lag
+features). A colour legend beside the chart always lists every plottable line — its entry set is
+the shared colour scale's explicit domain, so it never changes as lines are toggled on and off.
+The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at
+local midnight only (day-of-week first — crucial for demand forecasting), with unlabelled minor
+ticks every 3 hours, all in Europe/London wall time.
 """
 
 import calendar
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any, Final, cast
 
@@ -33,6 +37,41 @@ WEEKEND_SHADE_OPACITY: Final[float] = 0.07
 At this level, ``ocf_theme.MUSTARD`` over the cream theme background reads as a slightly warmer
 cream rather than an orange stripe, so the bands mark weekends without competing with the
 low-opacity grey ensemble lines.
+"""
+
+
+def _lag_label(lag: timedelta) -> str:
+    """The display label for a power lag, used in the UI control and the chart legend alike."""
+    return f"{lag.days}-day lagged power"
+
+
+LAG_OPTIONS: Final[dict[str, timedelta]] = {
+    _lag_label(lag): lag for lag in (timedelta(days=7), timedelta(days=14))
+}
+"""The lagged-power lines the dashboard offers, as UI-label → lag.
+
+Hardcoded, illustrative model inputs: the dashboard cannot see which lag features a given
+experiment's model actually used (that config lives in MLflow), so we offer the common
+defaults rather than pretending to read them from the model.
+"""
+
+_LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
+"""Line colours assigned to lags in ascending-lag order; must cover ``len(LAG_OPTIONS)``."""
+
+_FORECAST_LABEL: Final[str] = "Forecast power"
+_ACTUALS_LABEL: Final[str] = "Actual power"
+_INIT_TIME_LABEL: Final[str] = "Forecast init time"
+
+_LINE_COLORS: Final[dict[str, str]] = {
+    _FORECAST_LABEL: ocf_theme.ENSEMBLE_LINE,
+    _ACTUALS_LABEL: ocf_theme.BLUE,
+    **dict(zip(LAG_OPTIONS, _LAG_COLORS, strict=True)),
+    _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
+}
+"""Legend label → line colour for everything the chart can draw, in legend order.
+
+Used as the explicit domain/range of the shared colour scale, so the legend always lists every
+entry — whichever lines are currently toggled on — and each line keeps a stable colour.
 """
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
@@ -88,6 +127,35 @@ def _weekend_bands(window_start: datetime, window_end: datetime) -> pl.DataFrame
     )
 
 
+def _lagged_power_frame(
+    actuals: pl.LazyFrame, power_fcst_init_time: datetime, lags: Sequence[timedelta]
+) -> pl.LazyFrame:
+    """Observed power shifted forward by each lag — the raw material of the power-lag features.
+
+    Only observations at or before ``power_fcst_init_time`` are shifted (the model cannot see
+    later ones), so each line ends at ``power_fcst_init_time + lag`` — precisely where feature
+    engineering nullifies that lag as leaky for longer lead times. The early end of the line is
+    the point, not an artefact.
+
+    Args:
+        actuals: ``PowerTimeSeries`` observations (UTC ``time``), including history at least
+            ``max(lags)`` before the plotted window starts.
+        power_fcst_init_time: The forecast init time (tz-aware UTC).
+        lags: The lags to shift by; one output line (``lag`` label) per element.
+
+    Returns:
+        A frame of (UTC) ``time``, ``power``, and ``lag`` label rows, clipped to start no
+        earlier than the plotted window.
+    """
+    window_start = power_fcst_init_time - PLOT_HISTORY
+    return pl.concat(
+        actuals.filter(pl.col("time") <= power_fcst_init_time)
+        .with_columns(time=pl.col("time") + lag, lag=pl.lit(_lag_label(lag)))
+        .filter(pl.col("time") >= window_start)
+        for lag in lags
+    )
+
+
 def _x_axis_ticks(window_start: datetime, window_end: datetime) -> list[datetime]:
     """Every 3-hourly wall-clock tick across the (naive, wall-time) plotted window."""
     first_tick = window_start.replace(minute=0, second=0, microsecond=0)
@@ -135,20 +203,29 @@ def build_view_forecast_chart(
     title: str,
     subtitle: str,
     shade_weekends: bool = True,
+    show_forecast: bool = True,
+    show_actuals: bool = True,
+    lags: Sequence[timedelta] = (),
 ) -> alt.LayerChart:
     """Build the single-panel forecast chart for one series and one forecast run.
 
     Args:
         forecasts: ``PowerForecast`` rows for one ``(time_series_id, power_fcst_init_time)``
             (UTC ``valid_time``); every distinct ``ensemble_member`` becomes a thin grey line.
-        actuals: ``PowerTimeSeries`` observations for the same series (UTC ``time``); plotted
-            wherever available across the whole window, including past the init time.
+        actuals: ``PowerTimeSeries`` observations for the same series (UTC ``time``). The thick
+            blue line plots the window's observations, including past the init time; rows from
+            deeper history (which callers must include when requesting ``lags``) feed only the
+            lagged-power lines.
         power_fcst_init_time: The forecast init time (tz-aware UTC). Sets the plotted window —
             ``PLOT_HISTORY`` before it to ``PLOT_HORIZON`` after it — and the vertical rule.
         units: ``"MW"`` or ``"MVA"``, from this series' ``TimeSeriesMetadata``.
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / experiment line).
         shade_weekends: Whether to draw a faint background band behind each weekend.
+        show_forecast: Whether to draw the grey forecast-ensemble lines.
+        show_actuals: Whether to draw the thick blue observed-power line.
+        lags: Power lags to plot as coloured lines (observed power shifted forward by each lag,
+            using only pre-init observations — see ``_lagged_power_frame``). Empty for none.
 
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
@@ -166,8 +243,24 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
+    # All power layers share the y title so Vega-Lite merges them into one clean y-axis
+    # whichever subset of lines is toggled on.
+    y_title = f"Power ({units})"
+
+    # The shared colour scale's explicit domain drives the legend, so the legend always lists
+    # every line — even ones currently toggled off — and colours never reshuffle. The scale and
+    # legend definitions ride on the field-encoded layers (lags and the always-present init-time
+    # rule); the single-colour layers reference the same scale via datum encodings.
+    # (Swatch opacity is pinned to 1 in the OCF theme's legend config — a per-legend
+    # ``symbolOpacity`` here would lose to the opacity Vega-Lite derives from the marks.)
+    line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
+    line_legend = alt.Legend(title=None, symbolType="stroke", symbolStrokeWidth=2)
+
+    # Layers are appended in draw order: weekend bands at the back, then the forecast
+    # ensemble, then lagged power (model *inputs*, which must not obscure observations), then
+    # observed power, with the init-time rule on top of everything.
     layers: list[alt.Chart] = []
-    legend_parts = ["Grey: ensemble members", "Blue: observed power"]
+    subtitle_notes: list[str] = []
     if shade_weekends:
         # Drawn first so every other layer sits on top; no y encoding, so each band spans the
         # full chart height. Uses the shared x encoding (see _x_encoding's docstring for why
@@ -180,39 +273,71 @@ def build_view_forecast_chart(
                 x2="end:T",
             )
         )
-        legend_parts.append("Shaded: weekends")
-    ensemble_layer = (
-        alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
-        .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
+        subtitle_notes.append("Shaded: weekends")
+    if show_forecast:
+        layers.append(
+            alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
+            .mark_line(strokeWidth=1, opacity=0.3)
+            .encode(
+                x=x,
+                y=alt.Y("power_fcst:Q", title=y_title),
+                color=alt.ColorDatum(_FORECAST_LABEL),
+                detail="ensemble_member:N",
+                tooltip=["ensemble_member", "valid_time", "power_fcst"],
+            )
+        )
+    if lags:
+        sorted_lags = sorted(lags)
+        layers.append(
+            alt.Chart(
+                _prepare_for_plot(
+                    _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags),
+                    "time",
+                    "power",
+                )
+                .rename({"time": "valid_time"})
+                .collect()
+            )
+            .mark_line(strokeWidth=1.5, opacity=0.8)
+            .encode(
+                x=x,
+                y=alt.Y("power:Q", title=y_title),
+                color=alt.Color("lag:N", scale=line_color_scale, legend=line_legend),
+                tooltip=["lag", "valid_time", "power"],
+            )
+        )
+    if show_actuals:
+        layers.append(
+            alt.Chart(
+                _prepare_for_plot(
+                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY),
+                    "time",
+                    "power",
+                )
+                .rename({"time": "valid_time"})
+                .collect()
+            )
+            .mark_line(strokeWidth=2.5)
+            .encode(
+                x=x,
+                y=alt.Y("power:Q", title=y_title),
+                color=alt.ColorDatum(_ACTUALS_LABEL),
+                tooltip=["valid_time", "power"],
+            )
+        )
+    layers.append(
+        alt.Chart(pl.DataFrame({"valid_time": [init_wall], "series": [_INIT_TIME_LABEL]}))
+        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4])
         .encode(
             x=x,
-            y=alt.Y("power_fcst:Q", title=f"Power ({units})"),
-            detail="ensemble_member:N",
-            tooltip=["ensemble_member", "valid_time", "power_fcst"],
+            color=alt.Color("series:N", scale=line_color_scale, legend=line_legend),
+            tooltip=[alt.Tooltip("valid_time", title="Forecast init time")],
         )
     )
-    actuals_layer = (
-        alt.Chart(
-            _prepare_for_plot(actuals, "time", "power").rename({"time": "valid_time"}).collect()
-        )
-        .mark_line(strokeWidth=2.5, color=ocf_theme.BLUE)
-        .encode(
-            x=x,
-            y=alt.Y("power:Q"),
-            tooltip=["valid_time", "power"],
-        )
-    )
-    init_time_rule = (
-        alt.Chart(pl.DataFrame({"valid_time": [init_wall]}))
-        .mark_rule(strokeWidth=1.5, strokeDash=[6, 4], color=ocf_theme.ORANGE_RED)
-        .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
-    )
-
-    layers += [ensemble_layer, actuals_layer, init_time_rule]
     chart = alt.layer(*layers).properties(
         title=alt.TitleParams(
             text=title,
-            subtitle=[subtitle, " · ".join(legend_parts)],
+            subtitle=[subtitle, " · ".join(subtitle_notes)] if subtitle_notes else [subtitle],
         ),
         width="container",
         height=400,

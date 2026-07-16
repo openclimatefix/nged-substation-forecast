@@ -9,7 +9,12 @@ with app.setup:
     from contracts.power_schemas import TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
-    from dashboard.forecast_chart import PLOT_HISTORY, PLOT_HORIZON, build_view_forecast_chart
+    from dashboard.forecast_chart import (
+        LAG_OPTIONS,
+        PLOT_HISTORY,
+        PLOT_HORIZON,
+        build_view_forecast_chart,
+    )
     from deltalake import DeltaTable
 
 
@@ -60,9 +65,14 @@ def _(settings):
         ]
         for row in metadata_df.sort("time_series_type", "time_series_name").iter_rows(named=True)
     }
+    # Default to time_series_id 24 rather than the alphabetically-first option — id 20 (a BESS)
+    # sorts first but is mostly garbage data, which makes for a poor first impression.
+    _default_label = next(
+        (label for label, id_ in series_options.items() if id_ == 24), next(iter(series_options))
+    )
     series_picker = mo.ui.dropdown(
         options=series_options,
-        value=next(iter(series_options)),
+        value=_default_label,
         label="Time series",
         searchable=True,
     )
@@ -179,8 +189,20 @@ def _(available_dates, available_init_times, date_picker):
 
 @app.cell
 def _():
+    show_forecast = mo.ui.checkbox(value=True, label="Forecast power")
+    show_actuals = mo.ui.checkbox(value=True, label="Actual power")
+    # One checkbox per LAG_OPTIONS entry — explicit globals rather than a comprehension,
+    # because marimo only makes UI elements reactive when they are bound to top-level names.
+    show_lag_7d = mo.ui.checkbox(label="7-day lagged power")
+    show_lag_14d = mo.ui.checkbox(label="14-day lagged power")
     weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
-    return (weekend_shading,)
+    return (
+        show_actuals,
+        show_forecast,
+        show_lag_14d,
+        show_lag_7d,
+        weekend_shading,
+    )
 
 
 @app.cell
@@ -192,6 +214,10 @@ def _(
     no_runs_message,
     run_picker,
     series_picker,
+    show_actuals,
+    show_forecast,
+    show_lag_14d,
+    show_lag_7d,
     weekend_shading,
 ):
     _pickers = [series_picker, fold_picker]
@@ -200,7 +226,11 @@ def _(
     _pickers.append(date_picker)
     if run_picker is not None:
         _pickers.append(run_picker)
-    _pickers.append(weekend_shading)
+    _lines = mo.vstack(
+        [mo.md("**Lines**"), show_forecast, show_actuals, show_lag_7d, show_lag_14d],
+        gap=0,
+    )
+    _pickers += [_lines, weekend_shading]
     _rows = [mo.hstack(_pickers, justify="start", gap=2, wrap=True)]
     if no_runs_message is not None:
         _rows.append(no_runs_message)
@@ -226,11 +256,17 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
         .select("valid_time", "power_fcst", "ensemble_member")
         .collect()
     )
+    # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are
+    # loaded whatever the lag picker says — toggling lags then re-runs only the chart cell,
+    # never this Delta query. The extra rows are trivial (one series, 14 more days).
     actuals = (
         pl.scan_delta(settings.power_time_series_data_path, storage_options=_storage)
         .filter(
             pl.col("time_series_id") == series_picker.value,
-            pl.col("time").is_between(init_time - PLOT_HISTORY, init_time + PLOT_HORIZON),
+            pl.col("time").is_between(
+                init_time - PLOT_HISTORY - max(LAG_OPTIONS.values()),
+                init_time + PLOT_HORIZON,
+            ),
         )
         .select("time", "power")
         .collect()
@@ -254,6 +290,10 @@ def _(
     init_time,
     metadata_df,
     series_picker,
+    show_actuals,
+    show_forecast,
+    show_lag_14d,
+    show_lag_7d,
     weekend_shading,
 ):
     _meta = metadata_df.filter(pl.col("time_series_id") == series_picker.value)
@@ -271,6 +311,16 @@ def _(
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
         shade_weekends=weekend_shading.value,
+        show_forecast=show_forecast.value,
+        show_actuals=show_actuals.value,
+        lags=[
+            lag
+            for box, lag in (
+                (show_lag_7d, LAG_OPTIONS["7-day lagged power"]),
+                (show_lag_14d, LAG_OPTIONS["14-day lagged power"]),
+            )
+            if box.value
+        ],
     )
     # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in
     # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —
