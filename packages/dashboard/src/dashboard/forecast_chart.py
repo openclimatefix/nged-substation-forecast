@@ -1,12 +1,15 @@
 """Single-panel ensemble forecast chart for the ``view_forecasts.py`` dashboard app.
 
 Builds an Altair chart of one forecast run for one ``time_series_id``: every NWP ensemble member
-as a thin grey line, observed power as a thick blue line, and a vertical rule at
-``power_fcst_init_time``. The x-axis deliberately overrides Altair's adaptive datetime ticks:
-labels sit at local midnight only (day-of-week first — crucial for demand forecasting), with
-unlabelled minor ticks every 3 hours, all in Europe/London wall time.
+as a thin grey line, observed power as a thick blue line, a vertical rule at
+``power_fcst_init_time``, and a faint shaded band behind each weekend (weekday/weekend structure
+dominates demand, so weekends should be findable at a glance). The x-axis deliberately overrides
+Altair's adaptive datetime ticks: labels sit at local midnight only (day-of-week first — crucial
+for demand forecasting), with unlabelled minor ticks every 3 hours, all in Europe/London wall
+time.
 """
 
+import calendar
 from datetime import datetime, timedelta
 from typing import Any, Final, cast
 
@@ -23,6 +26,14 @@ PLOT_HORIZON: Final[timedelta] = timedelta(days=14)
 DISPLAY_TIME_ZONE: Final[str] = "Europe/London"
 """All plotted times are converted to this zone's wall time (demand shape follows the local
 clock, so midnight ticks and day-of-week labels must be local, not UTC)."""
+
+WEEKEND_SHADE_OPACITY: Final[float] = 0.07
+"""Opacity of the weekend background bands.
+
+At this level, ``ocf_theme.MUSTARD`` over the cream theme background reads as a slightly warmer
+cream rather than an orange stripe, so the bands mark weekends without competing with the
+low-opacity grey ensemble lines.
+"""
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
 """Vega expression: is this tick at (wall-clock) midnight?
@@ -46,6 +57,34 @@ def _prepare_for_plot(lf: pl.LazyFrame, time_column: str, power_column: str) -> 
     return lf.with_columns(
         pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None),
         pl.col(power_column).cast(pl.Float64).round(3),
+    )
+
+
+def _weekend_bands(window_start: datetime, window_end: datetime) -> pl.DataFrame:
+    """Weekend intervals (Saturday 00:00 to Monday 00:00 wall time) overlapping the window.
+
+    Args:
+        window_start: Start of the plotted window (naive Europe/London wall time).
+        window_end: End of the plotted window (naive wall time).
+
+    Returns:
+        One row per weekend, with naive wall-time ``start``/``end`` columns clipped to the
+        window (possibly zero rows). Bands sit at wall-clock midnights, matching the labelled
+        midnight gridlines.
+    """
+    # Scan from two days before the window so a window that opens mid-weekend still picks up
+    # the enclosing band's Saturday.
+    day = (window_start - timedelta(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
+    bands: list[tuple[datetime, datetime]] = []
+    while day < window_end:
+        if day.weekday() == calendar.SATURDAY:
+            band = (max(day, window_start), min(day + timedelta(days=2), window_end))
+            if band[0] < band[1]:
+                bands.append(band)
+        day += timedelta(days=1)
+    return pl.DataFrame(
+        {"start": [b[0] for b in bands], "end": [b[1] for b in bands]},
+        schema={"start": pl.Datetime("us"), "end": pl.Datetime("us")},
     )
 
 
@@ -120,6 +159,20 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
+    # Drawn first so every other layer sits on top; no y encoding, so each band spans the full
+    # chart height. The other layers carry the labelled x-axis, hence axis=None here.
+    weekend_layer = (
+        alt.Chart(_weekend_bands(window_start, window_end))
+        .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
+        .encode(
+            x=alt.X(
+                "start:T",
+                scale=alt.Scale(domain=[window_start, window_end]),
+                axis=None,
+            ),
+            x2="end:T",
+        )
+    )
     ensemble_layer = (
         alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
         .mark_line(strokeWidth=1, opacity=0.3, color=ocf_theme.ENSEMBLE_LINE)
@@ -147,10 +200,10 @@ def build_view_forecast_chart(
         .encode(x=x, tooltip=[alt.Tooltip("valid_time", title="Forecast init time")])
     )
 
-    chart = alt.layer(ensemble_layer, actuals_layer, init_time_rule).properties(
+    chart = alt.layer(weekend_layer, ensemble_layer, actuals_layer, init_time_rule).properties(
         title=alt.TitleParams(
             text=title,
-            subtitle=[subtitle, "Grey: ensemble members · Blue: observed power"],
+            subtitle=[subtitle, "Grey: ensemble members · Blue: observed power · Shaded: weekends"],
         ),
         width="container",
         height=400,
