@@ -804,10 +804,15 @@ def _score_forecast_group(
     The group is scored in per-series batches of ``_METRICS_SERIES_BATCH_SIZE`` so that peak
     memory is one batch, never the whole fold (a single V1 fold is already too big to
     materialise). ``compute_metrics`` is independent per ``time_series_id``, so concatenating
-    the per-batch ``Metrics`` frames is exactly equivalent to scoring the group in one call.
-    A batch whose series have no overlapping actuals is skipped — mirroring how such series
-    silently vanish from the inner join in a whole-group call — but a group where *no* batch
-    overlaps raises, exactly as the whole-group call would.
+    the per-batch ``Metrics`` frames produces exactly the metric values a whole-group call
+    would. A batch whose series have no overlapping actuals is skipped — mirroring how such
+    series silently vanish from the inner join in a whole-group call — but a group where *no*
+    batch overlaps raises, exactly as the whole-group call would.
+
+    One deliberate divergence from whole-group scoring: error messages from
+    ``compute_metrics`` (missing capacity, negative lead times) describe only the first
+    offending *batch* — at most ``_METRICS_SERIES_BATCH_SIZE`` series — rather than the
+    whole group, since the raise aborts the loop before later batches load.
 
     Args:
         exp_name: Experiment name for this group.

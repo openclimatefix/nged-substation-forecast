@@ -481,6 +481,18 @@ def test_score_forecast_group_per_series_batches(
     )
 
     monkeypatch.setattr(cv_assets, "_METRICS_SERIES_BATCH_SIZE", 1)
+    # Spy on the batch loader so the test fails loudly if a refactor ever defeats the
+    # batch-size monkeypatch (which would silently collapse this back to one batch).
+    batch_calls: list[list[int]] = []
+    real_load_series_batch = cv_assets._load_series_batch
+
+    def _spy_load_series_batch(
+        group_scan: pl.LazyFrame, series_ids: list[int]
+    ) -> pt.DataFrame[PowerForecast]:
+        batch_calls.append(series_ids)
+        return real_load_series_batch(group_scan, series_ids)
+
+    monkeypatch.setattr(cv_assets, "_load_series_batch", _spy_load_series_batch)
     metrics_path = tmp_path / "forecast_metrics"
     n_rows, fold_metric_dict = cv_assets._score_forecast_group(
         "exp_batch",
@@ -496,6 +508,8 @@ def test_score_forecast_group_per_series_batches(
     )
 
     assert fold_metric_dict is None  # ad_hoc scope never logs to MLflow
+    # The multi-batch and skip paths were genuinely exercised: one single-series batch each.
+    assert batch_calls == [[1], [2], [3]]
     written = pl.read_delta(str(metrics_path))
     assert set(written["time_series_id"].to_list()) == {1, 2}
 
