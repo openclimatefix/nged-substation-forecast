@@ -178,11 +178,15 @@ HORIZON_SLICES: Final[tuple[str, ...]] = (
 )
 """Horizon slice labels matching the four forecast ranges from the project report.
 
+Bands are left-closed intervals of lead time (`valid_time − power_fcst_init_time`), as
+implemented by `ml_core.metrics`:
+
 - `"all"`: aggregates over all horizons and is always computed
-- `"intraday"`: 0 – 6 h
-- `"day_ahead"`: 6 – 36 h
-- `"short_medium_range"`: Day 2 – Day 7
-- `"extended_range"`: Day 8 – Day 14
+- `"intraday"`: [0 h, 6 h)
+- `"day_ahead"`: [6 h, 36 h)
+- `"short_medium_range"`: [36 h, 168 h) — day 2 to day 7
+- `"extended_range"`: [168 h, ∞) — day 8 onwards (unbounded above; in practice forecasts
+  stop at the 14-day NWP horizon)
 """
 
 METRIC_NAMES: Final[tuple[str, ...]] = ("mae", "nmae", "rmse", "mbe")
