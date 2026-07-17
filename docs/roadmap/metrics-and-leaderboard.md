@@ -294,6 +294,18 @@ itself a relevant statistic (visible as the MLflow experiment count).
   candidates (that re-creates the problem); they exist to report honest skill for the chosen
   champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
 
+**A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in
+the `metrics` asset averages each metric key over *only the folds in which that key appears*
+(`exp_metrics.setdefault(key, []).append(value)` then `sum/len` in `defs/cv_assets.py`). Today
+every fold emits the same key set, so this is invisible — but folds with *different horizon
+coverage* (one fold's forecasts stop at 36 h, another's reach day 14) would emit different
+per-horizon-slice keys, and a key like `rmse__all__extended_range` would then silently average
+over a different fold subset than `rmse__all`, with nothing marking the smaller denominator.
+Per-`time_series_type` keys have the same property if fold populations differ. When adding
+folds (the multi-fold epoch below, or the `final_test` fold), either guarantee every
+leaderboard fold emits an identical key set, or make the parent-run aggregation record its
+per-key denominator.
+
 **3. Trade-off (decide at implementation time).** This costs 3 of the 12 validation months, on
 a dataset that is already short. The alternative — accepting documented bias until
 Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is
@@ -517,9 +529,8 @@ it yields spread from *weather uncertainty only* — no model or observation unc
 ensembles are systematically overconfident, worst at short horizons where members haven't
 diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
 directly — yet nothing measures calibration today: `compute_metrics` averages members into a
-deterministic mean (`packages/ml_core/src/ml_core/metrics.py:84-90`) and scores only MAE/NMAE/
-RMSE/MBE on the `"all"` horizon slice (`metrics.py:51`). We pay 51× inference cost and score
-only the mean.
+deterministic ensemble mean per forecast run and scores only MAE/NMAE/RMSE/MBE (now per horizon
+slice, since Phase A landed). We pay 51× inference cost and score only the mean.
 
 The theory behind this diagnosis — the three-term uncertainty decomposition, why a
 deterministic model driven by an NWP ensemble captures only the weather term, and what the
@@ -531,21 +542,11 @@ Fix in four phases, each an independent PR (Phase D is itself several PRs). Phas
 pure evaluation (no model changes) and should land before any further MAE-driven
 experimentation.
 
-### Phase A — horizon-sliced metrics
+### Phase A — horizon-sliced metrics ✅
 
-`HORIZON_SLICES` already exists in `contracts/ml_schemas.py:172` and the
-[time-slices table above](#time-slices-for-performance-evaluation) argues skill drivers differ
-radically by horizon; only `"all"` is computed.
-
-- In `compute_metrics` (`metrics.py`), derive `lead_time = valid_time − power_fcst_init_time`
-  per row (confirm `power_fcst_init_time` survives into the forecast/actuals join; it is a
-  `PowerForecast` primary-key column) and map it onto the `HORIZON_SLICES` bands with
-  `pl.when/then` chains or `cut`.
-- Compute the existing four metrics per `(series, fold, model, horizon_slice)` via one
-  `group_by` including the slice column, plus the existing `"all"` aggregate.
-- `build_mlflow_aggregate_metrics` gains keys like `nmae__all__day_ahead`. Keep the existing
-  key format for `"all"` slices unchanged so historical MLflow runs stay comparable.
-- Schema needs no change (the `Metrics` tall format was designed for this).
+Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (derived from
+`valid_time − power_fcst_init_time`, with the ensemble collapsed per forecast run), and
+`build_mlflow_aggregate_metrics` logs overall per-slice keys like `nmae__all__day_ahead`.
 
 ### Phase B — probabilistic metrics from the existing ensemble
 

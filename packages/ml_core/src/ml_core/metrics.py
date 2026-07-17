@@ -2,6 +2,7 @@
 
 import re
 from datetime import datetime
+from typing import Final
 
 import patito as pt
 import polars as pl
@@ -22,6 +23,49 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 
+_INTRADAY_MAX_HOURS: Final[int] = 6
+"""Exclusive upper bound (hours) of the ``"intraday"`` horizon slice: lead times in [0 h, 6 h)."""
+
+_DAY_AHEAD_MAX_HOURS: Final[int] = 36
+"""Exclusive upper bound (hours) of the ``"day_ahead"`` horizon slice: lead times in [6 h, 36 h)."""
+
+_SHORT_MEDIUM_RANGE_MAX_HOURS: Final[int] = 168
+"""Exclusive upper bound (hours) of the ``"short_medium_range"`` horizon slice.
+
+Lead times in [36 h, 168 h) — day 2 to day 7. Lead times of 168 h and beyond fall in
+``"extended_range"``.
+"""
+
+
+def _horizon_slice_expr() -> pl.Expr:
+    """Map each row's lead time onto the ``HORIZON_SLICES`` bands.
+
+    Lead time is ``valid_time − power_fcst_init_time``. Bands are left-closed:
+    ``"intraday"`` [0 h, 6 h), ``"day_ahead"`` [6 h, 36 h), ``"short_medium_range"``
+    [36 h, 168 h), ``"extended_range"`` [168 h, ∞) — matching the band definitions
+    documented on ``contracts.ml_schemas.HORIZON_SLICES``.
+    """
+    lead_time = pl.col("valid_time") - pl.col("power_fcst_init_time")
+    return (
+        pl.when(lead_time < pl.duration(hours=_INTRADAY_MAX_HOURS))
+        .then(pl.lit("intraday"))
+        .when(lead_time < pl.duration(hours=_DAY_AHEAD_MAX_HOURS))
+        .then(pl.lit("day_ahead"))
+        .when(lead_time < pl.duration(hours=_SHORT_MEDIUM_RANGE_MAX_HOURS))
+        .then(pl.lit("short_medium_range"))
+        .otherwise(pl.lit("extended_range"))
+        .cast(pl.Enum(HORIZON_SLICES))
+    )
+
+
+def _wide_error_metrics(with_error: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
+    """Aggregate the ``error`` column into wide MAE/RMSE/MBE rows, one per ``group_keys`` group."""
+    return with_error.group_by(group_keys).agg(
+        mae=pl.col("error").abs().mean(),
+        rmse=(pl.col("error").pow(2).mean()).sqrt(),
+        mbe=pl.col("error").mean(),
+    )
+
 
 def compute_metrics(
     cv_forecasts: pt.DataFrame[PowerForecast],
@@ -34,10 +78,16 @@ def compute_metrics(
     For each ``(time_series_id, fold_id, power_fcst_model_name)`` group:
 
     1. Joins predictions to observed ``power`` on ``(time_series_id, valid_time)``.
-    2. Averages across ``ensemble_member`` to form a deterministic ensemble mean.
-    3. Computes MAE, NMAE, RMSE, and MBE.
-    4. Joins ``time_series_type`` from ``metadata`` onto each row.
-    5. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
+    2. Assigns each row a ``horizon_slice`` from its lead time
+       (``valid_time − power_fcst_init_time``) — see ``_horizon_slice_expr`` for the bands.
+    3. Averages across ``ensemble_member`` *within each forecast run* (per
+       ``power_fcst_init_time``) to form a deterministic ensemble mean. Each run covering a
+       ``valid_time`` is scored independently, exactly as a production consumer would
+       experience it — runs at different lead times are never pooled.
+    4. Computes MAE, NMAE, RMSE, and MBE per ``horizon_slice``, plus the ``"all"`` aggregate
+       over every lead time.
+    5. Joins ``time_series_type`` from ``metadata`` onto each row.
+    6. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
     NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
@@ -47,8 +97,8 @@ def compute_metrics(
     upgrade makes capacity time-varying (one row per ``(time_series_id,
     time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``.
 
-    Currently only the ``"all"`` horizon slice and ``"all"`` metric_param are computed.
-    Horizon-sliced metrics and parametric metrics (Pinball Loss, PICP) can be
+    Currently only the ``"all"`` metric_param is computed. Parametric metrics
+    (Pinball Loss, PICP) and ensemble metrics (CRPS, spread-skill ratio) can be
     added here later without changing the schema.
 
     Args:
@@ -65,9 +115,24 @@ def compute_metrics(
         A validated tall ``Metrics`` DataFrame with ``time_series_type`` populated.
 
     Raises:
-        ValueError: If no rows survive the inner join (forecasts cover a period with no observed
-            data), or if any scored series has no row in ``capacity``.
+        ValueError: If any forecast row has a negative lead time (``valid_time`` before
+            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), if no
+            rows survive the inner join (forecasts cover a period with no observed data), or
+            if any scored series has no row in ``capacity``.
     """
+    # A negative lead time means hindcast rows — valid times already in the past at
+    # power_fcst_init_time, which a live forecast could never deliver. Scoring them would
+    # silently flatter the model (they'd land in "intraday" via the left-closed bands), so
+    # fail loudly. The CV inference pass currently emits such rows for valid times inside
+    # the NWP publication-delay window; issue #346 tracks removing them at the source.
+    n_negative = cv_forecasts.filter(pl.col("valid_time") < pl.col("power_fcst_init_time")).height
+    if n_negative > 0:
+        raise ValueError(
+            f"{n_negative} forecast row(s) have valid_time before power_fcst_init_time "
+            "(negative lead time). These are undeliverable hindcast rows and must not be "
+            "scored — regenerate the forecasts without them (see issue #346)."
+        )
+
     # Join forecasts to actuals; rename power → power_actual to avoid shadowing.
     # Strip the Patito model subclass from actuals so that Polars' cross-subclass
     # type check (assert_same_type) doesn't reject a join between two differently-typed
@@ -80,23 +145,41 @@ def compute_metrics(
         how="inner",
     )
 
-    # Average across ensemble members to produce a deterministic ensemble mean.
-    ensemble_mean = joined.group_by(
-        ["time_series_id", "fold_id", "power_fcst_model_name", "valid_time"]
-    ).agg(
-        power_fcst=pl.col("power_fcst").mean(),
-        power_actual=pl.col("power_actual").first(),
+    # Average across ensemble members to produce a deterministic ensemble mean per forecast
+    # run: power_fcst_init_time is a group key so that runs covering the same valid_time at
+    # different lead times are scored independently, never pooled into a lagged-ensemble blend.
+    # horizon_slice is constant within a (power_fcst_init_time, valid_time) group.
+    ensemble_mean = (
+        joined.with_columns(horizon_slice=_horizon_slice_expr())
+        .group_by(
+            [
+                "time_series_id",
+                "fold_id",
+                "power_fcst_model_name",
+                "power_fcst_init_time",
+                "valid_time",
+            ]
+        )
+        .agg(
+            power_fcst=pl.col("power_fcst").mean(),
+            power_actual=pl.col("power_actual").first(),
+            horizon_slice=pl.col("horizon_slice").first(),
+        )
     )
 
     # Compute error column once, reuse in all aggregations.
     with_error = ensemble_mean.with_columns(error=pl.col("power_fcst") - pl.col("power_actual"))
 
-    # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name).
-    metrics_wide = with_error.group_by(["time_series_id", "fold_id", "power_fcst_model_name"]).agg(
-        mae=pl.col("error").abs().mean(),
-        rmse=(pl.col("error").pow(2).mean()).sqrt(),
-        mbe=pl.col("error").mean(),
+    # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name, horizon_slice),
+    # where horizon_slice covers the four lead-time bands plus the "all" aggregate over every
+    # lead time.
+    base_keys = ["time_series_id", "fold_id", "power_fcst_model_name"]
+    wide_columns = [*base_keys, "horizon_slice", "mae", "rmse", "mbe"]
+    per_slice = _wide_error_metrics(with_error, [*base_keys, "horizon_slice"])
+    all_slice = _wide_error_metrics(with_error, base_keys).with_columns(
+        horizon_slice=pl.lit("all").cast(pl.Enum(HORIZON_SLICES))
     )
+    metrics_wide = pl.concat([per_slice.select(wide_columns), all_slice.select(wide_columns)])
 
     # Join the pre-computed full-history effective capacity — the NMAE denominator. Strip the
     # Patito model so Polars' cross-subclass join type check doesn't reject the join.
@@ -119,7 +202,7 @@ def compute_metrics(
     metrics_tall = (
         wide.unpivot(
             on=["mae", "nmae", "rmse", "mbe"],
-            index=["time_series_id", "fold_id", "power_fcst_model_name"],
+            index=[*base_keys, "horizon_slice"],
             variable_name="metric_name",
             value_name="metric_value",
         )
@@ -130,7 +213,6 @@ def compute_metrics(
             }
         )
         .with_columns(
-            horizon_slice=pl.lit("all").cast(pl.Enum(HORIZON_SLICES)),
             metric_param=pl.lit("all").cast(pl.Enum(METRIC_PARAMS)),
         )
     )
@@ -166,10 +248,15 @@ def build_mlflow_aggregate_metrics(
 ) -> dict[str, float]:
     """Return a flat ``{metric_key: value}`` dict for ``mlflow.log_metrics``.
 
-    Computes mean ``metric_value`` across all series (``"all"`` aggregate) and per
-    ``time_series_type``, restricted to ``horizon_slice="all"`` and ``metric_param="all"``
-    (the scalar metrics). Key format: ``"{metric_name}__all"`` for the overall aggregate
-    and ``"{metric_name}__{type_slug}"`` for per-type aggregates.
+    Computes mean ``metric_value`` across all series (``"all"`` aggregate), per
+    ``time_series_type``, and per ``horizon_slice``, restricted to ``metric_param="all"``
+    (the scalar metrics). Key formats:
+
+    - ``"{metric_name}__all"`` — overall aggregate (``horizon_slice="all"``).
+    - ``"{metric_name}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
+    - ``"{metric_name}__all__{horizon_slice}"`` — overall aggregate per lead-time band
+      (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are deliberately not
+      logged — that detail stays queryable in the ``forecast_metrics`` Delta table.
 
     Args:
         metrics_df: Per-series ``Metrics`` rows with ``time_series_type`` populated.
@@ -196,6 +283,15 @@ def build_mlflow_aggregate_metrics(
     overall = base.group_by("metric_name").agg(mean_value=pl.col("metric_value").mean())
     for row in overall.iter_rows(named=True):
         result[f"{row['metric_name']}__all"] = float(row["mean_value"])
+
+    # Overall aggregate per lead-time band (includes all series regardless of type).
+    per_slice = (
+        metrics_df.filter((pl.col("horizon_slice") != "all") & (pl.col("metric_param") == "all"))
+        .group_by(["metric_name", "horizon_slice"])
+        .agg(mean_value=pl.col("metric_value").mean())
+    )
+    for row in per_slice.iter_rows(named=True):
+        result[f"{row['metric_name']}__all__{row['horizon_slice']}"] = float(row["mean_value"])
 
     return result
 
