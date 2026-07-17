@@ -214,7 +214,10 @@ def _engineer_features(
         # on the full frame and lets the caller filter before predicting. The strict `>`
         # mirrors what the live service delivers. The no-NWP bulk branch is exempt: it sets
         # power_fcst_init_time = valid_time (lead 0 by construction), so this filter would
-        # drop every row.
+        # drop every row. That exemption makes the no-NWP branch training-only: predict
+        # output built from it is all-lead-0 and always fails PowerForecast.validate, so a
+        # power-only forecaster (e.g. a persistence baseline) must synthesise genuine
+        # power_fcst_init_times for inference rather than predict through this branch.
         engineered_lf = engineered_lf.filter(pl.col("valid_time") > pl.col("power_fcst_init_time"))
     final_lf = _select_output_columns(engineered_lf, selected_features)
     return pt.LazyFrame.from_existing(final_lf).set_model(AllFeatures)
