@@ -3,8 +3,10 @@
 How OCF measures the skill of its forecasts and compares forecasting approaches.
 
 > **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the
-> `metrics` Dagster asset, and the deterministic metrics (MAE, NMAE, RMSE, MBE) are ✅
-> implemented. The interactive leaderboard visualisation and probabilistic metrics are 🚧 planned.
+> `metrics` Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the
+> probabilistic metrics (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the
+> [evaluation-metrics reference](../techniques/evaluation-metrics.md)) are ✅ implemented. The
+> interactive leaderboard visualisation is 🚧 planned.
 > The implemented [cross-validation protocol](../ml_experimentation/cross-validation-folds.md) has
 > moved out of the roadmap. See the [roadmap index](index.md) for status conventions.
 > The 🚧 items are tracked under the v0.3 epic
@@ -331,15 +333,16 @@ and nothing is logged to the leaderboard MLflow runs.
 | Root mean squared error (RMSE) | Deterministic | ✅ | Heavily penalises large misses (one 100 MW error costs more than two 50 MW errors). |
 | Mean bias error (MBE) | Deterministic | ✅ | Systematic over/under-prediction. |
 | Histogram of errors | Deterministic | 🚧 | Visual check that errors are ~Normal. |
-| Pinball loss (quantile loss) | Quantile | 🚧 | Penalises asymmetrically by target quantile. Averaged across quantiles for a single quantile-skill score. |
-| PICP (Prediction Interval Coverage Probability) | Quantile | 🚧 | Of a P10–P90 band, exactly 80% of observations should fall inside. < 80% ⇒ overconfident. |
-| CRPS (Continuous Ranked Probability Score) | Ensemble | 🚧 | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. |
-| Spread-Skill Ratio | Ensemble | 🚧 | Ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; < 1 under-dispersed (overconfident); > 1 over-dispersed (underconfident). |
+| [Pinball loss (quantile loss)](../techniques/evaluation-metrics.md#pinball-loss) | Quantile | ✅ | Penalises asymmetrically by target quantile, at the 13 NGED delivery quantiles. Averaged across quantiles for a single quantile-skill score. |
+| [PICP (Prediction Interval Coverage Probability)](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability) | Quantile | ✅ | Coverage of six symmetric bands (p1–p99 … p35–p65). Judge against the finite-ensemble calibrated reference (≈ 0.769 for p10–p90 at 51 members), not the nominal rate. |
+| [Interval width](../techniques/evaluation-metrics.md#interval-width) | Quantile | ✅ | Mean band width (MW) — the sharpness companion that stops PICP being gamed by over-widening. |
+| [CRPS (Continuous Ranked Probability Score)](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) | Ensemble | ✅ | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. Fair (finite-ensemble-unbiased) form — the one metric comparable across ensemble sizes. |
+| [Spread-Skill Ratio](../techniques/evaluation-metrics.md#spread-skill-ratio) | Ensemble | ✅ | Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; < 1 under-dispersed (overconfident); > 1 over-dispersed (underconfident). |
 
 > The `Metrics` schema (`contracts.ml_schemas.Metrics`) stores results as
 > `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param,
 > metric_value)`. `metric_param` carries, e.g., the quantile for Pinball Loss (`p10`) or the band
-> for PICP (`p10_p90`). The `metrics` Dagster asset computes the deterministic metrics ✅ and writes
+> for PICP (`p10_p90`). The `metrics` Dagster asset computes every ✅ metric above and writes
 > per-series rows to `forecast_metrics` Delta (partitioned by `experiment_name, fold_id`), with
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
@@ -528,9 +531,9 @@ the control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51
 it yields spread from *weather uncertainty only* — no model or observation uncertainty. Such
 ensembles are systematically overconfident, worst at short horizons where members haven't
 diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
-directly — yet nothing measures calibration today: `compute_metrics` averages members into a
-deterministic ensemble mean per forecast run and scores only MAE/NMAE/RMSE/MBE (now per horizon
-slice, since Phase A landed). We pay 51× inference cost and score only the mean.
+directly. Phases A and B below (both shipped) built the measurement machinery — every metric in
+the [evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice; the
+remaining phases act on what those numbers show.
 
 The theory behind this diagnosis — the three-term uncertainty decomposition, why a
 deterministic model driven by an NWP ensemble captures only the weather term, and what the
@@ -548,30 +551,23 @@ Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (de
 `valid_time − power_fcst_init_time`, with the ensemble collapsed per forecast run), and
 `build_mlflow_aggregate_metrics` logs overall per-slice keys like `nmae__all__day_ahead`.
 
-### Phase B — probabilistic metrics from the existing ensemble
+### Phase B — probabilistic metrics from the existing ensemble ✅
 
-Compute member-aware metrics *before* the ensemble-mean collapse in `compute_metrics`:
-
-- **Spread-skill ratio**: mean ensemble stddev ÷ RMSE of the ensemble mean, per group. Ratio
-  ≪ 1 confirms underdispersion — this is the headline diagnostic for the finding above.
-- **PICP**: empirical member quantiles per `(series, valid_time)` (`pl.quantile` over members),
-  then coverage of the P10–P90 interval. `metric_param` (currently only `"all"`,
-  `ml_schemas.py:203`) carries the interval label, e.g. `"p10_p90"`.
-- **Pinball loss** at P10/P50/P90 from the same empirical quantiles; `metric_param` = quantile
-  label. (Schema docstrings already anticipate pinball/PICP.)
-- **CRPS** (fair/ensemble form): per timestamp, `mean|xᵢ − y| − ½·mean|xᵢ − xⱼ|`. The pairwise
-  term over 51 members is computable with a self-join on member index within
-  `(series, valid_time)` groups; ~51² × rows is fine at V1 scale. If it's slow, the
-  sorted-member O(m log m) form is a known optimisation — don't start there.
-- Extend `METRIC_NAMES` (`ml_schemas.py:188`) and `METRIC_PARAMS` accordingly. Both are
-  `pl.Enum` columns written to Delta as String (documented gotcha) — additive enum growth is
-  safe for existing data.
-- Flip the statuses in the [metrics table above](#evaluation-metrics) from 🚧 to ✅ as they
-  land.
+Shipped. `compute_metrics` now computes fair CRPS, the Fortin-corrected spread-skill ratio,
+pinball loss at the thirteen NGED delivery quantiles (plus their mean), and PICP and interval
+width for the six symmetric delivery bands — all member-aware, computed before the
+ensemble-mean collapse, per horizon slice. Definitions, equations, and the design decisions
+(fair CRPS divisor, RMS spread, delivery quantiles, MLflow allowlist) live in the
+[evaluation-metrics reference](../techniques/evaluation-metrics.md).
 
 ### Phase C — cheap calibration (after B proves the diagnosis)
 
-Decide based on Phase B's spread-skill numbers. **Post-hoc spread inflation** (EMOS-lite): per
+Decide based on Phase B's spread-skill numbers — and on the **rank (Talagrand) histogram** of
+the observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms
+plain underdispersion (a single multiplicative inflation can fix it), whereas a sloped or
+asymmetric histogram means bias or shape error, which a symmetric inflation cannot repair and
+which would push toward a rank-dependent correction instead. **Post-hoc spread inflation**
+(EMOS-lite): per
 horizon slice, fit a scalar `s` on the *training* window so that inflating members around the
 ensemble mean (`mean + s·(member − mean)`) makes spread match error. Zero schema change, zero
 new model — implementable as an optional step in `predict` or as a wrapper forecaster. Fit on
@@ -612,14 +608,6 @@ each:
    recalibration hook (fit on train) applied only if the pooled spread-skill/PICP numbers
    demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C inflated
    deterministic champion.
-
-### Implementation details — probabilistic metrics (deleted when they ship)
-
-Verification: (1) unit tests in `packages/ml_core/tests/` with hand-computable fixtures — a
-3-member toy ensemble where PICP, spread-skill, pinball, and CRPS are worked out by hand.
-(2) Property check: CRPS of a single-member "ensemble" equals MAE. (3) Re-score an existing
-experiment via the `metrics` asset (`ad_hoc` scope) and eyeball that spread-skill ≪ 1 at short
-horizons — the expected signature of the finding.
 
 ---
 

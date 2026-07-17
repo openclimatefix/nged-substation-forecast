@@ -202,15 +202,25 @@ in the run config dialog before launching.
    need sub-fold chunking — see
    [The other hard ceiling: Polars' 32-bit row index](../architecture/overview.md#the-other-hard-ceiling-polars-32-bit-row-index).)
    For each group:
-   a. Calls `compute_metrics()` — joins observed power, averages ensemble members, computes
-      MAE / NMAE / RMSE / MBE per `(time_series_id, fold_id, power_fcst_model_name)`.
+   a. Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble
+      members into per-timestamp quantities, and computes the deterministic metrics
+      (MAE / NMAE / RMSE / MBE on the ensemble mean) plus the probabilistic metrics (fair
+      CRPS, spread-skill ratio, pinball loss at the 13 delivery quantiles, PICP and interval
+      width for the 6 symmetric bands) per
+      `(time_series_id, fold_id, power_fcst_model_name, horizon_slice)` — see the
+      [evaluation-metrics reference](../techniques/evaluation-metrics.md) for definitions.
    b. Enriches rows with scope (`evaluation_scope`), window bounds (`window_start`, `window_end`,
       `window_label`), `computed_at`, and the MLflow fold run id (leaderboard scope only).
    c. Writes to `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an
       idempotent overwrite predicate — safe to re-run without duplicating rows.
-3. For `evaluation_scope="leaderboard"`: builds a per-type + overall aggregate metric dict (e.g.
-   `rmse__all`, `rmse__disaggregated_demand`) and logs it to the fold's MLflow child run, then
-   averages across folds and logs the mean to the parent run.
+3. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the
+   fold's MLflow child run, then averages across folds and logs the mean to the parent run.
+   The key token is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for
+   parametric ones, in three families: overall (`rmse__all`, `crps__all`), per type
+   (`rmse__disaggregated_demand`), and per horizon slice (`nmae__all__day_ahead`). Parametric
+   metrics are restricted to a headline subset in MLflow (`pinball_loss` at p10/p50/p90;
+   `picp`/`interval_width` at p10_p90) — the full 13-quantile / 6-band detail stays in the
+   `forecast_metrics` Delta table.
 
 After step 8, the MLflow run structure looks like this:
 

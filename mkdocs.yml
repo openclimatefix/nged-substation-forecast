@@ -42,6 +42,7 @@ nav:
       - Overview: techniques/index.md
       - Convex Optimisation: techniques/convex-optimisation.md
       - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
+      - Evaluation Metrics: techniques/evaluation-metrics.md
       - Differentiable Physics: techniques/differentiable-physics.md
       - Encoders: techniques/encoders.md
       - Disaggregation Evaluation: techniques/disaggregation-evaluation.md

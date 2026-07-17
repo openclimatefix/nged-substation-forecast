@@ -23,6 +23,13 @@ docstrings) as the work that applies them ships.
   caveat. Applied by the
   [probabilistic evaluation & calibration plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
   and the [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
+- [Evaluation metrics](evaluation-metrics.md) — every metric `compute_metrics` produces, each
+  with a plain-language summary, the equation, and the design decisions behind it: the
+  deterministic four (MAE, NMAE, RMSE, MBE), fair CRPS, the Fortin-corrected spread-skill
+  ratio, pinball loss at the NGED delivery quantiles, PICP with its finite-ensemble calibrated
+  references, and interval width. Applied by the
+  [metrics & leaderboard plan](../roadmap/metrics-and-leaderboard.md) and computed by the
+  `metrics` Dagster asset.
 - [Differentiable physics](differentiable-physics.md) — inversion through differentiable forward
   models: the single-site solar plant and the aggregate fleet node. Applied by the
   [capacity-estimation](../roadmap/capacity-estimation.md) and
