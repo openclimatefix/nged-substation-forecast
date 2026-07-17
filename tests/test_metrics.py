@@ -346,7 +346,10 @@ def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
 
 
 def _read_metric(metrics_path: Path, metric_name: str) -> float:
-    fm = pl.read_delta(str(metrics_path)).filter(pl.col("metric_name") == metric_name)
+    """Read the overall (``horizon_slice="all"``) value of one metric for the single test series."""
+    fm = pl.read_delta(str(metrics_path)).filter(
+        (pl.col("metric_name") == metric_name) & (pl.col("horizon_slice") == "all")
+    )
     assert fm.height == 1
     return float(fm["metric_value"][0])
 

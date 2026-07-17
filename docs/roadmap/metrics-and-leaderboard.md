@@ -517,9 +517,8 @@ it yields spread from *weather uncertainty only* — no model or observation unc
 ensembles are systematically overconfident, worst at short horizons where members haven't
 diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
 directly — yet nothing measures calibration today: `compute_metrics` averages members into a
-deterministic mean (`packages/ml_core/src/ml_core/metrics.py:84-90`) and scores only MAE/NMAE/
-RMSE/MBE on the `"all"` horizon slice (`metrics.py:51`). We pay 51× inference cost and score
-only the mean.
+deterministic ensemble mean per forecast run and scores only MAE/NMAE/RMSE/MBE (now per horizon
+slice, since Phase A landed). We pay 51× inference cost and score only the mean.
 
 The theory behind this diagnosis — the three-term uncertainty decomposition, why a
 deterministic model driven by an NWP ensemble captures only the weather term, and what the
@@ -531,21 +530,11 @@ Fix in four phases, each an independent PR (Phase D is itself several PRs). Phas
 pure evaluation (no model changes) and should land before any further MAE-driven
 experimentation.
 
-### Phase A — horizon-sliced metrics
+### Phase A — horizon-sliced metrics ✅
 
-`HORIZON_SLICES` already exists in `contracts/ml_schemas.py:172` and the
-[time-slices table above](#time-slices-for-performance-evaluation) argues skill drivers differ
-radically by horizon; only `"all"` is computed.
-
-- In `compute_metrics` (`metrics.py`), derive `lead_time = valid_time − power_fcst_init_time`
-  per row (confirm `power_fcst_init_time` survives into the forecast/actuals join; it is a
-  `PowerForecast` primary-key column) and map it onto the `HORIZON_SLICES` bands with
-  `pl.when/then` chains or `cut`.
-- Compute the existing four metrics per `(series, fold, model, horizon_slice)` via one
-  `group_by` including the slice column, plus the existing `"all"` aggregate.
-- `build_mlflow_aggregate_metrics` gains keys like `nmae__all__day_ahead`. Keep the existing
-  key format for `"all"` slices unchanged so historical MLflow runs stay comparable.
-- Schema needs no change (the `Metrics` tall format was designed for this).
+Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (derived from
+`valid_time − power_fcst_init_time`, with the ensemble collapsed per forecast run), and
+`build_mlflow_aggregate_metrics` logs overall per-slice keys like `nmae__all__day_ahead`.
 
 ### Phase B — probabilistic metrics from the existing ensemble
 
