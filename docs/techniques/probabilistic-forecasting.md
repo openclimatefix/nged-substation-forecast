@@ -66,15 +66,44 @@ Total predictive uncertainty decomposes into three terms:
    exactly: meter noise, occupant behaviour, unmodelled local events. Irreducible randomness.
 
 A deterministic model (XGBoost trained with squared error learns the **conditional mean**)
-pushed through 51 members captures term 1 *only*. Terms 2 and 3 are dropped entirely. The
-resulting ensemble is **under-dispersed** — systematically overconfident — and worst at short
-horizons, where term 1 shrinks toward zero while terms 2 and 3 do not. The
+pushed through 51 members captures term 1 *only*. Terms 2 and 3 are dropped entirely, at *every*
+lead time. The resulting ensemble is **under-dispersed** — systematically overconfident — and the
+failure is most conspicuous at short horizons, where term 1 has barely grown, so the fan
+collapses toward the single line of the sketch above while our errors do not. The
 [spread-skill ratio](evaluation-metrics.md#spread-skill-ratio) is the metric
 that catches this: spread ÷ error ≪ 1 means the fan is too thin.
 
 This matters commercially, not just statistically: flexibility procurement keys off the
 **tails** (P90+ peaks), and under-dispersion is precisely the error that makes tails look safer
 than they are.
+
+### Long horizons are not automatically safe
+
+The long-horizon end looks like the safe one. By day 8–14 the 51 weather stories have diverged
+enormously, so the fan is anything but a thin line — the opposite of the short-horizon failure
+above. But the same two dropped terms still bite here; they just hide better. A wide *input* fan
+does not guarantee an honest *output* fan, because the learned weather→power mapping sits between
+them, and squared-error training quietly narrows what that mapping passes through as lead time
+grows.
+
+Far out, ECMWF's individual trajectories are themselves close to noise: the model was trained on
+forecast weather as its input, and at long lead times that input is wrong by a large,
+lead-time-dependent amount. Squared-error training responds to noisy inputs by hedging toward the
+mean — attenuating the fitted weather→power sensitivity — and today's model applies one
+sensitivity across all lead times, because it has no feature telling it how trustworthy the
+weather input is. So the day-8–14 fan can be merely *wide-looking*: large NWP spread pushed
+through a damped, horizon-blind sensitivity, with the dropped term-2 residual (largest exactly
+where the weather input is least trustworthy) never added back in. This is why the
+[spread-skill ratio and PICP](evaluation-metrics.md#probabilistic-metrics) are computed per
+horizon slice and not just overall: a visibly fanned-out `extended_range` can still be
+under-dispersed, and only the numbers, not the eye, can say so.
+
+The mechanism also sharpens the case for giving the model `nwp_lead_time_hours` as a feature
+([#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230)). Beyond the
+double-counting mitigation discussed in the caveat below, the lead-time feature is what lets the
+model learn *how much* to attenuate its weather sensitivity per horizon — narrow when the weather
+input is trustworthy, wide when it isn't — instead of the one horizon-averaged compromise it is
+forced into today.
 
 ## The fix, formally: a mixture of conditional distributions
 

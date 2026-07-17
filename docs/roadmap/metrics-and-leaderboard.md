@@ -190,17 +190,41 @@ machinery instead of writing any new time-series logic:
 - Rows where all lags are null (long horizons + data gaps): drop those rows from the output
   (`PowerForecast.power_fcst` presumably non-nullable — check) and log the dropped count.
 
-**4. `ClimatologyForecaster` — diagnostic bookend.**
+**4. `ClimatologyForecaster` — diagnostic bookend, and our *pure* probabilistic climatology
+reference.** `nged_incumbent` is also probabilistic and weather-free, but it is a hybrid —
+persistence-like weekly recency plus climatology-like annual seasonality — so it does not
+isolate the calendar-only distribution. This baseline does: its spread is the unconditional
+seasonal/time-of-day distribution of power, with no recency and no weather, which is exactly the
+"skill floor" the NWP ensemble has to clear at long horizons.
 
-- `train()`: collect `(time_series_id, valid_time, power)` from the features frame and build a
-  lookup table of mean power per `(time_series_id, month, half-hour-of-day, is_weekend)` over
-  the training window. Store as a small Polars frame; `save` writes it as one parquet +
-  `meta.json`.
-- `predict()`: join the lookup onto the prediction rows by the same keys.
+- `train()`: collect `(time_series_id, valid_time, power)` from the features frame and, per
+  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the **empirical quantiles**
+  of that cell's training-window power samples at the thirteen NGED delivery quantile levels
+  (`contracts.common.DELIVERY_QUANTILES`) — not just the mean. Store as a small Polars frame;
+  `save` writes it as one parquet + `meta.json`.
+- `predict()`: join the lookup onto the prediction rows by the same keys, then unpivot the
+  thirteen quantile columns into `ensemble_member` rows (member index = quantile index) — the
+  same shape `nged_incumbent` uses. The headline deterministic point forecast is the **median**
+  (the p50 quantile column).
 - `selected_features` needs only the target join — reuse existing time features
   (`local_time_of_day_*` etc.) or derive month/half-hour directly from `valid_time` inside the
   forecaster; prefer deriving directly to keep the feature list empty.
 - `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
+- **Why a distribution, not a mean:** a deterministic climatology forecast collapses CRPS to
+  MAE, so it can only ever be compared against the ML ensemble on point accuracy — exactly the
+  axis a squared-error XGBoost is built to win. The claim we actually need to test is
+  distributional: does the 51-member NWP-driven ensemble know more about day 8–14 power than the
+  plain seasonal/time-of-day distribution does, or is it just dressing up climatology in
+  weather-shaped clothing? (See [Probabilistic forecasting from NWP
+  ensembles](../techniques/probabilistic-forecasting.md#long-horizons-are-not-automatically-safe).)
+  Only a quantile/ensemble climatology answers that, via `crps__all__extended_range` head-to-head
+  against the ML models. Like `nged_incumbent`, this baseline owns its own member axis (see the
+  `uses_nwp_ensemble` flag in item 5) — it must not be broadcast across the 51 NWP members.
+- **Follow-up once this ships:** overlay the climatology forecast as an always-on reference band
+  in the `view_forecasts` dashboard, so the weather-driven fan can be read against the
+  calendar-only skill floor by eye — the visual twin of the `crps__all__extended_range`
+  comparison above ([#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354),
+  blocked by this work).
 
 **5. Configs and registration.**
 
@@ -209,13 +233,14 @@ machinery instead of writing any new time-series logic:
   following `conf/model/xgboost.yaml`'s `_target_` structure, with `weather_source: "none"`.
 - `PowerForecast.nwp_init_time` is already nullable for exactly this case
   (`power_schemas.py:242`); confirm `cv_power_forecasts` tolerates it end-to-end.
-- **Ensemble members:** for the *deterministic* baselines (persistence, climatology) the CV
+- **Ensemble members:** for the one genuinely *deterministic* baseline (persistence) the CV
   predict path feeds all ~51 members and they produce identical forecasts per member — wasteful
-  but harmless (the ensemble mean is unchanged); v0.3 accepts it. `nged_incumbent` is different:
-  it emits its own 13-member ensemble, so broadcasting it across the 51 NWP members would be wrong,
-  not merely wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
-  `cv_power_forecasts` honours — restricting deterministic baselines to member 0 and letting
-  `nged_incumbent` own the member axis — resolves both at once.
+  but harmless (the ensemble mean is unchanged); v0.3 accepts it. `nged_incumbent` and
+  `climatology` are different: each emits its own 13-member ensemble (analogues and quantiles
+  respectively), so broadcasting either across the 51 NWP members would be wrong, not merely
+  wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
+  `cv_power_forecasts` honours — restricting the deterministic baseline to member 0 and letting
+  `nged_incumbent` and `climatology` each own their member axis — resolves both at once.
 
 **6. Run and publish.** Register each via `register_experiment_job` (`run_mode: smoke_test`
 first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
@@ -234,15 +259,19 @@ so each appears in MLflow as a leaderboard row.
 
 **Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: `nged_incumbent`
 unpivots to the expected 13 members and both its **median** (headline) and **P95** (operating-point)
-collapses match hand-computed values; persistence picks the shortest non-null lag; climatology
-lookup round-trips through `save`/`load`; all freeze `trained_time_series_ids`. (2) Smoke-test fold
-end-to-end via the existing integration-test pattern (`tests/test_trained_cv_model.py` fixtures),
-and confirm the incumbent's 13-member ensemble flows through the Phase B probabilistic metrics
-(e.g. CRPS computes over its members). (3) Sanity-check the numbers: persistence NMAE should be
-*worse overall* than XGBoost but plausibly competitive at short horizons; `nged_incumbent`'s median
+collapses match hand-computed values; persistence picks the shortest non-null lag; climatology's
+quantile lookup unpivots to the expected 13 members and matches hand-computed empirical quantiles
+per cell; all three round-trip through `save`/`load` and freeze `trained_time_series_ids`. (2)
+Smoke-test fold end-to-end via the existing integration-test pattern
+(`tests/test_trained_cv_model.py` fixtures), and confirm both `nged_incumbent`'s and
+`climatology`'s member ensembles flow through the Phase B probabilistic metrics (e.g. CRPS
+computes over their members). (3) Sanity-check the numbers: persistence NMAE should be *worse
+overall* than XGBoost but plausibly competitive at short horizons; `nged_incumbent`'s median
 should be a roughly unbiased central estimate while its reported **P95** shows a clear positive MBE
 (the conservative operating point) — even where its CRPS over the 13 members is competitive; don't
-mistake the P95 bias for a bug.
+mistake the P95 bias for a bug. Watch `climatology`'s `crps__all__extended_range` in particular —
+if it comes within noise of the ML ensemble's at day 8–14, that is the quantitative answer to
+"how much is the NWP ensemble actually worth this far out", not a failure to investigate away.
 
 ---
 
