@@ -924,14 +924,16 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     ).set_model(PowerForecast)
     pruned_scan = config.population_filter.apply(scan)
 
-    # Discover the matching groups from the pruned scan — projecting to only the two partition
-    # columns keeps this collect cheap (partition metadata, not row data). Each group is then
-    # scored in per-series batches, so peak memory is one batch, never a whole fold.
+    # Discover the matching groups from the pruned scan. The streaming engine is essential
+    # here even though only the two partition columns are projected: the in-memory engine
+    # materialises them at full row length before the unique (measured: OOM-killed on the
+    # 364M-row fold vs 0.3 GB peak streaming). Each group is then scored in per-series
+    # batches, so peak memory is one batch, never a whole fold.
     groups = (
         pruned_scan.select(["experiment_name", "fold_id"])
         .unique()
         .sort(["experiment_name", "fold_id"])
-        .collect()
+        .collect(engine="streaming")
         .rows()
     )
     if not groups:
