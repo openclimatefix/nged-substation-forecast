@@ -1,5 +1,16 @@
 # Forecast Delivery: Delta Lake on S3
 
+**In brief:** We deliver forecasts to NGED as Delta Lake tables on S3, not through a REST API.
+The workload is a poor fit for REST — one power-user consumer who wants routine access to the
+*entire* forecast history, which will reach trillions of rows at V2 scale — and Delta Lake on S3
+is a genuine database-grade delivery mechanism: an open protocol with ACID guarantees, lazy
+partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Power BI, …), and schema
+evolution, with no API server for OCF to build, run, or be on call for. If a future consumer
+needs small operational queries or per-customer permissions, a REST API can be added later as a
+purely additive layer over the same tables.
+
+---
+
 OCF's national solar forecast is served through a custom REST API
 ([quartz-api](https://github.com/openclimatefix/quartz-api)), and that's the right tool for that
 product. So when we talk about NGED Flexpectation delivering files on object storage instead, it's
@@ -79,7 +90,7 @@ per row**.
 V2 scales to ~2,500 time series: approx 78× more, or roughly **86 million rows per run**. At the
 6-hourly cadence (4 runs/day × 365 days) that's roughly **125 billion rows per year of history** — a
 couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), and several
-*terabytes* uncompressed. 
+*terabytes* uncompressed.
 
 What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
 on real forecast rows: ~356 bytes each), the same year of history would be roughly **45 terabytes on
