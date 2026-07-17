@@ -662,6 +662,60 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     assert nwp_init_times == {nwp_init_time_1, nwp_init_time_2}
 
 
+def test_engineer_features_bulk_mode_drops_hindcast_rows():
+    """Bulk mode emits only deliverable rows: valid_time strictly after power_fcst_init_time.
+
+    Each NWP run's valid times start at its own init_time, but the derived
+    power_fcst_init_time is init_time + nwp_publication_delay_hours — so the run's first
+    delay-hours of valid times are hindcast rows that a live forecast could never deliver.
+    They must not appear in the output; the earliest emitted valid_time is the first
+    half-hourly step strictly after power_fcst_init_time.
+    """
+    delay_hours = 6
+    nwp_init_time = datetime(2023, 1, 1, 0, 0)
+    power_fcst_init_time = nwp_init_time + timedelta(hours=delay_hours)
+    # Half-hourly valid times from the NWP init through 2 h past the publication delay.
+    valid_times = [nwp_init_time + timedelta(minutes=30 * i) for i in range(17)]
+
+    nwp_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(valid_times),
+            "valid_time": valid_times,
+            "ensemble_member": [0] * len(valid_times),
+            "init_time": [nwp_init_time] * len(valid_times),
+            "temperature_2m": [10.0] * len(valid_times),
+        }
+    )
+    power_df = pl.DataFrame(
+        {
+            "time_series_id": ["ts1"] * len(valid_times),
+            "time": valid_times,
+            "power": [100.0] * len(valid_times),
+        }
+    )
+    metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["substation"]})
+
+    result = (
+        _engineer_features(
+            power_time_series=pt.LazyFrame.from_existing(power_df.lazy()).set_model(
+                PowerTimeSeries
+            ),
+            time_series_metadata=pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata),
+            nwp=nwp_df.lazy(),
+            selected_features={"temperature_2m"},
+            power_fcst_init_time=None,  # bulk mode
+            nwp_publication_delay_hours=delay_hours,
+        )
+        .collect()
+        .sort("valid_time")
+    )
+
+    # 17 half-hourly steps: 12 hindcast (leads −6 h .. −30 min), 1 at lead 0, 4 deliverable.
+    assert len(result) == 4
+    assert (result["valid_time"] > result["power_fcst_init_time"]).all()
+    assert result["valid_time"][0] == power_fcst_init_time + timedelta(minutes=30)
+
+
 def test_engineer_features_raises_when_nwp_init_time_given_without_power_fcst_init_time():
     power_df = pl.DataFrame(
         {"time_series_id": ["ts1"], "time": [datetime(2023, 1, 1, 12)], "power": [100.0]}

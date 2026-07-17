@@ -117,10 +117,12 @@ def _engineer_features(
             The function is NWP-centric. It produces one row per
             (time_series_id, nwp_init_time, valid_time, ensemble_member), and derives
             power_fcst_init_time = nwp_init_time + nwp_publication_delay_hours per-row.
-            Leaky power lags are nullified relative to each row's power_fcst_init_time,
-            so the resulting dataset is safe for training. For backtesting, pass the full
-            historical dataset here and filter the output to valid_time >= power_fcst_init_time
-            before evaluating.
+            Hindcast rows (valid_time at or before the derived power_fcst_init_time — each
+            NWP run's first nwp_publication_delay_hours of valid times) are dropped, so both
+            training and backtesting see only rows the live service could deliver
+            (valid_time > power_fcst_init_time, strictly). Leaky power lags are nullified
+            relative to each row's power_fcst_init_time, so the resulting dataset is safe
+            for training.
 
             **Single datetime — real-time production inference or backfilling:**
             A constant power_fcst_init_time is stamped onto every row, and the NWP join
@@ -204,6 +206,16 @@ def _engineer_features(
         processed_nwp=processed_nwp,
         historical_weather=historical_weather,
     )
+    if power_fcst_init_time is None and nwp_lf is not None:
+        # Bulk mode with NWP: drop hindcast rows (each NWP run's first
+        # nwp_publication_delay_hours of valid times, which precede the derived
+        # power_fcst_init_time). Filtering *after* feature computation keeps window features
+        # (e.g. weather rolling means) identical to single-run mode, which likewise computes
+        # on the full frame and lets the caller filter before predicting. The strict `>`
+        # mirrors what the live service delivers. The no-NWP bulk branch is exempt: it sets
+        # power_fcst_init_time = valid_time (lead 0 by construction), so this filter would
+        # drop every row.
+        engineered_lf = engineered_lf.filter(pl.col("valid_time") > pl.col("power_fcst_init_time"))
     final_lf = _select_output_columns(engineered_lf, selected_features)
     return pt.LazyFrame.from_existing(final_lf).set_model(AllFeatures)
 

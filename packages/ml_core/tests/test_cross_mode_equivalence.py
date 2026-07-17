@@ -10,8 +10,11 @@ the *same* ``_engineer_features()``, differing only in operating mode:
 This test takes a fixture spanning several **daily** NWP runs (real ECMWF ENS is issued once
 per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode with
 ``power_fcst_init_time = nwp_init_time + delay`` and asserts the rows match exactly on the
-primary key and on every requested feature column. If a future change diverges the two modes,
-this fails.
+primary key and on every requested feature column. The comparison is over **deliverable** rows
+(``valid_time > power_fcst_init_time``): bulk mode drops hindcast rows at source, while
+single-run mode keeps them for its caller to filter before predicting (as ``live_forecasts``
+does), so the replay side applies that same filter here. If a future change diverges the two
+modes, this fails.
 
 Scope note: this test exercises the **weather, time, power-lag, and weather-rolling** features.
 Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included because
@@ -152,11 +155,21 @@ def test_bulk_and_single_run_features_are_identical() -> None:
             nwp_init_time=run,
         ).collect()
         # Keep only rows the NWP run actually covers (single-run mode is power-centric and
-        # emits null-weather rows for valid_times outside this run's window).
-        single_run_parts.append(replay.filter(pl.col("nwp_lead_time_hours").is_not_null()))
+        # emits null-weather rows for valid_times outside this run's window), and only
+        # deliverable rows (valid_time strictly after power_fcst_init_time) — single-run mode
+        # keeps history rows for the production caller to filter before predicting, whereas
+        # bulk mode drops them at source.
+        single_run_parts.append(
+            replay.filter(
+                pl.col("nwp_lead_time_hours").is_not_null()
+                & (pl.col("valid_time") > run + timedelta(hours=_DELAY_HOURS))
+            )
+        )
     single_run = pl.concat(single_run_parts)
 
-    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 13
+    # 12, not 13: each run's window is 13 half-hourly steps, but the first lands exactly on
+    # power_fcst_init_time (lead 0), which bulk mode drops as an undeliverable hindcast row.
+    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 12
     # Guard: the power lag must actually resolve to non-null observed values for some rows,
     # otherwise "identical" would be a vacuous all-null match on both sides.
     assert bulk["power_lag_3h"].is_not_null().any()
