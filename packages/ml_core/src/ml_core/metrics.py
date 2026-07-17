@@ -23,6 +23,17 @@ from contracts.power_schemas import (
     TimeSeriesMetadata,
 )
 
+
+class NoOverlappingActualsError(ValueError):
+    """Raised by ``compute_metrics`` when no forecast row joins to any observed actual.
+
+    A distinct subclass so callers that score a fold in per-series batches can treat "this
+    batch's series have no overlapping actuals" as skippable — mirroring how such series
+    silently vanish from the inner join when the whole fold is scored in one call — while
+    every other ``ValueError`` (negative lead times, missing capacity) still propagates.
+    """
+
+
 _INTRADAY_MAX_HOURS: Final[int] = 6
 """Exclusive upper bound (hours) of the ``"intraday"`` horizon slice: lead times in [0 h, 6 h)."""
 
@@ -115,10 +126,11 @@ def compute_metrics(
         A validated tall ``Metrics`` DataFrame with ``time_series_type`` populated.
 
     Raises:
+        NoOverlappingActualsError: If no rows survive the inner join (forecasts cover a
+            period with no observed data).
         ValueError: If any forecast row has a negative lead time (``valid_time`` before
-            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), if no
-            rows survive the inner join (forecasts cover a period with no observed data), or
-            if any scored series has no row in ``capacity``.
+            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), or if
+            any scored series has no row in ``capacity``.
     """
     # A negative lead time means hindcast rows — valid times already in the past at
     # power_fcst_init_time, which a live forecast could never deliver. Scoring them would
@@ -218,7 +230,7 @@ def compute_metrics(
     )
 
     if metrics_tall.is_empty():
-        raise ValueError(
+        raise NoOverlappingActualsError(
             "No rows in the joined forecast/actuals data. "
             "Check that cv_forecasts and actuals overlap in time."
         )

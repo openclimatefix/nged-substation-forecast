@@ -14,7 +14,11 @@ from contracts.power_schemas import (
     PowerTimeSeries,
     TimeSeriesMetadata,
 )
-from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics
+from ml_core.metrics import (
+    NoOverlappingActualsError,
+    build_mlflow_aggregate_metrics,
+    compute_metrics,
+)
 
 
 def _utc(year: int, month: int, day: int, hour: int = 0, minute: int = 0) -> datetime:
@@ -217,13 +221,46 @@ def test_compute_metrics_multiple_folds():
 
 
 def test_compute_metrics_raises_on_no_join():
-    """If forecasts and actuals have no overlapping times, raise ValueError."""
+    """No overlapping times raises the dedicated (batch-skippable) ValueError subclass."""
     actuals = _make_actuals(1, [_utc(2022, 6, 1)], [10.0])
     forecasts = PowerForecast.validate(
         _make_cv_forecasts(1, [_utc(2023, 6, 1)], [10.0]), allow_superfluous_columns=True
     )
-    with pytest.raises(ValueError, match="No rows"):
+    with pytest.raises(NoOverlappingActualsError, match="No rows"):
         compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+
+def test_compute_metrics_per_series_batching_is_equivalent():
+    """Scoring series separately and concatenating equals scoring them in one call.
+
+    This property is what lets the metrics asset score a fold in per-series batches
+    (bounded memory) without changing any metric value.
+    """
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = pt.LazyFrame.from_existing(
+        pl.concat(
+            [
+                _make_actuals(1, times, [10.0, 10.0]).collect().lazy(),
+                _make_actuals(2, times, [20.0, 20.0]).collect().lazy(),
+            ]
+        )
+    ).set_model(PowerTimeSeries)
+    fcst_1 = _make_cv_forecasts(1, times, [12.0, 8.0])
+    fcst_2 = _make_cv_forecasts(2, times, [25.0, 19.0])
+    both = PowerForecast.validate(pl.concat([fcst_1, fcst_2]), allow_superfluous_columns=True)
+    metadata = _make_metadata([1, 2])
+    capacity = _make_capacity([1, 2], [10.0, 20.0])
+
+    whole = compute_metrics(both, actuals, metadata, capacity)
+    batched = pl.concat(
+        [
+            compute_metrics(fcst_1, actuals, metadata, capacity),
+            compute_metrics(fcst_2, actuals, metadata, capacity),
+        ]
+    )
+
+    sort_keys = ["time_series_id", "horizon_slice", "metric_name"]
+    assert whole.sort(sort_keys).equals(batched.sort(sort_keys))
 
 
 def test_compute_metrics_populates_time_series_type():
