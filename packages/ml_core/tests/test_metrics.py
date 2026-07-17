@@ -7,6 +7,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import Metrics
+from polars.testing import assert_frame_equal
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
     EffectiveCapacity,
@@ -180,10 +181,15 @@ def test_compute_metrics_raises_when_series_missing_capacity():
 
 
 def test_compute_metrics_ensemble_averaging():
-    """Ensemble mean should be taken before computing metrics."""
+    """Ensemble mean should be taken before computing the deterministic metrics.
+
+    Members 8 and 12 against an actual of 11: the ensemble mean is 10, so MAE = 1 — whereas
+    scoring the members individually would give (3 + 1)/2 = 2. (The actual deliberately
+    differs from the ensemble mean: an exact hit with positive spread is the contradictory
+    zero-RMSE corner that ``compute_metrics`` rejects as non-finite.)
+    """
     time = _utc(2022, 1, 1, 0, 0)
     init_time = _utc(2021, 12, 31, 23, 30)
-    # Two ensemble members: forecasts 8 and 12 → ensemble mean = 10 → error = 0
     df = pl.DataFrame(
         {
             "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
@@ -202,10 +208,10 @@ def test_compute_metrics_ensemble_averaging():
         }
     )
     forecasts = PowerForecast.validate(df, allow_superfluous_columns=True)
-    actuals = _make_actuals(1, [time], [10.0])
+    actuals = _make_actuals(1, [time], [11.0])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mae_row = result.filter(pl.col("metric_name") == "mae")
-    assert math.isclose(mae_row["metric_value"][0], 0.0, abs_tol=1e-5)
+    assert math.isclose(mae_row["metric_value"][0], 1.0, abs_tol=1e-5)
 
 
 def test_compute_metrics_multiple_folds():
@@ -527,6 +533,56 @@ def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
     assert _metric_value(result, "spread_skill_ratio") == 0.0
     assert _metric_value(result, "interval_width", metric_param="p10_p90") == 0.0
     assert _metric_value(result, "picp", metric_param="p10_p90") == 0.0
+
+
+def test_compute_metrics_perfect_forecast_scores_finite_zero_spread_skill():
+    """A perfect deterministic forecast (RMSE = 0, spread = 0) scores 0, never NaN.
+
+    The unguarded ratio would be 0/0 = NaN — which is not null, so it would pass
+    ``Metrics.validate`` and silently poison every downstream MLflow mean. Realistically
+    reachable: a persistence baseline forecasting a flat series.
+    """
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])
+    forecasts = _make_cv_forecasts(1, times, [10.0, 10.0])  # exact hit at every timestamp
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+    assert _metric_value(result, "spread_skill_ratio") == 0.0
+    assert result["metric_value"].is_finite().all()
+
+
+def test_compute_metrics_zero_rmse_with_positive_spread_raises():
+    """Positive spread around an error-free ensemble mean fails loudly, not as inf.
+
+    Members [8, 12] against an actual of 10: the ensemble mean is exact (RMSE = 0) but the
+    spread is positive, so the spread-skill ratio divides to infinity — the finiteness check
+    must refuse to emit it.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [10.0])
+    forecasts = _make_ensemble_forecasts(1, times, [[8.0, 12.0]])
+    with pytest.raises(ValueError, match="non-finite"):
+        compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+
+def test_compute_metrics_deduplicates_actuals():
+    """A duplicated (time_series_id, time) actuals row leaves every metric unchanged.
+
+    Without the dedupe, the join would double the ensemble members — doubling m and silently
+    corrupting the member-aware metrics (CRPS, spread, quantiles) while the deterministic
+    ones, which only see the mean, stay untouched.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    forecasts = _make_ensemble_forecasts(1, times, [[1.0, 2.0, 4.0]])
+    metadata, capacity = _make_metadata([1]), _make_capacity([1], [10.0])
+
+    clean = compute_metrics(forecasts, _make_actuals(1, times, [2.5]), metadata, capacity)
+    duplicated = compute_metrics(
+        forecasts, _make_actuals(1, times * 2, [2.5, 2.5]), metadata, capacity
+    )
+
+    sort_keys = ["horizon_slice", "metric_name", "metric_param"]
+    assert_frame_equal(clean.sort(sort_keys), duplicated.sort(sort_keys))
 
 
 def test_compute_metrics_fair_crps_handles_duplicate_members():

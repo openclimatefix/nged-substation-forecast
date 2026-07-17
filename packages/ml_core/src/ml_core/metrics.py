@@ -88,8 +88,11 @@ _MLFLOW_LOGGED_PARAMETRIC: Final[frozenset[tuple[str, str]]] = frozenset(
 """The parametric ``(metric_name, metric_param)`` pairs logged to MLflow.
 
 Metrics with ``metric_param="all"`` are always logged; parametric metrics are restricted to
-this headline subset to keep the MLflow leaderboard legible (~130 keys instead of ~340). The
-full 13-quantile / 6-band detail is always queryable in the ``forecast_metrics`` Delta table.
+this headline subset to keep the MLflow leaderboard legible. The key count depends on how
+many distinct ``time_series_type`` values the scored population spans (each adds a per-type
+key family): 132 keys for the V1 trial area's ~6 types, versus ~340 if every parametric
+metric were logged. The full 13-quantile / 6-band detail is always queryable in the
+``forecast_metrics`` Delta table.
 """
 
 
@@ -190,11 +193,20 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
         high_col = pl.col(_quantile_column(1 - lower))
         aggs[f"picp:{_band_label(lower)}"] = actual.is_between(low_col, high_col).mean()
         aggs[f"interval_width:{_band_label(lower)}"] = (high_col - low_col).mean()
+    # A perfect forecast group (rmse == 0) with zero spread would score 0/0 = NaN — which is
+    # not null, so it would sail through Metrics.validate and poison every downstream MLflow
+    # mean. Define that corner as 0.0 (consistent with "a deterministic forecast's
+    # spread-skill ratio is 0"). Zero rmse with *positive* spread divides to +inf, which the
+    # finiteness check in compute_metrics turns into a loud error.
+    rmse = pl.col("rmse")
+    rms_spread = pl.col("_rms_spread")
     return (
         per_run.group_by(group_keys)
         .agg(**aggs)
         .with_columns(
-            spread_skill_ratio=pl.col("_rms_spread") / pl.col("rmse"),
+            spread_skill_ratio=pl.when((rmse == 0) & (rms_spread == 0))
+            .then(0.0)
+            .otherwise(rms_spread / rmse),
             mean_pinball_loss=pl.mean_horizontal(
                 [f"pinball_loss:{quantile_label(q)}" for q in DELIVERY_QUANTILES]
             ),
@@ -250,6 +262,8 @@ def compute_metrics(
             Currently only CV fold rows are handled; ``fold_id="live"`` support will
             be added with the ``production_monitoring`` scope in Phase 8.
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
+            Deduplicated on ``(time_series_id, time)`` before the join — a duplicated actual
+            would otherwise double the ensemble members and corrupt the member-aware metrics.
         metadata: Substation metadata used to join ``time_series_type`` onto each metric row.
             Series absent from ``metadata`` receive a null ``time_series_type``.
         capacity: Pre-computed per-series effective capacity; ``effective_capacity_mw`` is the
@@ -262,8 +276,10 @@ def compute_metrics(
         NoOverlappingActualsError: If no rows survive the inner join (forecasts cover a
             period with no observed data).
         ValueError: If any forecast row has a negative lead time (``valid_time`` before
-            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), or if
-            any scored series has no row in ``capacity``.
+            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), if
+            any scored series has no row in ``capacity``, or if any computed metric value is
+            non-finite (NaN/inf — which ``Metrics.validate`` would otherwise accept, since
+            NaN is not null, and which would poison the MLflow aggregate means).
     """
     # A negative lead time means hindcast rows — valid times already in the past at
     # power_fcst_init_time, which a live forecast could never deliver. Scoring them would
@@ -282,9 +298,15 @@ def compute_metrics(
     # Strip the Patito model subclass from actuals so that Polars' cross-subclass
     # type check (assert_same_type) doesn't reject a join between two differently-typed
     # pt.LazyFrame objects.
+    # Dedupe actuals on the join key: a duplicated (time_series_id, time) row would double
+    # every ensemble member through the join, silently corrupting the member-aware metrics
+    # (CRPS, spread, quantiles) while leaving the deterministic ones — which only see the
+    # mean — untouched. Nothing enforces this uniqueness upstream, so guard it here.
     actuals_plain = pl.LazyFrame._from_pyldf(actuals._ldf)
     joined = cv_forecasts.lazy().join(
-        actuals_plain.select(["time_series_id", "time", "power"]).rename({"power": "power_actual"}),
+        actuals_plain.select(["time_series_id", "time", "power"])
+        .unique(subset=["time_series_id", "time"], keep="any")
+        .rename({"power": "power_actual"}),
         left_on=["time_series_id", "valid_time"],
         right_on=["time_series_id", "time"],
         how="inner",
@@ -381,6 +403,18 @@ def compute_metrics(
         raise NoOverlappingActualsError(
             "No rows in the joined forecast/actuals data. "
             "Check that cv_forecasts and actuals overlap in time."
+        )
+
+    # NaN/inf are not null, so Metrics.validate would accept them — and a single non-finite
+    # value poisons every downstream MLflow mean. Fail loudly instead, naming the offenders.
+    non_finite = metrics_tall.filter(~pl.col("metric_value").is_finite())
+    if not non_finite.is_empty():
+        offenders = non_finite.select(
+            ["time_series_id", "horizon_slice", "metric_name", "metric_param", "metric_value"]
+        )
+        raise ValueError(
+            f"{non_finite.height} metric row(s) have a non-finite metric_value, which would "
+            f"silently poison the MLflow aggregate means. First offenders:\n{offenders.head(10)}"
         )
 
     # Join time_series_type from metadata (left — keeps all metric rows; unmatched → null).

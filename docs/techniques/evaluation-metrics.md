@@ -172,7 +172,11 @@ true* rather than approximately true:
 
 The variance uses `ddof=1` (the sample variance), and a single-member forecast scores spread 0
 — zero spread is the honest description of a deterministic forecast, and 0/RMSE keeps the
-ratio's meaning (maximally overconfident) rather than becoming null.
+ratio's meaning (maximally overconfident) rather than becoming null. The remaining corner is
+RMSE = 0 (a perfect forecast over the scored group): with zero spread the ratio is defined as
+0 rather than the indeterminate 0/0, and with positive spread (contradictory: claimed
+uncertainty around an error-free mean) the computation refuses to emit a value — NaN or
+infinity in any metric raises rather than silently poisoning the leaderboard aggregates.
 
 ### Pinball loss
 
@@ -239,7 +243,7 @@ $$
 **The calibrated reference is *below* nominal coverage.** Empirical quantiles from a finite
 ensemble sit inside the true ones, so even a perfectly calibrated $m$-member ensemble covers
 less than the nominal rate — approximately
-$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$, which we confirmed by simulation.
+$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$.
 Judge PICP against these references, not the nominal rates:
 
 | Band | Nominal coverage | Calibrated reference at $m = 51$ |
@@ -254,6 +258,15 @@ Judge PICP against these references, not the nominal rates:
 A p10–p90 PICP of 0.72 at 51 members is therefore mild overconfidence (reference 0.769), not
 the 8-point shortfall a naive comparison with 0.8 would suggest. The gap grows as $m$ shrinks —
 one more reason PICP is not comparable across ensemble sizes.
+
+One caveat on precision: the formula is exact only when the interpolated quantile estimator is
+evaluated on a uniform distribution; for other distribution shapes the interpolation between
+extreme order statistics shifts coverage slightly. We verified by Monte Carlo (1M trials at
+$m = 51$, using the same `quantile(τ, "linear")` estimator as the metrics code) that uniform
+draws reproduce the table to within ±0.001 at every band, while Gaussian draws lift the
+outermost band to ≈ 0.947 (vs the table's 0.942) and leave the rest within noise. So treat the
+p1–p99 reference as accurate to roughly ±0.005 depending on the forecast distribution's shape;
+the central bands are safe as given.
 
 PICP alone is also **gameable**: an absurdly wide band hits any coverage target for free. It
 must always be read alongside a sharpness measure — which is what interval width is for (and
@@ -284,10 +297,13 @@ is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for par
 in three families: `{token}__all` (overall), `{token}__{type_slug}` (per
 `time_series_type`), and `{token}__all__{horizon_slice}` (per lead-time band).
 
-To keep the leaderboard legible (~130 keys rather than ~340), parametric metrics are
+To keep the leaderboard legible, parametric metrics are
 restricted in MLflow to a **headline subset**: `pinball_loss` at p10/p50/p90 and `picp` /
 `interval_width` at p10_p90 (the allowlist is `_MLFLOW_LOGGED_PARAMETRIC` in
-`ml_core.metrics`). Anything not in MLflow is still one Polars filter away in Delta.
+`ml_core.metrics`). The exact key count scales with how many distinct `time_series_type`
+values the scored population spans (each adds a per-type key family): 132 keys for the V1
+trial area's six types, versus roughly 340 if every quantile and band were logged. Anything
+not in MLflow is still one Polars filter away in Delta.
 
 ## What is deliberately *not* here
 
