@@ -250,6 +250,71 @@ synthetic-injection harness.
 - Produces the masking artifact and the honest sensitivity floor that everything downstream relies on.
 - De-risks the programme at minimal cost.
 
+#### Residual lag features — a complementary forecaster experiment
+
+The stage-1 baseline enables a cheap experiment on the *production forecaster* that is worth
+running as soon as normalised residuals exist, independently of the detector stages 2–3: replace
+(or augment) the forecaster's raw power-lag features with **residual lags** — the normalised
+"actual − expected" delta at each lag time, for the target substation and, optionally, its
+neighbours. The intuition: a raw power lag conflates "what the weather was doing" with "what is
+anomalous"; handing the model the anomaly component directly tells it how *normal* each recent
+observation is.
+
+What this buys — and why it is plausibly the largest forecast-*accuracy* win available from
+switching-awareness:
+
+- **A cleaner lag representation in general.** Separating the expected part from the anomalous
+  part of each lagged observation is plausibly useful everywhere, not only during switching
+  events.
+- **Learned event persistence.** During an ongoing switching event the residual is a sustained
+  level shift, so the model can learn "sustained recent residual → carry the offset forward".
+  This is the model-learned version of the
+  [zeroth-order patch](#v06-unsupervised-statistical-switching-event-detector), applied at
+  forecast time instead of to the training data — and for pure forecast accuracy, "the current
+  shift will persist" is most of the value switching-handling can deliver, since event *onsets*
+  are unpredictable from power data by definition.
+- **Neighbour context.** Neighbour residuals (e.g. a neighbourhood-sum feature) expose the
+  conservation fingerprint — my residual dropped while my neighbours' rises sum to the same
+  amount — which distinguishes "a transfer that will persist and eventually revert" from "a
+  permanent change such as load growth or a meter re-base".
+
+**What it does not replace.** This experiment makes the *forecaster* robust to switching; it
+produces none of the detector's deliverables. There is no event list or donor attribution (so no
+[`substation_switching` table](delivery-tables.md#table-5-substation_switching)), no ARA mask, no
+sensitivity floor, and no latent-NRA reconstruction — a good forecast of *metered* power is a
+different product from an estimate of what demand would have been under NRA. The two compose
+rather than compete: once the detector exists, its outputs (an in-event flag, event age,
+attributed magnitude) are themselves natural features for this model. And if the experiment wins
+big, that is an argument for re-weighting the *forecast-motivated* part of the switching work —
+while the event table, the mask, and the sensitivity floor keep their own justification.
+
+**Caveats to build in from the start:**
+
+- **A residual is not only switching.** It is also NWP error — autocorrelated and
+  heteroscedastic, exactly the stage-1 problem. Feed *normalised* residuals (divide by the
+  baseline's spread quantiles, which stage 1 fits anyway) rather than raw MW deltas, and include
+  a neighbourhood-sum residual so the model can separate a regional NWP bust (the sum steps too)
+  from a genuine transfer (the sum stays flat).
+- **Fold hygiene.** The baseline is a hindcast fitted on history; in cross-validation, each
+  fold's residual features must come from a baseline trained only on that fold's training
+  period, otherwise the test period leaks into the features. This makes the experiment pipeline
+  more expensive than adding an ordinary feature.
+- **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
+  (`_nullify_leaky_lags()`), and the expected-power values at past lag times must use only NWP
+  runs published before forecast time — the existing freshest-NWP-for-past-target-times join
+  provides exactly this.
+- **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
+  list (a Part 5 dependency) plus a cross-series join in feature engineering, and a per-series
+  feature-naming scheme (aggregated or ranked neighbour features, since each series has its own
+  neighbour set).
+- **Data volume.** Learning multi-donor conservation implicitly from 32 series with ~10% event
+  occupancy asks a lot of a tabular learner; expect the model to learn "persist my own offset"
+  easily and neighbour attribution only weakly. The closed-form detector exploits that structure
+  directly, which is another reason this complements rather than replaces it.
+
+The natural slot is immediately after implementation step 2 below (the baseline), as a measured
+cross-validation experiment; its result also doubles as evidence of the baseline's quality.
+
 #### v0.6.1 — the joint edge-flow estimator
 
 > **Status within v0.6:** this section documents the known next move if sequential matching
@@ -424,6 +489,11 @@ only if steps 1–7 prove to be too fragile (or to test out convex optimisation 
    shows sequential matching is the binding error source (overlapping events, ambiguous
    attributions). Reuses steps 1–5 wholesale; penalty weights tuned on the injection harness;
    adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
+
+The
+[residual-lag-features experiment](#residual-lag-features-a-complementary-forecaster-experiment)
+hangs off step 2 and can run any time after it, in parallel with steps 3–8 — it does not block,
+and is not blocked by, any of them (beyond the adjacency dependency for its neighbour features).
 
 ##### Sketch of the edge-flow estimator
 
