@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any, Final, Type
 
 import patito as pt
 import polars as pl
@@ -11,6 +11,38 @@ from patito.exceptions import (
 
 # Define our standard datetime type for all schemas
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
+
+DELIVERY_QUANTILES: Final[tuple[float, ...]] = (
+    0.01,
+    0.02,
+    0.05,
+    0.10,
+    0.20,
+    0.35,
+    0.50,
+    0.65,
+    0.80,
+    0.90,
+    0.95,
+    0.98,
+    0.99,
+)
+"""The thirteen quantile levels agreed with NGED for the delivery tables.
+
+Deliberately tail-heavy: NGED is far more interested in the tails than the shoulders. This
+tuple is the single source of truth for every quantile-indexed artefact — the pinball-loss
+``metric_param`` labels today, and the percentile columns of the delivery-table
+representations (Representations 2 and 3) when those land in v0.5.
+"""
+
+
+def quantile_label(quantile: float) -> str:
+    """Return the canonical ``p{level}`` label for a quantile, e.g. ``0.05`` → ``"p5"``.
+
+    The label format matches the percentile column names agreed with NGED for the delivery
+    tables (see ``DELIVERY_QUANTILES``).
+    """
+    return f"p{round(quantile * 100)}"
 
 
 def _get_time_series_id_dtype(**kwargs) -> Any:

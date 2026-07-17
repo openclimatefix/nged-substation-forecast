@@ -261,7 +261,9 @@ def test_compute_metrics_per_series_batching_is_equivalent():
         ]
     )
 
-    sort_keys = ["time_series_id", "horizon_slice", "metric_name"]
+    # metric_param must be a sort key: each group has 13 pinball_loss rows (one per
+    # quantile), so sorting by metric_name alone leaves ties in non-deterministic order.
+    sort_keys = ["time_series_id", "horizon_slice", "metric_name", "metric_param"]
     assert whole.sort(sort_keys).equals(batched.sort(sort_keys))
 
 
@@ -389,6 +391,193 @@ def test_power_forecast_contract_rejects_hindcast_rows():
 
 
 # ---------------------------------------------------------------------------
+# probabilistic-metric tests
+# ---------------------------------------------------------------------------
+
+
+def _make_ensemble_forecasts(
+    time_series_id: int,
+    times: list[datetime],
+    member_values: list[list[float]],
+    init_times: list[datetime] | None = None,
+) -> pt.DataFrame[PowerForecast]:
+    """Build forecasts with one row per (valid_time, ensemble_member).
+
+    ``member_values[i]`` lists the ensemble-member forecasts for ``times[i]``. Two rows with
+    the same ``valid_time`` but different ``init_times`` entries form two separate forecast
+    runs, each with its own members.
+    """
+    if init_times is None:
+        init_times = [_utc(2021, 12, 31, 23, 30)] * len(times)
+    valid_times: list[datetime] = []
+    run_init_times: list[datetime] = []
+    members: list[int] = []
+    values: list[float] = []
+    for valid_time, init_time, run_members in zip(times, init_times, member_values, strict=True):
+        for member, value in enumerate(run_members):
+            valid_times.append(valid_time)
+            run_init_times.append(init_time)
+            members.append(member)
+            values.append(value)
+    n = len(values)
+    df = pl.DataFrame(
+        {
+            "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
+            "valid_time": pl.Series(valid_times, dtype=pl.Datetime("us", "UTC")),
+            "power_fcst_init_time": pl.Series(run_init_times, dtype=pl.Datetime("us", "UTC")),
+            "ensemble_member": pl.Series(members, dtype=pl.Int8),
+            "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
+            "power_fcst": pl.Series(values, dtype=pl.Float32),
+            "power_fcst_model_name": pl.Series(["stub"] * n, dtype=pl.String),
+            "power_fcst_model_version": pl.Series([1] * n, dtype=pl.Int16),
+            "ml_flow_experiment_id": pl.Series([None] * n, dtype=pl.Int32),
+            "experiment_name": pl.Series(["stub_exp"] * n, dtype=pl.String),
+            "fold_id": pl.Series(["2022"] * n, dtype=pl.String),
+        }
+    )
+    return PowerForecast.validate(df, allow_superfluous_columns=True)
+
+
+def _metric_value(
+    result: pl.DataFrame,
+    metric_name: str,
+    horizon_slice: str = "all",
+    metric_param: str = "all",
+) -> float:
+    """Extract the single value of one (metric_name, horizon_slice, metric_param) row."""
+    rows = result.filter(
+        (pl.col("metric_name") == metric_name)
+        & (pl.col("horizon_slice") == horizon_slice)
+        & (pl.col("metric_param") == metric_param)
+    )
+    assert rows.height == 1
+    return float(rows["metric_value"][0])
+
+
+def test_compute_metrics_probabilistic_three_member_toy():
+    """Every probabilistic metric matches hand computation on a 3-member toy ensemble.
+
+    Members [1, 2, 4] forecast an actual of 2.5 (one timestamp, one run, m = 3):
+
+    - Fair CRPS = mean|xᵢ − y| − Σᵢ<ⱼ|xᵢ − xⱼ| / (m(m−1))
+      = (1.5 + 0.5 + 1.5)/3 − (1 + 3 + 2)/6 = 7/6 − 1 = 1/6.
+    - Ensemble mean = 7/3 → error = 7/3 − 2.5 = −1/6, so RMSE = 1/6. Sample variance
+      (ddof=1) = 7/3; Fortin-corrected variance = (m+1)/m · 7/3 = 28/9;
+      spread_skill_ratio = √(28/9) / (1/6) = 6·√(28/9).
+    - Linear empirical quantiles interpolate at position (m−1)·τ: p10 → 1.2, p50 → 2,
+      p90 → 3.6, p99 → 3.96.
+    - Pinball loss (y = 2.5): p10 → 0.1·1.3 = 0.13; p50 → 0.5·0.5 = 0.25;
+      p90 → 0.1·1.1 = 0.11; p99 → 0.01·1.46 = 0.0146.
+    - p10–p90 band = [1.2, 3.6] contains 2.5 → PICP = 1.0, interval width = 2.4.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [2.5])
+    forecasts = _make_ensemble_forecasts(1, times, [[1.0, 2.0, 4.0]])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+    assert math.isclose(_metric_value(result, "crps"), 1.0 / 6.0, rel_tol=1e-5)
+    assert math.isclose(
+        _metric_value(result, "spread_skill_ratio"), 6.0 * math.sqrt(28.0 / 9.0), rel_tol=1e-5
+    )
+    assert math.isclose(
+        _metric_value(result, "pinball_loss", metric_param="p10"), 0.13, rel_tol=1e-5
+    )
+    assert math.isclose(
+        _metric_value(result, "pinball_loss", metric_param="p50"), 0.25, rel_tol=1e-5
+    )
+    assert math.isclose(
+        _metric_value(result, "pinball_loss", metric_param="p90"), 0.11, rel_tol=1e-5
+    )
+    assert math.isclose(
+        _metric_value(result, "pinball_loss", metric_param="p99"), 0.0146, rel_tol=1e-4
+    )
+    assert math.isclose(_metric_value(result, "picp", metric_param="p10_p90"), 1.0, rel_tol=1e-5)
+    assert math.isclose(
+        _metric_value(result, "interval_width", metric_param="p10_p90"), 2.4, rel_tol=1e-5
+    )
+    # mean_pinball_loss is the unweighted mean over all 13 delivery quantiles.
+    pinball_rows = result.filter(
+        (pl.col("metric_name") == "pinball_loss") & (pl.col("horizon_slice") == "all")
+    )
+    assert pinball_rows.height == 13
+    mean_of_quantile_pinballs = pinball_rows["metric_value"].mean()
+    assert isinstance(mean_of_quantile_pinballs, float)
+    assert math.isclose(
+        _metric_value(result, "mean_pinball_loss"), mean_of_quantile_pinballs, rel_tol=1e-5
+    )
+    # Pinball loss is non-negative at every quantile.
+    assert (pinball_rows["metric_value"] >= 0).all()
+
+
+def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
+    """A deterministic (single-member) forecast is scored honestly, with no null values.
+
+    Fair CRPS reduces to MAE (the pairwise term is defined as 0 at m = 1), the spread-skill
+    ratio is 0 (zero spread, not null — ``.var(ddof=1)`` alone would return null), every
+    quantile coincides with the forecast so interval widths are 0, and PICP is 0 whenever the
+    actual differs from the forecast.
+    """
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # single member; MAE = 2
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+    assert result["metric_value"].is_not_null().all()
+    assert math.isclose(_metric_value(result, "crps"), _metric_value(result, "mae"), rel_tol=1e-6)
+    assert _metric_value(result, "spread_skill_ratio") == 0.0
+    assert _metric_value(result, "interval_width", metric_param="p10_p90") == 0.0
+    assert _metric_value(result, "picp", metric_param="p10_p90") == 0.0
+
+
+def test_compute_metrics_fair_crps_handles_duplicate_members():
+    """The sorted-member pairwise identity is exact when members tie.
+
+    Members [2, 2, 5], actual 3.5: CRPS = (1.5 + 1.5 + 1.5)/3 − (0 + 3 + 3)/6 = 1.5 − 1 = 0.5.
+    """
+    times = [_utc(2022, 1, 1, 0, 0)]
+    actuals = _make_actuals(1, times, [3.5])
+    forecasts = _make_ensemble_forecasts(1, times, [[2.0, 2.0, 5.0]])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+    assert math.isclose(_metric_value(result, "crps"), 0.5, rel_tol=1e-5)
+
+
+def test_compute_metrics_crps_scored_per_forecast_run():
+    """CRPS pools members within a run, never across runs covering the same valid_time.
+
+    Two 2-member runs forecast the same valid_time (actual 10): members [7, 9] give
+    CRPS = (3 + 1)/2 − 2/2 = 1, and members [11, 13] likewise give 1, so per-run scoring
+    averages to 1. Pooling all four members into one lagged ensemble would instead give
+    (3 + 1 + 1 + 3)/4 − 20/12 = 1/3.
+    """
+    valid_time = _utc(2022, 1, 2)
+    init_times = [_utc(2022, 1, 1, 0), _utc(2022, 1, 1, 6)]  # leads 24 h and 18 h: day_ahead
+    actuals = _make_actuals(1, [valid_time], [10.0])
+    forecasts = _make_ensemble_forecasts(
+        1, [valid_time, valid_time], [[7.0, 9.0], [11.0, 13.0]], init_times=init_times
+    )
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+    assert math.isclose(_metric_value(result, "crps"), 1.0, rel_tol=1e-5)
+
+
+def test_compute_metrics_probabilistic_metrics_per_slice():
+    """Probabilistic metrics are aggregated per horizon slice, with "all" as the row mean.
+
+    One run: an intraday timestamp with members [7, 9] (CRPS 1) and a day_ahead timestamp
+    with members [4, 8] (CRPS = (6 + 2)/2 − 4/2 = 2), both against an actual of 10.
+    """
+    init_time = _utc(2022, 1, 1)
+    times = [init_time + timedelta(hours=0.5), init_time + timedelta(hours=24)]
+    actuals = _make_actuals(1, times, [10.0, 10.0])
+    forecasts = _make_ensemble_forecasts(
+        1, times, [[7.0, 9.0], [4.0, 8.0]], init_times=[init_time] * 2
+    )
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+    assert math.isclose(_metric_value(result, "crps", horizon_slice="intraday"), 1.0, rel_tol=1e-5)
+    assert math.isclose(_metric_value(result, "crps", horizon_slice="day_ahead"), 2.0, rel_tol=1e-5)
+    assert math.isclose(_metric_value(result, "crps"), 1.5, rel_tol=1e-5)
+
+
+# ---------------------------------------------------------------------------
 # build_mlflow_aggregate_metrics tests
 # ---------------------------------------------------------------------------
 
@@ -511,3 +700,63 @@ def test_build_mlflow_aggregate_metrics_null_type_excluded_from_per_type():
     assert all("__none" not in k and "null" not in k for k in result)
     # "all" includes both series
     assert math.isclose(result["rmse__all"], 3.0, rel_tol=1e-5)
+
+
+def _parametric_metrics_row(
+    metric_name: str,
+    metric_param: str,
+    metric_value: float,
+    horizon_slice: str = "all",
+    time_series_id: int = 1,
+    time_series_type: str = "PV",
+) -> dict[str, object]:
+    """One Metrics-shaped row for parametric-key MLflow tests."""
+    return {
+        "time_series_id": time_series_id,
+        "metric_name": metric_name,
+        "metric_value": metric_value,
+        "time_series_type": time_series_type,
+        "horizon_slice": horizon_slice,
+        "metric_param": metric_param,
+    }
+
+
+def test_build_mlflow_aggregate_metrics_parametric_key_tokens():
+    """Parametric metrics use {name}_{param} key tokens, restricted to the headline allowlist.
+
+    metric_param="all" metrics keep the bare-name token (existing key formats unchanged);
+    pinball_loss is logged at p10/p50/p90 only and picp/interval_width at p10_p90 only —
+    the full 13-quantile / 6-band detail stays in the Delta table.
+    """
+    rows = [
+        _parametric_metrics_row("crps", "all", 1.5),
+        _parametric_metrics_row("pinball_loss", "p10", 2.0),
+        _parametric_metrics_row("pinball_loss", "p1", 3.0),  # not in the allowlist
+        _parametric_metrics_row("picp", "p10_p90", 0.7),
+        _parametric_metrics_row("picp", "p5_p95", 0.8),  # not in the allowlist
+        _parametric_metrics_row("interval_width", "p10_p90", 5.0),
+    ]
+    df = pl.DataFrame(rows).cast({"time_series_id": pl.Int32, "metric_value": pl.Float32})
+    result = build_mlflow_aggregate_metrics(df)
+
+    assert math.isclose(result["crps__all"], 1.5, rel_tol=1e-5)
+    assert math.isclose(result["pinball_loss_p10__all"], 2.0, rel_tol=1e-5)
+    assert math.isclose(result["picp_p10_p90__all"], 0.7, rel_tol=1e-5)
+    assert math.isclose(result["interval_width_p10_p90__all"], 5.0, rel_tol=1e-5)
+    # The allowlist also applies to the per-type key family.
+    assert math.isclose(result["pinball_loss_p10__pv"], 2.0, rel_tol=1e-5)
+    # Non-allowlisted params are absent from every key family.
+    assert not any(key.startswith("pinball_loss_p1_") for key in result)
+    assert not any(key.startswith("picp_p5_p95") for key in result)
+
+
+def test_build_mlflow_aggregate_metrics_parametric_sliced_keys():
+    """Allowlisted parametric metrics get per-slice keys; non-allowlisted ones do not."""
+    rows = [
+        _parametric_metrics_row("pinball_loss", "p10", 2.0, horizon_slice="day_ahead"),
+        _parametric_metrics_row("pinball_loss", "p1", 3.0, horizon_slice="day_ahead"),
+    ]
+    df = pl.DataFrame(rows).cast({"time_series_id": pl.Int32, "metric_value": pl.Float32})
+    result = build_mlflow_aggregate_metrics(df)
+    assert math.isclose(result["pinball_loss_p10__all__day_ahead"], 2.0, rel_tol=1e-5)
+    assert not any(key.startswith("pinball_loss_p1_") for key in result)

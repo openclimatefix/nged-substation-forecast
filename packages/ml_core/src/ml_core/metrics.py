@@ -6,7 +6,7 @@ from typing import Final
 
 import patito as pt
 import polars as pl
-from contracts.common import UTC_DATETIME_DTYPE
+from contracts.common import DELIVERY_QUANTILES, UTC_DATETIME_DTYPE, quantile_label
 from contracts.ml_schemas import (
     EVALUATION_SCOPES,
     HORIZON_SLICES,
@@ -69,12 +69,137 @@ def _horizon_slice_expr() -> pl.Expr:
     )
 
 
-def _wide_error_metrics(with_error: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
-    """Aggregate the ``error`` column into wide MAE/RMSE/MBE rows, one per ``group_keys`` group."""
-    return with_error.group_by(group_keys).agg(
-        mae=pl.col("error").abs().mean(),
-        rmse=(pl.col("error").pow(2).mean()).sqrt(),
-        mbe=pl.col("error").mean(),
+_BAND_LOWER_QUANTILES: Final[tuple[float, ...]] = tuple(q for q in DELIVERY_QUANTILES if q < 0.5)
+"""Lower quantile of each symmetric prediction-interval band scored by PICP/interval width.
+
+Each lower quantile ``q`` pairs with ``1 − q`` to form a band (e.g. 0.1 → the p10–p90 band),
+matching ``contracts.ml_schemas.BAND_METRIC_PARAMS``.
+"""
+
+_MLFLOW_LOGGED_PARAMETRIC: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("pinball_loss", "p10"),
+        ("pinball_loss", "p50"),
+        ("pinball_loss", "p90"),
+        ("picp", "p10_p90"),
+        ("interval_width", "p10_p90"),
+    }
+)
+"""The parametric ``(metric_name, metric_param)`` pairs logged to MLflow.
+
+Metrics with ``metric_param="all"`` are always logged; parametric metrics are restricted to
+this headline subset to keep the MLflow leaderboard legible (~130 keys instead of ~340). The
+full 13-quantile / 6-band detail is always queryable in the ``forecast_metrics`` Delta table.
+"""
+
+
+def _band_label(lower_quantile: float) -> str:
+    """Return the band ``metric_param`` label for a lower quantile, e.g. ``0.1`` → ``"p10_p90"``."""
+    return f"{quantile_label(lower_quantile)}_{quantile_label(1 - lower_quantile)}"
+
+
+def _quantile_column(quantile: float) -> str:
+    """Name of the per-timestamp empirical-quantile column for ``quantile``, e.g. ``"q_p10"``."""
+    return f"q_{quantile_label(quantile)}"
+
+
+def _fair_crps_expr() -> pl.Expr:
+    """Per-timestamp fair CRPS over the ensemble members of one forecast-run group.
+
+    Evaluated inside the per-run collapse ``group_by``, where each group holds the ``m``
+    members forecasting one ``(time_series_id, power_fcst_init_time, valid_time)``. The fair
+    (finite-ensemble-unbiased, Ferro 2014) form is::
+
+        CRPS = mean_i |x_i − y|  −  Σ_{i<j} |x_i − x_j| / (m(m−1))
+
+    with the pairwise term defined as 0 when ``m = 1`` (so a single-member "ensemble" scores
+    its absolute error, and group means reduce to MAE). The pairwise sum uses the sorted-member
+    identity ``Σ_{i<j}(x_(j) − x_(i)) = Σ_k (2k − m − 1)·x_(k)`` — O(m log m) instead of a
+    member self-join — computed in Float64 because the identity's large cancelling terms (up
+    to ±m·|power|) lose percent-level accuracy in Float32 when members are near-identical.
+
+    See
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>
+    for the full rationale.
+    """
+    m = pl.len()
+    members = pl.col("power_fcst").cast(pl.Float64)
+    mean_member_ae = (members - pl.col("power_actual").cast(pl.Float64)).abs().mean()
+    rank = pl.int_range(1, m + 1)
+    pairwise_sum = (members.sort() * (2 * rank - m - 1)).sum()
+    pairwise_mean = pl.when(m > 1).then(pairwise_sum / (m * (m - 1))).otherwise(0.0)
+    return mean_member_ae - pairwise_mean
+
+
+def _corrected_variance_expr() -> pl.Expr:
+    """Per-timestamp Fortin-corrected ensemble variance, ``((m+1)/m)·Var(members)``.
+
+    Evaluated inside the per-run collapse ``group_by``. For a calibrated ensemble the RMSE of
+    the ensemble mean equals ``sqrt((m+1)/m)`` times the RMS ensemble spread (Fortin et
+    al. 2014), so folding the factor in here makes the spread-skill ratio's calibrated target
+    exactly 1.0 at any ensemble size. Uses the sample variance (``ddof=1``), guarded to 0 for
+    single-member groups where ``.var()`` would return null (``metric_value`` is
+    non-nullable, and zero spread is the honest description of a deterministic forecast).
+    """
+    m = pl.len()
+    variance = pl.col("power_fcst").cast(pl.Float64).var()
+    return pl.when(m > 1).then(variance * (m + 1) / m).otherwise(0.0)
+
+
+def _wide_metric_columns() -> list[str]:
+    """Ordered names of the wide metric columns produced by ``_wide_metrics``.
+
+    Parametric metrics encode their ``metric_param`` after a ``":"`` separator (e.g.
+    ``"pinball_loss:p10"``); ``compute_metrics`` splits the encoding apart again after the
+    unpivot to tall format. ``"nmae"`` is absent — it is derived from ``"mae"`` after the
+    capacity join.
+    """
+    columns = ["mae", "rmse", "mbe", "crps", "spread_skill_ratio", "mean_pinball_loss"]
+    columns += [f"pinball_loss:{quantile_label(q)}" for q in DELIVERY_QUANTILES]
+    for lower in _BAND_LOWER_QUANTILES:
+        columns += [f"picp:{_band_label(lower)}", f"interval_width:{_band_label(lower)}"]
+    return columns
+
+
+def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
+    """Aggregate per-timestamp values into one wide row of metrics per ``group_keys`` group.
+
+    ``per_run`` is the per-forecast-run frame built by ``compute_metrics``: one row per
+    ``(time_series_id, power_fcst_init_time, valid_time)`` carrying the ensemble-mean
+    ``error``, per-timestamp ``crps`` and ``corrected_var``, and the empirical
+    ``DELIVERY_QUANTILES`` columns. Emits the columns listed by ``_wide_metric_columns``.
+    """
+    actual = pl.col("power_actual")
+    aggs: dict[str, pl.Expr] = {
+        "mae": pl.col("error").abs().mean(),
+        "rmse": (pl.col("error").pow(2).mean()).sqrt(),
+        "mbe": pl.col("error").mean(),
+        "crps": pl.col("crps").mean(),
+        # RMS spread, not mean-of-std: Jensen's inequality drags mean-of-std well below the
+        # RMS form whenever spread varies across timestamps, which would fake underdispersion
+        # for a calibrated ensemble. The (m+1)/m factor is already folded into corrected_var.
+        "_rms_spread": pl.col("corrected_var").mean().sqrt(),
+    }
+    for q in DELIVERY_QUANTILES:
+        diff = actual - pl.col(_quantile_column(q))
+        aggs[f"pinball_loss:{quantile_label(q)}"] = (
+            pl.when(diff >= 0).then(diff * q).otherwise(diff * (q - 1)).mean()
+        )
+    for lower in _BAND_LOWER_QUANTILES:
+        low_col = pl.col(_quantile_column(lower))
+        high_col = pl.col(_quantile_column(1 - lower))
+        aggs[f"picp:{_band_label(lower)}"] = actual.is_between(low_col, high_col).mean()
+        aggs[f"interval_width:{_band_label(lower)}"] = (high_col - low_col).mean()
+    return (
+        per_run.group_by(group_keys)
+        .agg(**aggs)
+        .with_columns(
+            spread_skill_ratio=pl.col("_rms_spread") / pl.col("rmse"),
+            mean_pinball_loss=pl.mean_horizontal(
+                [f"pinball_loss:{quantile_label(q)}" for q in DELIVERY_QUANTILES]
+            ),
+        )
+        .drop("_rms_spread")
     )
 
 
@@ -86,17 +211,24 @@ def compute_metrics(
 ) -> pt.DataFrame[Metrics]:
     """Compute evaluation metrics from CV predictions and observed power.
 
+    Full metric definitions, equations, and design rationale:
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>
+
     For each ``(time_series_id, fold_id, power_fcst_model_name)`` group:
 
     1. Joins predictions to observed ``power`` on ``(time_series_id, valid_time)``.
     2. Assigns each row a ``horizon_slice`` from its lead time
        (``valid_time − power_fcst_init_time``) — see ``_horizon_slice_expr`` for the bands.
-    3. Averages across ``ensemble_member`` *within each forecast run* (per
-       ``power_fcst_init_time``) to form a deterministic ensemble mean. Each run covering a
-       ``valid_time`` is scored independently, exactly as a production consumer would
-       experience it — runs at different lead times are never pooled.
-    4. Computes MAE, NMAE, RMSE, and MBE per ``horizon_slice``, plus the ``"all"`` aggregate
-       over every lead time.
+    3. Collapses the ensemble members *within each forecast run* (per
+       ``power_fcst_init_time``) into per-timestamp quantities: the deterministic ensemble
+       mean, the fair CRPS, the Fortin-corrected ensemble variance, and the empirical
+       ``DELIVERY_QUANTILES``. Each run covering a ``valid_time`` is scored independently,
+       exactly as a production consumer would experience it — runs at different lead times
+       are never pooled.
+    4. Aggregates per ``horizon_slice``, plus the ``"all"`` aggregate over every lead time:
+       MAE, NMAE, RMSE, and MBE on the ensemble mean; CRPS and the spread-skill ratio from
+       the member-aware quantities; pinball loss at each delivery quantile (plus their
+       mean); and PICP and interval width for each symmetric quantile band.
     5. Joins ``time_series_type`` from ``metadata`` onto each row.
     6. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
@@ -108,9 +240,10 @@ def compute_metrics(
     upgrade makes capacity time-varying (one row per ``(time_series_id,
     time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``.
 
-    Currently only the ``"all"`` metric_param is computed. Parametric metrics
-    (Pinball Loss, PICP) and ensemble metrics (CRPS, spread-skill ratio) can be
-    added here later without changing the schema.
+    Single-member "ensembles" (e.g. a deterministic baseline forecaster) are scored
+    unconditionally: their fair CRPS equals their MAE, their spread-skill ratio is 0, and
+    their quantile bands are degenerate (all quantiles coincide, so PICP ≈ 0 and interval
+    width = 0). Those are honest descriptions of a deterministic forecast, not errors.
 
     Args:
         cv_forecasts: CV predictions to evaluate.
@@ -157,11 +290,17 @@ def compute_metrics(
         how="inner",
     )
 
-    # Average across ensemble members to produce a deterministic ensemble mean per forecast
-    # run: power_fcst_init_time is a group key so that runs covering the same valid_time at
-    # different lead times are scored independently, never pooled into a lagged-ensemble blend.
-    # horizon_slice is constant within a (power_fcst_init_time, valid_time) group.
-    ensemble_mean = (
+    # Collapse the ensemble members of each forecast run into per-timestamp quantities: the
+    # deterministic ensemble mean plus the member-aware values (fair CRPS, Fortin-corrected
+    # variance, empirical delivery quantiles). power_fcst_init_time is a group key so that
+    # runs covering the same valid_time at different lead times are scored independently,
+    # never pooled into a lagged-ensemble blend. horizon_slice is constant within a
+    # (power_fcst_init_time, valid_time) group.
+    quantile_aggs = {
+        _quantile_column(q): pl.col("power_fcst").cast(pl.Float64).quantile(q, "linear")
+        for q in DELIVERY_QUANTILES
+    }
+    per_run = (
         joined.with_columns(horizon_slice=_horizon_slice_expr())
         .group_by(
             [
@@ -176,19 +315,22 @@ def compute_metrics(
             power_fcst=pl.col("power_fcst").mean(),
             power_actual=pl.col("power_actual").first(),
             horizon_slice=pl.col("horizon_slice").first(),
+            crps=_fair_crps_expr(),
+            corrected_var=_corrected_variance_expr(),
+            **quantile_aggs,
         )
     )
 
-    # Compute error column once, reuse in all aggregations.
-    with_error = ensemble_mean.with_columns(error=pl.col("power_fcst") - pl.col("power_actual"))
+    # Compute the ensemble-mean error column once, reuse in all aggregations.
+    with_error = per_run.with_columns(error=pl.col("power_fcst") - pl.col("power_actual"))
 
     # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name, horizon_slice),
     # where horizon_slice covers the four lead-time bands plus the "all" aggregate over every
     # lead time.
     base_keys = ["time_series_id", "fold_id", "power_fcst_model_name"]
-    wide_columns = [*base_keys, "horizon_slice", "mae", "rmse", "mbe"]
-    per_slice = _wide_error_metrics(with_error, [*base_keys, "horizon_slice"])
-    all_slice = _wide_error_metrics(with_error, base_keys).with_columns(
+    wide_columns = [*base_keys, "horizon_slice", *_wide_metric_columns()]
+    per_slice = _wide_metrics(with_error, [*base_keys, "horizon_slice"])
+    all_slice = _wide_metrics(with_error, base_keys).with_columns(
         horizon_slice=pl.lit("all").cast(pl.Enum(HORIZON_SLICES))
     )
     metrics_wide = pl.concat([per_slice.select(wide_columns), all_slice.select(wide_columns)])
@@ -210,22 +352,28 @@ def compute_metrics(
         )
     wide = wide.with_columns(nmae=pl.col("mae") / pl.col("effective_capacity_mw"))
 
-    # Pivot to tall format. The leftover effective_capacity_mw column is dropped by the unpivot.
+    # Pivot to tall format, then split the "name:param" encoding of the parametric wide
+    # columns into (metric_name, metric_param); scalar metrics have no separator, so their
+    # split field_1 is null and fills to "all". The leftover effective_capacity_mw column is
+    # dropped by the unpivot.
+    name_parts = pl.col("metric_name").str.split_exact(":", 1)
     metrics_tall = (
         wide.unpivot(
-            on=["mae", "nmae", "rmse", "mbe"],
+            on=[*_wide_metric_columns(), "nmae"],
             index=[*base_keys, "horizon_slice"],
             variable_name="metric_name",
             value_name="metric_value",
         )
+        .with_columns(
+            metric_name=name_parts.struct.field("field_0"),
+            metric_param=name_parts.struct.field("field_1").fill_null("all"),
+        )
         .cast(
             {
                 "metric_name": pl.Enum(METRIC_NAMES),
+                "metric_param": pl.Enum(METRIC_PARAMS),
                 "metric_value": pl.Float32,
             }
-        )
-        .with_columns(
-            metric_param=pl.lit("all").cast(pl.Enum(METRIC_PARAMS)),
         )
     )
 
@@ -255,20 +403,49 @@ def _type_slug(type_str: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", type_str.lower()).strip("_")
 
 
+def _mlflow_logged_expr() -> pl.Expr:
+    """Predicate selecting the metric rows logged to MLflow.
+
+    Every ``metric_param="all"`` metric is logged; parametric metrics are restricted to the
+    ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset.
+    """
+    logged = pl.col("metric_param") == "all"
+    for name, param in sorted(_MLFLOW_LOGGED_PARAMETRIC):
+        logged = logged | ((pl.col("metric_name") == name) & (pl.col("metric_param") == param))
+    return logged
+
+
+def _metric_key_token_expr() -> pl.Expr:
+    """MLflow key token for a metric row: ``{metric_name}`` or ``{metric_name}_{metric_param}``.
+
+    ``metric_param="all"`` metrics keep the bare name (so the pre-probabilistic key formats
+    are unchanged); parametric metrics append the param, e.g. ``"pinball_loss_p10"``.
+    """
+    name = pl.col("metric_name").cast(pl.String)
+    return (
+        pl.when(pl.col("metric_param") == "all")
+        .then(name)
+        .otherwise(name + "_" + pl.col("metric_param").cast(pl.String))
+    )
+
+
 def build_mlflow_aggregate_metrics(
     metrics_df: pl.DataFrame,
 ) -> dict[str, float]:
     """Return a flat ``{metric_key: value}`` dict for ``mlflow.log_metrics``.
 
     Computes mean ``metric_value`` across all series (``"all"`` aggregate), per
-    ``time_series_type``, and per ``horizon_slice``, restricted to ``metric_param="all"``
-    (the scalar metrics). Key formats:
+    ``time_series_type``, and per ``horizon_slice``. The key token is ``{metric_name}`` for
+    ``metric_param="all"`` metrics and ``{metric_name}_{metric_param}`` for parametric ones
+    (e.g. ``pinball_loss_p10``, ``picp_p10_p90``); parametric metrics are restricted to the
+    ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset. Key formats:
 
-    - ``"{metric_name}__all"`` — overall aggregate (``horizon_slice="all"``).
-    - ``"{metric_name}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
-    - ``"{metric_name}__all__{horizon_slice}"`` — overall aggregate per lead-time band
+    - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``).
+    - ``"{token}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
+    - ``"{token}__all__{horizon_slice}"`` — overall aggregate per lead-time band
       (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are deliberately not
-      logged — that detail stays queryable in the ``forecast_metrics`` Delta table.
+      logged — that detail stays queryable in the ``forecast_metrics`` Delta table, as does
+      the full 13-quantile / 6-band parametric detail.
 
     Args:
         metrics_df: Per-series ``Metrics`` rows with ``time_series_type`` populated.
@@ -276,7 +453,10 @@ def build_mlflow_aggregate_metrics(
     Returns:
         Flat dict of MLflow metric key → mean float value.
     """
-    base = metrics_df.filter((pl.col("horizon_slice") == "all") & (pl.col("metric_param") == "all"))
+    logged = metrics_df.filter(_mlflow_logged_expr()).with_columns(
+        metric_key=_metric_key_token_expr()
+    )
+    base = logged.filter(pl.col("horizon_slice") == "all")
 
     result: dict[str, float] = {}
 
@@ -284,26 +464,26 @@ def build_mlflow_aggregate_metrics(
     if "time_series_type" in base.columns:
         per_type = (
             base.filter(pl.col("time_series_type").is_not_null())
-            .group_by(["metric_name", "time_series_type"])
+            .group_by(["metric_key", "time_series_type"])
             .agg(mean_value=pl.col("metric_value").mean())
         )
         for row in per_type.iter_rows(named=True):
-            key = f"{row['metric_name']}__{_type_slug(str(row['time_series_type']))}"
+            key = f"{row['metric_key']}__{_type_slug(str(row['time_series_type']))}"
             result[key] = float(row["mean_value"])
 
     # Overall "all" aggregate (includes all series regardless of type).
-    overall = base.group_by("metric_name").agg(mean_value=pl.col("metric_value").mean())
+    overall = base.group_by("metric_key").agg(mean_value=pl.col("metric_value").mean())
     for row in overall.iter_rows(named=True):
-        result[f"{row['metric_name']}__all"] = float(row["mean_value"])
+        result[f"{row['metric_key']}__all"] = float(row["mean_value"])
 
     # Overall aggregate per lead-time band (includes all series regardless of type).
     per_slice = (
-        metrics_df.filter((pl.col("horizon_slice") != "all") & (pl.col("metric_param") == "all"))
-        .group_by(["metric_name", "horizon_slice"])
+        logged.filter(pl.col("horizon_slice") != "all")
+        .group_by(["metric_key", "horizon_slice"])
         .agg(mean_value=pl.col("metric_value").mean())
     )
     for row in per_slice.iter_rows(named=True):
-        result[f"{row['metric_name']}__all__{row['horizon_slice']}"] = float(row["mean_value"])
+        result[f"{row['metric_key']}__all__{row['horizon_slice']}"] = float(row["mean_value"])
 
     return result
 

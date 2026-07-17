@@ -532,12 +532,23 @@ def test_score_forecast_group_per_series_batches(
     )
     assert n_rows == expected.height
 
-    compare_cols = ["time_series_id", "horizon_slice", "metric_name", "metric_value"]
-    sort_keys = ["time_series_id", "horizon_slice", "metric_name"]
+    # metric_param must be in both the sort keys and the compared columns: each group has 13
+    # pinball_loss rows (one per quantile), so without it tied metric_name rows sort
+    # non-deterministically and a p10 value could be compared against a p90 row.
+    compare_cols = [
+        "time_series_id",
+        "horizon_slice",
+        "metric_name",
+        "metric_param",
+        "metric_value",
+    ]
+    sort_keys = ["time_series_id", "horizon_slice", "metric_name", "metric_param"]
     # Delta stores the Enum columns as String, so compare in String space. Expression casts
     # (not a {column: dtype} dict-cast) because `expected` is a model-bearing Patito frame.
     expected_str = expected.select(compare_cols).with_columns(
-        pl.col("horizon_slice").cast(pl.String), pl.col("metric_name").cast(pl.String)
+        pl.col("horizon_slice").cast(pl.String),
+        pl.col("metric_name").cast(pl.String),
+        pl.col("metric_param").cast(pl.String),
     )
     assert written.select(compare_cols).sort(sort_keys).equals(expected_str.sort(sort_keys))
 
