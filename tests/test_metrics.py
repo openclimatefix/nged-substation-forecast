@@ -388,6 +388,142 @@ def test_metrics_nmae_denominator_is_effective_capacity(
     assert nmae == pytest.approx(mae / capacity, rel=1e-5)
 
 
+def _batch_forecast_frame(
+    time_series_id: int, times: list[datetime], power_fcst: list[float]
+) -> pl.DataFrame:
+    """One-member PowerForecast rows for the per-series-batching test."""
+    n = len(times)
+    return pl.DataFrame(
+        {
+            "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
+            "valid_time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
+            "power_fcst_init_time": pl.Series([min(times)] * n, dtype=pl.Datetime("us", "UTC")),
+            "ensemble_member": pl.Series([0] * n, dtype=pl.Int8),
+            "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
+            "power_fcst": pl.Series(power_fcst, dtype=pl.Float32),
+            "power_fcst_model_name": pl.Series(["stub"] * n, dtype=pl.String),
+            "power_fcst_model_version": pl.Series([1] * n, dtype=pl.Int16),
+            "ml_flow_experiment_id": pl.Series([None] * n, dtype=pl.Int32),
+            "experiment_name": pl.Series(["exp_batch"] * n, dtype=pl.String),
+            "fold_id": pl.Series(["2025"] * n, dtype=pl.String),
+        }
+    )
+
+
+def test_score_forecast_group_per_series_batches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Per-series batching writes exactly the rows a whole-group call would.
+
+    With the batch size forced to 1, three series exercise the multi-batch path; the series
+    with no overlapping actuals is skipped (as it silently vanishes from the inner join in a
+    whole-group call) and the written Delta rows match ``compute_metrics`` on the overlapping
+    series.
+    """
+    from contracts.power_schemas import EffectiveCapacity, PowerTimeSeries
+    from ml_core.metrics import compute_metrics
+
+    from nged_substation_forecast.defs import cv_assets
+
+    times = [
+        datetime(2025, 8, 1, 6, 0, tzinfo=timezone.utc),
+        datetime(2025, 8, 1, 6, 30, tzinfo=timezone.utc),
+    ]
+    # Series 1 and 2 overlap the actuals below; series 3's valid times are a year later.
+    far_times = [t.replace(year=2026) for t in times]
+    group = PowerForecast.validate(
+        pl.concat(
+            [
+                _batch_forecast_frame(1, times, [12.0, 8.0]),
+                _batch_forecast_frame(2, times, [25.0, 19.0]),
+                _batch_forecast_frame(3, far_times, [1.0, 1.0]),
+            ]
+        )
+    )
+    actuals = pt.LazyFrame.from_existing(
+        pl.LazyFrame(
+            {
+                "time_series_id": pl.Series([1, 1, 2, 2], dtype=pl.Int32),
+                "time": pl.Series(times * 2, dtype=pl.Datetime("us", "UTC")),
+                "power": pl.Series([10.0, 10.0, 20.0, 20.0], dtype=pl.Float32),
+            }
+        )
+    ).set_model(PowerTimeSeries)
+    metadata_df = TimeSeriesMetadata.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1, 2, 3], dtype=pl.Int32),
+                "time_series_name": [f"Substation {i}" for i in (1, 2, 3)],
+                "time_series_type": pl.Series(["Disaggregated Demand"] * 3).cast(
+                    pl.Enum(LIST_OF_TIME_SERIES_TYPES)
+                ),
+                "units": pl.Series(["MW"] * 3).cast(pl.Enum(["MW", "MVA"])),
+                "licence_area": pl.Series(["EMids"] * 3).cast(pl.Enum(["EMids"])),
+                "substation_number": pl.Series([1, 2, 3], dtype=pl.Int32),
+                "substation_type": pl.Series(["Primary"] * 3).cast(
+                    pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"])
+                ),
+                "latitude": pl.Series([53.0] * 3, dtype=pl.Float32),
+                "longitude": pl.Series([-0.5] * 3, dtype=pl.Float32),
+                "h3_res_5": pl.Series([_TS1_CELL] * 3, dtype=pl.UInt64),
+            }
+        ),
+        allow_superfluous_columns=True,
+    )
+    capacity_df = EffectiveCapacity.validate(
+        pl.DataFrame(
+            {
+                "time_series_id": pl.Series([1, 2, 3], dtype=pl.Int32),
+                "time": pl.Series([times[0]] * 3, dtype=pl.Datetime("us", "UTC")),
+                "effective_capacity_mw": pl.Series([10.0, 20.0, 5.0], dtype=pl.Float32),
+            }
+        )
+    )
+
+    monkeypatch.setattr(cv_assets, "_METRICS_SERIES_BATCH_SIZE", 1)
+    metrics_path = tmp_path / "forecast_metrics"
+    n_rows, fold_metric_dict = cv_assets._score_forecast_group(
+        "exp_batch",
+        "2025",
+        group.lazy(),
+        actuals,
+        metadata_df,
+        capacity_df,
+        "ad_hoc",
+        str(metrics_path),
+        datetime.now(timezone.utc),
+        None,
+    )
+
+    assert fold_metric_dict is None  # ad_hoc scope never logs to MLflow
+    written = pl.read_delta(str(metrics_path))
+    assert set(written["time_series_id"].to_list()) == {1, 2}
+
+    expected = compute_metrics(
+        PowerForecast.validate(
+            pl.concat(
+                [
+                    _batch_forecast_frame(1, times, [12.0, 8.0]),
+                    _batch_forecast_frame(2, times, [25.0, 19.0]),
+                ]
+            )
+        ),
+        actuals,
+        metadata_df,
+        capacity_df,
+    )
+    assert n_rows == expected.height
+
+    compare_cols = ["time_series_id", "horizon_slice", "metric_name", "metric_value"]
+    sort_keys = ["time_series_id", "horizon_slice", "metric_name"]
+    # Delta stores the Enum columns as String, so compare in String space. Expression casts
+    # (not a {column: dtype} dict-cast) because `expected` is a model-bearing Patito frame.
+    expected_str = expected.select(compare_cols).with_columns(
+        pl.col("horizon_slice").cast(pl.String), pl.col("metric_name").cast(pl.String)
+    )
+    assert written.select(compare_cols).sort(sort_keys).equals(expected_str.sort(sort_keys))
+
+
 def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:
     instance = DagsterInstance.ephemeral()
     _run_cv_pipeline(instance)

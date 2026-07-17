@@ -43,7 +43,12 @@ from ml_core._cv_helpers import (
     eligible_time_series_ids,
     parse_cv_partition_key,
 )
-from ml_core.metrics import build_mlflow_aggregate_metrics, compute_metrics, enrich_metrics_rows
+from ml_core.metrics import (
+    NoOverlappingActualsError,
+    build_mlflow_aggregate_metrics,
+    compute_metrics,
+    enrich_metrics_rows,
+)
 from ml_core._mlflow_runs import (
     get_or_create_experiment,
     get_or_create_fold_run,
@@ -642,7 +647,7 @@ class MetricsConfig(Config):
 def _resolve_eval_window(
     evaluation_scope: EvalScopeType,
     fold_id: str,
-    group_df: pt.DataFrame[PowerForecast],
+    group_scan: pl.LazyFrame,
 ) -> tuple[datetime, datetime, str]:
     """Return ``(window_start, window_end, window_label)`` for a metrics group.
 
@@ -653,8 +658,9 @@ def _resolve_eval_window(
         evaluation_scope: ``"leaderboard"`` uses fold-config dates; ``"ad_hoc"`` uses the
             observed ``valid_time`` range of the forecast group.
         fold_id: Fold identifier; only used when ``evaluation_scope == "leaderboard"``.
-        group_df: Validated ``PowerForecast`` rows for this ``(experiment_name, fold_id)``
-            group. Only ``valid_time`` is accessed, and only for the ``"ad_hoc"`` branch.
+        group_scan: Lazy scan of this ``(experiment_name, fold_id)`` group's forecast rows.
+            Only a streaming min/max over ``valid_time`` is computed, and only for the
+            ``"ad_hoc"`` branch — the group is never materialised here.
 
     Returns:
         ``(window_start, window_end, window_label)`` — the inclusive evaluation window bounds
@@ -667,9 +673,12 @@ def _resolve_eval_window(
             date_to_utc_datetime(fold.val_end, end_of_day=True),
             fold_id,
         )
-    # groups is derived from a non-empty forecasts_df, so min/max are always non-null datetimes.
-    window_start = group_df["valid_time"].min()
-    window_end = group_df["valid_time"].max()
+    bounds = group_scan.select(
+        window_start=pl.col("valid_time").min(), window_end=pl.col("valid_time").max()
+    ).collect(engine="streaming")
+    window_start = bounds["window_start"][0]
+    window_end = bounds["window_end"][0]
+    # groups is derived from a non-empty forecast scan, so min/max are always non-null datetimes.
     assert isinstance(window_start, datetime) and isinstance(window_end, datetime)
     return window_start, window_end, "ad_hoc"
 
@@ -710,36 +719,77 @@ def _write_metrics_to_delta(
     )
 
 
-def _load_forecast_group(
-    pruned_scan: pt.LazyFrame[PowerForecast], exp_name: str, fold_id: str
-) -> pt.DataFrame[PowerForecast]:
-    """Collect and validate a single ``(experiment_name, fold_id)`` group.
+_METRICS_SERIES_BATCH_SIZE: Final[int] = 4
+"""How many ``time_series_id`` values to materialise per scoring batch in the ``metrics`` asset.
 
-    Narrows the already-pruned scan to one partition. This extra ``.filter()`` on the String
-    partition columns pushes down into the Delta scan, so only this partition's Parquet files are
-    read. Peak memory is therefore a single fold, regardless of how many groups the population
-    filter matched.
+A single V1 fold is far too big to collect whole (~370M rows with the full ``PowerForecast``
+schema OOM-kills a 29 GB machine), but ``compute_metrics`` is independent per
+``time_series_id`` — every group key includes it — so scoring per-series batches and
+concatenating the tall ``Metrics`` results is exactly equivalent to one big call.
+
+Measured on the V1 fold (28 series, ~13M rows each): batch size 4 completes in ~50 s with
+~18 GB peak process RSS, dominated by the streaming Delta scan (each batch re-scans the
+partition; the materialised batch frame itself is a few GB). Batch size 2 measured only
+~2 GB lower, so shrinking the batch buys little — the scan overhead is roughly constant in
+fold size, which is what keeps this workable at V2 scale.
+"""
+
+
+def _group_scan(
+    pruned_scan: pt.LazyFrame[PowerForecast], exp_name: str, fold_id: str
+) -> pl.LazyFrame:
+    """Narrow the already-pruned scan to a single ``(experiment_name, fold_id)`` partition.
+
+    The ``.filter()`` on the String partition columns pushes down into the Delta scan, so
+    downstream collects read only this partition's Parquet files.
 
     Args:
         pruned_scan: The ``pt.LazyFrame[PowerForecast]`` returned by ``PopulationFilter.apply``
             (partition predicates already applied).
-        exp_name: Experiment name of the group to load.
-        fold_id: Fold identifier of the group to load.
+        exp_name: Experiment name of the group.
+        fold_id: Fold identifier of the group.
 
     Returns:
-        The validated ``PowerForecast`` rows for this one group.
+        A lazy scan of this one group's rows (a plain ``pl.LazyFrame`` — ``.filter()`` drops
+        the Patito subclass; the per-batch loader re-validates on collect).
     """
-    group_scan = pruned_scan.filter(
+    return pruned_scan.filter(
         (pl.col("experiment_name") == exp_name) & (pl.col("fold_id") == fold_id)
     )
-    collected = pt.LazyFrame.from_existing(group_scan).set_model(PowerForecast).collect()
+
+
+def _series_ids_in_group(group_scan: pl.LazyFrame) -> list[int]:
+    """Return the sorted ``time_series_id`` values present in one forecast group.
+
+    A streaming single-column aggregation — cheap relative to the row data.
+    """
+    return sorted(
+        group_scan.select("time_series_id").unique().collect(engine="streaming")["time_series_id"]
+    )
+
+
+def _load_series_batch(
+    group_scan: pl.LazyFrame, series_ids: list[int]
+) -> pt.DataFrame[PowerForecast]:
+    """Collect and validate one batch of series from a single-group forecast scan.
+
+    Args:
+        group_scan: Lazy scan of one ``(experiment_name, fold_id)`` group's rows.
+        series_ids: The ``time_series_id`` values to materialise.
+
+    Returns:
+        The validated ``PowerForecast`` rows for these series.
+    """
+    collected = group_scan.filter(pl.col("time_series_id").is_in(series_ids)).collect(
+        engine="streaming"
+    )
     return PowerForecast.validate(collected, allow_superfluous_columns=True)
 
 
 def _score_forecast_group(
     exp_name: str,
     fold_id: str,
-    group_forecasts: pt.DataFrame[PowerForecast],
+    group_scan: pl.LazyFrame,
     actuals_lf: pt.LazyFrame[PowerTimeSeries],
     metadata_df: pt.DataFrame[TimeSeriesMetadata],
     capacity_df: pt.DataFrame[EffectiveCapacity],
@@ -751,11 +801,19 @@ def _score_forecast_group(
     """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
     optionally log to MLflow.
 
+    The group is scored in per-series batches of ``_METRICS_SERIES_BATCH_SIZE`` so that peak
+    memory is one batch, never the whole fold (a single V1 fold is already too big to
+    materialise). ``compute_metrics`` is independent per ``time_series_id``, so concatenating
+    the per-batch ``Metrics`` frames is exactly equivalent to scoring the group in one call.
+    A batch whose series have no overlapping actuals is skipped — mirroring how such series
+    silently vanish from the inner join in a whole-group call — but a group where *no* batch
+    overlaps raises, exactly as the whole-group call would.
+
     Args:
         exp_name: Experiment name for this group.
         fold_id: Fold identifier for this group.
-        group_forecasts: The already-sliced, validated ``PowerForecast`` rows for this single
-            ``(exp_name, fold_id)`` group (loaded by ``_load_forecast_group``).
+        group_scan: Lazy scan of this single ``(exp_name, fold_id)`` group's forecast rows
+            (from ``_group_scan``); materialised one series batch at a time.
         actuals_lf: Lazy observed power scan (only the joined subset is collected inside
             ``compute_metrics()``).
         metadata_df: Substation metadata used to join ``time_series_type`` onto each metric row.
@@ -776,11 +834,30 @@ def _score_forecast_group(
         - ``fold_metric_dict`` — flat ``{mlflow_metric_key: mean_value}`` dict logged to the
           fold's MLflow child run (e.g. ``{"rmse__all": 0.42, "rmse__pv": 0.31}``). ``None``
           for ``"ad_hoc"`` scope, where no MLflow run exists.
+
+    Raises:
+        NoOverlappingActualsError: If no series in the group has any overlapping actuals.
     """
-    per_series_metrics = compute_metrics(group_forecasts, actuals_lf, metadata_df, capacity_df)
+    series_ids = _series_ids_in_group(group_scan)
+    batch_metrics: list[pt.DataFrame[Metrics]] = []
+    for start in range(0, len(series_ids), _METRICS_SERIES_BATCH_SIZE):
+        batch_ids = series_ids[start : start + _METRICS_SERIES_BATCH_SIZE]
+        batch_forecasts = _load_series_batch(group_scan, batch_ids)
+        try:
+            batch_metrics.append(
+                compute_metrics(batch_forecasts, actuals_lf, metadata_df, capacity_df)
+            )
+        except NoOverlappingActualsError:
+            continue
+    if not batch_metrics:
+        raise NoOverlappingActualsError(
+            f"No rows in the joined forecast/actuals data for group ({exp_name}, {fold_id}). "
+            "Check that cv_forecasts and actuals overlap in time."
+        )
+    per_series_metrics = Metrics.validate(pl.concat(batch_metrics), allow_superfluous_columns=True)
 
     window_start, window_end, window_label = _resolve_eval_window(
-        evaluation_scope, fold_id, group_forecasts
+        evaluation_scope, fold_id, group_scan
     )
     mlflow_run_id: str | None = None
     if evaluation_scope == "leaderboard":
@@ -844,7 +921,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     # Discover the matching groups from the pruned scan — projecting to only the two partition
     # columns keeps this collect cheap (partition metadata, not row data). Each group is then
-    # loaded and scored one at a time, so peak memory is a single fold.
+    # scored in per-series batches, so peak memory is one batch, never a whole fold.
     groups = (
         pruned_scan.select(["experiment_name", "fold_id"])
         .unique()
@@ -891,11 +968,10 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:
-        group_forecasts = _load_forecast_group(pruned_scan, exp_name, fold_id)
         n_rows, fold_metric_dict = _score_forecast_group(
             exp_name,
             fold_id,
-            group_forecasts,
+            _group_scan(pruned_scan, exp_name, fold_id),
             actuals_lf,
             metadata_df,
             capacity_df,
