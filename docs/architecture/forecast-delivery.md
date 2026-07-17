@@ -1,11 +1,5 @@
 # Forecast Delivery: Delta Lake on S3
 
-> **Status: durable architecture explainer.** This page explains *why* OCF delivers forecasts
-> to NGED as Delta Lake tables on S3 rather than through a custom REST API — where that choice
-> came from, what it gives NGED, and how a REST API could still fit in later. The concrete
-> table schemas and their implementation status live in the
-> [delivery tables](../roadmap/delivery-tables.md) page.
-
 OCF's national solar forecast is served through a custom REST API
 ([quartz-api](https://github.com/openclimatefix/quartz-api)), and that's the right tool for that
 product. So when we talk about NGED Flexpectation delivering files on object storage instead, it's
@@ -13,71 +7,6 @@ natural to ask why — "just files on S3" can sound like a shortcut we'd eventua
 "real API". This page walks through the reasoning: what Delta Lake actually is, why the two
 products suit different mechanisms, what Delta Lake on S3 gives NGED (more than it might first
 appear), and when a REST API *would* earn its keep here.
-
-## What Delta Lake is (and who else uses it)
-
-It's worth being concrete about what Delta Lake actually *is*, because "Parquet files
-on S3" can conjure an image of our code carefully hand-crafting every file and hoping nothing
-goes wrong mid-write. That's not what happens. [Delta Lake](https://delta.io) is an open-source
-table format created at Databricks and donated to the Linux Foundation in 2019, and — just like
-a traditional database — all the fiddly bookkeeping is the library's job, not ours.
-
-Writing a forecast run is one function call:
-
-```python
-from deltalake import write_deltalake
-
-write_deltalake("s3://<bucket>/power_forecasts", forecasts, mode="append")
-```
-
-The library ([delta-rs](https://github.com/delta-io/delta-rs), written in Rust) decides how to
-split rows across files, names the files, lays out the partition directories, records per-column
-statistics, and — the crucial part — atomically commits the new files to the transaction log.
-(Our [`delta_store`](../api/delta_store/index.md) package layers our own storage policy on top —
-row sort order, per-column parquet encodings, precision rounding — but that too is just
-configuration passed to the same library call.)
-
-On disk, the result looks like this (our development `power_forecasts` table):
-
-```text
-power_forecasts/
-├── _delta_log/                    ← the transaction log
-│   ├── 00000000000000000000.json
-│   ├── 00000000000000000001.json
-│   └── …
-├── experiment_name=xgboost_cv_0001/
-│   └── fold_id=mid_2025_to_mid_2026/
-│       ├── part-00000-cbb0236f-….zstd.parquet
-│       ├── part-00000-ef8aad4e-….zstd.parquet
-│       └── …
-└── …
-```
-
-Readers never touch those Parquet files directly. Opening the table is a single call —
-`DeltaTable("s3://<bucket>/power_forecasts")` — and the first thing that client does is read
-`_delta_log`. The log tells it exactly which Parquet files make up the current version of the
-table and, for each file, which partition values and value ranges it holds — so a query can
-skip irrelevant files without downloading them. A file the log doesn't mention — half-uploaded,
-or left behind by a failed write — simply doesn't exist as far as any reader is concerned. That
-log is where the atomic-publish guarantee described
-[below](#and-it-is-a-database-acid-on-object-storage) physically lives. And every tool that
-reads Delta Lake starts the same way, including Polars' `scan_delta`
-([below](#lazy-reads-query-it-dont-download-it)).
-
-If this still feels unusual, remember that *every* database is ultimately files on disk.
-Postgres — OCF's workhorse — stores each table as files of 8 kB pages in a binary format that
-only Postgres can read, and you reach them through the Postgres server process. Delta Lake is
-the same idea with the layers rearranged: the on-disk format is open and columnar, so dozens of
-independently developed tools read it directly, and the "server" role is played by object
-storage. In neither case does application code manage the files by hand.
-
-And this is thoroughly mainstream technology, not an exotic bet. Databricks built its entire
-platform on Delta Lake; Apple, Comcast, Adobe, and Salesforce all run it at massive scale; and —
-closest to home — [NESO](https://www.neso.energy/) uses Delta Lake too. More broadly, the
-open-table-format family it belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/),
-created at Netflix; [Apache Hudi](https://hudi.apache.org/), created at Uber) is now the standard
-way large companies store and share analytical data. In other words: we picked the boring,
-battle-tested option.
 
 ## Two products, two shapes of problem
 
@@ -136,37 +65,128 @@ being just as important to NGED as the power forecasts.
 
 ## How big is Flexpectation's power forecast data?
 
+In short: At v2 scale, we will be storing multiple _trillions_ of rows of data. As discussed below,
+that is far too much to be practical for storing in Postgres, or for delivering over a REST API.
+
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of the
 14-day horizon. For the V1 trial area that is 32 series × 51 members × 672 half-hours ≈ **1.1
 million rows per run**. Our development `power_forecasts` table already holds **~414 million rows**
 from 428 forecast init times (mostly backtests, plus a handful of live runs so far) — for just 32
-time series. The per-run average is a little below the 1.1 million theoretical maximum because
-backtest folds near either edge of their date range have a 14-day horizon that runs past the
-fold's boundary, truncating those runs. Our
+time series. Our
 [`delta_store`](../api/delta_store/index.md) storage format packs that into **0.75 GB, ~1.8 bytes
 per row**.
 
 V2 scales to ~2,500 time series: approx 78× more, or roughly **86 million rows per run**. At the
-6-hourly cadence (4 runs/day × 365 days) that's roughly **125 billion rows per year of
-history** — a couple of hundred gigabytes at the measured bytes-per-row, and several
-*terabytes* uncompressed. Serialised as uncompressed JSON (measured on real forecast rows:
-~356 bytes each), the same year of history would be roughly **45 terabytes on the wire — about
-200× the Delta footprint**. NGED wants routine access to all of it!
+6-hourly cadence (4 runs/day × 365 days) that's roughly **125 billion rows per year of history** — a
+couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), and several
+*terabytes* uncompressed. 
 
-Multiply that per-year figure out across history and models and it keeps climbing: four years of
-history across two concurrently-run models already reaches **a trillion rows** (125 billion × 4 ×
-2 = 1 trillion) — and both those multipliers are conservative once backtests and additional model
-families are counted.
+What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
+on real forecast rows: ~356 bytes each), the same year of history would be roughly **45 terabytes on
+the wire — about 200× the Delta footprint**. NGED wants routine access to all of it!
+
+Multiply that per-year figure out across multiple years of history and multiple ML models and it
+keeps climbing: four years of history across two concurrently-run models already reaches **a
+trillion rows** (125 billion × 4 × 2 = 1 trillion) — and both those multipliers are conservative
+once backtests and additional model families are counted.
 
 That volume is an awkward fit for JSON request/response cycles (to say the least!); in practice,
 REST designs for workloads like this tend to grow a "bulk export" endpoint that hands back files —
 at which point the files are doing the real work, and the REST API has become a wrapper around them.
 
-## Could Postgres do this instead?
+## What REST was designed for
+
+REST was named and formalised in Roy Fielding's
+[2000 PhD dissertation](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm) as
+a retrospective description of *why the web worked*: many independent clients, small
+hypermedia resources, stateless request/response over HTTP, caches in the middle. It is a
+superb architecture for exactly that — operational queries, multi-tenant products, and
+integrations where each interaction moves a small resource.
+
+What REST wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
+that press it into that role tend to find themselves re-implementing, one endpoint at a time,
+the things analytical storage formats already provide: pagination (chunked reads),
+retry-and-resume (transactional snapshots), server-side filtering (predicate pushdown), column
+selection (columnar layout), and compression. Each of those becomes a bespoke design decision
+to make, document, and maintain — and a bespoke client for NGED to write against.
+
+## What Delta Lake is (and who else uses it)
+
+It's worth being concrete about what Delta Lake actually *is*, because "Parquet files
+on S3" can conjure an image of our code carefully hand-crafting every file and hoping nothing
+goes wrong mid-write. That's not what happens. [Delta Lake](https://delta.io) is an open-source
+table format created at Databricks and donated to the Linux Foundation in 2019, and — just like
+a traditional database — all the fiddly bookkeeping is the library's job, not ours.
+
+Writing a forecast run is one function call:
+
+```python
+from deltalake import write_deltalake
+
+write_deltalake("s3://<bucket>/power_forecasts", forecasts, mode="append")
+```
+
+The library ([delta-rs](https://github.com/delta-io/delta-rs), written in Rust) decides how to
+split rows across files, names the files, lays out the partition directories, records per-column
+statistics, and — the crucial part — atomically commits the new files to the transaction log.
+(Our [`delta_store`](../api/delta_store/index.md) package layers our own storage policy on top —
+row sort order, per-column parquet encodings, precision rounding — but that too is just
+configuration passed to the same library call.)
+
+On disk, the result looks like this (our development `power_forecasts` table):
+
+```text
+power_forecasts/
+├── _delta_log/                    ← the transaction log
+│   ├── 00000000000000000000.json
+│   ├── 00000000000000000001.json
+│   └── …
+├── experiment_name=xgboost_cv_0001/
+│   └── fold_id=mid_2025_to_mid_2026/
+│       ├── part-00000-cbb0236f-….zstd.parquet
+│       ├── part-00000-ef8aad4e-….zstd.parquet
+│       └── …
+└── …
+```
+
+Readers never touch those Parquet files directly. Opening the table is a single call —
+`DeltaTable("s3://<bucket>/power_forecasts")` — and the first thing that client does is read
+`_delta_log`. The log tells it exactly which Parquet files make up the current version of the
+table and, for each file, which partition values and value ranges it holds — so a query can
+skip irrelevant files without downloading them. A file the log doesn't mention — half-uploaded,
+or left behind by a failed write — simply doesn't exist as far as any reader is concerned. That
+log is where the atomic-publish guarantee described
+[below](#and-it-is-a-database-acid-on-object-storage) physically lives. And every tool that
+reads Delta Lake starts the same way, including Polars' `scan_delta`
+([below](#lazy-reads-query-it-dont-download-it)).
+
+If this still feels unusual, remember that *every* database is ultimately files on disk. Postgres —
+OCF's workhorse — stores each table as files of 8 kB pages in a binary format that only Postgres can
+read, and you reach them through the Postgres server process. Delta Lake is the same idea with the
+layers rearranged: the on-disk format is open and columnar, so dozens of independently developed
+tools read it directly, and the "server" role is played by object storage. In neither case does
+application code manage the files by hand.
+
+And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
+Lake; Apple, Comcast, Adobe, and Salesforce all run it at massive scale; and — closest to home —
+[NESO](https://www.neso.energy/) uses Delta Lake too. More broadly, the open-table-format family it
+belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
+Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
+share analytical data. In other words: Delta Lake the boring, battle-tested option.
+
+## Could Postgres store this data?
+
+This doc is mostly about _delivery_ of forecast data. But it's worth pausing to talk about our
+internal _storage_ of the data too.
 
 The [previous section](#how-big-is-flexpectations-power-forecast-data) put a number on where
-this is headed: V2's `power_forecasts` could reach the order of a trillion rows. Postgres — OCF's
-workhorse for everything else — is worth asking about directly: could it hold this?
+this is headed: V2's `power_forecasts` could reach the order of a trillion rows. Could Postgres — OCF's
+workhorse - hold a trillion rows?
+
+The short answer is: Technically, _yes_, Postgres can store one trillion rows. But it'd cost on the
+order of £10,000 per month just for RDS (AWS' managed Postgres service), and require a team of
+database admins, and it'd be horrifyingly slow. And, remember that we could easily require
+_multiple_ trillions of rows.
 
 | At trillion-row (V2) scale | Postgres | Delta Lake on S3 |
 |---|---|---|
@@ -211,7 +231,7 @@ where a row store loses to a columnar one, typically by 10–100×.
 Trillion-row Postgres is done in practice, via Timescale's columnar compression or Citus sharded
 across a cluster — but both mean an extension plus a distributed cluster with dedicated database
 operators, not a change to Postgres's fundamentals. Postgres can do it if you hire the team to run
-it; Delta does it without one.
+it; Delta does it without a team of database admins.
 
 **Query scaling.** Postgres's B-tree indexes give O(log n) point lookups — a trillion-row index is
 only ~6 levels deep, close to flat in theory. The practical cliff is cache residency: once the
@@ -238,24 +258,7 @@ size at all.
 **Bottom line.** A trillion rows is technically possible in Postgres with enough specialised
 extensions and operational investment. For Flexpectation's shape of problem — analytical,
 scan-heavy, growing without bound, one small team without dedicated database operators — it's the
-wrong tool by roughly two orders of magnitude on both storage cost and operational burden, and the
-Delta Lake choice already sidesteps the problem entirely.
-
-## What REST was designed for
-
-REST was named and formalised in Roy Fielding's
-[2000 PhD dissertation](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm) as
-a retrospective description of *why the web worked*: many independent clients, small
-hypermedia resources, stateless request/response over HTTP, caches in the middle. It is a
-superb architecture for exactly that — operational queries, multi-tenant products, and
-integrations where each interaction moves a small resource.
-
-What REST wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
-that press it into that role tend to find themselves re-implementing, one endpoint at a time,
-the things analytical storage formats already provide: pagination (chunked reads),
-retry-and-resume (transactional snapshots), server-side filtering (predicate pushdown), column
-selection (columnar layout), and compression. Each of those becomes a bespoke design decision
-to make, document, and maintain — and a bespoke client for NGED to write against.
+wrong tool and the Delta Lake choice already sidesteps the problem entirely.
 
 ## We _are_ delivering data over an API (but not a _REST_ API)
 
