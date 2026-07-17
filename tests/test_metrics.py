@@ -19,7 +19,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import mlflow
@@ -397,7 +397,11 @@ def _batch_forecast_frame(
         {
             "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
             "valid_time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
-            "power_fcst_init_time": pl.Series([min(times)] * n, dtype=pl.Datetime("us", "UTC")),
+            # 30 min before the earliest valid_time: the PowerForecast contract requires
+            # valid_time strictly after power_fcst_init_time.
+            "power_fcst_init_time": pl.Series(
+                [min(times) - timedelta(minutes=30)] * n, dtype=pl.Datetime("us", "UTC")
+            ),
             "ensemble_member": pl.Series([0] * n, dtype=pl.Int8),
             "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
             "power_fcst": pl.Series(power_fcst, dtype=pl.Float32),
