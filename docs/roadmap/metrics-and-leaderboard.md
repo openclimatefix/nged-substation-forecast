@@ -294,6 +294,18 @@ itself a relevant statistic (visible as the MLflow experiment count).
   candidates (that re-creates the problem); they exist to report honest skill for the chosen
   champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).
 
+**A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in
+the `metrics` asset averages each metric key over *only the folds in which that key appears*
+(`exp_metrics.setdefault(key, []).append(value)` then `sum/len` in `defs/cv_assets.py`). Today
+every fold emits the same key set, so this is invisible — but folds with *different horizon
+coverage* (one fold's forecasts stop at 36 h, another's reach day 14) would emit different
+per-horizon-slice keys, and a key like `rmse__all__extended_range` would then silently average
+over a different fold subset than `rmse__all`, with nothing marking the smaller denominator.
+Per-`time_series_type` keys have the same property if fold populations differ. When adding
+folds (the multi-fold epoch below, or the `final_test` fold), either guarantee every
+leaderboard fold emits an identical key set, or make the parent-run aggregation record its
+per-key denominator.
+
 **3. Trade-off (decide at implementation time).** This costs 3 of the 12 validation months, on
 a dataset that is already short. The alternative — accepting documented bias until
 Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is

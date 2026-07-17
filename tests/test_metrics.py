@@ -193,7 +193,8 @@ def _base_env(
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
     # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
-    # table is absent until a test materialises it, so NMAE falls back to the window P99 by default.
+    # table is absent until a test materialises it, and the metrics asset fails cleanly without it
+    # (see test_metrics_raises_without_effective_capacity).
     monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))
 
     _write_power_with_actuals(str(nged_path / "power_time_series.delta"))
