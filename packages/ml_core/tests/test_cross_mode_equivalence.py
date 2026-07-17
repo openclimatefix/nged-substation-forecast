@@ -10,8 +10,11 @@ the *same* ``_engineer_features()``, differing only in operating mode:
 This test takes a fixture spanning several **daily** NWP runs (real ECMWF ENS is issued once
 per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode with
 ``power_fcst_init_time = nwp_init_time + delay`` and asserts the rows match exactly on the
-primary key and on every requested feature column. If a future change diverges the two modes,
-this fails.
+primary key and on every requested feature column. The comparison is over **deliverable** rows
+(``valid_time > power_fcst_init_time``): bulk mode drops hindcast rows at source, while
+single-run mode keeps them for its caller to filter before predicting (as ``live_forecasts``
+does), so the replay side applies that same filter here. If a future change diverges the two
+modes, this fails.
 
 Scope note: this test exercises the **weather, time, power-lag, and weather-rolling** features.
 Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included because
@@ -69,13 +72,16 @@ _SORT_COLS = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_
 
 
 def _run_valid_times(run_init: datetime) -> list[datetime]:
-    """A non-overlapping 06:00–12:00 half-hourly window for each daily run.
+    """A non-overlapping 00:00–12:00 half-hourly window for each daily run.
 
-    Non-overlapping windows mean each (time_series_id, valid_time) appears in exactly one run,
-    which keeps the bulk and single-run row sets directly comparable.
+    Starting at the run's own init_time (like real ECMWF ENS) gives every run a full
+    ``_DELAY_HOURS`` of hindcast valid times before its derived power_fcst_init_time. Those
+    rows must feed window features (weather rolling means) as predecessors on both sides even
+    though they are dropped from the compared output. Non-overlapping windows mean each
+    (time_series_id, valid_time) appears in exactly one run, which keeps the bulk and
+    single-run row sets directly comparable.
     """
-    start = run_init + timedelta(hours=_DELAY_HOURS)
-    return [start + timedelta(minutes=30 * i) for i in range(13)]  # 06:00 .. 12:00 inclusive
+    return [run_init + timedelta(minutes=30 * i) for i in range(25)]  # 00:00 .. 12:00 inclusive
 
 
 def _power_observation_times(run_init: datetime) -> list[datetime]:
@@ -152,14 +158,37 @@ def test_bulk_and_single_run_features_are_identical() -> None:
             nwp_init_time=run,
         ).collect()
         # Keep only rows the NWP run actually covers (single-run mode is power-centric and
-        # emits null-weather rows for valid_times outside this run's window).
-        single_run_parts.append(replay.filter(pl.col("nwp_lead_time_hours").is_not_null()))
+        # emits null-weather rows for valid_times outside this run's window), and only
+        # deliverable rows (valid_time strictly after power_fcst_init_time) — single-run mode
+        # keeps history rows for the production caller to filter before predicting, whereas
+        # bulk mode drops them at source.
+        single_run_parts.append(
+            replay.filter(
+                pl.col("nwp_lead_time_hours").is_not_null()
+                & (pl.col("valid_time") > run + timedelta(hours=_DELAY_HOURS))
+            )
+        )
     single_run = pl.concat(single_run_parts)
 
-    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 13
+    # 12 of each run's 25 half-hourly steps survive: the 12 negative-lead steps and the lead-0
+    # step land at or before the derived power_fcst_init_time, and bulk mode drops those
+    # undeliverable hindcast rows after computing features on the full window.
+    assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * 12
     # Guard: the power lag must actually resolve to non-null observed values for some rows,
     # otherwise "identical" would be a vacuous all-null match on both sides.
     assert bulk["power_lag_3h"].is_not_null().any()
+    # Guard: at the first deliverable step (init + 6.5 h) the 3 h rolling window reaches back
+    # into the dropped hindcast steps. If bulk mode filtered *before* computing window
+    # features, the window would hold only the row itself and the mean would collapse to the
+    # row's own temperature — so equality with single-run alone would not catch a matched
+    # regression on both sides.
+    first_deliverable = bulk.filter(
+        (pl.col("valid_time") == _NWP_RUNS[0] + timedelta(hours=_DELAY_HOURS, minutes=30))
+        & (pl.col("ensemble_member") == 0)
+    )
+    assert first_deliverable.height == 1
+    row = first_deliverable.row(0, named=True)
+    assert row["temperature_2m_rolling_mean_3h"] != row["temperature_2m"]
     assert_frame_equal(
         bulk.select(_COMPARE_COLS).sort(_SORT_COLS),
         single_run.select(_COMPARE_COLS).sort(_SORT_COLS),

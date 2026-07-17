@@ -49,7 +49,9 @@ def _make_cv_forecasts(
 ) -> pt.DataFrame[PowerForecast]:
     n = len(times)
     if init_times is None:
-        init_times = [_utc(2022, 1, 1)] * n
+        # 30 min before the fixtures' customary first valid_time (2022-01-01 00:00): the
+        # PowerForecast contract requires valid_time strictly after power_fcst_init_time.
+        init_times = [_utc(2021, 12, 31, 23, 30)] * n
     df = pl.DataFrame(
         {
             "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
@@ -180,7 +182,7 @@ def test_compute_metrics_raises_when_series_missing_capacity():
 def test_compute_metrics_ensemble_averaging():
     """Ensemble mean should be taken before computing metrics."""
     time = _utc(2022, 1, 1, 0, 0)
-    init_time = _utc(2022, 1, 1)
+    init_time = _utc(2021, 12, 31, 23, 30)
     # Two ensemble members: forecasts 8 and 12 → ensemble mean = 10 → error = 0
     df = pl.DataFrame(
         {
@@ -301,18 +303,21 @@ def _slice_mae(result: pl.DataFrame, horizon_slice: str) -> float:
 def test_compute_metrics_horizon_slice_band_boundaries():
     """Lead times land in the correct left-closed bands, including exact boundary values.
 
-    One forecast run (single init time) with valid_times at lead times 0 h and 5.5 h
+    One forecast run (single init time) with valid_times at lead times 0.5 h and 5.5 h
     (intraday), 6 h and 35.5 h (day_ahead), 36 h and 167.5 h (short_medium_range), and
     168 h and 336 h (extended_range). Distinct errors per band make per-slice MAE reveal
-    band membership.
+    band membership. 0.5 h is the shortest deliverable lead: the PowerForecast contract
+    requires valid_time strictly after power_fcst_init_time, so lead 0 cannot occur.
     """
     init_time = _utc(2022, 1, 1)
-    leads_hours = [0.0, 5.5, 6.0, 35.5, 36.0, 167.5, 168.0, 336.0]
+    leads_hours = [0.5, 5.5, 6.0, 35.5, 36.0, 167.5, 168.0, 336.0]
     times = [init_time + timedelta(hours=h) for h in leads_hours]
     # errors: intraday 1, 2 → MAE 1.5; day_ahead 3, 4 → 3.5; smr 5, 6 → 5.5; extended 7, 8 → 7.5
     errors = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
     actuals = _make_actuals(1, times, [10.0] * len(times))
-    forecasts = _make_cv_forecasts(1, times, [10.0 + e for e in errors])
+    forecasts = _make_cv_forecasts(
+        1, times, [10.0 + e for e in errors], init_times=[init_time] * len(times)
+    )
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     assert math.isclose(_slice_mae(result, "intraday"), 1.5, rel_tol=1e-5)
     assert math.isclose(_slice_mae(result, "day_ahead"), 3.5, rel_tol=1e-5)
@@ -324,12 +329,14 @@ def test_compute_metrics_horizon_slice_band_boundaries():
 def test_compute_metrics_all_slice_is_row_weighted():
     """The "all" slice averages over every scored row, not over the per-slice metric values."""
     init_time = _utc(2022, 1, 1)
-    leads_hours = [0.0, 0.5, 5.5, 6.0, 35.5, 36.0, 168.0]
+    leads_hours = [0.5, 1.0, 5.5, 6.0, 35.5, 36.0, 168.0]
     times = [init_time + timedelta(hours=h) for h in leads_hours]
     # intraday errors 1, 2, 3 → MAE 2; day_ahead 6, 8 → 7; smr 9 → 9; extended 11 → 11.
     errors = [1.0, 2.0, 3.0, 6.0, 8.0, 9.0, 11.0]
     actuals = _make_actuals(1, times, [10.0] * len(times))
-    forecasts = _make_cv_forecasts(1, times, [10.0 + e for e in errors])
+    forecasts = _make_cv_forecasts(
+        1, times, [10.0 + e for e in errors], init_times=[init_time] * len(times)
+    )
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     # Row-weighted mean = 40/7 ≈ 5.714; the mean of the four slice MAEs would be 7.25.
     assert math.isclose(_slice_mae(result, "all"), 40.0 / 7.0, rel_tol=1e-5)
@@ -352,12 +359,33 @@ def test_compute_metrics_collapses_ensemble_per_forecast_run():
 
 
 def test_compute_metrics_negative_lead_time_raises():
-    """A valid_time before power_fcst_init_time is corrupted data and must fail loudly."""
+    """A valid_time before power_fcst_init_time is corrupted data and must fail loudly.
+
+    ``PowerForecast.validate`` rejects hindcast rows at construction, so to exercise
+    ``compute_metrics``' own defence-in-depth guard we corrupt the frame *after* validation
+    (``with_columns`` does not re-validate).
+    """
     valid_time = _utc(2022, 1, 1)
     actuals = _make_actuals(1, [valid_time], [10.0])
-    forecasts = _make_cv_forecasts(1, [valid_time], [10.0], init_times=[_utc(2022, 1, 2)])
+    forecasts = _make_cv_forecasts(1, [valid_time], [10.0]).with_columns(
+        power_fcst_init_time=pl.lit(_utc(2022, 1, 2)).cast(pl.Datetime("us", "UTC"))
+    )
     with pytest.raises(ValueError, match="negative lead time"):
         compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
+
+
+def test_power_forecast_contract_rejects_hindcast_rows():
+    """The PowerForecast contract itself refuses valid_time at or before power_fcst_init_time.
+
+    Enforced declaratively via the ``valid_time`` field's Patito constraint;
+    ``DataFrameValidationError`` is a ``ValueError`` subclass, so callers treating validation
+    failures as ``ValueError`` keep working.
+    """
+    valid_time = _utc(2022, 1, 1)
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="valid_time"):
+        _make_cv_forecasts(1, [valid_time], [10.0], init_times=[valid_time])  # lead 0
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="valid_time"):
+        _make_cv_forecasts(1, [valid_time], [10.0], init_times=[_utc(2022, 1, 2)])
 
 
 # ---------------------------------------------------------------------------

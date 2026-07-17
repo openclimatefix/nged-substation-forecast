@@ -31,6 +31,10 @@ def _join_nwp_bulk_mode(
 
     Produces one row per (time_series_id, nwp_init_time, valid_time, ensemble_member) with
     power_fcst_init_time derived per-row as nwp_init_time + nwp_publication_delay_hours.
+    Each NWP run's first nwp_publication_delay_hours of valid times therefore precede the
+    derived power_fcst_init_time; those hindcast rows are kept here so that window features
+    (e.g. weather rolling means) see the same predecessor rows as single-run mode, and are
+    dropped by ``_engineer_features`` after feature computation.
     """
     if processed_nwp is None:
         result = power_with_metadata.with_columns(

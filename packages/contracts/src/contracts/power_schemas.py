@@ -219,7 +219,15 @@ class PowerForecast(pt.Model):
 
     valid_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The target time this forecast is valid for.",
+        constraints=pl.col("valid_time") > pl.col("power_fcst_init_time"),
+        description=(
+            "The target time this forecast is valid for. Constrained to be strictly after"
+            " power_fcst_init_time: a row targeting a valid time at or before its own"
+            " initialisation is an undeliverable hindcast row — at power_fcst_init_time that"
+            " valid time is already observed. The live service only forecasts strictly future"
+            " valid times and bulk-mode feature engineering drops hindcast rows at source, so"
+            " a constraint violation here indicates a pipeline regression."
+        ),
     )
 
     time_series_id: int = _get_time_series_id_dtype()
