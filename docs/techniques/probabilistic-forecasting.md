@@ -69,7 +69,7 @@ A deterministic model (XGBoost trained with squared error learns the **condition
 pushed through 51 members captures term 1 *only*. Terms 2 and 3 are dropped entirely. The
 resulting ensemble is **under-dispersed** — systematically overconfident — and worst at short
 horizons, where term 1 shrinks toward zero while terms 2 and 3 do not. The
-[spread-skill ratio](../roadmap/metrics-and-leaderboard.md#evaluation-metrics) is the metric
+[spread-skill ratio](evaluation-metrics.md#spread-skill-ratio) is the metric
 that catches this: spread ÷ error ≪ 1 means the fan is too thin.
 
 This matters commercially, not just statistically: flexibility procurement keys off the
@@ -157,7 +157,7 @@ Mitigations, in order of practicality:
   isn't, rather than one horizon-averaged width.
 - **Train on many ensemble members, not just the control** (planned in [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)) — the model then sees "one plausible
   scenario" as its actual input distribution, which is what a member is at inference time.
-- **Measure, then correct**: check the spread-skill ratio and PICP (planned in [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)) of the *pooled* forecast per
+- **Measure, then correct**: check the [spread-skill ratio and PICP](evaluation-metrics.md#probabilistic-metrics) of the *pooled* forecast per
   horizon slice, and apply a per-horizon affine recalibration of the pooled quantiles (fit on
   the training window) only if the numbers demand it.
 
@@ -168,7 +168,8 @@ over-stated risk) is a far safer failure mode than the under-dispersion it repla
 ## How this maps onto the project
 
 - **Diagnose first**: the spread-skill / PICP / pinball / CRPS metrics that quantify all of the
-  above are Phases A–B of the
+  above are implemented — see the [evaluation-metrics reference](evaluation-metrics.md) — as
+  Phases A–B of the
   [probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 - **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C
   of the probabilistic evaluation plan](../roadmap/metrics-and-leaderboard.md#phase-c-cheap-calibration-after-b-proves-the-diagnosis)) buys calibration without any of this machinery — the full mixture pipeline must beat

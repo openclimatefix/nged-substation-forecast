@@ -7,7 +7,12 @@ from typing_extensions import Self
 
 from contracts.power_schemas import LIST_OF_TIME_SERIES_TYPES
 
-from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
+from .common import (
+    DELIVERY_QUANTILES,
+    UTC_DATETIME_DTYPE,
+    _get_time_series_id_dtype,
+    quantile_label,
+)
 
 _FEATURE_DTYPE = pt.Field(dtype=pl.Float32, allow_missing=True)
 
@@ -189,27 +194,73 @@ implemented by `ml_core.metrics`:
   stop at the 14-day NWP horizon)
 """
 
-METRIC_NAMES: Final[tuple[str, ...]] = ("mae", "nmae", "rmse", "mbe")
+METRIC_NAMES: Final[tuple[str, ...]] = (
+    "mae",
+    "nmae",
+    "rmse",
+    "mbe",
+    "crps",
+    "spread_skill_ratio",
+    "pinball_loss",
+    "mean_pinball_loss",
+    "picp",
+    "interval_width",
+)
 """Metric names currently implemented.
 
+Full definitions, equations, and design rationale:
+https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/
+
+Deterministic (scored on the per-run ensemble mean):
+
 - `"mae"`: mean absolute error (MW)
-- `"nmae"`: normalised MAE (dimensionless; normalised by mean |power|)
+- `"nmae"`: normalised MAE (dimensionless; normalised by full-history effective capacity)
 - `"rmse"`: root mean squared error (MW)
 - `"mbe"`: mean bias error (MW; positive = over-prediction)
 
-Extend as new metrics are added:
+Probabilistic (scored on the ensemble members before the mean collapse):
 
-- ensemble: `"crps"`, `"spread_skill_ratio"`;
-- quantile: `"pinball_loss"`, `"mean_pinball_loss"`;
-- calibration: `"picp"`.
+- `"crps"`: fair (finite-ensemble-unbiased) continuous ranked probability score (MW). The only
+  metric here that is comparable across models with different ensemble sizes.
+- `"spread_skill_ratio"`: Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean
+  (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
+- `"pinball_loss"`: quantile loss (MW) at the quantile named by `metric_param`.
+- `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the thirteen
+  `DELIVERY_QUANTILES` (MW). Tail-heavy by construction, matching NGED's priorities.
+- `"picp"`: prediction-interval coverage probability of the band named by `metric_param`
+  (dimensionless fraction). The calibrated reference for empirical quantiles from a finite
+  ensemble sits *below* the nominal coverage — e.g. ≈ 0.769, not 0.8, for `p10_p90` at 51
+  members.
+- `"interval_width"`: mean width (MW) of the band named by `metric_param` — the sharpness
+  companion to `"picp"` (coverage is only impressive if the band is also narrow).
 """
 
-METRIC_PARAMS: Final[tuple[str, ...]] = ("all",)
-"""Parameter values for parametric metrics (e.g. Pinball Loss at a specific quantile).
+QUANTILE_METRIC_PARAMS: Final[tuple[str, ...]] = tuple(
+    quantile_label(q) for q in DELIVERY_QUANTILES
+)
+"""`metric_param` labels for quantile-indexed metrics (pinball loss), e.g. `"p1"` … `"p99"`.
 
-- `"all"` is used for all scalar metrics with no extra parameter dimension.
-- When Pinball Loss is added, extend with `"p10"`, `"p20"`, …, `"p90"`.
-- When PICP is added, extend with `"p10_p90"`, `"p20_p80"`, etc.
+Derived from `DELIVERY_QUANTILES` so that evaluation is always scored at exactly the quantile
+levels the product delivers.
+"""
+
+BAND_METRIC_PARAMS: Final[tuple[str, ...]] = tuple(
+    f"{quantile_label(q)}_{quantile_label(1 - q)}" for q in DELIVERY_QUANTILES if q < 0.5
+)
+"""`metric_param` labels for the symmetric prediction-interval bands (PICP, interval width).
+
+One band per symmetric pair of `DELIVERY_QUANTILES`: `"p1_p99"`, `"p2_p98"`, `"p5_p95"`,
+`"p10_p90"`, `"p20_p80"`, `"p35_p65"`. Together they trace a coverage curve from the 30%
+band to the 98% band.
+"""
+
+METRIC_PARAMS: Final[tuple[str, ...]] = ("all", *QUANTILE_METRIC_PARAMS, *BAND_METRIC_PARAMS)
+"""Parameter values for parametric metrics.
+
+- `"all"`: all scalar metrics with no extra parameter dimension (MAE, NMAE, RMSE, MBE, CRPS,
+  spread-skill ratio, mean pinball loss).
+- Quantile labels (`"p1"` … `"p99"`, from `QUANTILE_METRIC_PARAMS`): pinball loss.
+- Band labels (`"p1_p99"` … `"p35_p65"`, from `BAND_METRIC_PARAMS`): PICP and interval width.
 """
 
 EVALUATION_SCOPES: Final[tuple[str, ...]] = ("leaderboard", "production_monitoring", "ad_hoc")
@@ -287,9 +338,9 @@ class Metrics(pt.Model):
         dtype=pl.Enum(METRIC_PARAMS),
         description=(
             "Extra parameter dimension for parametric metrics.  "
-            "'all' for scalar metrics (MAE, RMSE, MBE, NMAE).  "
-            "For Pinball Loss: 'p10', 'p50', etc.  "
-            "For PICP: 'p10_p90', 'p20_p80', etc."
+            "'all' for scalar metrics (MAE, NMAE, RMSE, MBE, CRPS, spread-skill ratio, mean"
+            " pinball loss).  For pinball loss: a DELIVERY_QUANTILES label ('p1' … 'p99').  "
+            "For PICP and interval width: a symmetric band label ('p1_p99' … 'p35_p65')."
         ),
     )
 

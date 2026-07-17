@@ -895,10 +895,12 @@ def _score_forecast_group(
 def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     """Compute evaluation metrics and write to ``forecast_metrics``.
 
-    Reads the filtered ``power_forecasts`` Delta, joins observed power, computes MAE/NMAE/RMSE/MBE
-    per series (via ``compute_metrics()``), enriches each row with scope and evaluation-window
-    provenance, and writes to the ``forecast_metrics`` Delta table partitioned by
-    ``(experiment_name, fold_id)``.
+    Reads the filtered ``power_forecasts`` Delta, joins observed power, computes the
+    deterministic and probabilistic metrics per series and horizon slice (via
+    ``compute_metrics()`` — see
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>),
+    enriches each row with scope and evaluation-window provenance, and writes to the
+    ``forecast_metrics`` Delta table partitioned by ``(experiment_name, fold_id)``.
 
     For ``evaluation_scope="leaderboard"``, also logs per-type + overall aggregate metrics to each
     fold's MLflow child run and the mean-across-folds aggregates to the experiment's parent run.

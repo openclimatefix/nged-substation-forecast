@@ -90,9 +90,10 @@ AWS — see [Live service](live-service.md).
 *Epic: [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6)*
 
 - Implement the ML energy forecasting "leaderboard" (cross-fold validation metrics in MLflow), ready for systematic ML experimentation ✓ (CV assets added)
-- Metrics: normalised MBE, normalised MAE, RMSE, Pinball loss, PICP, CRPS, Spread-Skill Ratio — the
-  deterministic metrics are ✅; the probabilistic ones are 🚧 (see
-  [Metrics & leaderboard](metrics-and-leaderboard.md))
+- Metrics: MBE, MAE, NMAE, RMSE, Pinball loss, PICP, interval width, CRPS, Spread-Skill Ratio —
+  all ✅ (definitions in the
+  [evaluation-metrics reference](../techniques/evaluation-metrics.md); plan and remaining 🚧
+  items in [Metrics & leaderboard](metrics-and-leaderboard.md))
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range (Day 8–14), peak events (top 5%)
 - Baseline forecasters (persistence + climatology) so leaderboard scores are interpretable
 - Production monitoring of the live service (`production_monitoring` metrics scope)
