@@ -375,11 +375,16 @@ def test_compute_metrics_negative_lead_time_raises():
 
 
 def test_power_forecast_contract_rejects_hindcast_rows():
-    """The PowerForecast contract itself refuses valid_time at or before power_fcst_init_time."""
+    """The PowerForecast contract itself refuses valid_time at or before power_fcst_init_time.
+
+    Enforced declaratively via the ``valid_time`` field's Patito constraint;
+    ``DataFrameValidationError`` is a ``ValueError`` subclass, so callers treating validation
+    failures as ``ValueError`` keep working.
+    """
     valid_time = _utc(2022, 1, 1)
-    with pytest.raises(ValueError, match="hindcast"):
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="valid_time"):
         _make_cv_forecasts(1, [valid_time], [10.0], init_times=[valid_time])  # lead 0
-    with pytest.raises(ValueError, match="hindcast"):
+    with pytest.raises(pt.exceptions.DataFrameValidationError, match="valid_time"):
         _make_cv_forecasts(1, [valid_time], [10.0], init_times=[_utc(2022, 1, 2)])
 
 

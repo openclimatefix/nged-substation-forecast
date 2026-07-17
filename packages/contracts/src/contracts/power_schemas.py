@@ -219,7 +219,15 @@ class PowerForecast(pt.Model):
 
     valid_time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="The target time this forecast is valid for.",
+        constraints=pl.col("valid_time") > pl.col("power_fcst_init_time"),
+        description=(
+            "The target time this forecast is valid for. Constrained to be strictly after"
+            " power_fcst_init_time: a row targeting a valid time at or before its own"
+            " initialisation is an undeliverable hindcast row — at power_fcst_init_time that"
+            " valid time is already observed. The live service only forecasts strictly future"
+            " valid times and bulk-mode feature engineering drops hindcast rows at source, so"
+            " a constraint violation here indicates a pipeline regression."
+        ),
     )
 
     time_series_id: int = _get_time_series_id_dtype()
@@ -304,57 +312,6 @@ class PowerForecast(pt.Model):
             "filter on this column to select the population you need."
         ),
     )
-
-    @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
-        cls,
-        dataframe: pl.DataFrame,
-        columns: Sequence[str] | None = None,
-        allow_missing_columns: bool = False,
-        allow_superfluous_columns: bool = False,
-        drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame[Self]:
-        """Validate the given dataframe, ensuring every row is a deliverable forecast.
-
-        Beyond the per-column checks, enforce ``valid_time > power_fcst_init_time`` (strictly):
-        a row targeting a valid_time at or before its own initialisation time is a hindcast row.
-        The live service never delivers one (``live_forecasts`` forecasts strictly future valid
-        times), and bulk-mode feature engineering drops them at source, so their presence here
-        indicates a pipeline regression.
-
-        Args:
-            dataframe: The Polars DataFrame to validate.
-            columns: Optional list of columns to validate against.
-            allow_missing_columns: Whether to allow missing columns.
-            allow_superfluous_columns: Whether to allow extra columns.
-            drop_superfluous_columns: Whether to drop extra columns.
-
-        Returns:
-            A validated Patito DataFrame.
-
-        Raises:
-            ValueError: If any row has ``valid_time <= power_fcst_init_time``.
-        """
-        validated_df = super().validate(
-            dataframe=dataframe,
-            columns=columns,
-            allow_missing_columns=allow_missing_columns,
-            allow_superfluous_columns=allow_superfluous_columns,
-            drop_superfluous_columns=drop_superfluous_columns,
-        )
-
-        n_hindcast: int = validated_df.select(
-            (pl.col("valid_time") <= pl.col("power_fcst_init_time")).sum()
-        ).item()
-        if n_hindcast > 0:
-            raise ValueError(
-                f"Found {n_hindcast} hindcast row(s) with valid_time <= power_fcst_init_time. "
-                "Every forecast row must target a strictly future valid_time — at "
-                "power_fcst_init_time those valid times are already observed, so such rows can "
-                "never be delivered."
-            )
-
-        return validated_df
 
 
 class EffectiveCapacity(pt.Model):
