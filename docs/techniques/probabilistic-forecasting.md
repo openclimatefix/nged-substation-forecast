@@ -76,6 +76,34 @@ This matters commercially, not just statistically: flexibility procurement keys 
 **tails** (P90+ peaks), and under-dispersion is precisely the error that makes tails look safer
 than they are.
 
+### Long horizons are not automatically safe
+
+The paragraph above reads as "term 1 shrinks toward zero at short horizons", which invites the
+opposite conclusion at day 8–14: that once weather spread is large, the fan is wide enough on
+its own. That does not follow. A wide NWP ensemble in does not guarantee an honest power fan
+out — the learned weather→power mapping's sensitivity mediates the two, and squared-error
+training damps that sensitivity in a way that grows with lead time.
+
+At day 8–14, ECMWF's individual weather trajectories are themselves close to noise: the model
+was trained on forecast weather as its input, and at long lead times that input is wrong by a
+large, lead-time-dependent amount. Squared-error training responds to noisy inputs by hedging
+toward the mean — attenuating the fitted weather→power sensitivity — and today's model fits one
+sensitivity across all lead times rather than a per-horizon one, because it has no feature that
+tells it how trustworthy the weather input is. The result at day 8–14 can be a fan that is
+merely *wide-looking*: large NWP spread pushed through a damped, horizon-blind sensitivity, with
+the dropped term-2 residual (which is largest exactly where the weather input is least
+trustworthy) never added back in. Wide input spread and honest output spread are not the same
+claim, and only the shipped [spread-skill ratio and PICP](evaluation-metrics.md#probabilistic-metrics)
+computed per horizon slice can tell them apart — don't assume `extended_range` is calibrated
+just because `intraday` is under-dispersed and `extended_range`'s members have visibly fanned
+out.
+
+This is a second, independent reason (beyond the double-counting caveat below) to give the model
+`nwp_lead_time_hours` as a feature ([#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230)):
+it is not only a double-counting mitigation, it is what lets the model learn *how much* to
+attenuate its weather sensitivity per horizon, instead of applying one horizon-averaged
+compromise everywhere.
+
 ## The fix, formally: a mixture of conditional distributions
 
 Ask the model for a full conditional distribution per member — "the distribution of power
