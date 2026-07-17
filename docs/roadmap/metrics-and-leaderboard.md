@@ -220,6 +220,11 @@ seasonal/time-of-day distribution of power, with no recency and no weather, whic
   Only a quantile/ensemble climatology answers that, via `crps__all__extended_range` head-to-head
   against the ML models. Like `nged_incumbent`, this baseline owns its own member axis (see the
   `uses_nwp_ensemble` flag in item 5) — it must not be broadcast across the 51 NWP members.
+- **Follow-up once this ships:** overlay the climatology forecast as an always-on reference band
+  in the `view_forecasts` dashboard, so the weather-driven fan can be read against the
+  calendar-only skill floor by eye — the visual twin of the `crps__all__extended_range`
+  comparison above ([#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354),
+  blocked by this work).
 
 **5. Configs and registration.**
 
