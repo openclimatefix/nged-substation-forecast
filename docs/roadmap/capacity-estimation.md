@@ -428,6 +428,17 @@ v0.7, but v2 physics *forecasting* of PV needs a differentiable GHI → DNI/DHI 
 model (or `fdir` added to the upstream dataset). See
 [data sources](data-sources.md#weather-data).
 
+> **Design caveat — should ERA5 stay offline?** Feeding ERA5 into the *live* system adds a new
+> near-real-time data dependency: another external feed to ingest on a daily-ish cadence, monitor,
+> and recover when it lags. Because effective capacity moves slowly (daily blocks), a tempting
+> alternative is to run the ERA5-based capacity estimation **offline** on a periodic job that
+> refreshes the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table, and
+> keep the **production forecast path dependent only on ECMWF ENS** (plus the power feed) — no new
+> real-time dependency, and the live forecast just reads the slowly-updated capacity table. The
+> cost is that ECMWF-only would almost certainly give a slightly *worse* capacity estimate than
+> ERA5 would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
+> [live-service cadence](live-service.md#workload-model).
+
 ## What comes after v0.7
 
 Once the metered assets are accurately tracked, the harder v2 goal — disaggregating the

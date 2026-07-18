@@ -506,13 +506,18 @@ the archive is nowhere near that yet, so ERA5 wins in practice.
 **Storage and ingestion — an H3-indexed Delta table built by a Dagster asset.** Store the
 climatology the way the rest of the project stores gridded weather: an **H3-indexed Delta table**
 keyed by `(h3_index, day_of_year, half_hour_of_day)` with a mean and standard-deviation column
-per weather variable — not a bespoke Zarr. Populate it with a **Dagster asset** that ingests ERA5
-into a Delta table (the same shape as the `ecmwf_ens` NWP ingest) plus a downstream asset that
-reduces it to the smoothed μ,σ grid, fitting each as a smooth function of day-of-year and
-half-hour-of-day (a low-order harmonic fit or a ±15-day rolling window, because a raw
-per-calendar-day climatology is noisy even from 30 years of data). This is the new-ingestion
-dependency that places the item late in the tier: no ERA5 source exists yet, so it wants an entry
-on the [data-sources roadmap](data-sources.md) first.
+per weather variable — not a bespoke Zarr. The **mean** grid need not be built from scratch:
+Google's **WeatherBench2** publishes a precomputed ERA5 climatology
+(`gs://weatherbench2/datasets/era5-hourly-climatology/`) — the smoothed mean by day-of-year and
+6-hour, over 1990–2019 with a 61-day window, at ERA5's native 0.25° — so μ can start from that
+(regridded to our H3 cells and interpolated from 6-hourly to half-hourly), leaving only **σ** for
+us to compute over the same window (WeatherBench2 stores means only, no standard deviation). The
+alternative is a single **Dagster asset** that ingests ERA5 (the same shape as the `ecmwf_ens` NWP
+ingest, now on the [data-sources roadmap](data-sources.md#weather-data)) and reduces it to both μ
+and σ in one pass, fitting each as a smooth function of day-of-year and half-hour-of-day (a
+low-order harmonic fit or a ±15-day rolling window, because a raw per-calendar-day climatology is
+noisy even from 30 years of data). Either way the ERA5 ingest is the dependency that places this
+item late in the tier.
 
 Be precise about the update cadence, though — it is *not* near-real-time. A 30-year climatology
 is slowly varying, so the reducing asset recomputes only when a fresh chunk of ERA5 lands

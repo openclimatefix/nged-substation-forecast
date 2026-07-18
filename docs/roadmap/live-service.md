@@ -175,7 +175,10 @@ alternatives' costs.
 
 Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 4/day,
 `live_forecasts` 4/day (6-hourly partitions), the monitoring `metrics(production_monitoring)`
-step ~4/day → **~13 materialisations/day ≈ 395/month**. A backtest experiment today is ~4–6
+step ~4/day → **~13 materialisations/day ≈ 395/month**. This cadence ingests only ECMWF ENS and
+the NGED power feed today; a near-real-time ERA5/ERA5T ingest would join it *only if* live capacity
+estimation is made to depend on ERA5 — a new external dependency we may prefer to avoid by
+[keeping ERA5 offline](capacity-estimation.md#irradiance-inputs). A backtest experiment today is ~4–6
 materialisations (`eligible_time_series` + `trained_cv_model` + `cv_power_forecasts` per
 fold, plus `metrics`; single leaderboard fold), rising to ~15–20 under the future
 multi-yearly-fold epoch.
