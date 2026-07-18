@@ -70,12 +70,80 @@ Every series currently gets 500 trees at lr 0.05, whether it has 15 months of cl
 with `early_stopping_rounds`, and each booster right-sizes itself — removing a silent
 per-series over/underfit and making every later experiment cleaner. Related one-line
 experiment: **recency sample weights** (exponentially decaying with sample age) to track drift
-from new connections. Note the overlap with item 10, whose remaining value at 3–10 days is
+from new connections. Note the overlap with item 11, whose remaining value at 3–10 days is
 also mostly drift-tracking — whichever lands second should expect a smaller measured win.
+
+### 5. Aligned lagged weather — the single-stage ablation control for item 13
+
+For each power lag the model already receives, also feed it the *weather at that same lagged
+time* (e.g. `temperature_2m_lag_48h` beside the 48 h power lag). This is pure config —
+`LagFeature.base_col` already accepts weather variables — and lagged *datetime* adds nothing
+new (it is deterministic given the target's datetime features and the fixed lag offset), so
+aligned weather is the only genuinely new information. In principle the booster can then judge
+how *normal* each lagged power value is — power at the lagged time relative to what the weather
+then would predict — which is exactly the anomaly signal that
+[item 13](#13-residual-lag-features-from-the-switching-detector-baseline) engineers explicitly
+with a two-stage residual pipeline (the
+[full design](switching-events.md#residual-lag-features-a-complementary-forecaster-experiment)
+lives on the switching-events page). Feature engineering never adds information, only inductive
+bias — so whether the explicit two-stage version is worth its machinery is an empirical
+question, and this config-only variant is the cheap way to start answering it.
+
+**Pros, relative to the two-stage residual pipeline:**
+
+- **Almost free.** A config change: no two-pass pipeline, no per-fold baseline training, no
+  dependency on the central NWP analysis-proxy function
+  ([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)).
+- **No fold-hygiene leakage risk.** The two-stage design's subtlest failure mode — a baseline
+  trained on data that overlaps the evaluation fold — cannot occur, because there is no
+  baseline model.
+- **End-to-end optimisation.** The booster extracts whatever notion of "anomaly" actually helps
+  the forecast objective, rather than the one a residual definition pre-commits to (median
+  residual, a particular normalisation); no stage-1 bias is frozen into a feature.
+
+**Cons — why we expect it to learn a much cruder "how normal is this lag" signal:**
+
+- **Trees are structurally bad at subtraction.** XGBoost splits axis-parallel on single
+  features, and differences or ratios of continuous inputs are notoriously hard for trees to
+  represent. Using "power relative to expectation" here means approximating the whole
+  weather → power baseline *inside interactions with* the lagged power — the expensive kind of
+  structure for a gradient-boosted tree — whereas the two-stage residual hands the model that
+  comparison precomputed as a single number.
+- **The per-series data regime is small.** One booster per series sees on the order of
+  10⁴–10⁵ training rows — not the regime in which a tree ensemble reliably discovers a
+  multi-variable implicit baseline within interactions.
+- **The training signal for the implicit baseline is weak.** The two-stage design learns
+  weather → power as a *nowcast*, where every row's target is the concurrent power. Here the
+  same function must be learned only through its indirect effect on predicting *future* power,
+  where the anomaly signal matters strongly on only the ~10% of switching-affected rows.
+- **Feature-count explosion — worst for neighbours.** Each power lag brings roughly a dozen
+  aligned weather columns; that is tolerable for the self-series, but the conservation
+  fingerprint that item 13's neighbour variant targets would need each *neighbour's* lagged
+  power plus each neighbour's lagged weather (a different H3 cell per neighbour), per
+  neighbour — an order of magnitude more columns diluting split gain on small per-series
+  datasets. The two-stage design collapses every neighbour to one normalised residual, or the
+  whole neighbourhood to a single sum.
+- **No normalisation for free.** The two-stage baseline's quantile spread expresses each
+  residual in units of that series' usual wobble at that kind of moment; the single-stage model
+  must learn that heteroscedasticity implicitly as well.
+- **No reusable artifact.** The two-stage baseline *is* the v0.6 switching-detector baseline —
+  the same fitted model feeds the changepoint detector, the sensitivity floor, and the residual
+  features. This variant produces nothing inspectable: no residual series to plot, changepoint,
+  or hand to the detector; its notion of normality is buried in split structure.
+
+**Sequencing: run this before item 13, as its ablation control.** Its measured result bounds
+how much anomaly signal a tabular learner extracts *unaided*, so item 13's later comparison —
+"residual features beat aligned raw features by X" — cleanly isolates the value of the explicit
+baseline instead of conflating it with "the model finally saw lagged weather at all". And if
+this variant already captures most of the gain, that is a cheap and important discovery to make
+*before* anyone builds the two-pass machinery. Expect the direct win to be modest and
+concentrated at short horizons, though: the anomaly reading only exists where the power lag
+itself is non-null (lead time < lag), the same nullification limit item 13 notes for its
+valid-time-anchored variant.
 
 ## Tier 2 — cheap feature engineering (about a day each)
 
-### 5. Per-`time_series_type` feature lists
+### 6. Per-`time_series_type` feature lists
 
 Issues: [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201),
 [#107](https://github.com/openclimatefix/nged-substation-forecast/issues/107)
@@ -91,10 +159,10 @@ features exist. Same logic, more mildly, for PV.
 Mechanics: YAML gains `selected_features_by_type: {type: [...]}` with the existing
 `selected_features` as the default for unlisted types. Boosters are already per-series, so
 each can resolve its series' type (in `AllFeatures`) to a feature list at train/predict time;
-persist the mapping in `meta.json`. The value compounds as items 2 and 6–9 diverge the useful
+persist the mapping in `meta.json`. The value compounds as items 2 and 7–10 diverge the useful
 per-type sets (solar features for PV, turbine features for wind, holidays for demand).
 
-### 6. Training-data hygiene, the cheap version
+### 7. Training-data hygiene, the cheap version
 
 Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively
 teaches the model wrong targets *today* (quality issues are ~10%+ of some series). Cheap
@@ -103,7 +171,7 @@ interim: drop training rows whose target sits inside a detected stuck window (ro
 Cleaning only the *training* target is much lower-risk than cleaning delivered data, and it
 protects every subsequent experiment from learning artefacts.
 
-### 7. Effective (smoothed) temperature and degree-day features
+### 8. Effective (smoothed) temperature and degree-day features
 
 GB demand responds to *lagged* temperature (building thermal inertia), not instantaneous —
 National Grid's demand models use an exponentially-smoothed "effective temperature". Add an
@@ -111,7 +179,7 @@ EWM of `temperature_2m` over the past ~1–3 days (computed from the NWP traject
 horizon-safe) plus heating-degree `max(15.5 − T, 0)`. Linearises the demand–temperature
 relationship the same way item 8 does for generation.
 
-### 8. Linearised physics features for solar and wind
+### 9. Linearised physics features for solar and wind
 
 Issue: [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)
 
@@ -190,7 +258,7 @@ PV sites — and for MVA-metered substations whose readings bounce off zero from
   `wind_speed_100m` stays in the feature list. What the proxy must get right is the
   saturation at rated and the two dead zones — the parts trees can't build from raw speed.
   (Large errors in the steep ramp region are dominated by NWP speed error amplified by the
-  physics' own $dP/dv$ — no closed form removes that; item 15 is what addresses it.)
+  physics' own $dP/dv$ — no closed form removes that; item 16 is what addresses it.)
 
 Implement stage (c) as derived-feature names in `_parsed_features.py` — same pattern as the
 existing `windchill` feature. That pattern gives the correct order of operations for free:
@@ -203,18 +271,18 @@ half-hourly solar features sharp. The same principle already holds for wind: int
 smooth variable (speed), then apply the nonlinear power curve.
 
 Expect the win to concentrate in the PV and wind `time_series_type` slices; pairs with the
-per-type feature lists of item 5.
+per-type feature lists of item 6.
 
-### 9. Monotone constraints for the generation models
+### 10. Monotone constraints for the generation models
 
 XGBoost's `monotone_constraints`: PV power non-decreasing in irradiance, wind power monotone
 in speed below rated. Mostly buys sane extrapolation in weather regimes the training year
 never saw — precisely the failure mode of a single-fold training set. A config-field addition
-once item 8's features exist.
+once item 9's features exist.
 
 ## Tier 3 — new feature machinery (days)
 
-### 10. Init-time-anchored features (current-level anchor; prerequisite for item 16)
+### 11. Init-time-anchored features (current-level anchor; prerequisite for item 17)
 
 All current power lags are anchored to `valid_time` and nullified when lag ≤ lead time — so at
 a 7-day horizon every lag under 168 h is null, and at 14 days the model has almost no
@@ -231,18 +299,18 @@ level anomalies — and demand-anomaly autocorrelation at 7 days is modest. The 
 at day 0–2, where these features largely subsume "blend with persistence" (XGBoost learns the
 blend itself once it has the anchor) — outside the primary user band. They also overlap the
 recency sample weights of item 4; whichever lands second should expect a smaller measured win.
-Where they become *structurally essential* is the global model (item 16), whose booster cannot
+Where they become *structurally essential* is the global model (item 17), whose booster cannot
 bake in per-series level. So: a moderate expected win now, and a hard prerequisite later.
 **Must ship with a leakage test** in the spirit of the existing `_nullify_leaky_lags` tests
 before it's trusted.
 
-### 11. Neighbouring-H3-cell weather context
+### 12. Neighbouring-H3-cell weather context
 
 Each series currently gets its nearest NWP cell only. Add the mean and gradient across the
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
 expected gain, cheap given the `geo` H3 machinery exists.
 
-### 12. Residual lag features from the switching-detector baseline
+### 13. Residual lag features from the switching-detector baseline
 
 The full design and caveats live in the switching-events roadmap:
 [Residual lag features — a complementary forecaster experiment](switching-events.md#residual-lag-features-a-complementary-forecaster-experiment).
@@ -252,15 +320,20 @@ features only and a quantile objective), then feed the production model normalis
 the model how *normal* each recent observation is, so it can carry a sustained switching-event
 offset forward instead of blending it into weather-driven variation.
 
-Two scheduling notes specific to this page:
+Three scheduling notes specific to this page:
 
-- **The highest-value variant pairs with item 10.** Valid-time-anchored residual lags obey the
+- **Run [item 5](#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
+  first.** The config-only single-stage variant — aligned lagged-weather features, letting the
+  booster judge each lag's normality without an explicit baseline — is this item's ablation
+  control: its measured result is the bar the residual features must clear for the two-stage
+  machinery to be worth building.
+- **The highest-value variant pairs with item 11.** Valid-time-anchored residual lags obey the
   same nullification as raw power lags (any lag ≤ lead time is null), so in the 3–10 day band
   only residuals several days old survive — while the freshest, most informative residual is
   the one from just before forecast time. The strongest form is therefore *init-time-anchored*
   residual features ("normalised residual just before forecast time", "mean residual over the
   24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
-  signal that item 10's raw anchors mix in with ordinary weather-driven level variation.
+  signal that item 11's raw anchors mix in with ordinary weather-driven level variation.
 - **It costs more than a config change.** The two-pass pipeline (fit the baseline per CV fold
   on that fold's training period only, hindcast residuals over history, join them in as
   features) is new machinery — the hindcast leg should consume the central NWP analysis-proxy
@@ -280,7 +353,7 @@ Two scheduling notes specific to this page:
 
 ## Tier 4 — structural model changes (weeks)
 
-### 13. Per-horizon-window models
+### 14. Per-horizon-window models
 
 Issue: [#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149)
 
@@ -292,15 +365,15 @@ interesting experiment is narrower than "many windows": does a dedicated ~3–10
 the lead-time feature *in that band*? Compare against item 1 first — if the lead-time feature
 captures most of the benefit, the extra model count may not pay.
 
-### 14. Batched training via `xgb.DataIter` (enabler)
+### 15. Batched training via `xgb.DataIter` (enabler)
 
 Issue: [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91)
 
 Issue #91 already contains a complete, validated implementation design (`LazyFrameBatchIter` +
 `QuantileDMatrix`, grouping-agnostic, no temp disk, `train_batch_size` config field) — treat
-the issue body as the plan and implement as written. No direct skill gain; unblocks 15 and 16.
+the issue body as the plan and implement as written. No direct skill gain; unblocks 16 and 17.
 
-### 15. Train on more ensemble members (after 14)
+### 16. Train on more ensemble members (after 15)
 
 Issue: [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)
 
@@ -311,14 +384,14 @@ also teaches the model the member-spread input distribution it actually sees at 
 the train/serve input-skew flagged in the review. That skew grows with lead time: by day 7–10
 the control member is an increasingly unrepresentative sample of the ensemble, so the value of
 this item concentrates precisely in the primary user band — worth remembering when deciding
-how soon to invest in item 14. Ensemble *calibration* itself belongs to
+how soon to invest in item 15. Ensemble *calibration* itself belongs to
 [probabilistic evaluation](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
 Member training is also one of the
 [double-counting mitigations](../techniques/probabilistic-forecasting.md#caveat-double-counting-weather-uncertainty)
 for the Phase-D quantile-ensemble pipeline — a second reason to land it, alongside this item
 and item 1 (the lead-time feature), before or with the quantile model family.
 
-### 16. Global model per `time_series_type`
+### 17. Global model per `time_series_type`
 
 Issue: [#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104)
 
@@ -328,8 +401,8 @@ prerequisite: per-series target normalisation** — a global booster mixing a 20
 5 MW solar farm needs `power / effective_capacity_mw` targets (the `effective_capacity` asset
 exists) with the inverse transform at predict time, plus static per-series features (capacity,
 type, lat/lon) so the booster can tell sites apart — plus the init-time-anchored features of
-item 10, which supply the current-level signal a global booster cannot bake in per series.
-Needs item 14 at ensemble scale. The boundary of "quick".
+item 11, which supply the current-level signal a global booster cannot bake in per series.
+Needs item 15 at ensemble scale. The boundary of "quick".
 
 ## Explicitly deferred (not quick, or not skill)
 

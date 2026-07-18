@@ -328,8 +328,13 @@ The natural slot is immediately after implementation step 2 below (the baseline)
 cross-validation experiment; its result also doubles as evidence of the baseline's quality. So
 that it gets scheduled alongside the other forecaster experiments, it is also tracked on the
 XGBoost quick-wins backlog as
-[item 12](xgboost-improvements.md#12-residual-lag-features-from-the-switching-detector-baseline),
+[item 13](xgboost-improvements.md#13-residual-lag-features-from-the-switching-detector-baseline),
 where the horizon-band and init-time-anchoring interactions specific to that page are noted.
+Before any of that machinery is built, its config-only *single-stage* cousin should run first
+as the ablation control:
+[aligned lagged-weather features](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
+(quick-wins item 5), which lets the booster judge each lag's normality without an explicit
+baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
 #### v0.6.1 — the joint edge-flow estimator
 
