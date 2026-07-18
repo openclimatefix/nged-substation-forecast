@@ -69,13 +69,18 @@ For each substation, form an expected-power baseline that is a function of **exo
 **Why the baseline must be weather/calendar-based and *not* a lagged-power baseline.** A tempting cheap baseline is "same half-hour last week." It is unsound here, and disqualified. If last week sat in a switching event and this week is normal (or vice versa), the residual shows a step of the same magnitude and shape as a real event — but with the **sign reversed**, because the contamination is in the *reference*, not the observation. Stage 2's balance attribution would then hunt for donor rises coincident with a source drop that is a baseline artifact, manufacturing phantom events and mis-attributing them. Worse, because switching events can persist for days to months, a lag can land *inside the same ongoing event*, so there is no step at all and a real event is masked entirely. Weather and clock time are unaffected by network topology, so a baseline built only from them cannot be contaminated by switching state — the residual then isolates "power the weather and clock don't explain," which is exactly where a topology change appears, with no comparison period to poison.
 
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
-production forecaster already consumes exactly the covariates the baseline needs — NWP weather,
-time-of-day, day-of-week, holidays — through the existing feature pipeline. Configuring it with
-**no power-lag features** yields the switching-independent baseline with no new machinery (a lag
-feature would smuggle the lagged-power contamination above back in through the side door). Fit
-with a **quantile (median) objective**, which doubles as the robust loss required below; fitting
-additional quantiles (e.g. 10%/90%) gives a per-series, per-time spread estimate for free — used
-by the normalisation step below.
+production forecaster already consumes most of the covariates the baseline needs — NWP weather,
+time-of-day, day-of-week (holiday flags are a
+[planned quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features)) — through the
+existing feature pipeline. Configuring it with **no power-lag features** yields the
+switching-independent baseline (a lag feature would smuggle the lagged-power contamination above
+back in through the side door). Fit with a **quantile (median) objective**, which doubles as the
+robust loss required below; fitting additional quantiles (e.g. 10%/90%) gives a per-series,
+per-time spread estimate for free — used by the normalisation step below. That quantile fit is
+the one piece of genuinely new machinery here: the forecaster has no quantile-objective support
+today, so the baseline depends on the
+[quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
+landing first.
 
 **Three residual-contamination routes to handle:**
 
