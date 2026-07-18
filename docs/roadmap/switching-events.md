@@ -82,9 +82,46 @@ today, so the baseline depends on the
 [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
 landing first.
 
+**What "normal" means for demand-driven series — the behavioural calendar.** For weather-driven
+series (PV, wind), "normal for this weather at this time of day" is well-defined and the
+covariates above capture it. For demand-driven series, "normal" also depends on human behaviour,
+and the baseline is only as good as its calendar features. The saving grace is that the baseline
+is a supervised *model*, not an empirical climatology: it pools across days whose feature vectors
+look alike (all Mondays in May borrow strength from each other automatically), so the fiddly
+question "which days count as similar?" reduces to "is the calendar encoding rich enough?". The
+sharp cases are the days a day-of-year feature structurally cannot represent:
+
+- **Movable feasts.** Easter wanders across roughly five weeks of the calendar (late March to
+  late April), so its behavioural signature smears into "normal spring" unless an explicit
+  holiday feature marks it. The bridge days around bank holidays and the Christmas–New Year
+  "run of Sundays" are milder versions of the same problem, and school half-terms vary by
+  county across NGED's licence areas.
+- **Major broadcast events.** England playing in the later stages of a Football World Cup
+  shifts and synchronises evening demand (including the classic half-time TV-pickup surge).
+  Unlike bank holidays these are not knowable years ahead — but the stage-1 baseline is a
+  *hindcast*, so for detection purposes past events are perfectly known and a simple dated
+  event list suffices. (The production *forecaster* is different: at a 3–10 day horizon,
+  whether England will still be in the tournament may be genuinely unknown at forecast time —
+  see the [holiday quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features).)
+
+An unmodelled behavioural day surfaces as a coherent residual excursion that the changepoint
+detector can flag as a phantom switching event. Two things keep this manageable. First, the
+failure has a distinctive shape: a holiday miss hits many demand-driven series *simultaneously
+and with the same sign*, whereas a real switching event is localised and balance-conserving, so
+stage 2's neighbourhood-sum check discriminates the two. Second, the fix must come from the
+feature side — richer holiday encodings (the
+[planned quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features)) and, at V2
+scale, cross-series pooling (a
+[global model](xgboost-improvements.md#17-global-model-per-time_series_type) sees dozens of
+Easters where a per-series model sees about three) — and **never** from trailing same-weekday
+power averages, however naturally they express "recent similar days": they would smuggle the
+lagged-power contamination above back in through the side door, absorbing a persistent switching
+event into "expected" within a few weeks and blinding the detector to exactly the events it
+exists to find.
+
 **Three residual-contamination routes to handle:**
 
-- *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data.
+- *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data. In **v1 we also hold NGED's logged switching events**, which enables the cleanest option of all: train the baseline with labelled event periods excluded. Labels will not exist beyond the trial area, so v1 should run this as a *pair* of experiments — the stage-1 baseline trained **with and without** labelled-event exclusion. The measured gap between the two is exactly the contamination penalty that the robust fit fails to absorb, i.e. the price the label-free V2 fleet will pay — cheap to measure now, impossible to measure later.
 - *Persistent events.* A months-long ARA appears as a residual level shift that *stays* shifted, not a transient. The changepoint detector handles this (it catches the onset step), but the baseline must **not** be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.
 - *Seasonal-maintenance confounding.* Planned switching is not uniform through the year — outages
   cluster in maintenance seasons. A flexible time-of-year covariate fitted on contaminated history

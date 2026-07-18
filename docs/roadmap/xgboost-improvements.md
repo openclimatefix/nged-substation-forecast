@@ -56,6 +56,20 @@ Add `is_bank_holiday`, `is_day_before_holiday`, `is_day_after_holiday`, and a
 Christmas-proximity feature. Fully forecastable at any horizon — squarely in the 3–10 day
 band, which is why it sits this high.
 
+This item also double-serves as the covariate set of the v0.6 switching detector's
+[stage-1 baseline](switching-events.md#stage-1-per-series-weathercalendar-baseline-then-detect-changepoints-on-the-residual),
+which raises the bar on encoding: the detector consumes the baseline's residuals raw, so an
+unmodelled behavioural day becomes a phantom event candidate. Prefer encodings that generalise
+across sparse examples — a days-to-nearest-holiday feature and a holiday-name categorical
+rather than a lone `is_bank_holiday` flag — and cover the days a day-of-year feature
+structurally cannot represent: Easter (which wanders across roughly five weeks of the
+calendar), regional school half-terms, and major broadcast events such as England playing in
+the later stages of a Football World Cup. Sporting fixtures carry a forecastability asymmetry
+the bank holidays do not: they are known perfectly in hindsight (fine for the detector's
+hindcast baseline), but at a 3–10 day horizon whether England will still be in the tournament
+may be unknown at forecast time, so the forward-forecast version needs either a
+"possible England match" encoding or an acceptance of that uncertainty.
+
 ### 3. Raw ordinal time features alongside sin/cos
 
 Trees split axis-parallel: isolating "evening peak" from sin/cos pairs takes multiple awkward
@@ -78,7 +92,8 @@ also mostly drift-tracking — whichever lands second should expect a smaller me
 For each power lag the model already receives, also feed it the *weather at that same lagged
 time* (e.g. `temperature_2m_lag_48h` beside the 48 h power lag). This is pure config —
 `LagFeature.base_col` already accepts weather variables — and lagged *datetime* adds nothing
-new (it is deterministic given the target's datetime features and the fixed lag offset), so
+new (it is deterministic given the target's datetime features and the fixed lag offset; the
+same holds for holiday flags at the lag time once item 2 lands), so
 aligned weather is the only genuinely new information. In principle the booster can then judge
 how *normal* each lagged power value is — power at the lagged time relative to what the weather
 then would predict — which is exactly the anomaly signal that
