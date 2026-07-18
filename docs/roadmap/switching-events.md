@@ -1,6 +1,6 @@
 # Estimating Latent Demand Under Switching Events — Approach & Implementation Roadmap
 
-**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement* (the demand that would be metered if the network were never reconfigured) — given that the network is in fact reconfigured roughly 10% of the time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches (v0.6 → v2.5 → v2.6).
+**Scope.** How to make each NGED primary substation's forecast robust to switching events — and, further out, how to reconstruct its *latent demand under the normal running arrangement* (the demand that would be metered if the network were never reconfigured) — given that the network is in fact reconfigured roughly 10% of the time by switching events. The nearest-term approach is a switching-robust forecaster; the latent-demand reconstruction is later research. Background on what switching events are and why they are hard is at [**Switching Events**](../background/switching-events.md). This document defines the ordered set of approaches, from the v0.6 forecaster and detector to the later v2-scale mixture models.
 
 > **Status: 🔬 Research / 🚧 Planned.** Epic:
 > [#151](https://github.com/openclimatefix/nged-substation-forecast/issues/151) (the v0.6
@@ -11,8 +11,8 @@
 > [`substation_switching`](delivery-tables.md#table-5-substation_switching) table and the
 > training-data mask — is an open question governed by
 > [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector); the
-> v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is
-> not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
+> two v2-scale mixture models are later research. The post-v2.0 roadmap is
+> not yet fully specified, so read those two as "some time after v2.0". See the
 > [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
 > **canonical** treatment of switching events — it supersedes an earlier "switching state-space
 > model" sketch (see the retirement note in
@@ -22,7 +22,7 @@
 
 ## The approaches
 
-The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline; the later **v2.5** and **v2.6** approaches are aligned with those codebase versions. Each approach states its motivation, what it adds, what it misses, and its trade-offs. (We haven't fully specified the roadmap _after_ v2, so read "v2.x" as just meaning "some time after v2 is operational".) Escalation from a simpler approach to a heavier one must be justified by *measured residual structure the simpler one leaves behind*, not by anticipation — this keeps effort matched to demonstrated need, and it is the same principle [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) applies to our own plan.
+The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline; two later approaches reconstruct latent demand at v2 scale, once v2.0 is operational. Each approach states its motivation, what it adds, what it misses, and its trade-offs. (We haven't fully specified the roadmap _after_ v2, so read anything "at v2 scale" as just meaning "some time after v2 is operational".) Escalation from a simpler approach to a heavier one must be justified by *measured residual structure the simpler one leaves behind*, not by anticipation — this keeps effort matched to demonstrated need, and it is the same principle [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) applies to our own plan.
 
 ### Overview and ordering
 
@@ -46,28 +46,29 @@ is the raw material every approach below consumes. On top of that baseline we wi
 governs how far down that list we go. The v1 priority is forecast skill, so the two-stage
 forecaster leads and the explicit-detector approaches are pursued behind it — kept designed, built
 as forecast skill and NGED's needs justify. Two further approaches sit further out as later
-research, aligned with those codebase versions: the
-[magnitude-only mixture model](#v25-magnitude-only-mixture-model-the-workhorse) at **v2.5** and the
-[type-resolved mixture](#v26-type-resolved-mixture-with-differentiable-physics-modules) at
-**v2.6**.
+research, built at **v2 scale once v2.0 is operational**, and numbered to continue the ordering:
+approach 4, the
+[magnitude-only mixture model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) (the
+workhorse), then approach 5, the
+[type-resolved mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules).
 
-We deliberately do **not** pin each v0.6 approach to a specific v0.6.x patch version: the ordering
-above is the commitment, not the numbering. (v0.6.1, for instance, may well be a bug-fix of the
-two-stage forecaster rather than the next approach.)
+We deliberately do **not** pin any approach to a specific patch version — neither the v0.6
+approaches to a v0.6.x nor the v2-scale approaches to a v2.x. The ordering above is the commitment,
+not the numbering. (v0.6.1, for instance, may well be a bug-fix of the two-stage forecaster rather
+than the next approach.)
 
 ```text
-v0.6  ── One shared baseline (weather/calendar expected power), then, in order:
-  │       1. The two-stage forecaster — switching-robust forecasting; handles switching
-  │          implicitly; the v0.6.0 target. No event table.
-  │       2. The staged statistical detector — explicit events, ARA mask, sensitivity floor.
-  │       3. The joint edge-flow estimator — detection + attribution in one convex solve.
-  │       How far past (1) we build is set by the decision point, not fixed in advance.
+v0.6 scale ── One shared baseline (weather/calendar expected power), then, in order:
+  │            1. The two-stage forecaster — switching-robust forecasting; handles switching
+  │               implicitly; the v0.6.0 target. No event table.
+  │            2. The staged statistical detector — explicit events, ARA mask, sensitivity floor.
+  │            3. The joint edge-flow estimator — detection + attribution in one convex solve.
+  │            How far past (1) we build is set by the decision point, not fixed in advance.
   │
-v2.5  ── Magnitude-only mixture model. The workhorse.
-  │       Reconstructs latent NRA demand per substation. Fully unsupervised.
-  │
-v2.6  ── Type-resolved mixture with differentiable PV/wind/demand modules.
-          Lets a switching event move proportionally more PV than load.
+v2 scale   ── Reconstruct latent NRA demand per substation, after v2.0 is operational:
+  │            4. Magnitude-only mixture model. The workhorse. Fully unsupervised.
+  │            5. Type-resolved mixture with differentiable PV/wind/demand modules —
+                  lets a switching event move proportionally more PV than load.
 ```
 
 ---
@@ -312,7 +313,7 @@ Issues: [#117](https://github.com/openclimatefix/nged-substation-forecast/issues
 
 **Motivation.** Before any reconstruction model, we need to (a) flag/mask switching-affected periods so they stop poisoning forecasting training data; (b) produce an evaluation set to validate heavier models later; and (c) — critically — *quantify how well switching events can be detected from power data at all*, since at scale that is the only signal available.
 
-**The graph is a data structure, not a learned model.** A switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so a drop at $A$ and rises at $B$ and $C$ are the *same power moving* — and that is the one fact a per-series model is blind to. We encode it with a **graph**: nodes are substations, edges join substations that can exchange load. Nothing is learned along the edges; the graph is a fixed map of "who can exchange load with whom," used only to prune an otherwise $N \times N$ search down to each node's handful of real neighbours. Attribution (stage 2 below) is its first real use, and v2.5's mixing sparsity and v2.6's typed nodes reuse the same stance. (The project-wide version — the same graph-as-data-structure boundary across the disaggregation engine, and what evidence would revisit it — is stated once in [the disaggregation page](disaggregation.md#the-fusion-mechanism).)
+**The graph is a data structure, not a learned model.** A switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so a drop at $A$ and rises at $B$ and $C$ are the *same power moving* — and that is the one fact a per-series model is blind to. We encode it with a **graph**: nodes are substations, edges join substations that can exchange load. Nothing is learned along the edges; the graph is a fixed map of "who can exchange load with whom," used only to prune an otherwise $N \times N$ search down to each node's handful of real neighbours. Attribution (stage 2 below) is its first real use, and the mixture model's mixing sparsity and the typed mixture's typed nodes reuse the same stance. (The project-wide version — the same graph-as-data-structure boundary across the disaggregation engine, and what evidence would revisit it — is stated once in [the disaggregation page](disaggregation.md#the-fusion-mechanism).)
 
 The detector adds three stages on top of the shared baseline: it detects level shifts on the baseline's residual, attributes each to a balancing set of neighbours, and reads off the rough composition of what moved.
 
@@ -414,7 +415,7 @@ multi-substation "events".
 
 *Aim.* Stages 1–2 tell us *that* a switching event happened, *when*, and *how much net power* moved to each donor. They do **not** tell us *what kind* of power moved. A slice of the network carries a mix of underlying demand and embedded generation (rooftop PV, small wind), and the meter only ever sees the *net* (demand minus generation). Two transferred slices with the same net magnitude can have completely different make-ups — one might be 8 MW of demand with negligible generation, another might be 11 MW of demand offset by 3 MW of PV, both netting to +8 MW at the donor. The aim of stage 3 is to get a cheap, qualitative read on that make-up: *was the moved slice demand-dominated, PV-dominated, or wind-dominated?* This is corroboration and enrichment, not detection — it does not change whether we flagged the event, but it characterises it.
 
-*Why we want it.* Three uses. (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **A free preview of v2.6:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap one. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
+*Why we want it.* Three uses. (a) **Sanity-checking the attribution:** a leg whose inferred composition is physically implausible (e.g. "pure PV moved at 2 a.m.") is a signal the attribution in stage 2 mis-assigned that donor. (b) **A free preview of the typed mixture:** the later type-resolved model estimates per-type transfer properly; having a rough independent read here lets us check the heavy model agrees with the cheap one. (c) **Richer event labels:** the delivered event list becomes "source → donors, magnitude *and* rough composition per leg," which is more useful to NGED and to downstream stages.
 
 *Mechanism.* The make-up of a slice is exposed by *when, within the day,* its power moved — because demand, PV, and wind each have a distinct, well-known diurnal signature. After stage 2 has told us donor $j$ picked up some load at event onset, look at the **shape of $j$'s residual step across the hours of the day** (e.g. average the step magnitude by half-hour-of-day over the event's duration):
 
@@ -459,7 +460,7 @@ is the moved slice's *shape*: the transferred load is live demand with its own d
 seasonal variation, and subtracting a flat block leaves all of that variation sitting in the
 "corrected" donor series (and missing from the source), an error that grows with event duration.
 Closing that shape gap is exactly what
-[v2.5](#v25-magnitude-only-mixture-model-the-workhorse) is for. The subtraction version is still
+[the mixture model](#approach-4-the-magnitude-only-mixture-model-the-workhorse) is for. The subtraction version is still
 useful in its own right: it turns the ARA *mask* into an optional *patch* — keep
 switching-affected periods in the forecast training data with corrected values rather than
 discarding ~10% of the record — and whether the patch beats the hole is cheap to measure on the
@@ -571,16 +572,16 @@ detector — [Table 5](delivery-tables.md#table-5-substation_switching),
 [Table 4's in-event capacity patch](delivery-tables.md#table-4-effective_capacity), the
 [prevailing-conditions switching block](forecast-building-blocks.md), and the
 [in-event metrics flags](metrics-and-leaderboard.md#measuring-performance-during-switching-events)
-— are marked conditional on this decision where they are defined. The v2.5/v2.6 escalations
-become still more conditional than the
+— are marked conditional on this decision where they are defined. The two v2-scale mixture
+escalations become still more conditional than the
 [escalation principle](#the-approaches) already makes them. This is that principle
 applied honestly to our own plan: the staged detector must be justified by a measured gap the
 feature path leaves, not by anticipation.
 
 **Relationship to the v2 disaggregation ambition.** The full-fat v2 vision is a *single* model
 that sees everything — switching, capacity changes, embedded DERs — and makes an informed joint
-attribution among them: [v2.5](#v25-magnitude-only-mixture-model-the-workhorse)'s mixture and
-[v2.6](#v26-type-resolved-mixture-with-differentiable-physics-modules)'s typed physics modules,
+attribution among them: [the mixture model](#approach-4-the-magnitude-only-mixture-model-the-workhorse)'s mixture and
+[the typed mixture](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules)'s typed physics modules,
 with the per-node anomaly slack catching what neither explains. The two-stage forecaster is a
 step *toward* that vision, not a detour from it. Stage 1's residual is exactly the
 undifferentiated lump v2 exists to explain — everything the weather and clock don't account
@@ -713,7 +714,7 @@ consumes, the approximation the parameterisation makes, and how the penalty weig
   block, per recipient). If injections show the flat-block error matters, the still-convex
   refinement is a piecewise-constant *fraction* of the source's baseline —
   $e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ — which is also the stepping stone to
-  [v2.5](#v25-magnitude-only-mixture-model-the-workhorse), whose
+  [the mixture model](#approach-4-the-magnitude-only-mixture-model-the-workhorse), whose
   $\alpha_{ij}(t) \cdot d_j(t)$ is the same idea with the known baseline replaced by a jointly-inferred
   latent.
 - **The penalty weights are tuned on the synthetic-injection harness, never on the logs.** Too
@@ -906,14 +907,14 @@ Notes on the sketch:
 
 ---
 
-### v2.5 — Magnitude-only mixture model (the workhorse)
+### Approach 4 — the magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
 **Motivation.** v0.6 already supports a
 [zeroth-order NRA reconstruction by subtraction](#approach-2-the-staged-statistical-detector)
 — but that correction is a flat block per event: it restores each series' mean NRA *level* while
-leaving the moved slice's time-varying *shape* behind. v2.5 is the simplest model whose
+leaving the moved slice's time-varying *shape* behind. This mixture is the simplest model whose
 reconstruction carries shape — the correction is a scaled copy of a live, jointly-inferred demand
 signal rather than a constant — and it produces latent demand **without modelling anything below
 the primary**, sidestepping the (non-existent) feeder-discovery problem entirely. The latent
@@ -934,13 +935,13 @@ $$
 - **$d_i(t)$ must itself be modelled, not left free.** If the latent demand were an unconstrained
   value per timestep the model would be hopelessly underdetermined — any observation can be
   explained by moving $d$ instead of $\alpha$. $d_i(t)$ is a weather/calendar-driven model plus a
-  smooth residual; in other words, v2.5 embeds the v0.6 baseline inside itself as the latent's
-  backbone. The v0.6 work is reused, not discarded.
+  smooth residual; in other words, the mixture model embeds the v0.6 baseline inside itself as the
+  latent's backbone. The v0.6 work is reused, not discarded.
 - **Fitting is bilinear (non-convex) — initialise from v0.6.** The $\alpha \cdot d$ products mean local
   minima are a real risk. Initialise/anchor the $\alpha$ jump times from the v0.6 event list (or the
   edge-flow estimator's fitted flows, which are the same object in additive form) so the
   optimiser starts near the right switching structure. v0.6's output is thus a direct *input* to
-  v2.5, not just its validation set.
+  the mixture model, not just its validation set.
 - **Known degeneracies to guard.** (a) *Scale:* $\alpha_{ii} d_i$ is invariant to rescaling one against
   the other; the identity prior resolves this except for a substation observed under ARA for
   (nearly) its whole record, where v0.6's record-straddling blind spot applies unchanged.
@@ -949,11 +950,11 @@ $$
   anomaly/slack term, as in the edge-flow estimator, so partnerless changes are not forced into
   $\alpha$. (c) *Net-zero crossing:* $\alpha$ is a fraction of **net** power, and a fraction of a signal
   near zero moves almost nothing regardless of $\alpha$ — at PV-heavy substations whose net crosses
-  zero, the transfer's magnitude information vanishes around the crossing. v2.6's typed
+  zero, the transfer's magnitude information vanishes around the crossing. The typed mixture's
   decomposition removes this by mixing gross components instead.
 
-**Tooling: v2.5 can be built entirely with CVXPY — by alternation, with one honest caveat.** As
-written, v2.5 is *not* one convex problem: $\alpha \cdot d$ multiplies two unknowns, which is exactly the
+**Tooling: the mixture model can be built entirely with CVXPY — by alternation, with one honest caveat.** As
+written, it is *not* one convex problem: $\alpha \cdot d$ multiplies two unknowns, which is exactly the
 kind of expression CVXPY's DCP check refuses (see
 [Convex Optimisation](../techniques/convex-optimisation.md)). But the bilinearity has a special
 structure — the problem is convex in each unknown *separately* — and that enables the classic
@@ -975,15 +976,15 @@ first, then let alternation release $d$. The caveat to state plainly: convexity 
 *step*, not overall. Alternation converges, but to a *local* optimum of the bilinear problem — the
 certified-global-optimum promise of the pure-convex world does **not** come back just because
 each step uses CVXPY. The v0.6 initialisation (bullet above) and the convex warm start are what
-manage that risk. No part of v2.5 needs PyTorch.
+manage that risk. No part of the mixture model needs PyTorch.
 
 **Where `cvxpylayers` enters (and where it doesn't).** The bridge that embeds a convex solve as a
 differentiable layer inside a PyTorch model
 ([the techniques page explains it](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
-is *not needed* for v2.5 — alternation above is CVXPY in a loop. It earns its place at **v2.6**,
-when $d_i$ decomposes into physics modules (panel trigonometry, power curves, products of
-unknowns) that are genuinely non-convex and force PyTorch for the outer model — see the
-[v2.6 tooling paragraph](#v26-type-resolved-mixture-with-differentiable-physics-modules) for why
+is *not needed* for the mixture model — alternation above is CVXPY in a loop. It earns its place in
+the typed mixture, when $d_i$ decomposes into physics modules (panel trigonometry, power curves,
+products of unknowns) that are genuinely non-convex and force PyTorch for the outer model — see the
+[typed-mixture tooling paragraph](#approach-5-the-type-resolved-mixture-with-differentiable-physics-modules) for why
 the routing estimation should stay a convex layer even then.
 
 **Why "arbitrary continuous slice" is handled natively.** $\alpha_{ij}(t)$ is a continuous fraction, so "some load, cut anywhere, moved to several donors" is exactly representable. The continuous-fraction form — which earlier looked like a limitation — is in fact *fidelity* to a network where the transferred amount is genuinely continuous and the cut point is free.
@@ -992,15 +993,15 @@ the routing estimation should stay a convex layer even then.
 
 - **Shape, not just level.** Both v0.6 reconstructions correct an event with a flat block — the
   staged detector's subtraction and the edge-flow estimator's piecewise-constant flows alike —
-  leaving the moved slice's diurnal/seasonal variation behind. v2.5's correction
+  leaving the moved slice's diurnal/seasonal variation behind. The mixture model's correction
   $\alpha_{ij}(t) \cdot d_j(t)$ is a scaled copy of a live demand signal, so the moved load's
   variation moves with it. Even the edge-flow estimator's
   shaped-flow refinement $e_{ij}(t) = f_{ij}(t) \cdot \text{baseline}_j(t)$ only borrows shape
-  from the *fixed exogenous baseline*; v2.5's shape comes from the jointly-inferred latent
+  from the *fixed exogenous baseline*; the mixture model's shape comes from the jointly-inferred latent
   $d_j(t)$ — the weather/calendar backbone *plus* the smooth residual the baseline cannot see.
 - **Joint inference instead of point-estimate commitment.** The subtraction reconstruction
   commits forever to the detector's noisy magnitude estimates (which also absorb the few-percent
-  loss/CVR imbalance). v2.5 re-estimates routing and latent demand together, so each refines the
+  loss/CVR imbalance). The mixture model re-estimates routing and latent demand together, so each refines the
   other and detection-time noise in the magnitudes is smoothed against the demand model.
 - Produces the actual latent NRA demand signal $d_i(t)$ as a modelled object, not
   observed-minus-detected-events arithmetic.
@@ -1009,7 +1010,7 @@ the routing estimation should stay a convex layer even then.
 
 **What it misses / cons.**
 
-- A fractional mixture $\alpha_{ij} d_j$ moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). v2.5 can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), this is largely **not a fixable limitation** — v2.5's approximation is about as good as the data structurally permits for the *demand* total. v2.6 only partially improves it, and only for the DER component.
+- A fractional mixture $\alpha_{ij} d_j$ moves a *scaled copy of neighbour j's whole aggregate demand*. The slice that really moved may have a *different shape* (e.g. unusually PV-heavy). The mixture model can match the step magnitude but carries the wrong shape with it. **Important nuance:** because there is *no stable sub-unit* with a "true" recoverable shape (movable cut points), this is largely **not a fixable limitation** — its approximation is about as good as the data structurally permits for the *demand* total. The typed mixture only partially improves it, and only for the DER component.
 - DERs are folded implicitly into $d_i$ (no explicit PV/wind separation yet).
 
 **Pros.**
@@ -1021,13 +1022,13 @@ the routing estimation should stay a convex layer even then.
 
 ---
 
-### v2.6 — Type-resolved mixture with differentiable physics modules
+### Approach 5 — the type-resolved mixture with differentiable physics modules
 
 **Goal.** Decompose each substation into physically-typed components (demand, PV, wind), each from its own differentiable module, and let each *type* transfer with its own routing weights — so a switching event can move proportionally more PV than load.
 
-> **A note on differentiable physics.** This is the only stage that uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), the single source of truth for that machinery; we do not re-derive it here.
+> **A note on differentiable physics.** This is the only stage that uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the magnitude-only mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), the single source of truth for that machinery; we do not re-derive it here.
 
-**Motivation.** v2.5's residual error is wrong-*shape* transfer. Part of that shape error is *type mix*: the moved slice may carry disproportionate PV or wind relative to the parent's aggregate. Separating the physical types lets the model represent that. The differentiable modules also clean the meter of DERs generally (PV/wind net off demand whether or not switching occurs), which is independently valuable.
+**Motivation.** The mixture model's residual error is wrong-*shape* transfer. Part of that shape error is *type mix*: the moved slice may carry disproportionate PV or wind relative to the parent's aggregate. Separating the physical types lets the model represent that. The differentiable modules also clean the meter of DERs generally (PV/wind net off demand whether or not switching occurs), which is independently valuable.
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
 
@@ -1057,16 +1058,16 @@ model (via
 [`cvxpylayers`](../techniques/convex-optimisation.md#the-bridge-welding-cvxpy-into-pytorch))
 rather than becoming free tensors: the layer preserves exact zeros ("nonzero routing = detected
 event") and built-in conservation, while gradients flow through the solve to the physics modules.
-The full rationale, and the alternation-only path that gets v2.5 built without any PyTorch, is in
-the v2.5 tooling note above.
+The full rationale, and the alternation-only path that gets the mixture model built without any
+PyTorch, is in the mixture-model tooling note above.
 
 **Prior structure.**
 
 1. **Coupled switching, separate composition.** A reconfiguration is one electrical action — the types do not switch at unrelated times. Introduce one latent **switching indicator per ordered pair**, $s_{ij}(t) \in \{0, 1\}$, piecewise-constant and sparse, governing *whether* the i→j boundary is active; the **type composition** (what fraction of demand/PV/wind rides along) applies only when $s_{ij}(t) = 1$. Types switch *together*; the moved slice can still be disproportionately one type.
 2. **Per-pair composition prior — DOWNGRADED.** An earlier design proposed a *learnable per-boundary* prior $\theta_{ij}$ ("the i→j boundary is usually 90% PV"), treating it as a stable feeder fingerprint. **This is downgraded to at most a weak, shared empirical prior, or dropped entirely.** Reason: movable cut points mean a boundary has *no stable composition* — what crosses depends on where the switch was opened this time — and $\theta_{ij}$ could not be fitted at scale anyway, since that requires labels we won't have. Do **not** rely on per-boundary learned composition.
-3. **Multi-donor (one-to-many).** As in v2.5, several $s_{ij}(t)$ may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
+3. **Multi-donor (one-to-many).** As in the mixture model, several $s_{ij}(t)$ may be active for one source at once; conservation is node-level flow balance across the donor set, not pairwise.
 
-**What it adds over v2.5.**
+**What it adds over the mixture model.**
 
 - Captures disproportionate-*type* transfer (more PV than load can move).
 - Differentiable modules give separately-shaped PV/wind/demand signals, so a step can be attributed to the right type by its temporal signature (midday irradiance-shaped → PV; evening temperature-tracking → load).
@@ -1092,7 +1093,7 @@ An earlier plan included a further stage that modelled the **actual switchable p
 1. **The unit does not exist.** NGED have been explicit that the network is meshed and run radially with movable cut points; load is a near-continuous distribution splittable almost anywhere. There is no stable, re-identifiable feeder with a persistent identity or composition to discover and route. The model would be trying to recover units that do not persist.
 2. **It lives in the unlabelled regime.** This stage is precisely what would run at full scale (~1,161 primary substations), where **no switching labels exist.** Any block model that needed supervision to identify blocks is doomed there twice over.
 
-**Possible deferred successor (a research bet, not a planned step).** If within-type shape error in v2.6 ever proves to materially hurt the forecast, the conceptually correct (but much harder) direction is to model **load as distributed along network arcs with movable cut points**, inferring the cut location rather than assuming discrete blocks. This is a genuine spatial-inference research problem and should be explicitly *deferred*, not chased — and only entertained if v2.6 residuals demonstrate the need.
+**Possible deferred successor (a research bet, not a planned step).** If within-type shape error in the typed mixture ever proves to materially hurt the forecast, the conceptually correct (but much harder) direction is to model **load as distributed along network arcs with movable cut points**, inferring the cut location rather than assuming discrete blocks. This is a genuine spatial-inference research problem and should be explicitly *deferred*, not chased — and only entertained if the typed mixture's residuals demonstrate the need.
 
 ---
 
@@ -1118,7 +1119,7 @@ These apply at every stage and are the things most easily got wrong:
 - **Every detection statistic gets a null.** Changepoint penalties calibrated per series under the residual's real autocorrelation; attribution scores calibrated against chance-level subset balance by permutation. Uncalibrated thresholds are how phantom events happen.
 - **Synthetic event injection is the standard tuning instrument at every stage.** Thresholds, penalties, and sensitivity frontiers are tuned and measured on injected events; the logged events are reserved for final scoring, never for tuning.
 - **Routing/switching priors:** regularise toward the identity (NRA) and piecewise-constant in time; switching is rare and abrupt.
-- **Metered vs unmetered DER** kept as separate modules from v2.6 onward; metered tightly constrained, unmetered carrying the latent inference.
+- **Metered vs unmetered DER** kept as separate modules in the typed mixture; metered tightly constrained, unmetered carrying the latent inference.
 - **Interpretability artifacts** (detected events, inferred $s_{ij}$, DER estimates) are deliverables in their own right for NGED validation, not just internal state.
 
 ---

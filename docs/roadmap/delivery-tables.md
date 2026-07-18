@@ -292,5 +292,5 @@ A single donor can split power across multiple recipients (e.g. donor A loses 1 
 > **Known simplification.** Switching events transfer *behaviour*, not a constant amount of power.
 > v1 (the v0.6 statistical detector) estimates only the transferred magnitude. Reconstructing the
 > latent demand under the normal running arrangement — and capturing the fact that a transferred
-> slice can carry a different demand/PV/wind mix than its parent — is the job of the v2 mixture
-> models. See [Switching events & latent demand](switching-events.md) (v2.5 / v2.6).
+> slice can carry a different demand/PV/wind mix than its parent — is the job of the v2-scale
+> mixture models. See [Switching events & latent demand](switching-events.md).
