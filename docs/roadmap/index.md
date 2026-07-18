@@ -195,6 +195,40 @@ forecast-skill milestones above. Items so far:
 
 ---
 
+## v0.9 — Nice-to-haves if we have time
+
+*Epic: [#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)*
+
+Genuinely optional experiments worth trying **if the schedule allows**, sitting between the
+operational polish of v0.8 and the v1.0 trial-service milestone. Nothing downstream depends on
+any of them — if we are short on time, none of it blocks v1.0. Each lands as its own registered
+leaderboard experiment or controlled ad-hoc ablation, so we keep the result either way.
+
+- **Neural net vs XGBoost as a leaderboard experiment**
+  ([#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362)): does a simple
+  neural net — an MLP with a per-series embedding and quantile-regression heads — beat
+  gradient-boosted trees? XGBoost suits the current per-series regime (one model per series, on
+  the order of 10⁴–10⁵ rows), and the recurring "trees are bad at maths" pain is already handled
+  cheaply by the physics and residual features on the
+  [XGBoost improvements](xgboost-improvements.md) page. So the decisive, cheap test is the
+  sibling of the
+  [global model per `time_series_type`](xgboost-improvements.md#global-model-per-time_series_type)
+  win: a global MLP against a global XGBoost on the *identical* feature frame, run once that
+  win's prerequisites (per-series target normalisation, static per-series features, and
+  init-time-anchored features) exist, so the comparison isolates the model family. A negative
+  result de-risks the neural approaches on the [v2.0](#v20-scale-up-future-research) research
+  list before we spend research time on the fancier ones.
+- **Additional NWP source, e.g. ICON-EU**
+  ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
+  whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the
+  v1 nice-to-have version of the broader "further NWP sources" idea on the
+  [v2.0 research list](#v20-scale-up-future-research). Because ICON-EU's history starts early
+  2026 (shorter than the canonical CV folds) it is assessed via a controlled ad-hoc ablation,
+  not the leaderboard, until it has ~1–2 complete years of history. See
+  [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
+
+---
+
 ## v1.0 — Stable Live Service for NGED's Trial Area
 
 *Epic: [#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)*
@@ -237,7 +271,7 @@ delivery of the v2 live service)*
 - **CRPS training objective**: train the ensemble power forecast model to directly optimise CRPS for sharper probabilistic forecasts
 - **JEPA** (Joint Embedding Predictive Architecture, à la Yann LeCun): adapt to demand forecasting using JEPA's encoder and predictor as the "load" module in the graph-structured disaggregation engine
 - **[Differentiable physics](../techniques/differentiable-physics.md) for power forecasting** (not just capacity estimation): use DP models to directly forecast power, handling MVA metering natively (see [the graph-structured engine](disaggregation.md#the-graph-structured-engine) and [MVA metering](disaggregation.md#apparent-power-mva-metering))
-- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history
+- **Additional NWP sources (far from certain that we'll get round to this)**: explore whether adding further NWP sources — e.g. ICON-EU from Dynamical.org — improves forecast skill over ECMWF ENS alone. Sources with shorter history than the canonical CV folds (ICON-EU starts early 2026) cannot enter the leaderboard directly; they are first assessed via a controlled ad-hoc ablation, and only promoted to a new leaderboard epoch once they have ~1–2 complete years of history. The ICON-EU trial specifically is also pulled forward as a [v0.9 nice-to-have](#v09-nice-to-haves-if-we-have-time); this v2.0 item is the wider question of further sources beyond it
 
 **Stretch goals**:
 
