@@ -254,20 +254,26 @@ offset forward instead of blending it into weather-driven variation.
 
 Two scheduling notes specific to this page:
 
-- **The highest-value variant pairs with item 10.** Valid-time-anchored residual lags are
-  nullified in the 3–10 day band exactly like raw power lags, so the strongest form is
-  *init-time-anchored* residual features ("normalised residual just before forecast time",
-  "mean residual over the 24 h before forecast time") — never null at any horizon, and
-  carrying exactly the anomaly signal that item 10's raw anchors mix in with ordinary
-  weather-driven level variation.
+- **The highest-value variant pairs with item 10.** Valid-time-anchored residual lags obey the
+  same nullification as raw power lags (any lag ≤ lead time is null), so in the 3–10 day band
+  only residuals several days old survive — while the freshest, most informative residual is
+  the one from just before forecast time. The strongest form is therefore *init-time-anchored*
+  residual features ("normalised residual just before forecast time", "mean residual over the
+  24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
+  signal that item 10's raw anchors mix in with ordinary weather-driven level variation.
 - **It costs more than a config change.** The two-pass pipeline (fit the baseline per CV fold
   on that fold's training period only, hindcast residuals over history, join them in as
-  features) is new machinery — which is why the item sits in this tier even though the
-  baseline itself is just a config of the existing forecaster. The neighbour-residual variant
-  additionally needs the trial-area adjacency list
+  features) is new machinery. And while the baseline's *feature list* is just config, its
+  quantile fit is not: the forecaster has no quantile-objective support today, so residual
+  *normalisation* depends on the
+  [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
+  landing first (or an interim spread estimate, such as a rolling MAD of the residuals). The
+  neighbour-residual variant additionally needs the trial-area adjacency list
   ([switching-events Part 5](switching-events.md#part-5-open-items-dependencies)) and
   cross-series feature engineering; the self-residual version needs neither and should run
-  first.
+  first. Finally, adopting a winner is not free either: the live service must then run the
+  baseline model too — a second deployed model plus a hindcast-residual step in the predict
+  path.
 
 ## Tier 4 — structural model changes (weeks)
 

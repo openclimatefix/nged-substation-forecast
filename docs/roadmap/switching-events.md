@@ -300,9 +300,12 @@ while the event table, the mask, and the sensitivity floor keep their own justif
   period, otherwise the test period leaks into the features. This makes the experiment pipeline
   more expensive than adding an ordinary feature.
 - **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
-  (`_nullify_leaky_lags()`), and the expected-power values at past lag times must use only NWP
-  runs published before forecast time — the existing freshest-NWP-for-past-target-times join
-  provides exactly this.
+  (`_nullify_leaky_lags()`), and the expected-power values at past lag times must be hindcast
+  from NWP runs that had been published by forecast time. The existing
+  freshest-NWP-for-past-target-times join does **not** guarantee this — it selects the freshest
+  run per past target time with no publication-time constraint, and is leak-free today only as
+  a side effect of daily run cadence — so the residual pipeline must add an explicit
+  availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
   list (a Part 5 dependency) plus a cross-series join in feature engineering, and a per-series
   feature-naming scheme (aggregated or ranked neighbour features, since each series has its own
