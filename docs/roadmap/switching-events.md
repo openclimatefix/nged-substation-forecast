@@ -90,7 +90,7 @@ For each substation, form an expected-power baseline that is a function of **exo
 **Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
 production forecaster already consumes most of the covariates the baseline needs — NWP weather,
 time-of-day, day-of-week (holiday flags are a
-[planned quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features)) — through the
+[planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features)) — through the
 existing feature pipeline. Configuring it with **no power-lag features** yields the
 switching-independent baseline (a lag feature would smuggle the lagged-power contamination above
 back in through the side door). Fit with a **robust (median) objective**, which doubles as the
@@ -122,7 +122,7 @@ sharp cases are the days a day-of-year feature structurally cannot represent:
   *hindcast*, so for detection purposes past events are perfectly known and a simple dated
   event list suffices. (The production *forecaster* is different: at a 3–10 day horizon,
   whether England will still be in the tournament may be genuinely unknown at forecast time —
-  see the [holiday quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features).)
+  see the [holiday quick win](xgboost-improvements.md#uk-holiday-and-calendar-features).)
 
 An unmodelled behavioural day surfaces as a coherent residual excursion that the changepoint
 detector can flag as a phantom switching event. Two things keep this manageable. First, the
@@ -130,9 +130,9 @@ failure has a distinctive shape: a holiday miss hits many demand-driven series *
 and with the same sign*, whereas a real switching event is localised and balance-conserving, so
 stage 2's neighbourhood-sum check discriminates the two. Second, the fix must come from the
 feature side — richer holiday encodings (the
-[planned quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features)) and, at V2
+[planned quick win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2
 scale, cross-series pooling (a
-[global model](xgboost-improvements.md#17-global-model-per-time_series_type) sees dozens of
+[global model](xgboost-improvements.md#global-model-per-time_series_type) sees dozens of
 Easters where a per-series model sees about three) — and **never** from trailing same-weekday
 power averages, however naturally they express "recent similar days": they would smuggle the
 lagged-power contamination above back in through the side door, absorbing a persistent switching
@@ -296,12 +296,12 @@ It can begin as soon as the baseline exists (implementation step 2 below) and is
 implementation step 5, evaluated by cross-validation; its result also doubles as evidence of the
 baseline's quality. So that it gets scheduled alongside the other forecaster experiments, it is
 also tracked on the XGBoost quick-wins backlog as
-[item 13](xgboost-improvements.md#13-residual-lag-features-from-the-switching-detector-baseline),
+[the residual-lag features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline),
 where the horizon-band and init-time-anchoring interactions specific to that page are noted.
 Before any of that machinery is built, its config-only *single-stage* cousin should run first
 as the ablation control:
-[aligned lagged-weather features](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
-(quick-wins item 5), which lets the booster judge each lag's normality without an explicit
+[aligned lagged-weather features](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control)
+(a quick win), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
 **Attributing the uplift — calibration versus switching.** A residual-lag booster would sharpen
@@ -596,9 +596,9 @@ measure directly) and soft down-weighting of training rows by the event-age accu
 — an implicit detector, but a threshold-free one, tunable on the injection harness.
 
 **The decision.** After implementation step 2 (the baseline), the
-[item 5](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
+[aligned lagged weather](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control)
 and
-[item 13](xgboost-improvements.md#13-residual-lag-features-from-the-switching-detector-baseline)
+[the residual-lag features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline)
 experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority is **maximising
 NRA-forecast skill**, even where that means the model handles switching implicitly. So if the
 feature path delivers that skill (measured on out-of-event periods plus the training-side
