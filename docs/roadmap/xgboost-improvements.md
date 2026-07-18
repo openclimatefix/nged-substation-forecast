@@ -57,7 +57,7 @@ Christmas-proximity feature. Fully forecastable at any horizon — squarely in t
 band, which is why it sits this high.
 
 This item also double-serves as the covariate set of the v0.6 switching detector's
-[stage-1 baseline](switching-events.md#stage-1-per-series-weathercalendar-baseline-then-detect-changepoints-on-the-residual),
+[stage-1 baseline](switching-events.md#the-baseline-shared-foundation),
 which raises the bar on encoding: the detector consumes the baseline's residuals raw, so an
 unmodelled behavioural day becomes a phantom event candidate. Prefer encodings that generalise
 across sparse examples — a days-to-nearest-holiday feature and a holiday-name categorical
@@ -99,7 +99,7 @@ how *normal* each lagged power value is — power at the lagged time relative to
 then would predict — which is exactly the anomaly signal that
 [item 13](#13-residual-lag-features-from-the-switching-detector-baseline) engineers explicitly
 with a two-stage residual pipeline (the
-[full design](switching-events.md#residual-lag-features-a-complementary-forecaster-experiment)
+[full design](switching-events.md#approach-1-the-two-stage-forecaster)
 lives on the switching-events page). Feature engineering never adds information, only inductive
 bias — so whether the explicit two-stage version is worth its machinery is an empirical
 question, and this config-only variant is the cheap way to start answering it.
@@ -332,7 +332,7 @@ expected gain, cheap given the `geo` H3 machinery exists.
 ### 13. Residual lag features from the switching-detector baseline
 
 The full design and caveats live in the switching-events roadmap:
-[Residual lag features — a complementary forecaster experiment](switching-events.md#residual-lag-features-a-complementary-forecaster-experiment).
+[Approach 1 — the two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster).
 In brief: fit the v0.6 stage-1 baseline (this same forecaster, configured with weather/calendar
 features only and a quantile objective), then feed the production model normalised
 "actual − expected" residuals at lag times instead of (or alongside) raw power lags — telling

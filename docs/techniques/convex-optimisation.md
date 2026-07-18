@@ -4,7 +4,7 @@
 > convex formulation is a fundamentally better deal than gradient-descent training wherever it is
 > available, and the project's practical tooling rule — **CVXPY for convex estimation
 > subproblems, PyTorch for physics + learning**. The first planned applications are the
-> [joint edge-flow estimator](../roadmap/switching-events.md#v061-the-joint-edge-flow-estimator)
+> [joint edge-flow estimator](../roadmap/switching-events.md#approach-3-the-joint-edge-flow-estimator)
 > for switching-event detection and the
 > [convex candidate](../roadmap/capacity-estimation.md#candidate-a-the-convex-estimator-cvxpy) in
 > the v0.7 effective-capacity head-to-head; further applications are expected. The Python in this
@@ -366,7 +366,7 @@ switching now does not wall that code off from the PyTorch future.
 ## Applications in this project
 
 - **Switching-event detection — the
-  [joint edge-flow estimator](../roadmap/switching-events.md#v061-the-joint-edge-flow-estimator)**
+  [joint edge-flow estimator](../roadmap/switching-events.md#approach-3-the-joint-edge-flow-estimator)**
   (first planned application): a group fused lasso on signed edge flows; implementation sketch on
   the roadmap page.
 - **Metered-generator effective capacity — the
