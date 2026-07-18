@@ -36,7 +36,10 @@ The blocks are:
    [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table). E.g. if a wind
    turbine breaks in a wind farm, we estimate the reduced effective capacity over time.
 3. **Switching events** (the [`substation_switching`](delivery-tables.md#table-5-substation_switching)
-   table). OCF estimates the amount of power diverted across substations.
+   table). OCF estimates the amount of power diverted across substations. This block is
+   conditional: whether a discrete event table ships at all is an open question, and continuous
+   per-substation switching-state signals may be delivered instead — see
+   [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 ---
 
@@ -67,7 +70,10 @@ arrangement?"* — the worst-case view useful for network-constraint planning.
 This forecast **prevails the most recent conditions**:
 
 - *Generators*: × the **most recently observed effective capacity**.
-- *Substations*: prevails the **switching state**.
+- *Substations*: prevails the **switching state**. (How this is achieved depends on
+  [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
+  assembled from Table 5's discrete events, or delivered directly by the metered-power
+  forecast, which carries the current switching state forward natively.)
 - *Both*: prevails the `generator_or_circuit_fault` flag.
 
 This answers: *"what will this asset actually do over the next 14 days if current conditions

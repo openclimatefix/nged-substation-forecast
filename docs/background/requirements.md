@@ -8,17 +8,50 @@
 
 ## Core Objectives
 
+This is a research project, and our NGED partners treat it as one: the single hard requirement
+is that the project gives NGED **new information about forecasting for their assets**. Even a
+negative result carries value — if we try our hardest and cannot, say, detect switching events
+from power data alone, that is evidence NGED can take to their senior leadership to argue for
+investing in technology to extract switching labels from their operational systems. The
+objectives below therefore sit on a **priority continuum**, not a must-have/nice-to-have split.
+
+**Highest priority — probabilistic power forecasts under the normal running arrangement
+(NRA):**
+
 * Probabilistic, half-hourly, 14-day horizon forecasts updated every 6 hours. Within that
   horizon, users mostly act on forecasts roughly **1 to 10 days ahead**, so skill in that band
   matters most.
     * For the day-ahead forecast: NGED want to look at the forecast at 11am to see the forecast from midnight to
     23:59 on the next day.
 * Cover substations (primary, BSP, GSP), metered generators (solar PV, wind, BESS, etc.), and customer meters.
-* Automatically detect and compensate for **switching events** — where power is diverted from one substation to another due to maintenance, changing the local demand signature.
-* Track the **effective capacity** of metered generators over time (turbine failures, inverter faults, PV panel degradation), ignoring NGED-imposed ANM curtailment.
-* Automatically detect and flag **faulty metering** (stuck values, physically impossible values, missing data).
+
+**Everything else exists primarily to improve those forecasts.** Switching-event handling,
+effective-capacity tracking, and faulty-meter detection are pursued first and foremost because
+they make the NRA forecast better, and it is acceptable for the models to handle these
+phenomena *implicitly*. That said, explicit estimates are genuinely wanted where we can produce
+them:
+
+* Track the **effective capacity** of metered generators over time (turbine failures, inverter
+  faults, PV panel degradation), ignoring NGED-imposed ANM curtailment — including detecting
+  misbehaving generators.
+* Detect and compensate for **switching events** — where power is diverted from one substation
+  to another due to maintenance, changing the local demand signature. (Whether this ships as a
+  discrete event table or as continuous switching-state signals is an open question — see
+  [the decision point](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
+* Automatically detect and flag **faulty metering** (stuck values, physically impossible
+  values, missing data).
+* An optional **"prevailing conditions" forecast** assembled from the delivered building
+  blocks — explicitly lower priority than the NRA forecast. See
+  [forecast building blocks](../roadmap/forecast-building-blocks.md).
+
+The five [delivery tables](../roadmap/delivery-tables.md) were specified in our most recent
+formal report to NGED, so a change of shape there (such as replacing the discrete
+`substation_switching` table with continuous signals) is something to agree with NGED, not to
+decide unilaterally.
 
 ## Stretch Goals
+
+Further down the same continuum:
 
 * Model and forecast *unmetered* solar PV and wind power on each primary substation by disaggregating net power flow.
 * Disaggregate and forecast other distributed energy resources (DERs): EV chargers, heat pumps, price-sensitive batteries.

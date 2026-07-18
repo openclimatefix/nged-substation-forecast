@@ -546,8 +546,10 @@ with lead time:
 We will flag each timestep for whether it contains a switching event, and compute metrics separately
 for periods with switching events in the model inputs (or in the forecast's `valid_time`). This
 distinguishes models that perform well *only* on clean periods from models that handle switching
-events in their inputs. The flags come from the detector described in
-[Switching events & latent demand](switching-events.md).
+events in their inputs. In v1 the flags can come straight from NGED's logged switching events
+for the trial area; a fleet-scale version would need the discrete detector described in
+[Switching events & latent demand](switching-events.md), whose fate is an open question — see
+[the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 ---
 
@@ -627,7 +629,7 @@ each:
    `quantile_alpha`s, as a separate experiment/model family emitting Rep 3. Sort each member's
    quantiles at predict time (monotonic rearrangement fixes quantile crossing). The lead-time
    feature and training on multiple members
-   ([xgboost-improvements](xgboost-improvements.md) items 1 and 14) are the double-counting
+   ([xgboost-improvements](xgboost-improvements.md) items 1 and 16) are the double-counting
    mitigations discussed in the explainer — land them first or measure without them
    consciously.
 3. **Linear-pool combining step**

@@ -298,7 +298,7 @@ problem.solve(solver=cp.CLARABEL)  # certified global optimum, warm-startable
   (synthetic clipping injected into unclipped sites is the obvious test).
 - **The shared regional irradiance-bias term breaks the one-shot convexity.** A multiplicative
   regional bias × per-site capacity is bilinear — the same structure that makes
-  [v2.5 alternation-only](switching-events.md#v25-magnitude-only-mixture-model-the-workhorse).
+  [the mixture model alternation-only](switching-events.md#approach-4-the-magnitude-only-mixture-model-the-workhorse).
   The convex route must then choose between: **alternation** (bias given capacities, capacities
   given bias — each step convex, but the certified-global-optimum headline no longer applies to
   the joint answer); a **plug-in pre-estimate** (e.g. the fleet-median clear-sky-normalised

@@ -139,10 +139,10 @@ only for first month, then shared with NGED. (v0.6 vs v0.7: we don't yet know wh
 events and capacity estimation will actually land first — but naming one v0.6 and the other v0.7
 beats the ambiguity of "v0.6 or v0.7"; we'll swap them later if reality disagrees.)*
 
-- Detect "abnormal running arrangement" events from the power time series alone, using statistical methods — see [Switching events & latent demand](switching-events.md)
-- Ingest the NGED supporting files the detector needs (substation adjacency, switching logs as the validation oracle)
-- Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
-- Populate the `substation_switching` Delta table
+- Build the shared switching infrastructure: the stage-1 weather/calendar baseline, normalised residuals, the labelled event table, and the synthetic-injection harness — see [Switching events & latent demand](switching-events.md)
+- Ingest the NGED supporting files this needs (substation adjacency, switching logs)
+- Make the forecaster switching-aware with residual, event-age, and pooled-neighbour features, and run the v1 label-exclusion experiments — the feature-based mainline
+- Conditional — see [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector): the discrete detector (changepoint detection and attribution), training-data cleaning from detected events, and the `substation_switching` Delta table
 
 ---
 
@@ -230,7 +230,7 @@ delivery of the v2 live service)*
 
 **Research (advanced ML)**:
 
-- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [Switching events, Part 2](switching-events.md).)
+- **Graph-structured disaggregation**: Model substations, metered generators, and unmetered generator fleets as nodes in an electrical/spatial graph, with edges representing physical connections. The graph is a **data structure** — a structural prior on who can exchange load and which sites share weather: each substation is reconstructed as a sum of per-site differentiable-physics modules with inferred capacities, and cross-site gains come from hierarchical parameter sharing. (See [Net-demand disaggregation](disaggregation.md) — the canonical page for this arc, including the [convex dictionary baseline](disaggregation.md#the-convex-dictionary-baseline) it must beat — and [the switching-events approaches](switching-events.md#the-approaches).)
 - **Latent-demand recovery under switching**: reconstruct the demand each substation would have metered under the *normal running arrangement*, using a time-varying neighbourhood mixture (optionally type-resolved into demand / PV / wind) over the network graph. This reconstructs the topology-normalised demand NGED requires, and goes beyond the v0.6 statistical detector — which only flags and masks switching periods. See [Switching events & latent demand](switching-events.md).
 - **Pre-trained neural network [encoders](../techniques/encoders.md)**: "weather encoder" and "time encoder" pre-trained on large datasets, then fine-tuned for substation forecasting
 - **Multi-sequence alignment** with axial attention: find "similar" historical days and feed them as additional context to the forecasting model

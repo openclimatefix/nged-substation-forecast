@@ -357,6 +357,6 @@ component; treat those sketches as the prototype it grows from.
   forecasting architecture combining DP with
   [learned weather encoders](encoders.md) is also described on
   [that page](../roadmap/disaggregation.md#combining-the-physics-with-the-weather-encoder).
-- **Switching events** — the v2.6 type-resolved mixture routes the outputs of per-type DP modules
+- **Switching events** — the type-resolved mixture routes the outputs of per-type DP modules
   over the neighbourhood graph; see
   [Switching events & latent demand](../roadmap/switching-events.md).
