@@ -263,7 +263,10 @@ Two scheduling notes specific to this page:
   signal that item 10's raw anchors mix in with ordinary weather-driven level variation.
 - **It costs more than a config change.** The two-pass pipeline (fit the baseline per CV fold
   on that fold's training period only, hindcast residuals over history, join them in as
-  features) is new machinery. And while the baseline's *feature list* is just config, its
+  features) is new machinery — the hindcast leg should consume the central NWP analysis-proxy
+  function planned in
+  [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356), which owns the
+  publication-time availability cut the no-lookahead caveat requires. And while the baseline's *feature list* is just config, its
   quantile fit is not: the forecaster has no quantile-objective support today, so residual
   *normalisation* depends on the
   [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)

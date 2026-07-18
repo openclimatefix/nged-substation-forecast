@@ -311,6 +311,10 @@ while the event table, the mask, and the sensitivity floor keep their own justif
   run per past target time with no publication-time constraint, and is leak-free today only as
   a side effect of daily run cadence — so the residual pipeline must add an explicit
   availability cut, guarded by a leakage test in the spirit of the `_nullify_leaky_lags` tests.
+  The natural home for that cut is the planned central NWP analysis-proxy function
+  ([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)), which unifies
+  the dashboard's stitched proxy-analysis query with the feature pipeline's
+  freshest-run-per-valid-time join.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
   list (a Part 5 dependency) plus a cross-series join in feature engineering, and a per-series
   feature-naming scheme (aggregated or ranked neighbour features, since each series has its own
