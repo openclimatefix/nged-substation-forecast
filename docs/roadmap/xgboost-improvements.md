@@ -495,10 +495,11 @@ resolution because weather anomalies are synoptic-scale — a heatwave does not 
 across an H3 cell. CERRA is the tempting alternative — higher-resolution, and since its 2025
 timely-update extension no longer stuck at 2021 but running to within a few months of present —
 but it is a *different* model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts
-against a CERRA climatology folds a model-pair bias into every anomaly. (CERRA stays fully viable
-for the project's other uses — [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
-pre-training, capacity estimation; it is only the wrong source *here*, where self-consistency
-with the forecast model is the whole point.) The most self-consistent source imaginable would be
+against a CERRA climatology folds a model-pair bias into every anomaly. (This same
+model-consistency argument, together with ERA5T's near-real-time latency, is why the project now
+[standardises on ERA5](data-sources.md#weather-data) as its single reanalysis for every use —
+pre-training, capacity estimation, and this climatology alike; CERRA stays documented as a
+higher-resolution option but is deprioritised.) The most self-consistent source imaginable would be
 a climatology from our own archived ENS, but a robust day-of-year climatology wants 10+ years and
 the archive is nowhere near that yet, so ERA5 wins in practice.
 
@@ -583,7 +584,7 @@ Needs batched training at ensemble scale. The boundary of "quick".
 
 ## Explicitly deferred (not quick, or not skill)
 
-- **[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) CERRA pre-training** — needs a whole new data-source ingestion (CERRA download,
+- **[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) ERA5 pre-training** — needs a whole new data-source ingestion (ERA5 download,
   contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
   belongs to
   [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).

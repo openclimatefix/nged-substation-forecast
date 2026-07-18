@@ -420,9 +420,10 @@ wants the same inputs as
 [the differentiable model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant))
 is covered by the v0.7 weather ingests. **CM SAF SARAH-3** provides global (SIS), direct (SID)
 and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
-SIS − SID) — the primary input, matching the half-hourly metering. **CERRA** provides global
-plus time-integrated direct short-wave (diffuse by subtraction; accumulated fluxes from 3-hourly
-forecast cycles, so temporally coarser). The live **ECMWF ENS** feed carries only GHI — fine for
+SIS − SID) — the primary input, matching the half-hourly metering. **ERA5** provides global plus
+**direct** (`fdir`) short-wave (diffuse by subtraction), and its near-real-time ERA5T stream
+(~5 days behind) suits the near-real-time capacity estimate — unlike CERRA, whose ~3.5-month
+latency [rules it out here](data-sources.md#weather-data). The live **ECMWF ENS** feed carries only GHI — fine for
 v0.7, but v2 physics *forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition
 model (or `fdir` added to the upstream dataset). See
 [data sources](data-sources.md#weather-data).
