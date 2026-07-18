@@ -313,7 +313,11 @@ while the event table, the mask, and the sensitivity floor keep their own justif
   directly, which is another reason this complements rather than replaces it.
 
 The natural slot is immediately after implementation step 2 below (the baseline), as a measured
-cross-validation experiment; its result also doubles as evidence of the baseline's quality.
+cross-validation experiment; its result also doubles as evidence of the baseline's quality. So
+that it gets scheduled alongside the other forecaster experiments, it is also tracked on the
+XGBoost quick-wins backlog as
+[item 12](xgboost-improvements.md#12-residual-lag-features-from-the-switching-detector-baseline),
+where the horizon-band and init-time-anchoring interactions specific to that page are noted.
 
 #### v0.6.1 — the joint edge-flow estimator
 

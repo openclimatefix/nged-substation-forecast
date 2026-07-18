@@ -627,7 +627,7 @@ each:
    `quantile_alpha`s, as a separate experiment/model family emitting Rep 3. Sort each member's
    quantiles at predict time (monotonic rearrangement fixes quantile crossing). The lead-time
    feature and training on multiple members
-   ([xgboost-improvements](xgboost-improvements.md) items 1 and 14) are the double-counting
+   ([xgboost-improvements](xgboost-improvements.md) items 1 and 15) are the double-counting
    mitigations discussed in the explainer — land them first or measure without them
    consciously.
 3. **Linear-pool combining step**
