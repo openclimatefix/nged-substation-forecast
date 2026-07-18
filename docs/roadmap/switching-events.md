@@ -315,7 +315,8 @@ switching-awareness:
   forecast time instead of to the training data — and for pure forecast accuracy, "the current
   shift will persist" is most of the value switching-handling can deliver, since event *onsets*
   are unpredictable from power data by definition.
-- **Neighbour context.** Neighbour residuals (e.g. a neighbourhood-sum feature) expose the
+- **Neighbour context.** Neighbour residuals (e.g. the signed neighbourhood-sum feature
+  designed below) expose the
   conservation fingerprint — my residual dropped while my neighbours' rises sum to the same
   amount — which distinguishes "a transfer that will persist and eventually revert" from "a
   permanent change such as load growth or a meter re-base".
@@ -353,13 +354,53 @@ while the event table, the mask, and the sensitivity floor keep their own justif
   the dashboard's stitched proxy-analysis query with the feature pipeline's
   freshest-run-per-valid-time join.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
-  list (a Part 5 dependency) plus a cross-series join in feature engineering, and a per-series
-  feature-naming scheme (aggregated or ranked neighbour features, since each series has its own
-  neighbour set).
+  list (a Part 5 dependency) plus a cross-series join in feature engineering. The feature-schema
+  question (each series has its own neighbour set, of varying size) is answered by the pooled
+  design below — a fixed handful of permutation-invariant pooled columns, never one column per
+  neighbour.
 - **Data volume.** Learning multi-donor conservation implicitly from 32 series with ~10% event
   occupancy asks a lot of a tabular learner; expect the model to learn "persist my own offset"
   easily and neighbour attribution only weakly. The closed-form detector exploits that structure
   directly, which is another reason this complements rather than replaces it.
+
+**Three feature-design notes:**
+
+- **Event age, without a normality threshold.** "How long has this series been abnormal?" is a
+  natural feature, and it needs no hand-coded normality threshold — an XGBoost split *is* a
+  learned threshold, so the model only needs continuous accumulator statistics of the whitened
+  residual and it will pick its own cutpoints. The simplest basis: signed **EWMAs of the
+  normalised residual at two or three half-lives** (say 12 hours, 3 days, 2 weeks) — one
+  `ewm_mean` per half-life, no thresholds anywhere. Duration is encoded in the relationship
+  between the columns: a fresh event makes the short-half-life EWMA large while the long one is
+  still small; a weeks-old event saturates all of them. A two-sided **CUSUM statistic** is the
+  fancier alternative — its magnitude grows roughly as shift-size × duration and it self-resets
+  at zero (its only parameter is the slack, set in whitened units), and "hours since the CUSUM
+  last touched zero" gives a literal event age if one is wanted. Either way, the accumulator
+  must be computed only from residuals available at `power_fcst_init_time` — the same
+  no-lookahead discipline as every other lag feature.
+- **Pooled neighbour features, not per-neighbour columns.** Neighbour context should enter as a
+  fixed, small set of permutation-invariant pooled features rather than one input per
+  neighbour: pooling keeps the feature schema identical for every series regardless of
+  neighbour count (which is what lets the design survive to V2 scale), and permutation
+  invariance matches the physics — *which* neighbour donated does not matter for forecasting
+  this series; attribution is the detector's job. The most informative pool is the **signed
+  neighbourhood sum**, because it carries the conservation fingerprint: a transfer makes this
+  series' residual and the neighbours' sum equal-and-opposite, while a regional NWP bust moves
+  both the same way. Complement it with the **signed residual of the most-anomalous
+  neighbour**, which covers the case the sum dilutes — one strongly anomalous neighbour among
+  several quiet ones — and keep the sign, since whether that neighbour gained or shed load is
+  exactly what predicts whether this series is about to give load back. The two families of features in
+  these notes compose: the sum of neighbours' residual EWMAs is "how long has the neighbourhood
+  been abnormal" in a single column.
+- **Plot every one of these features before feeding it to a model.** Residuals, event-age
+  accumulators, and neighbour pools are all easy to build subtly wrong — a flipped sign
+  convention, a mis-normalised spread, a missing availability cut — in ways a leaderboard
+  metric will not surface. Each engineered feature should be inspected visually, on the same
+  time axis as observed power and the model's forecast (and, in v1, the logged switching
+  events), before it enters an experiment. The planned interactive feature-visualisation tool
+  ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) — likely an
+  extension of the view-forecasts dashboard, with the switching labels overlaid — exists for
+  exactly this.
 
 The natural slot is immediately after implementation step 2 below (the baseline), as a measured
 cross-validation experiment; its result also doubles as evidence of the baseline's quality. So

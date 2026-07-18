@@ -335,7 +335,7 @@ features only and a quantile objective), then feed the production model normalis
 the model how *normal* each recent observation is, so it can carry a sustained switching-event
 offset forward instead of blending it into weather-driven variation.
 
-Three scheduling notes specific to this page:
+Four scheduling notes specific to this page:
 
 - **Run [item 5](#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
   first.** The config-only single-stage variant — aligned lagged-weather features, letting the
@@ -348,7 +348,18 @@ Three scheduling notes specific to this page:
   the one from just before forecast time. The strongest form is therefore *init-time-anchored*
   residual features ("normalised residual just before forecast time", "mean residual over the
   24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
-  signal that item 11's raw anchors mix in with ordinary weather-driven level variation.
+  signal that item 11's raw anchors mix in with ordinary weather-driven level variation. The
+  same anchoring extends to the threshold-free *event-age* accumulators from the full design
+  (residual EWMAs at a few half-lives, or a self-resetting CUSUM statistic): "how long has this
+  series been abnormal" with no hand-coded normality threshold, because trees learn their own
+  cutpoints from continuous accumulators.
+- **Inspect every feature visually before it enters an experiment.** Residuals, event-age
+  accumulators, and neighbour pools are easy to build subtly wrong (sign conventions,
+  normalisation, availability cuts) in ways the leaderboard will not surface; plot each one
+  against observed power — and the v1 switching-event labels — first. The planned
+  feature-visualisation tool
+  ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) is the
+  vehicle.
 - **It costs more than a config change.** The two-pass pipeline (fit the baseline per CV fold
   on that fold's training period only, hindcast residuals over history, join them in as
   features) is new machinery — the hindcast leg should consume the central NWP analysis-proxy
@@ -361,8 +372,10 @@ Three scheduling notes specific to this page:
   landing first (or an interim spread estimate, such as a rolling MAD of the residuals). The
   neighbour-residual variant additionally needs the trial-area adjacency list
   ([switching-events Part 5](switching-events.md#part-5-open-items-dependencies)) and
-  cross-series feature engineering; the self-residual version needs neither and should run
-  first. Finally, adopting a winner is not free either: the live service must then run the
+  cross-series feature engineering — entering as a fixed set of permutation-invariant pooled
+  columns (the signed neighbourhood sum and the signed most-anomalous neighbour; see the full
+  design), never one column per neighbour; the self-residual version needs neither and should
+  run first. Finally, adopting a winner is not free either: the live service must then run the
   baseline model too — a second deployed model plus a hindcast-residual step in the predict
   path.
 
