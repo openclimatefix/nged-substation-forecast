@@ -396,59 +396,6 @@ Each series currently gets its nearest NWP cell only. Add the mean and gradient 
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
 expected gain, cheap given the `geo` H3 machinery exists.
 
-### Weather-abnormality (climatology z-score) features
-
-Give the booster a sense of whether the *forecast* weather is abnormal — a heatwave, an
-unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
-`z = (x − μ) / σ` against a climatological norm for that calendar time. This promotes the
-[deferred feature-grammar note](#explicitly-deferred-not-quick-or-not-skill)'s
-weather-abnormality idea to a concrete first experiment. The inductive-bias case is the one the
-[weather-delta features](#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation)
-already make: a z-score is a difference of two continuous inputs, exactly the structure trees
-are otherwise bad at. A per-series booster could in principle learn "hot for June" from a
-`day_of_year × temperature` interaction, but on the 10⁴–10⁵ rows one series provides it mostly
-will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
-information it already holds.
-
-**Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
-*actual* (effective) temperature, which the Tier-2
-[effective-temperature and degree-day features](#effective-smoothed-temperature-and-degree-day-features)
-already capture. Where the anomaly carries genuinely new information is second-order:
-acclimatisation (25 °C in May prompts different behaviour than 25 °C in August), heatwave
-cooling load that is nonlinear in *how* abnormal the temperature is, and behavioural shifts on
-unseasonably nice days. Those effects are real but modest, and partly aliased with features the
-model will already have — a raw `day_of_year` ordinal beside temperature lets a tree approximate
-crude seasonally-conditional splits. So sequence this *after* effective temperature lands and
-treat "anomaly beats raw + calendar" as an explicit ablation, in the same spirit as the
-aligned-weather → delta → residual ladder. The one place it may punch above its weight is the
-v0.6 stage-1 [switching baseline](switching-events.md#the-baseline-shared-foundation): an
-unmodelled heatwave becomes exactly the phantom-event residual that baseline must avoid, and an
-anomaly feature gives it a way to explain the excursion away.
-
-**Source: ERA5, not CERRA.** The ingestion-cost objection that defers
-[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (CERRA
-pre-training) does not bite here: a climatology is a one-off *offline* computation with only a
-static lookup at inference, so no live CERRA pipeline is needed. CERRA is still the wrong source,
-though, for two reasons of its own. It ends in mid-2021, so the climatology cannot reflect the
-recent warm years and every z-score skews warm-positive; and, more importantly, z-scoring ECMWF
-ENS *forecasts* against a *different* model's climatology lets model-pair biases contaminate the
-anomaly. The clean choice is **ERA5** — same IFS lineage as the ENS forecasts, so those biases
-largely cancel; running to near-present; and at 31 km ample resolution, because weather anomalies
-are synoptic-scale and a heatwave does not vary meaningfully across an H3 cell. The most
-self-consistent source imaginable would be a climatology computed from our own archived ENS, but
-a robust day-of-year climatology wants 10+ years and the archive is nowhere near that yet, so
-ERA5 wins in practice.
-
-**Design.** Per grid cell, fit μ and σ as smooth functions of day-of-year and hour-of-day — a
-low-order harmonic fit or a ±15-day rolling window, because a raw per-calendar-day climatology is
-noisy even from 30 years of data — stash the coefficients as a small static Zarr, and emit
-`z = (x − μ) / σ` per weather variable. This slots into the `_parsed_features.py` derived-feature
-pattern today, and becomes the anomaly-vs-climatology combinator if the composable grammar ever
-materialises. Storms mostly do not need it — the
-[wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
-already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so scope the
-first experiment to *temperature* anomaly only.
-
 ### Residual lag features from the switching-detector baseline
 
 The full design and caveats live in the switching-events roadmap:
@@ -508,6 +455,79 @@ Four scheduling notes specific to this page:
   run first. Finally, adopting a winner is not free either: the live service must then run the
   baseline model too — a second deployed model plus a hindcast-residual step in the predict
   path.
+
+### Weather-abnormality (climatology z-score) features
+
+Give the booster a sense of whether the *forecast* weather is abnormal — a heatwave, an
+unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
+`z = (x − μ) / σ` against a climatological norm for that calendar time. This promotes the
+[deferred feature-grammar note](#explicitly-deferred-not-quick-or-not-skill)'s
+weather-abnormality idea to a concrete experiment. The inductive-bias case is the one the
+[weather-delta features](#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation)
+already make: a z-score is a difference of two continuous inputs, exactly the structure trees
+are otherwise bad at. A per-series booster could in principle learn "hot for June" from a
+`day_of_year × temperature` interaction, but on the 10⁴–10⁵ rows one series provides it mostly
+will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
+information it already holds. It sits at the end of Tier 3 because its expected win is modest
+(see below) yet it carries a new data-ingestion dependency — more effort per unit skill than the
+residual-lag features above it, which are expected to offer far more bang for the buck.
+
+**Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
+*actual* (effective) temperature, which the Tier-2
+[effective-temperature and degree-day features](#effective-smoothed-temperature-and-degree-day-features)
+already capture. Where the anomaly carries genuinely new information is second-order:
+acclimatisation (25 °C in May prompts different behaviour than 25 °C in August), heatwave
+cooling load that is nonlinear in *how* abnormal the temperature is, and behavioural shifts on
+unseasonably nice days. Those effects are real but modest, and partly aliased with features the
+model will already have — a raw `day_of_year` ordinal beside temperature lets a tree approximate
+crude seasonally-conditional splits. So sequence this *after* effective temperature lands and
+treat "anomaly beats raw + calendar" as an explicit ablation, in the same spirit as the
+aligned-weather → delta → residual ladder. The one place it may punch above its weight is the
+v0.6 stage-1 [switching baseline](switching-events.md#the-baseline-shared-foundation): an
+unmodelled heatwave becomes exactly the phantom-event residual that baseline must avoid, and an
+anomaly feature gives it a way to explain the excursion away.
+
+**Source: ERA5, for model-consistency with the forecasts.** Choose the climatology source by
+asking which one makes the z-score a *clean* anomaly. The input `x` is an ECMWF ENS *forecast*,
+so the cleanest baseline shares the ENS's own systematic biases — they then cancel in `(x − μ)`.
+That is **ERA5**: same IFS lineage as the ENS, running to near-present, and at 31 km ample
+resolution because weather anomalies are synoptic-scale — a heatwave does not vary meaningfully
+across an H3 cell. CERRA is the tempting alternative — higher-resolution, and since its 2025
+timely-update extension no longer stuck at 2021 but running to within a few months of present —
+but it is a *different* model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts
+against a CERRA climatology folds a model-pair bias into every anomaly. (CERRA stays fully viable
+for the project's other uses — [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
+pre-training, capacity estimation; it is only the wrong source *here*, where self-consistency
+with the forecast model is the whole point.) The most self-consistent source imaginable would be
+a climatology from our own archived ENS, but a robust day-of-year climatology wants 10+ years and
+the archive is nowhere near that yet, so ERA5 wins in practice.
+
+**Storage and ingestion — an H3-indexed Delta table built by a Dagster asset.** Store the
+climatology the way the rest of the project stores gridded weather: an **H3-indexed Delta table**
+keyed by `(h3_index, day_of_year, half_hour_of_day)` with a mean and standard-deviation column
+per weather variable — not a bespoke Zarr. Populate it with a **Dagster asset** that ingests ERA5
+into a Delta table (the same shape as the `ecmwf_ens` NWP ingest) plus a downstream asset that
+reduces it to the smoothed μ,σ grid, fitting each as a smooth function of day-of-year and
+half-hour-of-day (a low-order harmonic fit or a ±15-day rolling window, because a raw
+per-calendar-day climatology is noisy even from 30 years of data). This is the new-ingestion
+dependency that places the item late in the tier: no ERA5 source exists yet, so it wants an entry
+on the [data-sources roadmap](data-sources.md) first.
+
+Be precise about the update cadence, though — it is *not* near-real-time. A 30-year climatology
+is slowly varying, so the reducing asset recomputes only when a fresh chunk of ERA5 lands
+(monthly at most, and even yearly would barely move μ,σ). Nothing in the feature needs live data:
+μ and σ for a forecast's valid times — up to 14 days out — are fully determined in advance by the
+calendar, and the z-score itself is computed at feature-engineering time in `_parsed_features.py`
+from the forecast NWP value minus the climatology lookup. That derived-feature slot is also what
+lets this become the anomaly-vs-climatology combinator if the composable grammar ever
+materialises. (A *trailing-window* "how unusual versus the last few weeks" anomaly would need
+near-real-time ingestion — but that is a different, and weaker, feature than the climatological
+norm, and is not what this item builds.)
+
+**Scope the first experiment to temperature.** Storms mostly do not need this — the
+[wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
+already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so the first
+experiment carries a *temperature* anomaly only.
 
 ## Tier 4 — structural model changes (weeks)
 
