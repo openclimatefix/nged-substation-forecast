@@ -396,6 +396,59 @@ Each series currently gets its nearest NWP cell only. Add the mean and gradient 
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
 expected gain, cheap given the `geo` H3 machinery exists.
 
+### Weather-abnormality (climatology z-score) features
+
+Give the booster a sense of whether the *forecast* weather is abnormal — a heatwave, an
+unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
+`z = (x − μ) / σ` against a climatological norm for that calendar time. This promotes the
+[deferred feature-grammar note](#explicitly-deferred-not-quick-or-not-skill)'s
+weather-abnormality idea to a concrete first experiment. The inductive-bias case is the one the
+[weather-delta features](#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation)
+already make: a z-score is a difference of two continuous inputs, exactly the structure trees
+are otherwise bad at. A per-series booster could in principle learn "hot for June" from a
+`day_of_year × temperature` interaction, but on the 10⁴–10⁵ rows one series provides it mostly
+will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
+information it already holds.
+
+**Is the anomaly the signal, or is the raw value?** For GB demand the first-order response is to
+*actual* (effective) temperature, which the Tier-2
+[effective-temperature and degree-day features](#effective-smoothed-temperature-and-degree-day-features)
+already capture. Where the anomaly carries genuinely new information is second-order:
+acclimatisation (25 °C in May prompts different behaviour than 25 °C in August), heatwave
+cooling load that is nonlinear in *how* abnormal the temperature is, and behavioural shifts on
+unseasonably nice days. Those effects are real but modest, and partly aliased with features the
+model will already have — a raw `day_of_year` ordinal beside temperature lets a tree approximate
+crude seasonally-conditional splits. So sequence this *after* effective temperature lands and
+treat "anomaly beats raw + calendar" as an explicit ablation, in the same spirit as the
+aligned-weather → delta → residual ladder. The one place it may punch above its weight is the
+v0.6 stage-1 [switching baseline](switching-events.md#the-baseline-shared-foundation): an
+unmodelled heatwave becomes exactly the phantom-event residual that baseline must avoid, and an
+anomaly feature gives it a way to explain the excursion away.
+
+**Source: ERA5, not CERRA.** The ingestion-cost objection that defers
+[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (CERRA
+pre-training) does not bite here: a climatology is a one-off *offline* computation with only a
+static lookup at inference, so no live CERRA pipeline is needed. CERRA is still the wrong source,
+though, for two reasons of its own. It ends in mid-2021, so the climatology cannot reflect the
+recent warm years and every z-score skews warm-positive; and, more importantly, z-scoring ECMWF
+ENS *forecasts* against a *different* model's climatology lets model-pair biases contaminate the
+anomaly. The clean choice is **ERA5** — same IFS lineage as the ENS forecasts, so those biases
+largely cancel; running to near-present; and at 31 km ample resolution, because weather anomalies
+are synoptic-scale and a heatwave does not vary meaningfully across an H3 cell. The most
+self-consistent source imaginable would be a climatology computed from our own archived ENS, but
+a robust day-of-year climatology wants 10+ years and the archive is nowhere near that yet, so
+ERA5 wins in practice.
+
+**Design.** Per grid cell, fit μ and σ as smooth functions of day-of-year and hour-of-day — a
+low-order harmonic fit or a ±15-day rolling window, because a raw per-calendar-day climatology is
+noisy even from 30 years of data — stash the coefficients as a small static Zarr, and emit
+`z = (x − μ) / σ` per weather variable. This slots into the `_parsed_features.py` derived-feature
+pattern today, and becomes the anomaly-vs-climatology combinator if the composable grammar ever
+materialises. Storms mostly do not need it — the
+[wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
+already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so scope the
+first experiment to *temperature* anomaly only.
+
 ### Residual lag features from the switching-detector baseline
 
 The full design and caveats live in the switching-events roadmap:
@@ -519,7 +572,7 @@ Needs batched training at ensemble scale. The boundary of "quick".
   ever show a DST-transition artefact.
 - **A composable feature-expression grammar (consider designing later, deliberately not now).**
   The accumulator machinery of the residual-lag features generalises well beyond power residuals: EWMAs of *any*
-  base column at chosen half-lives (an EWMA of temperature *is* the effective-temperature feature), each either lagged in valid time or locked to `power_fcst_init_time` (the init-time-anchored features' anchoring), plus weather-*abnormality* features — how unusual the forecast weather is against
+  base column at chosen half-lives (an EWMA of temperature *is* the effective-temperature feature), each either lagged in valid time or locked to `power_fcst_init_time` (the init-time-anchored features' anchoring), plus the [weather-abnormality features](#weather-abnormality-climatology-z-score-features) (now a Tier-3 item of their own) — how unusual the forecast weather is against
   the climatological norm for that calendar time ("is this a heat wave?"). Feature names are
   already a tiny parsed language (`ParsedFeatures.from_strings()` turns strings into typed
   `LagFeature`/`RollingFeature`/`WeatherFeature`/... objects), so the natural end state is a
@@ -530,7 +583,7 @@ Needs batched training at ensemble scale. The boundary of "quick".
   [#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359): any feature a
   string can express could be tried interactively in the visualisation, then pasted into any
   model config unchanged. Deferred because grammar design done speculatively becomes an inner
-  platform — grow combinators only as experiments demand them, and revisit once aligned lagged weather, effective temperature, the init-time-anchored features, and the residual-lag features have shown which transforms actually earn their keep.
+  platform — grow combinators only as experiments demand them, and revisit once aligned lagged weather, effective temperature, the weather-abnormality features, the init-time-anchored features, and the residual-lag features have shown which transforms actually earn their keep.
 
 ## How each win is evaluated
 
