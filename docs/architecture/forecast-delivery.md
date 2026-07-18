@@ -98,7 +98,7 @@ couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), an
 What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
 on real forecast rows: ~356 bytes each), the same year of history would be roughly **45 terabytes on
 the wire — about 200× the Delta footprint**. Gzip narrows the gap to roughly 20×, but that still
-leaves ~4.5 terabytes of annual transfer. NGED wants routine access to all of it!
+leaves ~4.5 terabytes per year of data. NGED wants routine access to all of it!
 
 Multiply that per-year figure out across multiple years of history and multiple ML models and it
 keeps climbing: four years of history across two concurrently-run models already reaches **a
