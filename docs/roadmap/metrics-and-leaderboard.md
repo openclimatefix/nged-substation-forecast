@@ -88,15 +88,16 @@ worth stating plainly:
   `ensemble_member ⇒ NWP`. The incumbent *synthesises* its ensemble inside `predict()` (by
   unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
   runs with `weather_source: "none"`.
-- **Deterministic collapse: median for the headline, NGED's P95 reported alongside.** The headline
-  deterministic column collapses the 13 members to their **median** — a central estimate, so
-  `nged_incumbent` is compared apples-to-apples with every other model's central forecast.
-  Separately we report NGED's *actual* operating point, the **95th percentile**, as a labelled
-  secondary number: being deliberately conservative it carries a large *positive* MBE **by design**
-  (a peak-safety choice, not a forecasting error), so it belongs *beside* the central metric, not in
-  place of it. Either way NGED weight the analogues equally ("no further processing at all"), so
-  equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them — are
-  faithful, not an approximation.
+- **Deterministic collapse is a property of the metrics layer, not the incumbent.** The incumbent
+  emits its 13 members and nothing else; the [metric-matched collapse
+  decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE
+  on the members' median (apples-to-apples with every other model's central forecast) and reports
+  NGED's *actual* operating point — the **95th percentile** — as a labelled secondary number
+  (`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
+  *positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs
+  *beside* the central metric, not in place of it. Either way NGED weight the analogues equally ("no
+  further processing at all"), so equiprobable members — and the probabilistic metrics (CRPS etc.)
+  computed over them — are faithful, not an approximation.
 
 ### A faithful replica and a "cheap upgrades" variant
 
@@ -127,124 +128,210 @@ docs promise the interface is model-agnostic; today only `XGBoostForecaster` exe
 
 ### Implementation details — baselines (deleted when they ship)
 
-New workspace package `packages/baseline_forecasters/` mirroring the `xgboost_forecaster`
-layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`), hosting all the baselines
-below. Add to the root `pyproject.toml` `[tool.uv.sources]` and dependencies.
+Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
+baseline each. The `nged_incumbent_holiday_aligned` variant (described under [A faithful replica
+and a "cheap upgrades" variant](#a-faithful-replica-and-a-cheap-upgrades-variant)) is a later
+sixth PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
+closes.
 
-**1. `NGEDIncumbentForecaster` (`nged_incumbent`) — the faithful replica, built first.** Reuses
-the lag machinery exactly like persistence, but *combines* the members instead of coalescing to
-one:
+**Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
+mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`,
+`tests/`), added to the root `pyproject.toml` `[tool.uv.sources]` and dependencies. Every baseline
+subclasses `BaseForecaster` and rides the **identical** asset chain
+(`register_experiment_job` → `trained_cv_model` → `cv_power_forecasts` → `metrics`) that
+`XGBoostForecaster` uses — a `train()` that only records `trained_time_series_ids` and a
+`meta.json`-only `save()` cost nothing, and the uniform provenance is exactly what makes re-running
+routine. Re-running CV for any algo is then a native Dagster operation: select **`trained_cv_model++`**
+in the asset graph (two `+` — `metrics` is two hops downstream, so a single `+` would silently stop
+at `cv_power_forecasts` and skip scoring), choose the experiment's partitions, launch a backfill;
+the unpartitioned `metrics` asset materialises once afterwards with its default config (no filter,
+`leaderboard` scope). Verify this drill end-to-end on a smoke-test fold before documenting it — the
+Dagster version supports mixed partitioned/unpartitioned backfill selections, but confirm the UI
+behaviour rather than assuming it. To re-score a *single* experiment without touching the rest, use
+the `metrics` asset's `PopulationFilter` config instead.
 
-- `selected_features` = the 13 analogue lags `{"power_lag_168h", "power_lag_336h",
-  "power_lag_504h", "power_lag_672h", "power_lag_840h", "power_lag_1008h", "power_lag_8232h",
-  "power_lag_8400h", "power_lag_8568h", "power_lag_8736h", "power_lag_8904h", "power_lag_9072h",
-  "power_lag_9240h"}` — 6 weekly + 7 annual, per NGED's confirmed recipe. Keep the weekly count
-  and annual span config-driven so variants stay cheap to try.
-- `predict()` unpivots the analogue-lag columns into `ensemble_member` rows (member index =
-  analogue index) — this is where the ensemble is *synthesised*, not consumed from NWP. Members
-  nulled by `_nullify_leaky_lags` (lag ≤ lead time) or by insufficient history are dropped; rows
-  where *all* members are null (very long horizons + data gaps) are dropped and the count logged,
-  as in persistence. The members are the faithful output (NGED plot all 13 and read the spread by
-  eye). The headline deterministic point forecast is the **median** of the surviving members;
-  NGED's **P95** operating point is reported alongside (conservative by design → large positive MBE;
-  see prose above).
-- **Deterministic-scoring wrinkle:** `compute_metrics` currently collapses members by *mean* for
-  the deterministic metrics. Here the headline is the **median** plus NGED's **P95** as a secondary
-  operating-point column, so the metrics path needs a per-experiment collapse statistic *and* the
-  ability to emit more than one (`median` headline + `p95` alongside) — a small `compute_metrics`
-  extension, or have the forecaster carry designated point-forecast columns. Don't silently score
-  the members' mean and call it the incumbent.
-- `train()` records `trained_time_series_ids` only. `save`/`load` persist a `meta.json` with the
-  config + ids (copy the `XGBoostForecaster` pattern).
-- `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`; runs with `weather_source: "none"`.
-- **Schema doc change (this PR):** document the `ensemble_member` overload on `PowerForecast` and
-  `AllFeatures` — an NWP-member index for NWP models, a historical-analogue index for
-  `nged_incumbent`. Because this baseline *owns* the member dimension, it must **not** be
-  broadcast across the NWP members (contrast the deterministic baselines in item 5); this is the
-  case where a per-forecaster `uses_nwp_ensemble = False` flag actually earns its keep.
+**PR 1 — deterministic-collapse rework in `compute_metrics`.** Implements the [metric-matched
+collapse decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters
+emit **members only**; every collapse lives in the metrics layer, so there is no per-experiment
+collapse config and no designated point-forecast columns on `PowerForecast`. In
+`packages/ml_core/src/ml_core/metrics.py`:
 
-**2. `NGEDIncumbentForecaster` + holiday alignment (`nged_incumbent_holiday_aligned`) — immediate
-follow-up PR.** Same output shape and ensemble emission, but analogue *selection* becomes
-calendar-aware and so can no longer be a fixed set of lag columns:
+- In the per-run aggregation, emit both `power_fcst_mean` (`.mean()`) and `power_fcst_median` (reuse
+  the already-computed `q_p50` empirical-quantile column — Polars `.quantile(0.5, "linear")` is
+  exactly `.median()`), and keep `q_p95`.
+- Score `mae`/`nmae` on the median error; `rmse`/`mbe` on the mean error; the spread-skill
+  denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
+  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (NGED's operating point) and
+  `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already contains
+  `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change** — and
+  the primary key includes `metric_param`, so the new rows do not collide with the `metric_param="all"`
+  headline rows.
+- Extend the MLflow allowlist `_MLFLOW_LOGGED_PARAMETRIC` with `("mbe", "p95")` and `("mbe", "p50")`
+  so the operating-point bias and the median's bias appear on the leaderboard (aggregate keys come
+  out distinct, e.g. `mbe_p95__all` vs `mbe__all`).
+- Update the docstrings that currently say deterministic metrics are "scored on the per-run ensemble
+  mean" (`METRIC_NAMES` in `contracts/ml_schemas.py`), the `Metrics.metric_param` field description
+  (no longer pinball-only), and the `_MLFLOW_LOGGED_PARAMETRIC` key-count claims. The promoted
+  [evaluation-metrics reference](../techniques/evaluation-metrics.md) section must state explicitly
+  that MAE/NMAE and RMSE/MBE score *different point forecasts* and why (otherwise the first person to
+  recompute RMSE from the stored median members files a bug), and note the identity
+  `mae ≡ 2 × pinball_loss@p50` as a deliberate internal consistency check.
+- Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
+  single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
+  identity. Recompute existing expected values — never relax a test to absorb the shift.
+- No standalone re-score needed: the one backfill after PR 2 (below) covers it.
 
-- A bespoke picker maps each target `valid_time` to its source timestamps: bank-holiday targets
-  draw from prior bank holidays / the matching day-type (a bank-holiday Monday → Sundays), and
-  moveable feasts align holiday-to-holiday (Easter→Easter) rather than by fixed week offset.
-- GB bank-holiday calendar via the pure-Python `holidays` package (pandas-free).
-- `MODEL_NAME = "nged_incumbent_holiday_aligned"`, `MODEL_VERSION = 1`.
-- Keep this out of the first PR; it ships once baseline 1 lands. It exists to test the project
-  thesis that a few cheap upgrades recover most of the benefit.
+**PR 2 — CV predict-path framework: `uses_nwp_ensemble`, power-lag lookback, `ensemble_member`
+docs.** Three changes to the shared rails, none baseline-specific.
 
-**3. `PersistenceForecaster` (seasonal-naive) — diagnostic bookend.** Reuse the existing lag
-machinery instead of writing any new time-series logic:
+- **`uses_nwp_ensemble: ClassVar[bool] = True` on `BaseForecaster`.** `cv_power_forecasts` passes
+  `ensemble_members=[0]` to `_load_engineering_inputs` when a class sets it `False`. Semantics to
+  document: `True` → the forecaster consumes the NWP member axis (output members = NWP members);
+  `False` → the forecaster does **not fan out across NWP members** — it either passes member 0
+  through (persistence) or synthesises its own member axis (`nged_incumbent`: 13 analogues;
+  `climatology`: quantile-derived members). This is model-family identity, like `MODEL_NAME`, so a
+  `ClassVar` is correct — and the class is resolved from the experiment's `forecaster_target` MLflow
+  tag *before* inputs are loaded, so the flag is available in time. Document alongside it that
+  `weather_source: "none"` does **not** mean "no NWP input": in bulk mode the control-member NWP scan
+  defines the shared `(init_time, valid_time)` forecast-run grid, which is what keeps every
+  leaderboard row — baseline or ML — scored on the identical grid.
+- **Power-lag lookback at feature-engineering load time.** Today `_load_engineering_inputs` filters
+  power to `[window_start, window_end]`, and `_apply_power_lag` reads lags from that same frame — so
+  any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
+  null for the first fortnight of every validation window, and the incumbent's 49–55-week lags would
+  be null for all but roughly the last three weeks of the fold (lag targets only re-enter the window
+  from `val_start + 49 weeks`). Fix: a `power_lookback: timedelta` parameter that widens **only the
+  power scan's** lower bound (`window_start − power_lookback`); callers derive it from the
+  experiment's `selected_features` via `ParsedFeatures` (max power-lag hours), so it is automatic
+  per-experiment (~2 weeks for XGBoost, ~55 weeks for the incumbent). Safe because the bulk-mode
+  spine is NWP-centric (`_join_nwp_bulk_mode` left-joins power *onto* NWP rows), so the extra early
+  power rows feed only the lag lookup and add no spine rows and no label rows (labels live on spine
+  rows, bounded by the NWP `valid_time` filter); and `_nullify_leaky_lags` (which nulls any lag with
+  `lead ≥ lag_hours`) still guards leakage, so a longer lookback cannot leak. Apply to both
+  `trained_cv_model` and `cv_power_forecasts`. `LIVE_POWER_HISTORY` in `production_assets.py` is a
+  hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
+  parameter so a future long-lag live model is not silently starved. Add a comment where
+  `cv_power_forecasts` re-scans the widened power window per `init_time` chunk (cheap next to NWP,
+  but worth flagging so nobody blames the wrong thing when profiling).
+- **Document the `ensemble_member` overload** on `PowerForecast` and `AllFeatures`: an NWP-member
+  index for NWP-consuming models, a historical-analogue index for `nged_incumbent`, a
+  quantile-sample index for `climatology`. Nobody may assume `ensemble_member ⇒ NWP`.
+- Tests: a dummy `uses_nwp_ensemble = False` forecaster exercising the member-0 path; a feature-
+  engineer test that a 336 h lag at the window edge is non-null *with* lookback while the spine row
+  count is unchanged; the leak test unchanged; the single-run (live) path unaffected by
+  `power_lookback`.
+- **After PRs 1 + 2 land back-to-back, run one `trained_cv_model++` backfill over every existing
+  experiment partition** — retrain, re-predict, and re-score everything under the fixed lag lookback
+  and the new collapse. This is deliberately the exact "re-run everything after a pipeline fix"
+  drill, and it doubles as the empirical verification of the backfill mechanics before the recipe is
+  written into `docs/ml_experimentation/dagster-workflow.md`. Treat both PRs as a single leaderboard
+  epoch event, since each shifts existing numbers.
 
-- `selected_features` = `{"power_lag_24h", "power_lag_48h", "power_lag_168h",
-  "power_lag_336h"}` (configurable in the config, this is the default).
-- `predict()` = `pl.coalesce` of the lag columns in ascending-lag order. The existing
-  `_nullify_leaky_lags` already nulls any lag ≤ lead time, so coalesce naturally selects the
-  *shortest non-leaky* lag per row — same-time-yesterday for day-1 horizons, last-week for
-  day 2–7, two-weeks-ago beyond that. Zero lookahead risk because it rides the audited pipeline.
-- `train()` records `trained_time_series_ids` only (nothing to fit). `save`/`load` persist a
-  `meta.json` with the config + ids (copy the pattern from `XGBoostForecaster`).
-- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`.
-- Rows where all lags are null (long horizons + data gaps): drop those rows from the output
-  (`PowerForecast.power_fcst` presumably non-nullable — check) and log the dropped count.
+**PR 3 — package skeleton + `PersistenceForecaster` (seasonal-naive; the cheapest end-to-end
+probe).** Ships the package and proves the PR-2 framework on the simplest model.
 
-**4. `ClimatologyForecaster` — diagnostic bookend, and our *pure* probabilistic climatology
-reference.** `nged_incumbent` is also probabilistic and weather-free, but it is a hybrid —
-persistence-like weekly recency plus climatology-like annual seasonality — so it does not
-isolate the calendar-only distribution. This baseline does: its spread is the unconditional
-seasonal/time-of-day distribution of power, with no recency and no weather, which is exactly the
-"skill floor" the NWP ensemble has to clear at long horizons.
+- Shared helper `_meta_io.py`: the `meta.json` save/load round-trip (config dump,
+  `trained_time_series_ids`, the fully-qualified `model_class`). No `StatelessForecaster` base class
+  until a third stateless model exists.
+- `MODEL_NAME = "persistence"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`. Config default
+  `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
+- `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
+  mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
+  lag columns in ascending-lag order — `_nullify_leaky_lags` nulls any lag with `lead ≥ lag_hours`
+  (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest *non-leaky*
+  lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
+  lookahead risk because it rides the audited pipeline. Output keeps the spine's `ensemble_member`
+  (= 0 only, given member-0 inputs), cast UInt8 → Int8 via an *expression* cast, following
+  `XGBoostForecaster._build_part` (a dict-`.cast({...})` on the concat-of-group-by frames would hit
+  the Patito cast trap). Rows where all lags are null are dropped, the count logged, and the
+  per-series dropped/coverage counts recorded in asset metadata.
+- `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
+- Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row
+  dropping; `save`/`load` round-trip freezing ids) plus an integration smoke fold via the
+  `tests/test_trained_cv_model.py` fixture pattern.
+- Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
+  overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
+  interval width degenerate (expected and ignorable for a deterministic baseline).
+- **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out and
+  its `all` / `extended_range` aggregates cover a shorter lead population than other models'. Fair
+  CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers are
+  read, backed by the per-series coverage counts in asset metadata.
 
-- `train()`: collect `(time_series_id, valid_time, power)` from the features frame and, per
-  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the **empirical quantiles**
-  of that cell's training-window power samples at the thirteen NGED delivery quantile levels
-  (`contracts.common.DELIVERY_QUANTILES`) — not just the mean. Store as a small Polars frame;
-  `save` writes it as one parquet + `meta.json`.
-- `predict()`: join the lookup onto the prediction rows by the same keys, then unpivot the
-  thirteen quantile columns into `ensemble_member` rows (member index = quantile index) — the
-  same shape `nged_incumbent` uses. The headline deterministic point forecast is the **median**
-  (the p50 quantile column).
-- `selected_features` needs only the target join — reuse existing time features
-  (`local_time_of_day_*` etc.) or derive month/half-hour directly from `valid_time` inside the
-  forecaster; prefer deriving directly to keep the feature list empty.
-- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`.
-- **Why a distribution, not a mean:** a deterministic climatology forecast collapses CRPS to
-  MAE, so it can only ever be compared against the ML ensemble on point accuracy — exactly the
-  axis a squared-error XGBoost is built to win. The claim we actually need to test is
-  distributional: does the 51-member NWP-driven ensemble know more about day 8–14 power than the
-  plain seasonal/time-of-day distribution does, or is it just dressing up climatology in
-  weather-shaped clothing? (See [Probabilistic forecasting from NWP
+**PR 4 — `NGEDIncumbentForecaster` (`nged_incumbent`; the deliverable).** The faithful replica,
+landing on a now-proven rail.
+
+- `MODEL_NAME = "nged_incumbent"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`,
+  `weather_source: "none"`. Config `n_weekly_analogues = 6` and `annual_week_span = (49, 55)` drive
+  the 13 analogue lags (weekly `168h × {1..6}`; annual `168h × {49..55}` = 8232…9240 h — all within
+  the feature parser's 17 520 h cap), with `selected_features` derived from them so variants stay one
+  override cheap.
+- `predict()` unpivots the 13 analogue-lag columns into `ensemble_member` rows (member index =
+  analogue index; Int8 holds 0–12). Members nulled by `_nullify_leaky_lags` (as lead time grows, the
+  short weekly members shed first) or by insufficient history are dropped; rows where *all* members
+  are null are dropped with the count logged and per-series surviving-member counts recorded in asset
+  metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline and the
+  p95 / p50 labelled rows.
+- Depends on PR 2's lookback (the 55-week annual lags are all-null without it).
+- **Data check before interpreting results:** `val_start − 55 weeks` ≈ mid-2024. Confirm which
+  eligible series actually have observations that far back — eligibility requires only
+  `min_training_months` of history, so a series can qualify yet have too little for the annual
+  analogues, degrading silently to a weekly-only (≤6-member) ensemble. Nothing crashes and fair CRPS
+  stays size-comparable, but the leaderboard means then average differently-shaped ensembles across
+  series, so surface the per-series member counts rather than discovering it later in a dashboard.
+- Tests: hand-computed unpivot to the expected members; the median, p95, and p50 collapses match
+  hand-computed values through `compute_metrics`; leaky-lag shedding as lead grows; `save`/`load`
+  round-trip; an integration smoke fold with a synthetic power history spanning the annual lags.
+  Sanity-check: the median is a roughly unbiased central estimate while `mbe@p95` shows a clear
+  positive bias (the conservative operating point — **not** a bug); no short-horizon skill (the
+  shortest member is a week old, which is realistic).
+- Ship-time triage: delete this item's details (summary → PR body); cross-link the [NGED's incumbent
+  forecast](../background/nged-incumbent-forecast.md) background page.
+
+**PR 5 — `ClimatologyForecaster` (`climatology`; the pure probabilistic reference).** The calendar-
+only skill floor the NWP ensemble must clear at long horizons.
+
+- `MODEL_NAME = "climatology"`, `MODEL_VERSION = 1`, `uses_nwp_ensemble = False`.
+- `train()`: from the features frame take `(time_series_id, valid_time, power)` and **dedupe on
+  `(time_series_id, valid_time)` first** — bulk-mode `AllFeatures` repeats each target row once per
+  covering `(nwp_init_time, ensemble_member)` (~15× at a 15-day horizon), so without the dedupe the
+  per-cell samples would be weighted by NWP-run coverage rather than by calendar. Then, per
+  `(time_series_id, month, half-hour-of-day, is_weekend)` cell, store the empirical quantiles of that
+  cell's power samples. Cell keys derive from **local** (Europe/London) time computed inside the
+  forecaster from `valid_time`, aligning with the demand rhythm (and matching the `local_*` time
+  features). `save()` writes the lookup as one parquet + `meta.json`.
+- **Member emission — deliberate deviation from an earlier draft.** Emit members at *equiprobable*
+  quantile levels `(i − 0.5)/m`, **not** at the tail-heavy `DELIVERY_QUANTILES` levels. Fair CRPS and
+  the per-run empirical delivery quantiles the metrics layer derives from members treat members as an
+  equiprobable sample; feeding 13 members at the delivery levels in with equal weight would put 7.7 %
+  of the mass at `q(0.01)` and `q(0.02)`, i.e. an ensemble materially wider-tailed than the
+  climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The delivery
+  quantiles are still produced — by `compute_metrics`' per-run quantile aggregation, same as every
+  other model. Keep `m = 13`: over the ~14-month training window a weekend cell holds only ~9–17
+  samples (weekday ~21–43), so quantile levels below ~0.06 are already min-sample extrapolation and
+  51 members would be false precision plus ~4× more `power_forecasts` rows; only raise it with
+  empirical justification.
+- `predict()`: join the lookup onto the prediction rows by the cell keys (rows in an unseen cell
+  dropped with the count logged), then unpivot the quantile columns into `ensemble_member` rows.
+- **Why a distribution, not a mean:** a deterministic climatology forecast collapses CRPS to MAE, so
+  it could only be compared against the ML ensemble on point accuracy — the axis a squared-error
+  XGBoost is built to win. The claim we need to test is distributional: does the NWP-driven ensemble
+  know more about day 8–14 power than the plain seasonal/time-of-day distribution, or is it dressing
+  up climatology in weather-shaped clothing? (See [Probabilistic forecasting from NWP
   ensembles](../techniques/probabilistic-forecasting.md#long-horizons-are-not-automatically-safe).)
-  Only a quantile/ensemble climatology answers that, via `crps__all__extended_range` head-to-head
-  against the ML models. Like `nged_incumbent`, this baseline owns its own member axis (see the
-  `uses_nwp_ensemble` flag in item 5) — it must not be broadcast across the 51 NWP members.
-- **Follow-up once this ships:** overlay the climatology forecast as an always-on reference band
-  in the `view_forecasts` dashboard, so the weather-driven fan can be read against the
-  calendar-only skill floor by eye — the visual twin of the `crps__all__extended_range`
-  comparison above ([#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354),
-  blocked by this work).
-
-**5. Configs and registration.**
-
-- `conf/model/nged_incumbent.yaml`, `conf/model/persistence.yaml`,
-  `conf/model/climatology.yaml` (and later `conf/model/nged_incumbent_holiday_aligned.yaml`)
-  following `conf/model/xgboost.yaml`'s `_target_` structure, with `weather_source: "none"`.
-- `PowerForecast.nwp_init_time` is already nullable for exactly this case
-  (`power_schemas.py:242`); confirm `cv_power_forecasts` tolerates it end-to-end.
-- **Ensemble members:** for the one genuinely *deterministic* baseline (persistence) the CV
-  predict path feeds all ~51 members and they produce identical forecasts per member — wasteful
-  but harmless (the ensemble mean is unchanged); v0.3 accepts it. `nged_incumbent` and
-  `climatology` are different: each emits its own 13-member ensemble (analogues and quantiles
-  respectively), so broadcasting either across the 51 NWP members would be wrong, not merely
-  wasteful. A per-forecaster `uses_nwp_ensemble` class flag (default `True`) that
-  `cv_power_forecasts` honours — restricting the deterministic baseline to member 0 and letting
-  `nged_incumbent` and `climatology` each own their member axis — resolves both at once.
-
-**6. Run and publish.** Register each via `register_experiment_job` (`run_mode: smoke_test`
-first, then `full_cv`) and materialise `trained_cv_model` → `cv_power_forecasts` → `metrics`
-so each appears in MLflow as a leaderboard row.
+  Only a quantile/ensemble climatology answers that, via `crps__all__extended_range` head-to-head.
+  Caveat to record where that comparison is read: a *deterministic-quantile* ensemble slightly
+  out-scores an i.i.d. ensemble of the same size under fair CRPS (a known property of Ferro's
+  correction), so climatology carries a small structural edge in exactly this comparison — read a
+  near-tie as "the NWP ensemble is worth little out here", not as climatology winning outright.
+- Known limitation, documented not solved: small per-cell samples make the tail quantiles noisy;
+  pooling adjacent months is a possible refinement if the numbers look ragged.
+- Tests: hand-computed per-cell quantiles; the dedupe (a duplicated spine must not change the
+  quantiles); `save`/`load` round-trip; an integration smoke fold; CRPS flows over the members.
+- Ship-time triage: unblocks
+  [#354](https://github.com/openclimatefix/nged-substation-forecast/issues/354) (the dashboard
+  climatology reference band). As the last 🚧 baseline item, delete the whole "Implementation
+  details — baselines" section (summary → PR body), close #147, and update the status banner plus the
+  milestone section in [`docs/roadmap/index.md`](index.md) if the arc changed.
 
 **Recipe confirmed by NGED (July 2026).** No open questions remain. Full write-up in
 [NGED's incumbent forecast](../background/nged-incumbent-forecast.md); the implementation spec:
@@ -252,26 +339,19 @@ so each appears in MLflow as a leaderboard row.
 - **Weekly analogues:** the last **6** weeks, same weekday & time-of-day.
 - **Annual analogues:** the **seven** weeks spanning **49–55 weeks back**, same weekday & time.
 - **Deterministic value:** NGED's own operating point is the **95th percentile** of all 13 analogue
-  values ("more of a vibe") — we report it alongside a **median** headline (see item 1).
+  values ("more of a vibe") — reported alongside the metric-matched **median** headline (PR 1).
 - **No further processing:** no weighting, no holiday handling, no anomaly rejection, no
-  load-growth scaling. (This is precisely why the holiday-aligned variant in item 2 is a genuine,
-  un-done upgrade — not a reimplementation of something NGED already do.)
+  load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
+  upgrade — not a reimplementation of something NGED already do.)
 
-**Verification.** (1) Unit tests in `packages/baseline_forecasters/tests/`: `nged_incumbent`
-unpivots to the expected 13 members and both its **median** (headline) and **P95** (operating-point)
-collapses match hand-computed values; persistence picks the shortest non-null lag; climatology's
-quantile lookup unpivots to the expected 13 members and matches hand-computed empirical quantiles
-per cell; all three round-trip through `save`/`load` and freeze `trained_time_series_ids`. (2)
-Smoke-test fold end-to-end via the existing integration-test pattern
-(`tests/test_trained_cv_model.py` fixtures), and confirm both `nged_incumbent`'s and
-`climatology`'s member ensembles flow through the Phase B probabilistic metrics (e.g. CRPS
-computes over their members). (3) Sanity-check the numbers: persistence NMAE should be *worse
-overall* than XGBoost but plausibly competitive at short horizons; `nged_incumbent`'s median
-should be a roughly unbiased central estimate while its reported **P95** shows a clear positive MBE
-(the conservative operating point) — even where its CRPS over the 13 members is competitive; don't
-mistake the P95 bias for a bug. Watch `climatology`'s `crps__all__extended_range` in particular —
-if it comes within noise of the ML ensemble's at day 8–14, that is the quantitative answer to
-"how much is the NWP ensemble actually worth this far out", not a failure to investigate away.
+**Cross-cutting.** (1) **Issue hygiene:** create one tracked sub-issue per PR under epic
+[#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) / #147 following the
+CLAUDE.md issue-creation rules (labels, Type, OCF project fields, sub-issue ordering), *including*
+one for `nged_incumbent_holiday_aligned` so it survives #147 closing. (2) **Re-run recipe:** add a
+short "Re-running CV for an experiment" subsection to `docs/ml_experimentation/dagster-workflow.md`
+describing the `trained_cv_model++` backfill, written only after the drill is verified end-to-end,
+and mentioning `PopulationFilter` for single-experiment scoring. (3) **MLflow re-logging** on a
+re-run is idempotent in effect (latest value wins; history accumulates harmlessly).
 
 ---
 
@@ -376,31 +456,75 @@ and nothing is logged to the leaderboard MLflow runs.
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
 
-### ⚠️ Unresolved: which ensemble collapse defines the deterministic point forecast? 🚧
+### Which ensemble collapse defines the deterministic point forecast? 🚧
+
+**Decided: metric-matched collapse, uniform across every model.** Implemented as part of the
+baseline work ([PR 1 in the baseline implementation
+details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning below is the
+durable design rationale, promoted to
+[the evaluation-metrics reference](../techniques/evaluation-metrics.md) when that PR ships.
+
+#### The problem
 
 The deterministic metrics (MAE, NMAE, RMSE, MBE) score a **single point forecast**, but every model
-on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical
-analogues for `nged_incumbent`). Something has to collapse each ensemble to one number, and **that
-choice is not yet consistent across models**:
+on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical analogues
+for `nged_incumbent`; a quantile sample for `climatology`). Something has to collapse each ensemble
+to one number. `compute_metrics` today collapses every ensemble to its **mean**
+(`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
+different models would be scored on *different* collapses — e.g. the ML models on their mean and
+`nged_incumbent` on the median NGED effectively reads off its analogue spread. Mean and median
+diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
+is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
-- `compute_metrics` today collapses every ensemble to its **mean**
-  (`packages/ml_core/src/ml_core/metrics.py`).
-- The [`nged_incumbent` baseline](#the-headline-baseline-nged_incumbent) instead wants its headline
-  to be the **median** (plus NGED's P95 reported alongside).
+#### Mean versus median — the trade-off
 
-Mean and median diverge for skewed or underdispersed ensembles, so a leaderboard that scores some
-models on their mean and others on their median is **not apples-to-apples** on the deterministic
-columns — a silent trap that will quietly mis-rank models.
+The instinct is to "pick one central statistic and apply it everywhere". But mean and median are not
+interchangeable, and the reason is the crux of the decision:
 
-**Decision to make (flagged, not yet resolved):** pick **one** central statistic for the headline
-deterministic column — applied uniformly to *every* model — and treat any other collapse (NGED's
-P95, an ML model's own mean, etc.) strictly as an *extra, labelled* column, never the headline. The
-median is the more defensible uniform choice (robust to the skew and to the underdispersion the
-[probabilistic section](#delivering-the-probabilistic-metrics) documents), but standardising on it
-means changing the ML models' deterministic collapse from mean → median, which shifts every existing
-deterministic number. Resolve this *before* the leaderboard is used to adjudicate between models;
-it pairs naturally with the per-experiment collapse-statistic work noted in the
-[baseline implementation details](#implementation-details-baselines-deleted-when-they-ship).
+- The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is
+  a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
+  is *consistent* with the mean. Our squared-error XGBoost models literally learn a conditional
+  mean, and the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the
+  mean on RMSE rewards a model for doing the statistically correct thing; the mean also averages out
+  member noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
+  verification practice.
+- The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
+  *consistent* with the median. It is robust to the skew that is real in this problem (holiday
+  weeks, solar clipping) and to the ensemble underdispersion the [probabilistic
+  section](#delivering-the-probabilistic-metrics) documents, it is the faithful reading of NGED's
+  equally-weighted analogue spread, and it is coherent with the quantile columns already on the
+  leaderboard: median MAE is exactly `2 × pinball_loss@p50`, so a median headline makes the
+  deterministic and probabilistic columns tell one story.
+
+The key realisation is that **MAE and RMSE elicit *different* functionals, so no single collapse is
+fair on both columns.** A uniform median is inconsistent for RMSE (it penalises squared-error models
+for forecasting their honest mean); a uniform mean is inconsistent for MAE (a model could improve its
+MAE ranking by warping its forecast away from its honest mean — Gneiting 2011, *Making and Evaluating
+Point Forecasts*). The apples-to-apples requirement is only that the collapse be uniform *across
+models*, not *across metrics*.
+
+#### The decision
+
+Score each deterministic metric on the ensemble collapse it is consistent with, **the same way for
+every model**:
+
+- **MAE / NMAE ← ensemble median** (NMAE is the headline cross-series metric, so the headline is
+  effectively median-based).
+- **RMSE / MBE ← ensemble mean.**
+- **Spread-skill ratio ← ensemble mean, internally, unchanged** — its Fortin calibration target
+  (RMSE of the ensemble mean = `√((m+1)/m) ×` RMS spread, so "1.0 = calibrated") is *defined*
+  against the mean; switching its internal collapse would silently break that reading.
+
+Everything else is an **extra, labelled** row, never a headline: NGED's **P95** operating point
+(`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large positive MBE that belongs
+*beside* the central number, not in place of it), and the **median's own bias** (`mbe` at
+`metric_param="p50"`, so the delivered central forecast has an honest bias number distinct from the
+mean's energy-balance bias). No model is structurally disadvantaged on any column — which a single
+uniform statistic cannot achieve — and the trap is closed because the collapse is uniform across
+models. Because the collapse lives entirely *downstream* of the stored forecasts, switching it
+re-scores the whole leaderboard from a single `metrics` re-materialisation with no retraining or
+re-prediction — and doing it now, before the leaderboard adjudicates anything, is the cheapest moment
+to shift every existing deterministic number.
 
 ### Normalising NMAE by `effective_capacity`
 
