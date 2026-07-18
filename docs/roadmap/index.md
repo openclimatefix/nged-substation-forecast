@@ -139,10 +139,10 @@ only for first month, then shared with NGED. (v0.6 vs v0.7: we don't yet know wh
 events and capacity estimation will actually land first — but naming one v0.6 and the other v0.7
 beats the ambiguity of "v0.6 or v0.7"; we'll swap them later if reality disagrees.)*
 
-- Detect "abnormal running arrangement" events from the power time series alone, using statistical methods — see [Switching events & latent demand](switching-events.md)
-- Ingest the NGED supporting files the detector needs (substation adjacency, switching logs as the validation oracle)
-- Use the detected switching events to clean training data: train XGBoost only on "normal arrangement" periods
-- Populate the `substation_switching` Delta table
+- Build the shared switching infrastructure: the stage-1 weather/calendar baseline, normalised residuals, the labelled event table, and the synthetic-injection harness — see [Switching events & latent demand](switching-events.md)
+- Ingest the NGED supporting files this needs (substation adjacency, switching logs)
+- Make the forecaster switching-aware with residual, event-age, and pooled-neighbour features, and run the v1 label-exclusion experiments — the feature-based mainline
+- Conditional — see [the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector): the discrete detector (changepoint detection and attribution), training-data cleaning from detected events, and the `substation_switching` Delta table
 
 ---
 

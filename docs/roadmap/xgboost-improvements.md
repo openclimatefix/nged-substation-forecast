@@ -106,9 +106,12 @@ question, and this config-only variant is the cheap way to start answering it.
 
 **Pros, relative to the two-stage residual pipeline:**
 
-- **Almost free.** A config change: no two-pass pipeline, no per-fold baseline training, no
-  dependency on the central NWP analysis-proxy function
-  ([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)).
+- **Almost free.** A config change: no two-pass pipeline, no per-fold baseline training. (One
+  caveat is shared rather than avoided: lagged weather at past target times rides the same
+  freshest-NWP-run join as item 13's residual hindcasts — a join with no publication-time cut,
+  leak-free today only as a side effect of daily run cadence — so the availability cut planned
+  in [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356) hardens this
+  item and item 13 alike.)
 - **No fold-hygiene leakage risk.** The two-stage design's subtlest failure mode — a baseline
   trained on data that overlaps the evaluation fold — cannot occur, because there is no
   baseline model.
@@ -128,9 +131,10 @@ question, and this config-only variant is the cheap way to start answering it.
   10⁴–10⁵ training rows — not the regime in which a tree ensemble reliably discovers a
   multi-variable implicit baseline within interactions.
 - **The training signal for the implicit baseline is weak.** The two-stage design learns
-  weather → power as a *nowcast*, where every row's target is the concurrent power. Here the
-  same function must be learned only through its indirect effect on predicting *future* power,
-  where the anomaly signal matters strongly on only the ~10% of switching-affected rows.
+  weather → power as a direct regression — every training row's target is the power concurrent
+  with the weather input. Here the same function must be learned only through its indirect
+  effect on predicting *future* power, where the anomaly signal matters strongly on only the
+  ~10% of switching-affected rows.
 - **Feature-count explosion — worst for neighbours.** Each power lag brings roughly a dozen
   aligned weather columns; that is tolerable for the self-series, but the conservation
   fingerprint that item 13's neighbour variant targets would need each *neighbour's* lagged
@@ -192,7 +196,7 @@ GB demand responds to *lagged* temperature (building thermal inertia), not insta
 National Grid's demand models use an exponentially-smoothed "effective temperature". Add an
 EWM of `temperature_2m` over the past ~1–3 days (computed from the NWP trajectory itself, so
 horizon-safe) plus heating-degree `max(15.5 − T, 0)`. Linearises the demand–temperature
-relationship the same way item 8 does for generation.
+relationship the same way item 9 does for generation.
 
 ### 9. Linearised physics features for solar and wind
 
@@ -365,15 +369,17 @@ Four scheduling notes specific to this page:
   ([#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359)) is the
   vehicle.
 - **It costs more than a config change.** The two-pass pipeline (fit the baseline per CV fold
-  on that fold's training period only, hindcast residuals over history, join them in as
+  on that fold's training period only; hindcast residuals over history, generating the
+  booster's *training-row* residuals out-of-sample for the baseline via rolling-origin refits,
+  so the booster never calibrates on in-sample residuals it will not see live; join them in as
   features) is new machinery — the hindcast leg should consume the central NWP analysis-proxy
   function planned in
   [#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356), which owns the
-  publication-time availability cut the no-lookahead caveat requires. And while the baseline's *feature list* is just config, its
-  quantile fit is not: the forecaster has no quantile-objective support today, so residual
-  *normalisation* depends on the
+  publication-time availability cut the no-lookahead caveat requires. And while the baseline's
+  *feature list* and robust median objective are both just config, residual *normalisation*
+  needs a per-series spread estimate — from the
   [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-  landing first (or an interim spread estimate, such as a rolling MAD of the residuals). The
+  once it lands, or an interim rolling MAD of the residuals. The
   neighbour-residual variant additionally needs the trial-area adjacency list
   ([switching-events Part 5](switching-events.md#part-5-open-items-dependencies)) and
   cross-series feature engineering — entering as a fixed set of permutation-invariant pooled

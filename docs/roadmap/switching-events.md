@@ -79,13 +79,14 @@ time-of-day, day-of-week (holiday flags are a
 [planned quick win](xgboost-improvements.md#2-uk-holiday-and-calendar-features)) — through the
 existing feature pipeline. Configuring it with **no power-lag features** yields the
 switching-independent baseline (a lag feature would smuggle the lagged-power contamination above
-back in through the side door). Fit with a **quantile (median) objective**, which doubles as the
-robust loss required below; fitting additional quantiles (e.g. 10%/90%) gives a per-series,
-per-time spread estimate for free — used by the normalisation step below. That quantile fit is
-the one piece of genuinely new machinery here: the forecaster has no quantile-objective support
-today, so the baseline depends on the
+back in through the side door). Fit with a **robust (median) objective**, which doubles as the
+robust loss required below — a median (absolute-error) fit is a config-only change to the
+existing forecaster today. The per-series, per-time spread estimate used by the normalisation
+step below can come from either of two sources: additional quantile heads (e.g. 10%/90%) once
+the
 [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-landing first.
+lands — the tidiest option — or an interim rolling MAD of the residuals. The baseline is
+therefore not hard-blocked on that model family.
 
 **What "normal" means for demand-driven series — the behavioural calendar.** For weather-driven
 series (PV, wind), "normal for this weather at this time of day" is well-defined and the
@@ -126,7 +127,7 @@ exists to find.
 
 **Three residual-contamination routes to handle:**
 
-- *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data. In **v1 we also hold NGED's logged switching events**, which enables the cleanest option of all: train the baseline with labelled event periods excluded. Labels will not exist beyond the trial area, so v1 should run this as a *pair* of experiments — the stage-1 baseline trained **with and without** labelled-event exclusion. The measured gap between the two is exactly the contamination penalty that the robust fit fails to absorb, i.e. the price the label-free V2 fleet will pay — cheap to measure now, impossible to measure later.
+- *Training-set contamination.* If the baseline is fitted on history that itself contains switching events, the fit is biased toward those contaminated periods. Fit **robustly** (quantile or Huber loss), or iteratively: fit → flag large residuals as candidate events → refit excluding them. Because events occupy only ~10% of the time, a robust fit recovers the NRA relationship and the events fall out as residuals. This closes a virtuous loop with the detector itself — detected events feed back to clean the baseline's training data. In **v1 we also hold NGED's logged switching events**, which enables the cleanest option of all: train the baseline with labelled event periods excluded. Labels will not exist beyond the trial area, so v1 should run this as a small experiment family: the stage-1 baseline trained **with and without** labelled-event exclusion, plus a third arm that excludes the *same volume* of randomly chosen non-event periods — the random-exclusion control separates the effect of removing contamination from the effect of simply training on less data. Score all arms on out-of-event periods only: during a logged event the metered target is precisely what a label-clean model is *supposed* to disagree with, so in-event scoring would penalise the cleaner model for being right. The gap between the labelled-exclusion arm and the random-exclusion control measures the contamination penalty that the robust fit fails to absorb, i.e. the price the label-free V2 fleet will pay — cheap to measure now, impossible to measure later.
 - *Persistent events.* A months-long ARA appears as a residual level shift that *stays* shifted, not a transient. The changepoint detector handles this (it catches the onset step), but the baseline must **not** be allowed to slowly adapt and treat the new level as normal. Keep the baseline static (weather/calendar-driven only) over the detection window so a sustained ARA remains visible as a sustained residual offset.
 - *Seasonal-maintenance confounding.* Planned switching is not uniform through the year — outages
   cluster in maintenance seasons. A flexible time-of-year covariate fitted on contaminated history
@@ -342,13 +343,21 @@ model.
 
 - **A residual is not only switching.** It is also NWP error — autocorrelated and
   heteroscedastic, exactly the stage-1 problem. Feed *normalised* residuals (divide by the
-  baseline's spread quantiles, which stage 1 fits anyway) rather than raw MW deltas, and include
-  a neighbourhood-sum residual so the model can separate a regional NWP bust (the sum steps too)
-  from a genuine transfer (the sum stays flat).
-- **Fold hygiene.** The baseline is a hindcast fitted on history; in cross-validation, each
-  fold's residual features must come from a baseline trained only on that fold's training
-  period, otherwise the test period leaks into the features. This makes the experiment pipeline
-  more expensive than adding an ordinary feature.
+  baseline's spread estimate, which stage 1 fits anyway) rather than raw MW deltas for the
+  self-series features, and include a neighbourhood-sum residual — whose unit convention is
+  different, and set out in the design note below — so the model can separate a regional NWP
+  bust (the sum steps too) from a genuine transfer (the sum stays flat).
+- **Fold hygiene, in both directions.** The baseline is a hindcast fitted on history; in
+  cross-validation, each fold's residual features must come from a baseline trained only on
+  that fold's training period, otherwise the test period leaks into the features. Less
+  obviously, the *training-row* residuals need protecting too: a baseline evaluated on its own
+  training period produces in-sample residuals — shrunken and shaped by overfit — while at
+  serving time the residuals near forecast time are out-of-sample for the deployed baseline,
+  so a booster whose split thresholds were calibrated on in-sample residuals meets a
+  systematically wider, differently-shaped distribution live. The standard stacking remedy
+  applies: every residual the booster trains on should be **out-of-sample** for the baseline
+  that produced it (rolling-origin refits within the training period). Both directions make
+  the experiment pipeline more expensive than adding an ordinary feature.
 - **No lookahead.** Residual lags must obey the same nullification rule as raw power lags
   (`_nullify_leaky_lags()`), and the expected-power values at past lag times must be hindcast
   from NWP runs that had been published by forecast time. The existing
@@ -374,17 +383,29 @@ model.
 
 - **Event age, without a normality threshold.** "How long has this series been abnormal?" is a
   natural feature, and it needs no hand-coded normality threshold — an XGBoost split *is* a
-  learned threshold, so the model only needs continuous accumulator statistics of the whitened
-  residual and it will pick its own cutpoints. The simplest basis: signed **EWMAs of the
-  normalised residual at two or three half-lives** (say 12 hours, 3 days, 2 weeks) — one
+  learned threshold, so the model only needs continuous accumulator statistics of the
+  normalised residual and it will pick its own cutpoints. The simplest basis: signed **EWMAs of
+  the normalised residual at two or three half-lives** (say 12 hours, 3 days, 2 weeks) — one
   `ewm_mean` per half-life, no thresholds anywhere. Duration is encoded in the relationship
   between the columns: a fresh event makes the short-half-life EWMA large while the long one is
   still small; a weeks-old event saturates all of them. A two-sided **CUSUM statistic** is the
   fancier alternative — its magnitude grows roughly as shift-size × duration and it self-resets
-  at zero (its only parameter is the slack, set in whitened units), and "hours since the CUSUM
-  last touched zero" gives a literal event age if one is wanted. Either way, the accumulator
-  must be computed only from residuals available at `power_fcst_init_time` — the same
-  no-lookahead discipline as every other lag feature.
+  at zero (its only parameter is the slack, set in normalised units), and "hours since the
+  CUSUM last touched zero" gives a literal event age if one is wanted. Two disciplines apply.
+  First, the accumulator must be computed only from residuals available at
+  `power_fcst_init_time` — the same no-lookahead rule as every other lag feature. Second, **run
+  the accumulators on normalised residuals, never on the whitened innovations the changepoint
+  detector consumes** — easy to get backwards, because whitening sounds like a strictly better
+  input. It is the opposite here: whitening removes whatever was predictable from the residuals
+  just before, and a persistent level shift is *exactly* such a predictable component, so after
+  an event's onset the whitened innovations fall back toward zero and an accumulator of them
+  decays — it stops encoding age, which is the one thing it exists to encode. The detector
+  whitens because its question is "did a step occur *just now*"; the accumulator's question is
+  "how far from normal has the level *been*", and the persistence must be left in to answer it.
+  The cost of skipping whitening is that the accumulators also integrate slow NWP-error waves —
+  acceptable for a *feature* (the booster holds the weather covariates and the neighbour pools
+  that provide discriminating context) in a way it never would be for a detector that must
+  control its false-alarm rate.
 - **Pooled neighbour features, not per-neighbour columns.** Neighbour context should enter as a
   fixed, small set of permutation-invariant pooled features rather than one input per
   neighbour: pooling keeps the feature schema identical for every series regardless of
@@ -393,12 +414,22 @@ model.
   this series; attribution is the detector's job. The most informative pool is the **signed
   neighbourhood sum**, because it carries the conservation fingerprint: a transfer makes this
   series' residual and the neighbours' sum equal-and-opposite, while a regional NWP bust moves
-  both the same way. Complement it with the **signed residual of the most-anomalous
-  neighbour**, which covers the case the sum dilutes — one strongly anomalous neighbour among
-  several quiet ones — and keep the sign, since whether that neighbour gained or shed load is
-  exactly what predicts whether this series is about to give load back. The two families of features in
-  these notes compose: the sum of neighbours' residual EWMAs is "how long has the neighbourhood
-  been abnormal" in a single column.
+  both the same way. **Units matter here, non-obviously: compute the sum over raw MW residuals,
+  and only rescale afterwards.** Conservation holds in megawatts — a transfer moves the same MW
+  out of one meter and into others — so the equal-and-opposite fingerprint exists only in MW.
+  Summing *per-series-normalised* residuals looks more consistent with the other features but
+  silently destroys the fingerprint whenever neighbours' noise scales differ: a 5 MW transfer
+  between a noisy series and a quiet one sums to nowhere near zero in per-series σ-units. For
+  fleet-wide comparability, normalise *after* summation — divide the MW sum by a combined
+  neighbourhood spread (e.g. the root-sum-square of the members' MW spread estimates) — which
+  rescales the whole signal without breaking the cancellation. Complement the sum with the
+  **signed residual of the most-anomalous neighbour** — selected and expressed in that
+  neighbour's own normalised units, since "anomalous" is a per-series notion — which covers the
+  case the sum dilutes: one strongly anomalous neighbour among several quiet ones. Keep the
+  sign, since whether that neighbour gained or shed load is exactly what predicts whether this
+  series is about to give load back. The two families of features in these notes compose: the
+  sum of neighbours' residual EWMAs is "how long has the neighbourhood been abnormal" in a
+  single column.
 - **Plot every one of these features before feeding it to a model.** Residuals, event-age
   accumulators, and neighbour pools are all easy to build subtly wrong — a flipped sign
   convention, a mis-normalised spread, a missing availability cut — in ways a leaderboard
@@ -423,19 +454,23 @@ baseline and bounds how much of the anomaly signal a tabular learner extracts un
 
 #### The decision point — a feature-based mainline vs the staged detector
 
-The staged detector (stages 2–3 and the v0.6.1 escalation) was designed against a deliverables
-list that has since softened: the hard requirement on this project is **NRA forecasts**; the
-[`substation_switching` table](delivery-tables.md#table-5-substation_switching) was our own
-proposal rather than a stated requirement. One nuance keeps an inferred switching record
-genuinely valuable, though: NGED's internal systems do record switching, but getting data *out*
-of those systems is surprisingly hard — so a simple switching log inferred from the time series
-is something NGED would likely welcome. It is a nice-to-have, not a hard requirement, and that
-reframing opens a genuine alternative mainline in which the detector's discrete layer is never
-built:
+The staged detector (stages 2–3 and the v0.6.1 escalation) should be weighed against the
+project's actual priorities, which form a continuum rather than a must-have list (see
+[Requirements](../background/requirements.md#core-objectives)): the top priority is
+**probabilistic NRA forecasts**, and switching-event handling is pursued first and foremost
+because it improves them — an *implicit* handling inside the forecaster is acceptable. An
+explicit switching record is still genuinely wanted, further down the continuum: the
+[`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified in
+our most recent formal report to NGED (so changing its shape is something to agree with NGED,
+not decide unilaterally — the Part 5 question), and although NGED's internal systems do record
+switching, getting data *out* of those systems is surprisingly hard, so a switching log
+inferred from the time series is something NGED would likely welcome. That prioritisation opens
+a genuine alternative mainline in which the detector's discrete layer is deferred behind
+forecast skill rather than built up front:
 
 - **The NRA forecast** is the stage-1 model itself, generalised from hindcast to forward
   forecast: the weather/calendar forecaster, trained with switching-event periods excluded from
-  the target (labelled periods, in v1 — the with/without-exclusion experiment pair above) and
+  the target (labelled periods, in v1 — the label-exclusion experiment family above) and
   given none of the anomaly features, predicts what power *would be* under normal running. No
   changepoints, no attribution.
 - **The metered-power forecast** is the same forecaster *plus* the residual, event-age, and
@@ -448,38 +483,66 @@ built:
   dichotomy to defend. For situational awareness this is arguably a *better* product than a
   discrete event table, not a consolation prize.
 
-**What the feature path cannot recover.** Two capabilities lapse if the attribution layer is
-never built, and the choice should be made with both named. First, **counterfactual NRA
+**What the feature path cannot recover.** Three capabilities lapse if the attribution layer is
+never built, and the choice should be made with all three named. First, **counterfactual NRA
 *history***: reconstructing what demand would have been *during* a past event requires
 subtracting an estimated step magnitude, which needs the changepoint-plus-attribution layer (the
 [zeroth-order patch](#v06-unsupervised-statistical-switching-event-detector)). If the
 requirement is NRA *forecasts* only, this never bites. Second, **donor attribution**: "who took
 the load" needs the balance-matching machinery — the pooled features deliberately discard it,
 because permutation invariance is a virtue for forecasting and the exact opposite of what
-attribution needs.
+attribution needs. Third, **an NRA level that tracks organic growth**: the stage-1 model's
+calendar features are all cyclical and trees do not extrapolate, so its notion of "normal" is
+pinned to the level of its training window. Genuine load growth and new connections — which
+*are* normal running, not events — land in the residual alongside switching, and the NRA
+forecast goes stale against that secular drift between retrains. The staged path's
+reconstruction does not share this problem (growth is partnerless, so attribution leaves it in
+the observed signal rather than subtracting it out); the feature path's mitigation is frequent
+retraining, which in turn leans on the training-hygiene fallbacks below. The same
+training-window caveat is stated for the capacity multiplier at the end of this section — it
+applies to the NRA product identically.
 
-**Evaluating an NRA forecast needs synthetic injection.** During an event there is no NRA
-ground truth — the metered power is precisely *not* the target — so the NRA product can only be
-scored on out-of-event periods plus the synthetic-injection harness: inject an event into the
-*inputs*, keep the target clean, and require the NRA output to ignore the injection while the
-metered-power output tracks it. The harness — already the staged plan's tuning workhorse — is
-the piece that transfers wholesale, and becomes the validation backbone of the feature path too.
+**Evaluating an NRA forecast needs synthetic injection.** During a real event there is no NRA
+ground truth — the metered power is precisely *not* the target — so out-of-event periods are
+the only place the NRA product can be scored directly. Synthetic injection fills the in-event
+gap, because injecting an event into believed-clean data *creates* the missing counterfactual:
+we hold both the modified series and the clean original. The test that can actually fail is
+**training-side**: inject events into the *training history*, fit the NRA baseline under each
+hygiene strategy (label-excluded, robust-loss, accumulator-down-weighted), and score its
+predictions against the clean pre-injection series — a direct measurement of how much
+contamination each strategy lets through into "normal". A forecast-window injection — perturb
+the recent observed power that feeds the anomaly features, and require the metered-power
+output to track the shift while the NRA output ignores it — exercises only the *metered* leg.
+Beware the trap in that second check: the NRA model has no power-derived inputs at all, so
+"the NRA output ignores the injection" is true by construction — a wiring sanity check, not
+evidence of NRA quality. The NRA evidence comes from out-of-event scoring plus the
+training-side stress above. The harness — already the staged plan's tuning workhorse — is the
+piece that transfers wholesale, and becomes the validation backbone of the feature path too.
 
 **The V2 hygiene question.** "Train with labelled events excluded" presumes labels. Whether that
 extends beyond the trial area depends on how completely NGED's own logs cover the fleet — a
 question added to [Part 5](#part-5-open-items-dependencies). If coverage turns out poor, the
-label-free fallbacks are the robust quantile fit (whose adequacy the v1 exclusion pair measures
-directly) and soft down-weighting of training rows by the event-age accumulator itself — an
-implicit detector, but a threshold-free one, tunable on the injection harness.
+label-free fallbacks are the robust median fit (whose adequacy the v1 exclusion experiments
+measure directly) and soft down-weighting of training rows by the event-age accumulator itself
+— an implicit detector, but a threshold-free one, tunable on the injection harness.
 
 **The decision.** After implementation step 2 (the baseline), the
 [item 5](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
 and
 [item 13](xgboost-improvements.md#13-residual-lag-features-from-the-switching-detector-baseline)
-experiments, and the v1 label-exclusion pair, evaluate. If NRA-forecast quality with
-label-cleaned training is good, and NGED confirm the continuous signals meet their needs (the
-Part 5 question), stages 2–3 and v0.6.1 demote from mainline to **contingency — kept designed,
-not built** — and the v2.5/v2.6 escalations become still more conditional than the
+experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority is **maximising
+NRA-forecast skill**, even where that means the model handles switching implicitly. So if the
+feature path delivers that skill (measured on out-of-event periods plus the training-side
+injection stress above) and NGED confirm the continuous signals meet their needs (the Part 5
+question), stages 2–3 and v0.6.1 demote from mainline to **contingency — kept designed, built
+if time allows once forecast skill is secured**, an explicit inferred event log being a valued
+nice-to-have rather than a requirement. The downstream artefacts that assume the discrete
+detector — [Table 5](delivery-tables.md#table-5-substation_switching),
+[Table 4's in-event capacity patch](delivery-tables.md#table-4-effective_capacity), the
+[prevailing-conditions switching block](forecast-building-blocks.md), and the
+[in-event metrics flags](metrics-and-leaderboard.md#measuring-performance-during-switching-events)
+— are marked conditional on this decision where they are defined. The v2.5/v2.6 escalations
+become still more conditional than the
 [escalation principle](#part-2-the-staged-roadmap) already makes them. This is that principle
 applied honestly to our own plan: the staged detector must be justified by a measured gap the
 feature path leaves, not by anticipation.
@@ -503,22 +566,30 @@ v2 — and the shared infrastructure (the baseline, the normalised residuals, th
 harness, the adjacency) carries over wholesale whichever way the decision point goes.
 
 **A further reuse — effective generator capacity.** The same abnormality machinery may double as
-a simple read-out of the *effective capacity* of generation-dominated series. A capacity change —
-a derating, one unit of several tripping, an uprating, new plant commissioning — has its own
-distinctive residual fingerprint, different from switching's: it is **persistent, partnerless
-(no equal-and-opposite neighbour), and multiplicative** — the deviation from the stage-1
-weather-expected output scales with the weather drive, large when it is windy or sunny and near
-zero when it is calm or dark, where a switching transfer is an additive level shift. The
-features designed above therefore already *distinguish* the two cases as well as detect them.
-The simplest capacity estimator falls straight out: the ratio of two long init-time-locked
-EWMAs, actual over weather-expected — a threshold-free effective-capacity multiplier per series,
-plottable in the [feature-visualisation UI](https://github.com/openclimatefix/nged-substation-forecast/issues/359)
-like every other engineered signal. Two caveats to carry: curtailment or export limitation looks
-identical to a derating from the meter's side, and slow capacity growth contaminates the
-baseline itself (the baseline's training window silently defines what "capacity 1.0" means), so
-the multiplier is an *effective* capacity relative to the training period, not an absolute
-rating. Since capacity changes are one of the attribution categories the v2 paragraph above
-names, a working read-out here is one more de-risking step for v2.
+a simple read-out of the *effective capacity* of **metered generator** series (switching
+detection, by contrast, targets *substation* series; estimating the capacity of unmetered
+generators is out of scope for v1). A capacity change — a derating, one unit of several
+tripping, an uprating, new plant commissioning — has a residual fingerprint different from
+switching's: it is **persistent, partnerless (no equal-and-opposite neighbour), and
+multiplicative** — the deviation from the stage-1 weather-expected output scales with the
+weather drive, large when it is windy or sunny and near zero when it is calm or dark, where a
+switching transfer is an additive level shift. The event-age and pooled features above *detect*
+such a change (a persistent, partnerless residual) but cannot by themselves *distinguish*
+multiplicative from additive: none of them conditions on the weather drive, and a long EWMA of
+a derated wind farm's residual is just a persistent negative number. The distinguishing
+statistic must divide by the drive, and the simplest one falls straight out of the machinery:
+the **ratio of two long init-time-locked EWMAs, actual over weather-expected** — a
+threshold-free effective-capacity multiplier per series, plottable in the
+[feature-visualisation UI](https://github.com/openclimatefix/nged-substation-forecast/issues/359)
+like every other engineered signal, and a natural extra "cheap baseline" entrant for the v0.7
+[capacity-estimator head-to-head](capacity-estimation.md). Three caveats to carry: curtailment
+or export limitation looks identical to a derating from the meter's side; the ratio's
+denominator (the EWMA of weather-expected output) runs small and noisy through calm or dark
+stretches, so the ratio should only be read when that EWMA clears a floor; and slow capacity
+growth contaminates the baseline itself (the baseline's training window silently defines what
+"capacity 1.0" means), so the multiplier is an *effective* capacity relative to the training
+period, not an absolute rating. Since capacity changes are one of the attribution categories
+the v2 paragraph above names, a working read-out here is one more de-risking step for v2.
 
 #### v0.6.1 — the joint edge-flow estimator
 
@@ -676,9 +747,10 @@ point retains it.
    (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
    list from NGED (see Part 5). Nothing downstream is testable without these.
 2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
-   (**no power-lag features**), quantile objective (median + spread quantiles), per series.
-   Output: normalised residual series. Sanity-check residual autocorrelation and per-series
-   spread before proceeding.
+   (**no power-lag features**) and a robust median objective, per series, with a per-series
+   spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
+   normalised residual series. Sanity-check residual autocorrelation and per-series spread
+   before proceeding.
 3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
    *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
    step, the sum should stay flat. This validates the baseline, the adjacency list, and the
@@ -993,8 +1065,18 @@ An earlier plan included a further stage that modelled the **actual switchable p
 
 These apply at every stage and are the things most easily got wrong:
 
-- **Fully unsupervised at runtime.** The production model uses **power time series only**. Switching logs are never a runtime input. They exist for the 32-series trial only, and serve exclusively as a **gold-standard test set**.
-- **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a production dependency. The *method* generalises; a pilot lookup does not.
+- **Unsupervised at production scale; the labels are for using in v1.** The switching logs
+  exist for the 32-series trial only, so no fleet-scale production path may *require* them. But
+  v1 is an experiment, and within it the logs should be used freely: plot them against every
+  engineered feature, and run label-consuming training variants (label-excluded baselines and
+  the like) deliberately — the measured value of the labels is itself a deliverable,
+  quantifying for NGED what fleet-wide switching logs would be worth and thereby informing
+  their case for investing in extracting logs from their operational systems.
+- **Do not fit pilot-only parameters and rely on them at scale.** Anything learned only on the 16 labelled primaries that cannot be set for the other ~1,145 is forbidden as a *production* dependency. The *method* generalises; a pilot lookup does not.
+- **Keep the detector's headline scores honest.** Any *unsupervised* detector's reported
+  precision/recall must come from logged events that were not used to tune it — tuning belongs
+  on the synthetic-injection harness. Free experimental use of the logs (the first bullet) and
+  held-out final scoring coexist by keeping those two activities separate.
 - **Conservation is node-level flow balance, everywhere.** One source's lost power is absorbed by a *subset* of neighbours whose pickups sum to it. Never implement conservation as independent pairwise equal-and-opposite matches — confirmed 2–3-way fan-out makes that wrong.
 - **Composition is read from recipients, never the source.** Any per-leg composition estimate (v0.6 stage 3) must come from each recipient's individual step *after* attribution; the source's step blends all simultaneous outgoing legs.
 - **Partial transfer is the common case.** Expect arbitrary continuous transferred magnitudes down to the noise floor. Quantify the detection sensitivity floor (a magnitude × duration frontier, per series); do not assume a clean event/no-event separation.
@@ -1018,6 +1100,10 @@ These apply at every stage and are the things most easily got wrong:
   for data hygiene at all — see
   [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
   (c) Would continuous per-substation switching-state signals — the engineered features — meet
-  NGED's needs in place of a discrete event table? (Table 5 was our proposal, not a stated
-  requirement — though since NGED's own switching records are hard to extract data from, an
-  inferred discrete log remains a valued nice-to-have even if the continuous signals suffice.)
+  NGED's needs in place of a discrete event table? (Table 5's shape was specified in our formal
+  report, so this change needs NGED's agreement — and since NGED's own switching records are
+  hard to extract data from, an inferred discrete log remains a valued nice-to-have even if
+  the continuous signals suffice.)
+  (d) Can NGED supply the who-can-exchange-load **adjacency at fleet scale** (~1,161
+  primaries)? The trial-area adjacency is already a dependency above; the pooled
+  neighbour features' V2 story additionally stands on a fleet-wide list.

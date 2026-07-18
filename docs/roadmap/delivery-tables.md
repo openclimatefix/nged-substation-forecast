@@ -47,7 +47,7 @@ There are **five** tables. This table tracks where each one stands today:
 | 2 | `power_forecast_warnings` | 🚧 Planned (partial at first; complete by v1.0) | not yet in code |
 | 3 | `asset_health_history` | 🚧 Planned | not yet in code |
 | 4 | `effective_capacity` | ✅ Implemented in v0.1 (static P99 estimate); time-varying upgrade planned for v0.7 | `contracts.power_schemas.EffectiveCapacity` |
-| 5 | `substation_switching` | 🚧 Planned (v0.6) | not yet in code |
+| 5 | `substation_switching` | 🚧 Planned (v0.6), conditional — see the Table 5 status note | not yet in code |
 
 > **Naming note.** The Milestone 1 report drafted these tables with the column name `timeseries_id`,
 > but the codebase uses **`time_series_id`** everywhere. The implemented `PowerForecast` schema uses
@@ -243,7 +243,12 @@ degradation, partial inverter trips, etc., but **ignoring ANM** (a wind farm ANM
 with 10 MW physical capability has `effective_capacity_mw = 10`). For substations, the 99th
 percentile of observed load over a rolling window, under normal running arrangement only. During a
 switching event, effective capacity = last known normal-arrangement value plus the "switched
-power" from [Table 5](#table-5-substation_switching). The v0.7 estimate should carry uncertainty
+power" from [Table 5](#table-5-substation_switching) — a step that inherits Table 5's
+conditional status, since it needs the per-event magnitudes only the discrete detector produces
+(see
+[the decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector));
+if the discrete detector is not built, in-event effective capacity falls back to the last known
+normal-arrangement value alone. The v0.7 estimate should carry uncertainty
 (a [first-class judging criterion](capacity-estimation.md#uncertainty-a-first-class-judging-criterion)
 in the head-to-head), so the
 single `effective_capacity_mw` column is upgraded to a mean + std pair
