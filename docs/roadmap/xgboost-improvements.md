@@ -381,7 +381,7 @@ Four scheduling notes specific to this page:
   [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
   once it lands, or an interim rolling MAD of the residuals. The
   neighbour-residual variant additionally needs the trial-area adjacency list
-  ([switching-events Part 5](switching-events.md#part-5-open-items-dependencies)) and
+  ([switching-events open items](switching-events.md#open-items-dependencies)) and
   cross-series feature engineering — entering as a fixed set of permutation-invariant pooled
   columns (the signed neighbourhood sum and the signed most-anomalous neighbour; see the full
   design), never one column per neighbour; the self-residual version needs neither and should

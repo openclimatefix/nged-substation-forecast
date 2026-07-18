@@ -20,23 +20,11 @@
 
 ---
 
-## Part 1 — The graph is a data structure
-
-A **graph** is just **nodes** connected by **edges**. Here the nodes are substations and the edges connect substations that can exchange load (i.e. that can be electrically joined by some switching operation). The graph is the natural way to encode the one fact a per-substation model is blind to: that a switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so the drop at A and the rises at B and C are the *same power moving*.
-
-It is worth being explicit about what the graph is *not*: it is not a trained model, and nothing is learned along its edges. We use the graph purely as a **data structure** — a fixed map of "who can exchange load with whom" — and run simple, mostly closed-form operations over it. In every stage the graph is used the same humble way: to look up which substations are even *eligible* to exchange load, pruning an otherwise $N \times N$ problem down to each node's handful of real neighbours. The per-stage specifics — the cheap neighbour-subset search in v0.6, the sparsity pattern on the mixing weights in v2.5, and the typed nodes in v2.6 — are described with each version in Part 2 below.
-
-In short: the graph tells us *who can connect to whom*; the simple statistics and the differentiable forward model do the rest. (The project-wide design boundary — the same graph-as-data-structure stance across the disaggregation engine, and what evidence would ever revisit it — is stated once, in [the disaggregation page](disaggregation.md#the-fusion-mechanism).)
-
-> **A note on differentiable physics.** Only the v2.6 stage uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), which is the single source of truth for that machinery; we do not re-derive it here.
-
----
-
-## Part 2 — The approaches
+## The approaches
 
 The work is organised as a set of **named approaches**, tried in the order set out just below. The three v0.6 approaches all build on one shared baseline; the later **v2.5** and **v2.6** approaches are aligned with those codebase versions. Each approach states its motivation, what it adds, what it misses, and its trade-offs. (We haven't fully specified the roadmap _after_ v2, so read "v2.x" as just meaning "some time after v2 is operational".) Escalation from a simpler approach to a heavier one must be justified by *measured residual structure the simpler one leaves behind*, not by anticipation — this keeps effort matched to demonstrated need, and it is the same principle [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) applies to our own plan.
 
-### The approaches, and the order we will try them
+### Overview and ordering
 
 Everything in v0.6 rests on **one shared baseline**: a per-substation model of expected power
 from weather and calendar covariates alone (no power lags), whose per-series-normalised residual
@@ -233,7 +221,7 @@ model.
   the dashboard's stitched proxy-analysis query with the feature pipeline's
   freshest-run-per-valid-time join.
 - **Cross-series features are new machinery.** Neighbour residuals need the trial-area adjacency
-  list (a Part 5 dependency) plus a cross-series join in feature engineering. The feature-schema
+  list (a dependency in [Open items](#open-items-dependencies)) plus a cross-series join in feature engineering. The feature-schema
   question (each series has its own neighbour set, of varying size) is answered by the pooled
   design below — a fixed handful of permutation-invariant pooled columns, never one column per
   neighbour.
@@ -323,6 +311,8 @@ Issues: [#117](https://github.com/openclimatefix/nged-substation-forecast/issues
 **Goal.** Flag periods of abnormal running arrangement using simple statistics on the power time series. **No neural networks, no differentiable physics, no latent-variable inference, no switching-log inputs.**
 
 **Motivation.** Before any reconstruction model, we need to (a) flag/mask switching-affected periods so they stop poisoning forecasting training data; (b) produce an evaluation set to validate heavier models later; and (c) — critically — *quantify how well switching events can be detected from power data at all*, since at scale that is the only signal available.
+
+**The graph is a data structure, not a learned model.** A switching event is a *cross-substation* phenomenon — load leaving one node reappears at others, so a drop at $A$ and rises at $B$ and $C$ are the *same power moving* — and that is the one fact a per-series model is blind to. We encode it with a **graph**: nodes are substations, edges join substations that can exchange load. Nothing is learned along the edges; the graph is a fixed map of "who can exchange load with whom," used only to prune an otherwise $N \times N$ search down to each node's handful of real neighbours. Attribution (stage 2 below) is its first real use, and v2.5's mixing sparsity and v2.6's typed nodes reuse the same stance. (The project-wide version — the same graph-as-data-structure boundary across the disaggregation engine, and what evidence would revisit it — is stated once in [the disaggregation page](disaggregation.md#the-fusion-mechanism).)
 
 The detector adds three stages on top of the shared baseline: it detects level shifts on the baseline's residual, attributes each to a balancing set of neighbours, and reads off the rough composition of what moved.
 
@@ -502,7 +492,7 @@ because it improves them — an *implicit* handling inside the forecaster is acc
 explicit switching record is still genuinely wanted, further down the continuum: the
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching) was specified in
 our most recent formal report to NGED (so changing its shape is something to agree with NGED,
-not decide unilaterally — the Part 5 question), and although NGED's internal systems do record
+not decide unilaterally — an [open question for NGED](#open-items-dependencies)), and although NGED's internal systems do record
 switching, getting data *out* of those systems is surprisingly hard, so a switching log
 inferred from the time series is something NGED would likely welcome. That prioritisation opens
 a genuine alternative mainline in which the detector's discrete layer is deferred behind
@@ -561,7 +551,7 @@ piece that transfers wholesale, and becomes the validation backbone of the featu
 
 **The V2 hygiene question.** "Train with labelled events excluded" presumes labels. Whether that
 extends beyond the trial area depends on how completely NGED's own logs cover the fleet — a
-question added to [Part 5](#part-5-open-items-dependencies). If coverage turns out poor, the
+question added to [Open items / dependencies](#open-items-dependencies). If coverage turns out poor, the
 label-free fallbacks are the robust median fit (whose adequacy the v1 exclusion experiments
 measure directly) and soft down-weighting of training rows by the event-age accumulator itself
 — an implicit detector, but a threshold-free one, tunable on the injection harness.
@@ -573,8 +563,8 @@ and
 experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority is **maximising
 NRA-forecast skill**, even where that means the model handles switching implicitly. So if the
 feature path delivers that skill (measured on out-of-event periods plus the training-side
-injection stress above) and NGED confirm the continuous signals meet their needs (the Part 5
-question), approaches 2 and 3 demote from mainline to **contingency — kept designed, built
+injection stress above) and NGED confirm the continuous signals meet their needs (an
+[open question for NGED](#open-items-dependencies)), approaches 2 and 3 demote from mainline to **contingency — kept designed, built
 if time allows once forecast skill is secured**, an explicit inferred event log being a valued
 nice-to-have rather than a requirement. The downstream artefacts that assume the discrete
 detector — [Table 5](delivery-tables.md#table-5-substation_switching),
@@ -583,7 +573,7 @@ detector — [Table 5](delivery-tables.md#table-5-substation_switching),
 [in-event metrics flags](metrics-and-leaderboard.md#measuring-performance-during-switching-events)
 — are marked conditional on this decision where they are defined. The v2.5/v2.6 escalations
 become still more conditional than the
-[escalation principle](#part-2-the-approaches) already makes them. This is that principle
+[escalation principle](#the-approaches) already makes them. This is that principle
 applied honestly to our own plan: the staged detector must be justified by a measured gap the
 feature path leaves, not by anticipation.
 
@@ -786,7 +776,7 @@ also to test out convex optimisation as a warm-up for v2).
 
 1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
    (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
-   list from NGED (see Part 5). Nothing downstream is testable without these.
+   list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
 2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
    (**no power-lag features**) and a robust median objective, per series, with a per-series
    spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
@@ -1035,6 +1025,8 @@ the routing estimation should stay a convex layer even then.
 
 **Goal.** Decompose each substation into physically-typed components (demand, PV, wind), each from its own differentiable module, and let each *type* transfer with its own routing weights — so a switching event can move proportionally more PV than load.
 
+> **A note on differentiable physics.** This is the only stage that uses *differentiable physics*: physics-based forward models (e.g. irradiance → PV power) implemented so their latent parameters — capacity, panel orientation, and so on — can be recovered by gradient-based **inversion** (running the forward model backwards to fit observed power). The v0.6 detector and the v2.5 mixture model do not use it. The full treatment lives in [Differentiable Physics](../techniques/differentiable-physics.md), the single source of truth for that machinery; we do not re-derive it here.
+
 **Motivation.** v2.5's residual error is wrong-*shape* transfer. Part of that shape error is *type mix*: the moved slice may carry disproportionate PV or wind relative to the parent's aggregate. Separating the physical types lets the model represent that. The differentiable modules also clean the meter of DERs generally (PV/wind net off demand whether or not switching occurs), which is independently valuable.
 
 **Method.** Decompose each substation into typed components, each from its own differentiable forward module:
@@ -1093,7 +1085,7 @@ the v2.5 tooling note above.
 
 ---
 
-## Part 3 — Considered but rejected: the feeder-block model
+## Considered but rejected: the feeder-block model
 
 An earlier plan included a further stage that modelled the **actual switchable physical units (feeders / load blocks)** explicitly — decomposing each substation into discrete blocks, each routed as a unit. **This stage is retired**, for two independent and decisive reasons:
 
@@ -1104,7 +1096,7 @@ An earlier plan included a further stage that modelled the **actual switchable p
 
 ---
 
-## Part 4 — Cross-cutting implementation requirements
+## Cross-cutting implementation requirements
 
 These apply at every stage and are the things most easily got wrong:
 
@@ -1131,7 +1123,7 @@ These apply at every stage and are the things most easily got wrong:
 
 ---
 
-## Part 5 — Open items / dependencies
+## Open items / dependencies
 
 - **Switching logs for the 32-series trial** (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
