@@ -304,6 +304,44 @@ as the ablation control:
 (quick-wins item 5), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
+**Attributing the uplift — calibration versus switching.** A residual-lag booster would sharpen
+the forecast even on a grid that never switched, simply by telling the model how high or low it is
+currently running relative to weather and clock — an inference-time *calibration* that corrects
+NWP bias, meter drift, DER growth, or any persistent regime offset. That general uplift is worth
+having, but it is not evidence the model has learned anything about switching, so the two
+contributions must be measured apart. They separate cleanly because they live in different feature
+families and leave different signatures:
+
+- **Stratify by switching state.** Score the two-stage forecaster against the stage-1 baseline
+  separately on NRA- and ARA-labelled rows of the trial area (the switching logs used as a test
+  set, never a training input). The uplift on NRA rows is the pure-calibration benefit; the extra
+  uplift on ARA rows is the switching-specific part. Break the ARA rows down by event age too:
+  calibration is briefly *harmful* at an onset — the recent residuals still describe the pre-event
+  level — so a genuine switching benefit should concentrate in the *body* of an event, not its
+  first few hours, and that shape is itself a check that the right thing is being measured.
+- **Ablate by feature family.** Self-residual lags can only calibrate; the pooled
+  **neighbourhood-sum** feature has no calibration pathway and pays off only through conservation.
+  So three arms — baseline, baseline + self-lags, baseline + self-lags + neighbour pools — split
+  the gain almost by construction: the second minus the first bounds calibration, the third minus
+  the second isolates the switching-specific contribution. This is the label-free version of the
+  decomposition, so unlike the stratification above it also predicts what the label-less V2 fleet
+  gains; the two should agree — the neighbour arm's extra should be near-zero on NRA rows and
+  positive on ARA-body rows.
+- **Bound calibration with a naive control.** Mirror the random-exclusion control used for the
+  baseline's training-contamination test: add a deliberately switching-blind calibrator — the
+  stage-1 baseline plus a trailing EWMA of its own residual, nothing learned — and measure its
+  uplift over the baseline. That floors the calibration channel, so the learned stage-2's margin
+  over it bounds the same channel from above, and the three levers bracket the split.
+
+One honest limitation: a small, undetected switching event and a generic persistent offset look
+identical to a self-residual lag, and the logs have a detection floor of their own, so the
+NRA/calibration bucket is really an *upper* bound on the truly switching-free benefit — the
+neighbour ablation is the cleaner attribution of the part that unambiguously needs conservation.
+For a controlled rather than observational answer, **semi-synthetic injection** — move a conserved
+load slice from a series to its neighbours over a clean NRA period, then measure how much of the
+*known* contamination the forecaster removes — recovers the switching-specific component causally,
+at the cost of having to make the injected magnitude, fan-out, and duration realistic.
+
 #### Approach 2 — the staged statistical detector
 
 Issues: [#117](https://github.com/openclimatefix/nged-substation-forecast/issues/117),
