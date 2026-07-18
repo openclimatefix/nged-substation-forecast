@@ -4,7 +4,7 @@
 The workload is a poor fit for REST — one power-user consumer who wants routine access to the
 *entire* forecast history, which will reach trillions of rows at V2 scale — and Delta Lake on S3
 is a genuine database-grade delivery mechanism: an open protocol with ACID guarantees, lazy
-partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Power BI, …), and schema
+partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and schema
 evolution, with no API server for OCF to build, run, or be on call for. If a future consumer
 needs small operational queries or per-customer permissions, a REST API can be added later as a
 purely additive layer over the same tables.
@@ -66,8 +66,10 @@ NGED Flexpectation turns out to look quite different on each of those axes:
 ## Evolving requirements
 
 NGED are refreshingly open that they don't yet know exactly which views of the data they will find
-most useful. We need headroom to iterate table schemas rapidly. Delta Lake supports schema evolution
-directly; a REST API would add a versioning-and-deprecation cycle on top of every schema change.
+most useful. We need headroom to iterate table schemas rapidly while they are still being designed
+with NGED. Delta Lake supports schema evolution directly (new columns land without breaking
+existing readers); a REST API would add a versioning-and-deprecation cycle on top of every schema
+change.
 
 And, crucially, NGED are _already_ finding uses for our "firehose of data" that we had never
 considered. These are exactly the sort of unforeseen use-cases that simply wouldn't have occurred to
@@ -81,7 +83,8 @@ that is far too much to be practical for storing in Postgres, or for delivering 
 
 Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of the
 14-day horizon. For the V1 trial area that is 32 series × 51 members × 672 half-hours ≈ **1.1
-million rows per run**. Our development `power_forecasts` table already holds **~414 million rows**
+million rows per run** (a little fewer in practice, since the NWP publication delay trims the
+usable horizon). Our development `power_forecasts` table already holds **~407 million rows**
 from 428 forecast init times (mostly backtests, plus a handful of live runs so far) — for just 32
 time series. Our
 [`delta_store`](../api/delta_store/index.md) storage format packs that into **0.75 GB, ~1.8 bytes
@@ -94,22 +97,24 @@ couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), an
 
 What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
 on real forecast rows: ~356 bytes each), the same year of history would be roughly **45 terabytes on
-the wire — about 200× the Delta footprint**. NGED wants routine access to all of it!
+the wire — about 200× the Delta footprint**. Gzip narrows the gap to roughly 20×, but that still
+leaves ~4.5 terabytes per year of data. NGED wants routine access to all of it!
 
 Multiply that per-year figure out across multiple years of history and multiple ML models and it
 keeps climbing: four years of history across two concurrently-run models already reaches **a
 trillion rows** (125 billion × 4 × 2 = 1 trillion) — and both those multipliers are conservative
 once backtests and additional model families are counted.
 
-That volume is an awkward fit for JSON request/response cycles (to say the least!); in practice,
+That volume is an awkward fit for JSON request/response cycles; in practice,
 REST designs for workloads like this tend to grow a "bulk export" endpoint that hands back files —
 at which point the files are doing the real work, and the REST API has become a wrapper around them.
 
 ## What REST was designed for
 
 REST was named and formalised in Roy Fielding's
-[2000 PhD dissertation](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm) as
-a retrospective description of *why the web worked*: many independent clients, small
+[2000 PhD dissertation](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm),
+distilling his 1990s work on the HTTP/1.1 and URI specifications into a description of *why the
+web worked*: many independent clients, small
 hypermedia resources, stateless request/response over HTTP, caches in the middle. It is a
 superb architecture for exactly that — operational queries, multi-tenant products, and
 integrations where each interaction moves a small resource.
@@ -179,11 +184,12 @@ tools read it directly, and the "server" role is played by object storage. In ne
 application code manage the files by hand.
 
 And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
-Lake; Apple, Comcast, Adobe, and Salesforce all run it at massive scale; and — closest to home —
-[NESO](https://www.neso.energy/) uses Delta Lake too. More broadly, the open-table-format family it
+Lake; Adobe, Comcast, Salesforce, and Apple all run it at massive scale; and — closest to home —
+our colleagues at [NESO](https://www.neso.energy/) tell us NESO uses Delta Lake internally too.
+More broadly, the open-table-format family it
 belongs to (Delta Lake; [Apache Iceberg](https://iceberg.apache.org/), created at Netflix; [Apache
 Hudi](https://hudi.apache.org/), created at Uber) is now the standard way large companies store and
-share analytical data. In other words: Delta Lake the boring, battle-tested option.
+share analytical data. In other words: Delta Lake is the boring, battle-tested option.
 
 ## Could Postgres store this data?
 
@@ -192,12 +198,12 @@ internal _storage_ of the data too.
 
 The [previous section](#how-big-is-flexpectations-power-forecast-data) put a number on where
 this is headed: V2's `power_forecasts` could reach the order of a trillion rows. Could Postgres — OCF's
-workhorse - hold a trillion rows?
+workhorse — hold a trillion rows?
 
 The short answer is: Technically, _yes_, Postgres can store one trillion rows. But it'd cost on the
 order of £10,000 per month just for RDS (AWS' managed Postgres service), and require a team of
-database admins, and it'd be horrifyingly slow. And, remember that we could easily require
-_multiple_ trillions of rows.
+database admins, and be 10–100× slower than a columnar store on our scan-heavy queries. And,
+remember that we could easily require _multiple_ trillions of rows.
 
 | At trillion-row (V2) scale | Postgres | Delta Lake on S3 |
 |---|---|---|
@@ -209,14 +215,15 @@ _multiple_ trillions of rows.
 | Full/aggregate scan | O(n) over every column, whether selected or not | O(n), but columnar, compressed, and parallel across files |
 | Operational burden | Autovacuum/freeze + index rebuilds; needs Timescale or Citus plus dedicated DB ops at this scale | S3's SLA; on-call just confirms the 4 daily runs completed |
 
-The rest of this section walks through where each row of that table comes from.
+The comparison table above is the summary; the rest of this section walks through where each of
+its rows comes from. Skip ahead if the table already convinces you.
 
 **Storage footprint.** Every Postgres row carries fixed overhead before any column data: a
 23-byte [tuple header](https://www.postgresql.org/docs/current/storage-page-layout.html) plus a
 4-byte line pointer. At a trillion rows that's ~27 TB of overhead alone — before indexes,
 alignment padding, or the data itself. A realistic trillion-row Postgres table, indexed, lands
-somewhere in the range of **50–150 TB** (an estimate, not a measurement — there's no trillion-row
-Postgres deployment to benchmark against); the same rows in
+somewhere in the range of **50–150 TB** (an estimate, not a measurement — there's no *vanilla*
+trillion-row Postgres deployment to benchmark against); the same rows in
 [`delta_store`](../api/delta_store/index.md)'s ~1.8-bytes/row packing
 ([above](#what-delta-lake-is-and-who-else-uses-it), from the `power_forecasts` table) come to
 roughly **2 TB**. That 25–75× gap has
@@ -278,7 +285,7 @@ that framing undersells what's actually being delivered. An application programm
 is, at heart, a *contract*: a precisely specified interface that lets independent programs
 interoperate. Delta Lake is exactly that — an [open, versioned protocol
 specification](https://github.com/delta-io/delta/blob/master/PROTOCOL.md) with mature, independently
-developed client implementations: Polars, pandas, DuckDB, Spark, Power BI, Rust, and more.
+developed client implementations: Polars, pandas, DuckDB, Spark, Rust, and more.
 
 So we *are* delivering through an API. The difference is that the protocol, the client
 libraries, the authentication layer (S3/IAM), and the server (S3 itself) are all off-the-shelf,
@@ -289,7 +296,7 @@ table schemas, which are pinned down in code by the
 
 ## …and it is a database: ACID on object storage
 
-As the [opening section](#what-delta-lake-is-and-who-else-uses-it) showed, Delta Lake is
+As [an earlier section](#what-delta-lake-is-and-who-else-uses-it) showed, Delta Lake is
 Parquet files plus a transaction log — and that log is what elevates "files on S3" into a
 database with full **ACID** guarantees:
 
@@ -303,7 +310,7 @@ database with full **ACID** guarantees:
   [eleven-nines object durability](https://aws.amazon.com/s3/faqs/#Durability_.26_Data_Protection).
 
 On top of ACID, the transaction log gives **time-travel** (read the table exactly as it was at
-any past version — useful for auditing what NGED saw at a given moment) and **schema
+any past version we retain — useful for auditing what NGED saw at a given moment) and **schema
 evolution** (add columns without breaking existing readers).
 
 ## Lazy reads: query it, don't download it
@@ -324,10 +331,11 @@ touches cross the wire. Three mechanisms make that efficient:
 - **Column pruning** — Parquet is columnar, so unselected columns are never read at all.
 
 The practical effect: fetching a single forecast run from a multi-billion-row table takes a
-fraction of a second. At today's V1 scale that's only a few megabytes moving (~2 MB per run); even
+fraction of a second on a local copy, and a few seconds over the internet. At today's V1 scale
+that's only a few megabytes moving (~2 MB per run); even
 at V2's ~86 million rows per run it's still only ~150 MB — a tiny fraction of the full table either
 way. NGED writes **zero custom
-data-reading code** — they point existing tools (Polars, pandas, DuckDB, Power BI, Excel) at
+data-reading code** — they point existing tools (Polars, pandas, DuckDB, Spark) at
 the bucket and query it like a database. The same mechanism powers our own pipeline: the
 [lazy evaluation strategy](overview.md#lazy-evaluation-strategy) that keeps our training memory
 bounded is exactly what keeps NGED's reads cheap.
@@ -386,9 +394,9 @@ standard S3/IAM authentication. With a single consumer this is straightforward �
 authenticated principal, no entitlement matrix — and it mirrors exactly how NGED protect their
 own time-series JSON bucket, which we read the same way. Every tool named above supports
 authenticated S3 access natively. That "single authenticated principal" is a dedicated IAM
-**user**, not a cross-account role: Excel and Power BI, both named above as expected clients,
-have no support for AWS role-assumption — they need a plain access key and secret, which only an
-IAM user (not a role) provides.
+**user**, not a cross-account role: many desktop analytics tools — including the connectors that
+give BI tools such as Power BI access to S3 — have no support for AWS role-assumption; they need
+a plain access key and secret, which only an IAM user (not a role) provides.
 
 **Two buckets, not one.** OCF shares more than the five delivery tables with NGED — there's no
 reason to withhold the NWP and raw-telemetry tables OCF's own pipeline works with day to day, and
@@ -400,21 +408,21 @@ separately-named S3 bucket makes that distinction impossible to miss — a bucke
 survives being pasted into a script or a Slack message even out of context, where a path prefix
 within one bucket is easier to skim past. The same single IAM user reads both buckets; the
 split is a naming/documentation signal, not an access-control boundary. See [Setting up the live
-service on AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets)
+service on AWS](../live_service/aws.md#step-1-create-the-s3-buckets)
 for the concrete bucket/IAM setup and [Delivery tables](../roadmap/delivery-tables.md) for
 exactly which five tables are the stable contract.
 
 **Why `eu-west-2`, not the cheaper `eu-west-1`?** AWS Price List API data (2026-07-03) shows
 Ireland (`eu-west-1`) consistently cheaper than London (`eu-west-2`) — not hugely for the
 always-on control-plane box, but noticeably for the Fargate compute that actually runs
-inference:
+inference (AWS bills in US dollars; converted here at $1.30/£):
 
 | SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
 |---|---|---|---|
-| EC2 `t4g.medium` on-demand | $0.0368/hr | $0.0376/hr | +2.2% |
-| Fargate ARM vCPU-hour | $0.03238/hr | $0.03725/hr | +15.0% |
-| Fargate ARM GB-hour | $0.00356/hr | $0.00409/hr | +14.9% |
-| S3 Standard storage (first 50 TB) | $0.023/GB-mo | $0.024/GB-mo | +4.3% |
+| EC2 `t4g.medium` on-demand | £0.0283/hr | £0.0289/hr | +2.2% |
+| Fargate ARM vCPU-hour | £0.0249/hr | £0.0287/hr | +15.0% |
+| Fargate ARM GB-hour | £0.00274/hr | £0.00315/hr | +14.9% |
+| S3 Standard storage (first 50 TB) | £0.0177/GB-mo | £0.0185/GB-mo | +4.3% |
 
 At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
 [AWS architecture: Cost summary](../roadmap/live-service.md#cost-summary)). It matters more at
@@ -429,19 +437,19 @@ it depends on *how* NGED reads, which the AWS Price List API pins down precisely
 
 | Read path | Rate |
 |---|---|
-| S3 → another AWS service, **same region** (even a different account) | **$0** |
-| S3 → another AWS service, **`eu-west-1` ↔ `eu-west-2`** (cross-region) | $0.02/GB |
-| S3 → public internet ("data transfer out"), **either region** | $0.09/GB (first 10 TB/month) — identical in both regions |
+| S3 → another AWS service, **same region** (even a different account) | **£0** |
+| S3 → another AWS service, **`eu-west-1` ↔ `eu-west-2`** (cross-region) | £0.015/GB |
+| S3 → public internet ("data transfer out"), **either region** | £0.069/GB (first 10 TB/month) — identical in both regions |
 
 Same-region AWS-to-AWS transfer is free even across accounts, but internet-egress pricing
-doesn't vary by region at all — so matching regions only pays off if NGED reads via **their own
+is identical in these two regions — so matching regions only pays off if NGED reads via **their own
 AWS-hosted compute** (e.g. Athena, Glue, an EC2/Lambda job) in `eu-west-2`, not if they read via
-a desktop client like Excel or Power BI over the public internet, where the region choice makes
+a desktop client like Power BI over the public internet, where the region choice makes
 no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
-Excel caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
+a spreadsheet caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
 NGED pulling "a sizeable chunk" of it stops being something a spreadsheet can do at all — they
 would need their own query engine against our bucket, and running that in `eu-west-2` is what
-turns those reads free instead of $0.02–0.09/GB.
+turns those reads free instead of £0.015–0.069/GB.
 
 This is still provisional: NGED haven't yet confirmed whether a GB-resident region is a hard
 requirement for this data, and we're waiting on their reply before treating the region choice as
@@ -490,7 +498,7 @@ REST APIs have their place, and there are futures in which this project grows on
   beyond NGED.
 - **Small operational queries from non-Python systems** — e.g. a control-room application that
   just wants "the latest forecast for substation X" as JSON over HTTP.
-- **Browser-based consumers** that can't speak S3 directly. (although WASM mostly solves that)
+- **Browser-based consumers** that can't speak S3 directly.
 
 The reassuring part is that adding a REST API later is **purely additive**: a thin, stateless
 service that reads from the same Delta tables and serves slices of them over HTTP. Nothing would
