@@ -426,9 +426,12 @@ baseline and bounds how much of the anomaly signal a tabular learner extracts un
 The staged detector (stages 2–3 and the v0.6.1 escalation) was designed against a deliverables
 list that has since softened: the hard requirement on this project is **NRA forecasts**; the
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching) was our own
-proposal rather than a stated requirement; and NGED hold their own switching logs — they know
-their planned switching far better than any detector of ours ever will. That reframing opens a
-genuine alternative mainline in which the detector's discrete layer is never built:
+proposal rather than a stated requirement. One nuance keeps an inferred switching record
+genuinely valuable, though: NGED's internal systems do record switching, but getting data *out*
+of those systems is surprisingly hard — so a simple switching log inferred from the time series
+is something NGED would likely welcome. It is a nice-to-have, not a hard requirement, and that
+reframing opens a genuine alternative mainline in which the detector's discrete layer is never
+built:
 
 - **The NRA forecast** is the stage-1 model itself, generalised from hindcast to forward
   forecast: the weather/calendar forecaster, trained with switching-event periods excluded from
@@ -498,6 +501,24 @@ partnerless, embedded PV if its shape tracks irradiance. So a demonstrated win f
 features is direct evidence that the residual carries attribution-relevant signal — de-risking
 v2 — and the shared infrastructure (the baseline, the normalised residuals, the injection
 harness, the adjacency) carries over wholesale whichever way the decision point goes.
+
+**A further reuse — effective generator capacity.** The same abnormality machinery may double as
+a simple read-out of the *effective capacity* of generation-dominated series. A capacity change —
+a derating, one unit of several tripping, an uprating, new plant commissioning — has its own
+distinctive residual fingerprint, different from switching's: it is **persistent, partnerless
+(no equal-and-opposite neighbour), and multiplicative** — the deviation from the stage-1
+weather-expected output scales with the weather drive, large when it is windy or sunny and near
+zero when it is calm or dark, where a switching transfer is an additive level shift. The
+features designed above therefore already *distinguish* the two cases as well as detect them.
+The simplest capacity estimator falls straight out: the ratio of two long init-time-locked
+EWMAs, actual over weather-expected — a threshold-free effective-capacity multiplier per series,
+plottable in the [feature-visualisation UI](https://github.com/openclimatefix/nged-substation-forecast/issues/359)
+like every other engineered signal. Two caveats to carry: curtailment or export limitation looks
+identical to a derating from the meter's side, and slow capacity growth contaminates the
+baseline itself (the baseline's training window silently defines what "capacity 1.0" means), so
+the multiplier is an *effective* capacity relative to the training period, not an absolute
+rating. Since capacity changes are one of the attribution categories the v2 paragraph above
+names, a working read-out here is one more de-risking step for v2.
 
 #### v0.6.1 — the joint edge-flow estimator
 
@@ -998,4 +1019,5 @@ These apply at every stage and are the things most easily got wrong:
   [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
   (c) Would continuous per-substation switching-state signals — the engineered features — meet
   NGED's needs in place of a discrete event table? (Table 5 was our proposal, not a stated
-  requirement.)
+  requirement — though since NGED's own switching records are hard to extract data from, an
+  inferred discrete log remains a valued nice-to-have even if the continuous signals suffice.)
