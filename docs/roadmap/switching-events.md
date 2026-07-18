@@ -7,7 +7,12 @@
 > detector). None of this is implemented yet. The v0.6 unsupervised
 > statistical detector is the nearest-term piece (it feeds the
 > [`substation_switching`](delivery-tables.md#table-5-substation_switching) table and the
-> training-data mask); the v2.5 / v2.6 mixture models are later research. The post-v2.0 roadmap is
+> training-data mask); the v2.5 / v2.6 mixture models are later research. Whether the discrete
+> detector stages are built at all is now an open question — a feature-based alternative
+> mainline, in which the forecaster consumes continuous switching-state features and no event
+> table ships, is documented at
+> [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)
+> inside the v0.6 section. The post-v2.0 roadmap is
 > not yet fully specified, so read "v2.5 / v2.6" as "some time after v2.0". See the
 > [roadmap index](index.md) for status conventions and where this fits the overall plan. This is the
 > **canonical** treatment of switching events — it supersedes an earlier "switching state-space
@@ -321,15 +326,17 @@ switching-awareness:
   amount — which distinguishes "a transfer that will persist and eventually revert" from "a
   permanent change such as load growth or a meter re-base".
 
-**What it does not replace.** This experiment makes the *forecaster* robust to switching; it
-produces none of the detector's deliverables. There is no event list or donor attribution (so no
+**What it does and does not produce.** This experiment makes the *forecaster* robust to
+switching; it produces none of the detector's discrete deliverables. There is no event list or
+donor attribution (so no
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching)), no ARA mask, no
 sensitivity floor, and no latent-NRA reconstruction — a good forecast of *metered* power is a
-different product from an estimate of what demand would have been under NRA. The two compose
-rather than compete: once the detector exists, its outputs (an in-event flag, event age,
-attributed magnitude) are themselves natural features for this model. And if the experiment wins
-big, that is an argument for re-weighting the *forecast-motivated* part of the switching work —
-while the event table, the mask, and the sensitivity floor keep their own justification.
+different product from an estimate of what demand would have been under NRA. How much each of
+those absences matters is a requirements question as much as a technical one, and is taken up at
+the [decision point below](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
+The two paths still compose rather than compete: if the staged detector is built, its outputs
+(an in-event flag, event age, attributed magnitude) are themselves natural features for this
+model.
 
 **Caveats to build in from the start:**
 
@@ -413,6 +420,84 @@ as the ablation control:
 [aligned lagged-weather features](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
 (quick-wins item 5), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
+
+#### The decision point — a feature-based mainline vs the staged detector
+
+The staged detector (stages 2–3 and the v0.6.1 escalation) was designed against a deliverables
+list that has since softened: the hard requirement on this project is **NRA forecasts**; the
+[`substation_switching` table](delivery-tables.md#table-5-substation_switching) was our own
+proposal rather than a stated requirement; and NGED hold their own switching logs — they know
+their planned switching far better than any detector of ours ever will. That reframing opens a
+genuine alternative mainline in which the detector's discrete layer is never built:
+
+- **The NRA forecast** is the stage-1 model itself, generalised from hindcast to forward
+  forecast: the weather/calendar forecaster, trained with switching-event periods excluded from
+  the target (labelled periods, in v1 — the with/without-exclusion experiment pair above) and
+  given none of the anomaly features, predicts what power *would be* under normal running. No
+  changepoints, no attribution.
+- **The metered-power forecast** is the same forecaster *plus* the residual, event-age, and
+  pooled-neighbour features above, which let it track the current ARA state and carry it
+  forward.
+- **The switching deliverable to NGED** becomes the continuous engineered signals themselves —
+  "this substation has been running 3σ above its weather-expected level for 19 days, and its
+  neighbours' signed sum shows the equal-and-opposite" — plottable per substation and laid
+  directly against NGED's own logs, with no detection threshold and no false-positive/negative
+  dichotomy to defend. For situational awareness this is arguably a *better* product than a
+  discrete event table, not a consolation prize.
+
+**What the feature path cannot recover.** Two capabilities lapse if the attribution layer is
+never built, and the choice should be made with both named. First, **counterfactual NRA
+*history***: reconstructing what demand would have been *during* a past event requires
+subtracting an estimated step magnitude, which needs the changepoint-plus-attribution layer (the
+[zeroth-order patch](#v06-unsupervised-statistical-switching-event-detector)). If the
+requirement is NRA *forecasts* only, this never bites. Second, **donor attribution**: "who took
+the load" needs the balance-matching machinery — the pooled features deliberately discard it,
+because permutation invariance is a virtue for forecasting and the exact opposite of what
+attribution needs.
+
+**Evaluating an NRA forecast needs synthetic injection.** During an event there is no NRA
+ground truth — the metered power is precisely *not* the target — so the NRA product can only be
+scored on out-of-event periods plus the synthetic-injection harness: inject an event into the
+*inputs*, keep the target clean, and require the NRA output to ignore the injection while the
+metered-power output tracks it. The harness — already the staged plan's tuning workhorse — is
+the piece that transfers wholesale, and becomes the validation backbone of the feature path too.
+
+**The V2 hygiene question.** "Train with labelled events excluded" presumes labels. Whether that
+extends beyond the trial area depends on how completely NGED's own logs cover the fleet — a
+question added to [Part 5](#part-5-open-items-dependencies). If coverage turns out poor, the
+label-free fallbacks are the robust quantile fit (whose adequacy the v1 exclusion pair measures
+directly) and soft down-weighting of training rows by the event-age accumulator itself — an
+implicit detector, but a threshold-free one, tunable on the injection harness.
+
+**The decision.** After implementation step 2 (the baseline), the
+[item 5](xgboost-improvements.md#5-aligned-lagged-weather-the-single-stage-ablation-control-for-item-13)
+and
+[item 13](xgboost-improvements.md#13-residual-lag-features-from-the-switching-detector-baseline)
+experiments, and the v1 label-exclusion pair, evaluate. If NRA-forecast quality with
+label-cleaned training is good, and NGED confirm the continuous signals meet their needs (the
+Part 5 question), stages 2–3 and v0.6.1 demote from mainline to **contingency — kept designed,
+not built** — and the v2.5/v2.6 escalations become still more conditional than the
+[escalation principle](#part-2-the-staged-roadmap) already makes them. This is that principle
+applied honestly to our own plan: the staged detector must be justified by a measured gap the
+feature path leaves, not by anticipation.
+
+**Relationship to the v2 disaggregation ambition.** The full-fat v2 vision is a *single* model
+that sees everything — switching, capacity changes, embedded DERs — and makes an informed joint
+attribution among them: [v2.5](#v25-magnitude-only-mixture-model-the-workhorse)'s mixture and
+[v2.6](#v26-type-resolved-mixture-with-differentiable-physics-modules)'s typed physics modules,
+with the per-node anomaly slack catching what neither explains. The two-stage forecaster is a
+step *toward* that vision, not a detour from it. Stage 1's residual is exactly the
+undifferentiated lump v2 exists to explain — everything the weather and clock don't account
+for: switching, DER growth, new connections, capacity changes alike — and the engineered
+features are hand-crafted summaries of precisely the structure v2 uses to attribute it:
+conservation across neighbours (the signed sum), persistence (the EWMAs), diurnal shape. The
+booster consumes those fingerprints for *prediction without attribution*; what v2 adds is the
+structured generative layer that turns the same fingerprints into *named causes* — a persistent
+level shift is switching if it conserves across a neighbour subset, load growth if it is
+partnerless, embedded PV if its shape tracks irradiance. So a demonstrated win from these
+features is direct evidence that the residual carries attribution-relevant signal — de-risking
+v2 — and the shared infrastructure (the baseline, the normalised residuals, the injection
+harness, the adjacency) carries over wholesale whichever way the decision point goes.
 
 #### v0.6.1 — the joint edge-flow estimator
 
@@ -560,6 +645,11 @@ implementation-details section directly below.
 The build order for v0.6, simplest-first, each step delivering something testable before the next
 adds complexity. Steps 1–7 are the staged detector; step 8 is the joint edge-flow estimator, built
 only if steps 1–7 prove to be too fragile (or to test out convex optimisation as a warm-up for v2!)
+Note that steps 1–4 serve both sides of
+[the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) — the
+labelled event table, the baseline, the diagnostics, and the injection harness are shared
+infrastructure — while steps 5–8 are the staged detector proper, built only if the decision
+point retains it.
 
 1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
    (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
@@ -900,4 +990,12 @@ These apply at every stage and are the things most easily got wrong:
 - **Switching logs for the 32-series trial** (held; e.g. the DINDER example). Used as the gold-standard validation set for v0.6 and beyond. **Not** available at full scale — this asymmetry drives the whole design.
 - **Neighbour/adjacency structure** for the trial substations — which substations can exchange load (needed to define graph edges and the attribution search). Even approximate adjacency helps; note that because cut points move, "adjacency" means "can be electrically connected by some switching," not a fixed feeder map.
 - **Confirmed by NGED:** (a) multi-recipient transfer (2–3 donors) is the norm; (b) partial transfers (some, not all, of a substation's load) are the common and harder case; (c) no stable "feeder" unit exists; (d) switching labels exist only for the trial area, not at scale.
-- **To ask NGED:** how complete are the control-room switching logs for the trial area? (Determines whether measured detection precision is a tight bound or a loose lower bound.)
+- **To ask NGED:** (a) how complete are the control-room switching logs for the trial area?
+  (Determines whether measured detection precision is a tight bound or a loose lower bound.)
+  (b) How completely do NGED's own logs cover the **full fleet**? (Determines whether
+  label-excluded training extends to V2 scale, and how much unsupervised detection is needed
+  for data hygiene at all — see
+  [the decision point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).)
+  (c) Would continuous per-substation switching-state signals — the engineered features — meet
+  NGED's needs in place of a discrete event table? (Table 5 was our proposal, not a stated
+  requirement.)

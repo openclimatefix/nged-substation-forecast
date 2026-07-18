@@ -263,7 +263,10 @@ its `time_series_id`-only capacity join for a temporal as-of join (see
 
 ## Table 5 — `substation_switching` 🚧
 
-> **Status: 🚧 Planned (v0.6).** Depends on switching-event detection.
+> **Status: 🚧 Planned (v0.6), now conditional.** Depends on switching-event detection — and
+> whether a discrete event table ships at all is an open question: continuous per-substation
+> switching-state signals may be delivered instead. See
+> [the decision point in the switching-events plan](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector).
 
 Captures the amount of power OCF estimates has been **switched** from a "donor" substation to a
 "recipient" substation. OCF estimates switching events purely from the power-flow time series and

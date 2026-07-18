@@ -333,7 +333,11 @@ In brief: fit the v0.6 stage-1 baseline (this same forecaster, configured with w
 features only and a quantile objective), then feed the production model normalised
 "actual − expected" residuals at lag times instead of (or alongside) raw power lags — telling
 the model how *normal* each recent observation is, so it can carry a sustained switching-event
-offset forward instead of blending it into weather-driven variation.
+offset forward instead of blending it into weather-driven variation. Beyond its expected metric
+win, this experiment's result gates the
+[decision point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)
+between a feature-based switching mainline and the staged detector — extra reason to schedule
+it.
 
 Four scheduling notes specific to this page:
 
@@ -441,6 +445,23 @@ Needs item 15 at ensemble scale. The boundary of "quick".
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power lags** — a DST edge case affecting a handful of half-hours per year;
   the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
   ever show a DST-transition artefact.
+- **A composable feature-expression grammar (consider designing later, deliberately not now).**
+  The accumulator machinery of item 13 generalises well beyond power residuals: EWMAs of *any*
+  base column at chosen half-lives (an EWMA of temperature *is* item 8's effective
+  temperature), each either lagged in valid time or locked to `power_fcst_init_time` (item 11's
+  anchoring), plus weather-*abnormality* features — how unusual the forecast weather is against
+  the climatological norm for that calendar time ("is this a heat wave?"). Feature names are
+  already a tiny parsed language (`ParsedFeatures.from_strings()` turns strings into typed
+  `LagFeature`/`RollingFeature`/`WeatherFeature`/... objects), so the natural end state is a
+  modestly richer grammar of composable combinators — base column → transform (EWMA,
+  anomaly-vs-climatology) → anchoring (valid-time lag vs init-time lock) — still expressed as
+  concise strings, e.g. something like `temperature_2m->ewma(3d)@init_time` (illustrative, not
+  a design). The payoff couples to
+  [#359](https://github.com/openclimatefix/nged-substation-forecast/issues/359): any feature a
+  string can express could be tried interactively in the visualisation, then pasted into any
+  model config unchanged. Deferred because grammar design done speculatively becomes an inner
+  platform — grow combinators only as experiments demand them, and revisit once items 5, 8, 11,
+  and 13 have shown which transforms actually earn their keep.
 
 ## How each win is evaluated
 
