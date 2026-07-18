@@ -160,6 +160,73 @@ concentrated at short horizons, though: the anomaly reading only exists where th
 itself is non-null (lead time < lag), the same nullification limit the residual-lag features note for their
 valid-time-anchored variant.
 
+### Weather-delta compensation for power lags — an implicit handle on unmetered generation
+
+Aligned lagged weather hands the booster the lagged power value *and* the weather at that lagged
+time as two separate columns, then asks it to work out that the two belong together. This item
+precomputes the comparison the booster struggles to make: for each power lag, add a single
+**delta** column — the change in a weather (or weather-*proxy*) variable between the lagged time
+and the target `valid_time` — so the feature literally says "the power lag is from a much sunnier
+moment than the one you are forecasting; compensate." It sits between aligned lagged weather and
+the [residual-lag features](#residual-lag-features-from-the-switching-detector-baseline) on the
+same ablation ladder: aligned weather leaves the subtraction to the tree, the two-stage residual
+does the subtraction against a full fitted baseline, and this does the one subtraction that the
+unmetered-generation case needs, with no baseline model.
+
+**Why this is the strongest case for a delta feature.** A substation with embedded (unmetered) PV
+or wind meters roughly `demand − C · cf(weather)`, where `C` is the unknown behind-the-meter
+capacity and `cf` the capacity factor. The correction that maps the lagged observation onto the
+target conditions is then `≈ −C · (cf_valid − cf_lag)` — **linear in the capacity-factor delta**,
+with a per-series constant scale. A per-series booster does not need to know `C`: it discovers the
+slope as an ordinary split relationship on the one delta column. That is a far easier learning
+problem than the general "how anomalous was this lag" question, and it is exactly the structure
+trees are otherwise bad at — a difference of two continuous inputs — served precomputed.
+
+**Compute the delta on the right variable — this is why it depends on the physics proxies.** The
+delta is only meaningful on a variable that is roughly linear in the generation it stands for:
+
+- **PV.** A raw GHI delta is a serviceable start (the PV proxy is nearly linear in GHI), so a PV
+  variant can run using irradiance directly. The
+  [simplified PV power proxy](#linearised-physics-features-for-solar-and-wind) sharpens it —
+  especially across the clear-sky-index-interpolated sunrise/sunset ramps and the cell-temperature
+  derate — so the proxy delta is the better feature once that item lands.
+- **Wind.** A raw wind-*speed* delta is actively misleading, because the power curve is cubic then
+  flat: equal speed deltas at 5 m/s and at 15 m/s mean wildly different power deltas. The wind
+  variant must take its delta on the
+  [farm-level power-curve proxy](#linearised-physics-features-for-solar-and-wind), not on speed,
+  and therefore waits for that proxy.
+
+**Where it is weaker than the two-stage residual** — worth stating plainly so the ablation stays
+honest. It only compensates for the *weather-linear* component: nonlinear, asymmetric
+temperature-driven demand response and all calendar effects are outside it, whereas the residual
+baseline captures both because it is a full fitted model. It also arrives unnormalised (no
+per-series spread units), and it carries a confounder — a big GHI delta *should* be nearly ignored
+at a substation with little embedded PV, so the model must learn per series how much of its
+metered signal responds. That is fine for today's per-series boosters, but a
+[global model](#global-model-per-time_series_type) would need an embedded-capacity estimate as an
+interacting feature, which is the bridge to the V2
+[disaggregation](disaggregation.md) work.
+
+**Caveats carried over unchanged.** The weather/proxy value *at the lagged time* rides the same
+freshest-NWP-run join with no publication-time cut that aligned lagged weather and the residual-lag
+features both flag — leak-free today only as a side effect of daily run cadence — so this item
+shares the availability cut planned in
+[#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356). Null the delta
+wherever its paired power lag is nulled (`_nullify_leaky_lags`): a "conditions changed" signal with
+no surviving anchor for what they changed *from* is noise. And plot every delta against observed
+power before trusting it — a flipped sign convention (valid − lag vs lag − valid) is invisible to
+the leaderboard but obvious in the
+[feature-visualisation tool](https://github.com/openclimatefix/nged-substation-forecast/issues/359).
+
+**Sequencing.** This is a new arm in the aligned-weather → residual-lag ablation ladder: (a)
+aligned raw lagged weather, (b) these proxy deltas, (c) full two-stage residuals. Arm (b) minus
+arm (a) measures what the precomputed subtraction is worth; if it captures most of arm (c)'s gain
+on non-switching rows, that is a cheap and important discovery to make before the two-pass
+baseline machinery is built. It is slightly more than the pure config of aligned weather — a
+derived delta column in `_parsed_features.py`, in the mould of the existing derived features — so
+it sits at the bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant
+waits on the [solar/wind physics proxies](#linearised-physics-features-for-solar-and-wind).
+
 ## Tier 2 — cheap feature engineering (about a day each)
 
 ### Per-`time_series_type` feature lists
