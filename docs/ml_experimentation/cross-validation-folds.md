@@ -67,7 +67,7 @@ target protocol: an expanding training window with one **complete-year** validat
 a **new leaderboard epoch** (every experiment is re-scored against the new fold set), and is a
 `conf/cv/default.yaml` edit with no schema change.
 
-Separately, and later, we plan to **pre-train** on weather reanalysis (CERRA) so models can use the
+Separately, and later, we plan to **pre-train** on weather reanalysis (ERA5) so models can use the
 long power histories that some assets have back to 2020, then fine-tune on ECMWF ENS. Pre-training
 is a training-time technique, distinct from the validation folds described here.
 
@@ -76,6 +76,6 @@ is a training-time technique, distinct from the validation folds described here.
 ## Alternatives considered
 
 We weighed three other ways to slice the limited honest data — monthly expanding CV, quarterly
-non-overlapping walk-forward, and yearly folds backed by CERRA reanalysis — before settling on the
+non-overlapping walk-forward, and yearly folds backed by ERA5 reanalysis — before settling on the
 single fold above. The reasoning for rejecting or deferring each is recorded in
 [ML Experiment Orchestration — Design Decisions](../architecture/ml-orchestration.md#fold-design-alternatives-considered).

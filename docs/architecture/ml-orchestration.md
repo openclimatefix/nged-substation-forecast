@@ -114,13 +114,13 @@ We deferred it to keep the initial CV setup minimal; it is the recommended next 
 multiple folds
 *before* the ECMWF back-fill enables the full yearly protocol.
 
-### Yearly folds backed by CERRA — rejected for validation
+### Yearly folds backed by ERA5 — rejected for validation
 
-Keep the yearly 2022–2025 folds now by training on **CERRA reanalysis** for the pre-2024-04-01
-years. Rejected: CERRA is *reanalysis* (it ingests future observations), so validating on it
+Keep the yearly 2022–2025 folds now by training on **ERA5 reanalysis** for the pre-2024-04-01
+years. Rejected: ERA5 is *reanalysis* (it ingests future observations), so validating on it
 measures the model's response to near-perfect weather, not **forecast** skill — systematically
-misleading — and a leaderboard mixing CERRA folds and ECMWF folds is apples-to-oranges. It would
-also pull a large CERRA-ingestion effort forward. CERRA is valuable, but for **pre-training** (see
+misleading — and a leaderboard mixing reanalysis folds and ECMWF-forecast folds is
+apples-to-oranges. Reanalysis is valuable, but for **pre-training** (see
 [Cross-validation folds: Target](../ml_experimentation/cross-validation-folds.md#target-multiple-yearly-folds)),
 not for validation.
 

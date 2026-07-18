@@ -420,12 +420,24 @@ wants the same inputs as
 [the differentiable model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant))
 is covered by the v0.7 weather ingests. **CM SAF SARAH-3** provides global (SIS), direct (SID)
 and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
-SIS − SID) — the primary input, matching the half-hourly metering. **CERRA** provides global
-plus time-integrated direct short-wave (diffuse by subtraction; accumulated fluxes from 3-hourly
-forecast cycles, so temporally coarser). The live **ECMWF ENS** feed carries only GHI — fine for
+SIS − SID) — the primary input, matching the half-hourly metering. **ERA5** provides global plus
+**direct** (`fdir`) short-wave (diffuse by subtraction), and its near-real-time ERA5T stream
+(~5 days behind) suits the near-real-time capacity estimate — unlike CERRA, whose ~3.5-month
+latency [rules it out here](data-sources.md#weather-data). The live **ECMWF ENS** feed carries only GHI — fine for
 v0.7, but v2 physics *forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition
 model (or `fdir` added to the upstream dataset). See
 [data sources](data-sources.md#weather-data).
+
+> **Design caveat — should ERA5 stay offline?** Feeding ERA5 into the *live* system adds a new
+> near-real-time data dependency: another external feed to ingest on a daily-ish cadence, monitor,
+> and recover when it lags. Because effective capacity moves slowly (daily blocks), a tempting
+> alternative is to run the ERA5-based capacity estimation **offline** on a periodic job that
+> refreshes the [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table, and
+> keep the **production forecast path dependent only on ECMWF ENS** (plus the power feed) — no new
+> real-time dependency, and the live forecast just reads the slowly-updated capacity table. The
+> cost is that ECMWF-only would almost certainly give a slightly *worse* capacity estimate than
+> ERA5 would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
+> [live-service cadence](live-service.md#workload-model).
 
 ## What comes after v0.7
 

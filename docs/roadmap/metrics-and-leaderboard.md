@@ -770,19 +770,19 @@ each:
 
 Each ML experiment is tagged with metadata so we can group experiments and compute average
 performance per group (e.g. "does lagged power *always* help, regardless of model sophistication?",
-or "how robust is each model to weather-forecast uncertainty — CERRA reanalysis vs. operational
+or "how robust is each model to weather-forecast uncertainty — ERA5 reanalysis vs. operational
 NWP?"). Example tags:
 
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
 | `model_family` | nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
-| `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, cerra |
+| `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, era5 |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |
 | `generator_capacity_estimation` | none, simple_p99, convex_envelope, differentiable_physics |
 | `switching_event_detection` | none, simple_statistical |
-| `pre_training` | none, CERRA |
+| `pre_training` | none, ERA5 |
 
 > Estimating **cost savings (£)** attributable to each forecasting approach, per leaderboard row, is
 > a 🔬 v2 stretch goal.
