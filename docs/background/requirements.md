@@ -56,6 +56,31 @@ Further down the same continuum:
 * Model and forecast *unmetered* solar PV and wind power on each primary substation by disaggregating net power flow.
 * Disaggregate and forecast other distributed energy resources (DERs): EV chargers, heat pumps, price-sensitive batteries.
 
+## ML experimentation at scale
+
+Nearly every objective above is an open research question — improving NRA forecast skill,
+detecting switching events, estimating effective capacity, flagging faulty meters,
+disaggregating DERs — and we hold far more ideas than we can try at once. That turns
+experimentation throughput into an infrastructure requirement in its own right: we need to run
+**on the order of hundreds of ML experiments per month**, and the workflow must make each one
+as frictionless as possible.
+
+Two properties matter as much as raw throughput:
+
+* **Re-runnability.** We will inevitably find and fix bugs that invalidate earlier results —
+  in feature engineering, in evaluation, in the data itself. When that happens we must be able
+  to re-run old experiments cheaply and confidently (same configuration, same folds), so that
+  results reflect the fixed world rather than a mixture of before and after.
+* **A standardised leaderboard.** Every experiment's metrics land in one comparable place,
+  computed the same way, so "is this idea better?" is a lookup, not an analysis project. See
+  [Metrics & Leaderboard](../roadmap/metrics-and-leaderboard.md).
+
+This requirement shapes the orchestration architecture: it is why the experiment layer is
+built around per-(experiment, fold) partitions that can be run — and re-run — individually
+(see [ML Orchestration Design](../architecture/ml-orchestration.md)), and it was decisive in
+choosing Dagster over Airflow (see
+[Why Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md)).
+
 ## Operating model & handover
 
 NGED confirmed (2026-07-14) that their preference for running Flexpectation business-as-usual

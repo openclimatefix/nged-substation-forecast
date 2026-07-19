@@ -1,10 +1,13 @@
-# Porting to Airflow — What It Would Take
+# Why Dagster, not Airflow?
 
-OCF's existing production services are orchestrated with Apache Airflow, as a fleet of
-micro-services (each service in its own git repository, running in its own container). Since
-Flexpectation orchestrates with Dagster instead, the question naturally arises whether this
-project could — or should — converge on Airflow. This page records the assessment so the
-reasoning stays auditable, in the same spirit as the
+OCF currently orchestrates with *both* tools: our existing production services run on Apache
+Airflow, as a fleet of micro-services (each service in its own git repository, running in its
+own container), while our on-prem data pipelines run on Dagster. Since Flexpectation
+orchestrates with Dagster, the question naturally arises whether this project could — or
+should — converge on Airflow — especially as OCF has, since around August 2025, been
+discussing standardising on Airflow (a direction under discussion, not yet a settled
+decision). This page records the assessment so the reasoning stays auditable, in the same
+spirit as the
 [rejected designs in Production Deployment](production-deployment.md#considered-but-rejected-designs).
 
 The page answers three questions in turn:
@@ -23,7 +26,17 @@ Airflow claims on this page were verified against Airflow 3.3.0 (released 6 July
 
 ## Why we chose Dagster (August 2025)
 
-The ML R&D side of this project was designed around a specific workflow: mint an
+This project is ML-R&D-heavy by design. Beyond improving demand-forecast skill, the
+[requirements](../background/requirements.md#ml-experimentation-at-scale) span switching-event
+detection, effective-capacity estimation, faulty-meter detection, and DER disaggregation — and
+we hold far more ideas than we can try at once. The infrastructure therefore has to support
+running **on the order of hundreds of ML experiments per month**, make each run — and,
+crucially, each *re-run*, when an inevitable bug fix invalidates earlier results — as
+frictionless as possible, and land every result on a standardised leaderboard. Orchestrator
+ergonomics for experimentation are not a nice-to-have here; they are load-bearing for the
+project's core output.
+
+Concretely, the workflow we designed for this is: mint an
 `{experiment_name}__{fold_id}` partition key per cross-validation cell at runtime, and get
 individually addressable, retryable, observable materialisations per key — with a UI that shows
 at a glance which (experiment, fold) cells exist, succeeded, or failed, across every experiment
@@ -57,7 +70,10 @@ When the system was designed in August 2025, the current Airflow release was 3.0
 So the design-time claim is straightforward: in August 2025, Airflow could not deliver the
 per-cell experiment workflow this project was built around, and its nearest substitute had a
 broken per-fold retry story in the release we would have deployed. Choosing Dagster was not a
-matter of taste.
+matter of taste. Nor was it contrarian within OCF: we already ran Dagster for our on-prem data
+pipelines, and OCF's data-engineering view at the time favoured Dagster of the two
+orchestrators. (The later organisational shift towards possibly standardising on Airflow
+post-dates this design decision.)
 
 ## Could we migrate today? (assessed July 2026)
 
@@ -133,7 +149,10 @@ The honest framing is no longer "Airflow can't do ML R&D" — it demonstrably ca
 model closed the dynamic-partition gap in July 2026. The framing is: **Airflow can run the
 workload; what it lacks is the catalog** — the persistent per-cell status surface and in-place
 experiment extension that Dagster gives us for free — and re-platforming to chase a weeks-old
-partition feature whose observability UI is still on the roadmap would be premature.
+partition feature whose observability UI is still on the roadmap would be premature. At our
+[experiment volume](../background/requirements.md#ml-experimentation-at-scale) — hundreds of
+runs a month, with routine re-runs of old experiments — small per-experiment friction
+compounds into a real tax on the project's core output.
 
 ## What would a port look like?
 
@@ -233,8 +252,11 @@ The assessment cuts both ways — Airflow would bring some genuine improvements:
   The trade is ~1 minute of task provisioning latency per *task* instead of per *run*.
 - **Pluggable retry policies** (AIP-105, Airflow 3.3) map cleanly onto "retry only on
   `NwpRunNotYetAvailable`, fail fast on genuine bugs".
-- **Organisational familiarity and managed hosting.** Airflow is what OCF already runs in
-  production, so a port buys shared operational knowledge, shared tooling, and a hiring pool.
+- **Organisational alignment and managed hosting.** OCF runs Airflow for its existing
+  production services (alongside Dagster for the on-prem data pipelines), and has been
+  discussing standardising on Airflow since around August 2025. If that lands as a platform
+  decision, a port buys alignment with the OCF standard: shared operational knowledge, shared
+  tooling, and a hiring pool.
   AWS offers managed Airflow (MWAA, supporting Airflow 3.2.1 as of May 2026) — though MWAA
   pins Python 3.12, so this project's 3.14-only packages could not be imported by MWAA workers
   directly; the standard escape is thin DAGs of `EcsRunTaskOperator` calls launching our own
@@ -318,7 +340,8 @@ We would happily revisit this page if any of the following happens:
 - **A concrete handover signal** — NGED (or a post-NIA operating agreement) indicating that
   they run Airflow or want MWAA-managed orchestration. This is the strongest trigger, and it
   points at Option B, not Option A.
-- **An OCF platform decision** that all production services must run on the shared Airflow
+- **OCF standardising on Airflow.** The discussion under way since around August 2025 becoming
+  a firm platform decision that all production services must run on the shared Airflow
   infrastructure. Also points at Option B.
 - **AIP-76 partition observability shipping** — a per-partition status surface (which keys
   exist, succeeded, failed, over all time) for runtime-minted partitions. The data model
