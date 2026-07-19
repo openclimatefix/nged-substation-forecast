@@ -34,7 +34,12 @@ running **on the order of hundreds of ML experiments per month**, make each run 
 crucially, each *re-run*, when an inevitable bug fix invalidates earlier results — as
 frictionless as possible, and land every result on a standardised leaderboard. Orchestrator
 ergonomics for experimentation are not a nice-to-have here; they are load-bearing for the
-project's core output.
+project's core output. And conducting experiments is only half the loop: a winning experiment
+must then move into production as easily and as safely as possible, which is why R&D and
+production share a single unified codebase — promotion is an
+[audited materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
+not a rewrite — and why anything that splits the R&D and production worlds apart carries an
+ongoing cost (a tension Option B below has to price in).
 
 Concretely, the workflow we designed for this is: mint an
 `{experiment_name}__{fold_id}` partition key per cross-validation cell at runtime, and get

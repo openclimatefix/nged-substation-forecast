@@ -65,7 +65,7 @@ experimentation throughput into an infrastructure requirement in its own right: 
 **on the order of hundreds of ML experiments per month**, and the workflow must make each one
 as frictionless as possible.
 
-Two properties matter as much as raw throughput:
+Three properties matter as much as raw throughput:
 
 * **Re-runnability.** We will inevitably find and fix bugs that invalidate earlier results —
   in feature engineering, in evaluation, in the data itself. When that happens we must be able
@@ -74,11 +74,19 @@ Two properties matter as much as raw throughput:
 * **A standardised leaderboard.** Every experiment's metrics land in one comparable place,
   computed the same way, so "is this idea better?" is a lookup, not an analysis project. See
   [Metrics & Leaderboard](../roadmap/metrics-and-leaderboard.md).
+* **A short, safe path from R&D to production.** Conducting experiments is only half the
+  loop: an experiment that wins on the leaderboard must move into the live service as easily
+  and as safely as possible. This is why R&D and production share a single unified codebase —
+  the exact feature-engineering and model code that won the experiment is what runs in
+  production, and promotion is an
+  [audited configuration change](../architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
+  not a rewrite or a port between systems.
 
-This requirement shapes the orchestration architecture: it is why the experiment layer is
-built around per-(experiment, fold) partitions that can be run — and re-run — individually
-(see [ML Orchestration Design](../architecture/ml-orchestration.md)), and it was decisive in
-choosing Dagster over Airflow (see
+This requirement shapes the architecture: it is why the experiment layer is built around
+per-(experiment, fold) partitions that can be run — and re-run — individually (see
+[ML Orchestration Design](../architecture/ml-orchestration.md)), why R&D and production live
+in one repository and one execution path rather than separate codebases, and it was decisive
+in choosing Dagster over Airflow (see
 [Why Dagster, not Airflow?](../architecture/why-dagster-not-airflow.md)).
 
 ## Operating model & handover
