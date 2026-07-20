@@ -47,6 +47,7 @@ operational systems, rather than us silently working around the gap.
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
 - [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
 - [Code Style](architecture/code-style.md) — code conventions
+- [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable test suites
 - [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML experimentation: cross-validation folds, the leaderboard, and how we evaluate models
 - [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting a champion model and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders

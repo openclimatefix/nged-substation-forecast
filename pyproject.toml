@@ -116,7 +116,7 @@ docstring-code-line-length = 100
 # mode aborts collection with an "import file mismatch" error on the duplicate name.
 # The network-gated tests are skipped by default by the root conftest.py's collection hook (a plain
 # `uv run pytest` — local dev and per-PR CI — never touches the real Dynamical.org catalog). Run them
-# with `uv run pytest --run-network` — see docs/architecture/code-style.md. The gate lives in a hook,
+# with `uv run pytest --run-network` — see docs/architecture/testing.md. The gate lives in a hook,
 # not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would silently override it.
 addopts = "--import-mode=importlib"
 filterwarnings = [

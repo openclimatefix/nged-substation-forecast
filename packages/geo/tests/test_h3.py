@@ -99,7 +99,7 @@ def test_grid_weights_preserve_geographic_orientation() -> None:
     refactor that introduces axis handling.
 
     See the orientation-coverage table in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#nwp-grid-h3-orientation-coverage>
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
     for how this test sits alongside the ``dynamical_data`` layers.
     """
     grid = 0.25

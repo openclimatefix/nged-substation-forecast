@@ -19,7 +19,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     # and the physical units feed Nwp.validate. The offline tests share those assumptions, so after
     # changing this function run the network-gated test manually:
     #     uv run pytest --run-network -m network
-    # See docs/architecture/code-style.md ("Network-gated tests").
+    # See docs/architecture/testing.md ("Network-gated tests").
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
         ds.latitude.values.astype(np.float32),

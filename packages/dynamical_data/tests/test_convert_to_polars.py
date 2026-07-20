@@ -189,7 +189,7 @@ def test_convert_maps_each_grid_point_to_its_own_lat_lon(
     real-world hexagon) depends on that upstream asset and is out of scope here.
 
     See the orientation-coverage table in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#nwp-grid-h3-orientation-coverage>
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
     for how this test, the cached-real-slice test, and the geo landmark test divide the work.
     """
     ds = make_ens_dataset(
