@@ -83,6 +83,30 @@ moto S3 backend being process-global (reset it per test), and Polars row counts 
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
   canonical pattern.
 
+### Network-gated tests
+
+Most tests run fully offline, mocking any network call (for example, patching
+`dynamical_catalog.open` to return a synthetic `xr.Dataset`). A handful of tests are worth running
+against a **real** external service — chiefly to catch the *shared-convention blind spot*, where a
+synthetic fixture and the code under test share the same wrong assumption about the real data's
+shape (dimension order, latitude orientation, longitude range, dtypes, units) and both pass.
+
+Mark such a test `@pytest.mark.network`. The root `pyproject.toml` sets `addopts = "... -m 'not
+network'"`, so these tests are **deselected by default**: a plain `uv run pytest` (local dev and
+the per-PR CI) never touches the network. Run them explicitly — nightly CI or on demand — with:
+
+```bash
+uv run pytest -m network
+```
+
+`packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
+real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts
+the conventions the offline fixtures merely assume.
+
+(One wrinkle of the default `-m "not network"`: naming a network test by node id alone still
+deselects it — add `-m network` to run a single one, e.g. `uv run pytest path::test_foo -m
+network`.)
+
 ### Assertion style for Patito frames
 
 Build a frame, attach the model, cast, and validate for the happy path:

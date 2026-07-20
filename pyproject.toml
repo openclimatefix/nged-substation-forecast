@@ -114,13 +114,17 @@ docstring-code-line-length = 100
 # importlib mode lets test modules in different directories share a basename (e.g.
 # tests/test_metrics.py and packages/ml_core/tests/test_metrics.py); the default prepend
 # mode aborts collection with an "import file mismatch" error on the duplicate name.
-addopts = "--import-mode=importlib"
+# `-m "not network"` deselects the network-gated tests by default, so a plain `uv run pytest`
+# (local dev and the per-PR CI) never touches the real Dynamical.org catalog. Run them explicitly
+# with `uv run pytest -m network` (nightly CI only) — see docs/architecture/code-style.md.
+addopts = "--import-mode=importlib -m 'not network'"
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
 ]
 norecursedirs = [".venv", "venv", ".git", "__pycache__"]
 markers = [
     "integration: tests that exercise real wiring (Dagster + file-based MLflow + temp Delta)",
+    "network: hits the real Dynamical.org NWP catalog; deselected by default, `-m network` to run",
 ]
 
 [tool.pymarkdown]

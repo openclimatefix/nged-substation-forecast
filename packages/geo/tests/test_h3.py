@@ -81,6 +81,46 @@ def test_grid_weights_snap_to_nearest_grid_centre() -> None:
     assert produced_points == expected_points
 
 
+def test_grid_weights_preserve_geographic_orientation() -> None:
+    """A known point maps to NWP grid cells at its own (lat, lon) — no lat/lon swap, no flip.
+
+    This is the geographic complement to the ``dynamical_data`` orientation test: that test proves
+    ``convert`` preserves the value↔(lat, lon) pairing through the join; *this* one proves the
+    (lat, lon) labels themselves are geographically right, i.e. that
+    ``compute_h3_grid_weights`` snaps each cell to grid points at the cell's true location.
+
+    Two well-separated Great Britain landmarks pin it down. Absolute check: Edinburgh (~56°N, ~3°W)
+    must map to ``nwp_lat`` near +56 and ``nwp_lon`` near -3 — a lat/lon swap would send it to
+    (lat -3, lon +56), in the Indian Ocean, and is caught here. Relative check: the northern
+    landmark keeps the larger latitude and the western landmark the smaller (more negative)
+    longitude, so a vertical or horizontal flip is caught too.
+    """
+    grid = 0.25
+    edinburgh_lat, edinburgh_lon = 55.95, -3.19  # far north
+    lands_end_lat, lands_end_lon = 50.07, -5.71  # far south-west
+    edinburgh_cell = h3.latlng_to_cell(edinburgh_lat, edinburgh_lon, 6)
+    lands_end_cell = h3.latlng_to_cell(lands_end_lat, lands_end_lon, 6)
+
+    weights = compute_h3_grid_weights(
+        nwp_grid_size_degrees=grid, h3_index=[edinburgh_cell, lands_end_cell]
+    )
+    edinburgh = weights.filter(pl.col("h3_index") == edinburgh_cell)
+    lands_end = weights.filter(pl.col("h3_index") == lands_end_cell)
+    edinburgh_lats, edinburgh_lons = edinburgh["nwp_lat"].to_list(), edinburgh["nwp_lon"].to_list()
+    lands_end_lats, lands_end_lons = lands_end["nwp_lat"].to_list(), lands_end["nwp_lon"].to_list()
+
+    # Absolute: each landmark's grid points sit within ~1° of the landmark itself. This is what a
+    # lat/lon swap breaks (it would put Edinburgh's nwp_lat near -3, not +56).
+    assert 55.0 <= min(edinburgh_lats) and max(edinburgh_lats) <= 57.0
+    assert -4.0 <= min(edinburgh_lons) and max(edinburgh_lons) <= -2.0
+    assert 49.0 <= min(lands_end_lats) and max(lands_end_lats) <= 51.0
+    assert -7.0 <= min(lands_end_lons) and max(lands_end_lons) <= -4.0
+
+    # Relative: north stays north (larger lat), west stays west (smaller lon).
+    assert min(edinburgh_lats) > max(lands_end_lats)
+    assert max(lands_end_lons) < min(edinburgh_lons)
+
+
 @pytest.mark.parametrize(
     ("call", "match"),
     [
