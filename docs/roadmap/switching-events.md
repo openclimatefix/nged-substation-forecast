@@ -160,8 +160,9 @@ conflates "what the weather was doing" with "what is anomalous"; handing the mod
 component directly tells it how *normal* each recent observation is. It needs nothing beyond the
 baseline, so it can run as soon as normalised residuals exist — ahead of any detector machinery.
 
-What this buys — and why it is plausibly the largest forecast-*accuracy* win available from
-switching-awareness:
+##### What it buys
+
+It is plausibly the largest forecast-*accuracy* win available from switching-awareness, because:
 
 - **A cleaner lag representation in general.** Separating the expected part from the anomalous
   part of each lagged observation is plausibly useful everywhere, not only during switching
@@ -179,7 +180,9 @@ switching-awareness:
   amount — which distinguishes "a transfer that will persist and eventually revert" from "a
   permanent change such as load growth or a meter re-base".
 
-**What it does and does not produce.** This approach makes the *forecaster* robust to
+##### What it does and does not produce
+
+This approach makes the *forecaster* robust to
 switching; it produces none of the detector's discrete deliverables. There is no event list or
 donor attribution (so no
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching)), no ARA mask, no
@@ -191,7 +194,7 @@ The two paths still compose rather than compete: if the staged detector is built
 (an in-event flag, event age, attributed magnitude) are themselves natural features for this
 model.
 
-**Caveats to build in from the start:**
+##### Caveats to build in from the start
 
 - **A residual is not only switching.** It is also NWP error — autocorrelated and
   heteroscedastic, exactly the stage-1 problem. Feed *normalised* residuals (divide by the
@@ -231,7 +234,7 @@ model.
   easily and neighbour attribution only weakly. The closed-form detector exploits that structure
   directly, which is another reason this complements rather than replaces it.
 
-**Three feature-design notes:**
+##### Feature-design notes
 
 - **Event age, without a normality threshold.** "How long has this series been abnormal?" is a
   natural feature, and it needs no hand-coded normality threshold — an XGBoost split *is* a
@@ -292,6 +295,8 @@ model.
   extension of the view-forecasts dashboard, with the switching labels overlaid — exists for
   exactly this.
 
+##### When it runs, and the single-stage ablation control that precedes it
+
 It can begin as soon as the baseline exists (implementation step 2 below) and is itself
 implementation step 5, evaluated by cross-validation; its result also doubles as evidence of the
 baseline's quality. So that it gets scheduled alongside the other forecaster experiments, it is
@@ -304,7 +309,84 @@ as the ablation control:
 (a quick win), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
-**Attributing the uplift — calibration versus switching.** A residual-lag booster would sharpen
+##### A second way to use the stage-1 baseline: correct a draft
+
+The residual-lag design evaluates the stage-1 baseline at *lag* times, to tell stage 2 how
+anomalous each recent observation was. The same fitted baseline can also be evaluated at the
+*target* time, producing a "first-draft" forecast of the power we are trying to predict, which
+stage 2 then *corrects* rather than forecasting from scratch. This is a design axis orthogonal to
+the residual lags — they concern what stage 2 receives as recent-observation features; the draft
+concerns what stage 2 predicts and starts from — so the two compose (a booster can take a draft as
+its starting point *and* residual lags as features) rather than competing. It re-uses exactly the
+per-fold, out-of-sample hindcast machinery the residual lags already require, so it is cheap to try
+once that exists. There are two ways to hand stage 2 the draft:
+
+- **Draft as an ordinary feature; stage 2 predicts total power.** A soft specialisation: the
+  booster usually latches onto the draft as a dominant split variable and spends the rest on
+  corrections, but nothing forces it to. This is close to the documented design plus one feature,
+  and it keeps the main safety property — stage-1 error enters only as feature noise the booster
+  can learn to down-weight.
+- **`base_margin`; stage 2 predicts the correction (actual − draft).** XGBoost's `base_margin`
+  sets a per-row starting score, so the trees continue stage 1's boosting and regularisation
+  shrinks naturally toward "no correction". This is the version that genuinely forces
+  specialisation, and it degrades gracefully with horizon: as the anomaly signal decays and
+  valid-time lags null out, the correction tends to zero and the forecast falls back to the draft.
+  It also sharpens interpretation: because the draft is an offset rather than a column, it never
+  competes for splits, so the trees' feature importances and SHAP values describe *only* what drives
+  the correction — a cleaner read on the switching/anomaly signal than the soft variant, where the
+  draft soaks up most of the gain and entangles everything else. (That interpretability win comes
+  from predicting the correction, so the equivalent delta-regression shares it; it is a reason to
+  prefer this hard corrector over draft-as-feature, not `base_margin` over the delta trick.)
+
+**What `base_margin` buys over predicting the delta directly.** For plain squared-error regression,
+supplying the draft as `base_margin` is mathematically identical to training stage 2 on
+`(actual − draft)` and adding the draft back — same gradients, same trees — so under that objective
+predicting the delta is fine and arguably more transparent. That equivalence is not special to
+squared error — it holds for *any* identity-link loss that is a function of the residual alone,
+including the pinball/quantile objective this project wants, because pinball loss is
+translation-invariant (`ρ_τ(actual − draft − correction) = ρ_τ((actual − draft) − correction)`): same
+gradients, same trees, and an identical early-stopping metric either way. The margin earns its keep
+once the *link* is not the identity — a Poisson/Tweedie link (natural for a non-negative quantity),
+where the margin lives in log-space so the correction becomes *multiplicative*, the loss is no longer
+a function of `actual − prediction`, and the output cannot go negative. There the delta trick has no
+clean analogue and the margin is doing real work. The operational footgun is that the margin must be
+passed at *both* train and predict time; forgetting it at inference silently falls back to the
+default base score.
+
+**Costs of the hard corrector, and the hedge.** Because stage 2 starts from the draft, any stage-1
+*bias at the target time* flows straight into the output unless stage 2 can see the raw inputs
+needed to fix it — so the "no end-to-end optimisation" con bites harder than in the
+residual-feature design. The hedge is to keep the weather/calendar inputs in stage 2's feature list
+*even under* `base_margin`, trading some of the specialisation for a route to correct draft bias.
+
+**Quantiles need care.** The draft is a single deterministic number per row, so adding it shifts
+every quantile equally — $Q_\tau(\text{actual} \mid x) = \text{draft} + Q_\tau(\text{correction} \mid x)$
+holds exactly, for *any* fixed draft used as the margin. What that means is that correctness comes
+from training stage 2 *per target quantile* (each $\tau$ its own pinball fit), not from any special
+choice of margin: a probabilistic version needs one stage-2 model per quantile, and using the
+*corresponding* stage-1 quantile as each one's margin is a warm-start convenience (smaller
+corrections), not a requirement. Stage 1's quantile *spread* then does double duty: as a stage-2
+feature it supplies exactly the per-series "usual wobble" normalisation the residual lags already
+need.
+
+**The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
+available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its
+corrections against a draft that is systematically better than the live one — the same
+availability cut the residual-lag hindcasts and the freshest-run join require
+([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)). The lead-time
+feature belongs in stage 1 so the draft's own attenuation with horizon is honest.
+
+**The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`
+has far smaller variance than raw power and is far more stationary across series: recent-anomaly
+persistence looks similar at a 200 MW GSP and a 5 MW feeder once residuals are on a comparable
+scale. So a *global* corrector becomes plausible long before a global raw-power model does,
+sidestepping the per-series-level problem that is the
+[global model](xgboost-improvements.md#global-model-per-time_series_type)'s hard prerequisite — the
+same `base_margin` move that item notes for its capacity-factor-normalised physics proxy.
+
+##### Attributing the uplift: calibration versus switching
+
+A residual-lag booster would sharpen
 the forecast even on a grid that never switched, simply by telling the model how high or low it is
 currently running relative to weather and clock — an inference-time *calibration* that corrects
 NWP bias, meter drift, DER growth, or any persistent regime offset. That general uplift is worth
@@ -797,56 +879,7 @@ applies unchanged to its output. It is an escalation rather than the starting po
 staged detector fails *legibly* — every flag traces to a visible step and a named neighbour
 subset — while a joint optimiser is harder to inspect when it misbehaves. Build the transparent
 version first, keep it as the reference, and adopt the joint estimator where the head-to-head
-comparison (on logs + injections) shows it wins. A CVXPY implementation sketch lives in the
-implementation-details section directly below.
-
----
-
-#### Implementation details for v0.6.x (deleted when this ships)
-
-The build order for v0.6, simplest-first, each step delivering something testable before the next
-adds complexity. **Steps 1–4 are the shared infrastructure** every approach needs — the labelled
-event table, the baseline, the diagnostics, and the injection harness. **Step 5 is approach 1, the
-two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure alone. **Steps 6–8
-are approach 2, the staged detector**, and **step 9 is approach 3, the joint edge-flow
-estimator**; both are built only as [the decision
-point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) retains them (step 9
-also to test out convex optimisation as a warm-up for v2).
-
-1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
-   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
-   list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
-2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
-   (**no power-lag features**) and a robust median objective, per series, with a per-series
-   spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
-   normalised residual series. Sanity-check residual autocorrelation and per-series spread
-   before proceeding.
-3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
-   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
-   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
-   conservation premise in one cheap pass. If it fails, fix data before building anything on top.
-4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
-   magnitude × duration grid into believed-clean periods. Built early because every later
-   threshold — and the two-stage forecaster's in-event evaluation — is measured on it.
-5. **The two-stage forecaster (approach 1, the v0.6.0 target).** Add residual-lag, event-age, and
-   pooled-neighbour features to the booster, with the no-lookahead and out-of-fold hygiene the
-   [approach-1 caveats](#approach-1-the-two-stage-forecaster) require; evaluate on out-of-event
-   periods plus training-side injection. Ships the switching-robust metered-power forecast (and,
-   with the anomaly features withheld, the NRA forecast). Depends only on steps 1–4 and can begin
-   as soon as the baseline (step 2) exists; run its single-stage item-5 ablation control first.
-6. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
-   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
-   injections.
-7. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
-   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
-   onset/reversion pairing into event intervals.
-8. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
-   duration floor only); score everything against the logged events (precision reported as a
-   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
-9. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 7/8 validation
-   shows sequential matching is the binding error source (overlapping events, ambiguous
-   attributions). Reuses steps 1–6 wholesale; penalty weights tuned on the injection harness;
-   adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
+comparison (on logs + injections) shows it wins. A CVXPY implementation sketch is directly below.
 
 ##### Sketch of the edge-flow estimator
 
@@ -945,7 +978,66 @@ Notes on the sketch:
 
 ---
 
-### Approach 4 — the magnitude-only mixture model (the workhorse)
+#### Implementation sequence for v0.6.x (deleted when this ships)
+
+The build order for v0.6, simplest-first, each step delivering something testable before the next
+adds complexity. **Steps 1–4 are the shared infrastructure** every approach needs — the labelled
+event table, the baseline, the diagnostics, and the injection harness. **Step 5 is approach 1, the
+two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure alone. **Steps 6–8
+are approach 2, the staged detector**, and **step 9 is approach 3, the joint edge-flow
+estimator**; both are built only as [the decision
+point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) retains them (step 9
+also to test out convex optimisation as a warm-up for v2).
+
+1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
+   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
+   list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
+2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
+   (**no power-lag features**) and a robust median objective, per series, with a per-series
+   spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
+   normalised residual series. Sanity-check residual autocorrelation and per-series spread
+   before proceeding.
+3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
+   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
+   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
+   conservation premise in one cheap pass. If it fails, fix data before building anything on top.
+4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
+   magnitude × duration grid into believed-clean periods. Built early because every later
+   threshold — and the two-stage forecaster's in-event evaluation — is measured on it.
+5. **The two-stage forecaster (approach 1, the v0.6.0 target).** Add residual-lag, event-age, and
+   pooled-neighbour features to the booster, with the no-lookahead and out-of-fold hygiene the
+   [approach-1 caveats](#approach-1-the-two-stage-forecaster) require; evaluate on out-of-event
+   periods plus training-side injection. Ships the switching-robust metered-power forecast (and,
+   with the anomaly features withheld, the NRA forecast). Depends only on steps 1–4 and can begin
+   as soon as the baseline (step 2) exists; run its single-stage item-5 ablation control first.
+   The [draft-corrector variant](#a-second-way-to-use-the-stage-1-baseline-correct-a-draft) is an
+   optional additional experiment on this same infrastructure — it reuses the per-fold hindcast
+   machinery and reorders nothing.
+6. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
+   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
+   injections.
+7. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
+   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
+   onset/reversion pairing into event intervals.
+8. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
+   duration floor only); score everything against the logged events (precision reported as a
+   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
+9. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 7/8 validation
+   shows sequential matching is the binding error source (overlapping events, ambiguous
+   attributions). Reuses steps 1–6 wholesale; penalty weights tuned on the injection harness;
+   adopted only where it beats the staged detector head-to-head. CVXPY sketch in
+   [Approach 3](#sketch-of-the-edge-flow-estimator) above.
+
+---
+
+### After v2 is live — reconstructing latent NRA demand
+
+The two approaches below reconstruct each substation's *latent NRA demand* — the demand that would
+be metered under normal running — and are built at **v2 scale, once v2.0 is operational**; read
+them as "some time after v2.0". They share the v0.6 infrastructure above (the baseline, the
+normalised residuals, the injection harness, the adjacency).
+
+#### Approach 4 — the magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
@@ -1060,7 +1152,7 @@ the routing estimation should stay a convex layer even then.
 
 ---
 
-### Approach 5 — the type-resolved mixture with differentiable physics modules
+#### Approach 5 — the type-resolved mixture with differentiable physics modules
 
 **Goal.** Decompose each substation into physically-typed components (demand, PV, wind), each from its own differentiable module, and let each *type* transfer with its own routing weights — so a switching event can move proportionally more PV than load.
 

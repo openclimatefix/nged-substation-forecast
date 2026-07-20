@@ -359,6 +359,21 @@ smooth variable (speed), then apply the nonlinear power curve.
 Expect the win to concentrate in the PV and wind `time_series_type` slices; pairs with the
 per-`time_series_type` feature lists.
 
+**Enter these as features, not as an XGBoost `base_margin`.** It is tempting to treat a physics
+proxy as a baseline prediction the booster only has to *correct* — XGBoost's `base_margin` does
+exactly that, continuing the boosting on top of a supplied per-row starting score. It is the wrong
+tool here, for one structural reason: `base_margin` needs the baseline on the *target's* scale (an
+actual MW prediction), but these proxies are deliberately capacity-free, and for most series the
+target is *net demand*, where the physics explains only the embedded-generation slice. A
+capacity-free, generation-only margin is a poor starting score for the whole signal, and the trees
+would spend their capacity undoing its wrong scale. As a *feature*, by contrast, the per-series
+booster learns the proxy's slope (implicitly discovering the behind-the-meter capacity) and how it
+interacts with the demand component; the [monotone constraints](#monotone-constraints-for-the-generation-models)
+below then supply the "trust the physics when extrapolating" property a margin would otherwise
+provide. `base_margin` only becomes the right tool once the target is put on the proxy's scale —
+which is exactly what the [global model](#global-model-per-time_series_type)'s capacity-factor
+normalisation does.
+
 ### Monotone constraints for the generation models
 
 XGBoost's `monotone_constraints`: PV power non-decreasing in irradiance, wind power monotone
@@ -410,7 +425,7 @@ win, this experiment's result gates the
 between a feature-based switching mainline and the staged detector — extra reason to schedule
 it.
 
-Four scheduling notes specific to this page:
+Five scheduling notes specific to this page:
 
 - **Run [aligned lagged weather](#aligned-lagged-weather-the-single-stage-ablation-control)
   first.** The config-only single-stage variant — aligned lagged-weather features, letting the
@@ -455,6 +470,15 @@ Four scheduling notes specific to this page:
   run first. Finally, adopting a winner is not free either: the live service must then run the
   baseline model too — a second deployed model plus a hindcast-residual step in the predict
   path.
+- **A related variant reuses the same machinery to *correct a draft*, not only to supply residual
+  lags.** The stage-1 baseline can be evaluated at the target time to make a first-draft forecast
+  that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost
+  `base_margin` — a design axis orthogonal to the residual lags (the lags concern what stage 2
+  receives; the draft, what it predicts and starts from) and cheap to add once their per-fold
+  out-of-sample hindcast machinery exists. The
+  [full treatment](switching-events.md#approach-1-the-two-stage-forecaster) — soft-vs-hard
+  corrector, the quantile subtlety, and why the low-variance correction target is a plausible route
+  to a *global* model — is on the switching-events page.
 
 ### Weather-abnormality (climatology z-score) features
 
@@ -586,6 +610,24 @@ prerequisite: per-series target normalisation** — a global booster mixing a 20
 exists) with the inverse transform at predict time, plus static per-series features (capacity,
 type, lat/lon) so the booster can tell sites apart — plus the init-time-anchored features, which supply the current-level signal a global booster cannot bake in per series.
 Needs batched training at ensemble scale. The boundary of "quick".
+
+Normalisation also unlocks `base_margin` for the generation types. Once a series' target is a
+capacity factor in $[0, 1]$, its
+[wind/PV physics proxy](#linearised-physics-features-for-solar-and-wind) can be put on that same
+scale — the [wind proxy](#linearised-physics-features-for-solar-and-wind) already runs 0→1 (the
+normalised cubic ramp), while the PV proxy is in irradiance units ($\mathrm{W/m^2}$) and needs one
+extra division by a reference irradiance (≈ 1000 $\mathrm{W/m^2}$ at STC) to become a capacity
+factor. On a matched scale a single-`time_series_type` generation booster can take the proxy as its
+`base_margin` and learn only the site-specific deviation — physics carrying the cross-site shape,
+trees the correction. This is the scale match the per-series net-demand
+models lack — there the capacity-free proxy is the wrong tool as a margin (the
+[physics-features section](#linearised-physics-features-for-solar-and-wind) explains why), and
+capacity-factor normalisation is what supplies it. It is also the same base-margin move the
+[two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster) makes with its
+stage-1 draft; there, the correction target's low variance and cross-series stationarity are part
+of what makes a *global* corrector tractable at all — the same property that helps here. (Under a
+log-link generation objective the margin would be `log(proxy)`, which needs a floor to handle the
+PV proxy's exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
