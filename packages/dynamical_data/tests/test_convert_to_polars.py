@@ -187,6 +187,10 @@ def test_convert_maps_each_grid_point_to_its_own_lat_lon(
     pairing a data value with the wrong (lat, lon) before the join — and that is exactly what this
     test pins down. End-to-end geographic correctness (a real ECMWF cell landing in the correct
     real-world hexagon) depends on that upstream asset and is out of scope here.
+
+    See the orientation-coverage table in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
+    for how this test, the cached-real-slice test, and the geo landmark test divide the work.
     """
     ds = make_ens_dataset(
         latitudes=(52.0, 51.75),

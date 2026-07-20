@@ -8,13 +8,10 @@ import patito as pt
 import polars as pl
 
 from contracts._uri import ObjectStoreOptions
-from contracts.settings import Settings
+from contracts.settings import get_settings
 from contracts.typing_utils import typeddict_to_dict
 
 from .common import UTC_DATETIME_DTYPE
-
-SETTINGS = Settings()
-
 
 WeatherFeature = Literal[
     "temperature_2m",
@@ -62,8 +59,15 @@ class NwpMetaData(pt.Model):
     is_ensemble: bool = pt.Field(description="Whether this NWP model produces ensemble forecasts.")
 
     @classmethod
-    def load(cls, csv_path: str | Path = SETTINGS.nwp_metadata_csv_path) -> pt.DataFrame[Self]:
-        """Load NWP metadata from a static CSV file."""
+    def load(cls, csv_path: str | Path | None = None) -> pt.DataFrame[Self]:
+        """Load NWP metadata from a static CSV file.
+
+        Args:
+            csv_path: Path to the metadata CSV; defaults to ``get_settings().nwp_metadata_csv_path``
+                (resolved lazily so importing this module needs no ``.env``).
+        """
+        if csv_path is None:
+            csv_path = get_settings().nwp_metadata_csv_path
         df = pl.read_csv(csv_path)
         # Patito's .cast() will handle the conversion to the Enum type defined in the model
         return pt.DataFrame(df).set_model(cls).cast().validate()
@@ -326,8 +330,8 @@ class Nwp(pt.Model):
     @classmethod
     def scan_delta(
         cls,
-        path: str | Path = SETTINGS.nwp_data_path,
-        storage_options: ObjectStoreOptions = SETTINGS.storage_options,
+        path: str | Path | None = None,
+        storage_options: ObjectStoreOptions | None = None,
     ) -> pt.LazyFrame[Self]:
         """Lazily scan the NWP Delta table, typed and cast to this contract's dtypes.
 
@@ -335,11 +339,18 @@ class Nwp(pt.Model):
         so no rescale step is needed.
 
         Args:
-            path: Path or URI of the ``nwp`` Delta table.
+            path: Path or URI of the ``nwp`` Delta table; defaults to
+                ``get_settings().nwp_data_path`` (resolved lazily so importing this module needs
+                no ``.env``).
             storage_options: delta-rs object-store options (credentials/endpoint) for a remote
-                ``path``; defaults to the ``SETTINGS`` singleton's options (empty for a local
-                ``path``). Read-only — never mutated here (shared mutable default).
+                ``path``; defaults to ``get_settings().storage_options`` (empty for a local
+                ``path``).
         """
+        settings = get_settings()
+        if path is None:
+            path = settings.nwp_data_path
+        if storage_options is None:
+            storage_options = settings.storage_options
         return (
             pt.LazyFrame.from_existing(
                 pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))

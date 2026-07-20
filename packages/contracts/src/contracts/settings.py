@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 from typing import Final, Self
 
@@ -304,3 +305,21 @@ class Settings(BaseSettings):
         """Validate that the S3 bucket URL is a valid URL."""
         url_adapter.validate_python(v)
         return v
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return the shared, lazily-constructed ``Settings`` singleton.
+
+    Prefer this over constructing ``Settings()`` at module import time. ``Settings`` has required
+    fields (the ``nged_s3_bucket_*`` credentials) with no defaults, so instantiation reads ``.env``
+    and raises ``ValidationError`` when those are absent. Deferring construction to first *use*
+    keeps library modules (e.g. the ``contracts`` schemas) importable without live credentials —
+    so type-checkers, doc builders, and tests that only touch in-memory frames don't need a
+    populated ``.env`` — while still failing fast the moment settings are actually needed.
+
+    Cached with ``lru_cache`` so every caller shares one instance (matching the previous
+    module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to
+    re-read the environment after changing it.
+    """
+    return Settings()

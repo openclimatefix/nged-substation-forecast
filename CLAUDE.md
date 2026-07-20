@@ -32,9 +32,9 @@ command above yourself before committing, for faster feedback than waiting on th
 hook.
 
 **Testing conventions** — where test dependencies and fixtures live, how discovery works, mocking
-with `monkeypatch`, and the Patito assertion house style — are documented in the **Testing**
-section of [`docs/architecture/code-style.md`](docs/architecture/code-style.md). (The moto and
-Polars row-count testing *gotchas* live further down this file, with the other gotchas.)
+with `monkeypatch`, network-gated tests, and the Patito assertion house style — are documented on the
+**[Testing](docs/architecture/testing.md)** page. (The moto and Polars row-count testing *gotchas*
+live further down this file, with the other gotchas.)
 
 ## Docs
 
