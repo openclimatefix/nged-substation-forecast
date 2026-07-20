@@ -111,6 +111,16 @@ def compute_h3_grid_weights(
 
     weights_df = (
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_h3_res))
+        # empty_as_null=False matches the Polars 2.0 default. cell_to_children is mathematically
+        # guaranteed to return at least one child here -- child_h3_res > h3_res is enforced above,
+        # and every H3 cell has multiple children at any finer resolution -- so an empty list is
+        # unreachable and this setting has no effect on today's output. It only matters if that
+        # invariant is ever broken: False would silently drop the offending parent from
+        # weights_df (one h3_index missing from the output, no error raised), whereas True would
+        # inject a row with a null child_h3 (hence null nwp_lat/nwp_lon) that
+        # H3GridWeights.validate() below rejects immediately, since neither field is optional.
+        # Neither failure mode is meaningfully "safer" for a case that can't occur, so we match
+        # the future default rather than guess.
         .explode("child_h3", empty_as_null=False)
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),

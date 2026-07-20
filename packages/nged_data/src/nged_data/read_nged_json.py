@@ -57,6 +57,21 @@ def _extract_power_time_series(
     # Extract time series data: explode the 'data' column and unnest the struct.
     # 'explode' expands the list of structs into individual rows.
     # 'unnest' expands the struct fields into individual columns.
+    #
+    # empty_as_null=False matters here, unlike at the other two explode() call sites this repo
+    # fixed for the same warning: an empty 'data' array is a real possibility we haven't ruled
+    # out, not a provably-unreachable case. NGED's documented "no readings" signal is a Null
+    # 'data' field, which raises before reaching this line (see the docstring above) and is
+    # caught by storage.py's download_and_parse_files, which logs a warning and skips that one
+    # file. An empty array ('data: []') isn't documented as impossible -- just untested -- and it
+    # would NOT be caught by that same handler, because it only matches on
+    # pl.exceptions.InvalidOperationError's specific message. With empty_as_null=False, an empty
+    # array produces zero exploded rows, so this meter contributes zero PowerTimeSeries rows and
+    # the pt.DataFrame(...).validate() below trivially passes on the empty frame -- the same
+    # graceful outcome as the documented Null case. With empty_as_null=True, it would instead
+    # inject one row with null 'time'/'power', which PowerTimeSeries.validate() rejects (neither
+    # field is optional) with an error the except clause in storage.py doesn't catch -- crashing
+    # ingestion for every remaining file in the batch over one meter's edge case.
     time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})

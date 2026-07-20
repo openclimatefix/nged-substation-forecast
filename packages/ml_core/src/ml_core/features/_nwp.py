@@ -126,6 +126,15 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
             ).alias("valid_time")
         )
         .drop("_start", "_end")
+        # empty_as_null=False matches the Polars 2.0 default. datetime_ranges(start, end) always
+        # returns at least the single-point list [start] here, since _start/_end are the min/max
+        # valid_time of the same group and therefore start <= end, so an empty list is
+        # unreachable and this setting has no effect on today's output. It only matters if that
+        # invariant is ever broken: False would silently drop the group from time_grid (fewer
+        # 30-min rows downstream, no error raised), whereas True would inject a null valid_time
+        # row that the left-join below would fail to match against anything. Neither failure mode
+        # is meaningfully "safer" for a case that can't occur, so we match the future default
+        # rather than guess.
         .explode("valid_time", empty_as_null=False)
     )
 
