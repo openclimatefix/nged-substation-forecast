@@ -100,17 +100,21 @@ Exactly the *continuous* ``Nwp`` variables (a test guards against drift):
 which a line chart would render as meaningless slopes.
 """
 
-NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=24)
+NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=27)
 """How much of each NWP run's start feeds the stitched proxy-analysis line.
 
 We hold no weather observations, so the closest available proxy for the *true* weather over
-historical times is each run's shortest-lead forecasts: the first day of every run across the
-window, stitched into one line. 24 hours matches the daily-00Z run cadence, so consecutive
-chunks tile into a continuous line with no gaps and no overlaps.
+historical times is each run's shortest-lead forecasts: the first ~day of every run across the
+window, stitched into one line. The daily-00Z run cadence is 24 hours; we take 27 hours so each
+run overlaps the next by 3 hours (one NWP step). The overlap is deliberate: accumulated variables
+(precipitation, radiation) are null at lead 0, so at each 24 h stitch boundary the incoming run's
+first value is missing — the 3 h overlap lets ``select_analysis_proxy``'s per-column null-fill draw
+that value from the outgoing run's lead-24 instead of leaving a gap.
 
 The proxy-analysis line uses the control member (member 0) — ``view_forecasts.py`` obtains it via
-``weather_utils.select_analysis_proxy``, which also reduces overlapping runs to the freshest per
-valid time, so the frame reaching ``build_nwp_ensemble_chart`` is already a single stitched line.
+``weather_utils.select_analysis_proxy``, which reduces the overlapping runs to one freshest-non-null
+row per valid time, so the frame reaching ``build_nwp_ensemble_chart`` is already a single stitched
+line.
 """
 
 

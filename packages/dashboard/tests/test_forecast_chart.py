@@ -17,6 +17,7 @@ from dashboard.forecast_chart import (
     build_view_forecast_chart,
 )
 from plotting import ocf_theme
+from weather_utils import select_analysis_proxy
 
 INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 """During British Summer Time, so wall time is UTC+1 — the axis tests below rely on that."""
@@ -257,11 +258,11 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
 
 
 def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
-    """The first ``NWP_ANALYSIS_LEAD`` of one run per element of ``inits``, control member only
-    — the already-reduced proxy-analysis frame the dashboard feeds ``build_nwp_ensemble_chart``
-    (``view_forecasts.py`` produces it via ``weather_utils.select_analysis_proxy``). Pass
-    non-overlapping runs, since the builder no longer collapses overlaps itself. The temperature
-    encodes the run's index so tests can see which run each plotted point came from.
+    """The proxy-analysis frame the dashboard feeds ``build_nwp_ensemble_chart``, built exactly as
+    ``view_forecasts.py`` builds it: the first ``NWP_ANALYSIS_LEAD`` of one control-member run per
+    element of ``inits``, run through ``select_analysis_proxy`` so overlapping runs collapse to one
+    freshest-non-null row per valid time. The temperature encodes the run's index so tests can see
+    which run each plotted point came from.
     """
     frames = []
     for index, run_init in enumerate(inits):
@@ -278,6 +279,8 @@ def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
                 {
                     "init_time": [run_init] * len(valid_times),
                     "valid_time": valid_times,
+                    "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.UInt8),
+                    "h3_index": pl.Series([100] * len(valid_times), dtype=pl.UInt64),
                     "temperature_2m": pl.Series(
                         [float(index)] * len(valid_times), dtype=pl.Float32
                     ),
@@ -287,7 +290,10 @@ def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
                 }
             )
         )
-    return pl.concat(frames).lazy()
+    raw = pl.concat(frames).lazy()
+    return select_analysis_proxy(raw, group_key="h3_index", max_lead=NWP_ANALYSIS_LEAD).drop(
+        "h3_index"
+    )
 
 
 def _build_nwp(

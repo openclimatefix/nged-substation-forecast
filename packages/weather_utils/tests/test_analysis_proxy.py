@@ -44,6 +44,37 @@ def test_freshest_run_wins_per_group_and_valid_time() -> None:
     assert "ensemble_member" not in result.columns
 
 
+def test_null_in_the_freshest_run_falls_back_to_the_next_freshest_run() -> None:
+    # The freshest run is null for a column (as accumulated variables are at lead 0); that cell
+    # must be filled from the next-freshest run that has a value, while a column the freshest run
+    # *does* have keeps the freshest value. This is the accumulated-variable gap fill.
+    valid = BASE + timedelta(hours=24)
+    lf = _nwp(
+        [
+            {**_row(1, BASE, valid, 0, 10.0), "precip": 0.5},  # older run, lead 24 — has precip
+            {
+                **_row(1, BASE + timedelta(hours=24), valid, 0, 20.0),
+                "precip": None,
+            },  # freshest, null
+        ]
+    )
+    result = select_analysis_proxy(lf, group_key="group").collect()
+    assert result["temperature_2m"].to_list() == [20.0]  # freshest run's value
+    assert result["precip"].to_list() == [0.5]  # filled from the older run
+
+
+def test_null_stays_null_when_no_run_has_a_value() -> None:
+    valid = BASE + timedelta(hours=24)
+    lf = _nwp(
+        [
+            {**_row(1, BASE, valid, 0, 10.0), "precip": None},
+            {**_row(1, BASE + timedelta(hours=24), valid, 0, 20.0), "precip": None},
+        ]
+    )
+    result = select_analysis_proxy(lf, group_key="group").collect()
+    assert result["precip"].to_list() == [None]
+
+
 def test_only_the_control_member_is_kept() -> None:
     valid = BASE + timedelta(hours=6)
     lf = _nwp(

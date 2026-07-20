@@ -41,15 +41,21 @@ def select_analysis_proxy(
 ) -> pl.LazyFrame:
     """Select the freshest-run analysis proxy: one row per ``(group_key, valid_time)``.
 
-    Keeps only the control ``member``, then — for each ``(group_key, valid_time)`` — the row from
-    the freshest NWP run (the latest ``init_time_col``, equivalently the shortest lead). The
-    ``ensemble_member`` column is dropped from the result.
+    Keeps only the control ``member``, then — for each ``(group_key, valid_time)`` and *per column*
+    — takes the value from the freshest NWP run (the latest ``init_time_col``) that has a **non-null**
+    value there. A null cell in the freshest run therefore falls back to the next-freshest run that
+    holds a value: this fills the accumulated variables' lead-0 nulls (precipitation and radiation
+    are null at the first forecast step by ECMWF convention) from the overlapping older run, rather
+    than leaving a gap. A cell is null in the result only when *every* candidate run is null there.
+    Because the fallback is per column, one output row can source different columns from different
+    runs; the reported ``init_time_col`` is the freshest run's, so it no longer necessarily matches
+    every value's source run. The ``ensemble_member`` column is dropped from the result.
 
     ``pl.LazyFrame`` in / ``pl.LazyFrame`` out, so it composes with both ``pl.scan_delta`` (the
     dashboard, keyed by ``h3_index``) and in-memory post-spatial-join frames (the pipeline, keyed
     by ``time_series_id``). The pushdownable filters (``member``, ``max_lead``, ``available_at``)
-    are applied *before* the freshest-run reduction so a Delta scan's partition pruning and
-    row-group skipping survive — confirm with ``.explain()`` when wiring a new scan through it.
+    are applied *before* the reduction so a Delta scan's partition pruning and row-group skipping
+    survive — confirm with ``.explain()`` when wiring a new scan through it.
 
     The ``group_by(...).agg(...)`` reduction always collapses to exactly one row per
     ``(group_key, valid_time)`` — so the result never fans out even if two rows tie at the freshest
@@ -65,7 +71,8 @@ def select_analysis_proxy(
             ``"nwp_init_time"`` in the pipeline after its rename).
         member: The ensemble member to keep (the control run by default).
         max_lead: If given, keep only rows with ``valid_time < init_time + max_lead`` — the
-            dashboard passes its per-run stitching window; the pipeline leaves it unbounded.
+            dashboard passes its per-run stitching window (wide enough to overlap the next run, so
+            the null-fill above has an older run to draw on); the pipeline leaves it unbounded.
         available_at: If given, keep only runs available by this as-of time, i.e.
             ``init_time + publication_delay <= available_at`` (replay-mode availability — it models
             what a hindcast could have seen, not the live path, which reads only already-published
@@ -80,7 +87,10 @@ def select_analysis_proxy(
         lf = lf.filter(pl.col("valid_time") < pl.col(init_time_col) + max_lead)
     if available_at is not None:
         lf = lf.filter(pl.col(init_time_col) + publication_delay <= available_at)
-    # Freshest run wins per (location, valid_time): take every column from the row with the latest
-    # init_time (equivalently the shortest lead). group_by(...).agg(...) guarantees exactly one row
-    # per group, so the result never fans out on a tie — see the docstring.
-    return lf.group_by([group_key, "valid_time"]).agg(pl.all().sort_by(init_time_col).last())
+    # Freshest run wins per (location, valid_time), per column: sort each column by init_time,
+    # drop its nulls, then take the last (freshest non-null) value — so a null in the freshest run
+    # falls back to the next-freshest run that has a value. group_by(...).agg(...) guarantees
+    # exactly one row per group, so the result never fans out on a tie — see the docstring.
+    return lf.group_by([group_key, "valid_time"]).agg(
+        pl.all().sort_by(init_time_col).drop_nulls().last()
+    )
