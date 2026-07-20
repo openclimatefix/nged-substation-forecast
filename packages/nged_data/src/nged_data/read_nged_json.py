@@ -57,7 +57,7 @@ def _extract_power_time_series(
     # Extract time series data: explode the 'data' column and unnest the struct.
     # 'explode' expands the list of structs into individual rows.
     # 'unnest' expands the struct fields into individual columns.
-    time_series_df = df.select("data").explode("data").unnest("data")
+    time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})
 

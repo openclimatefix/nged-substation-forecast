@@ -126,7 +126,7 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
             ).alias("valid_time")
         )
         .drop("_start", "_end")
-        .explode("valid_time")
+        .explode("valid_time", empty_as_null=False)
     )
 
     # Left-join original NWP onto the grid; new 30-min rows come in as nulls.
