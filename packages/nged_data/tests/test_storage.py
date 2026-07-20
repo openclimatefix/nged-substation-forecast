@@ -51,6 +51,37 @@ def test_upsert_metadata_new_file(tmp_path: Path):
     assert read_metadata["time_series_id"].item() == 1
 
 
+def test_upsert_metadata_creates_missing_parent_dir(tmp_path: Path):
+    """A first-ever run writes into a data root whose subdirectory doesn't exist yet; the create
+    branch must make the parent dir rather than raising FileNotFoundError from write_parquet."""
+    metadata_path = tmp_path / "NGED" / "metadata.parquet"  # parent NGED/ does not exist
+    metadata = (
+        pt.DataFrame(
+            [
+                {
+                    "time_series_id": 1,
+                    "time_series_name": "Test Substation",
+                    "time_series_type": "Disaggregated Demand",
+                    "units": "MW",
+                    "licence_area": "EMids",
+                    "substation_number": 1,
+                    "substation_type": "Primary",
+                    "latitude": 52.0,
+                    "longitude": -1.0,
+                    "h3_res_5": 599423199024775167,
+                }
+            ]
+        )
+        .set_model(TimeSeriesMetadata)
+        .cast()
+        .validate()
+    )
+
+    upsert_metadata(metadata, str(metadata_path))
+
+    assert metadata_path.exists()
+
+
 def test_upsert_metadata_merge(tmp_path: Path):
     metadata_path = tmp_path / "metadata.parquet"
 
