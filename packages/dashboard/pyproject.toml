@@ -13,6 +13,7 @@ dependencies = [
     "plotting",
     "polars>=1.37.1",
     "pyarrow>=23.0.0",
+    "weather_utils",
     "geoarrow-pyarrow>=0.2.0",
     "patito>=0.8.5",
 ]

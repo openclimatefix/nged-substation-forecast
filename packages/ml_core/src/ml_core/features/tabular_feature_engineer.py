@@ -32,13 +32,13 @@ from contracts.weather_schemas import Nwp
 from ml_core.features._lags import _apply_power_lag, _apply_weather_lag, _nullify_leaky_lags
 from ml_core.features._nwp import (
     NWP_PUBLICATION_DELAY_HOURS,
-    _build_historical_weather,
     _join_nwp_bulk_mode,
     _join_nwp_single_run,
     _upsample_nwp_to_half_hourly,
 )
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
 from ml_core.features.feature_engineer import FeatureEngineer
+from weather_utils import select_analysis_proxy
 
 
 def _attach_nearest_nwp_cell(
@@ -179,7 +179,9 @@ def _engineer_features(
                 "to build historical weather, but no such rows were found in the NWP data."
             )
     historical_weather = (
-        _build_historical_weather(processed_nwp)
+        select_analysis_proxy(
+            processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"
+        )
         if processed_nwp is not None and weather_lags
         else None
     )

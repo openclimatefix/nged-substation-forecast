@@ -258,8 +258,10 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
 
 def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
     """The first ``NWP_ANALYSIS_LEAD`` of one run per element of ``inits``, control member only
-    — what the dashboard feeds ``build_nwp_ensemble_chart``'s ``analysis`` argument. The
-    temperature encodes the run's index so tests can see which run each plotted point came from.
+    — the already-reduced proxy-analysis frame the dashboard feeds ``build_nwp_ensemble_chart``
+    (``view_forecasts.py`` produces it via ``weather_utils.select_analysis_proxy``). Pass
+    non-overlapping runs, since the builder no longer collapses overlaps itself. The temperature
+    encodes the run's index so tests can see which run each plotted point came from.
     """
     frames = []
     for index, run_init in enumerate(inits):
@@ -363,22 +365,6 @@ def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
     assert analysis["encoding"]["y"] == spec["layer"][1]["encoding"]["y"]
     assert "detail" not in analysis["encoding"]  # one stitched line, not a line per member
     assert any("Proxy analysis" in line for line in spec["title"]["subtitle"])
-
-
-def test_nwp_analysis_keeps_the_freshest_run_where_runs_overlap() -> None:
-    # Two runs 12 h apart, each contributing NWP_ANALYSIS_LEAD (24 h) of rows, so the second
-    # run's first 12 h of valid times appear in both — the freshest (shortest-lead) run must
-    # win there, collapsing each overlapped valid_time to a single point.
-    spec = _build_nwp(
-        analysis=_nwp_analysis([NWP_INIT_TIME, NWP_INIT_TIME + timedelta(hours=12)])
-    ).to_dict()
-    rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
-    by_time = {row["valid_time"]: row["temperature_2m"] for row in rows}
-    assert len(by_time) == len(rows) == 12  # 8 + 8 rows, 4 of them at shared valid times
-    # NWP_INIT_TIME is 04 Jul 00:00 UTC = 01:00 wall time (BST); the runs overlap from 13:00.
-    assert by_time["2026-07-04T04:00:00"] == 0.0  # before the overlap: only the first run
-    assert by_time["2026-07-04T16:00:00"] == 1.0  # inside the overlap: the second run wins
-    assert by_time["2026-07-05T10:00:00"] == 1.0  # after the first run's 24 h end
 
 
 def test_nwp_analysis_line_is_omitted_when_absent_or_outside_the_window() -> None:
