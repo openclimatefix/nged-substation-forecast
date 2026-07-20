@@ -164,10 +164,30 @@ def test_convert_maps_each_grid_point_to_its_own_lat_lon(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
 ) -> None:
-    # A 2x2 grid with a distinct value at every corner, each corner isolated into its own H3 cell.
-    # This pins the meshgrid orientation (indexing="ij") that pairs each raveled data value with the
-    # right (lat, lon): a lat/lon transpose swaps the two off-diagonal corners (20 <-> 30) and this
-    # assertion catches it. Every other value test uses a single latitude and cannot see it.
+    """Each grid point's value reaches the H3 cell at its own (lat, lon): no flip or transpose.
+
+    This is the one test that guards the classic NWP orientation bugs: flipping the grid
+    vertically (latitude reversed), flipping it horizontally (longitude reversed), transposing
+    latitude and longitude, or rotating it. It uses a 2x2 grid carrying a distinct temperature at
+    every corner (north-west 10, north-east 20, south-west 30, south-east 40) over two distinct
+    latitudes and two distinct longitudes, and isolates each corner into its own single-point H3
+    cell. Because all four values and both axis coordinates are distinct, any permutation of the
+    values against the coordinates — vertical flip, horizontal flip, transpose, 180-degree
+    rotation — yields a different {h3_index: temperature} mapping, so the single equality
+    assertion catches every one of them. Verified by mutation: reversing the latitude coordinate,
+    reversing the longitude coordinate, and switching np.meshgrid from indexing="ij" to "xy" each
+    make this test fail. Every other value test in this module uses a single latitude, so this is
+    the only one that can see an orientation error.
+
+    Scope — what this proves and what it delegates. ``convert`` assigns grid cells to H3 hexagons
+    by a value-join on (lat, lon), never by position, so it structurally cannot place a grid cell
+    into the wrong hexagon on its own: the geographic truth of which hexagon owns a given (lat,
+    lon) lives entirely in the ``H3GridWeights`` table built upstream by the ``h3_grid_weights``
+    asset. The only orientation bug ``convert`` itself can introduce is a ravel misalignment —
+    pairing a data value with the wrong (lat, lon) before the join — and that is exactly what this
+    test pins down. End-to-end geographic correctness (a real ECMWF cell landing in the correct
+    real-world hexagon) depends on that upstream asset and is out of scope here.
+    """
     ds = make_ens_dataset(
         latitudes=(52.0, 51.75),
         longitudes=(-1.0, -0.75),
