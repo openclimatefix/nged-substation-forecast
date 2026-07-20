@@ -190,11 +190,22 @@ def test_importing_contracts_constructs_no_settings():
     make the whole contracts package unimportable without a populated .env — breaking type-checkers,
     doc builders, and credential-free unit tests. Run in a fresh interpreter because this process
     has already imported (and used) these modules. See contracts.settings.get_settings.
+
+    The guard patches ``Settings.__init__`` to raise, so it catches *any* import-time construction —
+    a direct module-level ``Settings()`` as well as one routed through ``get_settings()`` — not just
+    a populated cache. ``contracts/__init__.py`` imports nothing, so the patch lands before any
+    schema module loads.
     """
     probe = (
-        "import contracts.settings, contracts.weather_schemas\n"
-        "size = contracts.settings.get_settings.cache_info().currsize\n"
-        "assert size == 0, f'Settings constructed at import time (cache size {size})'\n"
+        "import contracts.settings as s\n"
+        "def _boom(*args, **kwargs):\n"
+        "    raise AssertionError('Settings() constructed at import time')\n"
+        "s.Settings.__init__ = _boom\n"
+        "import contracts.weather_schemas\n"
+        "import contracts.geo_schemas\n"
+        "import contracts.power_schemas\n"
+        "import contracts.ml_schemas\n"
+        "assert s.get_settings.cache_info().currsize == 0\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe], capture_output=True, text=True, check=False
