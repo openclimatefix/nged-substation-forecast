@@ -238,6 +238,44 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
     # ...and the converted frame is actually persisted via write_nwp (all 4 rows round-trip).
     written = pl.read_delta(Settings().nwp_data_path)
     assert written.height == 4
+    # The clean run emits a passing data-quality check.
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.check_name == "nwp_has_no_unexpected_nulls"
+    assert evaluation.passed
+
+
+def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Scattered per-pixel nulls in a de-accumulated variable (the known upstream ECMWF ENS
+    corruption) are tolerated: the run still materialises, and the data-quality check WARNs."""
+    from contracts.settings import Settings
+
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
+
+    # One (member, valid_time) slice across three h3 cells, one cell's precipitation nulled.
+    scattered = _make_nwp(init_time, n=3).with_columns(
+        init_time=pl.lit(init_time),
+        valid_time=pl.lit(init_time + timedelta(hours=3)),
+        ensemble_member=pl.lit(0, dtype=pl.UInt8),
+        precipitation_surface=pl.Series([0.001, None, 0.001], dtype=pl.Float32),
+    )
+    monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
+    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(
+        assets, "convert_nwp_xarray_dataset_to_polars_dataframe", lambda ds, h3_grid: scattered
+    )
+
+    result = materialize(
+        [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
+    )
+    assert result.success  # tolerated — the run is NOT failed
+    assert pl.read_delta(Settings().nwp_data_path).height == 3  # data was persisted
+    (evaluation,) = result.get_asset_check_evaluations()
+    assert evaluation.check_name == "nwp_has_no_unexpected_nulls"
+    assert not evaluation.passed  # WARN: the scatter is surfaced
+    assert evaluation.metadata["n_scattered_null_cells"].value == 1
 
 
 def test_ecmwf_ens_retries_when_run_not_yet_available(
@@ -295,9 +333,10 @@ def test_definitions_resolve(env: Path) -> None:
     }
     assert "h3_grid_weights" in ecmwf_parents
 
-    # The power-data freshness check is registered against its asset.
+    # The power-data freshness check and the NWP data-quality check are both registered.
     check_keys = {key.name for key in asset_graph.asset_check_keys}
     assert "power_data_is_fresh" in check_keys
+    assert "nwp_has_no_unexpected_nulls" in check_keys
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
     for job_name, expected_asset in [

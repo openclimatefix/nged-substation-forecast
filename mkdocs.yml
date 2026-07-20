@@ -52,6 +52,7 @@ nav:
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Production Deployment Design: architecture/production-deployment.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
+      - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - Code Style: architecture/code-style.md
       - Testing: architecture/testing.md
   - ML Experimentation:
