@@ -160,8 +160,9 @@ conflates "what the weather was doing" with "what is anomalous"; handing the mod
 component directly tells it how *normal* each recent observation is. It needs nothing beyond the
 baseline, so it can run as soon as normalised residuals exist — ahead of any detector machinery.
 
-What this buys — and why it is plausibly the largest forecast-*accuracy* win available from
-switching-awareness:
+##### What it buys
+
+It is plausibly the largest forecast-*accuracy* win available from switching-awareness, because:
 
 - **A cleaner lag representation in general.** Separating the expected part from the anomalous
   part of each lagged observation is plausibly useful everywhere, not only during switching
@@ -179,7 +180,9 @@ switching-awareness:
   amount — which distinguishes "a transfer that will persist and eventually revert" from "a
   permanent change such as load growth or a meter re-base".
 
-**What it does and does not produce.** This approach makes the *forecaster* robust to
+##### What it does and does not produce
+
+This approach makes the *forecaster* robust to
 switching; it produces none of the detector's discrete deliverables. There is no event list or
 donor attribution (so no
 [`substation_switching` table](delivery-tables.md#table-5-substation_switching)), no ARA mask, no
@@ -191,7 +194,7 @@ The two paths still compose rather than compete: if the staged detector is built
 (an in-event flag, event age, attributed magnitude) are themselves natural features for this
 model.
 
-**Caveats to build in from the start:**
+##### Caveats to build in from the start
 
 - **A residual is not only switching.** It is also NWP error — autocorrelated and
   heteroscedastic, exactly the stage-1 problem. Feed *normalised* residuals (divide by the
@@ -231,7 +234,7 @@ model.
   easily and neighbour attribution only weakly. The closed-form detector exploits that structure
   directly, which is another reason this complements rather than replaces it.
 
-**Three feature-design notes:**
+##### Feature-design notes
 
 - **Event age, without a normality threshold.** "How long has this series been abnormal?" is a
   natural feature, and it needs no hand-coded normality threshold — an XGBoost split *is* a
@@ -292,6 +295,8 @@ model.
   extension of the view-forecasts dashboard, with the switching labels overlaid — exists for
   exactly this.
 
+##### When it runs, and the single-stage ablation control that precedes it
+
 It can begin as soon as the baseline exists (implementation step 2 below) and is itself
 implementation step 5, evaluated by cross-validation; its result also doubles as evidence of the
 baseline's quality. So that it gets scheduled alongside the other forecaster experiments, it is
@@ -304,7 +309,8 @@ as the ablation control:
 (a quick win), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
-**A second way to use the stage-1 baseline — correct a draft, not only supply residual lags.**
+##### A second way to use the stage-1 baseline: correct a draft
+
 The residual-lag design evaluates the stage-1 baseline at *lag* times, to tell stage 2 how
 anomalous each recent observation was. The same fitted baseline can also be evaluated at the
 *target* time, producing a "first-draft" forecast of the power we are trying to predict, which
@@ -364,7 +370,9 @@ sidestepping the per-series-level problem that is the
 [global model](xgboost-improvements.md#global-model-per-time_series_type)'s hard prerequisite — the
 same `base_margin` move that item notes for its capacity-factor-normalised physics proxy.
 
-**Attributing the uplift — calibration versus switching.** A residual-lag booster would sharpen
+##### Attributing the uplift: calibration versus switching
+
+A residual-lag booster would sharpen
 the forecast even on a grid that never switched, simply by telling the model how high or low it is
 currently running relative to weather and clock — an inference-time *calibration* that corrects
 NWP bias, meter drift, DER growth, or any persistent regime offset. That general uplift is worth
