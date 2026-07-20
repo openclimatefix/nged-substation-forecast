@@ -295,6 +295,10 @@ def test_definitions_resolve(env: Path) -> None:
     }
     assert "h3_grid_weights" in ecmwf_parents
 
+    # The power-data freshness check is registered against its asset.
+    check_keys = {key.name for key in asset_graph.asset_check_keys}
+    assert "power_data_is_fresh" in check_keys
+
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
     for job_name, expected_asset in [
         ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),

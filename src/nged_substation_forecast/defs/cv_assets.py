@@ -55,6 +55,7 @@ from ml_core._mlflow_runs import (
     get_or_create_parent_run,
     load_experiment_forecaster,
 )
+from nged_data.storage import time_series_coverage
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
 # (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
@@ -128,17 +129,7 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     fold_id = context.partition_key
     fold = _cv_config.get_fold(fold_id)
 
-    coverage = (
-        pl.scan_delta(
-            settings.power_time_series_data_path, storage_options=typeddict_to_dict(storage_options)
-        )
-        .group_by("time_series_id")
-        .agg(
-            first_time=pl.col("time").min(),
-            last_time=pl.col("time").max(),
-        )
-        .collect()
-    )
+    coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
 
     min_training_months = fold.min_training_months or _cv_config.min_training_months
     eligible_ids = eligible_time_series_ids(coverage, fold, min_training_months=min_training_months)

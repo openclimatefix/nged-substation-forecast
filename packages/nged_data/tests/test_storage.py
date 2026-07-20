@@ -11,6 +11,7 @@ from nged_data.storage import (
     _RawFileListItem,
     _process_file_listing,
     select_new_rows,
+    time_series_coverage,
     upsert_metadata,
 )
 
@@ -293,8 +294,8 @@ def test_select_new_rows_file_listing(tmp_path: Path):
                 [
                     datetime(
                         2026, 1, 1, 12, 0, tzinfo=UTC
-                    ),  # equals max_time for ts_id=1 → excluded
-                    datetime(2026, 1, 1, 18, 0, tzinfo=UTC),  # > max_time for ts_id=1 → included
+                    ),  # equals last_time for ts_id=1 → excluded
+                    datetime(2026, 1, 1, 18, 0, tzinfo=UTC),  # > last_time for ts_id=1 → included
                     datetime(2026, 1, 1, 6, 0, tzinfo=UTC),  # ts_id=2 not in delta → included
                 ]
             ).cast(UTC_DATETIME_DTYPE),
@@ -340,6 +341,44 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
     assert result.height == 1
     assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
     PowerTimeSeries.validate(result)  # schema must survive filtering
+
+
+def test_time_series_coverage(tmp_path: Path):
+    """Returns the earliest and latest ``time`` per ``time_series_id`` from the Delta table."""
+    UTC = timezone.utc
+    delta_path = tmp_path / "power.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 2], dtype=pl.Int32),
+            "time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+                    datetime(2026, 1, 2, 9, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    coverage = time_series_coverage(str(delta_path)).sort("time_series_id")
+
+    assert coverage["time_series_id"].to_list() == [1, 2]
+    assert coverage["first_time"].to_list() == [
+        datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+        datetime(2026, 1, 2, 9, 0, tzinfo=UTC),
+    ]
+    assert coverage["last_time"].to_list() == [
+        datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+        datetime(2026, 1, 2, 9, 0, tzinfo=UTC),
+    ]
+
+
+def test_time_series_coverage_absent_table(tmp_path: Path):
+    """A missing Delta table yields an empty but correctly-typed frame, not an error."""
+    coverage = time_series_coverage(str(tmp_path / "does_not_exist.delta"))
+    assert coverage.is_empty()
+    assert coverage.columns == ["time_series_id", "first_time", "last_time"]
 
 
 def test_parse_file_listing_invalid():

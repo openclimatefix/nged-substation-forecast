@@ -5,6 +5,7 @@ from contracts.settings import Settings
 
 from nged_substation_forecast.defs import (
     assets,
+    checks,
     cv_assets,
     jobs,
     production_assets,
@@ -17,6 +18,7 @@ settings = Settings()
 
 defs = Definitions(
     assets=all_assets,
+    asset_checks=[checks.power_data_is_fresh],
     jobs=[jobs.register_experiment_job],
     schedules=[
         schedules.power_time_series_and_metadata_schedule,

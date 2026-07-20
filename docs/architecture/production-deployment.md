@@ -59,6 +59,37 @@ replay-mode backfill. See
 Several other orchestration shapes were considered and rejected — see
 [Considered but rejected designs](#considered-but-rejected-designs).
 
+## Warn on stale power data with a Dagster asset check
+
+`power_time_series_and_metadata_job` runs hourly and succeeds even when NGED has published
+nothing new, so a job that merely *ran* tells the operator nothing about whether fresh data
+actually arrived. If NGED's feed stalls, the Delta table silently goes stale. The
+`power_data_is_fresh` asset check closes that gap: it reads the `power_time_series` Delta
+table's *actual* data recency — the maximum `time` per `time_series_id` — rather than the
+asset's materialisation timestamp, and warns when any series has no data within a 24-hour
+staleness threshold. A native materialisation-freshness policy would miss this exact failure,
+because the materialisation keeps succeeding.
+
+The check is attached to `power_time_series_and_metadata`, so the existing hourly schedule
+runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
+reported but has now gone **stale**, and a roster series (present in the `TimeSeriesMetadata`
+parquet) that has **never** sent data. The count of each, plus a table of the offending
+`time_series_id`s, lands in the check's Dagster metadata — Dagster's Checks view becomes the
+operator's at-a-glance "is the power data healthy?" status surface, showing a green tick when
+every series is current and a yellow warning naming the late count when the feed has stalled.
+The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
+NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
+assets.
+
+This in-Dagster check is complementary to — not a replacement for — the
+[missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+The alarm fires on total silence from *outside* the deployment, because a dead daemon cannot
+report itself; this check reports per-series staleness from *inside* Dagster while the daemon
+is alive. The freshness evaluation is a pure function, and it is the hand-off point for
+[Sentry telemetry (#63)](https://github.com/openclimatefix/nged-substation-forecast/issues/63):
+when that lands, the same result object also feeds Sentry, and later the forecast-warnings
+delivery table.
+
 ## Bake the model into the image at build time
 
 Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster
