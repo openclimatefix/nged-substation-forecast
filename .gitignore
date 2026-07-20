@@ -72,3 +72,6 @@ site/
 
 # Personal permission allowlist — local to this machine, not project config.
 .claude/settings.local.json
+
+# Coverage artifacts (pytest-cov)
+.coverage
