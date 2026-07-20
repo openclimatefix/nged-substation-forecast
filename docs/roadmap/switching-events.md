@@ -865,56 +865,7 @@ applies unchanged to its output. It is an escalation rather than the starting po
 staged detector fails *legibly* — every flag traces to a visible step and a named neighbour
 subset — while a joint optimiser is harder to inspect when it misbehaves. Build the transparent
 version first, keep it as the reference, and adopt the joint estimator where the head-to-head
-comparison (on logs + injections) shows it wins. A CVXPY implementation sketch lives in the
-implementation-details section directly below.
-
----
-
-#### Implementation details for v0.6.x (deleted when this ships)
-
-The build order for v0.6, simplest-first, each step delivering something testable before the next
-adds complexity. **Steps 1–4 are the shared infrastructure** every approach needs — the labelled
-event table, the baseline, the diagnostics, and the injection harness. **Step 5 is approach 1, the
-two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure alone. **Steps 6–8
-are approach 2, the staged detector**, and **step 9 is approach 3, the joint edge-flow
-estimator**; both are built only as [the decision
-point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) retains them (step 9
-also to test out convex optimisation as a warm-up for v2).
-
-1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
-   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
-   list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
-2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
-   (**no power-lag features**) and a robust median objective, per series, with a per-series
-   spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
-   normalised residual series. Sanity-check residual autocorrelation and per-series spread
-   before proceeding.
-3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
-   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
-   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
-   conservation premise in one cheap pass. If it fails, fix data before building anything on top.
-4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
-   magnitude × duration grid into believed-clean periods. Built early because every later
-   threshold — and the two-stage forecaster's in-event evaluation — is measured on it.
-5. **The two-stage forecaster (approach 1, the v0.6.0 target).** Add residual-lag, event-age, and
-   pooled-neighbour features to the booster, with the no-lookahead and out-of-fold hygiene the
-   [approach-1 caveats](#approach-1-the-two-stage-forecaster) require; evaluate on out-of-event
-   periods plus training-side injection. Ships the switching-robust metered-power forecast (and,
-   with the anomaly features withheld, the NRA forecast). Depends only on steps 1–4 and can begin
-   as soon as the baseline (step 2) exists; run its single-stage item-5 ablation control first.
-6. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
-   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
-   injections.
-7. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
-   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
-   onset/reversion pairing into event intervals.
-8. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
-   duration floor only); score everything against the logged events (precision reported as a
-   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
-9. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 7/8 validation
-   shows sequential matching is the binding error source (overlapping events, ambiguous
-   attributions). Reuses steps 1–6 wholesale; penalty weights tuned on the injection harness;
-   adopted only where it beats the staged detector head-to-head. CVXPY sketch below.
+comparison (on logs + injections) shows it wins. A CVXPY implementation sketch is directly below.
 
 ##### Sketch of the edge-flow estimator
 
@@ -1013,7 +964,66 @@ Notes on the sketch:
 
 ---
 
-### Approach 4 — the magnitude-only mixture model (the workhorse)
+#### Implementation sequence for v0.6.x (deleted when this ships)
+
+The build order for v0.6, simplest-first, each step delivering something testable before the next
+adds complexity. **Steps 1–4 are the shared infrastructure** every approach needs — the labelled
+event table, the baseline, the diagnostics, and the injection harness. **Step 5 is approach 1, the
+two-stage forecaster** — the v0.6.0 target, which ships on that infrastructure alone. **Steps 6–8
+are approach 2, the staged detector**, and **step 9 is approach 3, the joint edge-flow
+estimator**; both are built only as [the decision
+point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector) retains them (step 9
+also to test out convex optimisation as a warm-up for v2).
+
+1. **Labelled event table + adjacency.** Parse the 32-series switching logs into a tidy table
+   (onset, end, source, donor set, magnitude where recorded); obtain the trial-area adjacency
+   list from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is testable without these.
+2. **Baseline.** Configure the existing XGBoost forecaster with weather/calendar features only
+   (**no power-lag features**) and a robust median objective, per series, with a per-series
+   spread estimate (quantile heads once available, or a rolling-MAD interim). Output:
+   normalised residual series. Sanity-check residual autocorrelation and per-series spread
+   before proceeding.
+3. **Diagnostic precursor — the first detection result, with zero detector code.** Around each
+   *logged* event, plot the member residuals and the neighbourhood-sum residual: members should
+   step, the sum should stay flat. This validates the baseline, the adjacency list, and the
+   conservation premise in one cheap pass. If it fails, fix data before building anything on top.
+4. **Synthetic-injection harness.** Inject shaped transfers between real neighbours over a
+   magnitude × duration grid into believed-clean periods. Built early because every later
+   threshold — and the two-stage forecaster's in-event evaluation — is measured on it.
+5. **The two-stage forecaster (approach 1, the v0.6.0 target).** Add residual-lag, event-age, and
+   pooled-neighbour features to the booster, with the no-lookahead and out-of-fold hygiene the
+   [approach-1 caveats](#approach-1-the-two-stage-forecaster) require; evaluate on out-of-event
+   periods plus training-side injection. Ships the switching-robust metered-power forecast (and,
+   with the anomaly features withheld, the NRA forecast). Depends only on steps 1–4 and can begin
+   as soon as the baseline (step 2) exists; run its single-stage item-5 ablation control first.
+   The [draft-corrector variant](#a-second-way-to-use-the-stage-1-baseline-correct-a-draft) is an
+   optional additional experiment on this same infrastructure — it reuses the per-fold hindcast
+   machinery and reorders nothing.
+6. **Per-series changepoint detection** on whitened/normalised residuals, penalty calibrated by
+   block bootstrap; measure the per-series magnitude × duration sensitivity frontier on
+   injections.
+7. **Attribution.** Neighbour-subset search + balance scoring with the permutation null and
+   loss-tolerance band; neighbourhood-sum corroboration; fleet-wide artifact filter;
+   onset/reversion pairing into event intervals.
+8. **Composition read-off + final validation.** Stage-3 covariate correlations (events above the
+   duration floor only); score everything against the logged events (precision reported as a
+   lower bound); deliver the event table, ARA mask, and sensitivity frontier.
+9. **Escalation (conditional): the joint edge-flow estimator.** Build only if step 7/8 validation
+   shows sequential matching is the binding error source (overlapping events, ambiguous
+   attributions). Reuses steps 1–6 wholesale; penalty weights tuned on the injection harness;
+   adopted only where it beats the staged detector head-to-head. CVXPY sketch in
+   [Approach 3](#sketch-of-the-edge-flow-estimator) above.
+
+---
+
+### After v2 is live — reconstructing latent NRA demand
+
+The two approaches below reconstruct each substation's *latent NRA demand* — the demand that would
+be metered under normal running — and are built at **v2 scale, once v2.0 is operational**; read
+them as "some time after v2.0". They share the v0.6 infrastructure above (the baseline, the
+normalised residuals, the injection harness, the adjacency).
+
+#### Approach 4 — the magnitude-only mixture model (the workhorse)
 
 **Goal.** Reconstruct a latent NRA demand $d_i(t)$ per substation by modelling observed power as a time-varying mixture of each substation's own normal demand and its neighbours'.
 
@@ -1128,7 +1138,7 @@ the routing estimation should stay a convex layer even then.
 
 ---
 
-### Approach 5 — the type-resolved mixture with differentiable physics modules
+#### Approach 5 — the type-resolved mixture with differentiable physics modules
 
 **Goal.** Decompose each substation into physically-typed components (demand, PV, wind), each from its own differentiable module, and let each *type* transfer with its own routing weights — so a switching event can move proportionally more PV than load.
 
