@@ -133,10 +133,6 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
-    # upsert_metadata writes metadata.parquet under NGED/ before anything creates that dir (the
-    # power-Delta write, which does create its parent, runs later), so pre-create it here — the
-    # same setup test_live_forecasts.py does.
-    (tmp_path / "NGED").mkdir()
     return tmp_path
 
 
@@ -166,6 +162,12 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     )
     PowerTimeSeries.validate(power)
     assert set(power["time_series_id"].unique().to_list()) == {10, 11}
+
+    # The asset wires both summary tables into its Dagster output metadata (the summary classes'
+    # own logic is unit-tested below; this covers the asset → add_output_metadata glue).
+    materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
+    metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
+    assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
 
 
 def test_power_time_series_and_metadata_handles_no_new_data(
@@ -236,10 +238,11 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
         [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
     )
     assert result.success
+    # The partition key is parsed into nwp_init_time and handed to open_ecmwf_ens_run...
     assert captured["nwp_init_time"] == init_time
-
+    # ...and the converted frame is actually persisted via write_nwp (all 4 rows round-trip).
     written = pl.read_delta(Settings().nwp_data_path)
-    assert written["init_time"].unique().to_list() == [init_time]
+    assert written.height == 4
 
 
 def test_ecmwf_ens_retries_when_run_not_yet_available(
@@ -268,33 +271,60 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
 
 def test_definitions_resolve(env: Path) -> None:
-    """The whole asset graph (assets + jobs + schedules) resolves into a repository — catches a
-    broken ``deps=[…]`` reference, a duplicate asset key, or a schedule targeting a missing job,
-    none of which any other test would surface before ``dg dev`` launch.
+    """The whole asset graph resolves into a repository, the three ingest assets are present, the
+    ``ecmwf_ens`` dependency edge is wired, and each asset job's selection resolves to its asset.
 
-    Resolves via ``get_repository_def()`` rather than the stricter ``Definitions.validate_loadable``:
-    the latter also runs ``validate_partitions``, which rejects the CV pipeline's deliberate
-    static-fold-upstream / dynamic-experiment-fold-downstream mapping that ``dg dev`` and the CV
-    asset tests run against happily.
+    Resolution alone (constructing ``Definitions`` + ``get_repository_def()``) catches import-time
+    errors and duplicate asset keys, but *not* a broken ``deps=[…]`` string (Dagster silently treats
+    an unknown key as an external asset) or a job ``AssetSelection`` pointing at a missing asset
+    (resolved lazily) — so those are asserted explicitly below.
+
+    Uses ``get_repository_def()`` rather than the stricter ``Definitions.validate_loadable``: the
+    latter also runs ``validate_partitions``, which rejects the CV pipeline's deliberate
+    static-fold-upstream / dynamic-experiment-fold-downstream ``deps`` mapping that ``dg dev`` and
+    the CV asset tests run against happily.
     """
+    from dagster import AssetKey
+
     from nged_substation_forecast.definitions import defs
 
-    asset_graph = defs.get_repository_def().asset_graph
+    repo = defs.get_repository_def()
+    asset_graph = repo.asset_graph
+
     asset_keys = {key.to_user_string() for key in asset_graph.get_all_asset_keys()}
     assert {"power_time_series_and_metadata", "h3_grid_weights", "ecmwf_ens"} <= asset_keys
+
+    # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
+    ecmwf_parents = {
+        key.to_user_string() for key in asset_graph.get(AssetKey("ecmwf_ens")).parent_keys
+    }
+    assert "h3_grid_weights" in ecmwf_parents
+
+    # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
+    for job_name, expected_asset in [
+        ("power_time_series_and_metadata_job", "power_time_series_and_metadata"),
+        ("ecmwf_ens_job", "ecmwf_ens"),
+    ]:
+        selected = {
+            key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
+        }
+        assert selected == {expected_asset}
 
 
 # --- summary classes (pure, no Dagster) ----------------------------------------------------------
 
 
-def _file_listing(n: int) -> pt.DataFrame[_ProcessedFileListing]:
+def _file_listing(
+    n: int, time_series_ids: list[int] | None = None
+) -> pt.DataFrame[_ProcessedFileListing]:
     base = datetime(2026, 3, 26, 8, tzinfo=timezone.utc)
+    ids = time_series_ids if time_series_ids is not None else list(range(9, 9 + n))
     return (
         _ProcessedFileListing.DataFrame(
             {
                 "path": [f"p{i}" for i in range(n)],
                 "filesize_bytes": [1000 + i for i in range(n)],
-                "time_series_id": [11 - i for i in range(n)],  # descending → validators must sort
+                "time_series_id": ids,
                 "start_time": [base] * n,
                 "end_time": [base + timedelta(hours=i) for i in range(n)],
             }
@@ -305,14 +335,17 @@ def _file_listing(n: int) -> pt.DataFrame[_ProcessedFileListing]:
 
 
 def test_file_listing_summary_non_empty() -> None:
-    """Non-empty frame: the ``@field_validator``s format the datetime and sort/unique the IDs, and
-    ``n_time_series_ids`` parses the resulting string back to a count."""
-    summary = _FileListingSummary.from_data_frame("Files with new data", _file_listing(3))
+    """Non-empty frame: the ``@field_validator``s format the datetime and dedup the IDs (two of the
+    three files share ``time_series_id`` 11), and ``n_time_series_ids`` parses the resulting string
+    back to a count distinct from ``n_files``."""
+    summary = _FileListingSummary.from_data_frame(
+        "Files with new data", _file_listing(3, time_series_ids=[11, 9, 11])
+    )
     assert summary.n_files == 3
     assert summary.start_time == "2026-03-26 08:00"
     assert summary.end_time == "2026-03-26 10:00"
-    assert summary.time_series_ids == "[9, 10, 11]"
-    assert summary.n_time_series_ids == 3
+    assert summary.time_series_ids == "[9, 11]"  # deduped and sorted
+    assert summary.n_time_series_ids == 2
     assert summary.min_file_size_bytes == 1000
     assert summary.max_file_size_bytes == 1002
 
