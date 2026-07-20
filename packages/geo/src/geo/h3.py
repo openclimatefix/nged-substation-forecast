@@ -111,7 +111,7 @@ def compute_h3_grid_weights(
 
     weights_df = (
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_h3_res))
-        .explode("child_h3")
+        .explode("child_h3", empty_as_null=False)
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),
             nwp_lon=_snap_to_grid(plh3.cell_to_lng("child_h3")),
