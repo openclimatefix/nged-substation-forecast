@@ -304,6 +304,66 @@ as the ablation control:
 (a quick win), which lets the booster judge each lag's normality without an explicit
 baseline and bounds how much of the anomaly signal a tabular learner extracts unaided.
 
+**A second way to use the stage-1 baseline — correct a draft, not only supply residual lags.**
+The residual-lag design evaluates the stage-1 baseline at *lag* times, to tell stage 2 how
+anomalous each recent observation was. The same fitted baseline can also be evaluated at the
+*target* time, producing a "first-draft" forecast of the power we are trying to predict, which
+stage 2 then *corrects* rather than forecasting from scratch. This is a design axis orthogonal to
+the residual lags — they concern what stage 2 receives as recent-observation features; the draft
+concerns what stage 2 predicts and starts from — so the two compose (a booster can take a draft as
+its starting point *and* residual lags as features) rather than competing. It re-uses exactly the
+per-fold, out-of-sample hindcast machinery the residual lags already require, so it is cheap to try
+once that exists. There are two ways to hand stage 2 the draft:
+
+- **Draft as an ordinary feature; stage 2 predicts total power.** A soft specialisation: the
+  booster usually latches onto the draft as a dominant split variable and spends the rest on
+  corrections, but nothing forces it to. This is close to the documented design plus one feature,
+  and it keeps the main safety property — stage-1 error enters only as feature noise the booster
+  can learn to down-weight.
+- **`base_margin`; stage 2 predicts the correction (actual − draft).** XGBoost's `base_margin`
+  sets a per-row starting score, so the trees continue stage 1's boosting and regularisation
+  shrinks naturally toward "no correction". This is the version that genuinely forces
+  specialisation, and it degrades gracefully with horizon: as the anomaly signal decays and
+  valid-time lags null out, the correction tends to zero and the forecast falls back to the draft.
+
+**What `base_margin` buys over predicting the delta directly.** For plain squared-error regression,
+supplying the draft as `base_margin` is mathematically identical to training stage 2 on
+`(actual − draft)` and adding the draft back — same gradients, same trees — so under that objective
+predicting the delta is fine and arguably more transparent. The margin earns its keep once the
+objective is *not* least-squares: with the quantile/pinball objective this project wants, or a
+Poisson/Tweedie link (natural for a non-negative quantity, where the margin lives in log-space so
+the correction becomes *multiplicative* and the output cannot go negative), early stopping, eval
+metrics, and the loss itself all operate on *actual* power rather than on a residual. The
+operational footgun is that the margin must be passed at *both* train and predict time; forgetting
+it at inference silently falls back to the default base score.
+
+**Costs of the hard corrector, and the hedge.** Because stage 2 starts from the draft, any stage-1
+*bias at the target time* flows straight into the output unless stage 2 can see the raw inputs
+needed to fix it — so the "no end-to-end optimisation" con bites harder than in the
+residual-feature design. The hedge is to keep the weather/calendar inputs in stage 2's feature list
+*even under* `base_margin`, trading some of the specialisation for a route to correct draft bias.
+
+**Quantiles need care.** Quantiles of `(draft + correction)` are not the draft's p50 plus the
+correction's quantiles, so a probabilistic version wants stage 2 trained per-quantile with the
+*corresponding* stage-1 quantile as its margin. Stage 1's quantile *spread* then does double duty:
+as a stage-2 feature it supplies exactly the per-series "usual wobble" normalisation the residual
+lags already need.
+
+**The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
+available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its
+corrections against a draft that is systematically better than the live one — the same
+availability cut the residual-lag hindcasts and the freshest-run join require
+([#356](https://github.com/openclimatefix/nged-substation-forecast/issues/356)). The lead-time
+feature belongs in stage 1 so the draft's own attenuation with horizon is honest.
+
+**The prize — a plausible route to a global corrector.** The correction target `(actual − draft)`
+has far smaller variance than raw power and is far more stationary across series: recent-anomaly
+persistence looks similar at a 200 MW GSP and a 5 MW feeder once residuals are on a comparable
+scale. So a *global* corrector becomes plausible long before a global raw-power model does,
+sidestepping the per-series-level problem that is the
+[global model](xgboost-improvements.md#global-model-per-time_series_type)'s hard prerequisite — the
+same `base_margin` move that item notes for its capacity-factor-normalised physics proxy.
+
 **Attributing the uplift — calibration versus switching.** A residual-lag booster would sharpen
 the forecast even on a grid that never switched, simply by telling the model how high or low it is
 currently running relative to weather and clock — an inference-time *calibration* that corrects
