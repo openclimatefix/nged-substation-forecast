@@ -4,10 +4,15 @@ This is the offline twin of ``test_ecmwf_ens_network.py``. It reads a tiny real 
 ``data/ecmwf_ens_real_slice.nc`` (captured once by ``data/capture_ecmwf_ens_slice.py``) and runs it
 through ``convert``. Because the bytes are genuine Dynamical.org output, the slice carries the real
 conventions — descending latitude, longitude in [-180, 180], dimension order, dtypes, physical
-units — that the synthetic ``conftest.py`` fixtures merely assume. Running every PR, it is a
-regression guard on those conventions and on the value↔(lat, lon) mapping, without the flakiness or
-credentials a live catalog call needs. The ``network`` test remains the guard against *future*
-upstream drift.
+units — that the synthetic ``conftest.py`` fixtures merely assume. The value here is exercising
+``convert`` and the value↔(lat, lon) orientation on *genuine* bytes every PR, without the flakiness
+or credentials a live catalog call needs.
+
+What this test can and cannot catch. The convention assertions below (descending latitude, [-180,
+180] longitude, °C-not-Kelvin) run against the committed slice, whose bytes never change — so they
+*pin* and document what that fixture carries, not guard against Dynamical.org changing its output.
+Catching *future upstream drift* — a new latitude order, longitude range, or unit from the real
+catalog — is the job of ``test_ecmwf_ens_network.py`` alone, since only it re-reads live data.
 """
 
 from pathlib import Path
@@ -64,11 +69,14 @@ def _one_cell_per_grid_point(
 def test_cached_real_slice_conventions_and_orientation() -> None:
     ds = xr.open_dataset(_SLICE)
 
-    # --- Conventions the offline synthetic fixtures assume, checked on real bytes ---
+    # --- Pin the conventions the committed slice carries (documenting the frozen fixture, not
+    # guarding upstream drift — that is test_ecmwf_ens_network.py's job) ---
     lats = ds.latitude.values
     lons = ds.longitude.values
-    assert lats[0] > lats[-1], "latitude must be descending, as the offline fixture assumes"
-    assert lons.min() >= -180.0 and lons.max() <= 180.0, "longitude must be in [-180, 180]"
+    assert lats[0] > lats[-1], (
+        "the committed slice is stored descending-latitude, as convert expects"
+    )
+    assert lons.min() >= -180.0 and lons.max() <= 180.0, "the committed slice is in [-180, 180]"
 
     grid, expected = _one_cell_per_grid_point(ds)
     df = convert(ds=ds, h3_grid=grid)

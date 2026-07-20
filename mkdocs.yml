@@ -53,6 +53,7 @@ nav:
       - Production Deployment Design: architecture/production-deployment.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code Style: architecture/code-style.md
+      - Testing: architecture/testing.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
