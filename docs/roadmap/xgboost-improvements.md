@@ -612,14 +612,22 @@ type, lat/lon) so the booster can tell sites apart — plus the init-time-anchor
 Needs batched training at ensemble scale. The boundary of "quick".
 
 Normalisation also unlocks `base_margin` for the generation types. Once a series' target is a
-capacity factor, its [wind/PV physics proxy](#linearised-physics-features-for-solar-and-wind) is
-finally on the target's scale (the reason it *cannot* be a margin for the per-series models above),
-so a single-`time_series_type` generation booster can take the proxy's capacity factor as its
+capacity factor in $[0, 1]$, its
+[wind/PV physics proxy](#linearised-physics-features-for-solar-and-wind) can be put on that same
+scale — the [wind proxy](#linearised-physics-features-for-solar-and-wind) already runs 0→1 (the
+normalised cubic ramp), while the PV proxy is in irradiance units ($\mathrm{W/m^2}$) and needs one
+extra division by a reference irradiance (≈ 1000 $\mathrm{W/m^2}$ at STC) to become a capacity
+factor. On a matched scale a single-`time_series_type` generation booster can take the proxy as its
 `base_margin` and learn only the site-specific deviation — physics carrying the cross-site shape,
-trees the correction. This is the same base-margin move the
+trees the correction. This is the scale match the per-series net-demand
+models lack — there the capacity-free proxy is the wrong tool as a margin (the
+[physics-features section](#linearised-physics-features-for-solar-and-wind) explains why), and
+capacity-factor normalisation is what supplies it. It is also the same base-margin move the
 [two-stage forecaster](switching-events.md#approach-1-the-two-stage-forecaster) makes with its
 stage-1 draft; there, the correction target's low variance and cross-series stationarity are part
-of what makes a *global* corrector tractable at all — the same property that helps here.
+of what makes a *global* corrector tractable at all — the same property that helps here. (Under a
+log-link generation objective the margin would be `log(proxy)`, which needs a floor to handle the
+PV proxy's exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 

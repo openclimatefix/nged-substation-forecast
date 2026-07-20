@@ -335,13 +335,17 @@ once that exists. There are two ways to hand stage 2 the draft:
 **What `base_margin` buys over predicting the delta directly.** For plain squared-error regression,
 supplying the draft as `base_margin` is mathematically identical to training stage 2 on
 `(actual − draft)` and adding the draft back — same gradients, same trees — so under that objective
-predicting the delta is fine and arguably more transparent. The margin earns its keep once the
-objective is *not* least-squares: with the quantile/pinball objective this project wants, or a
-Poisson/Tweedie link (natural for a non-negative quantity, where the margin lives in log-space so
-the correction becomes *multiplicative* and the output cannot go negative), early stopping, eval
-metrics, and the loss itself all operate on *actual* power rather than on a residual. The
-operational footgun is that the margin must be passed at *both* train and predict time; forgetting
-it at inference silently falls back to the default base score.
+predicting the delta is fine and arguably more transparent. That equivalence is not special to
+squared error — it holds for *any* identity-link loss that is a function of the residual alone,
+including the pinball/quantile objective this project wants, because pinball loss is
+translation-invariant (`ρ_τ(actual − draft − correction) = ρ_τ((actual − draft) − correction)`): same
+gradients, same trees, and an identical early-stopping metric either way. The margin earns its keep
+once the *link* is not the identity — a Poisson/Tweedie link (natural for a non-negative quantity),
+where the margin lives in log-space so the correction becomes *multiplicative*, the loss is no longer
+a function of `actual − prediction`, and the output cannot go negative. There the delta trick has no
+clean analogue and the margin is doing real work. The operational footgun is that the margin must be
+passed at *both* train and predict time; forgetting it at inference silently falls back to the
+default base score.
 
 **Costs of the hard corrector, and the hedge.** Because stage 2 starts from the draft, any stage-1
 *bias at the target time* flows straight into the output unless stage 2 can see the raw inputs
@@ -349,11 +353,15 @@ needed to fix it — so the "no end-to-end optimisation" con bites harder than i
 residual-feature design. The hedge is to keep the weather/calendar inputs in stage 2's feature list
 *even under* `base_margin`, trading some of the specialisation for a route to correct draft bias.
 
-**Quantiles need care.** Quantiles of `(draft + correction)` are not the draft's p50 plus the
-correction's quantiles, so a probabilistic version wants stage 2 trained per-quantile with the
-*corresponding* stage-1 quantile as its margin. Stage 1's quantile *spread* then does double duty:
-as a stage-2 feature it supplies exactly the per-series "usual wobble" normalisation the residual
-lags already need.
+**Quantiles need care.** The draft is a single deterministic number per row, so adding it shifts
+every quantile equally — $Q_\tau(\text{actual} \mid x) = \text{draft} + Q_\tau(\text{correction} \mid x)$
+holds exactly, for *any* fixed draft used as the margin. What that means is that correctness comes
+from training stage 2 *per target quantile* (each $\tau$ its own pinball fit), not from any special
+choice of margin: a probabilistic version needs one stage-2 model per quantile, and using the
+*corresponding* stage-1 quantile as each one's margin is a warm-start convenience (smaller
+corrections), not a requirement. Stage 1's quantile *spread* then does double duty: as a stage-2
+feature it supplies exactly the per-series "usual wobble" normalisation the residual lags already
+need.
 
 **The same no-lookahead discipline.** The draft at the target time must be hindcast on NWP *as
 available at that lead time*, not on fresh analysis-like data, or stage 2 calibrates its
