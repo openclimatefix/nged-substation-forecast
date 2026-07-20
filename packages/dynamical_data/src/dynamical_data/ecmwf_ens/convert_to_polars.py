@@ -15,6 +15,11 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     h3_grid: pt.DataFrame[H3GridWeights],
 ) -> pt.DataFrame[Nwp]:
     """Vectorized processing of ECMWF dataset to H3 grid."""
+    # Convention-sensitive to real ECMWF ENS data: the dim/coord order feeds the ravel + value-join,
+    # and the physical units feed Nwp.validate. The offline tests share those assumptions, so after
+    # changing this function run the network-gated test manually:
+    #     uv run pytest --run-network -m network
+    # See docs/architecture/code-style.md ("Network-gated tests").
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
         ds.latitude.values.astype(np.float32),

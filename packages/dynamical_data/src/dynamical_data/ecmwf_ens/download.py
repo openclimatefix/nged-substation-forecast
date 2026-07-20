@@ -44,6 +44,12 @@ def open_ecmwf_ens_run(
         nwp_init_time: The initialization time to open. Must be timezone aware.
         h3_grid: The H3 grid to use for spatial bounds.
     """
+    # Convention-sensitive to the *real* Dynamical.org catalog: this function bakes in assumptions
+    # about its shape (longitude in [-180, 180], descending latitude, coordinate/dimension names).
+    # The offline tests share those assumptions and cannot catch a mismatch with the live catalog, so
+    # after changing this function run the network-gated test manually:
+    #     uv run pytest --run-network -m network
+    # See docs/architecture/code-style.md ("Network-gated tests").
     if h3_grid.is_empty():
         raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
 

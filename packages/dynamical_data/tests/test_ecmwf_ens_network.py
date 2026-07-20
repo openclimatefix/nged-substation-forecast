@@ -1,9 +1,9 @@
 """Network-gated end-to-end test against the *real* Dynamical.org ECMWF ENS catalog.
 
-Every test here is marked ``network`` and is therefore **deselected by default** (see the
-``-m "not network"`` in the root ``pyproject.toml``); a plain ``uv run pytest`` — local dev and the
-per-PR CI — never touches the network. Run these explicitly with ``uv run pytest -m network``
-(nightly CI only).
+Every test here is marked ``network`` and is therefore **skipped by default** (the root
+``conftest.py`` skips ``network``-marked tests unless ``--run-network`` is passed); a plain
+``uv run pytest`` — local dev and the per-PR CI — never touches the network. Run these explicitly
+with ``uv run pytest --run-network -m network`` (nightly CI only).
 
 Why this exists — the "shared-convention blind spot". Every other ``dynamical_data`` test runs on
 the synthetic ``xr.Dataset`` built by ``conftest.py``, which *encodes our assumptions* about the

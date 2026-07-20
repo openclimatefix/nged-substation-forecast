@@ -91,21 +91,56 @@ against a **real** external service — chiefly to catch the *shared-convention 
 synthetic fixture and the code under test share the same wrong assumption about the real data's
 shape (dimension order, latitude orientation, longitude range, dtypes, units) and both pass.
 
-Mark such a test `@pytest.mark.network`. The root `pyproject.toml` sets `addopts = "... -m 'not
-network'"`, so these tests are **deselected by default**: a plain `uv run pytest` (local dev and
-the per-PR CI) never touches the network. Run them explicitly — nightly CI or on demand — with:
+Mark such a test `@pytest.mark.network`. The root `conftest.py` skips every `network`-marked test
+unless the caller passes `--run-network`, so a plain `uv run pytest` (local dev and the per-PR CI)
+never touches the network. Run them explicitly — nightly CI or on demand — with:
 
 ```bash
-uv run pytest -m network
+uv run pytest --run-network              # whole suite, network tests included
+uv run pytest --run-network -m network   # only the network tests
 ```
 
 `packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
 real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts
 the conventions the offline fixtures merely assume.
 
-(One wrinkle of the default `-m "not network"`: naming a network test by node id alone still
-deselects it — add `-m network` to run a single one, e.g. `uv run pytest path::test_foo -m
-network`.)
+The gate is a collection hook, **not** an `addopts = "... -m 'not network'"`. pytest keeps only the
+*last* `-m` it is given, so any caller-supplied marker expression (e.g. `-m "not integration"`) would
+silently replace an `addopts` `-m "not network"` and re-include the network tests. A skip applied
+during collection cannot be overridden that way — the gate holds whatever `-m` the caller passes, and
+even `-m network` alone stays skipped until `--run-network` is added.
+
+### NWP grid → H3 orientation coverage
+
+The NWP-grid-to-H3 mapping is the classic place for a silent orientation bug — a vertically or
+horizontally flipped weather grid, a transpose (`np.meshgrid` `indexing="ij"` vs `"xy"`), or a
+lat/lon swap. Three tests guard it in layers, from cheap-and-synthetic to real-and-networked. Each
+was checked by *mutation*: introducing the bug into the production code and confirming the test goes
+red. The table records which mutation each layer catches (✓ = the test fails when that bug is
+present):
+
+| Mutation in production code | synthetic `convert` test¹ | cached real-slice test² | geo landmark test³ |
+| --- | :---: | :---: | :---: |
+| `np.meshgrid` `indexing="ij"` → `"xy"` (transpose) | ✓ | ✓ | n/a |
+| lat/lon swap in the value-join keys | ✓ | ✓ | ✓ |
+| reversed latitude ravel (vertical flip) | ✓ | ✓ | n/a |
+| swap `cell_to_lat`/`cell_to_lng` when snapping | n/a | n/a | ✓ |
+
+- ¹ `dynamical_data/tests/test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`
+  — a 2×2 synthetic grid with a distinct value at every corner. Guards the ravel-alignment step
+  *inside* `convert`; the value-join itself is positional-agnostic, so which hexagon owns a given
+  (lat, lon) is delegated to the upstream `h3_grid_weights` asset (the geo test below).
+- ² `dynamical_data/tests/test_ecmwf_ens_cached.py::test_cached_real_slice_conventions_and_orientation`
+  — the same orientation check on a committed real ECMWF ENS slice, so the conventions the synthetic
+  fixture only *assumes* (descending latitude, °C, dimension order) are exercised on genuine bytes.
+- ³ `geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation` — proves
+  `compute_h3_grid_weights` labels each H3 cell with grid points at the cell's own (lat, lon), using
+  two well-separated GB landmarks. This is what fixes the hexagon↔(lat, lon) geography the `convert`
+  tests delegate.
+
+`test_ecmwf_ens_network.py` (network-gated, above) composes all three against the live catalog and is
+the only layer that can catch *future upstream drift* — a change in Dynamical.org's own conventions
+that the committed slice, frozen at capture time, cannot.
 
 ### Assertion style for Patito frames
 
