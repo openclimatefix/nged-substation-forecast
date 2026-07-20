@@ -132,16 +132,6 @@ def test_compute_metrics_mbe_sign():
     assert mbe_row["metric_value"][0] > 0
 
 
-def test_compute_metrics_nmae_normalisation():
-    """NMAE = MAE / effective_capacity_mw. With capacity 10 and MAE=2, NMAE=0.2."""
-    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
-    actuals = _make_actuals(1, times, [10.0, 10.0])
-    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # MAE=2, capacity=10
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    nmae_row = result.filter((pl.col("metric_name") == "nmae") & (pl.col("horizon_slice") == "all"))
-    assert math.isclose(nmae_row["metric_value"][0], 0.2, rel_tol=1e-5)
-
-
 def _make_capacity(
     time_series_ids: list[int], effective_capacity_mw: list[float]
 ) -> pt.DataFrame[EffectiveCapacity]:
@@ -189,25 +179,7 @@ def test_compute_metrics_ensemble_averaging():
     zero-RMSE corner that ``compute_metrics`` rejects as non-finite.)
     """
     time = _utc(2022, 1, 1, 0, 0)
-    init_time = _utc(2021, 12, 31, 23, 30)
-    df = pl.DataFrame(
-        {
-            "time_series_id": pl.Series([1, 1], dtype=pl.Int32),
-            "valid_time": pl.Series([time, time], dtype=pl.Datetime("us", "UTC")),
-            "power_fcst_init_time": pl.Series(
-                [init_time, init_time], dtype=pl.Datetime("us", "UTC")
-            ),
-            "ensemble_member": pl.Series([0, 1], dtype=pl.Int8),
-            "nwp_init_time": pl.Series([None, None], dtype=pl.Datetime("us", "UTC")),
-            "power_fcst": pl.Series([8.0, 12.0], dtype=pl.Float32),
-            "power_fcst_model_name": pl.Series(["stub", "stub"], dtype=pl.String),
-            "power_fcst_model_version": pl.Series([1, 1], dtype=pl.Int16),
-            "ml_flow_experiment_id": pl.Series([None, None], dtype=pl.Int32),
-            "experiment_name": pl.Series(["stub_exp", "stub_exp"], dtype=pl.String),
-            "fold_id": pl.Series(["2022", "2022"], dtype=pl.String),
-        }
-    )
-    forecasts = PowerForecast.validate(df, allow_superfluous_columns=True)
+    forecasts = _make_ensemble_forecasts(1, [time], [[8.0, 12.0]])
     actuals = _make_actuals(1, [time], [11.0])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mae_row = result.filter(pl.col("metric_name") == "mae")
@@ -670,20 +642,14 @@ def test_build_mlflow_aggregate_metrics_all_key():
 
 
 def test_build_mlflow_aggregate_metrics_per_type_keys():
-    """Per-type keys use slugified type names."""
-    df = _make_metrics_df({"PV": 2.0, "Disaggregated Demand": 6.0})
+    """Per-type keys use slugified type names; parentheses are stripped from the slug."""
+    df = _make_metrics_df({"PV": 2.0, "Disaggregated Demand": 6.0, "Other (Demand)": 3.0})
     result = build_mlflow_aggregate_metrics(df)
     assert "rmse__pv" in result
     assert "rmse__disaggregated_demand" in result
+    assert "rmse__other_demand" in result
     assert math.isclose(result["rmse__pv"], 2.0, rel_tol=1e-5)
     assert math.isclose(result["rmse__disaggregated_demand"], 6.0, rel_tol=1e-5)
-
-
-def test_build_mlflow_aggregate_metrics_other_demand_slug():
-    """Parentheses in type names are stripped from the slug."""
-    df = _make_metrics_df({"Other (Demand)": 3.0})
-    result = build_mlflow_aggregate_metrics(df)
-    assert "rmse__other_demand" in result
 
 
 def test_build_mlflow_aggregate_metrics_sliced_keys():

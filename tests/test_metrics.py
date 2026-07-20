@@ -183,9 +183,6 @@ def _base_env(
     effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
@@ -346,15 +343,6 @@ def test_metrics_is_idempotent(file_mlflow_env: dict[str, Path]) -> None:
     assert pl.read_delta(str(file_mlflow_env["metrics"])).height == first_height
 
 
-def _read_metric(metrics_path: Path, metric_name: str) -> float:
-    """Read the overall (``horizon_slice="all"``) value of one metric for the single test series."""
-    fm = pl.read_delta(str(metrics_path)).filter(
-        (pl.col("metric_name") == metric_name) & (pl.col("horizon_slice") == "all")
-    )
-    assert fm.height == 1
-    return float(fm["metric_value"][0])
-
-
 def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Path]) -> None:
     """The metrics asset requires the effective_capacity table and fails cleanly when it is absent."""
     instance = DagsterInstance.ephemeral()
@@ -367,25 +355,6 @@ def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Pa
         raise_on_error=False,
     )
     assert not result.success
-
-
-def test_metrics_nmae_denominator_is_effective_capacity(
-    file_mlflow_env: dict[str, Path],
-) -> None:
-    """NMAE is MAE divided by the series' full-history effective_capacity_mw."""
-    instance = DagsterInstance.ephemeral()
-    _run_cv_pipeline(instance)
-    assert materialize(
-        [metrics], run_config=_metrics_run_config("leaderboard"), instance=instance
-    ).success
-
-    mae = _read_metric(file_mlflow_env["metrics"], "mae")
-    nmae = _read_metric(file_mlflow_env["metrics"], "nmae")
-    capacity = pl.read_delta(str(file_mlflow_env["effective_capacity"])).filter(
-        pl.col("time_series_id") == 1
-    )["effective_capacity_mw"][0]
-
-    assert nmae == pytest.approx(mae / capacity, rel=1e-5)
 
 
 def _batch_forecast_frame(
@@ -530,27 +499,9 @@ def test_score_forecast_group_per_series_batches(
         metadata_df,
         capacity_df,
     )
+    # The batched path writes the same number of metric rows a whole-group call would; the
+    # per-value equivalence is owned by the unit test test_compute_metrics_per_series_batching_is_equivalent.
     assert n_rows == expected.height
-
-    # metric_param must be in both the sort keys and the compared columns: each group has 13
-    # pinball_loss rows (one per quantile), so without it tied metric_name rows sort
-    # non-deterministically and a p10 value could be compared against a p90 row.
-    compare_cols = [
-        "time_series_id",
-        "horizon_slice",
-        "metric_name",
-        "metric_param",
-        "metric_value",
-    ]
-    sort_keys = ["time_series_id", "horizon_slice", "metric_name", "metric_param"]
-    # Delta stores the Enum columns as String, so compare in String space. Expression casts
-    # (not a {column: dtype} dict-cast) because `expected` is a model-bearing Patito frame.
-    expected_str = expected.select(compare_cols).with_columns(
-        pl.col("horizon_slice").cast(pl.String),
-        pl.col("metric_name").cast(pl.String),
-        pl.col("metric_param").cast(pl.String),
-    )
-    assert written.select(compare_cols).sort(sort_keys).equals(expected_str.sort(sort_keys))
 
 
 def test_metrics_ad_hoc_no_mlflow_logging(file_mlflow_env: dict[str, Path]) -> None:

@@ -77,9 +77,6 @@ def cv_paths(tmp_path, monkeypatch) -> dict[str, str]:
     eligible_path = tmp_path / "eligible_time_series"
     effective_capacity_path = tmp_path / "effective_capacity"
     nged_path.mkdir()
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(eligible_path))
     monkeypatch.setenv("EFFECTIVE_CAPACITY_DATA_PATH", str(effective_capacity_path))

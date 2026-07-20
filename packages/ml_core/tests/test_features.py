@@ -308,46 +308,35 @@ def test_parsed_features_from_selected_features():
     assert leaky_features[0].hours == 24
 
 
-def test_parsed_features_from_selected_features_invalid_stacking():
-    with pytest.raises(ValueError, match="Feature stacking is not supported"):
-        ParsedFeatures.from_strings({"power_lag_24h_rolling_mean_6h"})
-
-
-def test_parsed_features_from_selected_features_invalid_hours():
-    # Lag and rolling window hours must be gt=0 and le=17520 (2 years)
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"power_lag_0h"})
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"power_lag_17521h"})
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"temperature_2m_rolling_mean_0h"})
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"temperature_2m_rolling_mean_17521h"})
-
-
-def test_parsed_features_from_selected_features_invalid_base_column():
-    # Base column must be a valid BaseColumn literal
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"invalid_col_lag_24h"})
-
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"invalid_col_rolling_mean_6h"})
-
-
-def test_parsed_features_from_selected_features_malformed_patterns():
-    # Negative hours, non-integer hours, or other malformed patterns should raise ValueError
-    # because they do not match the regex and fall through to unrecognized feature check.
-    with pytest.raises(ValueError, match="Invalid lag feature name format"):
-        ParsedFeatures.from_strings({"power_lag_-5h"})
-
-    with pytest.raises(ValueError, match="Invalid rolling_mean feature name format"):
-        ParsedFeatures.from_strings({"power_rolling_mean_-2h"})
-
-    with pytest.raises(ValueError, match="Invalid lag feature name format"):
-        ParsedFeatures.from_strings({"power_lag_12.5h"})
-
-    with pytest.raises(ValueError, match="Invalid rolling_mean feature name format"):
-        ParsedFeatures.from_strings({"power_rolling_mean_abch"})
+@pytest.mark.parametrize(
+    ("bad_feature", "expected_exc", "match"),
+    [
+        # Stacking a rolling mean on a lag is unsupported.
+        ("power_lag_24h_rolling_mean_6h", ValueError, "Feature stacking is not supported"),
+        # Lag / rolling window hours must be gt=0 and le=17520 (2 years).
+        ("power_lag_0h", ValidationError, None),
+        ("power_lag_17521h", ValidationError, None),
+        ("temperature_2m_rolling_mean_0h", ValidationError, None),
+        ("temperature_2m_rolling_mean_17521h", ValidationError, None),
+        # Base column must be a valid BaseColumn literal.
+        ("invalid_col_lag_24h", ValidationError, None),
+        ("invalid_col_rolling_mean_6h", ValidationError, None),
+        # A rolling mean of the target `power` is forbidden (leakage).
+        ("power_rolling_mean_6h", ValidationError, None),
+        # Malformed hours (negative / non-integer / non-numeric) miss the regex and raise ValueError.
+        ("power_lag_-5h", ValueError, "Invalid lag feature name format"),
+        ("power_rolling_mean_-2h", ValueError, "Invalid rolling_mean feature name format"),
+        ("power_lag_12.5h", ValueError, "Invalid lag feature name format"),
+        ("power_rolling_mean_abch", ValueError, "Invalid rolling_mean feature name format"),
+    ],
+)
+def test_parsed_features_from_strings_rejects_invalid(
+    bad_feature: str, expected_exc: type[Exception], match: str | None
+) -> None:
+    """Invalid feature strings are rejected: stacking, out-of-range/malformed hours, unknown base
+    columns, and rolling means of the target `power`."""
+    with pytest.raises(expected_exc, match=match):
+        ParsedFeatures.from_strings({bad_feature})
 
 
 def test_apply_rolling_mean_feature():
@@ -376,57 +365,38 @@ def test_apply_rolling_mean_feature():
     assert result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 25.0, 35.0]
 
 
-def test_apply_rolling_mean_feature_with_ensemble():
-    nwp_init_time = datetime(2023, 1, 1, 0, 0)
-    df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1"] * 4,
-            "nwp_init_time": [nwp_init_time] * 4,
-            "ensemble_member": [1, 1, 2, 2],
-            "valid_time": [
-                datetime(2023, 1, 1, 0, 0),
-                datetime(2023, 1, 1, 1, 0),
-                datetime(2023, 1, 1, 0, 0),
-                datetime(2023, 1, 1, 1, 0),
-            ],
-            "temperature_2m": [10.0, 20.0, 100.0, 200.0],
-        }
-    )
-    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
-    assert "temperature_2m_rolling_mean_2h" in result.columns
-    # Sort to ensure deterministic order
-    sorted_result = result.sort(["ensemble_member", "valid_time"])
+@pytest.mark.parametrize(
+    ("partition_col", "group_values"),
+    [
+        ("ensemble_member", [1, 2]),
+        ("nwp_init_time", [datetime(2023, 1, 1, 0, 0), datetime(2023, 1, 1, 6, 0)]),
+    ],
+)
+def test_apply_rolling_mean_feature_partitions_by_group(
+    partition_col: str, group_values: list[object]
+) -> None:
+    """The rolling window must not leak across ensemble members or NWP runs: each group is rolled
+    independently, so two groups covering the same valid_times keep their own means."""
+    columns: dict[str, list[object]] = {
+        "time_series_id": ["ts1"] * 4,
+        "nwp_init_time": [datetime(2023, 1, 1, 0, 0)] * 4,
+        "ensemble_member": [0] * 4,
+        "valid_time": [
+            datetime(2023, 1, 1, 6, 0),
+            datetime(2023, 1, 1, 7, 0),
+            datetime(2023, 1, 1, 6, 0),
+            datetime(2023, 1, 1, 7, 0),
+        ],
+        "temperature_2m": [10.0, 20.0, 100.0, 200.0],
+    }
+    a, b = group_values
+    columns[partition_col] = [a, a, b, b]
+    result = _apply_rolling_mean_feature(
+        pl.DataFrame(columns).lazy(), "temperature_2m", 2
+    ).collect()
+    sorted_result = result.sort([partition_col, "valid_time"])
+    # Group A: mean([10]) = 10, mean([10, 20]) = 15. Group B: mean([100]) = 100, mean([100, 200]) = 150.
     assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
-
-
-def test_apply_rolling_mean_feature_does_not_mix_nwp_runs():
-    # Two NWP runs covering the same valid_times; the rolling mean must stay within each run.
-    init_time_a = datetime(2023, 1, 1, 0, 0)
-    init_time_b = datetime(2023, 1, 1, 6, 0)
-    df = pl.DataFrame(
-        {
-            "time_series_id": ["ts1"] * 4,
-            "nwp_init_time": [init_time_a, init_time_a, init_time_b, init_time_b],
-            "ensemble_member": [0] * 4,
-            "valid_time": [
-                datetime(2023, 1, 1, 6, 0),
-                datetime(2023, 1, 1, 7, 0),
-                datetime(2023, 1, 1, 6, 0),
-                datetime(2023, 1, 1, 7, 0),
-            ],
-            "temperature_2m": [10.0, 20.0, 100.0, 200.0],
-        }
-    )
-    result = _apply_rolling_mean_feature(df.lazy(), "temperature_2m", 2).collect()
-    sorted_result = result.sort(["nwp_init_time", "valid_time"])
-    # Run A: mean([10]) = 10, mean([10, 20]) = 15
-    # Run B: mean([100]) = 100, mean([100, 200]) = 150
-    assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
-
-
-def test_parsed_features_from_selected_features_forbids_power_rolling_mean():
-    with pytest.raises(ValidationError):
-        ParsedFeatures.from_strings({"power_rolling_mean_6h"})
 
 
 def test_engineer_features_no_nwp():
@@ -438,20 +408,10 @@ def test_engineer_features_no_nwp():
             "power": [100.0],
         }
     )
-    metadata_df = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "time_series_name": ["ALFORD 33 11kV S STN"],
-            "time_series_type": ["BESS"],
-            "units": ["MW"],
-            "licence_area": ["EMids"],
-            "substation_number": [1],
-            "substation_type": ["BSP"],
-            "latitude": [52.0],
-            "longitude": [-1.0],
-            "h3_res_5": [123456789],
-        }
-    )
+    # _engineer_features left-joins metadata and only emits time_series_type from it, so the
+    # minimal two-column frame is sufficient (the full TimeSeriesMetadata schema is validated
+    # by the contracts tests, not here).
+    metadata_df = pl.DataFrame({"time_series_id": [123], "time_series_type": ["BESS"]})
 
     # Run engineer_features with nwp=None
     engineered = _engineer_features(
@@ -478,15 +438,7 @@ def test_engineer_features_empty_data():
     metadata_df = pl.DataFrame(
         {
             "time_series_id": pl.Series([], dtype=pl.Int64),
-            "time_series_name": pl.Series([], dtype=pl.String),
             "time_series_type": pl.Series([], dtype=pl.String),
-            "units": pl.Series([], dtype=pl.String),
-            "licence_area": pl.Series([], dtype=pl.String),
-            "substation_number": pl.Series([], dtype=pl.Int32),
-            "substation_type": pl.Series([], dtype=pl.String),
-            "latitude": pl.Series([], dtype=pl.Float32),
-            "longitude": pl.Series([], dtype=pl.Float32),
-            "h3_res_5": pl.Series([], dtype=pl.UInt64),
         }
     )
 
@@ -511,20 +463,7 @@ def test_engineer_features_raises_value_error_when_weather_requested_but_nwp_non
             "power": [100.0],
         }
     )
-    metadata_df = pl.DataFrame(
-        {
-            "time_series_id": [123],
-            "time_series_name": ["ALFORD 33 11kV S STN"],
-            "time_series_type": ["BESS"],
-            "units": ["MW"],
-            "licence_area": ["EMids"],
-            "substation_number": [1],
-            "substation_type": ["BSP"],
-            "latitude": [52.0],
-            "longitude": [-1.0],
-            "h3_res_5": [123456789],
-        }
-    )
+    metadata_df = pl.DataFrame({"time_series_id": [123], "time_series_type": ["BESS"]})
 
     def _call(features: set[str]) -> None:
         _engineer_features(
