@@ -196,6 +196,43 @@ class _MaxTimePerTimeSeriesId(pt.Model):
     max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
 
 
+def latest_time_per_time_series_id(
+    delta_path: str,
+    storage_options: ObjectStoreOptions | None = None,
+) -> pt.DataFrame[_MaxTimePerTimeSeriesId]:
+    """Return the most recent ``time`` on disk per ``time_series_id``.
+
+    Returns an empty (but correctly typed) frame if the Delta table does not exist yet.
+    ``max(time)`` grouped by ``time_series_id`` is a value aggregation, so it is safe from the
+    Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).
+
+    `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
+    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
+    """
+    if not delta_table_exists(delta_path, storage_options):
+        log.info(f"{delta_path=} does not exist yet; returning an empty max-times frame.")
+        empty = pl.DataFrame(
+            schema={
+                "time_series_id": _MaxTimePerTimeSeriesId.dtypes["time_series_id"],
+                "max_time": _MaxTimePerTimeSeriesId.dtypes["max_time"],
+            }
+        )
+        return pt.DataFrame(empty).set_model(_MaxTimePerTimeSeriesId).validate()
+
+    max_times = (
+        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
+        .group_by("time_series_id")
+        .agg(max_time=pl.max("time"))
+        .collect()
+    )
+    log.info(
+        f"Found the most recent data we have on disk for {max_times.height} time_series_ids from {delta_path}."
+        f" {max_times['max_time'].min()=}."
+        f" {max_times['max_time'].max()=}"
+    )
+    return pt.DataFrame(max_times).set_model(_MaxTimePerTimeSeriesId).validate()
+
+
 # This overload tells type checkers that if you pass a `pt.DataFrame[PowerTimeSeries]` into
 # `select_new_rows` then you get a `pt.DataFrame[PowerTimeSeries]` back.
 @overload
@@ -233,21 +270,8 @@ def select_new_rows(
         log.info(f"{delta_path=} does not exist yet.")
         return time_series
 
-    # Scan the existing delta table and find the most recent time per time_series_id
-    max_times = (
-        pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
-        .group_by("time_series_id")
-        .agg(max_time=pl.max("time"))
-        .collect()
-    )
-
-    log.info(
-        f"Found the most recent data we have on disk for {max_times.height} time_series_ids from {delta_path}."
-        f" {max_times['max_time'].min()=}."
-        f" {max_times['max_time'].max()=}"
-    )
-
-    _MaxTimePerTimeSeriesId.validate(max_times)
+    # Scan the existing delta table for the most recent time per time_series_id.
+    max_times = latest_time_per_time_series_id(delta_path, storage_options)
 
     # Check whether `time_series` is a `PowerTimeSeries` or a `_ProcessedFileListing`
     if "time" in time_series.columns:
@@ -264,9 +288,11 @@ def select_new_rows(
             f" not {time_series.columns=}"
         )
 
+    # Strip the Patito model from `max_times` so Polars' cross-subclass join check accepts it.
+    plain_max_times = pl.LazyFrame._from_pyldf(max_times.lazy()._ldf)
     filtered_df = (
         time_series.lazy()
-        .join(max_times.lazy(), on="time_series_id", how="left")
+        .join(plain_max_times, on="time_series_id", how="left")
         # If max_time is null for this time_series_id then this is a new time_series_id.
         .filter(pl.col("max_time").is_null() | (pl.col(time_col) > pl.col("max_time")))
         .drop("max_time")

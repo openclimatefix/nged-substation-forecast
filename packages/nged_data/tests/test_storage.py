@@ -10,6 +10,7 @@ from nged_data.storage import (
     _ProcessedFileListing,
     _RawFileListItem,
     _process_file_listing,
+    latest_time_per_time_series_id,
     select_new_rows,
     upsert_metadata,
 )
@@ -340,6 +341,40 @@ def test_select_new_rows_power_time_series(tmp_path: Path):
     assert result.height == 1
     assert result["time"][0] == datetime(2026, 1, 1, 12, 30, tzinfo=UTC)
     PowerTimeSeries.validate(result)  # schema must survive filtering
+
+
+def test_latest_time_per_time_series_id(tmp_path: Path):
+    """Returns the most recent ``time`` per ``time_series_id`` from the Delta table."""
+    UTC = timezone.utc
+    delta_path = tmp_path / "power.delta"
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 1, 2], dtype=pl.Int32),
+            "time": pl.Series(
+                [
+                    datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
+                    datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+                    datetime(2026, 1, 2, 9, 0, tzinfo=UTC),
+                ]
+            ).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0, 2.0, 3.0], dtype=pl.Float32),
+        }
+    ).write_delta(delta_path)
+
+    max_times = latest_time_per_time_series_id(str(delta_path)).sort("time_series_id")
+
+    assert max_times["time_series_id"].to_list() == [1, 2]
+    assert max_times["max_time"].to_list() == [
+        datetime(2026, 1, 1, 12, 30, tzinfo=UTC),
+        datetime(2026, 1, 2, 9, 0, tzinfo=UTC),
+    ]
+
+
+def test_latest_time_per_time_series_id_absent_table(tmp_path: Path):
+    """A missing Delta table yields an empty but correctly-typed frame, not an error."""
+    max_times = latest_time_per_time_series_id(str(tmp_path / "does_not_exist.delta"))
+    assert max_times.is_empty()
+    assert max_times.columns == ["time_series_id", "max_time"]
 
 
 def test_parse_file_listing_invalid():
