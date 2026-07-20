@@ -33,9 +33,6 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     tracking_uri = f"file://{tmp_path / 'mlruns'}"
     monkeypatch.setenv("MLFLOW_ALLOW_FILE_STORE", "true")
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(tmp_path / "production_model"))
     mlflow.set_tracking_uri(tracking_uri)
     return {"production_model_path": str(tmp_path / "production_model")}

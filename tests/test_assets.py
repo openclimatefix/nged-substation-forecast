@@ -122,14 +122,9 @@ def _write_h3_grid_weights(path: str) -> None:
 
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Point every managed data-path root at a temp dir and supply dummy S3 credentials.
-
-    ``Settings`` requires the ``NGED_S3_BUCKET_*`` fields and reads env vars ahead of any ``.env``,
-    so this fully isolates the assets from the developer's real configuration.
-    """
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
+    """Point every managed data-path root at a temp dir, fully isolating the assets from the
+    developer's real configuration (dummy ``NGED_S3_BUCKET_*`` creds come from the autouse
+    ``_dummy_nged_s3_creds`` fixture in conftest.py)."""
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))

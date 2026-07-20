@@ -183,9 +183,6 @@ def _base_env(
     effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
-    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
-    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "dummy")
-    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "dummy")
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
@@ -372,7 +369,12 @@ def test_metrics_raises_without_effective_capacity(file_mlflow_env: dict[str, Pa
 def test_metrics_nmae_denominator_is_effective_capacity(
     file_mlflow_env: dict[str, Path],
 ) -> None:
-    """NMAE is MAE divided by the series' full-history effective_capacity_mw."""
+    """NMAE is MAE divided by the series' full-history effective_capacity_mw.
+
+    Unlike the unit test test_compute_metrics_nmae_uses_supplied_capacity (which passes a capacity
+    frame directly), this proves the *asset* reads the materialised effective_capacity Delta table
+    and uses that table's value as the denominator.
+    """
     instance = DagsterInstance.ephemeral()
     _run_cv_pipeline(instance)
     assert materialize(
@@ -532,6 +534,10 @@ def test_score_forecast_group_per_series_batches(
     )
     assert n_rows == expected.height
 
+    # The unit test test_compute_metrics_per_series_batching_is_equivalent proves compute_metrics
+    # gives the same values batched or whole-group, but only this asset-layer test covers the
+    # write path: the per-batch pl.concat, enrich_metrics_rows, the Enum->String cast, and the
+    # Delta round-trip. So compare the values read back off disk against a whole-group compute.
     # metric_param must be in both the sort keys and the compared columns: each group has 13
     # pinball_loss rows (one per quantile), so without it tied metric_name rows sort
     # non-deterministically and a p10 value could be compared against a p90 row.

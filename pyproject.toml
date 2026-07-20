@@ -119,6 +119,10 @@ docstring-code-line-length = 100
 # with `uv run pytest --run-network` — see docs/architecture/testing.md. The gate lives in a hook,
 # not in an `addopts` `-m "not network"`, because any caller-supplied `-m` would silently override it.
 addopts = "--import-mode=importlib"
+# Put the root `tests/` dir on sys.path so its integration tests can import shared, non-fixture
+# test data (e.g. `_nwp_test_data`) by bare name — importlib mode does not add each test file's
+# own directory to sys.path the way prepend mode does.
+pythonpath = ["tests"]
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
 ]
