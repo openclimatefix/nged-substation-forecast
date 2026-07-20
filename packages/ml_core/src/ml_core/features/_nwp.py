@@ -126,7 +126,13 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
             ).alias("valid_time")
         )
         .drop("_start", "_end")
-        .explode("valid_time")
+        # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
+        # It has no effect on output today: _start/_end are the min/max valid_time of a non-empty
+        # group, so start <= end and datetime_ranges returns at least the single-point list
+        # [_start] -- the empty-list branch the two settings disagree on is unreachable. valid_time
+        # is a non-nullable datetime, so _start/_end are never null either (and a null range would
+        # explode to a single null row identically under both settings regardless).
+        .explode("valid_time", empty_as_null=False)
     )
 
     # Left-join original NWP onto the grid; new 30-min rows come in as nulls.

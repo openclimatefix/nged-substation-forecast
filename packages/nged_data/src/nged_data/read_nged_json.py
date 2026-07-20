@@ -50,14 +50,25 @@ def _extract_power_time_series(
 ) -> pt.DataFrame[PowerTimeSeries]:
     """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
-    If NGED's meter reported no values, then the `data` field in the JSON will be Null,
-    and this function will raise the following exception:
+    If NGED's meter reported no values, then the `data` field in the JSON will be Null (or, less
+    commonly, an empty array `[]`, which `pl.read_json` infers as `List(Null)`), and this function
+    will raise the following exception:
         polars.exceptions.InvalidOperationError: invalid dtype: expected 'Struct', got 'Null' for 'data'
     """
     # Extract time series data: explode the 'data' column and unnest the struct.
     # 'explode' expands the list of structs into individual rows.
     # 'unnest' expands the struct fields into individual columns.
-    time_series_df = df.select("data").explode("data").unnest("data")
+    #
+    # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning; it
+    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as
+    # List(Null) -- a single file can't infer the struct fields of an empty array -- so after
+    # explode, under *both* settings, the .unnest("data") below raises the same
+    # InvalidOperationError ("expected 'Struct', got 'Null' for 'data'") that a Null 'data' field
+    # raises. storage.py's download_and_parse_files catches that exact message, logs a warning,
+    # and skips the file, so an empty-data file is handled identically to the documented null-data
+    # case regardless of empty_as_null. (The only case where the two settings differ -- an empty
+    # List(Struct) with a known schema -- can't arise from pl.read_json of a single file.)
+    time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})
 

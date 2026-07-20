@@ -111,6 +111,13 @@ def compute_h3_grid_weights(
 
     weights_df = (
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_h3_res))
+        # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
+        # It has no effect on output today: cell_to_children always returns a non-empty list here
+        # (child_h3_res > h3_res is enforced above, and every H3 cell -- hexagon or pentagon -- has
+        # children at any finer resolution), so the empty-list branch the two settings disagree on
+        # is unreachable. (An *invalid* index yields a null list, not an empty one, and a null list
+        # explodes to a single null row under both settings -- which H3GridWeights.validate() below
+        # rejects regardless -- so there is no silent-data-loss risk from the choice either way.)
         .explode("child_h3", empty_as_null=False)
         .with_columns(
             nwp_lat=_snap_to_grid(plh3.cell_to_lat("child_h3")),
