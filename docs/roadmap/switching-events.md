@@ -331,6 +331,12 @@ once that exists. There are two ways to hand stage 2 the draft:
   shrinks naturally toward "no correction". This is the version that genuinely forces
   specialisation, and it degrades gracefully with horizon: as the anomaly signal decays and
   valid-time lags null out, the correction tends to zero and the forecast falls back to the draft.
+  It also sharpens interpretation: because the draft is an offset rather than a column, it never
+  competes for splits, so the trees' feature importances and SHAP values describe *only* what drives
+  the correction — a cleaner read on the switching/anomaly signal than the soft variant, where the
+  draft soaks up most of the gain and entangles everything else. (That interpretability win comes
+  from predicting the correction, so the equivalent delta-regression shares it; it is a reason to
+  prefer this hard corrector over draft-as-feature, not `base_margin` over the delta trick.)
 
 **What `base_margin` buys over predicting the delta directly.** For plain squared-error regression,
 supplying the draft as `base_margin` is mathematically identical to training stage 2 on
