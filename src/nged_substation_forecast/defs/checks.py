@@ -36,7 +36,7 @@ from dagster import (
     TableSchema,
     asset_check,
 )
-from nged_data.storage import latest_time_per_time_series_id
+from nged_data.storage import time_series_coverage
 
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
 
@@ -89,7 +89,7 @@ class PowerFreshnessResult:
 
 
 def evaluate_power_freshness(
-    max_times: pl.DataFrame,
+    coverage: pl.DataFrame,
     roster_ids: pl.Series | None,
     now: datetime,
     threshold: timedelta,
@@ -100,20 +100,21 @@ def evaluate_power_freshness(
     directly and reusable by the future Sentry alarm.
 
     Args:
-        max_times: One row per ``time_series_id`` that has data, carrying its most recent
-            ``time`` in a ``max_time`` column.
+        coverage: One row per ``time_series_id`` that has data, carrying its most recent
+            observation ``time`` in a ``last_time`` column (a ``TimeSeriesCoverage`` frame; any
+            ``first_time`` column is ignored — freshness depends only on the latest observation).
         roster_ids: The full set of expected ``time_series_id``s (from the ``TimeSeriesMetadata``
             roster), used to flag ids that have *never* sent data. ``None`` when no roster is
             available, in which case never-reported ids cannot be detected.
         now: Current time (UTC).
-        threshold: A series is stale when ``max_time < now - threshold``.
+        threshold: A series is stale when ``last_time < now - threshold``.
 
     Returns:
         A ``PowerFreshnessResult`` summarising the health of the power feed.
     """
     # Strip any Patito model so the frame-building below uses plain Polars semantics.
-    max_times = pl.DataFrame._from_pydf(max_times._df)
-    last_seen_dtype = max_times.schema["max_time"]
+    coverage = pl.DataFrame._from_pydf(coverage._df)
+    last_time_dtype = coverage.schema["last_time"]
     status_dtype = pl.Enum(_LATE_STATUS_ORDER)
     cutoff = now - threshold
 
@@ -125,21 +126,21 @@ def evaluate_power_freshness(
     # series that has gone quiet than silently stop watching it. If a permanently-yellow check
     # for a genuinely retired series becomes a nuisance, intersect the stale ids with
     # `roster_ids` here (when a roster is available) so only currently-expected series count.
-    stale = max_times.filter(pl.col("max_time") < cutoff).select(
+    stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
-        last_seen=pl.col("max_time"),
-        hours_late=(pl.lit(now) - pl.col("max_time")).dt.total_seconds() / 3600.0,
+        last_seen=pl.col("last_time"),
+        hours_late=(pl.lit(now) - pl.col("last_time")).dt.total_seconds() / 3600.0,
         status=pl.lit("stale", dtype=status_dtype),
     )
 
     # Never reported: in the roster, but with no rows in the Delta table at all.
     if roster_ids is not None:
-        never_ids = roster_ids.filter(~roster_ids.is_in(max_times["time_series_id"].implode()))
+        never_ids = roster_ids.filter(~roster_ids.is_in(coverage["time_series_id"].implode()))
     else:
-        never_ids = pl.Series("time_series_id", [], dtype=max_times.schema["time_series_id"])
+        never_ids = pl.Series("time_series_id", [], dtype=coverage.schema["time_series_id"])
     never = pl.DataFrame({"time_series_id": never_ids}).select(
         "time_series_id",
-        last_seen=pl.lit(None, dtype=last_seen_dtype),
+        last_seen=pl.lit(None, dtype=last_time_dtype),
         hours_late=pl.lit(None, dtype=pl.Float64),
         status=pl.lit("never", dtype=status_dtype),
     )
@@ -150,9 +151,9 @@ def evaluate_power_freshness(
     late = pl.concat([never, stale]).sort(["status", "hours_late"], descending=[False, True])
 
     if roster_ids is not None:
-        n_series_total = pl.concat([roster_ids, max_times["time_series_id"]]).n_unique()
+        n_series_total = pl.concat([roster_ids, coverage["time_series_id"]]).n_unique()
     else:
-        n_series_total = max_times.height
+        n_series_total = coverage.height
 
     return PowerFreshnessResult(
         n_series_total=n_series_total,
@@ -242,12 +243,10 @@ def power_data_is_fresh() -> AssetCheckResult:
     """
     settings = Settings()
     storage_options = settings.storage_options
-    max_times = latest_time_per_time_series_id(
-        settings.power_time_series_data_path, storage_options
-    )
+    coverage = time_series_coverage(settings.power_time_series_data_path, storage_options)
     roster_ids = _read_roster_ids(settings.metadata_path, storage_options)
     result = evaluate_power_freshness(
-        max_times=max_times,
+        coverage=coverage,
         roster_ids=roster_ids,
         now=datetime.now(timezone.utc),
         threshold=_POWER_DATA_STALENESS_THRESHOLD,

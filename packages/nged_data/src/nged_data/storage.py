@@ -191,61 +191,67 @@ def download_and_parse_files(
     return TimeSeriesMetadata.validate(metadata_df), PowerTimeSeries.validate(time_series_df)
 
 
-class _MaxTimePerTimeSeriesId(pt.Model):
+class TimeSeriesCoverage(pt.Model):
+    """Per-series observation-time span of the ``power_time_series`` Delta table.
+
+    ``first_time``/``last_time`` are the earliest/latest observation ``time`` for each
+    ``time_series_id``. A transient intermediate (never persisted): the freshness asset check
+    reads ``last_time`` to detect staleness, ``select_new_rows`` reads ``last_time`` to find
+    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.
+    """
+
     time_series_id: int = _get_time_series_id_dtype(unique=True)
-    max_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
+    first_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
+    last_time: int = pt.Field(dtype=PowerTimeSeries.dtypes["time"])
 
 
-def latest_time_per_time_series_id(
+def time_series_coverage(
     delta_path: str,
     storage_options: ObjectStoreOptions | None = None,
-) -> pt.DataFrame[_MaxTimePerTimeSeriesId]:
-    """Return the most recent ``time`` on disk per ``time_series_id``.
+) -> pt.DataFrame[TimeSeriesCoverage]:
+    """Return the earliest/latest observation ``time`` on disk per ``time_series_id``.
 
     Returns an empty (but correctly typed) frame if the Delta table does not exist yet.
-    ``max(time)`` grouped by ``time_series_id`` is a value aggregation, so it is safe from the
-    Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).
+    ``min``/``max`` grouped by ``time_series_id`` are value aggregations, so they are safe from
+    the Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).
 
     Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
-    the ``power`` column, but a group-wise ``max`` cannot be answered from Parquet row-group
-    statistics (no engine on our stack does aggregate-from-statistics), so every
-    ``time``/``time_series_id`` value is read. The ``collect`` uses the streaming engine to keep
-    peak memory bounded — this runs hourly on a small control-plane VM. Measured on a synthetic
-    V2 table (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history
-    (43.8M rows): streaming ~0.34 s / ~180 MB peak, versus ~0.5 s / ~1.3 GB peak for the
-    in-memory engine — same result, ~7x less memory. Cost scales linearly with accumulated
-    history. If the scan ever becomes a problem, the per-series ``max(time)`` can instead be read
-    from the Delta add-action ``max.time`` file statistics — metadata-only, O(files): ~0.02 s /
-    <100 MB at the same scale — the same Delta-log-metadata trick used to count whole-table rows
-    without scanning.
+    the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet
+    row-group statistics (no engine on our stack does aggregate-from-statistics), so every
+    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20%
+    more wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the
+    streaming engine to keep peak memory bounded — the freshness check runs hourly on a small
+    control-plane VM. Measured on a synthetic V2 table (2,500 series, half-hourly, partitioned
+    by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190 MB peak,
+    versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost scales
+    linearly with accumulated history. If the scan ever becomes a problem, both bounds can
+    instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —
+    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata
+    trick used to count whole-table rows without scanning.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
     """
     if not delta_table_exists(delta_path, storage_options):
-        log.info(f"{delta_path=} does not exist yet; returning an empty max-times frame.")
+        log.info(f"{delta_path=} does not exist yet; returning an empty coverage frame.")
         empty = pl.DataFrame(
-            schema={
-                "time_series_id": _MaxTimePerTimeSeriesId.dtypes["time_series_id"],
-                "max_time": _MaxTimePerTimeSeriesId.dtypes["max_time"],
-            }
+            schema={name: TimeSeriesCoverage.dtypes[name] for name in TimeSeriesCoverage.columns}
         )
-        return pt.DataFrame(empty).set_model(_MaxTimePerTimeSeriesId).validate()
+        return pt.DataFrame(empty).set_model(TimeSeriesCoverage).validate()
 
-    max_times = (
+    coverage = (
         pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
         .group_by("time_series_id")
-        .agg(max_time=pl.max("time"))
+        .agg(first_time=pl.min("time"), last_time=pl.max("time"))
         # Streaming engine: bounds peak memory (~7x lower than in-memory at V2 scale) so the
         # hourly full-table aggregate stays comfortable on a small control-plane VM. See docstring.
         .collect(engine="streaming")
     )
     log.info(
-        f"Found the most recent data we have on disk for {max_times.height} time_series_ids from {delta_path}."
-        f" {max_times['max_time'].min()=}."
-        f" {max_times['max_time'].max()=}"
+        f"Found on-disk coverage for {coverage.height} time_series_ids from {delta_path}."
+        f" {coverage['last_time'].min()=}. {coverage['last_time'].max()=}"
     )
-    return pt.DataFrame(max_times).set_model(_MaxTimePerTimeSeriesId).validate()
+    return pt.DataFrame(coverage).set_model(TimeSeriesCoverage).validate()
 
 
 # This overload tells type checkers that if you pass a `pt.DataFrame[PowerTimeSeries]` into
@@ -286,7 +292,7 @@ def select_new_rows(
         return time_series
 
     # Scan the existing delta table for the most recent time per time_series_id.
-    max_times = latest_time_per_time_series_id(delta_path, storage_options)
+    coverage = time_series_coverage(delta_path, storage_options)
 
     # Check whether `time_series` is a `PowerTimeSeries` or a `_ProcessedFileListing`
     if "time" in time_series.columns:
@@ -303,14 +309,17 @@ def select_new_rows(
             f" not {time_series.columns=}"
         )
 
-    # Strip the Patito model from `max_times` so Polars' cross-subclass join check accepts it.
-    plain_max_times = pl.LazyFrame._from_pyldf(max_times.lazy()._ldf)
+    # Strip the Patito model from `coverage` so Polars' cross-subclass join check accepts it, and
+    # keep only `last_time` (the most recent time on disk per series) for the new-row filter.
+    plain_last_times = pl.LazyFrame._from_pyldf(coverage.lazy()._ldf).select(
+        "time_series_id", "last_time"
+    )
     filtered_df = (
         time_series.lazy()
-        .join(plain_max_times, on="time_series_id", how="left")
-        # If max_time is null for this time_series_id then this is a new time_series_id.
-        .filter(pl.col("max_time").is_null() | (pl.col(time_col) > pl.col("max_time")))
-        .drop("max_time")
+        .join(plain_last_times, on="time_series_id", how="left")
+        # If last_time is null for this time_series_id then this is a new time_series_id.
+        .filter(pl.col("last_time").is_null() | (pl.col(time_col) > pl.col("last_time")))
+        .drop("last_time")
         .sort(by=columns_to_sort_by)
         .collect()
     )

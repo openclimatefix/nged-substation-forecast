@@ -25,12 +25,16 @@ _NOW = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
 _THRESHOLD = timedelta(hours=24)
 
 
-def _max_times(rows: dict[int, datetime]) -> pl.DataFrame:
-    """Build a max-times frame (``time_series_id``, ``max_time``) like the Delta scan returns."""
+def _coverage(rows: dict[int, datetime]) -> pl.DataFrame:
+    """Build a coverage frame (``time_series_id``, ``first_time``, ``last_time``) like the Delta
+    scan returns. ``rows`` maps id -> last_time; first_time is irrelevant to freshness, so it is
+    set a day earlier just to populate the column realistically."""
+    last = pl.Series("last_time", list(rows.values())).cast(UTC_DATETIME_DTYPE)
     return pl.DataFrame(
         {
             "time_series_id": pl.Series(list(rows.keys()), dtype=pl.Int32),
-            "max_time": pl.Series(list(rows.values())).cast(UTC_DATETIME_DTYPE),
+            "first_time": last.dt.offset_by("-1d"),
+            "last_time": last,
         }
     )
 
@@ -40,8 +44,8 @@ def _roster(ids: list[int]) -> pl.Series:
 
 
 def test_all_fresh_is_healthy() -> None:
-    max_times = _max_times({1: _NOW - timedelta(hours=1), 2: _NOW - timedelta(hours=23)})
-    result = evaluate_power_freshness(max_times, _roster([1, 2]), _NOW, _THRESHOLD)
+    coverage = _coverage({1: _NOW - timedelta(hours=1), 2: _NOW - timedelta(hours=23)})
+    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
     assert result.is_healthy
     assert result.n_late == 0
     assert result.n_series_total == 2
@@ -49,14 +53,14 @@ def test_all_fresh_is_healthy() -> None:
 
 
 def test_stale_series_flagged_most_stale_first() -> None:
-    max_times = _max_times(
+    coverage = _coverage(
         {
             1: _NOW - timedelta(hours=1),  # fresh
             2: _NOW - timedelta(hours=30),  # stale
             3: _NOW - timedelta(hours=72),  # more stale
         }
     )
-    result = evaluate_power_freshness(max_times, _roster([1, 2, 3]), _NOW, _THRESHOLD)
+    result = evaluate_power_freshness(coverage, _roster([1, 2, 3]), _NOW, _THRESHOLD)
     assert not result.is_healthy
     assert result.n_stale == 2
     assert result.n_never == 0
@@ -69,8 +73,8 @@ def test_stale_series_flagged_most_stale_first() -> None:
 
 def test_never_reported_ids_flagged_from_roster() -> None:
     """A roster id with no rows in the Delta table counts as late with a null ``last_seen``."""
-    max_times = _max_times({1: _NOW - timedelta(hours=1)})
-    result = evaluate_power_freshness(max_times, _roster([1, 2, 3]), _NOW, _THRESHOLD)
+    coverage = _coverage({1: _NOW - timedelta(hours=1)})
+    result = evaluate_power_freshness(coverage, _roster([1, 2, 3]), _NOW, _THRESHOLD)
     assert not result.is_healthy
     assert result.n_stale == 0
     assert result.n_never == 2
@@ -82,31 +86,31 @@ def test_never_reported_ids_flagged_from_roster() -> None:
 
 
 def test_never_reported_sorts_before_stale() -> None:
-    max_times = _max_times({1: _NOW - timedelta(hours=48)})  # stale
-    result = evaluate_power_freshness(max_times, _roster([1, 2]), _NOW, _THRESHOLD)
+    coverage = _coverage({1: _NOW - timedelta(hours=48)})  # stale
+    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
     assert result.late["status"].to_list() == ["never", "stale"]
     assert result.late["time_series_id"].to_list() == [2, 1]
 
 
 def test_no_roster_cannot_detect_never_reported() -> None:
     """With no roster, only stale series are detectable; total is the on-disk id count."""
-    max_times = _max_times({1: _NOW - timedelta(hours=48)})
-    result = evaluate_power_freshness(max_times, None, _NOW, _THRESHOLD)
+    coverage = _coverage({1: _NOW - timedelta(hours=48)})
+    result = evaluate_power_freshness(coverage, None, _NOW, _THRESHOLD)
     assert result.n_never == 0
     assert result.n_stale == 1
     assert result.n_series_total == 1
 
 
 def test_empty_table_with_roster_is_all_never() -> None:
-    max_times = _max_times({})
-    result = evaluate_power_freshness(max_times, _roster([1, 2]), _NOW, _THRESHOLD)
+    coverage = _coverage({})
+    result = evaluate_power_freshness(coverage, _roster([1, 2]), _NOW, _THRESHOLD)
     assert result.n_never == 2
     assert result.n_series_total == 2
     assert not result.is_healthy
 
 
 def test_result_threshold_hours_reflects_threshold() -> None:
-    result = evaluate_power_freshness(_max_times({}), None, _NOW, timedelta(hours=8))
+    result = evaluate_power_freshness(_coverage({}), None, _NOW, timedelta(hours=8))
     assert isinstance(result, PowerFreshnessResult)
     assert result.threshold_hours == 8.0
 
