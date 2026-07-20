@@ -98,6 +98,7 @@ def test_scattered_deaccumulated_null_beyond_lead0_is_tolerated(deaccumulated_va
     report = assess_nwp_quality(validated)
     assert not report.is_healthy
     assert report.n_null_cells == 1
+    assert report.n_affected_slices == 1
     assert report.affected_variables == (deaccumulated_var,)
 
 

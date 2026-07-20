@@ -276,14 +276,28 @@ def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
         description=description,
         metadata={
             "n_scattered_null_cells": report.n_null_cells,
+            "n_affected_slices": report.n_affected_slices,
             "affected_variables": list(report.affected_variables),
             "affected_slices": _nwp_null_slices_metadata(report.scattered),
         },
     )
 
 
+_NWP_NULL_SLICES_TABLE_LIMIT: Final[int] = 100
+"""Cap on rows rendered in the affected-slices metadata table.
+
+A broadly-corrupt upstream run could touch thousands of (variable, member, valid_time) slices;
+the exact totals live in the scalar metadata, so the table only needs the worst offenders to be
+useful — bounding it keeps the Dagster event log from bloating on a bad day."""
+
+
 def _nwp_null_slices_metadata(scattered: pl.DataFrame) -> TableMetadataValue:
-    """Render the affected (variable, member, valid_time) slices as a Dagster metadata table."""
+    """Render the worst affected (variable, member, valid_time) slices as a Dagster metadata table.
+
+    Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows (most-null first); the full counts are in the
+    scalar metadata alongside.
+    """
+    top = scattered.sort("n_null", descending=True).head(_NWP_NULL_SLICES_TABLE_LIMIT)
     records = [
         TableRecord(
             {
@@ -294,7 +308,7 @@ def _nwp_null_slices_metadata(scattered: pl.DataFrame) -> TableMetadataValue:
                 "n_total_cells": row["n_total"],
             }
         )
-        for row in scattered.iter_rows(named=True)
+        for row in top.iter_rows(named=True)
     ]
     return MetadataValue.table(records, schema=_NWP_NULL_SLICES_SCHEMA)
 

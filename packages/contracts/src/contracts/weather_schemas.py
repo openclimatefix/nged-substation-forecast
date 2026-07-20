@@ -267,7 +267,8 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
-        """Validate the given dataframe, ensuring no nulls from second step onwards and uniqueness."""
+        """Validate the frame: rejecting whole-slice nulls in de-accumulated variables (scattered
+        nulls are tolerated), enforcing uniqueness, and the ptype-introduction invariant."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -293,6 +294,10 @@ class Nwp(pt.Model):
         structural outage), which should fail ingest. :func:`assess_nwp_quality` reports the
         tolerated scatter as a non-fatal check. See
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+
+        This relies on a slice having many grid cells (the production GB grid has ~1671), so that
+        scatter (a few null cells) is cleanly distinct from a whole-slice gap (all cells null). On a
+        degenerate one-cell slice the two are indistinguishable, but that does not arise in practice.
         """
         whole_null = _deaccumulated_null_breakdown(dataframe).filter(
             pl.col("n_null") == pl.col("n_total")
@@ -301,8 +306,8 @@ class Nwp(pt.Model):
             offenders = whole_null.select("variable", "ensemble_member", "valid_time").rows()
             raise ValueError(
                 "Whole-slice null in a de-accumulated NWP variable beyond lead-0 — a wholesale "
-                "missing field, not tolerable scattered corruption. Offending "
-                f"(variable, ensemble_member, valid_time): {offenders[:10]}"
+                f"missing field, not tolerable scattered corruption. {whole_null.height} offending "
+                f"(variable, ensemble_member, valid_time) slice(s), first 10: {offenders[:10]}"
             )
 
     @classmethod
@@ -387,22 +392,24 @@ class Nwp(pt.Model):
 
 
 def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
-    """Per (variable, ensemble_member, valid_time) beyond lead-0: null- and total-cell counts.
+    """Per (variable, init_time, ensemble_member, valid_time) beyond lead-0: null-/total-cell counts.
 
     Returns only slices that have at least one null. Shared by the fatal whole-slice check and the
-    non-fatal :func:`assess_nwp_quality`, so both agree on what a "null" is. Operates on a single
-    NWP run (~1M rows), far below Polars' 2**32 row-count ceiling, so the counts are exact.
+    non-fatal :func:`assess_nwp_quality`, so both agree on what a "null" is. ``init_time`` is in the
+    group key so the counts stay correct even on a multi-run frame (each grid cell is one row, so
+    ``n_total`` is the slice's cell count). Operates on a single NWP run in practice (~1M rows), far
+    below Polars' 2**32 row-count ceiling, so the counts are exact.
     """
     deaccumulated = sorted(Nwp.deaccumulated_var_names)
     beyond_lead0 = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
     return (
         beyond_lead0.unpivot(
             on=deaccumulated,
-            index=["ensemble_member", "valid_time"],
+            index=["init_time", "ensemble_member", "valid_time"],
             variable_name="variable",
             value_name="value",
         )
-        .group_by("variable", "ensemble_member", "valid_time")
+        .group_by("variable", "init_time", "ensemble_member", "valid_time")
         .agg(n_null=pl.col("value").is_null().sum(), n_total=pl.len())
         .filter(pl.col("n_null") > 0)
     )
@@ -417,15 +424,19 @@ class NwpQualityReport:
     :meth:`Nwp.validate` before this runs, so a validated frame only ever has scatter here.
     """
 
-    init_time: datetime | None
     scattered: pl.DataFrame
-    """One row per affected (variable, ensemble_member, valid_time) slice, with ``n_null`` and
-    ``n_total`` cell counts. Empty when the run is clean."""
+    """One row per affected (variable, init_time, ensemble_member, valid_time) slice, with
+    ``n_null`` and ``n_total`` cell counts. Empty when the run is clean."""
 
     @property
     def n_null_cells(self) -> int:
         """Total scattered null cells across all affected slices."""
         return int(self.scattered["n_null"].sum()) if self.scattered.height else 0
+
+    @property
+    def n_affected_slices(self) -> int:
+        """Number of (variable, member, valid_time) slices carrying at least one scattered null."""
+        return self.scattered.height
 
     @property
     def is_healthy(self) -> bool:
@@ -452,5 +463,4 @@ def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
     scattered = _deaccumulated_null_breakdown(dataframe).filter(
         pl.col("n_null") < pl.col("n_total")
     )
-    init_time = dataframe["init_time"][0] if dataframe.height else None
-    return NwpQualityReport(init_time=init_time, scattered=scattered)
+    return NwpQualityReport(scattered=scattered)
