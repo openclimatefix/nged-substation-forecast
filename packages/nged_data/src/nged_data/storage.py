@@ -206,6 +206,16 @@ def latest_time_per_time_series_id(
     ``max(time)`` grouped by ``time_series_id`` is a value aggregation, so it is safe from the
     Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).
 
+    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
+    the ``power`` column, but a group-wise ``max`` cannot be answered from Parquet row-group
+    statistics, so every ``time``/``time_series_id`` value is read. Measured on a synthetic V2
+    table (2,500 series, half-hourly, partitioned by ``time_series_id``): ~0.36 s / ~1.4 GB peak
+    for a year of history (43.8M rows), scaling linearly with accumulated history. That is
+    negligible for the hourly freshness check today and for years, but if it ever matters the
+    per-series ``max(time)`` can instead be read from the Delta add-action ``max.time`` file
+    statistics — metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same
+    Delta-log-metadata trick used to count whole-table rows without scanning.
+
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
     """

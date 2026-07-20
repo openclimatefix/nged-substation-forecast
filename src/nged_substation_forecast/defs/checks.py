@@ -13,9 +13,9 @@ would miss exactly the failure this check exists to catch.
 
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
 and it is the hand-off point for the future Sentry missed-check-in alarm
-(`#63 <https://github.com/openclimatefix/nged-substation-forecast/issues/63>`_): that alarm,
-when it lands, consumes the same ``PowerFreshnessResult``. The two stay complementary — the
-Sentry alarm fires on total silence from outside the deployment, this check reports per-series
+([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): that alarm, when
+it lands, consumes the same ``PowerFreshnessResult``. The two stay complementary — the Sentry
+alarm fires on total silence from outside the deployment, this check reports per-series
 staleness from inside Dagster.
 """
 
@@ -49,6 +49,10 @@ _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
     ]
 )
 """Fixed schema for the late-series metadata table (required so an empty table still renders)."""
+
+_LATE_STATUS_ORDER: Final[tuple[str, ...]] = ("never", "stale")
+"""Runtime tuple — declared order for the ``status`` column's ``pl.Enum``, which is also the
+row order in the late-series table (never-reported series listed before merely-stale ones)."""
 
 _POWER_DATA_STALENESS_THRESHOLD: Final[timedelta] = timedelta(hours=24)
 """A ``time_series_id`` is 'late' if its most recent observation is older than this.
@@ -110,14 +114,22 @@ def evaluate_power_freshness(
     # Strip any Patito model so the frame-building below uses plain Polars semantics.
     max_times = pl.DataFrame._from_pydf(max_times._df)
     last_seen_dtype = max_times.schema["max_time"]
+    status_dtype = pl.Enum(_LATE_STATUS_ORDER)
     cutoff = now - threshold
 
     # Stale: has data on disk, but the newest observation predates the cutoff.
+    #
+    # NOTE: this is deliberately not restricted to `roster_ids`. A series that NGED has
+    # decommissioned (dropped from the metadata roster) but that still has old rows on disk will
+    # keep being flagged stale — which is what we want for now: we would rather be told about a
+    # series that has gone quiet than silently stop watching it. If a permanently-yellow check
+    # for a genuinely retired series becomes a nuisance, intersect the stale ids with
+    # `roster_ids` here (when a roster is available) so only currently-expected series count.
     stale = max_times.filter(pl.col("max_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("max_time"),
         hours_late=(pl.lit(now) - pl.col("max_time")).dt.total_seconds() / 3600.0,
-        status=pl.lit("stale", dtype=pl.String),
+        status=pl.lit("stale", dtype=status_dtype),
     )
 
     # Never reported: in the roster, but with no rows in the Delta table at all.
@@ -129,10 +141,12 @@ def evaluate_power_freshness(
         "time_series_id",
         last_seen=pl.lit(None, dtype=last_seen_dtype),
         hours_late=pl.lit(None, dtype=pl.Float64),
-        status=pl.lit("never", dtype=pl.String),
+        status=pl.lit("never", dtype=status_dtype),
     )
 
-    # Never-reported first, then most-stale first (status "never" sorts before "stale").
+    # Never-reported first, then most-stale first. `status` is an ordered `pl.Enum` (never before
+    # stale by declared order), so the ordering does not rely on the alphabetical accident that
+    # "never" < "stale"; never-rows have a null `hours_late` but the status key keeps them ahead.
     late = pl.concat([never, stale]).sort(["status", "hours_late"], descending=[False, True])
 
     if roster_ids is not None:
@@ -155,7 +169,11 @@ def _read_roster_ids(
     """Return the expected ``time_series_id``s from the metadata roster, or ``None`` if absent."""
     if not object_exists(metadata_path, storage_options):
         return None
-    roster = pl.read_parquet(metadata_path, storage_options=typeddict_to_dict(storage_options))
+    roster = (
+        pl.scan_parquet(metadata_path, storage_options=typeddict_to_dict(storage_options))
+        .select("time_series_id")
+        .collect()
+    )
     return roster["time_series_id"]
 
 
