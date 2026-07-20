@@ -48,13 +48,13 @@ def select_analysis_proxy(
     ``pl.LazyFrame`` in / ``pl.LazyFrame`` out, so it composes with both ``pl.scan_delta`` (the
     dashboard, keyed by ``h3_index``) and in-memory post-spatial-join frames (the pipeline, keyed
     by ``time_series_id``). The pushdownable filters (``member``, ``max_lead``, ``available_at``)
-    are applied *before* the freshest-run window reduction so a Delta scan's partition pruning and
+    are applied *before* the freshest-run reduction so a Delta scan's partition pruning and
     row-group skipping survive — confirm with ``.explain()`` when wiring a new scan through it.
 
-    The one-row-per-group guarantee relies on ``(group_key, init_time_col, valid_time)`` being
-    unique once ``member`` is fixed (true for the raw NWP table and for the upsampled pipeline
-    frame). If a caller passes a frame where it is not, the window reduction fans out to every row
-    tied at the maximum ``init_time`` rather than collapsing to one.
+    The ``group_by(...).agg(...)`` reduction always collapses to exactly one row per
+    ``(group_key, valid_time)`` — so the result never fans out even if two rows tie at the freshest
+    ``init_time`` (e.g. a second ``nwp_model_id`` covering the same cell). Such a tie is broken
+    arbitrarily; today the ``Nwp`` table holds a single model, so no tie arises.
 
     Args:
         nwp: NWP rows carrying at least ``ensemble_member``, ``valid_time``, ``init_time_col`` and
@@ -75,15 +75,12 @@ def select_analysis_proxy(
     Returns:
         The analysis-proxy rows, one per ``(group_key, valid_time)``, without ``ensemble_member``.
     """
-    lf = nwp.filter(pl.col("ensemble_member") == member)
+    lf = nwp.filter(pl.col("ensemble_member") == member).drop("ensemble_member")
     if max_lead is not None:
         lf = lf.filter(pl.col("valid_time") < pl.col(init_time_col) + max_lead)
     if available_at is not None:
         lf = lf.filter(pl.col(init_time_col) + publication_delay <= available_at)
-    # Freshest run wins per (location, valid_time): the latest init_time, equivalently the shortest
-    # lead. Kept as a window filter (not a group_by/agg) so every non-key column rides through
-    # untouched; see the docstring for the uniqueness invariant this relies on.
-    freshest = lf.filter(
-        pl.col(init_time_col) == pl.col(init_time_col).max().over([group_key, "valid_time"])
-    )
-    return freshest.drop("ensemble_member")
+    # Freshest run wins per (location, valid_time): take every column from the row with the latest
+    # init_time (equivalently the shortest lead). group_by(...).agg(...) guarantees exactly one row
+    # per group, so the result never fans out on a tie — see the docstring.
+    return lf.group_by([group_key, "valid_time"]).agg(pl.all().sort_by(init_time_col).last())

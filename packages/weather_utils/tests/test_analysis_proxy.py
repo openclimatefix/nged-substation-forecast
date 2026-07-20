@@ -4,7 +4,7 @@ Mirrors the leakage-test style of ``ml_core``'s ``_nullify_leaky_lags`` tests: s
 frames whose expected freshest-run / availability behaviour is obvious by inspection.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 
@@ -143,3 +143,34 @@ def test_matches_the_group_by_agg_freshest_selection() -> None:
     )
     new = select_analysis_proxy(lf, group_key="group").sort(["group", "valid_time"]).collect()
     assert new.select(sorted(new.columns)).equals(old.select(sorted(old.columns)))
+
+
+def test_collapses_to_one_row_when_two_runs_tie_at_the_freshest_init_time() -> None:
+    # Two rows share the same (group, valid_time) AND the same (freshest) init_time — as would
+    # happen if a second nwp_model_id ever covered the same cell. The reduction must still yield
+    # exactly one row rather than fanning out (which would silently double downstream feature rows).
+    valid = BASE + timedelta(hours=6)
+    lf = _nwp(
+        [
+            {**_row(1, BASE, valid, 0, 10.0), "nwp_model_id": "model_a"},
+            {**_row(1, BASE, valid, 0, 20.0), "nwp_model_id": "model_b"},
+        ]
+    )
+    result = select_analysis_proxy(lf, group_key="group").collect()
+    assert result.height == 1
+
+
+def test_available_at_works_with_tz_aware_datetimes() -> None:
+    # The real NWP columns are tz-aware UTC; the leakage cut must work against that dtype, not just
+    # the tz-naive datetimes the other tests use.
+    base = datetime(2026, 1, 1, tzinfo=UTC)
+    valid = base + timedelta(hours=48)
+    lf = _nwp(
+        [
+            _row(1, base, valid, 0, 10.0),  # published at base + delay
+            _row(1, base + timedelta(hours=24), valid, 0, 11.0),  # not yet available
+        ]
+    )
+    available_at = base + timedelta(hours=24)
+    result = select_analysis_proxy(lf, group_key="group", available_at=available_at).collect()
+    assert result["temperature_2m"].to_list() == [10.0]
