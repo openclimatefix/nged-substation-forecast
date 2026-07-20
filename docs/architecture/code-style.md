@@ -10,7 +10,7 @@
 - **Small functions**: Prefer small function bodies that do one, well-defined thing.
 - **Minimalism**: Re-use existing tools (Polars, Xarray, Dagster) instead of reinventing logic.
 - **Comments**: Do not remove existing comments unless they are misleading or out of date. Only add new comments if you're doing something that isn't obvious from the code. Write self-documenting code, and assume the reader is fluent in Python.
-- **Tests**: Unit tests should each be a short, simple function. For each function in the main code, there should be at least one test function that tests the "happy path", and one test function for each of the main "unhappy" paths. Never relax an existing test just to get it to pass!
+- **Tests**: Unit tests should each be a short, simple function. For each function in the main code, there should be at least one test function that tests the "happy path", and one test function for each of the main "unhappy" paths. Never relax an existing test just to get it to pass! See the [Testing](#testing) section below for where tests live, how they are wired, mocking, and the assertion house style.
 
 ## Formatting & Linting (Ruff)
 
@@ -43,3 +43,63 @@
 - Use specific exceptions.
 - Leverage Sentry for observability in production-like code.
 - Validate data at boundaries using data contracts.
+
+## Testing
+
+Conventions for where tests live, how they are wired up, and the house style for assertions. Two
+testing *gotchas* are documented alongside the other gotchas in CLAUDE.md rather than here: the
+moto S3 backend being process-global (reset it per test), and Polars row counts wrapping past
+2³² rows.
+
+### Where tests and their dependencies live
+
+- **Test tooling is declared once, at the workspace root.** `pytest`, `moto`, and `numpy` live in
+  the root `pyproject.toml` `[dependency-groups] dev`, and every workspace package inherits them.
+  A package that gains a `tests/` directory does **not** re-declare `pytest` in its own
+  `pyproject.toml` — we run the whole suite from the repo root with `uv run pytest`, against the
+  root environment. (`packages/geo` declares its own `pytest`/`pytest-cov`; treat that as a
+  historical exception, not the pattern to copy.)
+- **Discovery is automatic.** The only pytest configuration is the root
+  `[tool.pytest.ini_options]` block; there is no `testpaths` setting, so pytest collects both the
+  top-level `tests/` directory and every `packages/*/tests/` directory. A brand-new
+  `packages/<pkg>/tests/` directory is picked up with no configuration change.
+- **`--import-mode=importlib` is set deliberately** so that identically-named test modules in
+  different packages (for example, two `test_storage.py` files) do not collide during collection.
+  Because of this, test directories do not need `__init__.py` files.
+- **Test data files go in a `tests/data/` subdirectory** and are loaded relative to the test
+  module with `Path(__file__).parent / "data" / filename`. `packages/nged_data/tests/` is the
+  canonical example (it also keeps a small script documenting how the fixtures were trimmed down).
+
+### Fixtures and mocking
+
+- **Define fixtures inline in the test module by default.** When a fixture — or a fixture factory
+  — is shared across more than one test module *within a single package*, put it in a
+  package-level `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example:
+  it builds synthetic Xarray datasets that two test modules share. Keep such a conftest scoped to
+  its own package; there is no repo-wide conftest.
+- **Mock with pytest's `monkeypatch` fixture, not `unittest.mock`.** Patch environment variables
+  (`monkeypatch.setenv`), object attributes, and module-level functions
+  (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
+  drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
+  canonical pattern.
+
+### Assertion style for Patito frames
+
+Build a frame, attach the model, cast, and validate for the happy path:
+
+```python
+df = pt.DataFrame({...}).set_model(MySchema).cast()
+df.validate()                       # happy path: raises nothing
+MySchema.validate(existing_df)      # or validate a frame produced elsewhere
+```
+
+For the unhappy path, assert that validation raises:
+
+```python
+from patito.exceptions import DataFrameValidationError
+
+with pytest.raises(DataFrameValidationError):
+    bad_df.cast().validate()
+```
+
+`packages/contracts/tests/test_geo_schemas.py` is the shortest end-to-end example.

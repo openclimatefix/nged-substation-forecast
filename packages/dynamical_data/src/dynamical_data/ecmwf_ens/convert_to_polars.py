@@ -61,11 +61,11 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     return Nwp.validate(df)
 
 
-def _calc_wind_speed(height=Literal["10m", "100m"]) -> pl.Expr:
+def _calc_wind_speed(height: Literal["10m", "100m"]) -> pl.Expr:
     return (pl.col(f"wind_u_{height}") ** 2 + pl.col(f"wind_v_{height}") ** 2).sqrt()
 
 
-def _calc_wind_direction(height=Literal["10m", "100m"]) -> pl.Expr:
+def _calc_wind_direction(height: Literal["10m", "100m"]) -> pl.Expr:
     """Compute Wind Direction (Meteorological Convention)."""
     RAD_TO_DEG = 180 / np.pi
     # The arctan2 order: In standard math, it's often atan2(y, x). In Polars, pl.arctan2("y", "x")
