@@ -94,9 +94,15 @@ def test_convert_derives_wind_speed(
 
 @pytest.mark.parametrize(
     "wind_u, wind_v, expected_direction",
+    # Meteorological "direction from"; formula is (arctan2(u, v) * 180/pi + 180) % 360. All four
+    # quadrants plus a non-axis-aligned bearing; values kept clear of the 0/360 wrap boundary so
+    # float rounding can't flip 359.99 <-> 0.
     [
-        (0.0, 1.0, 180.0),  # (arctan2(0, 1) * 180/pi + 180) % 360
-        (1.0, 0.0, 270.0),  # (arctan2(1, 0) * 180/pi + 180) % 360
+        (0.0, 1.0, 180.0),  # from the south
+        (1.0, 0.0, 270.0),  # from the west
+        (-1.0, 0.0, 90.0),  # from the east
+        (1.0, 1.0, 225.0),  # from the south-west
+        (-1.0, -1.0, 45.0),  # from the north-east
     ],
 )
 def test_convert_derives_wind_direction(
@@ -106,16 +112,24 @@ def test_convert_derives_wind_direction(
     wind_v: float,
     expected_direction: float,
 ) -> None:
+    # Inject identical components at both heights so the 100 m derivation is checked too, not just
+    # its column presence.
     ds = make_ens_dataset(
         latitudes=(52.0,),
         longitudes=(-1.0,),
         lead_time_hours=(0,),
         ensemble_members=(0,),
-        var_values={"wind_u_10m": wind_u, "wind_v_10m": wind_v},
+        var_values={
+            "wind_u_10m": wind_u,
+            "wind_v_10m": wind_v,
+            "wind_u_100m": wind_u,
+            "wind_v_100m": wind_v,
+        },
     )
     df = convert(ds=ds, h3_grid=_single_cell_grid(make_h3_grid))
 
     assert df["wind_direction_10m"].item() == pytest.approx(expected_direction)
+    assert df["wind_direction_100m"].item() == pytest.approx(expected_direction)
 
 
 def test_convert_proportion_weighted_aggregation(
@@ -144,6 +158,37 @@ def test_convert_proportion_weighted_aggregation(
     assert df["temperature_2m"].item() == pytest.approx(0.75 * 10.0 + 0.25 * 20.0)
 
 
+def test_convert_maps_each_grid_point_to_its_own_lat_lon(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    # A 2x2 grid with a distinct value at every corner, each corner isolated into its own H3 cell.
+    # This pins the meshgrid orientation (indexing="ij") that pairs each raveled data value with the
+    # right (lat, lon): a lat/lon transpose swaps the two off-diagonal corners (20 <-> 30) and this
+    # assertion catches it. Every other value test uses a single latitude and cannot see it.
+    ds = make_ens_dataset(
+        latitudes=(52.0, 51.75),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(0,),
+        ensemble_members=(0,),
+        var_values={
+            "temperature_2m": np.array([[10.0, 20.0], [30.0, 40.0]], dtype=np.float32),
+        },
+    )
+    # Four single-point cells: (lat, lon) -> expected temperature.
+    h3 = make_h3_grid(
+        h3_index=[1, 2, 3, 4],
+        nwp_lat=[52.0, 52.0, 51.75, 51.75],
+        nwp_lon=[-1.0, -0.75, -1.0, -0.75],
+        proportion=[1.0, 1.0, 1.0, 1.0],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    temps = dict(zip(df["h3_index"].to_list(), df["temperature_2m"].to_list(), strict=True))
+    assert temps == {1: 10.0, 2: 20.0, 3: 30.0, 4: 40.0}
+
+
 def test_convert_preserves_nulls_after_aggregation(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
@@ -166,26 +211,33 @@ def test_convert_categorical_precipitation_type(
     make_ens_dataset: Callable[..., xr.Dataset],
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
 ) -> None:
+    # One H3 cell fed by five grid points whose categories are [null, 1, 2, 2, 3]. The aggregation
+    # (mode().first(ignore_nulls=True)) must return the dominant category 2 — which is neither the
+    # min (1), the max (3), nor a value the null could corrupt. A NaN input becomes a null category
+    # that must be ignored, not counted or forbidden by validation.
     ds = make_ens_dataset(
         latitudes=(52.0,),
-        longitudes=(-1.0, -0.75),
+        longitudes=(-1.0, -0.75, -0.5, -0.25, 0.0),
         lead_time_hours=(0,),
         ensemble_members=(0,),
         var_values={
-            "categorical_precipitation_type_surface": np.array([[1.0, 1.0]], dtype=np.float32)
+            "categorical_precipitation_type_surface": np.array(
+                [[float("nan"), 1.0, 2.0, 2.0, 3.0]], dtype=np.float32
+            )
         },
     )
     h3 = make_h3_grid(
-        h3_index=[10, 10],
-        nwp_lat=[52.0, 52.0],
-        nwp_lon=[-1.0, -0.75],
-        proportion=[0.5, 0.5],
+        h3_index=[10, 10, 10, 10, 10],
+        nwp_lat=[52.0, 52.0, 52.0, 52.0, 52.0],
+        nwp_lon=[-1.0, -0.75, -0.5, -0.25, 0.0],
+        proportion=[0.2, 0.2, 0.2, 0.2, 0.2],
     )
 
     df = convert(ds=ds, h3_grid=h3)
 
+    assert df.height == 1
     assert df["categorical_precipitation_type_surface"].dtype == pl.UInt8
-    assert df["categorical_precipitation_type_surface"].item() == 1
+    assert df["categorical_precipitation_type_surface"].item() == 2
 
 
 def test_full_pipeline_open_download_convert(
