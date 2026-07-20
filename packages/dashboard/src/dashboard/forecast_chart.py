@@ -100,20 +100,21 @@ Exactly the *continuous* ``Nwp`` variables (a test guards against drift):
 which a line chart would render as meaningless slopes.
 """
 
-NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=24)
+NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=27)
 """How much of each NWP run's start feeds the stitched proxy-analysis line.
 
 We hold no weather observations, so the closest available proxy for the *true* weather over
-historical times is each run's shortest-lead forecasts: the first day of every run across the
-window, stitched into one line. 24 hours matches the daily-00Z run cadence, so consecutive
-chunks tile into a continuous line with no gaps and no overlaps.
-"""
+historical times is each run's shortest-lead forecasts: the first ~day of every run across the
+window, stitched into one line. The daily-00Z run cadence is 24 hours; we take 27 hours so each
+run overlaps the next by 3 hours (one NWP step). The overlap is deliberate: accumulated variables
+(precipitation, radiation) are null at lead 0, so at each 24 h stitch boundary the incoming run's
+first value is missing — the 3 h overlap lets ``select_analysis_proxy``'s per-column null-fill draw
+that value from the outgoing run's lead-24 instead of leaving a gap.
 
-NWP_ANALYSIS_MEMBER: Final[int] = 0
-"""The ensemble member the proxy-analysis line uses.
-
-Member 0 of ECMWF ENS is the control run — the unperturbed forecast started from the analysis
-itself — so its shortest leads are the closest thing to the analysis that the ensemble holds.
+The proxy-analysis line uses the control member (member 0) — ``view_forecasts.py`` obtains it via
+``weather_utils.select_analysis_proxy``, which reduces the overlapping runs to one freshest-non-null
+row per valid time, so the frame reaching ``build_nwp_ensemble_chart`` is already a single stitched
+line.
 """
 
 
@@ -478,12 +479,12 @@ def build_nwp_ensemble_chart(
         nwp_init_time: When the plotted NWP run was initialised (tz-aware UTC); shown in the
             subtitle. The lines start here — the run has no earlier data — so the panel is
             deliberately empty between the window start and the NWP init time.
-        analysis: Short-lead ``Nwp`` rows from *every* run overlapping the window — the first
-            ``NWP_ANALYSIS_LEAD`` of each run, ``NWP_ANALYSIS_MEMBER`` only — with ``init_time``
-            and ``valid_time`` alongside the variable columns. Stitched (freshest run wins where
-            runs overlap a ``valid_time``) into a single thick blue line: our closest proxy for
-            the true weather, since we hold no weather observations. ``None``, or no rows in the
-            window, omits the line.
+        analysis: The proxy-analysis line, already reduced to one control-member row per
+            ``valid_time`` by ``weather_utils.select_analysis_proxy`` (the first
+            ``NWP_ANALYSIS_LEAD`` of each run, freshest run winning where runs overlap), with
+            ``valid_time`` alongside the variable columns. Drawn as a single thick blue line: our
+            closest proxy for the true weather, since we hold no weather observations. ``None``, or
+            no rows in the window, omits the line.
         shade_weekends: Whether to draw the same faint weekend bands as the power chart.
 
     Returns:
@@ -523,8 +524,6 @@ def build_nwp_ensemble_chart(
         if analysis is None
         else _prepare_for_plot(
             analysis.filter(plot_window)
-            # Where runs overlap a valid_time, keep the freshest run — the shortest lead.
-            .filter(pl.col("init_time") == pl.col("init_time").max().over("valid_time"))
             .select("valid_time", variable)
             .with_columns(pl.col(variable) * var.scale),
             "valid_time",

@@ -14,6 +14,7 @@ members = [
     "nged-substation-forecast",
     "notebooks",
     "plotting",
+    "weather-utils",
     "xgboost-forecaster",
 ]
 
@@ -1032,6 +1033,7 @@ dependencies = [
     { name = "plotting" },
     { name = "polars" },
     { name = "pyarrow" },
+    { name = "weather-utils" },
 ]
 
 [package.dev-dependencies]
@@ -1053,6 +1055,7 @@ requires-dist = [
     { name = "plotting", editable = "packages/plotting" },
     { name = "polars", specifier = ">=1.37.1" },
     { name = "pyarrow", specifier = ">=23.0.0" },
+    { name = "weather-utils", editable = "packages/weather_utils" },
 ]
 
 [package.metadata.requires-dev]
@@ -2538,6 +2541,7 @@ dependencies = [
     { name = "patito" },
     { name = "polars" },
     { name = "pydantic" },
+    { name = "weather-utils" },
 ]
 
 [package.metadata]
@@ -2548,6 +2552,7 @@ requires-dist = [
     { name = "patito" },
     { name = "polars", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "weather-utils", editable = "packages/weather_utils" },
 ]
 
 [[package]]
@@ -4798,6 +4803,29 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/34/74/c6428f875774288bec1396f5bfcbc2d925700a4dad61727fd5f2b12f249d/wcwidth-0.8.2.tar.gz", hash = "sha256:91fbef97204b96a3d4d421609b80340b760cf33e26da123ff243d76b1fda8dda", size = 1466253, upload-time = "2026-06-29T18:11:11.601Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/96/42/3e5985a0a7e57de470b320c6d6a1a67c844f6737a587f3d44dd13d1819e7/wcwidth-0.8.2-py3-none-any.whl", hash = "sha256:d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85", size = 323166, upload-time = "2026-06-29T18:11:09.888Z" },
+]
+
+[[package]]
+name = "weather-utils"
+version = "0.1.0"
+source = { editable = "packages/weather_utils" }
+dependencies = [
+    { name = "polars" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "polars", specifier = ">=1.38.1" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-cov" },
 ]
 
 [[package]]

@@ -12,7 +12,6 @@ with app.setup:
     from dashboard.forecast_chart import (
         LAG_OPTIONS,
         NWP_ANALYSIS_LEAD,
-        NWP_ANALYSIS_MEMBER,
         NWP_PLOT_VARIABLES,
         PLOT_HISTORY,
         PLOT_HORIZON,
@@ -20,6 +19,7 @@ with app.setup:
         build_view_forecast_chart,
     )
     from deltalake import DeltaTable
+    from weather_utils import select_analysis_proxy
 
 
 @app.cell
@@ -391,25 +391,29 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
             .collect()
         )
         # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping
-        # the plotted window (control member only) — see the constants' docstrings. Loading it
-        # here, unconditionally, keeps the "NWP proxy analysis" checkbox instant: toggling it
-        # re-runs only the chart cell, never this Delta query (~0.2 s across the ~17 pruned
-        # init_time partitions). Runs older than window_start − NWP_ANALYSIS_LEAD cannot reach
-        # the window, so the init_time filter starts there.
+        # the plotted window (control member only). select_analysis_proxy applies the member
+        # filter, the max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
+        # partition/row-group filters (init_time range, h3_index) stay on the scan above it so
+        # Delta partition pruning survives. Loading it here, unconditionally, keeps the "NWP proxy
+        # analysis" checkbox instant: toggling it re-runs only the chart cell, never this Delta
+        # query (~0.2 s across the ~17 pruned init_time partitions). Runs older than
+        # window_start − NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter starts
+        # there.
         nwp_analysis = (
-            pl.scan_delta(
-                settings.nwp_data_path,
-                storage_options=typeddict_to_dict(settings.storage_options),
-            )
-            .filter(
-                pl.col("init_time").is_between(
-                    init_time - PLOT_HISTORY - NWP_ANALYSIS_LEAD, init_time + PLOT_HORIZON
+            select_analysis_proxy(
+                pl.scan_delta(
+                    settings.nwp_data_path,
+                    storage_options=typeddict_to_dict(settings.storage_options),
+                ).filter(
+                    pl.col("init_time").is_between(
+                        init_time - PLOT_HISTORY - NWP_ANALYSIS_LEAD, init_time + PLOT_HORIZON
+                    ),
+                    pl.col("h3_index") == _series_h3,
                 ),
-                pl.col("h3_index") == _series_h3,
-                pl.col("ensemble_member") == NWP_ANALYSIS_MEMBER,
-                pl.col("valid_time") < pl.col("init_time") + NWP_ANALYSIS_LEAD,
+                group_key="h3_index",
+                max_lead=NWP_ANALYSIS_LEAD,
             )
-            .drop("nwp_model_id", "h3_index", "ensemble_member")
+            .drop("nwp_model_id", "h3_index")
             .collect()
         )
     except Exception as error:

@@ -5,21 +5,17 @@ can consume, and the two NWP join modes (bulk training vs. single-run inference)
 """
 
 from datetime import datetime, timedelta
-from typing import Final
 
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.weather_schemas import Nwp
 
-NWP_PUBLICATION_DELAY_HOURS: Final[int] = 6
-"""Default delay between an NWP run's ``init_time`` and when it becomes publicly available.
+# Re-export shim: the canonical definition lives in ``weather_utils`` (the analysis-proxy
+# availability cut owns it), but the join helpers here and ``_production_helpers`` /
+# ``feature_engineer`` still import it from this module.
+from weather_utils import NWP_PUBLICATION_DELAY_HOURS
 
-Used to derive ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, and to derive
-``nwp_init_time`` from ``power_fcst_init_time`` when it is not supplied in single-run mode (see
-``_join_nwp_bulk_mode`` / ``_join_nwp_single_run``). Also the default for
-``select_nwp_init_time``'s replay-mode cutoff (``ml_core._production_helpers``), which
-reconstructs what was actually available at a historical ``power_fcst_init_time``.
-"""
+__all__ = ["NWP_PUBLICATION_DELAY_HOURS"]
 
 
 def _join_nwp_bulk_mode(
@@ -154,18 +150,3 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
         )
 
     return upsampled
-
-
-def _build_historical_weather(processed_nwp: pl.LazyFrame) -> pl.LazyFrame:
-    """Builds the historical weather frame used by weather lag features.
-
-    Uses the control member (ensemble_member == 0) and selects the freshest forecast run
-    (shortest lead time) for each (time_series_id, valid_time).
-    """
-    return (
-        processed_nwp.filter(pl.col("ensemble_member") == 0)
-        .drop("ensemble_member")
-        .group_by(["time_series_id", "valid_time"])
-        .agg(pl.all().sort_by("nwp_lead_time_hours").first())
-        .sort(["time_series_id", "valid_time"])
-    )
