@@ -90,6 +90,25 @@ is alive. The freshness evaluation is a pure function, and it is the hand-off po
 when that lands, the same result object also feeds Sentry, and later the forecast-warnings
 delivery table.
 
+## Separate "is this run usable?" from "is it perfect?"
+
+Data ingest poses two different questions, and we answer them with two different mechanisms so
+that neither compromises the other. **"Is this run usable?"** is a fatal gate: the contract
+`validate` inside the ingest asset rejects data that is structurally broken, so a bad run fails
+loudly and writes nothing rather than poisoning the table. **"Is it perfect?"** is a separate,
+non-fatal Dagster asset check: it records known-but-tolerable imperfections as a warning without
+blocking the materialisation or anything downstream. Collapsing the two — failing on every
+imperfection — throws away otherwise-good data; ignoring the distinction the other way lets
+genuinely broken data land silently.
+
+The `ecmwf_ens` asset is the worked example. Its `nwp_has_no_unexpected_nulls` check surfaces the
+scattered per-pixel nulls that ECMWF ENS is known to carry (a WARN), while `Nwp.validate` still
+hard-fails a wholesale structural gap. The reasoning behind exactly where that fatal/tolerated line
+sits is documented in
+[Known ECMWF ENS data-quality issues](ecmwf-ens-known-issues.md). The `power_data_is_fresh` check
+above is the same shape of tool pointed at a different question — staleness rather than
+completeness — and is likewise a warning, never a failure.
+
 ## Bake the model into the image at build time
 
 Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster

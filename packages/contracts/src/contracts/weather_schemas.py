@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum, auto
 from pathlib import Path
@@ -80,6 +81,11 @@ class Nwp(pt.Model):
     Stored on disk as plain Float32, rounded to a significand-bit budget by
     `delta_store.nwp.write_nwp` — see `docs/architecture/overview.md` for the physical format
     and measured numbers.
+
+    `validate` is the fatal ingest gate; `assess_nwp_quality` reports the tolerated scattered nulls
+    (the known upstream ECMWF ENS corruption) as a non-fatal check. Which null patterns are fatal
+    versus tolerated, and why, is documented at
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
     nwp_model_id: str = pt.Field(
@@ -222,6 +228,21 @@ class Nwp(pt.Model):
         {"categorical_precipitation_type_surface"}
     )
 
+    deaccumulated_var_names: ClassVar[frozenset[str]] = frozenset(
+        {
+            "precipitation_surface",
+            "downward_short_wave_radiation_flux_surface",
+            "downward_long_wave_radiation_flux_surface",
+        }
+    )
+    """The variables Dynamical.org de-accumulates from ECMWF's cumulative source fields to rates.
+
+    They share a de-accumulation step whose known upstream corruption leaves *scattered* per-pixel
+    nulls beyond lead-0 (and all three are legitimately null at lead-0). Those scattered nulls are
+    tolerated at ingest and reported by :func:`assess_nwp_quality`; only a whole-slice gap is fatal.
+    See <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+    """
+
     # Columns that aren't NWP variables:
     _non_var_column_names: ClassVar[frozenset[str]] = frozenset(
         {"nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"}
@@ -246,7 +267,8 @@ class Nwp(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
-        """Validate the given dataframe, ensuring no nulls from second step onwards and uniqueness."""
+        """Validate the frame: rejecting whole-slice nulls in de-accumulated variables (scattered
+        nulls are tolerated), enforcing uniqueness, and the ptype-introduction invariant."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -255,29 +277,38 @@ class Nwp(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        cls._check_nulls_from_second_forecast_step_onwards(validated_df)
+        cls._check_no_whole_null_deaccumulated_slices(validated_df)
         cls._check_unique(validated_df)
         cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)
         return validated_df
 
     @classmethod
-    def _check_nulls_from_second_forecast_step_onwards(cls, dataframe: pt.DataFrame[Self]) -> None:
-        cols_to_check = [
-            "precipitation_surface",
-            "downward_short_wave_radiation_flux_surface",
-            "downward_long_wave_radiation_flux_surface",
-        ]
+    def _check_no_whole_null_deaccumulated_slices(cls, dataframe: pt.DataFrame[Self]) -> None:
+        """Reject a *structural* gap: any de-accumulated variable whose (ensemble_member,
+        valid_time) slice beyond lead-0 is *entirely* null across the grid.
 
-        second_step_onwards = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
+        Scattered per-pixel nulls in the de-accumulated variables are *tolerated* — they are the
+        known upstream ECMWF ENS corruption (empirically reaching a few percent of a slice), and
+        every model already handles null precipitation/radiation because both are legitimately null
+        at lead-0. A *whole-slice* null is different: it means the field is wholesale missing (a
+        structural outage), which should fail ingest. :func:`assess_nwp_quality` reports the
+        tolerated scatter as a non-fatal check. See
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
 
-        for col in cols_to_check:
-            has_nulls = second_step_onwards[col].is_null().any()
-            if has_nulls:
-                raise ValueError(
-                    f"Column '{col}' contains has null values from the second forecast "
-                    "step onwards. These variables are only allowed to be null for the first "
-                    "forecast step (lead time 0)."
-                )
+        This relies on a slice having many grid cells (the production GB grid has ~1671), so that
+        scatter (a few null cells) is cleanly distinct from a whole-slice gap (all cells null). On a
+        degenerate one-cell slice the two are indistinguishable, but that does not arise in practice.
+        """
+        whole_null = _deaccumulated_null_breakdown(dataframe).filter(
+            pl.col("n_null") == pl.col("n_total")
+        )
+        if whole_null.height:
+            offenders = whole_null.select("variable", "ensemble_member", "valid_time").rows()
+            raise ValueError(
+                "Whole-slice null in a de-accumulated NWP variable beyond lead-0 — a wholesale "
+                f"missing field, not tolerable scattered corruption. {whole_null.height} offending "
+                f"(variable, ensemble_member, valid_time) slice(s), first 10: {offenders[:10]}"
+            )
 
     @classmethod
     def _check_unique(cls, dataframe: pt.DataFrame[Self]) -> None:
@@ -358,3 +389,78 @@ class Nwp(pt.Model):
             .set_model(cls)
             .cast()
         )
+
+
+def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
+    """Per (variable, init_time, ensemble_member, valid_time) beyond lead-0: null-/total-cell counts.
+
+    Returns only slices that have at least one null. Shared by the fatal whole-slice check and the
+    non-fatal :func:`assess_nwp_quality`, so both agree on what a "null" is. ``init_time`` is in the
+    group key so the counts stay correct even on a multi-run frame (each grid cell is one row, so
+    ``n_total`` is the slice's cell count). Operates on a single NWP run in practice (~1M rows), far
+    below Polars' 2**32 row-count ceiling, so the counts are exact.
+    """
+    deaccumulated = sorted(Nwp.deaccumulated_var_names)
+    beyond_lead0 = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
+    return (
+        beyond_lead0.unpivot(
+            on=deaccumulated,
+            index=["init_time", "ensemble_member", "valid_time"],
+            variable_name="variable",
+            value_name="value",
+        )
+        .group_by("variable", "init_time", "ensemble_member", "valid_time")
+        .agg(n_null=pl.col("value").is_null().sum(), n_total=pl.len())
+        .filter(pl.col("n_null") > 0)
+    )
+
+
+@dataclass(frozen=True)
+class NwpQualityReport:
+    """Non-fatal data-quality summary for one NWP run.
+
+    Carries the *tolerated* scattered nulls in the de-accumulated variables beyond lead-0 — the
+    known upstream ECMWF ENS corruption. A structural whole-slice gap is rejected by
+    :meth:`Nwp.validate` before this runs, so a validated frame only ever has scatter here.
+    """
+
+    scattered: pl.DataFrame
+    """One row per affected (variable, init_time, ensemble_member, valid_time) slice, with
+    ``n_null`` and ``n_total`` cell counts. Empty when the run is clean."""
+
+    @property
+    def n_null_cells(self) -> int:
+        """Total scattered null cells across all affected slices."""
+        return int(self.scattered["n_null"].sum()) if self.scattered.height else 0
+
+    @property
+    def n_affected_slices(self) -> int:
+        """Number of (variable, member, valid_time) slices carrying at least one scattered null."""
+        return self.scattered.height
+
+    @property
+    def is_healthy(self) -> bool:
+        """True when the run has no unexpected nulls."""
+        return self.scattered.height == 0
+
+    @property
+    def affected_variables(self) -> tuple[str, ...]:
+        """The de-accumulated variables carrying scattered nulls, sorted."""
+        if not self.scattered.height:
+            return ()
+        return tuple(sorted(self.scattered["variable"].unique().to_list()))
+
+
+def assess_nwp_quality(dataframe: pt.DataFrame[Nwp]) -> NwpQualityReport:
+    """Summarise the tolerated-but-noteworthy nulls in a *validated* NWP run.
+
+    Reports the scattered per-pixel nulls in the de-accumulated variables (precipitation/radiation)
+    beyond lead-0 — the known upstream ECMWF ENS corruption that :meth:`Nwp.validate` deliberately
+    tolerates. Pure and Dagster-free (unit-testable in isolation); the ``ecmwf_ens`` asset wraps the
+    result into a WARN ``AssetCheckResult``. See
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
+    """
+    scattered = _deaccumulated_null_breakdown(dataframe).filter(
+        pl.col("n_null") < pl.col("n_total")
+    )
+    return NwpQualityReport(scattered=scattered)

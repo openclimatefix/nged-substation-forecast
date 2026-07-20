@@ -10,13 +10,20 @@ from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
+from contracts.weather_schemas import NwpQualityReport, assess_nwp_quality
 from dagster import (
+    AssetCheckResult,
+    AssetCheckSeverity,
+    AssetCheckSpec,
     AssetExecutionContext,
     DailyPartitionsDefinition,
+    MaterializeResult,
     MetadataValue,
     RetryRequested,
+    TableColumn,
     TableMetadataValue,
     TableRecord,
+    TableSchema,
     asset,
 )
 from delta_store.nwp import write_nwp
@@ -165,17 +172,38 @@ _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 _ECMWF_ENS_RETRY_DELAY_SECONDS: Final[int] = 1800
 """How long to wait between retries of a not-yet-published ECMWF run."""
 
+_NWP_QUALITY_CHECK_NAME: Final[str] = "nwp_has_no_unexpected_nulls"
+"""Name of the per-run NWP data-quality check emitted by ``ecmwf_ens`` (see ``assess_nwp_quality``).
+
+Computed in-asset from the frame already in memory rather than as a standalone ``@asset_check``
+scanning the Delta table: the quality of a run is a property of the specific ingest we are holding,
+so there is nothing to re-scan (and re-scanning the whole ~5.9B-row NWP table would hit Polars'
+2**32 row-count ceiling). This differs from ``power_data_is_fresh``, whose freshness genuinely
+drifts over time and so must re-read the table on a schedule."""
+
+_NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
+    columns=[
+        TableColumn("variable", "string"),
+        TableColumn("ensemble_member", "int"),
+        TableColumn("valid_time", "string"),
+        TableColumn("n_null_cells", "int"),
+        TableColumn("n_total_cells", "int"),
+    ]
+)
+"""Fixed schema for the affected-slices metadata table (so an empty table still renders)."""
+
 
 @asset(
     partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
+    check_specs=[AssetCheckSpec(name=_NWP_QUALITY_CHECK_NAME, asset="ecmwf_ens")],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
     # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
     # concurrently. This is crucial because downloading ECMWF data is memory-intensive.
     # See: https://docs.dagster.io/guides/operate/managing-concurrency/concurrency-pools
     pool="ECMWF",
 )
-def ecmwf_ens(context: AssetExecutionContext) -> None:
+def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     """
     Downloads and processes ECMWF ensemble NWP data for a specific day.
 
@@ -215,13 +243,74 @@ def ecmwf_ens(context: AssetExecutionContext) -> None:
     write_nwp(nwp, nwp_data_path, storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
-    context.add_output_metadata(
-        {
+    # Non-fatal data-quality check: surface the tolerated scattered nulls (known upstream ECMWF ENS
+    # corruption) that Nwp.validate deliberately let through. A structural gap would have failed the
+    # validate above, so this only ever WARNs about scatter.
+    quality = assess_nwp_quality(nwp)
+    return MaterializeResult(
+        metadata={
             "n_rows": len(nwp),
             "path": nwp_data_path,
             "init_time": str(nwp_init_time),
-        }
+        },
+        check_results=[_nwp_quality_check_result(quality)],
     )
+
+
+def _nwp_quality_check_result(report: NwpQualityReport) -> AssetCheckResult:
+    """Wrap an :class:`NwpQualityReport` into a WARN-severity Dagster check result."""
+    if report.is_healthy:
+        description = "No unexpected nulls in the de-accumulated NWP variables."
+    else:
+        variables = ", ".join(report.affected_variables)
+        description = (
+            f"{report.n_null_cells} scattered null cell(s) beyond lead-0 in {variables} — known "
+            "upstream ECMWF ENS corruption, tolerated. See "
+            "https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/."
+        )
+    return AssetCheckResult(
+        check_name=_NWP_QUALITY_CHECK_NAME,
+        # WARN, never fail: the scatter is expected upstream corruption we deliberately ingest.
+        passed=report.is_healthy,
+        severity=AssetCheckSeverity.WARN,
+        description=description,
+        metadata={
+            "n_scattered_null_cells": report.n_null_cells,
+            "n_affected_slices": report.n_affected_slices,
+            "affected_variables": list(report.affected_variables),
+            "affected_slices": _nwp_null_slices_metadata(report.scattered),
+        },
+    )
+
+
+_NWP_NULL_SLICES_TABLE_LIMIT: Final[int] = 100
+"""Cap on rows rendered in the affected-slices metadata table.
+
+A broadly-corrupt upstream run could touch thousands of (variable, member, valid_time) slices;
+the exact totals live in the scalar metadata, so the table only needs the worst offenders to be
+useful — bounding it keeps the Dagster event log from bloating on a bad day."""
+
+
+def _nwp_null_slices_metadata(scattered: pl.DataFrame) -> TableMetadataValue:
+    """Render the worst affected (variable, member, valid_time) slices as a Dagster metadata table.
+
+    Capped at ``_NWP_NULL_SLICES_TABLE_LIMIT`` rows (most-null first); the full counts are in the
+    scalar metadata alongside.
+    """
+    top = scattered.sort("n_null", descending=True).head(_NWP_NULL_SLICES_TABLE_LIMIT)
+    records = [
+        TableRecord(
+            {
+                "variable": row["variable"],
+                "ensemble_member": row["ensemble_member"],
+                "valid_time": str(row["valid_time"]),
+                "n_null_cells": row["n_null"],
+                "n_total_cells": row["n_total"],
+            }
+        )
+        for row in top.iter_rows(named=True)
+    ]
+    return MetadataValue.table(records, schema=_NWP_NULL_SLICES_SCHEMA)
 
 
 ##############################################################################

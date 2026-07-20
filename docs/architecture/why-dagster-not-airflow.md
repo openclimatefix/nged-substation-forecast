@@ -198,6 +198,7 @@ around the Dagster UI and would need rewriting.
 | Per-fold retry and observability | CV layer | Dynamic task mapping (per-instance state, logs, clear; `map_index_template`) | Good on ≥3.1.4 |
 | Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`; conf-dropped bug fixed in 3.2.2 | Good on ≥3.2.2; MWAA (3.2.1) still affected |
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
+| Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`) | power ingest, `ecmwf_ens` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Sensors / run-status coordination (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest → forecast ordering | Asset-triggered DAGs, event-driven scheduling | Parity, arguably cleaner in Airflow |
 
