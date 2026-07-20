@@ -208,13 +208,16 @@ def latest_time_per_time_series_id(
 
     Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
     the ``power`` column, but a group-wise ``max`` cannot be answered from Parquet row-group
-    statistics, so every ``time``/``time_series_id`` value is read. Measured on a synthetic V2
-    table (2,500 series, half-hourly, partitioned by ``time_series_id``): ~0.36 s / ~1.4 GB peak
-    for a year of history (43.8M rows), scaling linearly with accumulated history. That is
-    negligible for the hourly freshness check today and for years, but if it ever matters the
-    per-series ``max(time)`` can instead be read from the Delta add-action ``max.time`` file
-    statistics — metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same
-    Delta-log-metadata trick used to count whole-table rows without scanning.
+    statistics (no engine on our stack does aggregate-from-statistics), so every
+    ``time``/``time_series_id`` value is read. The ``collect`` uses the streaming engine to keep
+    peak memory bounded — this runs hourly on a small control-plane VM. Measured on a synthetic
+    V2 table (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history
+    (43.8M rows): streaming ~0.34 s / ~180 MB peak, versus ~0.5 s / ~1.3 GB peak for the
+    in-memory engine — same result, ~7x less memory. Cost scales linearly with accumulated
+    history. If the scan ever becomes a problem, the per-series ``max(time)`` can instead be read
+    from the Delta add-action ``max.time`` file statistics — metadata-only, O(files): ~0.02 s /
+    <100 MB at the same scale — the same Delta-log-metadata trick used to count whole-table rows
+    without scanning.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
@@ -233,7 +236,9 @@ def latest_time_per_time_series_id(
         pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
         .group_by("time_series_id")
         .agg(max_time=pl.max("time"))
-        .collect()
+        # Streaming engine: bounds peak memory (~7x lower than in-memory at V2 scale) so the
+        # hourly full-table aggregate stays comfortable on a small control-plane VM. See docstring.
+        .collect(engine="streaming")
     )
     log.info(
         f"Found the most recent data we have on disk for {max_times.height} time_series_ids from {delta_path}."
