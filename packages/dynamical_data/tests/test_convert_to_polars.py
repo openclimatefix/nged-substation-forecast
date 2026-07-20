@@ -56,6 +56,8 @@ def test_convert_happy_path_shape_and_schema(
     # One row per (h3_index, valid_time, ensemble_member): 2 cells x 3 lead times x 2 members.
     assert df.height == 2 * 3 * 2
     assert df["nwp_model_id"].unique().to_list() == ["ECMWF_ENS_0_25_degree"]
+    # Each member's rows carry its own id (pins the per-member value routing, not just the count).
+    assert sorted(df["ensemble_member"].unique().to_list()) == [0, 1]
     # Wind speed/direction are derived; the raw u/v components are dropped.
     for col in ("wind_speed_10m", "wind_direction_10m", "wind_speed_100m", "wind_direction_100m"):
         assert col in df.columns

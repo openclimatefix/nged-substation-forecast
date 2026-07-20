@@ -104,12 +104,15 @@ def test_open_raises_on_empty_coords(
         download.open_ecmwf_ens_run(_INIT_TIME, default_h3_grid)
 
 
+@pytest.mark.parametrize("longitudes", [(-1.0, 200.0), (-200.0, -1.0)])
 def test_open_raises_on_longitude_out_of_range(
     monkeypatch: pytest.MonkeyPatch,
     make_ens_dataset: Callable[..., xr.Dataset],
     default_h3_grid: pt.DataFrame[H3GridWeights],
+    longitudes: tuple[float, float],
 ) -> None:
-    ds = make_ens_dataset(init_time=_INIT_TIME, longitudes=(-1.0, 200.0), init_time_as_dim=True)
+    # Both bounds are guarded: above +180 and below -180 must each raise.
+    ds = make_ens_dataset(init_time=_INIT_TIME, longitudes=longitudes, init_time_as_dim=True)
     _patch_catalog(monkeypatch, ds)
 
     with pytest.raises(ValueError, match=r"\[-180, 180\]"):
