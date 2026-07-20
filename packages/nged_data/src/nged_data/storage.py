@@ -4,7 +4,12 @@ from typing import Final, Sequence, TypedDict, overload
 import obstore
 import patito as pt
 import polars as pl
-from contracts._uri import ObjectStoreOptions, delta_table_exists, object_exists
+from contracts._uri import (
+    ObjectStoreOptions,
+    delta_table_exists,
+    if_local_path_then_make_parent_dir,
+    object_exists,
+)
 from contracts.common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.typing_utils import typeddict_to_dict
@@ -309,6 +314,10 @@ def upsert_metadata(
 
     if not object_exists(metadata_path, storage_options):
         log.info(f"Metadata file not found at {metadata_path}. Creating new file.")
+        # write_parquet doesn't create missing parent directories, so a first-ever run against a
+        # fresh local data root would fail here (this create branch runs before any Delta write
+        # that would otherwise create the dir). Create the parent for a local metadata_path.
+        if_local_path_then_make_parent_dir(metadata_path)
         new_metadata.write_parquet(
             metadata_path,
             compression=COMPRESSION,
