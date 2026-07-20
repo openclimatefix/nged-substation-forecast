@@ -7,10 +7,7 @@ import polars.selectors as cs
 import xarray as xr
 from contracts.common import UTC_DATETIME_DTYPE
 from contracts.geo_schemas import H3GridWeights
-from contracts.settings import Settings
 from contracts.weather_schemas import NWP_MODEL_ID_DTYPE, Nwp, NwpModelId
-
-_SETTINGS = Settings()
 
 
 def convert_nwp_xarray_dataset_to_polars_dataframe(

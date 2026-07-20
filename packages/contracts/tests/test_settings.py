@@ -1,7 +1,9 @@
+import subprocess
+import sys
 from typing import cast
 
 import pytest
-from contracts.settings import DataQualitySettings, Settings
+from contracts.settings import DataQualitySettings, Settings, get_settings
 from pydantic import ValidationError
 
 
@@ -163,3 +165,38 @@ def test_storage_options_populated_from_dev_credentials():
         "aws_secret_access_key": "minio123",
         "aws_region": "us-east-1",
     }
+
+
+def test_get_settings_is_cached(monkeypatch: pytest.MonkeyPatch):
+    """get_settings returns a single shared instance; cache_clear forces a rebuild."""
+    monkeypatch.setenv("NGED_S3_BUCKET_URL", "https://example.com")
+    monkeypatch.setenv("NGED_S3_BUCKET_ACCESS_KEY", "key")
+    monkeypatch.setenv("NGED_S3_BUCKET_SECRET", "secret")
+    get_settings.cache_clear()
+    try:
+        assert get_settings() is get_settings()
+        first = get_settings()
+        get_settings.cache_clear()
+        assert get_settings() is not first
+    finally:
+        # Don't leak this module's hermetic instance into other test modules' cache.
+        get_settings.cache_clear()
+
+
+def test_importing_contracts_constructs_no_settings():
+    """Importing the schema modules must not construct Settings (no import-time .env read).
+
+    Settings has required credential fields with no defaults, so any import-time construction would
+    make the whole contracts package unimportable without a populated .env — breaking type-checkers,
+    doc builders, and credential-free unit tests. Run in a fresh interpreter because this process
+    has already imported (and used) these modules. See contracts.settings.get_settings.
+    """
+    probe = (
+        "import contracts.settings, contracts.weather_schemas\n"
+        "size = contracts.settings.get_settings.cache_info().currsize\n"
+        "assert size == 0, f'Settings constructed at import time (cache size {size})'\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0, result.stderr

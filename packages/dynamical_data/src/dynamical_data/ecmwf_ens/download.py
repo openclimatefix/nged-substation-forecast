@@ -8,9 +8,6 @@ import patito as pt
 import polars as pl
 import xarray as xr
 from contracts.geo_schemas import H3GridWeights
-from contracts.settings import Settings
-
-_SETTINGS = Settings()
 
 
 class NwpRunNotYetAvailable(Exception):
