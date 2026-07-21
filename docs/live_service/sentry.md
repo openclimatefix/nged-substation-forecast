@@ -94,6 +94,30 @@ Then check the Sentry UI:
 Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and
 optionally resolve the test issue). Neither affects the production wiring.
 
+## What gets sent when you run Dagster locally
+
+With a `SENTRY_DSN` configured, `init_sentry` runs at import of the Dagster definitions module, so
+every local Dagster process (the webserver and each run worker) has Sentry active and tags
+everything with your `SENTRY_ENVIRONMENT`. But the telemetry is deliberately narrow — running
+Dagster on your laptop does **not** forward everything to Sentry:
+
+- **Failures of the three scheduled jobs are sent.** `power_time_series_and_metadata_job`,
+  `ecmwf_ens_job`, and `live_forecasts_job` each attach the `sentry_capture_failure` hook, so a
+  failed step in any of them forwards the live exception — traceback intact — to Sentry Issues,
+  tagged with your environment. This fires whether the run was launched by its schedule or started
+  by hand as that named job.
+- **Ad-hoc asset materialisations are *not* sent.** Clicking "Materialize" on an asset in the
+  Dagster UI runs it outside those jobs, so no failure hook is attached and a failure there never
+  reaches Sentry — it is yours to watch at the UI. To exercise the real hook end to end, launch
+  `live_forecasts_job` by name rather than materialising the `live_forecasts` asset directly.
+- **No heartbeats are sent.** The live check-in is gated on `SENTRY_MONITOR_FORECASTS`, which you
+  have left unset (see the warning above), so your laptop sends no cron check-ins and cannot touch
+  the production `live-forecasts` monitor.
+
+This is the same scope that runs in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
+explains why the failure hook covers only the scheduled jobs and why only success heartbeats are
+ever sent.
+
 ## Turn it on in production
 
 On the always-on control-plane box, the three `SENTRY_*` variables go in the box's `.env` — see
