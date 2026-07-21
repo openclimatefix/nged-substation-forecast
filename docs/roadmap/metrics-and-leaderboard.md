@@ -13,7 +13,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > [#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6):
 > baseline forecasters [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) ·
 > probabilistic evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) ·
-> peak-events filter [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
+> tail & exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
 > fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226).
 
@@ -447,6 +447,9 @@ and nothing is logged to the leaderboard MLflow runs.
 | [Interval width](../techniques/evaluation-metrics.md#interval-width) | Quantile | ✅ | Mean band width (MW) — the sharpness companion that stops PICP being gamed by over-widening. |
 | [CRPS (Continuous Ranked Probability Score)](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) | Ensemble | ✅ | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. Fair (finite-ensemble-unbiased) form — the one metric comparable across ensemble sizes. |
 | [Spread-Skill Ratio](../techniques/evaluation-metrics.md#spread-skill-ratio) | Ensemble | ✅ | Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; < 1 under-dispersed (overconfident); > 1 over-dispersed (underconfident). |
+| [Threshold-weighted CRPS (twCRPS)](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps) | Ensemble | 🚧 | CRPS confined to behaviour above a per-series threshold — the ranking-grade metric for skill near the network limit. See [Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks). |
+| [Exceedance rate of upper quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) | Quantile | 🚧 | "When we said p95, was it exceeded ~5% of the time?" — one-sided calibration check for the delivered tail quantiles. |
+| [Brier score for threshold exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance) | Ensemble | 🚧 | Grades the ensemble's "chance load exceeds the threshold" probability — the score for the yes/no warning NGED acts on. |
 
 > The `Metrics` schema (`contracts.ml_schemas.Metrics`) stores results as
 > `(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param,
@@ -586,23 +589,109 @@ time (the two-pass training scheme) must be the **causal** estimate available at
 backtests gain lookahead — see
 [Capacity estimation](capacity-estimation.md#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme).
 
-### Peak events — the metric filter that matters most for flexibility
+### Tail & exceedance metrics — scoring the question NGED actually asks 🚧
 
 Issue: [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254)
 
-Because NGED's goal is **flexibility procurement** (entirely about peak management and congestion),
-overall RMSE only tells half the story. We add a **"Peak Events"** filter:
+NGED's goal is **flexibility procurement**: paying flexible customers to reduce demand when a
+substation risks running beyond its capability. The question they ask of a forecast is therefore
+"**will load cross the limit?**" — their operator tool plots demand as headroom below a
+constraint line (see [NGED's incumbent
+forecast](../background/nged-incumbent-forecast.md#the-operators-view)), and the
+[requirements](../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance)
+name threshold exceedance as the core concept. The existing metrics lean toward the tails (the
+mean pinball loss is deliberately tail-weighted; PICP covers the p1–p99 band) but they measure
+upper-quantile skill *at every hour equally* — including hours when nothing is anywhere near a
+limit. This section adds the metrics that measure skill *near the limit* itself.
 
-- **Peak RMSE / Peak Pinball Loss**: score models *only* on the top 5% highest-demand half-hours
-  (or hours where solar generation unexpectedly drops during peak demand).
-- **Hand-picked "hard examples"**: if NGED supplies a list of historically tricky times, we compute
-  performance on those alone.
+One design rule governs the whole section: **never rank models on a sample selected by what
+actually happened.** Scoring models only on the top-N% highest *observed* half-hours rewards
+models that simply bias every forecast upward — the "forecaster's dilemma", explained in
+plain language in the [evaluation-metrics
+reference](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened).
+Ranking-grade tail emphasis instead comes from proper scores re-weighted toward the tail and
+computed over **all** hours. Concretely, three metrics — definitions, equations, and intuitive
+explanations in the [evaluation-metrics
+reference](../techniques/evaluation-metrics.md#tail-and-exceedance-metrics):
+
+- **Threshold-weighted CRPS
+  ([twCRPS](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps))** — CRPS
+  confined to behaviour above a per-series threshold; the headline *ranking* metric for tail
+  skill. Implementation is nearly free: replace members and observation by `max(value,
+  threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
+  comparability across ensemble sizes.
+
+- **[Exceedance rate of the upper delivery
+  quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles)**
+  (p80–p99) — "when we said p95, was it exceeded ~5% of the time?"; the plain-language
+  *calibration* check for the tail quantiles NGED reads, one-sided where PICP's bands are
+  symmetric.
+
+- **[Brier score for threshold
+  exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance)** —
+  grades the ensemble's "chance that load exceeds the threshold" the way one would grade a
+  "70% chance of rain" forecast; the most *decision-legible* number, scoring exactly the
+  warning NGED acts on.
+
+All three fit the existing `Metrics` schema — `metric_param` carries the threshold or quantile
+label — so there is no schema change.
+
+**Thresholds: static, per-series, quantile-derived.** A substation's true limit is not a
+single number (ratings vary with ambient temperature; transformers tolerate short overloads,
+so exceedance *duration* matters; switching changes what a feeder carries — NGED's own limit
+line is a time-varying "Flex Profile"). We deliberately do not model any of that for scoring.
+Each series gets two static thresholds — the P90 and P98 of its full observation history, in
+the series type's constraint-side direction (high load for demand; reverse power flow for
+generation) — chosen because they guarantee every series a scoreable event rate, mean the same
+thing across series, and stay stable across CV folds. Physical firm/flex ratings, where NGED
+supplies them, feed ad-hoc case studies and dashboard overlays instead: a rating that is never
+breached in the validation window yields zero events, and a warning system cannot be graded on
+events that never happen. The full rationale, and the explicit "this is a proxy" caveat, live
+in [the threshold-choice
+section](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived)
+of the reference.
+
+**Diagnostic slices — never ranking columns.** Two observed-outcome views stay available for
+*understanding* a model's errors, clearly labelled as ineligible for ranking (the design rule
+above): a **peak-events slice** (the top 5% highest-observed-demand half-hours, via the same
+population-filter mechanism as the Tricky-days filter) and **hand-picked "hard examples"** —
+historically difficult periods NGED supplies, scored as case studies.
+
+These metrics also serve the [probabilistic-calibration
+work](#delivering-the-probabilistic-metrics): an underdispersed ensemble pushes its exceedance
+probabilities to 0 or 1 too early, so the Brier score and exceedance rates are the sharpest
+before/after instruments for Phases C and D.
+
+#### Implementation details — tail & exceedance metrics (deleted when this ships)
+
+- **Thresholds:** compute per-series `hist_p90` / `hist_p98` scalars from the full observation
+  history alongside (or within) the `effective_capacity` asset — same full-history stability
+  rationale, same join shape (`time_series_id`-only). Constraint-side direction resolved per
+  `time_series_type`; confirm the mapping with NGED for ambiguous types (BESS charges *and*
+  discharges).
+- **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and
+  reuse the existing fair-CRPS expression (sorted-member identity, Float64 accumulation)
+  verbatim, once per threshold rung.
+- **Exceedance rates:** compare `y` against the already-computed empirical quantile columns
+  for p80, p90, p95, p98, p99 — one boolean mean per level.
+- **Brier score:** exceedance probability = member fraction above the threshold; outcome
+  indicator from `y`; squared difference, averaged.
+- **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
+  `twcrps@hist_p98`, exceedance rate at p95, `brier@hist_p98`); decide the exact set at
+  implementation time and keep it small — everything is in Delta regardless.
+- **Peak-events diagnostic slice:** one more named population filter on the shared mechanism
+  (with the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.
+- **Verification:** hand-computed toy-ensemble values for all three metrics; cross-check
+  twCRPS against the `scoringrules` reference implementation; Monte-Carlo the finite-ensemble
+  one-sided exceedance references (mirroring the PICP reference-table verification); on a
+  smoke fold, confirm `nged_incumbent`'s P95 operating point scores well on the p95 exceedance
+  rate while paying for its conservatism on Brier/twCRPS sharpness.
 
 ### Tricky days — a calendar-deterministic metric filter 🚧
 
 Issue: [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255)
 
-Alongside Peak Events, we add a **"Tricky days"** filter: score models separately on the handful of
+Alongside the tail & exceedance metrics, we add a **"Tricky days"** filter: score models separately on the handful of
 calendar dates whose demand shape departs sharply from the usual weekly rhythm. We scope it
 deliberately to the **calendar-deterministic** set — fixed and moveable public holidays (Christmas,
 Easter, and the rest of the GB bank holidays) plus the two annual daylight-saving transitions —
@@ -613,8 +702,12 @@ that are hard for *data-dependent* reasons stay in their own already-planned fil
 different failure modes into one bucket would make the number impossible to act on ("bad on tricky
 days" — is that Christmas, or a switching event?).
 
-Mechanically it is another population filter (the same mechanism the planned Peak Events filter
-uses): a boolean flag per timestep, derived from `valid_time` alone. Because it is purely
+Mechanically it is another population filter (the same mechanism the peak-events diagnostic
+slice uses): a boolean flag per timestep, derived from `valid_time` alone. Unlike that
+observed-peak slice, this one *is* a legitimate ranking column: the flag depends only on the
+calendar, which every forecaster knew in advance, so it does not fall into the
+[forecaster's-dilemma
+trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened). Because it is purely
 calendar-driven it **shares its calendar module with `nged_incumbent_holiday_aligned`** — the same
 GB bank-holiday calendar (the pure-Python `holidays` package) plus the two DST dates feed both the
 holiday-aligned baseline and this metric filter. And the two reinforce each other: `nged_incumbent`
@@ -644,9 +737,9 @@ explicit day-of-week-aware modelling of the run-up until there is evidence it mo
 - A small calendar module (shared with baseline 2, `nged_incumbent_holiday_aligned`) answers, for
   any `valid_time`, whether it falls inside a tricky-days window. Back it with the `holidays` GB
   calendar plus the two annual DST dates; expose the per-event window widths as config.
-- Represent the tricky-days slice the same way the Peak Events filter is represented — one more
-  named population filter, resolved by the same mechanism, **not** a new schema axis — so the
-  leaderboard gains a **Tricky days** column with no `Metrics` schema change.
+- Represent the tricky-days slice the same way the peak-events diagnostic slice is represented —
+  one more named population filter, resolved by the same mechanism, **not** a new schema axis —
+  so the leaderboard gains a **Tricky days** column with no `Metrics` schema change.
 - Verification: unit-test the flag on known dates (a Christmas week, an Easter, both DST
   switchovers, and a plain week that must be *excluded*); on a smoke-test fold, confirm
   `nged_incumbent` scores worse on the tricky-days slice than overall.
@@ -688,7 +781,11 @@ ensembles are systematically overconfident, worst at short horizons where member
 diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
 directly. Phases A and B below (both shipped) built the measurement machinery — every metric in
 the [evaluation-metrics reference](../techniques/evaluation-metrics.md), per horizon slice; the
-remaining phases act on what those numbers show.
+remaining phases act on what those numbers show. The planned
+[tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+will sharpen the picture further: an underdispersed ensemble pushes its exceedance
+probabilities to 0 or 1 too early, so the Brier score and the quantile exceedance rates are
+the clearest before/after instruments for Phases C and D.
 
 The theory behind this diagnosis — the three-term uncertainty decomposition, why a
 deterministic model driven by an NWP ensemble captures only the weather term, and what the

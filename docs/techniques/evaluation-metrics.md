@@ -1,10 +1,11 @@
 # Evaluation metrics
 
-> **Status: durable metric reference.** This page defines every metric computed by
+> **Status: durable metric reference.** This page defines the metrics computed by
 > `compute_metrics` (`packages/ml_core/src/ml_core/metrics.py`): a plain-language summary of
 > each, the equation, how to interpret the number, and — where the definition involved a real
-> choice — why we chose what we chose. The theory of *why* our ensembles need probabilistic
-> evaluation at all is the companion explainer
+> choice — why we chose what we chose. Sections marked 🚧 define metrics that are designed but
+> not yet computed; each links to its delivery plan. The theory of *why* our ensembles need
+> probabilistic evaluation at all is the companion explainer
 > [Probabilistic forecasting from NWP ensembles](probabilistic-forecasting.md); the plan that
 > delivered these metrics (and the calibration work that builds on them) is
 > [Metrics & leaderboard](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
@@ -288,6 +289,179 @@ $$
 
 It is computed for the same six bands as PICP.
 
+## Tail and exceedance metrics 🚧
+
+> **Status: designed, not yet computed.** The metrics in this section are planned; the delivery
+> plan is [Metrics & leaderboard → Tail & exceedance
+> metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
+> The principles (which selections of hours are safe to score on, and why) are durable and apply
+> today.
+
+### Why the tails need their own metrics
+
+NGED's need for these forecasts is [threshold exceedance](../background/requirements.md#the-worst-case-matters-most-forecasting-threshold-exceedance):
+"will load cross this substation's limit?". Their own operator tool plots demand as headroom
+below a constraint line — the y-axis is literally "MW Exceedance of Constraint" (see
+[NGED's incumbent forecast](../background/nged-incumbent-forecast.md#the-operators-view)). So
+the most valuable forecast skill lives in a specific *region of power values*: the region near
+each substation's limit.
+
+The metrics above already lean toward the tails — the
+[mean pinball loss](#mean-pinball-loss) is deliberately tail-weighted, and PICP covers the
+p1–p99 band — but they measure something subtly different: how well the model estimates the
+*upper quantiles of every half-hour's distribution*, including quiet summer nights when even
+the 95th percentile sits far below any limit. Getting the p95 right *everywhere* is not the
+same skill as getting the forecast right *near the limit*. The metrics in this section target
+the second skill directly.
+
+### The trap: scoring only the hours when the worst case actually happened
+
+The natural instinct — "NGED cares about peaks, so score the model only on the peak
+half-hours" — is a well-known statistical trap called the **forecaster's dilemma** (Lerch et
+al. 2017). The intuition: if you grade forecasters only on the occasions when something extreme
+actually happened, you systematically reward the forecaster who *always* predicts extremes.
+Their alarmist forecasts happen to look right on the hours you kept, and the false alarms they
+raised on all the other hours were thrown away before grading. Formally, restricting even a
+proper (un-gameable) score to cases *selected by the observed outcome* makes it improper: a
+model can climb that ranking by simply biasing every forecast upward, adding no skill at all.
+
+The fix is a distinction between two kinds of hour-selection:
+
+- **Selecting hours on information known *ex ante*** — Latin for "before the event", meaning
+  information available before the outcome was known — is safe. Scoring separately on
+  bank-holiday dates, on logged switching events, or per lead-time slice conditions only on
+  things a forecaster also knew in advance, so honest forecasts still win.
+
+- **Selecting hours by what actually happened** — e.g. "the top 5% highest *observed* demand
+  half-hours" — is not safe for ranking models, for the reason above.
+
+The consequence for this project: the calendar-based and switching-event metric slices are
+legitimate ranking columns, while any slice defined by observed peaks is a *diagnostic view
+only* — useful for asking "where did this model's error come from?", never for deciding which
+model is better. To *rank* models on tail skill, we instead re-weight a proper score across
+**all** hours, which is exactly what the next metric does.
+
+### Threshold-weighted CRPS (twCRPS)
+
+**MW; smaller is better.** The threshold-weighted Continuous Ranked Probability Score is
+[CRPS](#crps-continuous-ranked-probability-score) with its attention confined to the region
+above a threshold. Plain-language version: ordinary CRPS asks "how far was the forecast
+distribution from what happened?" and cares equally about errors at every power level; twCRPS
+asks the same question but only about behaviour *above the threshold* — how much probability
+the forecast placed above the line, and how far above. Distinctions entirely below the
+threshold contribute nothing. Because every half-hour is still scored (hours far below the
+threshold simply contribute ≈ 0 naturally, rather than being deleted from the sample), twCRPS
+stays a proper score — it avoids the forecaster's dilemma while still concentrating on the
+region NGED cares about. It is the ranking-grade tail metric: two models can tie on CRPS while
+twCRPS reveals which one actually knows more about the near-limit hours.
+
+Computation is a one-line extension of the existing machinery: for the threshold $r$, replace
+every member and the observation by $v(z) = \max(z, r)$ and compute the
+[fair CRPS](#crps-continuous-ranked-probability-score) of the transformed values (this
+equivalence is standard — Gneiting & Ranjan 2011):
+
+$$
+\mathrm{twCRPS}_t(r) = \mathrm{CRPS}_t\!\left( \max(x_{t,1}, r), \dots, \max(x_{t,m}, r);\;
+\max(y_t, r) \right)
+$$
+
+Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property:
+it is unbiased across ensemble sizes, so the 13-member `nged_incumbent` and the 51-member ML
+models can be compared on it directly. It is computed per threshold in the
+[per-series threshold ladder](#choosing-the-thresholds-static-per-series-quantile-derived),
+with `metric_param` carrying the threshold label.
+
+### Exceedance rate of the upper delivery quantiles
+
+**Dimensionless; aim for the calibrated reference.** The plainest calibration question NGED
+can ask of the product: *"when the forecast says p95, how often does reality end up above
+it?"* For an honest p95, the answer should be close to 5%. This metric reports, for each upper
+delivery quantile (p80, p90, p95, p98, p99), the observed fraction of half-hours in which the
+outcome exceeded the forecast quantile:
+
+$$
+\mathrm{ER}_\tau = \frac{1}{T} \sum_t \mathbf{1}\!\left[ y_t > \hat{q}_t(\tau) \right]
+$$
+
+It is the one-sided companion to [PICP](#picp-prediction-interval-coverage-probability):
+PICP checks symmetric bands (p10–p90, etc.), but NGED's operating point is one-sided — an
+operator reads the p95 as "the level demand should stay under, 19 times out of 20" — so its
+honesty deserves its own directly-readable number. It is *not* a ranking metric (a model can
+hit perfect exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish
+that); it is the trust check for the delivered tail quantiles.
+
+As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true ones, so
+even a perfectly calibrated ensemble exceeds its p95 slightly *more* than 5% of the time. The
+exact calibrated reference per quantile and ensemble size will be derived and verified by
+Monte Carlo at implementation time, mirroring [PICP's reference table](#picp-prediction-interval-coverage-probability).
+
+### Brier score for threshold exceedance
+
+**Dimensionless (0 to 1); smaller is better.** The ensemble can answer "what is the chance
+load exceeds threshold $r$?" — the fraction of members above $r$. The Brier score grades those
+probability statements the way you would grade a weather presenter's "70% chance of rain": it
+is the mean squared difference between the stated probability and what actually happened
+(1 if load exceeded the threshold, 0 if not):
+
+$$
+\mathrm{BS}(r) = \frac{1}{T} \sum_t \left( p_t(r) - \mathbf{1}\!\left[ y_t > r \right] \right)^2,
+\qquad
+p_t(r) = \frac{1}{m} \sum_i \mathbf{1}\!\left[ x_{t,i} > r \right]
+$$
+
+A forecaster minimises it by stating their honest probability — hedging toward 50% and
+alarmism both cost — so it is a proper score. Mathematically it is not independent of twCRPS
+(CRPS is the Brier score integrated over all possible thresholds, so twCRPS above $r$
+aggregates the Brier scores above $r$); we compute it anyway because it is the most
+*decision-legible* number in this section — it grades exactly the yes/no warning NGED acts on.
+
+One caveat to carry into reading it: a 51-member ensemble can only express 52 distinct
+probabilities, and an underdispersed ensemble slams its exceedance probabilities to 0 or 1 too
+early. That is not a flaw in the metric — it is precisely the failure mode this metric exists
+to expose, and the before/after instrument for the
+[calibration work](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
+The per-probability breakdown (a *reliability diagram*) is a curve rather than a scalar, so it
+lives in ad-hoc analyses — see
+[What is deliberately not here](#what-is-deliberately-not-here).
+
+### Choosing the thresholds: static, per-series, quantile-derived
+
+The metrics above need a threshold $r$ per series, and here honesty matters: **a substation's
+true limit is not a single number.** Thermal ratings vary with ambient temperature and season;
+transformers tolerate being overloaded for short periods, so the *duration* of an exceedance
+matters (cyclic ratings); and switching changes what a feeder carries. NGED's own operator
+tool draws the limit as a time-varying "Flex Profile", not a constant. We do not attempt to
+model any of that for scoring. Instead we pick **static, per-series thresholds chosen for
+their scoring properties**, and state plainly that they are a proxy — these metrics measure
+"skill near a fixed line standing where the limit typically lives", not operational breach
+prediction:
+
+- **The threshold ladder: the P90 and P98 of each series' full observation history** (of
+  power in the constraint-side direction — see below). Labels `hist_p90` / `hist_p98` in
+  `metric_param`, deliberately distinct from forecast-quantile labels like `p95`: one names a
+  fixed power level derived from history, the other a level of the forecast distribution. The
+  two rungs give a "busy periods" and a "genuinely extreme" read without exploding the key
+  count.
+
+- **Why historical quantiles rather than the physical ratings:** ratings are not available
+  for every series; a rating that is never breached in a 12-month validation window yields
+  *zero events* — and a warning system cannot be graded on events that never happen; and
+  per-series ratings sit at wildly different points of each series' distribution, breaking
+  cross-series comparability. Full-history quantile thresholds guarantee every series a
+  scoreable event rate (~10% and ~2% by construction), are identical in meaning across
+  series, and are stable across CV folds for the same reason the
+  [effective-capacity denominator](../roadmap/metrics-and-leaderboard.md#normalising-nmae-by-effective_capacity)
+  is computed over the full history.
+
+- **NGED-supplied firm/flex ratings** for the trial area remain valuable — for ad-hoc case
+  studies and dashboard overlays, where a zero-event outcome is informative rather than
+  fatal. They do not enter the leaderboard.
+
+- **Constraint direction.** For demand substations the dangerous tail is high load; for
+  generation-dominated feeders the binding constraint can be reverse power flow — the most
+  *negative* tail. The threshold metrics therefore apply to power measured in each series
+  type's constraint-side direction, rather than assuming "high is bad" universally.
+
 ## Where the numbers live: Delta vs MLflow
 
 The `forecast_metrics` Delta table always holds the complete detail: all thirteen pinball
@@ -315,3 +489,22 @@ not in MLflow is still one Polars filter away in Delta.
   approach) rather than stored per experiment.
 - **Histogram of errors** — same reason; planned as a visual check on the
   [roadmap](../roadmap/metrics-and-leaderboard.md#evaluation-metrics).
+
+- **Reliability diagrams** — the per-probability breakdown of the
+  [Brier score](#brier-score-for-threshold-exceedance): "of the hours where the forecast said
+  a 70% chance of exceedance, how many actually exceeded?", plotted across probability bins. A
+  curve, not a scalar; computed ad hoc when the Brier numbers need explaining.
+
+- **Hit-rate / false-alarm trigger analyses** — turning the ensemble's exceedance probability
+  into a yes/no warning requires choosing a trigger ("warn when the probability tops X%"), and
+  the informative object is the *scan* across triggers (a ROC curve — Receiver Operating
+  Characteristic — and, for rare events, base-rate-robust summaries such as the Symmetric
+  Extremal Dependence Index, SEDI). Curves again, and trigger choice is an operational
+  decision to make with NGED; ad-hoc analyses, not leaderboard columns.
+
+- **Cost-loss economic value curves** — the fully decision-theoretic summary of exceedance
+  skill: for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance
+  occurs", how much of a perfect forecast's value does this model capture? This is the natural
+  bridge to the 🔬 v2 stretch goal of estimating **cost savings (£)** per leaderboard row
+  ([Grouping the results](../roadmap/metrics-and-leaderboard.md#grouping-the-results)); until
+  then it is an ad-hoc analysis.
