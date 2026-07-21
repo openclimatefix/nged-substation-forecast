@@ -47,19 +47,25 @@ The verification below sends its heartbeat to a throwaway monitor slug instead.
 
 ## Verify it works from your laptop
 
-Save this script and run it with `uv run python <file>`. It exercises the two real code paths — the
-failure hook and the heartbeat — and flushes so the events reach Sentry before the process exits:
+Save this script and run it with `uv run python <file>`. It exercises the three real code paths —
+the failure hook, the heartbeat, and the freshness warning — and flushes so the events reach Sentry
+before the process exits:
 
 ```python
+from datetime import datetime, timezone
+
+import polars as pl
 import sentry_sdk
 from contracts.settings import Settings
 from dagster import job, op
 
 from nged_substation_forecast._sentry import (
     init_sentry,
+    report_power_freshness,
     send_forecast_checkin,
     sentry_capture_failure,
 )
+from nged_substation_forecast.defs.checks import PowerFreshnessResult
 
 TEST_MONITOR_SLUG = "live-forecasts-test"  # a throwaway slug — never the production monitor
 
@@ -74,6 +80,23 @@ def _sentry_smoke_job() -> None:
     _intended_failure()
 
 
+# A synthetic "one series is late" result, so report_power_freshness has something to send.
+_stale_result = PowerFreshnessResult(
+    n_series_total=1,
+    n_stale=1,
+    n_never=0,
+    threshold_hours=24.0,
+    late=pl.DataFrame(
+        {
+            "time_series_id": pl.Series([999], dtype=pl.Int32),
+            "last_seen": pl.Series([datetime(2000, 1, 1, tzinfo=timezone.utc)]),
+            "hours_late": pl.Series([9999.0], dtype=pl.Float64),
+            "status": pl.Series(["stale"]),
+        }
+    ),
+)
+
+
 settings = Settings()
 if not settings.sentry_dsn:
     raise SystemExit("No SENTRY_DSN in .env — nothing to test.")
@@ -81,18 +104,22 @@ if not settings.sentry_dsn:
 init_sentry(settings)
 _sentry_smoke_job.execute_in_process(raise_on_error=False)  # fires the failure hook
 send_forecast_checkin(Settings(sentry_monitor_forecasts=True), monitor_slug=TEST_MONITOR_SLUG)
+report_power_freshness(settings, _stale_result)  # fires the freshness warning
 sentry_sdk.flush(timeout=10)
 ```
 
 Then check the Sentry UI:
 
-- **Issues**, filtered to `environment:<your-name>-laptop` — a `ValueError: laptop Sentry
-  acceptance test…` with a full stack trace. A traceback (not a message-only event) is the point:
-  it confirms the failure hook forwards the live exception rather than relying on log capture.
+- **Issues**, filtered to `environment:<your-name>-laptop` — two events: a `ValueError: laptop
+  Sentry acceptance test…` with a full stack trace (a traceback, not a message-only event, is the
+  point — it confirms the failure hook forwards the live exception rather than relying on log
+  capture), and a `NGED power data stale: 1/1 time series late…` warning carrying the per-series
+  context. Both are fingerprinted with your `<your-name>-laptop` environment, so they form their
+  own issues, separate from production's.
 - **Crons → `live-forecasts-test`** — one OK check-in.
 
 Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and
-optionally resolve the test issue). Neither affects the production wiring.
+optionally resolve the two test issues). Neither affects the production wiring.
 
 ## What gets sent when you run Dagster locally
 

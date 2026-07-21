@@ -203,6 +203,8 @@ def test_report_power_freshness_sends_warning_with_fingerprint_and_context(
     # Environment IS in the fingerprint: Sentry's environment is a filter facet, not a grouping
     # dimension, so this is what gives each deployment its own issue.
     assert call["fingerprint"] == [_sentry.POWER_DATA_STALE_FINGERPRINT, "jacks-laptop"]
+    # These are the python ints on the pre-serialization scope; Sentry str()s tag values on the
+    # wire, so in the UI they filter as e.g. `n_late:3`.
     assert call["tags"] == {"n_late": 3, "n_stale": 2, "n_never_reported": 1}
     ctx = call["contexts"]["power_freshness"]
     assert ctx["n_late"] == 3

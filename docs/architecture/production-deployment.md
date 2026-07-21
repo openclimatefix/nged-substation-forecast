@@ -84,10 +84,11 @@ This in-Dagster check is complementary to — not a replacement for — the
 [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total
 silence from *outside* the deployment, because a dead daemon cannot report itself; this check
 reports per-series staleness from *inside* Dagster while the daemon is alive, and forwards that
-same staleness to Sentry as a warning (see [the freshness-warning bullet](#send-telemetry-to-sentry-and-alarm-on-absence)
-below). The freshness evaluation is a pure function, so the Sentry warning reuses the same
-`PowerFreshnessResult` the check already computed rather than recomputing it; the same result will
-later also feed the forecast-warnings delivery table.
+same staleness to Sentry as a warning (see the freshness-warning bullet under
+[Send telemetry to Sentry](#send-telemetry-to-sentry-and-alarm-on-absence)). The freshness
+evaluation is a pure function, so the Sentry warning reuses the same `PowerFreshnessResult` the
+check already computed rather than recomputing it; the same result will later also feed the
+forecast-warnings delivery table.
 
 ## Send telemetry to Sentry, and alarm on absence
 

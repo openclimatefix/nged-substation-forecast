@@ -217,38 +217,55 @@ def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
     assert result.metadata["n_series_total"].value == 0
 
 
-def test_power_data_is_fresh_hands_result_to_sentry(
+def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The check hands its computed ``PowerFreshnessResult`` to ``report_power_freshness`` — reused,
-    not recomputed. The reporter self-gates on health (tested in ``test_sentry.py``), so the check
-    calls it unconditionally; here we assert the object it receives matches what the check evaluated
-    and returned."""
+    """The check forwards the *exact* ``PowerFreshnessResult`` it evaluated to
+    ``report_power_freshness`` — reused, not recomputed. We patch ``evaluate_power_freshness`` to
+    return a sentinel and assert *object identity* on the reporter's argument: asserting counts
+    alone would not prove reuse, since the pure function is deterministic and a recompute would
+    yield equal counts and pass a weaker test. The reporter self-gates on health (tested in
+    ``test_sentry.py``), so the check calls it unconditionally."""
     from contracts.settings import Settings
 
+    sentinel = PowerFreshnessResult(
+        n_series_total=8,
+        n_stale=7,
+        n_never=0,
+        threshold_hours=24.0,
+        late=pl.DataFrame(
+            {
+                "time_series_id": pl.Series(range(7), dtype=pl.Int32),
+                "last_seen": pl.Series([datetime(2020, 1, 1, tzinfo=timezone.utc)] * 7).cast(
+                    UTC_DATETIME_DTYPE
+                ),
+                "hours_late": pl.Series([9999.0] * 7, dtype=pl.Float64),
+                "status": pl.Series(["stale"] * 7),
+            }
+        ),
+    )
+    monkeypatch.setattr(checks, "evaluate_power_freshness", lambda **_: sentinel)
     captured: list[PowerFreshnessResult] = []
     monkeypatch.setattr(
         checks, "report_power_freshness", lambda settings, result: captured.append(result)
     )
 
+    # The check still reads coverage + roster before calling the (patched) evaluator, so a minimal
+    # Delta table and roster must exist for those reads to succeed.
     now = datetime.now(timezone.utc)
     settings = Settings()
     pl.DataFrame(
         {
-            "time_series_id": pl.Series([1, 2], dtype=pl.Int32),
-            "time": pl.Series([now - timedelta(hours=1), now - timedelta(hours=48)]).cast(
-                UTC_DATETIME_DTYPE
-            ),
-            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+            "time_series_id": pl.Series([1], dtype=pl.Int32),
+            "time": pl.Series([now - timedelta(hours=1)]).cast(UTC_DATETIME_DTYPE),
+            "power": pl.Series([1.0], dtype=pl.Float32),
         }
     ).write_delta(settings.power_time_series_data_path)
-    _write_metadata_roster(settings.metadata_path, ids=[1, 2, 99])
+    _write_metadata_roster(settings.metadata_path, ids=[1])
 
-    result = checks.power_data_is_fresh()
-    assert isinstance(result, AssetCheckResult)
+    check_result = checks.power_data_is_fresh()
+    assert isinstance(check_result, AssetCheckResult)
     assert len(captured) == 1
-    reported = captured[0]
-    assert isinstance(reported, PowerFreshnessResult)
-    # The reported object carries the same counts the check turned into its returned metadata.
-    assert reported.n_stale == 1 and reported.n_never == 1
-    assert reported.n_late == result.metadata["n_late"].value == 2
+    assert captured[0] is sentinel  # the exact evaluated object, not a recomputation
+    # ...and that same object drove the returned check result (n_late == n_stale + n_never == 7).
+    assert check_result.metadata["n_late"].value == 7
