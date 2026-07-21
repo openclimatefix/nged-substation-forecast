@@ -352,9 +352,11 @@ def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
 
     lf = lf.with_columns(
         local_utc_offset=(
-            pl.col("local_time").dt.base_utc_offset() + pl.col("local_time").dt.dst_offset()
-        ).dt.total_seconds()
-        / 3600
+            (
+                pl.col("local_time").dt.base_utc_offset() + pl.col("local_time").dt.dst_offset()
+            ).dt.total_seconds()
+            // 3600
+        ).cast(pl.Int8)
     )
 
     local_hour_float = pl.col("local_time").dt.hour() + pl.col("local_time").dt.minute() / 60.0
