@@ -41,18 +41,18 @@ nav:
   - Techniques:
       - Overview: techniques/index.md
       - Convex Optimisation: techniques/convex-optimisation.md
-      - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
-      - Evaluation Metrics: techniques/evaluation-metrics.md
       - Differentiable Physics: techniques/differentiable-physics.md
-      - Encoders: techniques/encoders.md
       - Disaggregation Evaluation: techniques/disaggregation-evaluation.md
+      - Encoders: techniques/encoders.md
+      - Evaluation Metrics: techniques/evaluation-metrics.md
+      - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
   - Architecture:
       - Overview: architecture/overview.md
       - Forecast Delivery: architecture/forecast-delivery.md
+      - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Production Deployment Design: architecture/production-deployment.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
-      - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - Code Style: architecture/code-style.md
       - Testing: architecture/testing.md
   - ML Experimentation:
@@ -70,17 +70,17 @@ nav:
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md
-      - Live Service: roadmap/live-service.md
-      - Handover to NGED: roadmap/handover.md
-      - Delivery Tables: roadmap/delivery-tables.md
-      - Forecast Building Blocks: roadmap/forecast-building-blocks.md
-      - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
-      - Data Sources: roadmap/data-sources.md
       - Capacity Estimation: roadmap/capacity-estimation.md
+      - Data Sources: roadmap/data-sources.md
+      - Delivery Tables: roadmap/delivery-tables.md
+      - Engineering Health: roadmap/engineering-health.md
+      - Forecast Building Blocks: roadmap/forecast-building-blocks.md
+      - Handover to NGED: roadmap/handover.md
+      - Live Service: roadmap/live-service.md
+      - Metrics & Leaderboard: roadmap/metrics-and-leaderboard.md
       - Net-Demand Disaggregation: roadmap/disaggregation.md
       - Switching Events: roadmap/switching-events.md
       - XGBoost Improvements: roadmap/xgboost-improvements.md
-      - Engineering Health: roadmap/engineering-health.md
   - API Reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md
