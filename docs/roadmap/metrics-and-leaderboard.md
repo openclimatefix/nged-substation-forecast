@@ -459,6 +459,19 @@ and nothing is logged to the leaderboard MLflow runs.
 > per-fold and mean-across-folds aggregates logged to MLflow — see
 > [Running an ML experiment end-to-end](../ml_experimentation/dagster-workflow.md#step-8-materialise-metrics).
 
+**Every metric above is also broken out by named population-filter slices**, which appear as
+extra leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by
+information known *before* the outcome: the
+[horizon slice](#time-slices-for-performance-evaluation) a forecast falls in, the
+[Tricky days](#tricky-days-a-calendar-deterministic-metric-filter) calendar, and logged
+[switching events](#measuring-performance-during-switching-events). Two are **diagnostic only
+and must never drive ranking**, because they select hours by what actually happened and so
+reward a model that simply over-forecasts (the
+[forecaster's-dilemma trap](../techniques/evaluation-metrics.md#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened)):
+the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand-picked **hard
+examples**. Both are described under
+[Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
+
 ### Which ensemble collapse defines the deterministic point forecast? 🚧
 
 **Decided: metric-matched collapse, uniform across every model.** Implemented as part of the
