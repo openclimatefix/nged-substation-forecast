@@ -325,15 +325,19 @@ raised on all the other hours were thrown away before grading. Formally, restric
 proper (un-gameable) score to cases *selected by the observed outcome* makes it improper: a
 model can climb that ranking by simply biasing every forecast upward, adding no skill at all.
 
-The fix is a distinction between two kinds of hour-selection:
+The fix turns on *what* the hour-selection is based on:
 
-- **Selecting hours on information known *ex ante*** — Latin for "before the event", meaning
-  information available before the outcome was known — is safe. Scoring separately on
-  bank-holiday dates, on logged switching events, or per lead-time slice conditions only on
-  things a forecaster also knew in advance, so honest forecasts still win.
+- **Selecting hours by the load we are forecasting** — e.g. "the top 5% highest *observed*
+  demand half-hours" — is the unsafe case, for the reason above: because the selection is made
+  on the very quantity being scored, it rewards the forecaster who always predicts extremes.
 
-- **Selecting hours by what actually happened** — e.g. "the top 5% highest *observed* demand
-  half-hours" — is not safe for ranking models, for the reason above.
+- **Selecting hours by anything *other than* that observed load is safe** — the calendar
+  (bank-holiday dates), the lead time, or whether a switching event was logged. None of these
+  is the quantity we forecast, so restricting the score to them keeps it proper and honest
+  forecasts still win. A handy rule of thumb: if the selection could have been made *ex ante*
+  (Latin for "before the event") it is certainly safe — and a slice like logged switching
+  events is safe on the same grounds even when the event itself was an unforeseen fault,
+  because the test is "not the observed load", not "foreseeable".
 
 The consequence for this project: the calendar-based and switching-event metric slices are
 legitimate ranking columns, while any slice defined by observed peaks is a *diagnostic view
