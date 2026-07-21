@@ -44,6 +44,10 @@ operational systems, rather than us silently working around the gap.
 
 ## Documentation
 
+> **Want to run this on your laptop?** Start with [Getting started](getting-started.md) — a single
+> walkthrough from a fresh clone to a running Dagster instance that downloads data and trains a
+> model.
+
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
 - [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
 - [Code Style](architecture/code-style.md) — code conventions

@@ -31,6 +31,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Getting Started: getting-started.md
   - Documentation Guide: documentation-guide.md
   - Background & Challenges:
       - NGED Network: background/network.md

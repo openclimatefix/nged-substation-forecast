@@ -11,10 +11,10 @@ identical to the AWS deployment.
 
 ## Step 1 — Repository and credentials
 
-Follow the [repository README's Setup section](https://github.com/openclimatefix/nged-substation-forecast#setup)
-for first-time repo setup (`uv`, `uv sync`, pre-commit hooks), and create a `.env` in the repo
-root containing the three NGED source-bucket credentials — the only values that are always
-required (see [Configuration reference](setup.md#the-env-file-and-nged-source-credentials)):
+Follow [Getting started on your laptop](../getting-started.md) for first-time setup (`uv`, `uv
+sync`, pre-commit hooks, and `cp .env.example .env`). At minimum, `.env` needs the three NGED
+source-bucket credentials — the only values that are always required (see
+[Configuration reference](setup.md#the-env-file-and-nged-source-credentials)):
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>
@@ -31,8 +31,9 @@ The 6-hourly schedule only fires while Dagster's daemon is running continuously,
 dev` needs to keep running (rather than being started and stopped around each manual step) and
 needs a persistent `DAGSTER_HOME` so its schedule state survives a restart:
 
-1. `mkdir ~/dagster_home/` and put the `dagster.yaml` shown in the repository README's
-   [Setup](https://github.com/openclimatefix/nged-substation-forecast#setup) section into it.
+1. `mkdir ~/dagster_home/` and put the `dagster.yaml` shown in
+   [Getting started → Give Dagster a persistent home](../getting-started.md#step-3-give-dagster-a-persistent-home)
+   into it.
 2. `export DAGSTER_HOME=~/dagster_home` (add to `.bashrc` so it persists across terminals).
 
 ## Step 3 — Start Dagster

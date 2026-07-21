@@ -23,7 +23,8 @@ Each app has a **Data source** toggle (`local` / `s3`) that switches which data 
 reads without restarting marimo, so you can compare a fully local pipeline against production
 data in one session.
 
-- **local** reads only the root `.env` — the same local-pipeline config the rest of the app uses.
+- **local** reads only the root `.env` — the same local-pipeline config the rest of the app uses
+  (set up in the [Getting started guide](https://openclimatefix.github.io/nged-substation-forecast/getting-started/)).
 - **s3** layers a git-ignored `packages/dashboard/.env.s3` on top of the root `.env`, overriding
   the data-path roots (`DATA_PATH_INTERNAL`, `DATA_PATH_DELIVERY`) and the `DATA_STORE_*`
   credentials to point at the real S3 buckets.

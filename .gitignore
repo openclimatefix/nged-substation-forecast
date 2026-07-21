@@ -18,7 +18,7 @@ marimo/_lsp/
 __marimo__/
 
 #######################
-# Environment variables & secrets
+# Environment variables & secrets. The committed .env.example documents the keys; copy it to .env.
 .env
 .env.backup
 # Dashboard S3-mode overrides (issue #297); the committed .env.s3.example documents the keys.
