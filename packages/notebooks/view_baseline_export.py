@@ -33,7 +33,11 @@ with app.setup:
     SETTINGS = Settings()
     # Per-series descriptive metadata (name, type, unit) keyed by time_series_id, loaded once.
     SERIES_META: dict[int, dict[str, str]] = {
-        row["time_series_id"]: row
+        row["time_series_id"]: {
+            "time_series_name": row["time_series_name"],
+            "time_series_type": row["time_series_type"],
+            "units": row["units"],
+        }
         for row in pl.read_parquet(
             SETTINGS.metadata_path,
             storage_options=typeddict_to_dict(SETTINGS.storage_options),
