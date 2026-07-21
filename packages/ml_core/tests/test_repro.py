@@ -48,6 +48,13 @@ def test_git_info_outside_repo_is_unknown_never_raises(tmp_path: Path) -> None:
     assert info == {"git_sha": UNKNOWN, "git_dirty": UNKNOWN}
 
 
+def test_git_info_never_raises_on_bad_cwd(tmp_path: Path) -> None:
+    # A nonexistent working directory makes subprocess raise FileNotFoundError *for the cwd* — a
+    # different path from the out-of-repo case — which the broad guard must still swallow.
+    info = get_git_info(cwd=tmp_path / "does_not_exist")
+    assert info == {"git_sha": UNKNOWN, "git_dirty": UNKNOWN}
+
+
 def test_delta_version_zero_then_increments_on_append(tmp_path: Path) -> None:
     table_path = str(tmp_path / "tbl")
     frame = pl.DataFrame({"a": [1, 2, 3]}).to_arrow()
