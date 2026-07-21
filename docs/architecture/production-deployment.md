@@ -461,6 +461,8 @@ production-resilience mechanism.
   `EcsRunLauncher`) and its implementation workstreams.
 - [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:
   promotion, image build/push, and the full AWS bring-up including the control-plane box.
+- [Setting up Sentry telemetry](../live_service/sentry.md) — the how-to for the error reporting
+  and missed-check-in alarm designed above: get a DSN, test from a laptop, enable in production.
 - [Configuration reference](../live_service/setup.md) — where data tables and local
   artifacts live, and how to point `Settings` at S3.
 - [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the
