@@ -1,8 +1,9 @@
 # Getting started on your laptop
 
 This is the single walkthrough for going from a fresh clone to a running Dagster instance that
-downloads real data and trains a model — entirely on your laptop, no AWS involved. Follow it
-top to bottom the first time; later pages go deeper on each part and are linked as you reach them.
+downloads real data and trains a model — entirely on your laptop, with no AWS account of your own
+to set up. Follow it top to bottom the first time; later pages go deeper on each part and are
+linked as you reach them.
 
 ## Prerequisites
 
@@ -14,11 +15,11 @@ top to bottom the first time; later pages go deeper on each part and are linked 
   where NGED publishes its telemetry. Ask another team member if you do not have them. Nothing in
   this project works without them, because the raw power data lives there.
 
-## Step 1 — Install the project
-
-From your clone of the repository:
+## Step 1 — Clone and install the project
 
 ```bash
+git clone https://github.com/openclimatefix/nged-substation-forecast.git
+cd nged-substation-forecast
 uv sync                    # create the virtualenv and install all workspace packages
 uv run pre-commit install  # install the git hooks (lint, format, markdown, type-check on commit)
 ```
@@ -108,18 +109,27 @@ Leave it running and open <http://localhost:3000>. Everything from here is drive
 ## Step 5 — Download data and train a model
 
 In the Dagster UI, materialise the data assets in order — this is what pulls the real data onto
-your laptop:
+your laptop. The quickest first run is the **`smoke_test`** fold (a ~1-month train / ~1-month
+validation window for a fast end-to-end check), so the concrete values below target it:
 
-1. **`power_time_series_and_metadata`** — pulls NGED telemetry from S3 into a local Delta table.
-2. **`h3_grid_weights`** — computes the spatial weights the NWP download needs (one-off).
-3. **`ecmwf_ens`** — downloads ECMWF ensemble weather; materialise the daily partitions across
-   your training window.
-4. **`eligible_time_series`** — determines which series have enough coverage for a fold.
+1. **`power_time_series_and_metadata`** — pulls NGED telemetry from S3 into a local Delta table
+   (unpartitioned).
+2. **`h3_grid_weights`** — computes the spatial weights the NWP download needs (unpartitioned,
+   one-off).
+3. **`ecmwf_ens`** — downloads ECMWF ensemble weather, one daily partition at a time. Materialise
+   the partitions covering the fold's train **and** validation window; for `smoke_test` that is
+   `2025-01-01` through `2025-02-28`. Do not "Materialise all" on a first run — the full archive
+   back to `2024-04-01` is billions of rows.
+4. **`eligible_time_series`** — determines which series have enough coverage for a fold. This asset
+   is **fold-partitioned**, so materialise the **`smoke_test`** partition (not
+   `mid_2025_to_mid_2026`) to match the run below — otherwise training finds an empty population and
+   raises.
 
 Then register an experiment and train a model. The full recipe — the run config for each job, what
 `smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow — is
-[Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md). Start there with a
-`smoke_test` run to check the whole pipeline is wired up before committing to a long training run.
+[Running an ML experiment end-to-end](ml_experimentation/dagster-workflow.md). Register the
+experiment with `run_mode="smoke_test"` to check the whole pipeline is wired up before committing to
+a long `full_cv` training run.
 
 ## Where to go next
 
@@ -132,5 +142,5 @@ Then register an experiment and train a model. The full recipe — the run confi
   forecast schedule running continuously, and an optional MinIO rehearsal of the S3 code paths.
 - The [dashboard README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard#readme)
   — Marimo apps for inspecting forecasts, and the `.env.s3` toggle for viewing production data.
-- [MLflow experiment tracking](https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#viewing-results-in-the-mlflow-ui)
-  — viewing your training runs (`uv run mlflow ui --gunicorn-opts "--workers 1"`).
+- [Viewing results in the MLflow UI](ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)
+  — inspecting your training runs (`uv run mlflow ui --gunicorn-opts "--workers 1"`).
