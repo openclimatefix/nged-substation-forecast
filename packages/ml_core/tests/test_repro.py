@@ -59,15 +59,19 @@ def test_delta_version_zero_then_increments_on_append(tmp_path: Path) -> None:
     table_path = str(tmp_path / "tbl")
     frame = pl.DataFrame({"a": [1, 2, 3]}).to_arrow()
     write_deltalake(table_path, frame)
-    assert get_delta_versions({"tbl": table_path}) == {"delta_version__tbl": "0"}
+    assert get_delta_versions({"power_time_series": table_path}) == {
+        "delta_version__power_time_series": "0"
+    }
 
     write_deltalake(table_path, frame, mode="append")
-    assert get_delta_versions({"tbl": table_path}) == {"delta_version__tbl": "1"}
+    assert get_delta_versions({"power_time_series": table_path}) == {
+        "delta_version__power_time_series": "1"
+    }
 
 
 def test_delta_version_missing_table_is_absent(tmp_path: Path) -> None:
-    versions = get_delta_versions({"nope": str(tmp_path / "does_not_exist")})
-    assert versions == {"delta_version__nope": ABSENT}
+    versions = get_delta_versions({"nwp_data": str(tmp_path / "does_not_exist")})
+    assert versions == {"delta_version__nwp_data": ABSENT}
 
 
 def test_provenance_tags_are_stage_prefixed(tmp_path: Path) -> None:
@@ -77,13 +81,13 @@ def test_provenance_tags_are_stage_prefixed(tmp_path: Path) -> None:
 
     # get_git_info here uses the real repo of the test run (default cwd); we only assert the keys
     # and the Delta-version value, which are deterministic.
-    tags = provenance_tags("train", {"power": table_path})
+    tags = provenance_tags("train", {"power_time_series": table_path})
     assert set(tags) == {
         "train_git_sha",
         "train_git_dirty",
-        "train_delta_version__power",
+        "train_delta_version__power_time_series",
     }
-    assert tags["train_delta_version__power"] == "0"
+    assert tags["train_delta_version__power_time_series"] == "0"
 
 
 def test_provenance_tags_without_delta_paths_is_git_only() -> None:

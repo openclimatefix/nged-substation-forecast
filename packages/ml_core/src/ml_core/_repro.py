@@ -21,11 +21,30 @@ three provenance snapshots side by side.
 import logging
 import subprocess
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
+from contracts._uri import ObjectStoreOptions
+from contracts.typing_utils import typeddict_to_dict
 from deltalake import DeltaTable
 
 logger = logging.getLogger(__name__)
+
+MlflowTags = dict[str, str]
+"""A ``{tag_key: tag_value}`` mapping ready to hand to ``mlflow.set_tags``."""
+
+StageType = Literal["register", "train", "predict", "metrics"]
+"""The assets that stamp provenance; each value becomes a tag-key prefix (see ``provenance_tags``).
+Add a new member when a new asset starts stamping."""
+
+TableNameType = Literal[
+    "power_time_series",
+    "nwp_data",
+    "eligible_time_series",
+    "power_forecasts",
+    "effective_capacity",
+]
+"""Logical names of the Delta tables whose versions get stamped — the keys of a ``delta_paths``
+mapping. Add a new member when a stage starts reading (and stamping) another table."""
 
 UNKNOWN: Final[str] = "unknown"
 """Sentinel git SHA / dirty flag returned when no git repository is reachable (e.g. a container)."""
@@ -50,7 +69,7 @@ _GIT_TIMEOUT_S: Final[float] = 5.0
 surrounding Dagster asset — provenance is best-effort metadata, not a blocking dependency."""
 
 
-def get_git_info(cwd: Path | None = None) -> dict[str, str]:
+def get_git_info(cwd: Path | None = None) -> MlflowTags:
     """Return ``{"git_sha", "git_dirty"}`` for the current checkout, never raising.
 
     ``git_dirty`` is ``"true"`` when the working tree has uncommitted changes, ``"false"`` when
@@ -88,23 +107,24 @@ def get_git_info(cwd: Path | None = None) -> dict[str, str]:
 
 
 def get_delta_versions(
-    paths: dict[str, str], storage_options: dict[str, str] | None = None
-) -> dict[str, str]:
+    paths: dict[TableNameType, str], storage_options: ObjectStoreOptions | None = None
+) -> MlflowTags:
     """Return ``{f"delta_version__{name}": str(version)}`` for each named Delta table, never raising.
 
     Args:
         paths: ``{logical_name: table_uri}``. The URI may be local or a remote object-store URI.
-        storage_options: delta-rs storage options for a remote URI; ``None``/empty for local.
+        storage_options: object-store options for a remote URI; ``None``/empty for local. Widened
+            to the plain dict delta-rs expects at the call boundary.
 
     Returns:
         One entry per input path. A table that does not exist (or cannot be read) maps to
         ``ABSENT`` rather than raising, so provenance capture never fails the calling run.
     """
-    versions: dict[str, str] = {}
+    options = typeddict_to_dict(storage_options) or {}
+    versions: MlflowTags = {}
     for name, path in paths.items():
         key = f"delta_version__{name}"
         try:
-            options = storage_options or {}
             if not DeltaTable.is_deltatable(path, storage_options=options):
                 versions[key] = ABSENT
                 continue
@@ -116,25 +136,25 @@ def get_delta_versions(
 
 
 def provenance_tags(
-    stage: str,
-    delta_paths: dict[str, str] | None = None,
-    storage_options: dict[str, str] | None = None,
-) -> dict[str, str]:
+    stage: StageType,
+    delta_paths: dict[TableNameType, str] | None = None,
+    storage_options: ObjectStoreOptions | None = None,
+) -> MlflowTags:
     """Build stage-prefixed MLflow tags stamping the code (git) and data (Delta versions) provenance.
 
     Args:
-        stage: Prefix identifying the writing asset (``"register"``, ``"train"``, ``"predict"``,
-            ``"metrics"``). Keeps the tags of assets that share one MLflow run from clobbering.
+        stage: Prefix identifying the writing asset. Keeps the tags of assets that share one MLflow
+            run from clobbering.
         delta_paths: ``{logical_name: table_uri}`` for the Delta tables this stage reads; omit for
             a stage that reads no data (registration).
-        storage_options: delta-rs storage options for remote table URIs; ``None``/empty for local.
+        storage_options: object-store options for remote table URIs; ``None``/empty for local.
 
     Returns:
         e.g. for ``stage="train"``: ``{"train_git_sha", "train_git_dirty",
         "train_delta_version__power_time_series", ...}``.
     """
     git = get_git_info()
-    tags = {f"{stage}_git_sha": git["git_sha"], f"{stage}_git_dirty": git["git_dirty"]}
+    tags: MlflowTags = {f"{stage}_git_sha": git["git_sha"], f"{stage}_git_dirty": git["git_dirty"]}
     if delta_paths:
         for key, version in get_delta_versions(delta_paths, storage_options).items():
             tags[f"{stage}_{key}"] = version

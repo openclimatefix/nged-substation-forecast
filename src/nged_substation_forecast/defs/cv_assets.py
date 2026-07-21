@@ -55,7 +55,7 @@ from ml_core._mlflow_runs import (
     get_or_create_parent_run,
     load_experiment_forecaster,
 )
-from ml_core._repro import provenance_tags
+from ml_core._repro import MlflowTags, provenance_tags
 from nged_data.storage import time_series_coverage
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
@@ -438,7 +438,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
                     "nwp_data": settings.nwp_data_path,
                     "eligible_time_series": settings.eligible_time_series_data_path,
                 },
-                storage_options=typeddict_to_dict(settings.storage_options),
+                storage_options=settings.storage_options,
             )
         )
 
@@ -572,7 +572,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
                     "power_time_series": settings.power_time_series_data_path,
                     "nwp_data": settings.nwp_data_path,
                 },
-                storage_options=typeddict_to_dict(settings.storage_options),
+                storage_options=settings.storage_options,
             )
         )
         mlflow.log_metrics(
@@ -818,7 +818,7 @@ def _score_forecast_group(
     metrics_path: str,
     now: datetime,
     storage_options: ObjectStoreOptions | None = None,
-    provenance: dict[str, str] | None = None,
+    provenance: MlflowTags | None = None,
 ) -> tuple[int, dict[str, float] | None]:
     """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
     optionally log to MLflow.
@@ -1006,7 +1006,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             "power_time_series": settings.power_time_series_data_path,
             "effective_capacity": settings.effective_capacity_data_path,
         },
-        storage_options=typeddict_to_dict(storage_options),
+        storage_options=storage_options,
     )
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
