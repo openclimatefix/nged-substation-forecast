@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import patito as pt
 import polars as pl
@@ -274,6 +274,45 @@ def test_apply_local_time_features():
     # 2023-01-10 is a Tuesday (2)
     # 2023-07-10 is a Monday (1)
     assert result["local_day_of_week"].to_list() == ["Tuesday", "Monday"]
+
+    # local_utc_offset is a whole-hour offset, matching the AllFeatures Int8 dtype.
+    assert result["local_utc_offset"].dtype == pl.Int8
+
+
+def test_apply_local_time_features_dst_transitions():
+    """Exercise the two UK DST transition instants themselves, not just GMT/BST in general.
+
+    ``valid_time`` is tz-aware UTC in production, so the inputs here are UTC too. UTC is
+    gap-free and monotonic, so the transition manifests only in the derived local-time
+    features: at spring-forward a local wall-clock hour is skipped, and at fall-back a local
+    hour repeats. See issue #84.
+    """
+    df = pl.DataFrame(
+        {
+            "valid_time": [
+                # Spring forward: 01:00 UTC, clocks jump 01:00 GMT -> 02:00 BST.
+                datetime(2023, 3, 26, 0, 30, tzinfo=timezone.utc),  # 00:30 GMT, offset 0
+                datetime(2023, 3, 26, 1, 0, tzinfo=timezone.utc),  # 02:00 BST, offset 1
+                # Fall back: 01:00 UTC, clocks drop 02:00 BST -> 01:00 GMT (the 01:00 hour repeats).
+                datetime(2023, 10, 29, 0, 30, tzinfo=timezone.utc),  # 01:30 BST, offset 1
+                datetime(2023, 10, 29, 1, 0, tzinfo=timezone.utc),  # 01:00 GMT, offset 0
+                datetime(2023, 10, 29, 1, 30, tzinfo=timezone.utc),  # 01:30 GMT, offset 0
+            ]
+        }
+    ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
+
+    result = _apply_local_time_features(df.lazy()).collect()
+
+    # The offset flips at exactly the transition instant, in both directions.
+    assert result["local_utc_offset"].to_list() == [0, 1, 1, 0, 0]
+
+    # The cyclical time-of-day feature reflects the *local* wall clock, including the jump.
+    # Spring-forward: 01:00 UTC -> 02:00 BST, so local_time_of_day_sin = sin(2/24 * 2pi) = 0.5.
+    assert result["local_time_of_day_sin"][1] == pytest.approx(0.5, abs=1e-5)
+    # Fall-back: 00:30 UTC (01:30 BST) and 01:30 UTC (01:30 GMT) are the *same* local wall
+    # clock (01:30), the repeated hour, so their time-of-day features are identical.
+    assert result["local_time_of_day_sin"][2] == pytest.approx(result["local_time_of_day_sin"][4])
+    assert result["local_time_of_day_cos"][2] == pytest.approx(result["local_time_of_day_cos"][4])
 
 
 def test_parsed_features_from_selected_features():
