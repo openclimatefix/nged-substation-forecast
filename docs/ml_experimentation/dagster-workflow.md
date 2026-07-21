@@ -261,6 +261,26 @@ FastAPI server.
 Full MLflow (which bundles the web server) is in the `dev` dependency group, so `uv sync` installs
 it; production runs use `mlflow-skinny` (the client, without the server).
 
+## Reproducibility: reconstructing a run from its stamped provenance
+
+Every run carries the code and data provenance needed to answer "exactly which code and which data
+produced this?". Each asset stamps **stage-prefixed** MLflow tags on the run it writes:
+
+- `register_git_sha` / `register_git_dirty` on the **parent run** — the code that registered the
+  experiment. (`git_dirty` is `true` when the working tree had uncommitted changes.)
+- `train_*`, `predict_*`, `metrics_*` on the **fold run** — one snapshot per stage, because
+  `trained_cv_model`, `cv_power_forecasts` and `metrics` all write to the same fold run and may run
+  days apart on different code. Each carries that stage's `git_sha` / `git_dirty` plus a
+  `{stage}_delta_version__{table}` tag holding the [Delta Lake](https://delta.io/) version of every
+  table it read (e.g. `train_delta_version__power_time_series`, `train_delta_version__nwp_data`).
+  The git SHA is stamped explicitly rather than via MLflow's auto-detection, which needs gitpython
+  and a repo working directory — neither present in a production container (there the SHA degrades
+  to `unknown`, never failing the run).
+
+To reconstruct the training-time state of a fold: `git checkout {train_git_sha}`, then read each
+table at its logged version with Delta time travel —
+`pl.scan_delta(power_time_series_path, version=<train_delta_version__power_time_series>)`.
+
 ---
 
 ## Why `trained_cv_model` reads config from MLflow, not from YAML

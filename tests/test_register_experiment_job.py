@@ -71,6 +71,10 @@ def test_smoke_test_registers_experiment_and_dev_fold(mlflow_env: None) -> None:
     parent = _parent_run(experiment.experiment_id)
     assert parent.data.tags["model_family"] == "xgboost"
     assert parent.data.tags["weather_source"] == "ecmwf_control"
+    # Provenance: registration stamps the git SHA on the parent run (the tests run inside the
+    # repo, so it resolves to a real 40-char SHA, not the out-of-repo "unknown" sentinel).
+    assert len(parent.data.tags["register_git_sha"]) == 40
+    assert parent.data.tags["register_git_dirty"] in ("true", "false")
     # Resolved config is logged as flattened params (e.g. an XGBoost hyperparameter).
     assert "n_estimators" in parent.data.params
 

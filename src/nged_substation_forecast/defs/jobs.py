@@ -15,6 +15,7 @@ from contracts.settings import PROJECT_ROOT, Settings
 from dagster import Config, OpExecutionContext, job, op
 from ml_core._cv_helpers import CV_PARTITION_KEY_SEPARATOR, flatten_config
 from ml_core._mlflow_runs import get_or_create_experiment, get_or_create_parent_run
+from ml_core._repro import provenance_tags
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from mlflow.tracking import MlflowClient
 from omegaconf import OmegaConf
@@ -137,6 +138,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
             {
                 "model_family": forecaster_cls.MODEL_NAME,
                 "weather_source": forecaster_config.weather_source,
+                # Provenance: which code registered this experiment. Registration reads no data
+                # tables, so no Delta versions here — those are stamped at train/predict/metrics.
+                **provenance_tags("register"),
             }
         )
 
