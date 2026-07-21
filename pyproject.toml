@@ -131,7 +131,10 @@ pythonpath = ["tests"]
 filterwarnings = [
     "ignore:codecs.open\\(\\) is deprecated:DeprecationWarning:mlflow.*",
 ]
-norecursedirs = [".venv", "venv", ".git", "__pycache__"]
+# `.claude` holds git worktrees (`.claude/worktrees/*`), each a full checkout carrying its own
+# copy of this `conftest.py`; recursing into them re-registers the `--run-network` option and
+# aborts collection with "option names {'--run-network'} already added".
+norecursedirs = [".venv", "venv", ".git", ".claude", "__pycache__"]
 markers = [
     "integration: tests that exercise real wiring (Dagster + file-based MLflow + temp Delta)",
     "network: hits the real Dynamical.org NWP catalog; skipped by default, `--run-network` to run",
