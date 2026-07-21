@@ -49,6 +49,23 @@ formal report to NGED, so a change of shape there (such as replacing the discret
 `substation_switching` table with continuous signals) is something to agree with NGED, not to
 decide unilaterally.
 
+### The worst case matters most: forecasting threshold exceedance
+
+NGED's need for these forecasts is driven by **flexibility procurement**: deciding, days
+ahead, whether to pay flexible customers to reduce their demand when a substation risks
+running beyond its capability. So the question users ask of a forecast is rarely "what is the
+most likely load?" and usually "**how likely is load to cross this limit?**" — NGED's
+[incumbent forecasting tool](nged-incumbent-forecast.md#the-operators-view) literally plots
+demand as headroom below a constraint line. The project's value therefore concentrates in the
+**upper tail** of each forecast distribution: a model that is excellent on typical half-hours
+but unreliable in the handful of near-limit hours has failed at the job. This is why the
+delivery quantiles are deliberately tail-heavy, and why evaluation includes
+[tail & exceedance metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
+alongside average-error metrics. (One honest complication: a substation's real limit is not a
+single number — it varies with ambient temperature and with how long an overload lasts — so
+the evaluation metrics use documented static proxies; see
+[the threshold-choice discussion](../techniques/evaluation-metrics.md#choosing-the-thresholds-static-per-series-quantile-derived).)
+
 ## Stretch Goals
 
 Further down the same continuum:
