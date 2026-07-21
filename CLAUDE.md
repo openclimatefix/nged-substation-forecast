@@ -202,6 +202,19 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 
 - `snake_case` for variables/functions, `PascalCase` for classes, `UPPER_SNAKE_CASE` for constants.
 - All function signatures must have complete type hints including return types.
+- **Prefer self-documenting type hints over bare containers — a signature is documentation.**
+  Jack strongly prefers expressive signatures and is happy to spend a few extra lines of code to
+  get them, as long as complexity stays low. Whenever you would write `dict[str, str]` (or a bare
+  `str` for a value from a fixed set, or a tuple of positional values), stop and ask whether a more
+  self-documenting type is practical. Reach for: a `Type`-suffixed `Literal` alias for a closed set
+  of string values (`StageType = Literal["register", "train", "predict", "metrics"]`); a named
+  alias for a recurring shape (`MlflowTags = dict[str, str]`) so the intent is stated once and
+  reused; a `TypedDict` for a structured mapping with known keys (e.g. `ObjectStoreOptions`) —
+  taking the `TypedDict` in the signature and widening to a plain dict at the call boundary.
+  Constraining `dict` *keys* to a `Literal` alias (`dict[TableNameType, str]`) is worthwhile for a
+  closed vocabulary and works with bidirectional inference when callers pass dict literals.
+  `packages/ml_core/src/ml_core/_repro.py` is the worked example. Don't force it where no honest
+  stricter type exists — a genuinely heterogeneous or open-ended dict stays `dict[str, str]`.
 - All consts must be marked with the maximally "constant" type.
   e.g. `CONST_SEQ: Final[tuple[str, ...]] = ("a", "b")` or `FOO: Final[str] = "bar"`
 - Never relax an existing test to make it pass.
