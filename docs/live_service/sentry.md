@@ -113,10 +113,17 @@ Dagster on your laptop does **not** forward everything to Sentry:
 - **No heartbeats are sent.** The live check-in is gated on `SENTRY_MONITOR_FORECASTS`, which you
   have left unset (see the warning above), so your laptop sends no cron check-ins and cannot touch
   the production `live-forecasts` monitor.
+- **Freshness warnings *are* sent — if your local power data is stale.** Whenever the
+  `power_data_is_fresh` asset check runs (alongside every `power_time_series_and_metadata`
+  materialisation) and finds any series past the staleness threshold, it forwards a `warning`-level
+  event to Sentry. This is gated on the DSN, not the heartbeat flag, so a laptop with a stale local
+  Delta table *will* emit one. It can't pollute production's issue, though: the event is
+  fingerprinted per environment, so your `<name>-laptop` staleness forms its own Sentry issue,
+  separate from production's. Resolve or ignore it as you like.
 
-This is the same scope that runs in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
-explains why the failure hook covers only the scheduled jobs and why only success heartbeats are
-ever sent.
+The failure hook and heartbeat scope is the same in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
+explains why the failure hook covers only the scheduled jobs, why only success heartbeats are ever
+sent, and how the freshness warning models recovery.
 
 ## Turn it on in production
 
@@ -130,12 +137,20 @@ SENTRY_MONITOR_FORECASTS=true
 ```
 
 `SENTRY_MONITOR_FORECASTS=true` makes each successful live `live_forecasts` run check in to the
-production `live-forecasts` monitor. Two one-time console steps complete the setup:
+production `live-forecasts` monitor. Three one-time console steps complete the setup:
 
 1. The monitor is created automatically on the first check-in (the code sends its schedule and
    margin with every heartbeat), so no manual monitor creation is needed.
 2. **Scope the missed-check-in alert rule to `environment:production`** in Sentry, so a developer
    testing from a laptop can never trip the production alarm.
+3. **Add an alert rule for the freshness warning, also scoped to `environment:production`, and set
+   it to fire on *regressions*.** The freshness warning is a one-way event: when NGED's feed
+   recovers, the code simply stops sending, so the Sentry issue's "last seen" timestamp stops
+   advancing but the issue stays open until someone resolves it. Resolve it once you've confirmed
+   recovery. Firing on regressions (plus a short project-level auto-resolve window) means a *new*
+   stall after a recovery re-pages instead of silently appending to the old, unresolved issue. This
+   warning is a richer per-series breadcrumb layered on top of the missed-check-in alarm, which
+   remains the primary two-directional signal.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and
 possibly the account itself) moves to NGED — see

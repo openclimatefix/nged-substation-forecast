@@ -215,3 +215,40 @@ def test_power_data_is_fresh_no_data_yet_warns(env: Path) -> None:
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert result.metadata["n_series_total"].value == 0
+
+
+def test_power_data_is_fresh_hands_result_to_sentry(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check hands its computed ``PowerFreshnessResult`` to ``report_power_freshness`` — reused,
+    not recomputed. The reporter self-gates on health (tested in ``test_sentry.py``), so the check
+    calls it unconditionally; here we assert the object it receives matches what the check evaluated
+    and returned."""
+    from contracts.settings import Settings
+
+    captured: list[PowerFreshnessResult] = []
+    monkeypatch.setattr(
+        checks, "report_power_freshness", lambda settings, result: captured.append(result)
+    )
+
+    now = datetime.now(timezone.utc)
+    settings = Settings()
+    pl.DataFrame(
+        {
+            "time_series_id": pl.Series([1, 2], dtype=pl.Int32),
+            "time": pl.Series([now - timedelta(hours=1), now - timedelta(hours=48)]).cast(
+                UTC_DATETIME_DTYPE
+            ),
+            "power": pl.Series([1.0, 2.0], dtype=pl.Float32),
+        }
+    ).write_delta(settings.power_time_series_data_path)
+    _write_metadata_roster(settings.metadata_path, ids=[1, 2, 99])
+
+    result = checks.power_data_is_fresh()
+    assert isinstance(result, AssetCheckResult)
+    assert len(captured) == 1
+    reported = captured[0]
+    assert isinstance(reported, PowerFreshnessResult)
+    # The reported object carries the same counts the check turned into its returned metadata.
+    assert reported.n_stale == 1 and reported.n_never == 1
+    assert reported.n_late == result.metadata["n_late"].value == 2
