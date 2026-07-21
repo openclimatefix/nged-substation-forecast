@@ -55,6 +55,7 @@ from ml_core._mlflow_runs import (
     get_or_create_parent_run,
     load_experiment_forecaster,
 )
+from ml_core._repro import provenance_tags
 from nged_data.storage import time_series_coverage
 
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
@@ -425,6 +426,21 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     }
     with mlflow.start_run(run_id=fold_run_id):
         mlflow.log_params(training_params)
+        # Provenance: the code + data versions that produced this fold's model — the load-bearing
+        # stamp, since a fold can be trained days after registration on a different SHA. Tags (not
+        # params) because provenance overwrites cleanly on re-materialise; these are the three
+        # Delta tables the training path reads above.
+        mlflow.set_tags(
+            provenance_tags(
+                "train",
+                {
+                    "power_time_series": settings.power_time_series_data_path,
+                    "nwp_data": settings.nwp_data_path,
+                    "eligible_time_series": settings.eligible_time_series_data_path,
+                },
+                storage_options=typeddict_to_dict(settings.storage_options),
+            )
+        )
 
     context.add_output_metadata(
         {
@@ -545,6 +561,20 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         # raise "Changing param values is not allowed" — the covered window is mutable metadata.
         mlflow.set_tag("val_start", val_start.isoformat())
         mlflow.set_tag("val_end", val_end.isoformat())
+        # Provenance: prediction may run on yet another SHA / data state than training. Stamps the
+        # two Delta tables the forecasting path reads (via _load_engineering_inputs) — not
+        # eligible_time_series, which prediction does not read (the trained series come from the
+        # loaded model).
+        mlflow.set_tags(
+            provenance_tags(
+                "predict",
+                {
+                    "power_time_series": settings.power_time_series_data_path,
+                    "nwp_data": settings.nwp_data_path,
+                },
+                storage_options=typeddict_to_dict(settings.storage_options),
+            )
+        )
         mlflow.log_metrics(
             {
                 "n_forecast_rows": float(n_rows),
@@ -788,6 +818,7 @@ def _score_forecast_group(
     metrics_path: str,
     now: datetime,
     storage_options: ObjectStoreOptions | None = None,
+    provenance: dict[str, str] | None = None,
 ) -> tuple[int, dict[str, float] | None]:
     """Score one ``(experiment_name, fold_id)`` group, write ``Metrics`` to Delta, and
     optionally log to MLflow.
@@ -822,6 +853,9 @@ def _score_forecast_group(
             one asset materialisation share the same timestamp).
         storage_options: Object-store options for a remote ``metrics_path``; ``None``/empty
             for local.
+        provenance: Stage-prefixed provenance tags (git SHA + scored Delta-table versions) to
+            stamp on the fold's MLflow run in ``"leaderboard"`` scope; built once by the caller
+            so every group shares one snapshot. ``None`` skips the stamp.
 
     Returns:
         A ``(n_rows_written, fold_metric_dict)`` tuple where:
@@ -876,6 +910,8 @@ def _score_forecast_group(
     if evaluation_scope == "leaderboard":
         fold_metric_dict = build_mlflow_aggregate_metrics(per_series_metrics)
         with mlflow.start_run(run_id=mlflow_run_id):
+            if provenance is not None:
+                mlflow.set_tags(provenance)
             mlflow.log_metrics(fold_metric_dict)
         return enriched.height, fold_metric_dict
 
@@ -960,6 +996,18 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     if_local_path_then_make_parent_dir(settings.forecast_metrics_data_path)
     now = datetime.now(timezone.utc)
+    # Provenance for every fold + parent run this materialisation touches: the code SHA and the
+    # versions of the three Delta tables scoring reads (forecasts, actuals, capacity). Built once
+    # — all groups are scored in this one process, so they share a single code + data snapshot.
+    metrics_provenance = provenance_tags(
+        "metrics",
+        {
+            "power_forecasts": settings.power_forecasts_data_path,
+            "power_time_series": settings.power_time_series_data_path,
+            "effective_capacity": settings.effective_capacity_data_path,
+        },
+        storage_options=typeddict_to_dict(storage_options),
+    )
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
     # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
@@ -979,6 +1027,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             settings.forecast_metrics_data_path,
             now,
             storage_options,
+            provenance=metrics_provenance,
         )
         total_rows += n_rows
         if fold_metric_dict is not None:
@@ -992,6 +1041,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
             parent_run_id = get_or_create_parent_run(experiment_id)
             parent_metric_dict = {k: sum(v) / len(v) for k, v in fold_metrics.items()}
             with mlflow.start_run(run_id=parent_run_id):
+                mlflow.set_tags(metrics_provenance)
                 mlflow.log_metrics(parent_metric_dict)
 
     context.add_output_metadata(
