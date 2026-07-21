@@ -12,11 +12,11 @@ timestamp — the job succeeds hourly even when NGED publishes nothing, so only 
 would miss exactly the failure this check exists to catch.
 
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
-and it is the hand-off point for the future Sentry missed-check-in alarm
-([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)): that alarm, when
-it lands, consumes the same ``PowerFreshnessResult``. The two stay complementary — the Sentry
-alarm fires on total silence from outside the deployment, this check reports per-series
-staleness from inside Dagster.
+and it is the hand-off point for routing per-series staleness to Sentry: a follow-up will feed the
+same ``PowerFreshnessResult`` to Sentry rather than recomputing it. The two mechanisms stay
+complementary — the [Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+fires on total silence from outside the deployment, while this check reports per-series staleness
+from inside Dagster.
 """
 
 from dataclasses import dataclass

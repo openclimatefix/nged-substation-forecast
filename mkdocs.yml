@@ -67,6 +67,7 @@ nav:
       - Setting up the live service on AWS: live_service/aws.md
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
+      - Setting up Sentry telemetry: live_service/sentry.md
       - Configuration reference: live_service/setup.md
   - Roadmap:
       - Overview: roadmap/index.md

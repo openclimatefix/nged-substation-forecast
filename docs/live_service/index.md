@@ -9,9 +9,10 @@ already built — once each piece ships. Design rationale (the *why*) lives in
 counterpart.
 [The roadmap's Live Service page](../roadmap/live-service.md) sends readers here as its sections
 land (so far: the `live_forecasts` and `promoted_model` assets, local 6-hourly automation, the
-container build/verify runbook, and the AWS bring-up runbook; still to come: production
-monitoring, alerting). Once the whole v0.1 epic ships, the roadmap page is deleted and this
-section is the sole home for how the live service works.
+container build/verify runbook, the AWS bring-up runbook, and Sentry telemetry with the
+missed-check-in alarm; still to come: production monitoring, and per-task failure-email alerting).
+Once the whole v0.1 epic ships, the roadmap page is deleted and this section is the sole home for
+how the live service works.
 
 This is distinct from [ML Experimentation](../ml_experimentation/index.md): that area covers
 training and backtesting candidate models against historical data; this area covers picking one
@@ -44,5 +45,7 @@ driving is identical in both environments, so it lives on one shared page:
 - [Operating the live service](operations.md) — driving a running stack day to day: promote a
   champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by
   hand), inspect a forecast, and backfill a missed slot in replay mode.
+- [Setting up Sentry telemetry](sentry.md) — point error reporting and the missed-check-in alarm
+  at a Sentry project: get a DSN, test it from your laptop, and turn it on in production.
 - [Configuration reference](setup.md) — what the storage roots, the derive-from-root
   convention, and the credential settings mean, and which combination each environment uses.

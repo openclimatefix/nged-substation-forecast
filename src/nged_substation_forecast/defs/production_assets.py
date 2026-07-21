@@ -39,6 +39,7 @@ from ml_core._production_helpers import (
     select_nwp_init_time,
 )
 
+from nged_substation_forecast._sentry import send_forecast_checkin
 from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
@@ -54,6 +55,11 @@ Must cover the longest power lag feature any production model uses (currently up
 """
 
 live_forecast_partitions = TimeWindowPartitionsDefinition(
+    # DUPLICATED SCHEDULE: this crontab is the canonical live cadence, but it is also copied into
+    # LIVE_FORECAST_MONITOR_CONFIG in _sentry.py so the Sentry missed-check-in monitor expects a
+    # heartbeat on the same 6-hourly cadence. That module can't import this one back (it would be a
+    # circular import — this module imports send_forecast_checkin from it). If you change this
+    # crontab, change the copy in _sentry.py too.
     cron_schedule="0 0,6,12,18 * * *",
     start="2026-06-28-00:00",
     fmt="%Y-%m-%d-%H:%M",
@@ -292,6 +298,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         replace_predicate_extra=f"power_fcst_init_time = '{power_fcst_init_time.isoformat()}'",
         storage_options=settings.storage_options,
     )
+
+    # Heartbeat to Sentry's missed-check-in alarm — only after a genuinely successful live write,
+    # and never on a replay backfill (which reprocesses the past, not "the live service is alive
+    # now"). A no-op unless sentry_monitor_forecasts is set. See nged_substation_forecast._sentry.
+    if config.availability_mode == "live":
+        send_forecast_checkin(settings)
 
     context.add_output_metadata(
         {

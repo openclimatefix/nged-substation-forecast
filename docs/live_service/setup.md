@@ -114,6 +114,11 @@ NGED_S3_BUCKET_SECRET=<secret>
 `.env` is git-ignored — never commit real credentials. Everything else on this page is optional and
 layers on top of these three.
 
+The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
+`SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty
+`SENTRY_DSN` (the default) disables Sentry entirely. Their setup — laptop testing and production —
+has its own page: [Setting up Sentry telemetry](sentry.md).
+
 ### Credentials for our own S3 data (`DATA_STORE_*`)
 
 The four `DATA_STORE_*` fields (`ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`, `REGION`, `ENDPOINT_URL`)

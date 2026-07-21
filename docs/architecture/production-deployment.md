@@ -39,11 +39,10 @@ The design accepts two trade-offs:
   [uptime requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design):
   previously published forecasts stay readable from S3 and extend 14 days ahead, so a missed
   slot degrades forecast freshness rather than cutting NGED off. Mitigation: the
-  [missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
-  — each successful 6-hourly run checks in with an external monitoring service (Sentry cron
-  monitoring is the planned mechanism), and an alert fires when an expected check-in fails to
-  arrive. The alarm is the only component that lives outside the box, and the stack does not
-  depend on it to function.
+  [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence) — each successful
+  6-hourly run checks in with Sentry (external to the whole deployment), and an alert fires when
+  an expected check-in fails to arrive. The alarm is the only component that lives outside the
+  box, and the stack does not depend on it to function.
 
 - **No run-level auto-retry after a hard crash.** Accepted; covered by the existing
   replay/backfill mode for missed slots plus the missed-check-in alarm.
@@ -82,13 +81,51 @@ NGED recovers (the pipeline back-fills the gap automatically), so it must not bl
 assets.
 
 This in-Dagster check is complementary to — not a replacement for — the
-[missed-check-in alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
-The alarm fires on total silence from *outside* the deployment, because a dead daemon cannot
-report itself; this check reports per-series staleness from *inside* Dagster while the daemon
-is alive. The freshness evaluation is a pure function, and it is the hand-off point for
-[Sentry telemetry (#63)](https://github.com/openclimatefix/nged-substation-forecast/issues/63):
-when that lands, the same result object also feeds Sentry, and later the forecast-warnings
-delivery table.
+[missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total
+silence from *outside* the deployment, because a dead daemon cannot report itself; this check
+reports per-series staleness from *inside* Dagster while the daemon is alive. The freshness
+evaluation is a pure function, which makes it the natural hand-off point for routing per-series
+staleness to Sentry as well — reusing the same `PowerFreshnessResult` rather than recomputing it,
+an immediate follow-up to the initial Sentry telemetry work, and later the source for the
+forecast-warnings delivery table.
+
+## Send telemetry to Sentry, and alarm on absence
+
+Two independent Sentry mechanisms live in `nged_substation_forecast._sentry`, and both are active
+in every Dagster process (daemon, webserver, and each Fargate run worker) only when a `SENTRY_DSN`
+is configured — so laptops and CI stay silent by default.
+
+- **Error telemetry.** `init_sentry` initialises the SDK once per process at import of the Dagster
+  definitions module, and a Dagster `@failure_hook` (`sentry_capture_failure`, attached to the
+  scheduled asset jobs) reports a failed step's exception — traceback intact — from inside the run
+  worker. The explicit hook is used rather than relying on Sentry's logging integration alone
+  because Dagster logs a step failure without `exc_info`, so a purely log-based capture would yield
+  a message-only event with no stack trace. The hook is attached to the three *scheduled* asset
+  jobs, so it covers the whole unattended production workload; failures in a manual UI
+  materialisation, a replay backfill, or an experiment job are watched by the operator at the
+  Dagster UI, not routed to Sentry.
+
+- **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
+  `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
+  monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule
+  plus ~2 h grace), regardless of cause. Evaluation must live outside the deployment because a dead
+  daemon cannot report itself — the reasoning for why this, not a Dagster sensor, is the mechanism
+  is in [Alert on absence](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+  Only *success* heartbeats are ever sent (never an `error` check-in), so the alarm keys purely off
+  absence: an in-band run error is the failure hook's job, and a manual `replay` backfill — which
+  reprocesses the past rather than proving the service is live now — deliberately does not check in.
+
+### Separating laptop telemetry from production
+
+Sentry's `environment` tag (from `Settings.sentry_environment`) keeps the two apart. The always-on
+box sets `environment=production`; each developer overrides the `local` default with
+`<name>-laptop` (e.g. `jacks-laptop`, `alexs-laptop`), so error events filter cleanly by origin.
+The missed-check-in alert rule is scoped to `environment:production`, so an intermittently-run
+laptop never pages. When a developer wants to exercise the heartbeat path locally, they set
+`SENTRY_MONITOR_FORECASTS=true` and point it at a *throwaway* monitor slug (`live-forecasts-test`),
+never the production `live-forecasts` monitor — otherwise the shared production monitor would be
+left expecting a 6-hourly check-in that the laptop won't keep sending, and would flag it as missed.
+The [AWS runbook](../live_service/aws.md) lists the exact environment variables set on the box.
 
 ## Separate "is this run usable?" from "is it perfect?"
 
@@ -424,6 +461,8 @@ production-resilience mechanism.
   `EcsRunLauncher`) and its implementation workstreams.
 - [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:
   promotion, image build/push, and the full AWS bring-up including the control-plane box.
+- [Setting up Sentry telemetry](../live_service/sentry.md) — the how-to for the error reporting
+  and missed-check-in alarm designed above: get a DSN, test from a laptop, enable in production.
 - [Configuration reference](../live_service/setup.md) — where data tables and local
   artifacts live, and how to point `Settings` at S3.
 - [ML Orchestration Design](ml-orchestration.md) — why production inference doesn't reuse the
