@@ -58,6 +58,9 @@ dev = [
     "pymarkdownlnt>=0.9.13",
     "mlflow>=3.14.0",
     "moto[server]>=5.0.0",
+    # dashboard is a leaf marimo app that nothing depends on at runtime, so it is a dev
+    # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
+    "dashboard",
 ]
 
 [project.urls]
@@ -79,6 +82,7 @@ xgboost_forecaster = { workspace = true }
 dynamical_data = { workspace = true }
 geo = { workspace = true }
 weather_utils = { workspace = true }
+dashboard = { workspace = true }
 
 # --- DAGSTER ---
 
