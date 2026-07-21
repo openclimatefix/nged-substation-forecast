@@ -75,6 +75,10 @@ def _freshest_forecasts(
         pl.col("experiment_name") == experiment_name,
         pl.col("fold_id") == fold_id,
     )
+    # NOTE (revisit if this export is ever re-run at larger scale): `scan` is consumed twice —
+    # once for this per-timestep max init time, once for the semi-join below — so the partition
+    # (~369M rows for #179) is read twice. Fine as a one-off; a single-pass "max init_time over
+    # (time_series_id, valid_time)" window filter would avoid the second scan.
     freshest_init = scan.group_by("time_series_id", "valid_time").agg(
         power_fcst_init_time=pl.col("power_fcst_init_time").max()
     )
@@ -158,6 +162,10 @@ def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> di
         power_fcst_mean=pl.col("power_fcst").mean(),
         observed_power=pl.col("observed_power").first(),
     )
+    # NOTE (revisit if this export is ever re-run for serious use): Polars' default quantile
+    # interpolation is "nearest", so these band edges are actual member values across the ~51
+    # members, not linearly-interpolated p10/p50/p90. Acceptable for this under-dispersed baseline
+    # (the band is already caveated), but pass interpolation="linear" for true quantile estimates.
     quantiles = full.group_by(per_timestep).agg(
         power_fcst_init_time=pl.col("power_fcst_init_time").first(),
         power_fcst_p10=pl.col("power_fcst").quantile(0.1),
