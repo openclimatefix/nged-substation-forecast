@@ -104,3 +104,16 @@ def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
         hooks = job.hooks
         assert hooks is not None
         assert _sentry.sentry_capture_failure in hooks, job.name
+
+
+def test_monitor_config_schedule_matches_live_partitions() -> None:
+    """Drift guard: the Sentry monitor's crontab is a hand-kept copy of the live_forecasts
+    partition schedule (the two can't share an import — it would be circular; see the comment on
+    ``LIVE_FORECAST_MONITOR_CONFIG``). If someone changes one crontab and not the other, the alarm
+    would expect heartbeats on a different cadence than the asset runs; this catches that."""
+    from nged_substation_forecast.defs.production_assets import live_forecast_partitions
+
+    assert (
+        _sentry.LIVE_FORECAST_MONITOR_CONFIG["schedule"]["value"]
+        == live_forecast_partitions.cron_schedule
+    )

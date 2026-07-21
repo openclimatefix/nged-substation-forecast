@@ -41,6 +41,11 @@ Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-te
 intermittently-run laptop never registers a stale environment on the production monitor."""
 
 LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {
+    # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in
+    # defs/production_assets.py — it is the cadence Sentry expects a heartbeat on, so it has to
+    # track the cadence the live_forecasts asset actually runs on. The value is copied rather than
+    # imported because defs/production_assets.py imports this module (for send_forecast_checkin), so
+    # importing back would be a circular import. If you change the live schedule there, change it here.
     "schedule": {"type": "crontab", "value": "0 0,6,12,18 * * *"},
     "timezone": "UTC",
     "checkin_margin": 120,
@@ -50,7 +55,10 @@ grace after each expected check-in before that slot counts as missed — so the 
 fires ~8 hours after the last success (one 6-hourly slot plus the 2-hour margin). Only *success*
 check-ins are ever sent, so the alarm keys off missed check-ins alone; ``max_runtime`` is
 deliberately omitted because it needs an ``in_progress`` check-in to time against, which the
-success-only heartbeat never sends."""
+success-only heartbeat never sends.
+
+The ``schedule`` crontab is a hand-kept copy of ``live_forecast_partitions.cron_schedule`` in
+``defs/production_assets.py`` — see the inline comment above for why it is copied, not imported."""
 
 
 def init_sentry(settings: Settings) -> None:

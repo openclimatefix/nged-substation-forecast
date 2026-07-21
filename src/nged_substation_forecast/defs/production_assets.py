@@ -55,6 +55,11 @@ Must cover the longest power lag feature any production model uses (currently up
 """
 
 live_forecast_partitions = TimeWindowPartitionsDefinition(
+    # DUPLICATED SCHEDULE: this crontab is the canonical live cadence, but it is also copied into
+    # LIVE_FORECAST_MONITOR_CONFIG in _sentry.py so the Sentry missed-check-in monitor expects a
+    # heartbeat on the same 6-hourly cadence. That module can't import this one back (it would be a
+    # circular import — this module imports send_forecast_checkin from it). If you change this
+    # crontab, change the copy in _sentry.py too.
     cron_schedule="0 0,6,12,18 * * *",
     start="2026-06-28-00:00",
     fmt="%Y-%m-%d-%H:%M",
