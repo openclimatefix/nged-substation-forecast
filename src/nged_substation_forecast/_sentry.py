@@ -1,17 +1,21 @@
 """Sentry.io telemetry: error reporting and the missed-check-in alarm.
 
-Two independent mechanisms, both no-ops unless ``Settings.sentry_dsn`` is set, so laptops and CI
-need no Sentry configuration:
+Two independent mechanisms, both no-ops when Sentry is unconfigured, so laptops and CI need no
+Sentry configuration:
 
-- **Error telemetry** — :func:`init_sentry` initialises the SDK once per process, and the
-  :data:`sentry_capture_failure` Dagster failure hook reports the real exception (with traceback)
-  from inside the run worker. The hook is used rather than relying on Sentry's ``LoggingIntegration``
-  alone because Dagster logs a step failure without ``exc_info``, so the log-based path would yield a
-  message-only event with no stack trace.
+- **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
+  ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
+  reports the real exception (with traceback) from inside the run worker. The hook is used rather
+  than relying on Sentry's ``LoggingIntegration`` alone because Dagster logs a step failure without
+  ``exc_info``, so the log-based path would yield a message-only event with no stack trace. The hook
+  is attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
+  manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
 - **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
-  a Sentry cron monitor after each live ``live_forecasts`` run. Sentry fires the alarm on the
-  *absence* of a heartbeat past the margin (a dead daemon cannot report itself); in-band run errors
-  are handled by the failure hook above, never by this heartbeat.
+  a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
+  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
+  never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a heartbeat
+  past the margin (a dead daemon cannot report itself); in-band run errors are handled by the
+  failure hook above, never by this heartbeat.
 
 The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production`` on
 the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is scoped
@@ -40,11 +44,13 @@ LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {
     "schedule": {"type": "crontab", "value": "0 0,6,12,18 * * *"},
     "timezone": "UTC",
     "checkin_margin": 120,
-    "max_runtime": 60,
 }
-"""Declarative config upserted with each heartbeat: the 6-hourly live schedule, 120-minute grace
-before a slot counts as missed (≈ one missed 6-hourly slot plus margin), and a 60-minute max
-runtime. Only *success* heartbeats are ever sent, so the alarm keys off missed check-ins alone."""
+"""Declarative config upserted with each heartbeat: the 6-hourly live schedule plus 120 minutes of
+grace after each expected check-in before that slot counts as missed — so the alarm effectively
+fires ~8 hours after the last success (one 6-hourly slot plus the 2-hour margin). Only *success*
+check-ins are ever sent, so the alarm keys off missed check-ins alone; ``max_runtime`` is
+deliberately omitted because it needs an ``in_progress`` check-in to time against, which the
+success-only heartbeat never sends."""
 
 
 def init_sentry(settings: Settings) -> None:
@@ -74,6 +80,9 @@ def sentry_capture_failure(context: HookContext) -> None:
     Runs in the run worker after a step raises, so ``context.op_exception`` is the live exception
     (traceback intact) rather than Dagster's serialized error info. A no-op when Sentry is
     uninitialised (empty DSN), because ``capture_exception`` needs an active Sentry client.
+
+    Args:
+        context: The Dagster hook context for the failed step, carrying ``op_exception``.
     """
     exception = context.op_exception
     if exception is not None:

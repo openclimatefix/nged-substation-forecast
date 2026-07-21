@@ -88,3 +88,19 @@ def test_failure_hook_noop_without_exception(monkeypatch: pytest.MonkeyPatch) ->
     assert hook_fn is not None
     hook_fn(build_hook_context(op_exception=None))
     assert captured == []
+
+
+def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
+    """Regression guard: the failure hook stays wired onto every scheduled asset job, so dropping
+    ``hooks={sentry_capture_failure}`` from a ``define_asset_job`` call is caught here."""
+    from nged_substation_forecast.defs import schedules
+
+    scheduled_jobs = (
+        schedules.power_time_series_and_metadata_job,
+        schedules.ecmwf_ens_job,
+        schedules.live_forecasts_job,
+    )
+    for job in scheduled_jobs:
+        hooks = job.hooks
+        assert hooks is not None
+        assert _sentry.sentry_capture_failure in hooks, job.name
