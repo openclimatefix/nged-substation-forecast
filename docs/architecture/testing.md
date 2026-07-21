@@ -16,7 +16,21 @@ row counts wrapping past 2³² rows.
 - **Discovery is automatic.** The only pytest configuration is the root
   `[tool.pytest.ini_options]` block; there is no `testpaths` setting, so pytest collects both the
   top-level `tests/` directory and every `packages/*/tests/` directory. A brand-new
-  `packages/<pkg>/tests/` directory is picked up with no configuration change.
+  `packages/<pkg>/tests/` directory is picked up with no configuration change — provided the
+  package is installed in the root environment, which is automatic only when something already
+  depends on it. A **leaf** package that nothing depends on (for example `dashboard`, a marimo app)
+  is *not* in the default environment, so `uv run pytest` cannot import its tests; add it to the
+  root `[dependency-groups] dev` list (and give it a `[tool.uv.sources]` workspace entry) so a plain
+  `uv sync` installs it.
+- **Run the whole suite with plain `uv run pytest`, never `--all-packages`.** `uv run pytest`
+  executes against the root environment, which holds exactly the packages reachable from the root's
+  dependencies and dev group — i.e. every package that has tests, by the rule above. `--all-packages`
+  additionally installs workspace members that have no tests (`notebooks`) and each member's own
+  dev-groups, so it is heavier for no benefit here. It is the right tool for the pre-commit `ty` hook
+  (`uv run --all-packages ty check`) for a different reason: `ty` type-checks the *source* of every
+  workspace member, including leaf packages that are never installed as a dependency of anything, and
+  that source must be present for the check. Type-checking needs the source; running tests needs the
+  package installed — so the two commands legitimately differ.
 - **`--import-mode=importlib` is set deliberately** so that identically-named test modules in
   different packages (for example, two `test_storage.py` files) do not collide during collection.
   Because of this, test directories do not need `__init__.py` files.
