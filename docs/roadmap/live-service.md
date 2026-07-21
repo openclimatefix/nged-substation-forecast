@@ -15,8 +15,7 @@
 > ([#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328),
 > [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/329)),
 > infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)),
-> the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), and the
-> MLflow-server / dev-dashboard future work
+> and the MLflow-server / dev-dashboard future work
 > ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
 > [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)) — plus the
 > durable record of the costed [AWS-architecture decision](#aws-architecture) behind the
@@ -63,11 +62,11 @@ plan (phases 0–6.7 complete, PRs #182–#214); its final cleanup phase lives i
 - The NGED-delivery schema/contract
   ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)) — v0.1 is
   "forecast running", not "delivery contract live".
-- Telemetry to Sentry.io
-  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)) — including
-  Sentry cron monitoring as the
-  [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm); basic per-task failure
-  alerting covers v0.1 first.
+- Basic **per-task failure email alerting** (a failed run → SNS → email). Sentry error telemetry
+  and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) have shipped
+  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63) — see
+  [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence));
+  the remaining piece is the thin SNS→email notification edge for individual run failures.
 - An **MLflow tracking server** (issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate **development dashboard** ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on the
   always-on control-plane box once it exists — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
@@ -477,6 +476,14 @@ below already reserves that slot).
 
 ### Alert on absence: the missed-check-in alarm
 
+> **Status: ✅ Shipped** ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)).
+> The heartbeat, the failure hook, and the laptop/production environment split are built and
+> documented as-built in
+> [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+> This section keeps the *why* — the design rationale for alerting on absence from outside the
+> deployment. The remaining monitoring work on this page is the separate per-task failure email
+> edge (SNS → email).
+
 Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
 only fire when something runs and fails. Whole classes of failure are silent: a hung daemon, a
 full disk, an expired credential, a schedule that stopped firing. The **primary** production
@@ -618,7 +625,7 @@ order issues were opened.
 | [#206 Deploy to AWS!](https://github.com/openclimatefix/nged-substation-forecast/issues/206) | This page (the options above supersede its cost analysis) — done; deployed and running |
 | [#286 Create docs for setting up compute infra on AWS](https://github.com/openclimatefix/nged-substation-forecast/issues/286) | [Deployment workstream 3](#deployment-workstream-3-aws-infrastructure) — done; the option-agnostic pieces and the control-plane box are all in the [AWS runbook](../live_service/aws.md). Infra-as-code ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is a separate 🚧 follow-up |
 | [#197 Make fold-run param logging re-run-safe](https://github.com/openclimatefix/nged-substation-forecast/issues/197) | Bug fix folded into the v0.1 epic (MLflow param immutability on re-runs) |
-| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — Sentry cron monitoring provides the planned [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), plus error telemetry |
+| [#63 Send telemetry to OCF's Sentry.io](https://github.com/openclimatefix/nged-substation-forecast/issues/63) | Observability — done; Sentry error telemetry + the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm), as-built in [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence). Per-task failure email alerting is a separate 🚧 follow-up |
 | [#246 Scale `power_fcst` to [−1, +1] using the static P99 effective capacity](https://github.com/openclimatefix/nged-substation-forecast/issues/246) | Not detailed on this page — decided 2026-07-03 (see the issue for the full worklist); an open follow-up, not required for v0.1 |
 | [#96 Write power forecasts in schema agreed with NGED](https://github.com/openclimatefix/nged-substation-forecast/issues/96) | Deferred to the v1.0 epic ([#133](https://github.com/openclimatefix/nged-substation-forecast/issues/133)) — v0.1 is "forecast running", not "delivery contract live" |
 | [#161 More Dagster-UI metrics + validation for NWP ingestion](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | Deferred to the v0.2 epic ([#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138)) — mostly [NWP ingestion completeness checks](engineering-health.md#nwp-ingestion-completeness-checks-and-dagster-metrics) |

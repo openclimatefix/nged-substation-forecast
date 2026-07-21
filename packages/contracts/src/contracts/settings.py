@@ -250,6 +250,42 @@ class Settings(BaseSettings):
         ),
     )
 
+    # --- Sentry observability (all optional; an empty DSN disables Sentry entirely) ---
+
+    sentry_dsn: str = Field(
+        default="",
+        description=(
+            "Sentry.io project DSN. Empty (the default) disables Sentry entirely — every Sentry"
+            " code path becomes a no-op — so laptops and CI need no Sentry config. Set it in the"
+            " .env file to enable error telemetry. Passed explicitly to sentry_sdk.init as the"
+            " single source of truth (the SDK would otherwise also auto-read the SENTRY_DSN env"
+            " var)."
+        ),
+    )
+    sentry_environment: str = Field(
+        default="local",
+        description=(
+            "Sentry environment tag, the dimension that separates deployments in Sentry's UI,"
+            " alerts, and cron monitors. The always-on production box sets 'production'; each"
+            " developer overrides the 'local' fallback with '<name>-laptop' (e.g. 'jacks-laptop')"
+            " so laptop telemetry is cleanly filterable and the production-scoped missed-check-in"
+            " alert never fires for a laptop."
+        ),
+    )
+    sentry_traces_sample_rate: float = Field(
+        default=0.0,
+        description="Fraction of transactions sampled for Sentry performance tracing (off by default).",
+    )
+    sentry_monitor_forecasts: bool = Field(
+        default=False,
+        description=(
+            "Emit the live_forecasts success heartbeat to Sentry's cron monitor (the"
+            " missed-check-in alarm). True only on the always-on production deployment; left"
+            " False on laptops so an intermittently-run laptop never registers a monitor"
+            " environment that Sentry would then mark as missed."
+        ),
+    )
+
     @model_validator(mode="after")
     def _derive_unset_paths(self) -> Self:
         """Fill any unset ("") path from its root, so callers always see a concrete path.

@@ -39,6 +39,7 @@ from ml_core._production_helpers import (
     select_nwp_init_time,
 )
 
+from nged_substation_forecast._sentry import send_forecast_checkin
 from nged_substation_forecast.defs.cv_assets import _load_engineering_inputs
 
 LIVE_FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
@@ -292,6 +293,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         replace_predicate_extra=f"power_fcst_init_time = '{power_fcst_init_time.isoformat()}'",
         storage_options=settings.storage_options,
     )
+
+    # Heartbeat to Sentry's missed-check-in alarm — only after a genuinely successful live write,
+    # and never on a replay backfill (which reprocesses the past, not "the live service is alive
+    # now"). A no-op unless sentry_monitor_forecasts is set. See nged_substation_forecast._sentry.
+    if config.availability_mode == "live":
+        send_forecast_checkin(settings)
 
     context.add_output_metadata(
         {

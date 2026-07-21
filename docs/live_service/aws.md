@@ -27,8 +27,9 @@ bake the model in at build time, an always-on control plane rather than EventBri
 > [access-phasing plan](../roadmap/live-service.md#access-phasing), and infrastructure-as-code
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is scheduled
 > to start at Stage 2, when team access adds enough moving parts to justify it.
-> Alerting (per-task failure emails, the missed-check-in alarm) is also still to come — see
-> [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+> Sentry error telemetry and the missed-check-in alarm are wired (set the `SENTRY_*` vars in
+> [Step 14](#step-14-configure-dagster-on-the-box)); only per-task failure emails (SNS) are still
+> to come — see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Step 1 — Create the S3 buckets
 
@@ -934,7 +935,17 @@ NGED_S3_BUCKET_URL=<same value as the Parameter Store entry>
 NGED_S3_BUCKET_ACCESS_KEY=<same value as the Parameter Store entry>
 NGED_S3_BUCKET_SECRET=<same value as the Parameter Store entry>
 DAGSTER_PG_PASSWORD=<same value as /nged-forecast/dagster-pg-password from Step 8>
+SENTRY_DSN=<OCF Sentry project DSN>
+SENTRY_ENVIRONMENT=production
+SENTRY_MONITOR_FORECASTS=true
 ```
+
+The three `SENTRY_*` lines turn on error telemetry and the missed-check-in alarm (see
+[Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)).
+`SENTRY_ENVIRONMENT=production` is what the alarm's alert rule is scoped to; a developer testing
+from a laptop instead sets `SENTRY_ENVIRONMENT=<name>-laptop` and leaves `SENTRY_MONITOR_FORECASTS`
+unset (so a laptop never registers a stale check-in on the production monitor). An empty/absent
+`SENTRY_DSN` disables Sentry entirely, so this is safe to omit while bringing the box up.
 
 (The Fargate containers get these injected from Parameter Store; the box's containers read this
 file instead — Stage-1 simplicity, one hand-managed box.)
@@ -1244,10 +1255,13 @@ If a slot gets missed (box down, failed run), backfill it from the same UI —
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-The remaining operational safety nets — per-task failure alerts (email via SNS, the Simple
-Notification Service) and the missed-check-in alarm that catches a silently-dead daemon — are
-still to come; see
-[the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
+The missed-check-in alarm that catches a silently-dead daemon is wired via Sentry cron monitoring
+(the `SENTRY_*` vars in [Step 14](#step-14-configure-dagster-on-the-box)); the one console step it
+needs is to **scope its alert rule to `environment:production`** in Sentry, so a developer testing
+from a laptop never trips it. The one remaining operational safety net is per-task failure alerts
+(email via SNS, the Simple Notification Service) — still to come; see
+[the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and
+[Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
 
 ## Redeploying a new champion model
 

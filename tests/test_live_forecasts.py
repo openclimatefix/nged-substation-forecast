@@ -225,3 +225,33 @@ def test_accumulation_across_partitions(env: dict[str, str]) -> None:
         _EARLIER_TICK_POWER_FCST_INIT_TIME,
         _POWER_FCST_INIT_TIME,
     }
+
+
+def _capture_checkins(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    """Enable the monitor flag and capture every Sentry check-in the asset would emit."""
+    monkeypatch.setenv("SENTRY_MONITOR_FORECASTS", "true")
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        "nged_substation_forecast._sentry.capture_checkin", lambda **kw: calls.append(kw)
+    )
+    return calls
+
+
+def test_live_run_sends_sentry_heartbeat(
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A successful live run emits exactly one OK heartbeat to the live-forecasts monitor."""
+    calls = _capture_checkins(monkeypatch)
+    assert _materialize(DagsterInstance.ephemeral(), "live").success
+    assert len(calls) == 1
+    assert calls[0]["monitor_slug"] == "live-forecasts"
+    assert calls[0]["status"] == "ok"
+
+
+def test_replay_run_sends_no_sentry_heartbeat(
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A replay backfill reprocesses the past, so it must not check in to the live monitor."""
+    calls = _capture_checkins(monkeypatch)
+    assert _materialize(DagsterInstance.ephemeral(), "replay").success
+    assert calls == []

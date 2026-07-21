@@ -10,6 +10,7 @@ from dagster import (
     schedule,
 )
 
+from nged_substation_forecast._sentry import sentry_capture_failure
 from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
 from nged_substation_forecast.defs.production_assets import live_forecast_partitions
 
@@ -17,6 +18,7 @@ from nged_substation_forecast.defs.production_assets import live_forecast_partit
 power_time_series_and_metadata_job = define_asset_job(
     name="power_time_series_and_metadata_job",
     selection=AssetSelection.assets("power_time_series_and_metadata"),
+    hooks={sentry_capture_failure},
 )
 
 power_time_series_and_metadata_schedule = ScheduleDefinition(
@@ -38,6 +40,7 @@ ecmwf_ens_job = define_asset_job(
     "ecmwf_ens_job",
     selection=AssetSelection.assets("ecmwf_ens"),
     partitions_def=ecmwf_ens_partitions,
+    hooks={sentry_capture_failure},
 )
 
 
@@ -60,6 +63,7 @@ live_forecasts_job = define_asset_job(
     "live_forecasts_job",
     selection=AssetSelection.assets("live_forecasts"),
     partitions_def=live_forecast_partitions,
+    hooks={sentry_capture_failure},
 )
 
 live_forecasts_schedule = build_schedule_from_partitioned_job(live_forecasts_job)
