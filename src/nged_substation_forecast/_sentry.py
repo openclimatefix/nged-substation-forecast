@@ -30,7 +30,7 @@ to ``environment:production`` so intermittently-run laptops never page. See
 """
 
 import logging
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypedDict
 
 import sentry_sdk
 from contracts.settings import Settings
@@ -146,11 +146,28 @@ each ``<name>-laptop``) would share one issue. A stable fingerprint also collaps
 re-reports of an ongoing stall into that single issue rather than a fresh issue each hour."""
 
 MAX_LATE_SERIES_IN_CONTEXT: Final[int] = 50
-"""Cap on the number of late series listed in the Sentry event context.
+"""Cap on the number of late series listed in the Sentry event *context* (the structured payload).
 
 Keeps the payload small at V2 scale (~2,500 series) where a whole-feed stall would otherwise attach
 thousands of rows. The *true* late count is always carried by the ``n_late`` tag and context field,
 so a capped list never makes a large stall look like a small one."""
+
+MAX_LATE_SERIES_IN_MESSAGE: Final[int] = 20
+"""Cap on the number of late series spelled out in the human-readable *message* body.
+
+Smaller than the context cap: the message is the at-a-glance view (Sentry uses its first line as the
+issue title), so it lists only the leading late series and how late each is, with an ``…and N more``
+line pointing at the fuller context when it overflows."""
+
+
+class _LateSeriesEntry(TypedDict):
+    """One late series in the freshness event: its id, when last seen (``"never"`` if it never
+    reported), how many hours late it is (``None`` if never reported), and its status."""
+
+    time_series_id: int
+    last_seen: str
+    hours_late: float | None
+    status: str
 
 
 def report_power_freshness(settings: Settings, result: "PowerFreshnessResult") -> None:
@@ -188,7 +205,7 @@ def _capture_power_freshness_warning(settings: Settings, result: "PowerFreshness
     the likelier raiser than ``capture_message`` itself.
     """
     late_preview = result.late.head(MAX_LATE_SERIES_IN_CONTEXT)
-    late_series = [
+    late_series: list[_LateSeriesEntry] = [
         {
             "time_series_id": row["time_series_id"],
             "last_seen": "never" if row["last_seen"] is None else str(row["last_seen"]),
@@ -214,9 +231,36 @@ def _capture_power_freshness_warning(settings: Settings, result: "PowerFreshness
                 "late_series": late_series,
             },
         )
-        sentry_sdk.capture_message(
-            f"NGED power data stale: {result.n_late}/{result.n_series_total} time series late "
-            f"({result.n_stale} stale >{result.threshold_hours:.0f}h, "
-            f"{result.n_never} never reported)",
-            level="warning",
-        )
+        sentry_sdk.capture_message(_freshness_message(result, late_series), level="warning")
+
+
+def _freshness_message(result: "PowerFreshnessResult", late_series: list[_LateSeriesEntry]) -> str:
+    """Compose the warning message: a one-line summary (Sentry's issue title) followed by the
+    leading late series and how late each is.
+
+    The per-series lines are capped at :data:`MAX_LATE_SERIES_IN_MESSAGE`; if more series are late,
+    a trailing ``…and N more`` line reports the remainder (with the fuller list in the event's
+    ``power_freshness`` context). ``late_series`` is already ordered never-reported first, then
+    most-stale first, so the message leads with the worst offenders."""
+    summary = (
+        f"NGED power data stale: {result.n_late}/{result.n_series_total} time series late "
+        f"({result.n_stale} stale >{result.threshold_hours:.0f}h, {result.n_never} never reported)"
+    )
+    shown = late_series[:MAX_LATE_SERIES_IN_MESSAGE]
+    lines = [summary, *(_late_series_line(entry) for entry in shown)]
+    remaining = result.n_late - len(shown)
+    if remaining > 0:
+        lines.append(f"  …and {remaining} more (context lists up to {MAX_LATE_SERIES_IN_CONTEXT})")
+    return "\n".join(lines)
+
+
+def _late_series_line(entry: _LateSeriesEntry) -> str:
+    """One human-readable line for a late series: how many hours late it is, or that it never
+    reported (a null ``hours_late`` marks a never-reported series)."""
+    hours_late = entry["hours_late"]
+    if hours_late is None:
+        return f"  • series {entry['time_series_id']}: never reported"
+    return (
+        f"  • series {entry['time_series_id']}: {hours_late:.1f}h late "
+        f"(last seen {entry['last_seen']})"
+    )

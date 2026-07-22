@@ -113,9 +113,10 @@ Then check the Sentry UI:
 - **Issues**, filtered to `environment:<your-name>-laptop` — two events: a `ValueError: laptop
   Sentry acceptance test…` with a full stack trace (a traceback, not a message-only event, is the
   point — it confirms the failure hook forwards the live exception rather than relying on log
-  capture), and a `NGED power data stale: 1/1 time series late…` warning carrying the per-series
-  context. Both are fingerprinted with your `<your-name>-laptop` environment, so they form their
-  own issues, separate from production's.
+  capture), and a `NGED power data stale: 1/1 time series late…` warning whose message lists the
+  late series and how late each is (here, `series 999: 9999.0h late …`) with the full per-series
+  detail also in the event context. Both events are fingerprinted with your `<your-name>-laptop`
+  environment, so they form their own issues, separate from production's.
 - **Crons → `live-forecasts-test`** — one OK check-in.
 
 Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and

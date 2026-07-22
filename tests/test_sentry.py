@@ -211,7 +211,13 @@ def test_report_power_freshness_sends_warning_with_fingerprint_and_context(
     assert ctx["n_series_total"] == 32
     assert ctx["late_series_shown"] == 3
     assert len(ctx["late_series"]) == 3
-    assert "3/32" in call["message"]
+    # The message spells out the summary AND each late series with how late it is.
+    message = call["message"]
+    assert "3/32" in message
+    assert "series 0: 30.0h late" in message
+    assert "last seen 2026-07-01" in message
+    assert "series 2: never reported" in message
+    assert "…and" not in message  # all 3 fit under the message cap, so no overflow line
 
 
 def test_report_power_freshness_caps_context_but_keeps_true_total(
@@ -230,6 +236,23 @@ def test_report_power_freshness_caps_context_but_keeps_true_total(
     assert ctx["late_series_shown"] == _sentry.MAX_LATE_SERIES_IN_CONTEXT
     assert ctx["n_late"] == n_stale  # true total preserved
     assert call["tags"]["n_late"] == n_stale
+
+
+def test_report_power_freshness_caps_series_listed_in_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """More late series than the message cap ⇒ the message spells out only the leading
+    ``MAX_LATE_SERIES_IN_MESSAGE`` and reports the rest as an ``…and N more`` line."""
+    calls = _capture_message_recorder(monkeypatch)
+    n_stale = _sentry.MAX_LATE_SERIES_IN_MESSAGE + 5
+    _sentry.report_power_freshness(
+        _settings(sentry_dsn=_DSN), _freshness_result(n_stale=n_stale, n_total=n_stale)
+    )
+    (call,) = calls
+    message = call["message"]
+    series_lines = [line for line in message.splitlines() if "• series" in line]
+    assert len(series_lines) == _sentry.MAX_LATE_SERIES_IN_MESSAGE
+    assert "…and 5 more" in message
 
 
 def test_report_power_freshness_swallows_and_logs_on_send_error(

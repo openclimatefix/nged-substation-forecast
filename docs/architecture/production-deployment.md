@@ -124,10 +124,13 @@ is configured — so laptops and CI stay silent by default.
   (`["nged-power-data-stale", <environment>]`) — Sentry's `environment` is a filter facet, not a
   grouping key, so without the environment in the fingerprint every deployment would share one
   issue; with it, each deployment gets its own ongoing issue, and the hourly re-reports of a
-  continuing stall collapse into that one issue rather than a fresh issue each hour. The per-series
-  detail is attached as event context, capped so a whole-feed stall at V2 scale can't attach
-  thousands of rows (the true late count is always carried by the `n_late` tag). Sending is
-  best-effort: `report_power_freshness` never raises, so a Sentry hiccup can't fail the
+  continuing stall collapse into that one issue rather than a fresh issue each hour. The message
+  body lists the late series and how late each is (`series 12: 48.5h late (last seen …)`, or `never
+  reported`), and the full per-series detail is attached as structured event context. Both are
+  capped — the message to a short leading slice with an `…and N more` line, the context to a larger
+  slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
+  always carried by the `n_late` tag, so a capped list never makes a large stall look small. Sending
+  is best-effort: `report_power_freshness` never raises, so a Sentry hiccup can't fail the
   `blocking=False` check (which, inside the hooked hourly job, would otherwise trip the failure hook
   and fail the run).
 
