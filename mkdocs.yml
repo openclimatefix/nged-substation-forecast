@@ -58,6 +58,7 @@ nav:
       - Testing: architecture/testing.md
   - ML Experimentation:
       - Overview: ml_experimentation/index.md
+      - Our approach to MLops: ml_experimentation/mlops-approach.md
       - Model configuration: ml_experimentation/model-configuration.md
       - Running an experiment end-to-end: ml_experimentation/dagster-workflow.md
       - Cross-validation folds: ml_experimentation/cross-validation-folds.md

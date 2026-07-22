@@ -7,6 +7,9 @@ roadmap.
 
 ## Documents
 
+- [Our approach to MLops](mlops-approach.md) — why we automate experiments, and why the model
+  that wins the evaluation is deployed bit-for-bit, with nothing rewritten on the way to
+  production.
 - [Running an ML experiment end-to-end](dagster-workflow.md) — step-by-step recipe for going
   from raw data to a trained, MLflow-tracked model using the Dagster pipeline; explains why
   `trained_cv_model` reads config from MLflow rather than YAML.
