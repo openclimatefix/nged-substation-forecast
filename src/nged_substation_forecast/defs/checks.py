@@ -12,11 +12,12 @@ timestamp — the job succeeds hourly even when NGED publishes nothing, so only 
 would miss exactly the failure this check exists to catch.
 
 ``evaluate_power_freshness`` is a pure function so it is unit-testable without Dagster or Delta,
-and it is the hand-off point for routing per-series staleness to Sentry: a follow-up will feed the
-same ``PowerFreshnessResult`` to Sentry rather than recomputing it. The two mechanisms stay
-complementary — the [Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
-fires on total silence from outside the deployment, while this check reports per-series staleness
-from inside Dagster.
+and it is the hand-off point for routing per-series staleness to Sentry: the same
+``PowerFreshnessResult`` is fed to ``report_power_freshness`` (in ``nged_substation_forecast._sentry``)
+rather than recomputed. The two mechanisms stay complementary — the
+[Sentry missed-check-in alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+fires on total silence from outside the deployment, while this check (and its Sentry warning) report
+per-series staleness from inside Dagster while the daemon is alive.
 """
 
 from dataclasses import dataclass
@@ -38,6 +39,7 @@ from dagster import (
 )
 from nged_data.storage import time_series_coverage
 
+from nged_substation_forecast._sentry import report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
 
 _LATE_TABLE_SCHEMA: Final[TableSchema] = TableSchema(
@@ -97,7 +99,7 @@ def evaluate_power_freshness(
     """Classify each time series as fresh, stale, or never-reported.
 
     Pure and deterministic — no Dagster, Delta, or clock access — so it is unit-testable
-    directly and reusable by the future Sentry alarm.
+    directly and reused (not recomputed) by ``report_power_freshness`` for the Sentry warning.
 
     Args:
         coverage: One row per ``time_series_id`` that has data, carrying its most recent
@@ -251,4 +253,7 @@ def power_data_is_fresh() -> AssetCheckResult:
         now=datetime.now(timezone.utc),
         threshold=_POWER_DATA_STALENESS_THRESHOLD,
     )
+    # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
+    # Best-effort: report_power_freshness never raises, so a telemetry hiccup can't fail this check.
+    report_power_freshness(settings, result)
     return _to_asset_check_result(result)

@@ -47,19 +47,25 @@ The verification below sends its heartbeat to a throwaway monitor slug instead.
 
 ## Verify it works from your laptop
 
-Save this script and run it with `uv run python <file>`. It exercises the two real code paths — the
-failure hook and the heartbeat — and flushes so the events reach Sentry before the process exits:
+Save this script and run it with `uv run python <file>`. It exercises the three real code paths —
+the failure hook, the heartbeat, and the freshness warning — and flushes so the events reach Sentry
+before the process exits:
 
 ```python
+from datetime import datetime, timezone
+
+import polars as pl
 import sentry_sdk
 from contracts.settings import Settings
 from dagster import job, op
 
 from nged_substation_forecast._sentry import (
     init_sentry,
+    report_power_freshness,
     send_forecast_checkin,
     sentry_capture_failure,
 )
+from nged_substation_forecast.defs.checks import PowerFreshnessResult
 
 TEST_MONITOR_SLUG = "live-forecasts-test"  # a throwaway slug — never the production monitor
 
@@ -74,6 +80,23 @@ def _sentry_smoke_job() -> None:
     _intended_failure()
 
 
+# A synthetic "one series is late" result, so report_power_freshness has something to send.
+_stale_result = PowerFreshnessResult(
+    n_series_total=1,
+    n_stale=1,
+    n_never=0,
+    threshold_hours=24.0,
+    late=pl.DataFrame(
+        {
+            "time_series_id": pl.Series([999], dtype=pl.Int32),
+            "last_seen": pl.Series([datetime(2000, 1, 1, tzinfo=timezone.utc)]),
+            "hours_late": pl.Series([9999.0], dtype=pl.Float64),
+            "status": pl.Series(["stale"]),
+        }
+    ),
+)
+
+
 settings = Settings()
 if not settings.sentry_dsn:
     raise SystemExit("No SENTRY_DSN in .env — nothing to test.")
@@ -81,18 +104,23 @@ if not settings.sentry_dsn:
 init_sentry(settings)
 _sentry_smoke_job.execute_in_process(raise_on_error=False)  # fires the failure hook
 send_forecast_checkin(Settings(sentry_monitor_forecasts=True), monitor_slug=TEST_MONITOR_SLUG)
+report_power_freshness(settings, _stale_result)  # fires the freshness warning
 sentry_sdk.flush(timeout=10)
 ```
 
 Then check the Sentry UI:
 
-- **Issues**, filtered to `environment:<your-name>-laptop` — a `ValueError: laptop Sentry
-  acceptance test…` with a full stack trace. A traceback (not a message-only event) is the point:
-  it confirms the failure hook forwards the live exception rather than relying on log capture.
+- **Issues**, filtered to `environment:<your-name>-laptop` — two events: a `ValueError: laptop
+  Sentry acceptance test…` with a full stack trace (a traceback, not a message-only event, is the
+  point — it confirms the failure hook forwards the live exception rather than relying on log
+  capture), and a `NGED power data stale: 1/1 time series late…` warning whose message lists the
+  late series and how late each is (here, `series 999: 9999.0h late …`) with the full per-series
+  detail also in the event context. Both events are fingerprinted with your `<your-name>-laptop`
+  environment, so they form their own issues, separate from production's.
 - **Crons → `live-forecasts-test`** — one OK check-in.
 
 Once you are satisfied, delete the throwaway `live-forecasts-test` monitor in Sentry (and
-optionally resolve the test issue). Neither affects the production wiring.
+optionally resolve the two test issues). Neither affects the production wiring.
 
 ## What gets sent when you run Dagster locally
 
@@ -113,10 +141,17 @@ Dagster on your laptop does **not** forward everything to Sentry:
 - **No heartbeats are sent.** The live check-in is gated on `SENTRY_MONITOR_FORECASTS`, which you
   have left unset (see the warning above), so your laptop sends no cron check-ins and cannot touch
   the production `live-forecasts` monitor.
+- **Freshness warnings *are* sent — if your local power data is stale.** Whenever the
+  `power_data_is_fresh` asset check runs (alongside every `power_time_series_and_metadata`
+  materialisation) and finds any series past the staleness threshold, it forwards a `warning`-level
+  event to Sentry. This is gated on the DSN, not the heartbeat flag, so a laptop with a stale local
+  Delta table *will* emit one. It can't pollute production's issue, though: the event is
+  fingerprinted per environment, so your `<name>-laptop` staleness forms its own Sentry issue,
+  separate from production's. Resolve or ignore it as you like.
 
-This is the same scope that runs in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
-explains why the failure hook covers only the scheduled jobs and why only success heartbeats are
-ever sent.
+The failure hook and heartbeat scope is the same in production; the [design page](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)
+explains why the failure hook covers only the scheduled jobs, why only success heartbeats are ever
+sent, and how the freshness warning models recovery.
 
 ## Turn it on in production
 
@@ -130,12 +165,20 @@ SENTRY_MONITOR_FORECASTS=true
 ```
 
 `SENTRY_MONITOR_FORECASTS=true` makes each successful live `live_forecasts` run check in to the
-production `live-forecasts` monitor. Two one-time console steps complete the setup:
+production `live-forecasts` monitor. Three one-time console steps complete the setup:
 
 1. The monitor is created automatically on the first check-in (the code sends its schedule and
    margin with every heartbeat), so no manual monitor creation is needed.
 2. **Scope the missed-check-in alert rule to `environment:production`** in Sentry, so a developer
    testing from a laptop can never trip the production alarm.
+3. **Add an alert rule for the freshness warning, also scoped to `environment:production`, and set
+   it to fire on *regressions*.** The freshness warning is a one-way event: when NGED's feed
+   recovers, the code simply stops sending, so the Sentry issue's "last seen" timestamp stops
+   advancing but the issue stays open until someone resolves it. Resolve it once you've confirmed
+   recovery. Firing on regressions (plus a short project-level auto-resolve window) means a *new*
+   stall after a recovery re-pages instead of silently appending to the old, unresolved issue. This
+   warning is a richer per-series breadcrumb layered on top of the missed-check-in alarm, which
+   remains the primary two-directional signal.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and
 possibly the account itself) moves to NGED — see

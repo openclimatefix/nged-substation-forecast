@@ -83,15 +83,16 @@ assets.
 This in-Dagster check is complementary to — not a replacement for — the
 [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total
 silence from *outside* the deployment, because a dead daemon cannot report itself; this check
-reports per-series staleness from *inside* Dagster while the daemon is alive. The freshness
-evaluation is a pure function, which makes it the natural hand-off point for routing per-series
-staleness to Sentry as well — reusing the same `PowerFreshnessResult` rather than recomputing it,
-an immediate follow-up to the initial Sentry telemetry work, and later the source for the
+reports per-series staleness from *inside* Dagster while the daemon is alive, and forwards that
+same staleness to Sentry as a warning (see the freshness-warning bullet under
+[Send telemetry to Sentry](#send-telemetry-to-sentry-and-alarm-on-absence)). The freshness
+evaluation is a pure function, so the Sentry warning reuses the same `PowerFreshnessResult` the
+check already computed rather than recomputing it; the same result will later also feed the
 forecast-warnings delivery table.
 
 ## Send telemetry to Sentry, and alarm on absence
 
-Two independent Sentry mechanisms live in `nged_substation_forecast._sentry`, and both are active
+Three independent Sentry mechanisms live in `nged_substation_forecast._sentry`, all active
 in every Dagster process (daemon, webserver, and each Fargate run worker) only when a `SENTRY_DSN`
 is configured — so laptops and CI stay silent by default.
 
@@ -114,6 +115,32 @@ is configured — so laptops and CI stay silent by default.
   Only *success* heartbeats are ever sent (never an `error` check-in), so the alarm keys purely off
   absence: an in-band run error is the failure hook's job, and a manual `replay` backfill — which
   reprocesses the past rather than proving the service is live now — deliberately does not check in.
+
+- **Freshness warnings.** When the `power_data_is_fresh` asset check finds late series,
+  `report_power_freshness` forwards that per-series staleness to Sentry as a `warning`-level event,
+  reusing the `PowerFreshnessResult` the check already computed. It is gated on the DSN (like error
+  telemetry, not the heartbeat flag), so it fires from wherever a configured environment runs the
+  hourly check, separated by the `environment` tag. The event is fingerprinted **per environment**
+  (`["nged-power-data-stale", <environment>]`) — Sentry's `environment` is a filter facet, not a
+  grouping key, so without the environment in the fingerprint every deployment would share one
+  issue; with it, each deployment gets its own ongoing issue, and the hourly re-reports of a
+  continuing stall collapse into that one issue rather than a fresh issue each hour. The message
+  body lists the late series and how late each is (`series 12: 48.5h late (last seen …)`, or `never
+  reported`), and the full per-series detail is attached as structured event context. Both are
+  capped — the message to a short leading slice with an `…and N more` line, the context to a larger
+  slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
+  always carried by the `n_late` tag, so a capped list never makes a large stall look small. Sending
+  is best-effort: `report_power_freshness` never raises, so a Sentry hiccup can't fail the
+  `blocking=False` check (which, inside the hooked hourly job, would otherwise trip the failure hook
+  and fail the run).
+
+  Freshness is a *two-way* state (stale ↔ recovered) modelled with a *one-way* primitive: a warning
+  event has no "resolved" counterpart. So **recovery is signalled by the events stopping** — the
+  issue's "last seen" timestamp stops advancing — and the operator resolves the issue by hand. The
+  production alert rule should fire on *regressions* (and the project's Sentry auto-resolve window
+  kept short) so that a fresh stall after a recovery re-pages rather than silently appending to a
+  stale-but-unresolved issue. This is a deliberate trade: the missed-check-in alarm above is the
+  primary two-directional signal; this warning is the richer per-series breadcrumb layered on top.
 
 ### Separating laptop telemetry from production
 
