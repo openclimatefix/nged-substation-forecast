@@ -20,47 +20,17 @@ This repo is a `uv` [workspace](https://docs.astral.sh/uv/concepts/projects/work
 
 ### Setup
 
+The full first-run walkthrough — including creating your `.env`, giving Dagster a persistent
+home, and downloading data to train your first model — is the
+[Getting started guide](https://openclimatefix.github.io/nged-substation-forecast/getting-started/).
+The essentials:
+
 1. Ensure [`uv`](https://docs.astral.sh/uv/) is installed following their [official documentation](https://docs.astral.sh/uv/getting-started/installation/).
 2. **Install dependencies**: `uv sync`
 3. **Install pre-commit hooks**: `uv run pre-commit install`
-
-To run Dagster:
-
-1. `uv run dg dev`
-2. Open `http://localhost:3000` in your browser to see the project.
-
-Optional: To allow Dagster to remember its state after you shut it down:
-
-1. `mkdir ~/dagster_home/`
-2. Put the following into `~/dagster_home/dagster.yaml`:
-
-    ```yaml
-    storage:
-      sqlite:
-        base_dir: "dagster_history"
-
-    concurrency:
-      pools:
-        default_limit: 1  # Used to limit concurrency of ecmwf_ens asset.
-
-    run_monitoring:
-      # Without this, a crashed/killed run can leak its concurrency-pool slot (e.g. the pool
-      # above) forever, since nothing else frees a slot held by a run that never reached a
-      # normal finally-block exit. This lets the daemon self-heal: any run finished (in any
-      # terminal status) for longer than the threshold has its slots freed automatically.
-      enabled: true
-      free_slots_after_run_end_seconds: 300
-
-    python_logs:
-      managed_python_loggers:
-        - nged_data
-      python_log_level: DEBUG
-    ```
-
-3. Add `export DAGSTER_HOME=<dagster_home_path>` to your `.bashrc` file, and restart your terminal.
-
-Note: `dagster.yaml` is only read at process startup, so restart `dg dev` (and the daemon) after
-editing it for changes to take effect.
+4. **Create your `.env`**: `cp .env.example .env`, then fill in the three required
+   `NGED_S3_BUCKET_*` credentials (the only values you must set).
+5. **Run Dagster**: `uv run dg dev`, then open `http://localhost:3000` in your browser.
 
 ### Linting & Formatting
 

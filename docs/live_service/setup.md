@@ -5,8 +5,8 @@ disk, or S3 — Simple Storage Service, AWS's object store) and **what credentia
 This page is the reference; the step-by-step journeys that *use* these settings live elsewhere
 and deliberately aren't repeated here:
 
-- [The repository README](https://github.com/openclimatefix/nged-substation-forecast#setup) owns
-  first-time repo setup — installing `uv`, `uv sync`, pre-commit hooks.
+- [Getting started on your laptop](../getting-started.md) owns first-time repo setup — installing
+  `uv`, `uv sync`, pre-commit hooks, creating `.env`, and materialising the first data and model.
 - [Running the whole stack locally](local.md) owns the laptop bring-up (persistent
   `DAGSTER_HOME`, `dg dev`, the optional MinIO rehearsal).
 - [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM
@@ -101,9 +101,10 @@ per-table overrides).
 
 ### The `.env` file and NGED source credentials
 
-Create a `.env` file in the repo root. The three **NGED source-bucket** credentials are always
-required, in every environment — they authenticate reads of NGED's telemetry bucket, which is a
-*different* account and bucket from our own managed data tables:
+Create a `.env` file in the repo root by copying the committed template — `cp .env.example .env` —
+and filling in the values. The three **NGED source-bucket** credentials are always required, in
+every environment — they authenticate reads of NGED's telemetry bucket, which is a *different*
+account and bucket from our own managed data tables:
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>
