@@ -53,6 +53,7 @@ nav:
       - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md
       - Production Deployment Design: architecture/production-deployment.md
+      - AWS Running Costs: architecture/aws-costs.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code Style: architecture/code-style.md
       - Testing: architecture/testing.md

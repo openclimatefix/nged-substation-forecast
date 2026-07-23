@@ -437,7 +437,7 @@ model (or `fdir` added to the upstream dataset). See
 > real-time dependency, and the live forecast just reads the slowly-updated capacity table. The
 > cost is that ECMWF-only would almost certainly give a slightly *worse* capacity estimate than
 > ERA5 would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
-> [live-service cadence](live-service.md#workload-model).
+> [live-service cadence](../architecture/aws-costs.md#workload-model).
 
 ## What comes after v0.7
 

@@ -415,17 +415,19 @@ exactly which five tables are the stable contract.
 **Why `eu-west-2`, not the cheaper `eu-west-1`?** AWS Price List API data (2026-07-03) shows
 Ireland (`eu-west-1`) consistently cheaper than London (`eu-west-2`) — not hugely for the
 always-on control-plane box, but noticeably for the Fargate compute that actually runs
-inference (AWS bills in US dollars; converted here at $1.30/£):
+inference (AWS bills in US dollars; converted at **$1 = £0.75** — the ECB rate of 2026-07-03,
+the same basis as [AWS Running Costs](aws-costs.md); the premium percentages come from the
+underlying USD prices):
 
 | SKU | `eu-west-1` (Ireland) | `eu-west-2` (London) | London premium |
 |---|---|---|---|
-| EC2 `t4g.medium` on-demand | £0.0283/hr | £0.0289/hr | +2.2% |
-| Fargate ARM vCPU-hour | £0.0249/hr | £0.0287/hr | +15.0% |
-| Fargate ARM GB-hour | £0.00274/hr | £0.00315/hr | +14.9% |
-| S3 Standard storage (first 50 TB) | £0.0177/GB-mo | £0.0185/GB-mo | +4.3% |
+| EC2 `t4g.medium` on-demand | £0.0276/hr | £0.0282/hr | +2.2% |
+| Fargate ARM vCPU-hour | £0.0243/hr | £0.0279/hr | +15.0% |
+| Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
+| S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
 
 At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
-[AWS architecture: Cost summary](../roadmap/live-service.md#cost-summary)). It matters more at
+[AWS Running Costs](aws-costs.md)). It matters more at
 v2 scale: NGED's population grows from 32 to ~2,500 time series, and `power_forecasts` could
 reach on the order of a **trillion rows** (see [How big is Flexpectation's power forecast
 data?](#how-big-is-flexpectations-power-forecast-data), above) — at that volume, a per-GB
@@ -439,7 +441,7 @@ it depends on *how* NGED reads, which the AWS Price List API pins down precisely
 |---|---|
 | S3 → another AWS service, **same region** (even a different account) | **£0** |
 | S3 → another AWS service, **`eu-west-1` ↔ `eu-west-2`** (cross-region) | £0.015/GB |
-| S3 → public internet ("data transfer out"), **either region** | £0.069/GB (first 10 TB/month) — identical in both regions |
+| S3 → public internet ("data transfer out"), **either region** | £0.067/GB (first 10 TB/month) — identical in both regions |
 
 Same-region AWS-to-AWS transfer is free even across accounts, but internet-egress pricing
 is identical in these two regions — so matching regions only pays off if NGED reads via **their own
@@ -449,7 +451,7 @@ no difference to the bill. That AWS-native path is the one v2 scale points towar
 a spreadsheet caps out at ~1,048,576 rows, so once `power_forecasts` reaches the trillion-row range,
 NGED pulling "a sizeable chunk" of it stops being something a spreadsheet can do at all — they
 would need their own query engine against our bucket, and running that in `eu-west-2` is what
-turns those reads free instead of £0.015–0.069/GB.
+turns those reads free instead of £0.015–0.067/GB.
 
 This is still provisional: NGED haven't yet confirmed whether a GB-resident region is a hard
 requirement for this data, and we're waiting on their reply before treating the region choice as

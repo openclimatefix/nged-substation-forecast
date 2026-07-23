@@ -19,7 +19,9 @@
 > ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
 > [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)) — plus the
 > durable record of the costed [AWS-architecture decision](#aws-architecture) behind the
-> deployment. It is retired in full once production monitoring lands and its design is promoted,
+> deployment (the running-cost estimate itself has moved to
+> [AWS Running Costs](../architecture/aws-costs.md)). It is retired in full once production
+> monitoring lands and its design is promoted,
 > per the ship-time triage tracked in
 > [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup).
 
@@ -138,73 +140,12 @@ and the accepted trade-offs (mitigated by the external
 
 ### Cost summary
 
-All prices are for **eu-west-2 (London)** — the nearest AWS region to the UK — taken from
-the AWS price-list API (2026-07-03). AWS bills in USD; figures here are converted at
-**\$1 = £0.75** (ECB rate, 2026-07-03).
-
-**These estimates do *not* include ML training.** For v1 we expect most — maybe all — ML
-training to run on our own laptops; the only training AWS would see is an optional
-UI-launched backtest (~£0.65/run, priced below).
-
-Estimated total for the accepted option: **~£25–35/month**, made up of:
-
-| Component | £/month |
-|---|---|
-| Always-on control plane (EC2 `t4g.medium` + 20 GB EBS) | 15–22 (1-yr reserved vs on-demand) |
-| Live Fargate inference (4 runs/day) + hourly polling | 5–9 |
-| S3 storage (~130 GB) + requests | 3–4 |
-| Data transfer (ingress + egress) | ≈0 |
-| Backtests | ~£0.65 per run, as needed |
-
-[Access phasing](#access-phasing) (below) adds negligible spend on top of this accepted-option
-estimate: Stage 2's Caddy and oauth2-proxy, and Stage 3's wake-proxy, all run as plain processes on
-the existing control-plane box — zero new billable resources. The only new billable resource
-across all three stages is the second Fargate task/service for Stage 3's public Marimo instance,
-already roughly priced by the same-shaped workload in
-[Option D](#option-d-serverless-control-plane-no-pets-4145month) (~£6.20/month for Marimo as its
-own tiny Fargate service).
-
-The rejected alternatives range from ~£12–22/month (Option A, which fails two requirements) to
-~£56–86/month (Option C). The detailed analysis follows: the
-[workload model](#workload-model), [storage & data transfer](#storage-data-transfer-common-to-all-options)
-(common to every option), then the accepted option's cost breakdown, then the rejected
-alternatives' costs.
-
-### Workload model
-
-Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 4/day,
-`live_forecasts` 4/day (6-hourly partitions), the monitoring `metrics(production_monitoring)`
-step ~4/day → **~13 materialisations/day ≈ 395/month**. This cadence ingests only ECMWF ENS and
-the NGED power feed today; a near-real-time ERA5/ERA5T ingest would join it *only if* live capacity
-estimation is made to depend on ERA5 — a new external dependency we may prefer to avoid by
-[keeping ERA5 offline](capacity-estimation.md#irradiance-inputs). A backtest experiment today is ~4–6
-materialisations (`eligible_time_series` + `trained_cv_model` + `cv_power_forecasts` per
-fold, plus `metrics`; single leaderboard fold), rising to ~15–20 under the future
-multi-yearly-fold epoch.
-
-Fargate compute: x86 £0.0349/vCPU-hr + £0.0038/GB-hr; **ARM 20% cheaper** (£0.0279 +
-£0.0031) and polars/XGBoost run fine on arm64. A right-sized 4 vCPU / 16 GB ARM task
-(measured inference peak ~9 GB) is £0.16/hr → 4 × 15-min live runs/day ≈ **£5/month**;
-hourly empty polling wake-ups add ~£1.90/month; a 2-hour 8 vCPU / 32 GB ARM backtest ≈
-**£0.65/run**. (The old £11–19/month anchor assumed 8 vCPU / 32 GB x86.)
-
-### Storage & data transfer (common to all options)
-
-Identical under every option, so counted once and folded into each headline range below —
-**~£3–4/month in total**:
-
-- **S3 Standard storage — ~£2.50–3/month.** The working set is ~130 GB (~100 GB NWP +
-  ~30 GB forecasts) at £0.018/GB-month → ~£2.40/month, plus headroom for Delta version
-  history between vacuums. Grows as daily NWP partitions accumulate.
-- **S3 requests — ~£0.50–1.50/month.** Delta Lake is request-heavy (transaction-log JSON
-  reads, checkpoints, many small parquet GETs per scan), but ~13 materialisations/day is
-  tiny volume: a generous 1–2 M GET (£0.00031/1k) + 100–200 k PUT/COPY/POST/LIST
-  (£0.0040/1k) per month lands well under £1.50.
-- **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical
-  costs nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free;
-  internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
-  GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
-  beyond).
+The running-cost estimate for the accepted option — the headline **~£25–35/month**, the
+workload model behind it, and the storage and data-transfer arithmetic — now lives at its
+durable home, [AWS Running Costs](../architecture/aws-costs.md), alongside a projected
+estimate for running at v2 scale (~2,500 time series). The per-option figures below stay on
+this page as part of the decision record: the rejected alternatives range from ~£12–22/month
+(Option A, which fails two requirements) to ~£56–86/month (Option C).
 
 ### Accepted option: small EC2 control-plane box + `EcsRunLauncher` ~£25–35/month
 
