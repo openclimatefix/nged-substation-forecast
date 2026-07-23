@@ -50,15 +50,21 @@ In the AWS console → **S3** → **Create bucket**, twice:
   (NWP, raw power telemetry, forecast metrics, and everything else OCF's pipeline needs but
   hasn't promised to keep stable). Bucket names are globally unique; pick your own if these are
   taken.
-- **HTTP endpoint** — with those names and region, each bucket's virtual-hosted-style HTTPS
-  endpoint is `https://nged-forecast-delivery.s3.eu-west-2.amazonaws.com` and
-  `https://nged-forecast-internal.s3.eu-west-2.amazonaws.com`. **Block Public Access** (below)
-  stays on for both, so browsing either URL directly returns `AccessDenied`; the endpoint matters
-  only to tools that speak S3's HTTPS API with signed (SigV4) requests — e.g. a BI tool's S3
-  connector (see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
-  on Power BI needing a plain access key and secret) — rather than day-to-day access, which goes
-  through `s3://` URIs via the `deltalake`/Polars clients described in
-  [Forecast Delivery](../architecture/forecast-delivery.md).
+- **Bucket URIs** — with those names and the `eu-west-2` region above, each bucket is reachable
+  two ways:
+    - `s3://nged-forecast-delivery` and `s3://nged-forecast-internal` — the `s3://` root URI each
+      table path is built from (e.g. `DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data` in
+      [Step 14](#step-14-configure-dagster-on-the-box)). This is what the `deltalake`/Polars
+      clients described in [Forecast Delivery](../architecture/forecast-delivery.md) use for
+      day-to-day access, and it's region-agnostic — the client discovers `eu-west-2` from the
+      bucket itself.
+    - `https://nged-forecast-delivery.s3.eu-west-2.amazonaws.com` and
+      `https://nged-forecast-internal.s3.eu-west-2.amazonaws.com` — the virtual-hosted-style
+      HTTPS endpoint, region baked into the hostname. **Block Public Access** (below) stays on
+      for both, so browsing either URL directly returns `AccessDenied`; this form matters only to
+      tools that speak S3's HTTPS API directly with signed (SigV4) requests — e.g. a BI tool's S3
+      connector (see [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it)
+      on Power BI needing a plain access key and secret).
 - **Every other setting on the create-bucket form can stay at its console default:**
     - **Bucket namespace** — leave at **Global namespace**; do not switch to "Account Regional
       namespace", even though the console marks it "(recommended)". That option changes the
