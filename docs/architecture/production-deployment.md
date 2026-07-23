@@ -18,7 +18,8 @@ the reasoning is in
 [Running the data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm). This is the roadmap's
 [accepted architecture](../roadmap/live-service.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month);
 see [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) for the
-costed options.
+costed options, and [AWS Running Costs](aws-costs.md) for what the deployed service costs to
+run — as built at v1, and projected at v2 scale.
 
 Because scheduling lives inside Dagster rather than in any cloud-specific service, the entire
 stack stays portable: the laptop deployment and the cloud deployment are the same artifact,
@@ -486,6 +487,8 @@ production-resilience mechanism.
 - [Live service roadmap](../roadmap/live-service.md) — the full v0.1 design, including the
   costed AWS architecture options behind the accepted architecture (small control-plane box +
   `EcsRunLauncher`) and its implementation workstreams.
+- [AWS Running Costs](aws-costs.md) — what this architecture costs to run: the v1 estimate as
+  deployed, and the projected estimate at v2 scale.
 - [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:
   promotion, image build/push, and the full AWS bring-up including the control-plane box.
 - [Setting up Sentry telemetry](../live_service/sentry.md) — the how-to for the error reporting

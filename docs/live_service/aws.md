@@ -1238,7 +1238,7 @@ scheduler and run-monitoring daemons with green heartbeats.
    history intact.
 5. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a
    fresh NWP ingest after each daily 00Z publication; check Cost Explorer against the
-   [roadmap's cost model](../roadmap/live-service.md#cost-summary).
+   [cost model](../architecture/aws-costs.md#v1-32-time-series-2535month).
 
 If a slot gets missed (box down, failed run), backfill it from the same UI —
 [Operating the live service: Backfilling a missed slot](operations.md#backfilling-a-missed-slot).
@@ -1312,3 +1312,5 @@ configured. Rotate the key periodically once this is live.
 - [Live service: AWS architecture](../roadmap/live-service.md#aws-architecture) — the costed
   options behind this design, access phasing (team read-only access, the public dashboard), and
   the still-to-come alerting and infra-as-code work.
+- [AWS Running Costs](../architecture/aws-costs.md) — what the deployed service costs to run,
+  and the projected cost at v2 scale.
