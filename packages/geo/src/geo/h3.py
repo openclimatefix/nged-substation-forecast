@@ -1,6 +1,5 @@
 """H3-related utilities for geospatial operations."""
 
-import os  # CI break test: deliberately unused import
 import logging
 
 import h3.api.basic_int as h3
