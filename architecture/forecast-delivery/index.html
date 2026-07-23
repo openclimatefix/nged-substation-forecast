@@ -1,0 +1,3169 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../overview/">
+      
+      
+        <link rel="next" href="../ecmwf-ens-known-issues/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Forecast Delivery - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#forecast-delivery-delta-lake-on-s3" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Forecast Delivery
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-products-two-shapes-of-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two products, two shapes of problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evolving-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evolving requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-big-is-flexpectations-power-forecast-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How big is Flexpectation's power forecast data?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-rest-was-designed-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What REST was designed for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-delta-lake-is-and-who-else-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Delta Lake is (and who else uses it)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#could-postgres-store-this-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Could Postgres store this data?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#we-are-delivering-data-over-an-api-but-not-a-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        We are delivering data over an API (but not a REST API)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#and-it-is-a-database-acid-on-object-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        …and it is a database: ACID on object storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lazy-reads-query-it-dont-download-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lazy reads: query it, don't download it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-established-industry-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An established industry pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ocf-doesnt-have-to-build-or-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What OCF doesn't have to build or run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#securing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Securing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-data-contracts-machine-verifiable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict data contracts (machine-verifiable)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#and-its-excellent-for-our-internal-storage-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        And it's excellent for our internal storage too
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-would-a-rest-api-earn-its-keep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When would a REST API earn its keep?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-products-two-shapes-of-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two products, two shapes of problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evolving-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evolving requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-big-is-flexpectations-power-forecast-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How big is Flexpectation's power forecast data?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-rest-was-designed-for" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What REST was designed for
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-delta-lake-is-and-who-else-uses-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Delta Lake is (and who else uses it)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#could-postgres-store-this-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Could Postgres store this data?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#we-are-delivering-data-over-an-api-but-not-a-rest-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        We are delivering data over an API (but not a REST API)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#and-it-is-a-database-acid-on-object-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        …and it is a database: ACID on object storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lazy-reads-query-it-dont-download-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lazy reads: query it, don't download it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#an-established-industry-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An established industry pattern
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-ocf-doesnt-have-to-build-or-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What OCF doesn't have to build or run
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#securing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Securing it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#strict-data-contracts-machine-verifiable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strict data contracts (machine-verifiable)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#and-its-excellent-for-our-internal-storage-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        And it's excellent for our internal storage too
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-would-a-rest-api-earn-its-keep" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When would a REST API earn its keep?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="forecast-delivery-delta-lake-on-s3">Forecast Delivery: Delta Lake on S3</h1>
+<p><strong>In brief:</strong> We deliver forecasts to NGED as Delta Lake tables on S3, not through a REST API.
+The workload is a poor fit for REST — one power-user consumer who wants routine access to the
+<em>entire</em> forecast history, which will reach trillions of rows at V2 scale — and Delta Lake on S3
+is a genuine database-grade delivery mechanism: an open protocol with ACID guarantees, lazy
+partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and schema
+evolution, with no API server for OCF to build, run, or be on call for. If a future consumer
+needs small operational queries or per-customer permissions, a REST API can be added later as a
+purely additive layer over the same tables.</p>
+<hr />
+<p>OCF's national solar forecast is served through a custom REST API
+(<a href="https://github.com/openclimatefix/quartz-api">quartz-api</a>), and that's the right tool for that
+product. So when we talk about NGED Flexpectation delivering files on object storage instead, it's
+natural to ask why — "just files on S3" can sound like a shortcut we'd eventually replace with a
+"real API". This page walks through the reasoning: what Delta Lake actually is, why the two
+products suit different mechanisms, what Delta Lake on S3 gives NGED (more than it might first
+appear), and when a REST API <em>would</em> earn its keep here.</p>
+<h2 id="two-products-two-shapes-of-problem">Two products, two shapes of problem</h2>
+<p>A REST API is the right answer for OCF's commercial solar forecast because of the shape of that
+problem:</p>
+<ul>
+<li><strong>Many consumers.</strong> Multiple paying customers, each needing their own credentials,
+  entitlements, and usage tracking — fine-grained permissions are a core requirement.</li>
+<li><strong>Small payloads.</strong> The typical query is "give me the latest national forecast": a few
+  kilobytes of JSON per request.</li>
+<li><strong>URL-shaped consumers.</strong> Customers integrate the forecast into their own applications and
+  want an HTTP endpoint, not a database.</li>
+</ul>
+<p>NGED Flexpectation turns out to look quite different on each of those axes:</p>
+<ul>
+<li><strong>Novel concepts.</strong> The <a href="../../roadmap/delivery-tables/">delivery tables</a> carry information that
+  has no analogue in OCF's existing products. We &amp; NGED have spent many hours carefully designing
+  these tables and the data delivery mechanism. An API surface for all of this would have to be
+  designed from scratch:<ul>
+<li>time-varying <a href="../../roadmap/delivery-tables/#table-4-effective_capacity">effective capacity</a>,</li>
+<li><a href="../../roadmap/delivery-tables/#table-3-asset_health_history">asset-health history</a>,</li>
+<li><a href="../../roadmap/delivery-tables/#table-5-substation_switching">substation switching</a>,</li>
+<li><a href="../../roadmap/delivery-tables/#representation-1-ensemble-of-deterministic-forecasts">per-ensemble-member forecasts</a>
+  (including full backtest history &amp; live forecasts in the same table, for multiple ML models
+  run in parallel, and multiple ways of representing uncertainty),</li>
+<li>and <a href="../../roadmap/delivery-tables/#table-2-power_forecast_warnings">forecast warnings</a>.</li>
+</ul>
+</li>
+<li><strong>Much more data</strong> — quantified <a href="#how-big-is-flexpectations-power-forecast-data">below</a>.
+  Per-ensemble-member probabilistic forecasts across thousands of time series are simply a different
+  order of magnitude compared to OCF's commercial forecast products.</li>
+<li><strong>One user.</strong> NGED is the only consumer. There is no multi-tenant permission problem to solve — a
+  single authenticated AWS user covers the entire requirement. But this is not a ceiling on the
+  architecture: S3 can grant read access to further users via bucket policies or <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points.html">S3 Access
+  Points</a>, so having
+  multiple consumers wouldn't force us off Delta Lake on S3. A small, fixed number of views can
+  even be split across separate tables — e.g. keeping forecasts for NGED's generation customers
+  private while openly publishing the substation forecasts — with bucket-policy permissions set
+  per table. What doesn't fit that pattern is <em>dynamic, per-customer</em> entitlements decided at
+  query time rather than at data-layout time — many customers each needing their own filtered
+  slice of the same table — which is where a REST API would earn its keep, as covered
+  <a href="#when-would-a-rest-api-earn-its-keep">below</a>.</li>
+<li><strong>Power users.</strong> NGED's analysts are comfortable in Python and want access to the full firehose of
+  data: not just the latest run, but routine access to the <em>entire history</em> of forecasts, backtests,
+  and OCF's automated analysis of NGED's power data, all for NGED's own evaluation and downstream
+  analysis.</li>
+</ul>
+<h2 id="evolving-requirements">Evolving requirements</h2>
+<p>NGED are refreshingly open that they don't yet know exactly which views of the data they will find
+most useful. We need headroom to iterate table schemas rapidly while they are still being designed
+with NGED. Delta Lake supports schema evolution directly (new columns land without breaking
+existing readers); a REST API would add a versioning-and-deprecation cycle on top of every schema
+change.</p>
+<p>And, crucially, NGED are <em>already</em> finding uses for our "firehose of data" that we had never
+considered. These are exactly the sort of unforeseen use-cases that simply wouldn't have occurred to
+anyone if we only provided a minimal API to NGED. In fact, these "unforeseen use-cases" might end up
+being just as important to NGED as the power forecasts.</p>
+<h2 id="how-big-is-flexpectations-power-forecast-data">How big is Flexpectation's power forecast data?</h2>
+<p>In short: At v2 scale, we will be storing multiple <em>trillions</em> of rows of data. As discussed below,
+that is far too much to be practical for storing in Postgres, or for delivering over a REST API.</p>
+<p>Each 6-hourly forecast run produces one row per time series, ensemble member, and half-hour of the
+14-day horizon. For the V1 trial area that is 32 series × 51 members × 672 half-hours ≈ <strong>1.1
+million rows per run</strong> (a little fewer in practice, since the NWP publication delay trims the
+usable horizon). Our development <code>power_forecasts</code> table already holds <strong>~407 million rows</strong>
+from 428 forecast init times (mostly backtests, plus a handful of live runs so far) — for just 32
+time series. Our
+<a href="../../api/delta_store/"><code>delta_store</code></a> storage format packs that into <strong>0.75 GB, ~1.8 bytes
+per row</strong>.</p>
+<p>V2 scales to ~2,500 time series: approx 78× more, or roughly <strong>86 million rows per run</strong>. At the
+6-hourly cadence (4 runs/day × 365 days) that's roughly <strong>125 billion rows per year of history</strong> — a
+couple of hundred gigabytes at the measured bytes-per-row (using Delta Lake), and several
+<em>terabytes</em> uncompressed.</p>
+<p>What would it look like to send that data over a REST API? Serialised as uncompressed JSON (measured
+on real forecast rows: ~356 bytes each), the same year of history would be roughly <strong>45 terabytes on
+the wire — about 200× the Delta footprint</strong>. Gzip narrows the gap to roughly 20×, but that still
+leaves ~4.5 terabytes per year of data. NGED wants routine access to all of it!</p>
+<p>Multiply that per-year figure out across multiple years of history and multiple ML models and it
+keeps climbing: four years of history across two concurrently-run models already reaches <strong>a
+trillion rows</strong> (125 billion × 4 × 2 = 1 trillion) — and both those multipliers are conservative
+once backtests and additional model families are counted.</p>
+<p>That volume is an awkward fit for JSON request/response cycles; in practice,
+REST designs for workloads like this tend to grow a "bulk export" endpoint that hands back files —
+at which point the files are doing the real work, and the REST API has become a wrapper around them.</p>
+<h2 id="what-rest-was-designed-for">What REST was designed for</h2>
+<p>REST was named and formalised in Roy Fielding's
+<a href="https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm">2000 PhD dissertation</a>,
+distilling his 1990s work on the HTTP/1.1 and URI specifications into a description of <em>why the
+web worked</em>: many independent clients, small
+hypermedia resources, stateless request/response over HTTP, caches in the middle. It is a
+superb architecture for exactly that — operational queries, multi-tenant products, and
+integrations where each interaction moves a small resource.</p>
+<p>What REST wasn't designed for is bulk analytical access to terabytes of tabular history. Teams
+that press it into that role tend to find themselves re-implementing, one endpoint at a time,
+the things analytical storage formats already provide: pagination (chunked reads),
+retry-and-resume (transactional snapshots), server-side filtering (predicate pushdown), column
+selection (columnar layout), and compression. Each of those becomes a bespoke design decision
+to make, document, and maintain — and a bespoke client for NGED to write against.</p>
+<h2 id="what-delta-lake-is-and-who-else-uses-it">What Delta Lake is (and who else uses it)</h2>
+<p>It's worth being concrete about what Delta Lake actually <em>is</em>, because "Parquet files
+on S3" can conjure an image of our code carefully hand-crafting every file and hoping nothing
+goes wrong mid-write. That's not what happens. <a href="https://delta.io">Delta Lake</a> is an open-source
+table format created at Databricks and donated to the Linux Foundation in 2019, and — just like
+a traditional database — all the fiddly bookkeeping is the library's job, not ours.</p>
+<p>Writing a forecast run is one function call:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">deltalake</span><span class="w"> </span><span class="kn">import</span> <span class="n">write_deltalake</span>
+
+<span class="n">write_deltalake</span><span class="p">(</span><span class="s2">&quot;s3://&lt;bucket&gt;/power_forecasts&quot;</span><span class="p">,</span> <span class="n">forecasts</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;append&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>The library (<a href="https://github.com/delta-io/delta-rs">delta-rs</a>, written in Rust) decides how to
+split rows across files, names the files, lays out the partition directories, records per-column
+statistics, and — the crucial part — atomically commits the new files to the transaction log.
+(Our <a href="../../api/delta_store/"><code>delta_store</code></a> package layers our own storage policy on top —
+row sort order, per-column parquet encodings, precision rounding — but that too is just
+configuration passed to the same library call.)</p>
+<p>On disk, the result looks like this (our development <code>power_forecasts</code> table):</p>
+<div class="highlight"><pre><span></span><code>power_forecasts/
+├── _delta_log/                    ← the transaction log
+│   ├── 00000000000000000000.json
+│   ├── 00000000000000000001.json
+│   └── …
+├── experiment_name=xgboost_cv_0001/
+│   └── fold_id=mid_2025_to_mid_2026/
+│       ├── part-00000-cbb0236f-….zstd.parquet
+│       ├── part-00000-ef8aad4e-….zstd.parquet
+│       └── …
+└── …
+</code></pre></div>
+<p>Readers never touch those Parquet files directly. Opening the table is a single call —
+<code>DeltaTable("s3://&lt;bucket&gt;/power_forecasts")</code> — and the first thing that client does is read
+<code>_delta_log</code>. The log tells it exactly which Parquet files make up the current version of the
+table and, for each file, which partition values and value ranges it holds — so a query can
+skip irrelevant files without downloading them. A file the log doesn't mention — half-uploaded,
+or left behind by a failed write — simply doesn't exist as far as any reader is concerned. That
+log is where the atomic-publish guarantee described
+<a href="#and-it-is-a-database-acid-on-object-storage">below</a> physically lives. And every tool that
+reads Delta Lake starts the same way, including Polars' <code>scan_delta</code>
+(<a href="#lazy-reads-query-it-dont-download-it">below</a>).</p>
+<p>If this still feels unusual, remember that <em>every</em> database is ultimately files on disk. Postgres —
+OCF's workhorse — stores each table as files of 8 kB pages in a binary format that only Postgres can
+read, and you reach them through the Postgres server process. Delta Lake is the same idea with the
+layers rearranged: the on-disk format is open and columnar, so dozens of independently developed
+tools read it directly, and the "server" role is played by object storage. In neither case does
+application code manage the files by hand.</p>
+<p>And Delta Lake is thoroughly mainstream technology. Databricks built its entire platform on Delta
+Lake; Adobe, Comcast, Salesforce, and Apple all run it at massive scale; and — closest to home —
+our colleagues at <a href="https://www.neso.energy/">NESO</a> tell us NESO uses Delta Lake internally too.
+More broadly, the open-table-format family it
+belongs to (Delta Lake; <a href="https://iceberg.apache.org/">Apache Iceberg</a>, created at Netflix; <a href="https://hudi.apache.org/">Apache
+Hudi</a>, created at Uber) is now the standard way large companies store and
+share analytical data. In other words: Delta Lake is the boring, battle-tested option.</p>
+<h2 id="could-postgres-store-this-data">Could Postgres store this data?</h2>
+<p>This doc is mostly about <em>delivery</em> of forecast data. But it's worth pausing to talk about our
+internal <em>storage</em> of the data too.</p>
+<p>The <a href="#how-big-is-flexpectations-power-forecast-data">previous section</a> put a number on where
+this is headed: V2's <code>power_forecasts</code> could reach the order of a trillion rows. Could Postgres — OCF's
+workhorse — hold a trillion rows?</p>
+<p>The short answer is: Technically, <em>yes</em>, Postgres can store one trillion rows. But it'd cost on the
+order of £10,000 per month just for RDS (AWS' managed Postgres service), and require a team of
+database admins, and be 10–100× slower than a columnar store on our scan-heavy queries. And,
+remember that we could easily require <em>multiple</em> trillions of rows.</p>
+<table>
+<thead>
+<tr>
+<th>At trillion-row (V2) scale</th>
+<th>Postgres</th>
+<th>Delta Lake on S3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per-row footprint</td>
+<td>23-byte tuple header + 4-byte line pointer ≈ 27 bytes of <em>fixed overhead alone</em>, before any column data</td>
+<td>~1.8 bytes/row <em>total</em> — data and overhead combined, via columnar compression (<a href="../../api/delta_store/"><code>delta_store</code></a> packing)</td>
+</tr>
+<tr>
+<td>Storage footprint</td>
+<td>~50–150 TB, indexed (estimate, not a measurement)</td>
+<td>~2 TB</td>
+</tr>
+<tr>
+<td>Storage cost</td>
+<td>~£4,000–17,000/month (RDS <code>gp3</code>, <code>eu-west-2</code>)</td>
+<td>~£35–40/month (S3, <code>eu-west-2</code>)</td>
+</tr>
+<tr>
+<td>Table / storage ceiling</td>
+<td>32 TB per table; 64 TiB (RDS) or 256 TiB (Aurora) per instance</td>
+<td>No hard table-size cap — cost scales with data touched, not stored</td>
+</tr>
+<tr>
+<td>Selective query at scale</td>
+<td>O(log n), but 10–100× slower once the index outgrows RAM</td>
+<td>Near-constant — only the matching partitions/files are read</td>
+</tr>
+<tr>
+<td>Full/aggregate scan</td>
+<td>O(n) over every column, whether selected or not</td>
+<td>O(n), but columnar, compressed, and parallel across files</td>
+</tr>
+<tr>
+<td>Operational burden</td>
+<td>Autovacuum/freeze + index rebuilds; needs Timescale or Citus plus dedicated DB ops at this scale</td>
+<td>S3's SLA; on-call just confirms the 4 daily runs completed</td>
+</tr>
+</tbody>
+</table>
+<p>The comparison table above is the summary; the rest of this section walks through where each of
+its rows comes from. Skip ahead if the table already convinces you.</p>
+<p><strong>Storage footprint.</strong> Every Postgres row carries fixed overhead before any column data: a
+23-byte <a href="https://www.postgresql.org/docs/current/storage-page-layout.html">tuple header</a> plus a
+4-byte line pointer. At a trillion rows that's ~27 TB of overhead alone — before indexes,
+alignment padding, or the data itself. A realistic trillion-row Postgres table, indexed, lands
+somewhere in the range of <strong>50–150 TB</strong> (an estimate, not a measurement — there's no <em>vanilla</em>
+trillion-row Postgres deployment to benchmark against); the same rows in
+<a href="../../api/delta_store/"><code>delta_store</code></a>'s ~1.8-bytes/row packing
+(<a href="#what-delta-lake-is-and-who-else-uses-it">above</a>, from the <code>power_forecasts</code> table) come to
+roughly <strong>2 TB</strong>. That 25–75× gap has
+structural teeth:</p>
+<ul>
+<li>A single Postgres table <a href="https://www.postgresql.org/docs/current/limits.html">tops out at 32 TB</a>
+  — even the low end of the 50–150 TB range needs splitting across multiple partitions to fit, and
+  production tables at this scale typically use far more partitions than that bare minimum, since
+  autovacuum and reindex time scale with partition size, not just partition count.</li>
+<li>RDS for PostgreSQL caps storage at 64 TiB per instance; Aurora PostgreSQL goes up to 256 TiB
+  (after a 2025 limit increase). The low end of the 50–150 TB range fits either engine; the high
+  end only fits Aurora.</li>
+<li>At current RDS <code>gp3</code> rates (~£0.09–0.11/GB-month in <code>eu-west-2</code>), 50–150 TB of storage alone
+  costs roughly <strong>£4,000–17,000/month</strong> — versus roughly <strong>£35–40/month</strong> for ~2 TB on S3 at the
+  <code>eu-west-2</code> rate already cited under <a href="#securing-it">Securing it</a>, below.</li>
+</ul>
+<p><strong>Operational load.</strong> Tables at this size carry ongoing cost beyond storage: autovacuum and
+transaction-ID freeze scans over terabyte-scale tables are a real discipline, and terabyte-scale
+B-tree indexes take hours to days to build or reindex. The query pattern is also a poor structural
+fit — scan-heavy analytical aggregation over billions of rows touching few columns is exactly
+where a row store loses to a columnar one, typically by 10–100×.</p>
+<p>Trillion-row Postgres is done in practice, via Timescale's columnar compression or Citus sharded
+across a cluster — but both mean an extension plus a distributed cluster with dedicated database
+operators, not a change to Postgres's fundamentals. Postgres can do it if you hire the team to run
+it; Delta does it without a team of database admins.</p>
+<p><strong>Query scaling.</strong> Postgres's B-tree indexes give O(log n) point lookups — a trillion-row index is
+only ~6 levels deep, close to flat in theory. The practical cliff is cache residency: once the
+index no longer fits in RAM, lookups become random disk I/O and latency jumps 10–100×, a threshold
+set by RAM budget rather than row count. Aggregate queries that can't use an index are full
+sequential scans of every column, whether selected or not, and get slower every month as history
+grows (partitioning caps this to the matching partitions).</p>
+<p>Delta Lake's cost, by contrast, scales with <em>data touched, not data stored</em>: reading the
+transaction log costs a fixed few hundred milliseconds regardless of table size, and beyond that a
+query that aligns with the table's partition columns and sort order costs roughly the same whether
+the table holds a billion rows or a hundred billion — this is the same <a href="#lazy-reads-query-it-dont-download-it">lazy-read
+behaviour</a> described below. The trade is that Delta's
+"index" is coarse, file-level min/max statistics: a filter on a column that isn't a partition key
+or in the sort order degrades to a full scan, which is why <code>delta_store</code>'s row sort-order policy
+(<a href="#and-its-excellent-for-our-internal-storage-too">below</a>) is effectively doing the job of an
+index. Postgres pays the opposite cost: a fine-grained index update on every insert, and at ~86
+million rows per run (V2 scale), that write amplification becomes its own scaling problem.</p>
+<p>Postgres wins for millisecond operational queries on tables that fit in RAM; Delta wins as soon as
+tables outgrow RAM, because its cost for well-aligned selective queries stops depending on table
+size at all.</p>
+<p><strong>Bottom line.</strong> A trillion rows is technically possible in Postgres with enough specialised
+extensions and operational investment. For Flexpectation's shape of problem — analytical,
+scan-heavy, growing without bound, one small team without dedicated database operators — it's the
+wrong tool and the Delta Lake choice already sidesteps the problem entirely.</p>
+<h2 id="we-are-delivering-data-over-an-api-but-not-a-rest-api">We <em>are</em> delivering data over an API (but not a <em>REST</em> API)</h2>
+<p>It's easy to hear this design as "we're not building an API, we're just putting files on S3" — but
+that framing undersells what's actually being delivered. An application programming interface (API)
+is, at heart, a <em>contract</em>: a precisely specified interface that lets independent programs
+interoperate. Delta Lake is exactly that — an <a href="https://github.com/delta-io/delta/blob/master/PROTOCOL.md">open, versioned protocol
+specification</a> with mature, independently
+developed client implementations: Polars, pandas, DuckDB, Spark, Rust, and more.</p>
+<p>So we <em>are</em> delivering through an API. The difference is that the protocol, the client
+libraries, the authentication layer (S3/IAM), and the server (S3 itself) are all off-the-shelf,
+open components with far more engineering investment behind them than any service we could
+build. Our part of the contract shrinks to the piece that is genuinely ours to define: the
+table schemas, which are pinned down in code by the
+<a href="../../api/contracts/"><code>contracts</code> package</a>.</p>
+<h2 id="and-it-is-a-database-acid-on-object-storage">…and it is a database: ACID on object storage</h2>
+<p>As <a href="#what-delta-lake-is-and-who-else-uses-it">an earlier section</a> showed, Delta Lake is
+Parquet files plus a transaction log — and that log is what elevates "files on S3" into a
+database with full <strong>ACID</strong> guarantees:</p>
+<ul>
+<li><strong>Atomicity</strong> — each 6-hourly publish either becomes fully visible or not at all. NGED can
+  never read a half-written forecast.</li>
+<li><strong>Consistency</strong> — every committed version of the table satisfies its schema; readers never
+  see mixed or partial states.</li>
+<li><strong>Isolation</strong> — readers are never blocked by, or corrupted by, a concurrent write. A query
+  that starts mid-publish sees the previous complete version.</li>
+<li><strong>Durability</strong> — committed data lives on S3, with its
+  <a href="https://aws.amazon.com/s3/faqs/#Durability_.26_Data_Protection">eleven-nines object durability</a>.</li>
+</ul>
+<p>On top of ACID, the transaction log gives <strong>time-travel</strong> (read the table exactly as it was at
+any past version we retain — useful for auditing what NGED saw at a given moment) and <strong>schema
+evolution</strong> (add columns without breaking existing readers).</p>
+<h2 id="lazy-reads-query-it-dont-download-it">Lazy reads: query it, don't download it</h2>
+<p>Delivering the full history does <em>not</em> mean NGED downloads the full history. Reading the table
+is one line:</p>
+<div class="highlight"><pre><span></span><code><span class="n">forecasts</span> <span class="o">=</span> <span class="n">polars</span><span class="o">.</span><span class="n">scan_delta</span><span class="p">(</span><span class="s2">&quot;s3://&lt;bucket&gt;/power_forecasts&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p><code>scan_delta</code> is lazy: nothing is fetched until a query runs, and then only the bytes that query
+touches cross the wire. Three mechanisms make that efficient:</p>
+<ul>
+<li><strong>Partition pruning</strong> — filters on partition columns skip whole directories of files.</li>
+<li><strong>Row-group skipping</strong> — Parquet stores min/max statistics per row group, so filters skip
+  chunks within files.</li>
+<li><strong>Column pruning</strong> — Parquet is columnar, so unselected columns are never read at all.</li>
+</ul>
+<p>The practical effect: fetching a single forecast run from a multi-billion-row table takes a
+fraction of a second on a local copy, and a few seconds over the internet. At today's V1 scale
+that's only a few megabytes moving (~2 MB per run); even
+at V2's ~86 million rows per run it's still only ~150 MB — a tiny fraction of the full table either
+way. NGED writes <strong>zero custom
+data-reading code</strong> — they point existing tools (Polars, pandas, DuckDB, Spark) at
+the bucket and query it like a database. The same mechanism powers our own pipeline: the
+<a href="../overview/#lazy-evaluation-strategy">lazy evaluation strategy</a> that keeps our training memory
+bounded is exactly what keeps NGED's reads cheap.</p>
+<p>One caveat for anyone querying the <em>whole</em> table with Polars: default Polars builds cap any
+single row count or materialised frame at 2³² (~4.29 billion) rows, and a count past the cap
+<strong>silently wraps</strong> rather than erroring — so once a table passes that size (our internal NWP
+table already has, and <code>power_forecasts</code> will at V2 scale), whole-table row counts must come from
+the Delta transaction log (<code>DeltaTable(path).count()</code>), not <code>pl.len()</code> over an unfiltered scan.
+Filtered queries whose results stay under the cap — i.e. every read pattern described above —
+are unaffected. Details in
+<a href="../overview/#the-other-hard-ceiling-polars-32-bit-row-index">Architecture Overview → The other hard ceiling</a>.</p>
+<h2 id="an-established-industry-pattern">An established industry pattern</h2>
+<p>We're also in good company. "Analytical data as cloud-optimised files on object storage,
+queried in place" has quietly become one of the standard ways to ship large datasets:</p>
+<ul>
+<li><a href="https://dynamical.org">Dynamical.org</a> publishes global weather datasets as Zarr on object
+  storage — and Flexpectation <em>consumes</em> its ECMWF ensemble NWP exactly that way, every day.
+  Our delivery to NGED mirrors how we ourselves receive hundreds of gigabytes of upstream data.</li>
+<li><a href="https://earthmover.io">Earthmover</a> built a commercial data platform around the same
+  principle for scientific data.</li>
+<li><a href="https://source.coop">Source Cooperative</a> and the
+  <a href="https://registry.opendata.aws/">AWS Open Data programme</a> distribute petabytes of public
+  data as files on S3, not behind bespoke APIs.</li>
+</ul>
+<p>Inside the Flexpectation codebase, Delta Lake on object storage is already our
+<a href="../overview/#core-components">storage layer</a> for power telemetry and NWP data. Delivery adds no
+new technology to build, learn, or operate — the delivery tables are produced by the same
+mechanism as everything else in the pipeline.</p>
+<h2 id="what-ocf-doesnt-have-to-build-or-run">What OCF doesn't have to build or run</h2>
+<p>Choosing Delta Lake over a bespoke REST API removes an entire service from the project:</p>
+<ul>
+<li>no API server to design, write, deploy, monitor, scale, keep patched, and pay for;</li>
+<li>no endpoint schema to version and document alongside the table schemas;</li>
+<li>no authentication microservice or token lifecycle to manage;</li>
+<li>no client SDK for NGED to install and for us to maintain;</li>
+<li>availability is S3's SLA, not something we are on call for: The on-call engineer <em>only</em> has to
+  check the forecast has run at 00, 06, 12, and 18 hours. They aren't <em>constantly</em> on call;</li>
+<li>no maintenance windows to negotiate with NGED: because NGED reads forecasts from S3 rather
+  than from any OCF-run service, and new forecasts land only every 6 hours, the gap between one
+  forecast run and the next is a built-in maintenance window — OCF compute can be stopped,
+  patched, or rebuilt between runs without interrupting NGED's reads (see
+  <a href="../../background/requirements/#uptime-lenient-by-design">Requirements → Uptime: lenient by design</a>).</li>
+</ul>
+<p>For a small team whose mission is forecast quality, that's a lot of engineering effort we get
+to spend on the forecasts themselves instead.</p>
+<h2 id="securing-it">Securing it</h2>
+<p>Both buckets hold data about NGED's customers, so neither is public: both are protected with
+standard S3/IAM authentication. With a single consumer this is straightforward — one
+authenticated principal, no entitlement matrix — and it mirrors exactly how NGED protect their
+own time-series JSON bucket, which we read the same way. Every tool named above supports
+authenticated S3 access natively. That "single authenticated principal" is a dedicated IAM
+<strong>user</strong>, not a cross-account role: many desktop analytics tools — including the connectors that
+give BI tools such as Power BI access to S3 — have no support for AWS role-assumption; they need
+a plain access key and secret, which only an IAM user (not a role) provides.</p>
+<p><strong>Two buckets, not one.</strong> OCF shares more than the five delivery tables with NGED — there's no
+reason to withhold the NWP and raw-telemetry tables OCF's own pipeline works with day to day, and
+NGED are already finding uses for data beyond the minimal contract (see
+<a href="#evolving-requirements">Evolving requirements</a> above). But those internal tables are not a
+contract: their schemas may change shape at any time, with no deprecation cycle, exactly because
+nothing external is supposed to depend on them staying stable. Splitting them into a second,
+separately-named S3 bucket makes that distinction impossible to miss — a bucket name in a URI
+survives being pasted into a script or a Slack message even out of context, where a path prefix
+within one bucket is easier to skim past. The same single IAM user reads both buckets; the
+split is a naming/documentation signal, not an access-control boundary. See <a href="../../live_service/aws/#step-1-create-the-s3-buckets">Setting up the live
+service on AWS</a>
+for the concrete bucket/IAM setup and <a href="../../roadmap/delivery-tables/">Delivery tables</a> for
+exactly which five tables are the stable contract.</p>
+<p><strong>Why <code>eu-west-2</code>, not the cheaper <code>eu-west-1</code>?</strong> AWS Price List API data (2026-07-03) shows
+Ireland (<code>eu-west-1</code>) consistently cheaper than London (<code>eu-west-2</code>) — not hugely for the
+always-on control-plane box, but noticeably for the Fargate compute that actually runs
+inference (AWS bills in US dollars; converted at <strong>$1 = £0.75</strong> — the ECB rate of 2026-07-03,
+the same basis as <a href="../aws-costs/">AWS Running Costs</a>; the premium percentages come from the
+underlying USD prices):</p>
+<table>
+<thead>
+<tr>
+<th>SKU</th>
+<th><code>eu-west-1</code> (Ireland)</th>
+<th><code>eu-west-2</code> (London)</th>
+<th>London premium</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EC2 <code>t4g.medium</code> on-demand</td>
+<td>£0.0276/hr</td>
+<td>£0.0282/hr</td>
+<td>+2.2%</td>
+</tr>
+<tr>
+<td>Fargate ARM vCPU-hour</td>
+<td>£0.0243/hr</td>
+<td>£0.0279/hr</td>
+<td>+15.0%</td>
+</tr>
+<tr>
+<td>Fargate ARM GB-hour</td>
+<td>£0.00267/hr</td>
+<td>£0.00307/hr</td>
+<td>+14.9%</td>
+</tr>
+<tr>
+<td>S3 Standard storage (first 50 TB)</td>
+<td>£0.0173/GB-mo</td>
+<td>£0.0180/GB-mo</td>
+<td>+4.3%</td>
+</tr>
+</tbody>
+</table>
+<p>At v1 scale this premium is a rounding error — maybe £1–3/month on a ~£25–35/month bill (see
+<a href="../aws-costs/">AWS Running Costs</a>). It matters more at
+v2 scale: NGED's population grows from 32 to ~2,500 time series, and <code>power_forecasts</code> could
+reach on the order of a <strong>trillion rows</strong> (see <a href="#how-big-is-flexpectations-power-forecast-data">How big is Flexpectation's power forecast
+data?</a>, above) — at that volume, a per-GB
+storage premium compounds into real money rather than staying a rounding error.</p>
+<p><code>eu-west-2</code> is picked <strong>now</strong>, mainly because NGED's own S3 bucket is already in <code>eu-west-2</code>.
+The benefit that matters here is <strong>data transfer</strong>, not the compute/storage premium above — and
+it depends on <em>how</em> NGED reads, which the AWS Price List API pins down precisely:</p>
+<table>
+<thead>
+<tr>
+<th>Read path</th>
+<th>Rate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S3 → another AWS service, <strong>same region</strong> (even a different account)</td>
+<td><strong>£0</strong></td>
+</tr>
+<tr>
+<td>S3 → another AWS service, <strong><code>eu-west-1</code> ↔ <code>eu-west-2</code></strong> (cross-region)</td>
+<td>£0.015/GB</td>
+</tr>
+<tr>
+<td>S3 → public internet ("data transfer out"), <strong>either region</strong></td>
+<td>£0.067/GB (first 10 TB/month) — identical in both regions</td>
+</tr>
+</tbody>
+</table>
+<p>Same-region AWS-to-AWS transfer is free even across accounts, but internet-egress pricing
+is identical in these two regions — so matching regions only pays off if NGED reads via <strong>their own
+AWS-hosted compute</strong> (e.g. Athena, Glue, an EC2/Lambda job) in <code>eu-west-2</code>, not if they read via
+a desktop client like Power BI over the public internet, where the region choice makes
+no difference to the bill. That AWS-native path is the one v2 scale points towards anyway:
+a spreadsheet caps out at ~1,048,576 rows, so once <code>power_forecasts</code> reaches the trillion-row range,
+NGED pulling "a sizeable chunk" of it stops being something a spreadsheet can do at all — they
+would need their own query engine against our bucket, and running that in <code>eu-west-2</code> is what
+turns those reads free instead of £0.015–0.067/GB.</p>
+<p>This is still provisional: NGED haven't yet confirmed whether a GB-resident region is a hard
+requirement for this data, and we're waiting on their reply before treating the region choice as
+final.</p>
+<h2 id="strict-data-contracts-machine-verifiable">Strict data contracts (machine-verifiable)</h2>
+<p>The project makes strict use of Patito data contracts (defined in the
+<a href="../../api/contracts/"><code>contracts</code></a> sub-package). These enforce not just the <em>type</em> of the
+data, but also the statistical properties of the data. These contracts also serve as the
+human-readable documentation for the project's data inputs and data outputs. (For example, every
+public function that consumes and/or returns a DataFrame must declare the exact data contract for
+that DataFrame in the function's type hints).</p>
+<h2 id="and-its-excellent-for-our-internal-storage-too">And it's excellent for our internal storage too</h2>
+<p>Choosing Delta Lake for delivery is also a vote for our own infrastructure, because it's the same
+format we already rely on internally — and it earns its keep there on its own merits:</p>
+<ul>
+<li><strong>It's remarkably compact.</strong> The same <code>delta_store</code> write policy that packs <code>power_forecasts</code>
+  to ~1.8 bytes/row (<a href="#what-delta-lake-is-and-who-else-uses-it">above</a>) works just as well on
+  <a href="../../api/dynamical_data/">ECMWF ENS NWP</a>: a full daily run (~7.24 million rows across
+  1,671 H3 cells × 51 members × 85 lead times) averages ~113 MB, and our entire local development
+  table — 821 daily runs, ~5.9 billion rows, April 2024 to July 2026 — is <strong>~93 GB</strong>.</li>
+<li><strong>It's fast to query, even on a laptop.</strong> Row-group skipping on a member-sorted table means a
+  single-ensemble-member read (the common case for training) touches only a few row groups instead
+  of the whole file and only takes 0.02 seconds and uses 205 MB of RAM (measured on a real 29-day, 9-cell, control-member read).
+  <strong>That speed is what lets us run cross-validation across every ensemble member, for
+  every fold, on a laptop, in a few minutes</strong> — no cluster required for day-to-day model development.</li>
+<li><strong>It scales to parallel cloud training too.</strong> S3 is built for very high aggregate throughput to
+  many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
+  read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no
+  single database server to bottleneck the bandwidth, no bespoke data-loading pipeline, and no
+  separate "training data service" to build.</li>
+</ul>
+<p>There's a compounding benefit to using exactly the same storage technology everywhere: every
+improvement to <code>delta_store</code>'s writer properties, sort order, or precision policy
+(<a href="#what-delta-lake-is-and-who-else-uses-it">above</a>) pays off for training, backtesting, <em>and</em>
+delivery to NGED simultaneously, instead of being three separate storage stacks to maintain.</p>
+<h2 id="when-would-a-rest-api-earn-its-keep">When would a REST API earn its keep?</h2>
+<p>REST APIs have their place, and there are futures in which this project grows one:</p>
+<ul>
+<li><strong>Many consumers</strong> needing per-customer permissions — e.g. if the forecasts were productised
+  beyond NGED.</li>
+<li><strong>Small operational queries from non-Python systems</strong> — e.g. a control-room application that
+  just wants "the latest forecast for substation X" as JSON over HTTP.</li>
+<li><strong>Browser-based consumers</strong> that can't speak S3 directly.</li>
+</ul>
+<p>The reassuring part is that adding a REST API later is <strong>purely additive</strong>: a thin, stateless
+service that reads from the same Delta tables and serves slices of them over HTTP. Nothing would
+have to be re-written. Nothing about the Delta-first design forecloses a REST API — which is why a
+REST API sits comfortably as a <a href="../../roadmap/#v20-scale-up-future-research">v2 stretch goal</a>
+rather than a v1 requirement. The Delta tables remain the system of record either way; the API would
+be a convenience layer on top, added if and when a consumer appears whose needs it fits.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

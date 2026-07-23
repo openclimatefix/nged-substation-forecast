@@ -1,0 +1,3318 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../encoders/">
+      
+      
+        <link rel="next" href="../probabilistic-forecasting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Evaluation Metrics - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#evaluation-metrics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Evaluation Metrics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-scoring-works-in-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How scoring works, in brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deterministic metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mean-absolute-error-mae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean absolute error (MAE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalised-mae-nmae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalised MAE (NMAE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#root-mean-squared-error-rmse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root mean squared error (RMSE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-bias-error-mbe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean bias error (MBE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probabilistic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probabilistic metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Probabilistic metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crps-continuous-ranked-probability-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRPS (continuous ranked probability score)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spread-skill-ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spread-skill ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinball loss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean pinball loss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#picp-prediction-interval-coverage-probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PICP (prediction interval coverage probability)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interval-width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interval width
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tail-and-exceedance-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tail and exceedance metrics 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tail and exceedance metrics 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-tails-need-their-own-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the tails need their own metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trap: scoring only the hours when the worst case actually happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threshold-weighted-crps-twcrps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threshold-weighted CRPS (twCRPS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exceedance-rate-of-the-upper-delivery-quantiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exceedance rate of the upper delivery quantiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brier-score-for-threshold-exceedance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brier score for threshold exceedance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-the-thresholds-static-per-series-quantile-derived" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the thresholds: static, per-series, quantile-derived
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-numbers-live-delta-vs-mlflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the numbers live: Delta vs MLflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-deliberately-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is deliberately not here
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-scoring-works-in-brief" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How scoring works, in brief
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deterministic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deterministic metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deterministic metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mean-absolute-error-mae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean absolute error (MAE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalised-mae-nmae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalised MAE (NMAE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#root-mean-squared-error-rmse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Root mean squared error (RMSE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-bias-error-mbe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean bias error (MBE)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#probabilistic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Probabilistic metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Probabilistic metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crps-continuous-ranked-probability-score" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRPS (continuous ranked probability score)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spread-skill-ratio" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spread-skill ratio
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pinball loss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean pinball loss
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#picp-prediction-interval-coverage-probability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PICP (prediction interval coverage probability)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interval-width" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interval width
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tail-and-exceedance-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tail and exceedance metrics 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tail and exceedance metrics 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-the-tails-need-their-own-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the tails need their own metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The trap: scoring only the hours when the worst case actually happened
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threshold-weighted-crps-twcrps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Threshold-weighted CRPS (twCRPS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#exceedance-rate-of-the-upper-delivery-quantiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exceedance rate of the upper delivery quantiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#brier-score-for-threshold-exceedance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Brier score for threshold exceedance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-the-thresholds-static-per-series-quantile-derived" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing the thresholds: static, per-series, quantile-derived
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-the-numbers-live-delta-vs-mlflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where the numbers live: Delta vs MLflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-is-deliberately-not-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What is deliberately not here
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="evaluation-metrics">Evaluation metrics</h1>
+<blockquote>
+<p><strong>Status: durable metric reference.</strong> This page defines the metrics computed by
+<code>compute_metrics</code> (<code>packages/ml_core/src/ml_core/metrics.py</code>): a plain-language summary of
+each, the equation, how to interpret the number, and — where the definition involved a real
+choice — why we chose what we chose. Sections marked 🚧 define metrics that are designed but
+not yet computed; each links to its delivery plan. The theory of <em>why</em> our ensembles need
+probabilistic evaluation at all is the companion explainer
+<a href="../probabilistic-forecasting/">Probabilistic forecasting from NWP ensembles</a>; the plan that
+delivered these metrics (and the calibration work that builds on them) is
+<a href="../../roadmap/metrics-and-leaderboard/#delivering-the-probabilistic-metrics">Metrics &amp; leaderboard</a>.</p>
+</blockquote>
+<h2 id="how-scoring-works-in-brief">How scoring works, in brief</h2>
+<p>Every forecast in this project is an <strong>ensemble</strong>: for each substation (<code>time_series_id</code>) and
+each target half-hour (<code>valid_time</code>), one forecast <em>run</em> (<code>power_fcst_init_time</code>) produces <span class="arithmatex">\(m\)</span>
+member forecasts <span class="arithmatex">\(x_1, \dots, x_m\)</span> (51 members for the NWP-driven ML models; a deterministic
+baseline is simply <span class="arithmatex">\(m = 1\)</span>). Scoring proceeds in two steps:</p>
+<ol>
+<li><strong>Per timestamp</strong> — each forecast run's members are collapsed into per-timestamp quantities:
+   the ensemble mean <span class="arithmatex">\(\bar{x}_t\)</span> (which the deterministic metrics score), plus the member-aware
+   quantities (CRPS, ensemble variance, and the empirical quantiles). Runs that cover the same
+   <code>valid_time</code> at different lead times are scored <strong>independently</strong>, exactly as a production
+   consumer would experience each of them — members are never pooled across runs into a
+   lagged-ensemble blend.</li>
+<li><strong>Per group</strong> — the per-timestamp values are averaged within each
+   <code>(time_series_id, fold_id, power_fcst_model_name, horizon_slice)</code> group, where
+   <code>horizon_slice</code> buckets rows by lead time (<code>intraday</code> &lt; 6 h ≤ <code>day_ahead</code> &lt; 36 h ≤
+   <code>short_medium_range</code> &lt; 168 h ≤ <code>extended_range</code>), plus an <code>"all"</code> group over every lead
+   time. Dispersion errors are strongly horizon-dependent, so the per-slice view is usually
+   the one to read.</li>
+</ol>
+<p>Results land in two places: the <code>forecast_metrics</code> Delta table holds the <strong>full</strong> detail (one
+row per <code>(time_series_id, fold_id, horizon_slice, metric_name, metric_param)</code>), and MLflow
+receives per-experiment aggregates under a
+<a href="#where-the-numbers-live-delta-vs-mlflow">restricted headline subset</a>.</p>
+<p>Notation below: <span class="arithmatex">\(y_t\)</span> is the observed power at valid time <span class="arithmatex">\(t\)</span>; <span class="arithmatex">\(x_{t,1}, \dots, x_{t,m}\)</span> are
+the ensemble members of the run being scored; <span class="arithmatex">\(\bar{x}_t\)</span> is their mean; <span class="arithmatex">\(T\)</span> is the number of
+timestamps in the group; <span class="arithmatex">\(\hat{q}_t(\tau)\)</span> is the empirical quantile of the members at level
+<span class="arithmatex">\(\tau\)</span> (linear interpolation between order statistics).</p>
+<h2 id="deterministic-metrics">Deterministic metrics</h2>
+<p>These score the <strong>ensemble mean</strong> — a single number per timestamp — and say nothing about
+whether the forecast's claimed uncertainty was honest.</p>
+<h3 id="mean-absolute-error-mae">Mean absolute error (MAE)</h3>
+<p><strong>MW; smaller is better.</strong> the typical size of the miss. An MAE of 3 MW means the forecast is off by
+about 3 MW on an average half-hour, in one direction or the other.</p>
+<div class="arithmatex">\[
+\mathrm{MAE} = \frac{1}{T} \sum_t \left| \bar{x}_t - y_t \right|
+\]</div>
+<p>Every MW of error costs the same, so MAE is not distorted by a few bad hours — but for the same
+reason it cannot tell you whether errors are steady or spiky (that is RMSE's job), nor whether
+they lean high or low (MBE's job).</p>
+<h3 id="normalised-mae-nmae">Normalised MAE (NMAE)</h3>
+<p><strong>Dimensionless; smaller is better.</strong> MAE expressed as a fraction of the substation's size, so a 200 MW BSP and a
+5 MW primary can be compared on one axis. NMAE ≈ 0.03 means typical errors are about 3% of the
+series' effective capacity. This is the <strong>headline cross-series metric</strong>.</p>
+<div class="arithmatex">\[
+\mathrm{NMAE} = \frac{\mathrm{MAE}}{\text{effective capacity}}
+\]</div>
+<p><strong>Why a capacity denominator, not the mean:</strong> intermittent generators (PV, wind) spend much of
+their time near zero output, so normalising by <em>mean</em> power would inflate their NMAE relative
+to a demand substation of similar peak size. The denominator is the series' full-history
+effective capacity (P99 of |power|), computed over the full history so that it stays stable
+across CV folds — see
+<a href="../../roadmap/metrics-and-leaderboard/#normalising-nmae-by-effective_capacity">Normalising NMAE by effective_capacity</a>.</p>
+<h3 id="root-mean-squared-error-rmse">Root mean squared error (RMSE)</h3>
+<p><strong>MW; smaller is better.</strong> like MAE, but big misses count disproportionately — one 100 MW error hurts
+more than two 50 MW errors. If RMSE is much larger than MAE, the model's errors are spiky: it
+is usually fine and occasionally very wrong.</p>
+<div class="arithmatex">\[
+\mathrm{RMSE} = \sqrt{ \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right)^2 }
+\]</div>
+<h3 id="mean-bias-error-mbe">Mean bias error (MBE)</h3>
+<p><strong>MW; zero is best.</strong> does the forecast lean high or low? Positive MBE means systematic
+over-prediction. A model can have MBE ≈ 0 and still be terrible (large errors that cancel), so
+MBE is a diagnosis of <em>direction</em>, never of <em>size</em>.</p>
+<div class="arithmatex">\[
+\mathrm{MBE} = \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right)
+\]</div>
+<h2 id="probabilistic-metrics">Probabilistic metrics</h2>
+<p>These score the ensemble <strong>before</strong> the mean collapse, and are the reason we pay 51× inference
+cost. A recurring caveat: of everything below, <strong>only CRPS is fair across ensemble sizes</strong> —
+PICP, pinball loss, interval width, and (residually) the spread-skill ratio all shift with the
+member count <span class="arithmatex">\(m\)</span>, because empirical quantiles from few members are systematically too narrow.
+When comparing models with different ensemble sizes (e.g. the 51-member ML models against
+<code>nged_incumbent</code>'s 13 historical analogues), lean on CRPS.</p>
+<h3 id="crps-continuous-ranked-probability-score">CRPS (continuous ranked probability score)</h3>
+<p><strong>MW; smaller is better.</strong> MAE for a whole probability forecast. CRPS asks "how far was the forecast
+<em>distribution</em> from what happened?" — it rewards being right, and being <em>confidently</em> right,
+in one number. For a deterministic forecast (<span class="arithmatex">\(m = 1\)</span>) CRPS literally equals MAE, so CRPS values
+sit on the same MW scale as MAE and the two are directly comparable: an ensemble whose CRPS
+beats its own MAE is extracting real value from its spread.</p>
+<p>We compute the <strong>fair</strong> (finite-ensemble-unbiased) form of Ferro (2014), per timestamp:</p>
+<div class="arithmatex">\[
+\mathrm{CRPS}_t = \frac{1}{m} \sum_{i} \left| x_{t,i} - y_t \right|
+\;-\; \frac{1}{m(m-1)} \sum_{i&lt;j} \left| x_{t,i} - x_{t,j} \right|
+\]</div>
+<p>with the second (spread) term defined as 0 when <span class="arithmatex">\(m = 1\)</span>, and the group value being the mean of
+<span class="arithmatex">\(\mathrm{CRPS}_t\)</span> over the group's timestamps. The first term is accuracy (how far members sit
+from reality); the subtracted term is a reward for spread — hedging across the members' honest
+disagreement is scored better than betting everything on their mean.</p>
+<p><strong>Why the fair form:</strong> the textbook ensemble estimator divides the spread term by <span class="arithmatex">\(m^2\)</span> rather
+than <span class="arithmatex">\(m(m-1)\)</span>, which under-credits small ensembles — a <em>perfectly calibrated</em> 2-member ensemble
+scores ~50% worse than its true CRPS, shrinking to ~3% at 13 members (we verified this by
+Monte Carlo). Since we will compare ensembles of different sizes, we use the unbiased divisor;
+the <span class="arithmatex">\(m = 1\)</span> convention then makes "CRPS = MAE for deterministic forecasts" exact.</p>
+<p><strong>How it is computed:</strong> the naive pairwise sum is <span class="arithmatex">\(O(m^2)\)</span> per timestamp and, at fold scale,
+would require a members self-join materialising billions of pair rows. We instead use the
+sorted-member identity
+<span class="arithmatex">\(\sum_{i&lt;j} |x_i - x_j| = \sum_{k=1}^{m} (2k - m - 1)\, x_{(k)}\)</span> (for ascending order
+statistics <span class="arithmatex">\(x_{(k)}\)</span>), which is a single <span class="arithmatex">\(O(m \log m)\)</span> aggregation expression. The sum is
+accumulated in Float64: its terms are as large as <span class="arithmatex">\(\pm m \cdot |x|\)</span> while the result is only
+spread-sized, and that cancellation loses percent-level accuracy in Float32 when members are
+near-identical (precisely the underdispersed-intraday case we most care about).</p>
+<h3 id="spread-skill-ratio">Spread-skill ratio</h3>
+<p><strong>Dimensionless; 1.0 is best.</strong> is the fan the right width? The ratio compares how uncertain the forecast
+<em>claims</em> to be (the spread of its members) against how wrong it <em>actually</em> is (the RMSE of its
+mean). A ratio of 1.0 means the claimed uncertainty matches the realised error — the fan can be
+trusted. Below 1 the model is overconfident (<strong>underdispersed</strong>: the fan is too thin, and
+reality keeps landing outside it); above 1 it is underconfident. This is the headline
+diagnostic for the
+<a href="../probabilistic-forecasting/#where-forecast-uncertainty-actually-comes-from">underdispersion this project expects</a>.</p>
+<div class="arithmatex">\[
+\mathrm{SSR} = \frac{ \sqrt{ \dfrac{1}{T} \sum_t \dfrac{m+1}{m}\, s_t^2 } }{ \mathrm{RMSE} },
+\qquad
+s_t^2 = \frac{1}{m-1} \sum_i \left( x_{t,i} - \bar{x}_t \right)^2
+\]</div>
+<p>Two definitional choices matter here, both made so that "1.0 = well-calibrated" is <em>literally
+true</em> rather than approximately true:</p>
+<ul>
+<li><strong>RMS spread, not mean-of-stddev.</strong> Averaging per-timestamp standard deviations and dividing
+  by RMSE looks natural but is biased low by Jensen's inequality whenever spread varies across
+  timestamps — and power-forecast spread varies strongly (diurnally and synoptically). In a
+  simulation of a <em>perfectly calibrated</em> heteroscedastic 51-member ensemble, the mean-of-stddev
+  form read 0.80 while the RMS form read 0.99. We therefore aggregate variances and take one
+  square root ("RMS spread"), so a calibrated model cannot be misdiagnosed as underdispersed.</li>
+<li><strong>The Fortin <span class="arithmatex">\((m+1)/m\)</span> factor.</strong> Even with RMS spread, a calibrated <span class="arithmatex">\(m\)</span>-member ensemble
+  satisfies <span class="arithmatex">\(\mathrm{RMSE}^2 = \frac{m+1}{m} \times\)</span> (mean ensemble variance) — the truth
+  behaves like one extra draw from the same distribution (Fortin et al. 2014). Folding
+  <span class="arithmatex">\((m+1)/m\)</span> into the numerator makes the calibrated target exactly 1.0 at <em>any</em> ensemble size,
+  instead of ~0.99 at 51 members and ~0.96 at 13 — where the uncorrected form would read as
+  spurious underdispersion.</li>
+</ul>
+<p>The variance uses <code>ddof=1</code> (the sample variance), and a single-member forecast scores spread 0
+— zero spread is the honest description of a deterministic forecast, and 0/RMSE keeps the
+ratio's meaning (maximally overconfident) rather than becoming null. The remaining corner is
+RMSE = 0 (a perfect forecast over the scored group): with zero spread the ratio is defined as
+0 rather than the indeterminate 0/0, and with positive spread (contradictory: claimed
+uncertainty around an error-free mean) the computation refuses to emit a value — NaN or
+infinity in any metric raises rather than silently poisoning the leaderboard aggregates.</p>
+<h3 id="pinball-loss">Pinball loss</h3>
+<p><strong>MW; smaller is better.</strong> the score for a single quantile forecast, with a deliberately lopsided
+penalty that matches what the quantile <em>claims</em>. A p90 forecast claims "only a 10% chance power
+exceeds this", so when power does exceed it the loss is steep (weight 0.9), and when power
+falls below it the loss is shallow (weight 0.1). A forecaster minimises expected pinball loss
+at level <span class="arithmatex">\(\tau\)</span> by reporting the true <span class="arithmatex">\(\tau\)</span>-quantile — bluffing wide or narrow both cost — so
+pinball loss is the honest scorecard for each individual quantile.</p>
+<p>For the empirical member quantile <span class="arithmatex">\(\hat{q}_t(\tau)\)</span>:</p>
+<div class="arithmatex">\[
+L_\tau
+= \frac{1}{T} \sum_t
+\begin{cases}
+\tau \, \left( y_t - \hat{q}_t(\tau) \right) &amp; \text{if } y_t \ge \hat{q}_t(\tau) \\[2pt]
+(1 - \tau) \, \left( \hat{q}_t(\tau) - y_t \right) &amp; \text{otherwise.}
+\end{cases}
+\]</div>
+<p><strong>Which quantiles — the NGED delivery thirteen.</strong> Pinball loss is computed at exactly the
+levels agreed with NGED for the <a href="../../roadmap/delivery-tables/">delivery tables</a> (p1, p2, p5,
+p10, p20, p35, p50, p65, p80, p90, p95, p98, p99; the single source of truth is
+<code>contracts.common.DELIVERY_QUANTILES</code>), one <code>metric_param</code> row per level. Three reasons:
+evaluation should measure what we sell; the tails <em>are</em> the product (NGED is far more
+interested in the tails than the shoulders); and the
+<a href="../../roadmap/metrics-and-leaderboard/#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2">Phase D quantile pipeline</a>
+will be scored head-to-head at these same levels, so today's numbers are directly the baseline
+it must beat.</p>
+<p><strong>Finite-ensemble tail caveat:</strong> from 51 members, <span class="arithmatex">\(\hat{q}(0.01)\)</span> interpolates between the two
+lowest members — the raw ensemble simply cannot represent its own far tails well, so its tail
+pinball losses are partly a representational limit rather than pure skill. That is not a reason
+to skip them (the product needs tails scored); it is the quantitative motivation for Phase D's
+per-member quantile models.</p>
+<h3 id="mean-pinball-loss">Mean pinball loss</h3>
+<p><strong>MW; smaller is better.</strong> the thirteen pinball losses averaged into one quantile-skill scalar, for
+leaderboard ranking. Because six of the thirteen delivery levels sit at or beyond p10/p90, this
+average is deliberately <strong>tail-weighted</strong> — a model that nails the median but botches the tails
+scores poorly, which matches NGED's priorities.</p>
+<div class="arithmatex">\[
+\overline{L} = \frac{1}{13} \sum_{\tau \in Q} L_\tau ,
+\qquad Q = \{0.01, 0.02, 0.05, 0.10, 0.20, 0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, 0.99\}
+\]</div>
+<h3 id="picp-prediction-interval-coverage-probability">PICP (prediction interval coverage probability)</h3>
+<p><strong>Dimensionless; aim for the calibrated reference below.</strong> how often reality actually lands inside the claimed band. For the p10–p90
+band, roughly 80% of observations should fall inside; markedly less means the band is too
+narrow (overconfident), markedly more means too wide. PICP is scored for every symmetric pair
+of delivery quantiles — six bands from p35–p65 (30%) out to p1–p99 (98%) — so together the six
+values trace a <strong>coverage curve</strong> across the whole distribution.</p>
+<div class="arithmatex">\[
+\mathrm{PICP}_{[\tau_{\mathrm{lo}}, \tau_{\mathrm{hi}}]}
+= \frac{1}{T} \sum_t
+\mathbf{1}\!\left[ \hat{q}_t(\tau_{\mathrm{lo}}) \le y_t \le \hat{q}_t(\tau_{\mathrm{hi}}) \right]
+\]</div>
+<p><strong>The calibrated reference is <em>below</em> nominal coverage.</strong> Empirical quantiles from a finite
+ensemble sit inside the true ones, so even a perfectly calibrated <span class="arithmatex">\(m\)</span>-member ensemble covers
+less than the nominal rate — approximately
+<span class="arithmatex">\(\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})\)</span>.
+Judge PICP against these references, not the nominal rates:</p>
+<table>
+<thead>
+<tr>
+<th>Band</th>
+<th>Nominal coverage</th>
+<th>Calibrated reference at <span class="arithmatex">\(m = 51\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>p1–p99</td>
+<td>0.98</td>
+<td>≈ 0.942</td>
+</tr>
+<tr>
+<td>p2–p98</td>
+<td>0.96</td>
+<td>≈ 0.923</td>
+</tr>
+<tr>
+<td>p5–p95</td>
+<td>0.90</td>
+<td>≈ 0.865</td>
+</tr>
+<tr>
+<td>p10–p90</td>
+<td>0.80</td>
+<td>≈ 0.769</td>
+</tr>
+<tr>
+<td>p20–p80</td>
+<td>0.60</td>
+<td>≈ 0.577</td>
+</tr>
+<tr>
+<td>p35–p65</td>
+<td>0.30</td>
+<td>≈ 0.288</td>
+</tr>
+</tbody>
+</table>
+<p>A p10–p90 PICP of 0.72 at 51 members is therefore mild overconfidence (reference 0.769), not
+the 8-point shortfall a naive comparison with 0.8 would suggest. The gap grows as <span class="arithmatex">\(m\)</span> shrinks —
+one more reason PICP is not comparable across ensemble sizes.</p>
+<p>One caveat on precision: the formula is exact only when the interpolated quantile estimator is
+evaluated on a uniform distribution; for other distribution shapes the interpolation between
+extreme order statistics shifts coverage slightly. We verified by Monte Carlo (1M trials at
+<span class="arithmatex">\(m = 51\)</span>, using the same <code>quantile(τ, "linear")</code> estimator as the metrics code) that uniform
+draws reproduce the table to within ±0.001 at every band, while Gaussian draws lift the
+outermost band to ≈ 0.947 (vs the table's 0.942) and leave the rest within noise. So treat the
+p1–p99 reference as accurate to roughly ±0.005 depending on the forecast distribution's shape;
+the central bands are safe as given.</p>
+<p>PICP alone is also <strong>gameable</strong>: an absurdly wide band hits any coverage target for free. It
+must always be read alongside a sharpness measure — which is what interval width is for (and
+the proper scores, CRPS and pinball, punish over-widening automatically).</p>
+<h3 id="interval-width">Interval width</h3>
+<p><strong>MW; narrower is better <em>given</em> coverage.</strong> how wide the claimed band is, on average — the sharpness companion to PICP.
+On its own, narrower is not better (a zero-width band is maximally sharp and maximally
+useless); the pair to optimise is <em>coverage at the reference, at the smallest width</em>. Reading
+PICP and interval width together makes the coverage-vs-sharpness trade-off legible — in
+particular, a calibration step that "fixes" coverage by inflating spread will visibly pay for
+it here.</p>
+<div class="arithmatex">\[
+\mathrm{Width}_{[\tau_{\mathrm{lo}}, \tau_{\mathrm{hi}}]}
+= \frac{1}{T} \sum_t \left( \hat{q}_t(\tau_{\mathrm{hi}}) - \hat{q}_t(\tau_{\mathrm{lo}}) \right)
+\]</div>
+<p>It is computed for the same six bands as PICP.</p>
+<h2 id="tail-and-exceedance-metrics">Tail and exceedance metrics 🚧</h2>
+<blockquote>
+<p><strong>Status: designed, not yet computed.</strong> The metrics in this section are planned; the delivery
+plan is <a href="../../roadmap/metrics-and-leaderboard/#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">Metrics &amp; leaderboard → Tail &amp; exceedance
+metrics</a>.
+The principles (which selections of hours are safe to score on, and why) are durable and apply
+today.</p>
+</blockquote>
+<h3 id="why-the-tails-need-their-own-metrics">Why the tails need their own metrics</h3>
+<p>NGED's need for these forecasts is <a href="../../background/requirements/#the-worst-case-matters-most-forecasting-threshold-exceedance">threshold exceedance</a>:
+"will load cross this substation's limit?". Their own operator tool plots demand as headroom
+below a constraint line — the y-axis is literally "MW Exceedance of Constraint" (see
+<a href="../../background/nged-incumbent-forecast/#the-operators-view">NGED's incumbent forecast</a>). So
+the most valuable forecast skill lives in a specific <em>region of power values</em>: the region near
+each substation's limit.</p>
+<p>The metrics above already lean toward the tails — the
+<a href="#mean-pinball-loss">mean pinball loss</a> is deliberately tail-weighted, and PICP covers the
+p1–p99 band — but they measure something subtly different: how well the model estimates the
+<em>upper quantiles of every half-hour's distribution</em>, including quiet summer nights when even
+the 95th percentile sits far below any limit. Getting the p95 right <em>everywhere</em> is not the
+same skill as getting the forecast right <em>near the limit</em>. The metrics in this section target
+the second skill directly.</p>
+<h3 id="the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened">The trap: scoring only the hours when the worst case actually happened</h3>
+<p>The natural instinct — "NGED cares about peaks, so score the model only on the peak
+half-hours" — is a well-known statistical trap called the <strong>forecaster's dilemma</strong> (Lerch et
+al. 2017). The intuition: if you grade forecasters only on the occasions when something extreme
+actually happened, you systematically reward the forecaster who <em>always</em> predicts extremes.
+Their alarmist forecasts happen to look right on the hours you kept, and the false alarms they
+raised on all the other hours were thrown away before grading. Formally, restricting even a
+proper (un-gameable) score to cases <em>selected by the observed outcome</em> makes it improper: a
+model can climb that ranking by simply biasing every forecast upward, adding no skill at all.</p>
+<p>The fix turns on <em>what</em> the hour-selection is based on:</p>
+<ul>
+<li>
+<p><strong>Selecting hours by the load we are forecasting</strong> — e.g. "the top 5% highest <em>observed</em>
+  demand half-hours" — is the unsafe case, for the reason above: because the selection is made
+  on the very quantity being scored, it rewards the forecaster who always predicts extremes.</p>
+</li>
+<li>
+<p><strong>Selecting hours by anything <em>other than</em> that observed load is safe</strong> — the calendar
+  (bank-holiday dates), the lead time, or whether a switching event was logged. None of these
+  is the quantity we forecast, so restricting the score to them keeps it proper and honest
+  forecasts still win. A handy rule of thumb: if the selection could have been made <em>ex ante</em>
+  (Latin for "before the event") it is certainly safe — and a slice like logged switching
+  events is safe on the same grounds even when the event itself was an unforeseen fault,
+  because the test is "not the observed load", not "foreseeable".</p>
+</li>
+</ul>
+<p>The consequence for this project: the calendar-based and switching-event metric slices are
+legitimate ranking columns, while any slice defined by observed peaks is a <em>diagnostic view
+only</em> — useful for asking "where did this model's error come from?", never for deciding which
+model is better. To <em>rank</em> models on tail skill, we instead re-weight a proper score across
+<strong>all</strong> hours, which is exactly what the next metric does.</p>
+<h3 id="threshold-weighted-crps-twcrps">Threshold-weighted CRPS (twCRPS)</h3>
+<p><strong>MW; smaller is better.</strong> The threshold-weighted Continuous Ranked Probability Score is
+<a href="#crps-continuous-ranked-probability-score">CRPS</a> with its attention confined to the region
+above a threshold. Plain-language version: ordinary CRPS asks "how far was the forecast
+distribution from what happened?" and cares equally about errors at every power level; twCRPS
+asks the same question but only about behaviour <em>above the threshold</em> — how much probability
+the forecast placed above the line, and how far above. Distinctions entirely below the
+threshold contribute nothing. Because every half-hour is still scored (hours far below the
+threshold simply contribute ≈ 0 naturally, rather than being deleted from the sample), twCRPS
+stays a proper score — it avoids the forecaster's dilemma while still concentrating on the
+region NGED cares about. It is the ranking-grade tail metric: two models can tie on CRPS while
+twCRPS reveals which one actually knows more about the near-limit hours.</p>
+<p>Computation is a one-line extension of the existing machinery: for the threshold <span class="arithmatex">\(r\)</span>, replace
+every member and the observation by <span class="arithmatex">\(v(z) = \max(z, r)\)</span> and compute the
+<a href="#crps-continuous-ranked-probability-score">fair CRPS</a> of the transformed values (this
+equivalence is standard — Gneiting &amp; Ranjan 2011):</p>
+<div class="arithmatex">\[
+\mathrm{twCRPS}_t(r) = \mathrm{CRPS}_t\!\left( \max(x_{t,1}, r), \dots, \max(x_{t,m}, r);\;
+\max(y_t, r) \right)
+\]</div>
+<p>Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property:
+it is unbiased across ensemble sizes, so the 13-member <code>nged_incumbent</code> and the 51-member ML
+models can be compared on it directly. It is computed per threshold in the
+<a href="#choosing-the-thresholds-static-per-series-quantile-derived">per-series threshold ladder</a>,
+with <code>metric_param</code> carrying the threshold label.</p>
+<h3 id="exceedance-rate-of-the-upper-delivery-quantiles">Exceedance rate of the upper delivery quantiles</h3>
+<p><strong>Dimensionless; aim for the calibrated reference.</strong> The plainest calibration question NGED
+can ask of the product: <em>"when the forecast says p95, how often does reality end up above
+it?"</em> For an honest p95, the answer should be close to 5%. This metric reports, for each upper
+delivery quantile (p80, p90, p95, p98, p99), the observed fraction of half-hours in which the
+outcome exceeded the forecast quantile:</p>
+<div class="arithmatex">\[
+\mathrm{ER}_\tau = \frac{1}{T} \sum_t \mathbf{1}\!\left[ y_t &gt; \hat{q}_t(\tau) \right]
+\]</div>
+<p>It is the one-sided companion to <a href="#picp-prediction-interval-coverage-probability">PICP</a>:
+PICP checks symmetric bands (p10–p90, etc.), but NGED's operating point is one-sided — an
+operator reads the p95 as "the level demand should stay under, 19 times out of 20" — so its
+honesty deserves its own directly-readable number. It is <em>not</em> a ranking metric (a model can
+hit perfect exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish
+that); it is the trust check for the delivered tail quantiles.</p>
+<p>As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true ones, so
+even a perfectly calibrated ensemble exceeds its p95 slightly <em>more</em> than 5% of the time. The
+exact calibrated reference per quantile and ensemble size will be derived and verified by
+Monte Carlo at implementation time, mirroring <a href="#picp-prediction-interval-coverage-probability">PICP's reference table</a>.</p>
+<h3 id="brier-score-for-threshold-exceedance">Brier score for threshold exceedance</h3>
+<p><strong>Dimensionless (0 to 1); smaller is better.</strong> The ensemble can answer "what is the chance
+load exceeds threshold <span class="arithmatex">\(r\)</span>?" — the fraction of members above <span class="arithmatex">\(r\)</span>. The Brier score grades those
+probability statements the way you would grade a weather presenter's "70% chance of rain": it
+is the mean squared difference between the stated probability and what actually happened
+(1 if load exceeded the threshold, 0 if not):</p>
+<div class="arithmatex">\[
+\mathrm{BS}(r) = \frac{1}{T} \sum_t \left( p_t(r) - \mathbf{1}\!\left[ y_t &gt; r \right] \right)^2,
+\qquad
+p_t(r) = \frac{1}{m} \sum_i \mathbf{1}\!\left[ x_{t,i} &gt; r \right]
+\]</div>
+<p>A forecaster minimises it by stating their honest probability — hedging toward 50% and
+alarmism both cost — so it is a proper score. Mathematically it is not independent of twCRPS
+(CRPS is the Brier score integrated over all possible thresholds, so twCRPS above <span class="arithmatex">\(r\)</span>
+aggregates the Brier scores above <span class="arithmatex">\(r\)</span>); we compute it anyway because it is the most
+<em>decision-legible</em> number in this section — it grades exactly the yes/no warning NGED acts on.</p>
+<p>One caveat to carry into reading it: a 51-member ensemble can only express 52 distinct
+probabilities, and an underdispersed ensemble slams its exceedance probabilities to 0 or 1 too
+early. That is not a flaw in the metric — it is precisely the failure mode this metric exists
+to expose, and the before/after instrument for the
+<a href="../../roadmap/metrics-and-leaderboard/#delivering-the-probabilistic-metrics">calibration work</a>.
+The per-probability breakdown (a <em>reliability diagram</em>) is a curve rather than a scalar, so it
+lives in ad-hoc analyses — see
+<a href="#what-is-deliberately-not-here">What is deliberately not here</a>.</p>
+<h3 id="choosing-the-thresholds-static-per-series-quantile-derived">Choosing the thresholds: static, per-series, quantile-derived</h3>
+<p>The metrics above need a threshold <span class="arithmatex">\(r\)</span> per series, and here honesty matters: <strong>a substation's
+true limit is not a single number.</strong> Thermal ratings vary with ambient temperature and season;
+transformers tolerate being overloaded for short periods, so the <em>duration</em> of an exceedance
+matters (cyclic ratings); and switching changes what a feeder carries. NGED's own operator
+tool draws the limit as a time-varying "Flex Profile", not a constant. We do not attempt to
+model any of that for scoring. Instead we pick <strong>static, per-series thresholds chosen for
+their scoring properties</strong>, and state plainly that they are a proxy — these metrics measure
+"skill near a fixed line standing where the limit typically lives", not operational breach
+prediction:</p>
+<ul>
+<li>
+<p><strong>The threshold ladder: the P90 and P98 of each series' full observation history</strong> (of
+  power in the constraint-side direction — see below). Labels <code>hist_p90</code> / <code>hist_p98</code> in
+  <code>metric_param</code>, deliberately distinct from forecast-quantile labels like <code>p95</code>: one names a
+  fixed power level derived from history, the other a level of the forecast distribution. The
+  two rungs give a "busy periods" and a "genuinely extreme" read without exploding the key
+  count.</p>
+</li>
+<li>
+<p><strong>Why historical quantiles rather than the physical ratings:</strong> ratings are not available
+  for every series; a rating that is never breached in a 12-month validation window yields
+  <em>zero events</em> — and a warning system cannot be graded on events that never happen; and
+  per-series ratings sit at wildly different points of each series' distribution, breaking
+  cross-series comparability. Full-history quantile thresholds guarantee every series a
+  scoreable event rate (~10% and ~2% by construction), are identical in meaning across
+  series, and are stable across CV folds for the same reason the
+  <a href="../../roadmap/metrics-and-leaderboard/#normalising-nmae-by-effective_capacity">effective-capacity denominator</a>
+  is computed over the full history.</p>
+</li>
+<li>
+<p><strong>NGED-supplied firm/flex ratings</strong> for the trial area remain valuable — for ad-hoc case
+  studies and dashboard overlays, where a zero-event outcome is informative rather than
+  fatal. They do not enter the leaderboard.</p>
+</li>
+<li>
+<p><strong>Constraint direction.</strong> For demand substations the dangerous tail is high load; for
+  generation-dominated feeders the binding constraint can be reverse power flow — the most
+  <em>negative</em> tail. The threshold metrics therefore apply to power measured in each series
+  type's constraint-side direction, rather than assuming "high is bad" universally.</p>
+</li>
+</ul>
+<h2 id="where-the-numbers-live-delta-vs-mlflow">Where the numbers live: Delta vs MLflow</h2>
+<p>The <code>forecast_metrics</code> Delta table always holds the complete detail: all thirteen pinball
+levels, all six bands, every horizon slice, per series. MLflow — the leaderboard — receives
+per-experiment aggregates (unweighted means across series) under keys built from a token that
+is <code>{metric_name}</code> for scalar metrics and <code>{metric_name}_{metric_param}</code> for parametric ones,
+in three families: <code>{token}__all</code> (overall), <code>{token}__{type_slug}</code> (per
+<code>time_series_type</code>), and <code>{token}__all__{horizon_slice}</code> (per lead-time band).</p>
+<p>To keep the leaderboard legible, parametric metrics are
+restricted in MLflow to a <strong>headline subset</strong>: <code>pinball_loss</code> at p10/p50/p90 and <code>picp</code> /
+<code>interval_width</code> at p10_p90 (the allowlist is <code>_MLFLOW_LOGGED_PARAMETRIC</code> in
+<code>ml_core.metrics</code>). The exact key count scales with how many distinct <code>time_series_type</code>
+values the scored population spans (each adds a per-type key family): 132 keys for the V1
+trial area's six types, versus roughly 340 if every quantile and band were logged. Anything
+not in MLflow is still one Polars filter away in Delta.</p>
+<h2 id="what-is-deliberately-not-here">What is deliberately <em>not</em> here</h2>
+<ul>
+<li><strong>Rank (Talagrand) histograms</strong> — the most direct picture of <em>how</em> an ensemble is
+  miscalibrated (U-shaped = underdispersed, domed = overdispersed). A histogram is not a scalar,
+  so it does not fit the tall metrics schema; it is computed in ad-hoc analyses (e.g. when
+  choosing the
+  <a href="../../roadmap/metrics-and-leaderboard/#phase-c-cheap-calibration-after-b-proves-the-diagnosis">Phase C calibration</a>
+  approach) rather than stored per experiment.</li>
+<li>
+<p><strong>Histogram of errors</strong> — same reason; planned as a visual check on the
+  <a href="../../roadmap/metrics-and-leaderboard/#evaluation-metrics">roadmap</a>.</p>
+</li>
+<li>
+<p><strong>Reliability diagrams</strong> — the per-probability breakdown of the
+  <a href="#brier-score-for-threshold-exceedance">Brier score</a>: "of the hours where the forecast said
+  a 70% chance of exceedance, how many actually exceeded?", plotted across probability bins. A
+  curve, not a scalar; computed ad hoc when the Brier numbers need explaining.</p>
+</li>
+<li>
+<p><strong>Hit-rate / false-alarm trigger analyses</strong> — turning the ensemble's exceedance probability
+  into a yes/no warning requires choosing a trigger ("warn when the probability tops X%"), and
+  the informative object is the <em>scan</em> across triggers (a ROC curve — Receiver Operating
+  Characteristic — and, for rare events, base-rate-robust summaries such as the Symmetric
+  Extremal Dependence Index, SEDI). Curves again, and trigger choice is an operational
+  decision to make with NGED; ad-hoc analyses, not leaderboard columns.</p>
+</li>
+<li>
+<p><strong>Cost-loss economic value curves</strong> — the fully decision-theoretic summary of exceedance
+  skill: for each ratio of "cost of acting on a warning" to "loss if an unwarned exceedance
+  occurs", how much of a perfect forecast's value does this model capture? This is the natural
+  bridge to the 🔬 v2 stretch goal of estimating <strong>cost savings (£)</strong> per leaderboard row
+  (<a href="../../roadmap/metrics-and-leaderboard/#grouping-the-results">Grouping the results</a>); until
+  then it is an ad-hoc analysis.</p>
+</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

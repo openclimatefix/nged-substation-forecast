@@ -1,0 +1,3498 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../switching-events/">
+      
+      
+        <link rel="next" href="../../api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>XGBoost Improvements - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#xgboost-improvements-quick-wins" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              XGBoost Improvements
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-config-level-changes-hours-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1 — config-level changes (hours each)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 1 — config-level changes (hours each)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feed-the-model-the-forecast-lead-time-review-discovery-one-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed the model the forecast lead time (review discovery; ~one line)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uk-holiday-and-calendar-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UK holiday and calendar features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-ordinal-time-features-alongside-sincos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw ordinal time features alongside sin/cos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#early-stopping-instead-of-fixed-n_estimators500" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Early stopping instead of fixed n_estimators=500
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aligned-lagged-weather-the-single-stage-ablation-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aligned lagged weather — the single-stage ablation control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather-delta compensation for power lags — an implicit handle on unmetered generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-cheap-feature-engineering-about-a-day-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2 — cheap feature engineering (about a day each)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2 — cheap feature engineering (about a day each)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-time_series_type-feature-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-time_series_type feature lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#training-data-hygiene-the-cheap-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training-data hygiene, the cheap version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#effective-smoothed-temperature-and-degree-day-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Effective (smoothed) temperature and degree-day features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linearised-physics-features-for-solar-and-wind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linearised physics features for solar and wind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monotone-constraints-for-the-generation-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monotone constraints for the generation models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-3-new-feature-machinery-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3 — new feature machinery (days)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 3 — new feature machinery (days)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Init-time-anchored features (current-level anchor; prerequisite for the global model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbouring-h3-cell-weather-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neighbouring-H3-cell weather context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#residual-lag-features-from-the-switching-detector-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual lag features from the switching-detector baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-abnormality-climatology-z-score-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather-abnormality (climatology z-score) features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-4-structural-model-changes-weeks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 4 — structural model changes (weeks)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 4 — structural model changes (weeks)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-horizon-window-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-horizon-window models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-training-via-xgbdataiter-enabler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batched training via xgb.DataIter (enabler)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-on-more-ensemble-members-after-batched-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train on more ensemble members (after batched training)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-model-per-time_series_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global model per time_series_type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-deferred-not-quick-or-not-skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicitly deferred (not quick, or not skill)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-each-win-is-evaluated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How each win is evaluated
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tier-1-config-level-changes-hours-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 1 — config-level changes (hours each)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 1 — config-level changes (hours each)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feed-the-model-the-forecast-lead-time-review-discovery-one-line" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feed the model the forecast lead time (review discovery; ~one line)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#uk-holiday-and-calendar-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UK holiday and calendar features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#raw-ordinal-time-features-alongside-sincos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Raw ordinal time features alongside sin/cos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#early-stopping-instead-of-fixed-n_estimators500" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Early stopping instead of fixed n_estimators=500
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aligned-lagged-weather-the-single-stage-ablation-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aligned lagged weather — the single-stage ablation control
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather-delta compensation for power lags — an implicit handle on unmetered generation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-cheap-feature-engineering-about-a-day-each" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 2 — cheap feature engineering (about a day each)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 2 — cheap feature engineering (about a day each)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-time_series_type-feature-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-time_series_type feature lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#training-data-hygiene-the-cheap-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Training-data hygiene, the cheap version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#effective-smoothed-temperature-and-degree-day-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Effective (smoothed) temperature and degree-day features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linearised-physics-features-for-solar-and-wind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linearised physics features for solar and wind
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#monotone-constraints-for-the-generation-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monotone constraints for the generation models
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-3-new-feature-machinery-days" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 3 — new feature machinery (days)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 3 — new feature machinery (days)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Init-time-anchored features (current-level anchor; prerequisite for the global model)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbouring-h3-cell-weather-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Neighbouring-H3-cell weather context
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#residual-lag-features-from-the-switching-detector-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual lag features from the switching-detector baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-abnormality-climatology-z-score-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather-abnormality (climatology z-score) features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-4-structural-model-changes-weeks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier 4 — structural model changes (weeks)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tier 4 — structural model changes (weeks)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#per-horizon-window-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-horizon-window models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#batched-training-via-xgbdataiter-enabler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batched training via xgb.DataIter (enabler)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#train-on-more-ensemble-members-after-batched-training" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Train on more ensemble members (after batched training)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#global-model-per-time_series_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global model per time_series_type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-deferred-not-quick-or-not-skill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicitly deferred (not quick, or not skill)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-each-win-is-evaluated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How each win is evaluated
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="xgboost-improvements-quick-wins">XGBoost improvements ("quick wins")</h1>
+<blockquote>
+<p><strong>Status: 🚧 Planned (v0.5) — deferred until v0.1 is live on AWS.</strong> Epic:
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/145">#145</a>; the Tier-1
+quick wins are <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/230">#230</a>.
+Getting <em>any</em> forecast live (<a href="../live-service/">Live service</a>) takes priority over forecast
+quality.</p>
+</blockquote>
+<p>Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly
+<em>not</em> deep ML work ("little point in spending ages on the ML model before we have good capacity
+estimation"). This page merges the sub-issues of
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/145">#145</a>
+with additional tricks from the 2026-07 codebase review, grouped into <strong>effort tiers</strong> and
+ordered by expected skill per unit effort <em>within</em> each tier — so an item late in the list can
+still be high value; it just costs more to land.</p>
+<p><strong>Horizon focus: days 3–10.</strong> The product delivers a 14-day horizon
+(<a href="../../background/requirements/#core-objectives">requirements</a>), but users mostly act on
+forecasts roughly 3 to 10 days ahead. That band shapes the ordering below in three ways:
+wins that are fully forecastable at any horizon (calendar features, weather physics) outrank
+wins concentrated at day 0–2 (persistence-like anchors); ECMWF ENS steps drop from 3-hourly to
+6-hourly beyond 144 h, so interpolation quality matters most exactly where users look; and by
+day 7–10 the control member is an increasingly unrepresentative sample of the ensemble.</p>
+<p><strong>Measure before optimising.</strong> Land the
+<a href="../metrics-and-leaderboard/#baseline-forecasters">persistence/climatology baselines</a> (without
+them "improved" is unanchored) and
+<a href="../metrics-and-leaderboard/#delivering-the-probabilistic-metrics">horizon-sliced metrics</a>
+(several wins below are horizon-specific and invisible in the <code>"all"</code> aggregate) first. Each
+win is one registered experiment (<code>register_experiment_job</code>) scored against the current
+champion on the leaderboard fold; headline metric NMAE, sliced by horizon and
+<code>time_series_type</code>, with the 3–10 day band as the headline horizon slice. Several items
+interact (e.g. init-time-anchored features overlap short lags at short horizons), so land
+winners into <code>conf/model/xgboost.yaml</code> one at a time to keep attribution clean.</p>
+<h2 id="tier-1-config-level-changes-hours-each">Tier 1 — config-level changes (hours each)</h2>
+<h3 id="feed-the-model-the-forecast-lead-time-review-discovery-one-line">Feed the model the forecast lead time (review discovery; ~one line)</h3>
+<p><code>XGBoostForecaster</code> trains on <code>sorted(selected_features)</code> only (<code>forecaster.py:87-88</code>), and
+<code>conf/model/xgboost.yaml</code> does not select <code>nwp_lead_time_hours</code> — so despite the config's
+<code>training_strategy: "horizon_as_feature"</code> tag, <strong>the model never sees the horizon</strong>. It cannot
+learn that NWP inputs degrade with lead time; horizon information reaches it only through the
+coarse pattern of nullified lags. <code>nwp_lead_time_hours</code> is already computed and flows through
+<code>AllFeatures</code> (<code>tabular_feature_engineer.py:159</code>, <code>:222</code>), so the experiment is: add it to
+<code>selected_features</code> and register. If it wins, add it to the base YAML (making the
+<code>horizon_as_feature</code> tag honest).</p>
+<h3 id="uk-holiday-and-calendar-features">UK holiday and calendar features</h3>
+<p>Day-of-week and time-of-year features exist, but no holiday flags. GB demand on bank holidays
+looks like a Sunday, and the Christmas–New Year fortnight is its own regime; for
+demand-dominated series this is one of the highest-value features in the load-forecasting
+literature and costs a static lookup (the <code>holidays</code> package is pure-Python — no pandas).
+Add <code>is_bank_holiday</code>, <code>is_day_before_holiday</code>, <code>is_day_after_holiday</code>, and a
+Christmas-proximity feature. Fully forecastable at any horizon — squarely in the 3–10 day
+band, which is why it sits this high.</p>
+<p>This item also double-serves as the covariate set of the v0.6 switching detector's
+<a href="../switching-events/#the-baseline-shared-foundation">stage-1 baseline</a>,
+which raises the bar on encoding: the detector consumes the baseline's residuals raw, so an
+unmodelled behavioural day becomes a phantom event candidate. Prefer encodings that generalise
+across sparse examples — a days-to-nearest-holiday feature and a holiday-name categorical
+rather than a lone <code>is_bank_holiday</code> flag — and cover the days a day-of-year feature
+structurally cannot represent: Easter (which wanders across roughly five weeks of the
+calendar), regional school half-terms, and major broadcast events such as England playing in
+the later stages of a Football World Cup. Sporting fixtures carry a forecastability asymmetry
+the bank holidays do not: they are known perfectly in hindsight (fine for the detector's
+hindcast baseline), but at a 3–10 day horizon whether England will still be in the tournament
+may be unknown at forecast time, so the forward-forecast version needs either a
+"possible England match" encoding or an acceptance of that uncertainty.</p>
+<h3 id="raw-ordinal-time-features-alongside-sincos">Raw ordinal time features alongside sin/cos</h3>
+<p>Trees split axis-parallel: isolating "evening peak" from sin/cos pairs takes multiple awkward
+splits, while a raw <code>half_hour_of_day</code> integer does it in one. Keep the sin/cos (good at the
+midnight wrap-around) and <em>add</em> raw ordinals (<code>half_hour_of_day</code>, <code>day_of_year</code>) as new
+<code>TimeFeature</code> names. Trivial experiment, modest-but-real expected gain.</p>
+<h3 id="early-stopping-instead-of-fixed-n_estimators500">Early stopping instead of fixed <code>n_estimators=500</code></h3>
+<p>Every series currently gets 500 trees at lr 0.05, whether it has 15 months of clean data or
+7 months of noisy data. Hold out the last few weeks of each training window as an eval set
+with <code>early_stopping_rounds</code>, and each booster right-sizes itself — removing a silent
+per-series over/underfit and making every later experiment cleaner. Related one-line
+experiment: <strong>recency sample weights</strong> (exponentially decaying with sample age) to track drift
+from new connections. Note the overlap with the init-time-anchored features, whose remaining value at 3–10 days is
+also mostly drift-tracking — whichever lands second should expect a smaller measured win.</p>
+<h3 id="aligned-lagged-weather-the-single-stage-ablation-control">Aligned lagged weather — the single-stage ablation control</h3>
+<p>For each power lag the model already receives, also feed it the <em>weather at that same lagged
+time</em> (e.g. <code>temperature_2m_lag_48h</code> beside the 48 h power lag). This is pure config —
+<code>LagFeature.base_col</code> already accepts weather variables — and lagged <em>datetime</em> adds nothing
+new (it is deterministic given the target's datetime features and the fixed lag offset; the
+same holds for holiday flags at the lag time once the holiday and calendar features land), so
+aligned weather is the only genuinely new information. In principle the booster can then judge
+how <em>normal</em> each lagged power value is — power at the lagged time relative to what the weather
+then would predict — which is exactly the anomaly signal that
+<a href="#residual-lag-features-from-the-switching-detector-baseline">the residual-lag features</a> engineers explicitly
+with a two-stage residual pipeline (the
+<a href="../switching-events/#approach-1-the-two-stage-forecaster">full design</a>
+lives on the switching-events page). Feature engineering never adds information, only inductive
+bias — so whether the explicit two-stage version is worth its machinery is an empirical
+question, and this config-only variant is the cheap way to start answering it.</p>
+<p><strong>Pros, relative to the two-stage residual pipeline:</strong></p>
+<ul>
+<li><strong>Almost free.</strong> A config change: no two-pass pipeline, no per-fold baseline training. (One
+  caveat is shared rather than avoided: lagged weather at past target times rides the same
+  freshest-NWP-run join as the residual-lag hindcasts — a join with no publication-time cut,
+  leak-free today only as a side effect of daily run cadence — so the availability cut planned
+  in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/356">#356</a> hardens this
+  item and the residual-lag features alike.)</li>
+<li><strong>No fold-hygiene leakage risk.</strong> The two-stage design's subtlest failure mode — a baseline
+  trained on data that overlaps the evaluation fold — cannot occur, because there is no
+  baseline model.</li>
+<li><strong>End-to-end optimisation.</strong> The booster extracts whatever notion of "anomaly" actually helps
+  the forecast objective, rather than the one a residual definition pre-commits to (median
+  residual, a particular normalisation); no stage-1 bias is frozen into a feature.</li>
+</ul>
+<p><strong>Cons — why we expect it to learn a much cruder "how normal is this lag" signal:</strong></p>
+<ul>
+<li><strong>Trees are structurally bad at subtraction.</strong> XGBoost splits axis-parallel on single
+  features, and differences or ratios of continuous inputs are notoriously hard for trees to
+  represent. Using "power relative to expectation" here means approximating the whole
+  weather → power baseline <em>inside interactions with</em> the lagged power — the expensive kind of
+  structure for a gradient-boosted tree — whereas the two-stage residual hands the model that
+  comparison precomputed as a single number.</li>
+<li><strong>The per-series data regime is small.</strong> One booster per series sees on the order of
+  10⁴–10⁵ training rows — not the regime in which a tree ensemble reliably discovers a
+  multi-variable implicit baseline within interactions.</li>
+<li><strong>The training signal for the implicit baseline is weak.</strong> The two-stage design learns
+  weather → power as a direct regression — every training row's target is the power concurrent
+  with the weather input. Here the same function must be learned only through its indirect
+  effect on predicting <em>future</em> power, where the anomaly signal matters strongly on only the
+  ~10% of switching-affected rows.</li>
+<li><strong>Feature-count explosion — worst for neighbours.</strong> Each power lag brings roughly a dozen
+  aligned weather columns; that is tolerable for the self-series, but the conservation
+  fingerprint that the residual-lag features' neighbour variant targets would need each <em>neighbour's</em> lagged
+  power plus each neighbour's lagged weather (a different H3 cell per neighbour), per
+  neighbour — an order of magnitude more columns diluting split gain on small per-series
+  datasets. The two-stage design collapses every neighbour to one normalised residual, or the
+  whole neighbourhood to a single sum.</li>
+<li><strong>No normalisation for free.</strong> The two-stage baseline's quantile spread expresses each
+  residual in units of that series' usual wobble at that kind of moment; the single-stage model
+  must learn that heteroscedasticity implicitly as well.</li>
+<li><strong>No reusable artifact.</strong> The two-stage baseline <em>is</em> the v0.6 switching-detector baseline —
+  the same fitted model feeds the changepoint detector, the sensitivity floor, and the residual
+  features. This variant produces nothing inspectable: no residual series to plot, changepoint,
+  or hand to the detector; its notion of normality is buried in split structure.</li>
+</ul>
+<p><strong>Sequencing: run this before the residual-lag features, as their ablation control.</strong> Its measured result bounds
+how much anomaly signal a tabular learner extracts <em>unaided</em>, so the residual-lag features' later comparison —
+"residual features beat aligned raw features by X" — cleanly isolates the value of the explicit
+baseline instead of conflating it with "the model finally saw lagged weather at all". And if
+this variant already captures most of the gain, that is a cheap and important discovery to make
+<em>before</em> anyone builds the two-pass machinery. Expect the direct win to be modest and
+concentrated at short horizons, though: the anomaly reading only exists where the power lag
+itself is non-null (lead time &lt; lag), the same nullification limit the residual-lag features note for their
+valid-time-anchored variant.</p>
+<h3 id="weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation">Weather-delta compensation for power lags — an implicit handle on unmetered generation</h3>
+<p>Aligned lagged weather hands the booster the lagged power value <em>and</em> the weather at that lagged
+time as two separate columns, then asks it to work out that the two belong together. This item
+precomputes the comparison the booster struggles to make: for each power lag, add a single
+<strong>delta</strong> column — the change in a weather (or weather-<em>proxy</em>) variable between the lagged time
+and the target <code>valid_time</code> — so the feature literally says "the power lag is from a much sunnier
+moment than the one you are forecasting; compensate." It sits between aligned lagged weather and
+the <a href="#residual-lag-features-from-the-switching-detector-baseline">residual-lag features</a> on the
+same ablation ladder: aligned weather leaves the subtraction to the tree, the two-stage residual
+does the subtraction against a full fitted baseline, and this does the one subtraction that the
+unmetered-generation case needs, with no baseline model.</p>
+<p><strong>Why this is the strongest case for a delta feature.</strong> A substation with embedded (unmetered) PV
+or wind meters roughly <code>demand − C · cf(weather)</code>, where <code>C</code> is the unknown behind-the-meter
+capacity and <code>cf</code> the capacity factor. The correction that maps the lagged observation onto the
+target conditions is then <code>≈ −C · (cf_valid − cf_lag)</code> — <strong>linear in the capacity-factor delta</strong>,
+with a per-series constant scale. A per-series booster does not need to know <code>C</code>: it discovers the
+slope as an ordinary split relationship on the one delta column. That is a far easier learning
+problem than the general "how anomalous was this lag" question, and it is exactly the structure
+trees are otherwise bad at — a difference of two continuous inputs — served precomputed.</p>
+<p><strong>Compute the delta on the right variable — this is why it depends on the physics proxies.</strong> The
+delta is only meaningful on a variable that is roughly linear in the generation it stands for:</p>
+<ul>
+<li><strong>PV.</strong> A raw GHI delta is a serviceable start (the PV proxy is nearly linear in GHI), so a PV
+  variant can run using irradiance directly. The
+  <a href="#linearised-physics-features-for-solar-and-wind">simplified PV power proxy</a> sharpens it —
+  especially across the clear-sky-index-interpolated sunrise/sunset ramps and the cell-temperature
+  derate — so the proxy delta is the better feature once that item lands.</li>
+<li><strong>Wind.</strong> A raw wind-<em>speed</em> delta is actively misleading, because the power curve is cubic then
+  flat: equal speed deltas at 5 m/s and at 15 m/s mean wildly different power deltas. The wind
+  variant must take its delta on the
+  <a href="#linearised-physics-features-for-solar-and-wind">farm-level power-curve proxy</a>, not on speed,
+  and therefore waits for that proxy.</li>
+</ul>
+<p><strong>Where it is weaker than the two-stage residual</strong> — worth stating plainly so the ablation stays
+honest. It only compensates for the <em>weather-linear</em> component: nonlinear, asymmetric
+temperature-driven demand response and all calendar effects are outside it, whereas the residual
+baseline captures both because it is a full fitted model. It also arrives unnormalised (no
+per-series spread units), and it carries a confounder — a big GHI delta <em>should</em> be nearly ignored
+at a substation with little embedded PV, so the model must learn per series how much of its
+metered signal responds. That is fine for today's per-series boosters, but a
+<a href="#global-model-per-time_series_type">global model</a> would need an embedded-capacity estimate as an
+interacting feature, which is the bridge to the V2
+<a href="../disaggregation/">disaggregation</a> work.</p>
+<p><strong>Caveats carried over unchanged.</strong> The weather/proxy value <em>at the lagged time</em> rides the same
+freshest-NWP-run join with no publication-time cut that aligned lagged weather and the residual-lag
+features both flag — leak-free today only as a side effect of daily run cadence — so this item
+shares the availability cut planned in
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/356">#356</a>. Null the delta
+wherever its paired power lag is nulled (<code>_nullify_leaky_lags</code>): a "conditions changed" signal with
+no surviving anchor for what they changed <em>from</em> is noise. And plot every delta against observed
+power before trusting it — a flipped sign convention (valid − lag vs lag − valid) is invisible to
+the leaderboard but obvious in the
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/359">feature-visualisation tool</a>.</p>
+<p><strong>Sequencing.</strong> This is a new arm in the aligned-weather → residual-lag ablation ladder: (a)
+aligned raw lagged weather, (b) these proxy deltas, (c) full two-stage residuals. Arm (b) minus
+arm (a) measures what the precomputed subtraction is worth; if it captures most of arm (c)'s gain
+on non-switching rows, that is a cheap and important discovery to make before the two-pass
+baseline machinery is built. It is slightly more than the pure config of aligned weather — a
+derived delta column in <code>_parsed_features.py</code>, in the mould of the existing derived features — so
+it sits at the bottom of Tier 1. The PV variant can run now on a raw GHI delta; the wind variant
+waits on the <a href="#linearised-physics-features-for-solar-and-wind">solar/wind physics proxies</a>.</p>
+<h2 id="tier-2-cheap-feature-engineering-about-a-day-each">Tier 2 — cheap feature engineering (about a day each)</h2>
+<h3 id="per-time_series_type-feature-lists">Per-<code>time_series_type</code> feature lists</h3>
+<p>Issues: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/201">#201</a>,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/107">#107</a></p>
+<p>Every series type currently shares one demand-oriented feature list: four power lags (all
+nullified in the 3–10 day band anyway), day-of-week and time-of-day calendar features that
+mean nothing to a wind farm, and a windchill feature aimed at demand. Wind forecasts are
+currently poor, and the hypothesis is that feature noise is a big part of why: a wind-tailored
+list (wind speeds and directions at 10 m and 100 m, pressure — dropping the calendar features
+and power lags) could deliver a large win for the wind slice <em>immediately</em>, before any new
+features exist. Same logic, more mildly, for PV.</p>
+<p>Mechanics: YAML gains <code>selected_features_by_type: {type: [...]}</code> with the existing
+<code>selected_features</code> as the default for unlisted types. Boosters are already per-series, so
+each can resolve its series' type (in <code>AllFeatures</code>) to a feature list at train/predict time;
+persist the mapping in <code>meta.json</code>. The value compounds as the later feature-engineering items (holidays, effective temperature, the solar/wind physics proxies) diverge the useful
+per-type sets (solar features for PV, turbine features for wind, holidays for demand).</p>
+<h3 id="training-data-hygiene-the-cheap-version">Training-data hygiene, the cheap version</h3>
+<p>Full data cleaning is roadmap v0.4, but training on stuck meters and false zeros actively
+teaches the model wrong targets <em>today</em> (quality issues are ~10%+ of some series). Cheap
+interim: drop training rows whose target sits inside a detected stuck window (rolling std ≈ 0;
+<code>DataQualitySettings.stuck_std_threshold</code> already exists) or an isolated exact-zero run.
+Cleaning only the <em>training</em> target is much lower-risk than cleaning delivered data, and it
+protects every subsequent experiment from learning artefacts.</p>
+<h3 id="effective-smoothed-temperature-and-degree-day-features">Effective (smoothed) temperature and degree-day features</h3>
+<p>GB demand responds to <em>lagged</em> temperature (building thermal inertia), not instantaneous —
+National Grid's demand models use an exponentially-smoothed "effective temperature". Add an
+EWM of <code>temperature_2m</code> over the past ~1–3 days (computed from the NWP trajectory itself, so
+horizon-safe) plus heating-degree <code>max(15.5 − T, 0)</code>. Linearises the demand–temperature
+relationship the same way the solar/wind physics proxies do for generation.</p>
+<h3 id="linearised-physics-features-for-solar-and-wind">Linearised physics features for solar and wind</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/168">#168</a></p>
+<p>Trees are poor at smooth monotone functions; give them the physics directly. Everything here
+hangs off one shared solar-position/clear-sky helper, so this lands as a three-stage stack —
+and the order matters: build the clear-sky machinery and fix the upsample <strong>first</strong>, then
+derive features from the already-upsampled columns.</p>
+<p><strong>(a) Solar position and clear-sky helper.</strong> Closed-form, from site latitude <span class="arithmatex">\(\phi\)</span> and
+longitude <span class="arithmatex">\(\lambda\)</span> (metadata) and <code>valid_time</code> — <strong>not pvlib</strong>, which depends on pandas,
+forbidden here. Declination (Cooper's equation, <span class="arithmatex">\(d\)</span> = day of year):</p>
+<div class="arithmatex">\[
+\delta = -23.45^\circ \, \cos\!\left(\tfrac{360^\circ}{365}\,(d + 10)\right)
+\]</div>
+<p>Hour angle from solar time (<span class="arithmatex">\(t_{\text{solar}} = t_{\text{UTC}} + \lambda / 15^\circ\)</span>; the
+equation-of-time correction is ≤ ~16 min and can be dropped for a feature):</p>
+<div class="arithmatex">\[
+\omega = 15^\circ\!/\mathrm{h} \times (t_{\text{solar}} - 12\,\mathrm{h})
+\]</div>
+<p>Solar zenith angle:</p>
+<div class="arithmatex">\[
+\cos\theta_z = \sin\phi \sin\delta + \cos\phi \cos\delta \cos\omega
+\]</div>
+<p>Clear-sky irradiance via Haurwitz (GHI-only, no turbidity input — ideal for a feature):</p>
+<div class="arithmatex">\[
+\mathrm{GHI}_{\text{cs}} = 1098 \, \cos\theta_z \, e^{-0.057/\cos\theta_z}
+\quad \text{for } \cos\theta_z &gt; 0, \text{ else } 0
+\]</div>
+<p><strong>(b) Interpolate clear-sky <em>index</em>, not raw irradiance, in the 30-min upsample.</strong> The NWP
+upsample (<code>_upsample_nwp_to_half_hourly</code>) linearly interpolates native steps to half-hourly;
+for shortwave radiation that smears sunrise/sunset ramps badly. And the native steps are
+3-hourly only out to 144 h — from day 6 to day 15 they are <strong>6-hourly</strong>, so the smearing is
+worst precisely in the primary 3–10 day user band. Standard fix: divide irradiance by
+clear-sky irradiance at the native steps, interpolate the (slowly-varying) clear-sky index,
+multiply back by the <em>half-hourly</em> clear-sky curve. Sharpens exactly the ramps that matter for
+PV sites — and for MVA-metered substations whose readings bounce off zero from embedded solar.</p>
+<p><strong>(c) Derived features, computed from the upsampled columns:</strong></p>
+<ul>
+<li><strong>Clear-sky index</strong> <span class="arithmatex">\(k_c = \mathrm{GHI} / \mathrm{GHI}_{\text{cs}}\)</span> — the single most
+  informative derived solar feature. Null it when solar elevation is below ~5–10° (the ratio
+  blows up near the horizon) and clip to roughly <span class="arithmatex">\([0, 1.2]\)</span>.</li>
+<li>
+<p><strong>Simplified PV power proxy</strong> (PVWatts-style). Cell temperature from the Ross/NOCT model,
+  then a linear temperature derate:</p>
+<div class="arithmatex">\[
+T_{\text{cell}} = T_{2\text{m}} + k \, \mathrm{GHI},
+\qquad k = \tfrac{\mathrm{NOCT} - 20\,°\mathrm{C}}{800\,\mathrm{W\,m^{-2}}} \approx 0.03
+\]</div>
+<div class="arithmatex">\[
+P_{\text{pv}} \propto \mathrm{GHI} \, \bigl(1 + \gamma \, (T_{\text{cell}} - 25\,°\mathrm{C})\bigr),
+\qquad \gamma \approx -0.004\,/°\mathrm{C}
+\]</div>
+<p>i.e. one expression, <code>ghi * (1 - 0.004 * (t2m_celsius + 0.03 * ghi - 25))</code>, clipped at 0.
+Deliberately capacity-free (per-series boosters learn the scale) and with no
+tilt/orientation modelling — embedded PV behind a substation is an unknown mix of
+orientations, and the booster can bend the proxy per series.</p>
+</li>
+<li>
+<p><strong>Wind power curve</strong>: 100 m wind speed through a generic <em>farm-level</em> power curve — either
+  a piecewise form (zero below cut-in ~3 m/s, normalised cubic ramp
+  <span class="arithmatex">\((v^3 - v_{ci}^3)/(v_r^3 - v_{ci}^3)\)</span> to rated ~12–14 m/s, flat to cut-out ~25 m/s, zero
+  above) or a logistic sigmoid <strong>masked to zero above cut-out</strong> (an unmasked logistic is
+  actively wrong in storms — precisely when NGED cares). Exact shape matters less than it
+  looks: farm-level curves are smoother than single-turbine ones (aggregation, wakes,
+  hub-height spread), the booster monotonically re-bends the ramp anyway, and raw
+  <code>wind_speed_100m</code> stays in the feature list. What the proxy must get right is the
+  saturation at rated and the two dead zones — the parts trees can't build from raw speed.
+  (Large errors in the steep ramp region are dominated by NWP speed error amplified by the
+  physics' own <span class="arithmatex">\(dP/dv\)</span> — no closed form removes that; training on more ensemble members is what addresses it.)</p>
+</li>
+</ul>
+<p>Implement stage (c) as derived-feature names in <code>_parsed_features.py</code> — same pattern as the
+existing <code>windchill</code> feature. That pattern gives the correct order of operations for free:
+<code>StaticFeature</code> expressions are applied <em>after</em> <code>_upsample_nwp_to_half_hourly</code>, so derived
+features are computed at half-hourly resolution from already-interpolated inputs. This is why
+(b) comes before (c): the PV proxy is essentially linear in GHI, so deriving it from
+linearly-interpolated irradiance (or worse, interpolating a 3/6-hourly proxy directly) smears
+the sunrise/sunset ramps exactly as raw irradiance does — stage (b) is what makes the
+half-hourly solar features sharp. The same principle already holds for wind: interpolate the
+smooth variable (speed), then apply the nonlinear power curve.</p>
+<p>Expect the win to concentrate in the PV and wind <code>time_series_type</code> slices; pairs with the
+per-<code>time_series_type</code> feature lists.</p>
+<p><strong>Enter these as features, not as an XGBoost <code>base_margin</code>.</strong> It is tempting to treat a physics
+proxy as a baseline prediction the booster only has to <em>correct</em> — XGBoost's <code>base_margin</code> does
+exactly that, continuing the boosting on top of a supplied per-row starting score. It is the wrong
+tool here, for one structural reason: <code>base_margin</code> needs the baseline on the <em>target's</em> scale (an
+actual MW prediction), but these proxies are deliberately capacity-free, and for most series the
+target is <em>net demand</em>, where the physics explains only the embedded-generation slice. A
+capacity-free, generation-only margin is a poor starting score for the whole signal, and the trees
+would spend their capacity undoing its wrong scale. As a <em>feature</em>, by contrast, the per-series
+booster learns the proxy's slope (implicitly discovering the behind-the-meter capacity) and how it
+interacts with the demand component; the <a href="#monotone-constraints-for-the-generation-models">monotone constraints</a>
+below then supply the "trust the physics when extrapolating" property a margin would otherwise
+provide. <code>base_margin</code> only becomes the right tool once the target is put on the proxy's scale —
+which is exactly what the <a href="#global-model-per-time_series_type">global model</a>'s capacity-factor
+normalisation does.</p>
+<h3 id="monotone-constraints-for-the-generation-models">Monotone constraints for the generation models</h3>
+<p>XGBoost's <code>monotone_constraints</code>: PV power non-decreasing in irradiance, wind power monotone
+in speed below rated. Mostly buys sane extrapolation in weather regimes the training year
+never saw — precisely the failure mode of a single-fold training set. A config-field addition
+once the solar/wind physics features exist.</p>
+<h2 id="tier-3-new-feature-machinery-days">Tier 3 — new feature machinery (days)</h2>
+<h3 id="init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model">Init-time-anchored features (current-level anchor; prerequisite for the global model)</h3>
+<p>All current power lags are anchored to <code>valid_time</code> and nullified when lag ≤ lead time — so at
+a 7-day horizon every lag under 168 h is null, and at 14 days the model has almost no
+recent-level information. Add features anchored to <code>power_fcst_init_time</code> instead: "last
+observed power at forecast time", "mean/max of the 24 h before forecast time", "power at this
+half-hour-of-day yesterday relative to forecast time". These are <strong>never leaky and never null
+at any horizon</strong> (no nullification machinery — but respect the same comms-delay conservatism
+as <code>_nullify_leaky_lags</code>: observations strictly <em>before</em> init time).</p>
+<p>Be realistic about where the win lands, though. Per-series boosters already bake each series'
+typical level, weekly cycle, and seasonal shape into the trees, so in the 3–10 day band the
+incremental information is mostly <strong>drift since training</strong> (new connections) and short-lived
+level anomalies — and demand-anomaly autocorrelation at 7 days is modest. The large wins sit
+at day 0–2, where these features largely subsume "blend with persistence" (XGBoost learns the
+blend itself once it has the anchor) — outside the primary user band. They also overlap the
+recency sample weights of the early-stopping item; whichever lands second should expect a smaller measured win.
+Where they become <em>structurally essential</em> is the global model, whose booster cannot
+bake in per-series level. So: a moderate expected win now, and a hard prerequisite later.
+<strong>Must ship with a leakage test</strong> in the spirit of the existing <code>_nullify_leaky_lags</code> tests
+before it's trusted.</p>
+<h3 id="neighbouring-h3-cell-weather-context">Neighbouring-H3-cell weather context</h3>
+<p>Each series currently gets its nearest NWP cell only. Add the mean and gradient across the
+neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest
+expected gain, cheap given the <code>geo</code> H3 machinery exists.</p>
+<h3 id="residual-lag-features-from-the-switching-detector-baseline">Residual lag features from the switching-detector baseline</h3>
+<p>The full design and caveats live in the switching-events roadmap:
+<a href="../switching-events/#approach-1-the-two-stage-forecaster">Approach 1 — the two-stage forecaster</a>.
+In brief: fit the v0.6 stage-1 baseline (this same forecaster, configured with weather/calendar
+features only and a quantile objective), then feed the production model normalised
+"actual − expected" residuals at lag times instead of (or alongside) raw power lags — telling
+the model how <em>normal</em> each recent observation is, so it can carry a sustained switching-event
+offset forward instead of blending it into weather-driven variation. Beyond its expected metric
+win, this experiment's result gates the
+<a href="../switching-events/#the-decision-point-a-feature-based-mainline-vs-the-staged-detector">decision point</a>
+between a feature-based switching mainline and the staged detector — extra reason to schedule
+it.</p>
+<p>Five scheduling notes specific to this page:</p>
+<ul>
+<li><strong>Run <a href="#aligned-lagged-weather-the-single-stage-ablation-control">aligned lagged weather</a>
+  first.</strong> The config-only single-stage variant — aligned lagged-weather features, letting the
+  booster judge each lag's normality without an explicit baseline — is this item's ablation
+  control: its measured result is the bar the residual features must clear for the two-stage
+  machinery to be worth building.</li>
+<li><strong>The highest-value variant pairs with the init-time-anchored features.</strong> Valid-time-anchored residual lags obey the
+  same nullification as raw power lags (any lag ≤ lead time is null), so in the 3–10 day band
+  only residuals several days old survive — while the freshest, most informative residual is
+  the one from just before forecast time. The strongest form is therefore <em>init-time-anchored</em>
+  residual features ("normalised residual just before forecast time", "mean residual over the
+  24 h before forecast time") — never null at any horizon, and carrying exactly the anomaly
+  signal that the init-time-anchored features' raw anchors mix in with ordinary weather-driven level variation. The
+  same anchoring extends to the threshold-free <em>event-age</em> accumulators from the full design
+  (residual EWMAs at a few half-lives, or a self-resetting CUSUM statistic): "how long has this
+  series been abnormal" with no hand-coded normality threshold, because trees learn their own
+  cutpoints from continuous accumulators.</li>
+<li><strong>Inspect every feature visually before it enters an experiment.</strong> Residuals, event-age
+  accumulators, and neighbour pools are easy to build subtly wrong (sign conventions,
+  normalisation, availability cuts) in ways the leaderboard will not surface; plot each one
+  against observed power — and the v1 switching-event labels — first. The planned
+  feature-visualisation tool
+  (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/359">#359</a>) is the
+  vehicle.</li>
+<li><strong>It costs more than a config change.</strong> The two-pass pipeline (fit the baseline per CV fold
+  on that fold's training period only; hindcast residuals over history, generating the
+  booster's <em>training-row</em> residuals out-of-sample for the baseline via rolling-origin refits,
+  so the booster never calibrates on in-sample residuals it will not see live; join them in as
+  features) is new machinery — the hindcast leg should consume the central NWP analysis-proxy
+  function planned in
+  <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/356">#356</a>, which owns the
+  publication-time availability cut the no-lookahead caveat requires. And while the baseline's
+  <em>feature list</em> and robust median objective are both just config, residual <em>normalisation</em>
+  needs a per-series spread estimate — from the
+  <a href="../metrics-and-leaderboard/#delivering-the-probabilistic-metrics">quantile-objective model family</a>
+  once it lands, or an interim rolling MAD of the residuals. The
+  neighbour-residual variant additionally needs the trial-area adjacency list
+  (<a href="../switching-events/#open-items-dependencies">switching-events open items</a>) and
+  cross-series feature engineering — entering as a fixed set of permutation-invariant pooled
+  columns (the signed neighbourhood sum and the signed most-anomalous neighbour; see the full
+  design), never one column per neighbour; the self-residual version needs neither and should
+  run first. Finally, adopting a winner is not free either: the live service must then run the
+  baseline model too — a second deployed model plus a hindcast-residual step in the predict
+  path.</li>
+<li><strong>A related variant reuses the same machinery to <em>correct a draft</em>, not only to supply residual
+  lags.</strong> The stage-1 baseline can be evaluated at the target time to make a first-draft forecast
+  that stage 2 then corrects — supplied either as an ordinary feature or as an XGBoost
+  <code>base_margin</code> — a design axis orthogonal to the residual lags (the lags concern what stage 2
+  receives; the draft, what it predicts and starts from) and cheap to add once their per-fold
+  out-of-sample hindcast machinery exists. The
+  <a href="../switching-events/#approach-1-the-two-stage-forecaster">full treatment</a> — soft-vs-hard
+  corrector, the quantile subtlety, and why the low-variance correction target is a plausible route
+  to a <em>global</em> model — is on the switching-events page.</li>
+</ul>
+<h3 id="weather-abnormality-climatology-z-score-features">Weather-abnormality (climatology z-score) features</h3>
+<p>Give the booster a sense of whether the <em>forecast</em> weather is abnormal — a heatwave, an
+unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
+<code>z = (x − μ) / σ</code> against a climatological norm for that calendar time. This promotes the
+<a href="#explicitly-deferred-not-quick-or-not-skill">deferred feature-grammar note</a>'s
+weather-abnormality idea to a concrete experiment. The inductive-bias case is the one the
+<a href="#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation">weather-delta features</a>
+already make: a z-score is a difference of two continuous inputs, exactly the structure trees
+are otherwise bad at. A per-series booster could in principle learn "hot for June" from a
+<code>day_of_year × temperature</code> interaction, but on the 10⁴–10⁵ rows one series provides it mostly
+will not, so handing it the precomputed anomaly is legitimate inductive bias rather than
+information it already holds. It sits at the end of Tier 3 because its expected win is modest
+(see below) yet it carries a new data-ingestion dependency — more effort per unit skill than the
+residual-lag features above it, which are expected to offer far more bang for the buck.</p>
+<p><strong>Is the anomaly the signal, or is the raw value?</strong> For GB demand the first-order response is to
+<em>actual</em> (effective) temperature, which the Tier-2
+<a href="#effective-smoothed-temperature-and-degree-day-features">effective-temperature and degree-day features</a>
+already capture. Where the anomaly carries genuinely new information is second-order:
+acclimatisation (25 °C in May prompts different behaviour than 25 °C in August), heatwave
+cooling load that is nonlinear in <em>how</em> abnormal the temperature is, and behavioural shifts on
+unseasonably nice days. Those effects are real but modest, and partly aliased with features the
+model will already have — a raw <code>day_of_year</code> ordinal beside temperature lets a tree approximate
+crude seasonally-conditional splits. So sequence this <em>after</em> effective temperature lands and
+treat "anomaly beats raw + calendar" as an explicit ablation, in the same spirit as the
+aligned-weather → delta → residual ladder. The one place it may punch above its weight is the
+v0.6 stage-1 <a href="../switching-events/#the-baseline-shared-foundation">switching baseline</a>: an
+unmodelled heatwave becomes exactly the phantom-event residual that baseline must avoid, and an
+anomaly feature gives it a way to explain the excursion away.</p>
+<p><strong>Source: ERA5, for model-consistency with the forecasts.</strong> Choose the climatology source by
+asking which one makes the z-score a <em>clean</em> anomaly. The input <code>x</code> is an ECMWF ENS <em>forecast</em>,
+so the cleanest baseline shares the ENS's own systematic biases — they then cancel in <code>(x − μ)</code>.
+That is <strong>ERA5</strong>: same IFS lineage as the ENS, running to near-present, and at 31 km ample
+resolution because weather anomalies are synoptic-scale — a heatwave does not vary meaningfully
+across an H3 cell. CERRA is the tempting alternative — higher-resolution, and since its 2025
+timely-update extension no longer stuck at 2021 but running to within a few months of present —
+but it is a <em>different</em> model (a HARMONIE-based regional system), so z-scoring ECMWF forecasts
+against a CERRA climatology folds a model-pair bias into every anomaly. (This same
+model-consistency argument, together with ERA5T's near-real-time latency, is why the project now
+<a href="../data-sources/#weather-data">standardises on ERA5</a> as its single reanalysis for every use —
+pre-training, capacity estimation, and this climatology alike; CERRA stays documented as a
+higher-resolution option but is deprioritised.) The most self-consistent source imaginable would be
+a climatology from our own archived ENS, but a robust day-of-year climatology wants 10+ years and
+the archive is nowhere near that yet, so ERA5 wins in practice.</p>
+<p><strong>Storage and ingestion — an H3-indexed Delta table built by a Dagster asset.</strong> Store the
+climatology the way the rest of the project stores gridded weather: an <strong>H3-indexed Delta table</strong>
+keyed by <code>(h3_index, day_of_year, half_hour_of_day)</code> with a mean and standard-deviation column
+per weather variable — not a bespoke Zarr. The <strong>mean</strong> grid need not be built from scratch:
+Google's <strong>WeatherBench2</strong> publishes a precomputed ERA5 climatology
+(<code>gs://weatherbench2/datasets/era5-hourly-climatology/</code>) — the smoothed mean by day-of-year and
+6-hour, over 1990–2019 with a 61-day window, at ERA5's native 0.25° — so μ can start from that
+(regridded to our H3 cells and interpolated from 6-hourly to half-hourly), leaving only <strong>σ</strong> for
+us to compute over the same window (WeatherBench2 stores means only, no standard deviation). The
+alternative is a single <strong>Dagster asset</strong> that ingests ERA5 (the same shape as the <code>ecmwf_ens</code> NWP
+ingest, now on the <a href="../data-sources/#weather-data">data-sources roadmap</a>) and reduces it to both μ
+and σ in one pass, fitting each as a smooth function of day-of-year and half-hour-of-day (a
+low-order harmonic fit or a ±15-day rolling window, because a raw per-calendar-day climatology is
+noisy even from 30 years of data). Either way the ERA5 ingest is the dependency that places this
+item late in the tier.</p>
+<p>Be precise about the update cadence, though — it is <em>not</em> near-real-time. A 30-year climatology
+is slowly varying, so the reducing asset recomputes only when a fresh chunk of ERA5 lands
+(monthly at most, and even yearly would barely move μ,σ). Nothing in the feature needs live data:
+μ and σ for a forecast's valid times — up to 14 days out — are fully determined in advance by the
+calendar, and the z-score itself is computed at feature-engineering time in <code>_parsed_features.py</code>
+from the forecast NWP value minus the climatology lookup. That derived-feature slot is also what
+lets this become the anomaly-vs-climatology combinator if the composable grammar ever
+materialises. (A <em>trailing-window</em> "how unusual versus the last few weeks" anomaly would need
+near-real-time ingestion — but that is a different, and weaker, feature than the climatological
+norm, and is not what this item builds.)</p>
+<p><strong>Scope the first experiment to temperature.</strong> Storms mostly do not need this — the
+<a href="#linearised-physics-features-for-solar-and-wind">wind power-curve proxy</a>'s cut-out masking
+already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so the first
+experiment carries a <em>temperature</em> anomaly only.</p>
+<h2 id="tier-4-structural-model-changes-weeks">Tier 4 — structural model changes (weeks)</h2>
+<h3 id="per-horizon-window-models">Per-horizon-window models</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/149">#149</a></p>
+<p>One booster per <code>(time_series_id, horizon_window)</code> — e.g. 0–2 d, 2–7 d, 7–14 d, configurable.
+Train and predict route rows by <code>nwp_lead_time_hours</code>; <code>save</code>/<code>load</code> gain a window dimension.
+<strong>Requires <a href="../metrics-and-leaderboard/#delivering-the-probabilistic-metrics">horizon-sliced metrics</a>
+to evaluate</strong> — its win is by construction horizon-sliced. Under the 3–10 day focus the
+interesting experiment is narrower than "many windows": does a dedicated ~3–10 day model beat
+the lead-time feature <em>in that band</em>? Compare against the lead-time feature first — if the lead-time feature
+captures most of the benefit, the extra model count may not pay.</p>
+<h3 id="batched-training-via-xgbdataiter-enabler">Batched training via <code>xgb.DataIter</code> (enabler)</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/91">#91</a></p>
+<p>Issue #91 already contains a complete, validated implementation design (<code>LazyFrameBatchIter</code> +
+<code>QuantileDMatrix</code>, grouping-agnostic, no temp disk, <code>train_batch_size</code> config field) — treat
+the issue body as the plan and implement as written. No direct skill gain; unblocks ensemble-member training and the global model.</p>
+<h3 id="train-on-more-ensemble-members-after-batched-training">Train on more ensemble members (after batched training)</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/148">#148</a></p>
+<p>Training on all 51 members multiplies training data ~51× for correlated rows. Run the
+dose-response experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP
+loader already takes <code>ensemble_members: list[int]</code>, <code>cv_assets.py:237</code>). Training on members
+also teaches the model the member-spread input distribution it actually sees at inference —
+the train/serve input-skew flagged in the review. That skew grows with lead time: by day 7–10
+the control member is an increasingly unrepresentative sample of the ensemble, so the value of
+this item concentrates precisely in the primary user band — worth remembering when deciding
+how soon to invest in batched training. Ensemble <em>calibration</em> itself belongs to
+<a href="../metrics-and-leaderboard/#delivering-the-probabilistic-metrics">probabilistic evaluation</a>.
+Member training is also one of the
+<a href="../../techniques/probabilistic-forecasting/#caveat-double-counting-weather-uncertainty">double-counting mitigations</a>
+for the Phase-D quantile-ensemble pipeline — a second reason to land it, alongside this item
+and the lead-time feature, before or with the quantile model family.</p>
+<h3 id="global-model-per-time_series_type">Global model per <code>time_series_type</code></h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/104">#104</a></p>
+<p>One booster for all primaries, one for all PV sites, etc. — the biggest potential win for
+data-poor series (transfer across sites), and the stepping stone to V2 scale. <strong>Hard
+prerequisite: per-series target normalisation</strong> — a global booster mixing a 200 MW GSP with a
+5 MW solar farm needs <code>power / effective_capacity_mw</code> targets (the <code>effective_capacity</code> asset
+exists) with the inverse transform at predict time, plus static per-series features (capacity,
+type, lat/lon) so the booster can tell sites apart — plus the init-time-anchored features, which supply the current-level signal a global booster cannot bake in per series.
+Needs batched training at ensemble scale. The boundary of "quick".</p>
+<p>Normalisation also unlocks <code>base_margin</code> for the generation types. Once a series' target is a
+capacity factor in <span class="arithmatex">\([0, 1]\)</span>, its
+<a href="#linearised-physics-features-for-solar-and-wind">wind/PV physics proxy</a> can be put on that same
+scale — the <a href="#linearised-physics-features-for-solar-and-wind">wind proxy</a> already runs 0→1 (the
+normalised cubic ramp), while the PV proxy is in irradiance units (<span class="arithmatex">\(\mathrm{W/m^2}\)</span>) and needs one
+extra division by a reference irradiance (≈ 1000 <span class="arithmatex">\(\mathrm{W/m^2}\)</span> at STC) to become a capacity
+factor. On a matched scale a single-<code>time_series_type</code> generation booster can take the proxy as its
+<code>base_margin</code> and learn only the site-specific deviation — physics carrying the cross-site shape,
+trees the correction. This is the scale match the per-series net-demand
+models lack — there the capacity-free proxy is the wrong tool as a margin (the
+<a href="#linearised-physics-features-for-solar-and-wind">physics-features section</a> explains why), and
+capacity-factor normalisation is what supplies it. It is also the same base-margin move the
+<a href="../switching-events/#approach-1-the-two-stage-forecaster">two-stage forecaster</a> makes with its
+stage-1 draft; there, the correction target's low variance and cross-series stationarity are part
+of what makes a <em>global</em> corrector tractable at all — the same property that helps here. (Under a
+log-link generation objective the margin would be <code>log(proxy)</code>, which needs a floor to handle the
+PV proxy's exact zeros at night.)</p>
+<h2 id="explicitly-deferred-not-quick-or-not-skill">Explicitly deferred (not quick, or not skill)</h2>
+<ul>
+<li><strong><a href="https://github.com/openclimatefix/nged-substation-forecast/issues/167">#167</a> ERA5 pre-training</strong> — needs a whole new data-source ingestion (ERA5 download,
+  contracts, reanalysis-vs-forecast handling) before any training trick. The evaluation design
+  belongs to
+  <a href="../../ml_experimentation/evaluating-new-data-sources/">Evaluating new data sources</a>.</li>
+<li><strong><a href="https://github.com/openclimatefix/nged-substation-forecast/issues/176">#176</a> local-time power lags</strong> — a DST edge case affecting a handful of half-hours per year;
+  the issue itself says it may not be worth worrying about yet. Revisit if the metrics slices
+  ever show a DST-transition artefact.</li>
+<li><strong>A composable feature-expression grammar (consider designing later, deliberately not now).</strong>
+  The accumulator machinery of the residual-lag features generalises well beyond power residuals: EWMAs of <em>any</em>
+  base column at chosen half-lives (an EWMA of temperature <em>is</em> the effective-temperature feature), each either lagged in valid time or locked to <code>power_fcst_init_time</code> (the init-time-anchored features' anchoring), plus the <a href="#weather-abnormality-climatology-z-score-features">weather-abnormality features</a> (now a Tier-3 item of their own) — how unusual the forecast weather is against
+  the climatological norm for that calendar time ("is this a heat wave?"). Feature names are
+  already a tiny parsed language (<code>ParsedFeatures.from_strings()</code> turns strings into typed
+  <code>LagFeature</code>/<code>RollingFeature</code>/<code>WeatherFeature</code>/... objects), so the natural end state is a
+  modestly richer grammar of composable combinators — base column → transform (EWMA,
+  anomaly-vs-climatology) → anchoring (valid-time lag vs init-time lock) — still expressed as
+  concise strings, e.g. something like <code>temperature_2m-&gt;ewma(3d)@init_time</code> (illustrative, not
+  a design). The payoff couples to
+  <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/359">#359</a>: any feature a
+  string can express could be tried interactively in the visualisation, then pasted into any
+  model config unchanged. Deferred because grammar design done speculatively becomes an inner
+  platform — grow combinators only as experiments demand them, and revisit once aligned lagged weather, effective temperature, the weather-abnormality features, the init-time-anchored features, and the residual-lag features have shown which transforms actually earn their keep.</li>
+</ul>
+<h2 id="how-each-win-is-evaluated">How each win is evaluated</h2>
+<p>Each win lands as its own experiment on the leaderboard: register → <code>full_cv</code> → <code>metrics</code>
+(leaderboard scope) → compare NMAE (overall + per-type + per-horizon-slice once horizon
+slicing is in, with the 3–10 day band as the headline slice) against the current champion and
+the <a href="../metrics-and-leaderboard/#baseline-forecasters">baselines</a>. Keep losing experiments in
+MLflow (negative results are results); promote winners' settings into
+<code>conf/model/xgboost.yaml</code> one at a time so attribution stays clean.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

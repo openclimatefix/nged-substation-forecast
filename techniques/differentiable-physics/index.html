@@ -1,0 +1,2916 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../convex-optimisation/">
+      
+      
+        <link rel="next" href="../disaggregation-evaluation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Differentiable Physics - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#differentiable-physics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Differentiable Physics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-differentiable-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why differentiable physics?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-idea-inversion-through-a-differentiable-forward-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The core idea: inversion through a differentiable forward model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-building-block-differentiablesolarplant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The core building block: DifferentiableSolarPlant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The core building block: DifferentiableSolarPlant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#panel-temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Panel temperature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaling-to-aggregate-fleets-universalsolarfleetnode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaling to aggregate fleets: UniversalSolarFleetNode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaling to aggregate fleets: UniversalSolarFleetNode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-basis-function-insight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The basis-function insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-when-to-add-a-tracking-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. When to add a tracking basis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-soft-clipping-for-diverse-inverters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Soft clipping for diverse inverters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-implementation-universalsolarfleetnode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Implementation: UniversalSolarFleetNode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-convex-twin-for-initialisation-and-sanity-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A convex twin, for initialisation and sanity checking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pvlib-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pvlib-pytorch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applications-in-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applications in this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#why-differentiable-physics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why differentiable physics?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-idea-inversion-through-a-differentiable-forward-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The core idea: inversion through a differentiable forward model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-building-block-differentiablesolarplant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The core building block: DifferentiableSolarPlant
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The core building block: DifferentiableSolarPlant">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#panel-temperature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Panel temperature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaling-to-aggregate-fleets-universalsolarfleetnode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scaling to aggregate fleets: UniversalSolarFleetNode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scaling to aggregate fleets: UniversalSolarFleetNode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-the-basis-function-insight" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The basis-function insight
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-when-to-add-a-tracking-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. When to add a tracking basis
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-soft-clipping-for-diverse-inverters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Soft clipping for diverse inverters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-implementation-universalsolarfleetnode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Implementation: UniversalSolarFleetNode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-convex-twin-for-initialisation-and-sanity-checking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A convex twin, for initialisation and sanity checking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pvlib-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        pvlib-pytorch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applications-in-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applications in this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="differentiable-physics">Differentiable Physics</h1>
+<blockquote>
+<p><strong>Status: durable method explainer. 🚧 Planned / 🔬 Research — none of this is implemented
+yet.</strong> This page explains the <em>method</em>: what differentiable physics (DP) is, the inversion idea
+at its core, and the two reusable building blocks (a single-site solar model and an
+aggregate-fleet model). The plans for <em>applying</em> it live in the roadmap: DP is
+<a href="../../roadmap/capacity-estimation/#candidate-b-the-differentiable-physics-estimator">one of the candidate estimators</a>
+for metered-generator effective capacity
+(<a href="../../roadmap/#v07-dynamic-generator-capacity">v0.7</a>), and the engine behind the
+<a href="../../roadmap/disaggregation/">graph-structured disaggregation of net substation power</a>
+(<a href="../../roadmap/#v20-scale-up-future-research">v2 research</a>). The tooling counterpart to
+this page — which estimation problems belong in convex optimisation (CVXPY) rather than
+PyTorch, and the <code>cvxpylayers</code> bridge between the two — is
+<a href="../convex-optimisation/">Convex Optimisation</a>. The Python in this document is illustrative
+sketch code, not the implementation. See the <a href="../../roadmap/">roadmap index</a> for status
+conventions.</p>
+</blockquote>
+<h2 id="why-differentiable-physics">Why differentiable physics?</h2>
+<p>Pure black-box models (like standard neural networks or XGBoost) require vast amounts of data to
+learn basic physical invariants and are prone to overfitting or hallucinating non-physical
+behaviour. Differentiable physics (DP) instead injects a mechanistic physical model directly into
+the computational graph, for three core reasons:</p>
+<ul>
+<li><strong>Data and sample efficiency:</strong> The model does not have to spend capacity re-learning solar
+  geometry (where the sun is) or the shape of a turbine power curve (roughly cubic in wind speed
+  between cut-in and rated, then flat to rated power, then zero beyond cut-out). The physics engine
+  supplies these constraints for free, letting the ML components focus entirely on atmospheric and
+  behavioural nuances.</li>
+<li><strong>True invertibility (inputs as parameters):</strong> Because every operation in the physics engine
+  preserves gradients, we can backpropagate errors all the way to the <em>inputs</em>. This lets us treat
+  unobserved variables (like local irradiance) or system configurations as parameters that can be
+  solved via gradient descent.</li>
+<li><strong>Interpretability:</strong> Instead of inspecting uninterpretable latent layers, the system updates
+  explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
+  audit the model's assumptions.</li>
+</ul>
+<h2 id="the-core-idea-inversion-through-a-differentiable-forward-model">The core idea: inversion through a differentiable forward model</h2>
+<p>The fundamental insight is to treat a meter reading as the output of a <strong>forward model</strong> that
+takes the unobserved quantities as inputs. For a substation:</p>
+<div class="arithmatex">\[P_{\text{obs}}(t) = P_{\text{demand}}(t) - P_{\text{pv}}(t) - P_{\text{wind}}(t) + P_{\text{loss}}(t)\]</div>
+<p>where <span class="arithmatex">\(P_{\text{obs}}\)</span> is the observed meter reading, <span class="arithmatex">\(P_{\text{demand}}\)</span> the latent (unobserved)
+demand, and <span class="arithmatex">\(P_{\text{pv}}\)</span>, <span class="arithmatex">\(P_{\text{wind}}\)</span>, <span class="arithmatex">\(P_{\text{loss}}\)</span> are the PV generation, wind
+generation, and network losses respectively.</p>
+<p>Each right-hand-side term is modelled explicitly as a physical function of weather and time, with
+its own latent parameters (capacities, orientations, power curves). The forward model is
+<strong>differentiable end-to-end</strong>: every component is implemented in a differentiable framework (JAX
+or PyTorch), so that gradients of the reconstruction error with respect to all latent parameters
+and states can be computed and used for learning. Training minimises the discrepancy between the
+forward model's output and the observed meter readings, jointly optimising every latent term
+simultaneously. This is the "inversion" step — running the forward model backwards, constrained
+by physics.</p>
+<p>The pay-off is not just the parameter estimates but the latent terms themselves: subtract the
+reconstructed generation and what remains is the latent demand, free of the confounding effect of
+distributed energy resources (DERs). How this project deploys the idea — which terms are metered
+vs unmetered, which DER types are tractable, and the full graph-structured engine over the
+substation network — is planned in
+<a href="../../roadmap/disaggregation/">Net-demand disaggregation</a>.</p>
+<p>A note on the name: "differentiable physics" is shorthand for <em>a physics simulator written in an
+autodiff framework so that it composes with gradient-based learning</em> — the differentiability is
+the enabling property, not the point. The underlying activity is <strong>inverse modelling</strong>, and it is
+shared with the <a href="../convex-optimisation/">convex route</a>: both toolchains write a forward model and
+invert it against observations, and both host physics. What actually separates them is the
+expressiveness of the forward model versus the guarantees on the inversion — unpacked in
+<a href="../convex-optimisation/#two-routes-to-the-same-inverse-problem">Two routes to the same inverse problem</a>.</p>
+<hr />
+<h2 id="the-core-building-block-differentiablesolarplant">The core building block: <code>DifferentiableSolarPlant</code></h2>
+<p>We model each physical parameter as a learnable Normal distribution <span class="arithmatex">\(\mathcal{N}(\mu, \sigma^2)\)</span> — a mean-field variational posterior — and train with the reparameterisation trick (<code>rsample()</code>) so gradients flow through the sampling step.</p>
+<p>Crucially, the training objective is an <strong>ELBO</strong>, not a bare reconstruction loss: a power-reconstruction term <em>plus</em> a KL term that pulls each posterior toward a fixed physical prior. The KL term is not optional. Minimising power error alone always rewards shrinking <span class="arithmatex">\(\sigma \to 0\)</span>, so the parameter "uncertainty" we are trying to capture would simply collapse. The prior does double duty: it keeps the posterior spreads honest, and it injects weak domain knowledge (e.g. "panels point roughly south at a typical UK roof pitch") that regularises sites with little data.</p>
+<p>Two practical details the ELBO must get right — both classic failure modes of hand-rolled variational inference:</p>
+<ul>
+<li><strong>The reconstruction term must be a proper likelihood, not a bare MSE.</strong> Bare MSE silently assumes an observation-noise scale of 1 in whatever units the power happens to be in, which makes the balance between reconstruction and KL arbitrary — the posterior then either collapses onto the prior or ignores it, depending on nothing but the units. Use a Gaussian likelihood with a <strong>learnable observation-noise scale</strong> <span class="arithmatex">\(\sigma_{\text{obs}}\)</span> (see <code>negative_elbo</code> in the sketch).</li>
+<li><strong>Scale the KL for minibatches.</strong> The KL term regularises the <em>whole-dataset</em> objective once, so on a minibatch it must be weighted by <code>batch_size / dataset_size</code> — otherwise the effective prior strength depends on the batching.</li>
+</ul>
+<p>Three physics details the sketch gets right:</p>
+<ul>
+<li><strong>Irradiance transposition.</strong> Plane-of-array (POA) irradiance is <em>not</em> GHI scaled by the angle of incidence — GHI already bakes in a cosine-of-zenith projection. We decompose the resource into beam, sky-diffuse and ground-reflected components (an isotropic sky model) and transpose each correctly. The beam term uses DNI (not GHI) projected by the angle of incidence.</li>
+<li><strong>DC and AC capacity.</strong> The learnable <code>dc_capacity</code> is the DC nameplate in power units; POA is normalised by the reference irradiance (1000 W/m²) so that capacity falls out in MW at standard test conditions. <code>ac_capacity</code> is a separate learnable parameter that clips the inverter output via <code>torch.minimum</code> — a single plant clips hard, unlike <a href="#scaling-to-aggregate-fleets-universalsolarfleetnode">the fleet soft clip</a>.</li>
+<li><strong>Panel temperature derate.</strong> Cell temperature sits above ambient in proportion to absorbed POA irradiance; efficiency then falls roughly linearly with temperature above 25 °C. The sketch adds a steady-state derate using two module-level constants; in the full variational model these become learnable posteriors — and the <a href="#panel-temperature">subsection below</a> extends this to the broken-cloud effect.</li>
+</ul>
+<p>Angle convention: azimuth is measured from due south, with east negative and west positive (east = −90°, south = 0°, west = +90°). Beware that this differs from <a href="https://pvlib-python.readthedocs.io/">pvlib</a>'s convention (north = 0°, clockwise, in degrees); <code>pvlib-pytorch</code> should adopt pvlib's own convention and convert at the boundary — mismatched angle conventions are the classic silent bug in PV modelling.</p>
+<p>One detail the sketch deliberately ignores — <strong>interval averaging</strong>. NWP and satellite irradiance are half-hourly <em>period means</em> (period-ending in our NWP schema), but the sketch evaluates the solar geometry at an instant. Over 30 minutes the sun's hour angle moves ~7.5°, and near sunrise/sunset the transposition is strongly non-linear, so evaluating at a single timestamp biases the fit. Worse, a timestamp-convention error (period-start vs period-end vs mid-point) masquerades as an azimuth shift that the optimiser will happily absorb into the fitted parameters. The fix is cheap: evaluate the geometry at ~5-minute sub-steps across each half-hour and average the modelled power to the metered interval — and unit-test the timestamp convention end-to-end before trusting any fitted azimuth.</p>
+<p>Here's a quick Python code sketch of the rough idea for applying differentiable physics to solar:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.distributions</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">dist</span>
+
+<span class="n">STC_IRRADIANCE</span> <span class="o">=</span> <span class="mf">1000.0</span>    <span class="c1"># reference plane-of-array irradiance at standard test conditions (W/m^2)</span>
+<span class="n">GROUND_ALBEDO</span> <span class="o">=</span> <span class="mf">0.2</span>        <span class="c1"># typical broadband ground reflectance</span>
+<span class="n">STC_CELL_TEMP</span> <span class="o">=</span> <span class="mf">25.0</span>       <span class="c1"># cell temperature at standard test conditions (°C)</span>
+<span class="n">TEMP_COEFF_POWER</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.004</span>  <span class="c1"># relative power loss per °C above STC for crystalline silicon (1/°C)</span>
+<span class="n">NOCT_TEMP_RISE</span> <span class="o">=</span> <span class="mf">0.03</span>      <span class="c1"># steady-state cell-temp rise per W/m² of POA (°C·m²/W)</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">DifferentiableSolarPlant</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Differentiable physical model of a single metered solar site.</span>
+
+<span class="sd">    Each physical parameter is a mean-field variational posterior N(mu, sigma^2).</span>
+<span class="sd">    Training minimises `negative_elbo`: a Gaussian reconstruction likelihood (learnable</span>
+<span class="sd">    observation noise) plus a KL term against a fixed prior (see `kl_divergence`). The KL</span>
+<span class="sd">    term is what stops the posterior spreads from collapsing to zero under a pure</span>
+<span class="sd">    reconstruction loss.</span>
+
+<span class="sd">    Azimuth convention: measured from due south, east negative, west positive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prior_tilt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">prior_azimuth</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">prior_dc_capacity</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">prior_ac_capacity</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># Variational posteriors, each parameterised in an unconstrained space so no</span>
+        <span class="c1"># gradient-breaking clamp is needed and the Normal posterior/prior stay</span>
+        <span class="c1"># self-consistent: tilt in logit-space (squashed to (0, pi/2) in `forward`),</span>
+        <span class="c1"># azimuth in radians, capacities in log-space (strictly positive).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_tilt_mu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">special</span><span class="o">.</span><span class="n">logit</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_tilt</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_tilt_log_std</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">2.0</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">azimuth_mu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_azimuth</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">azimuth_log_std</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">2.0</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_dc_capacity_mu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_dc_capacity</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_dc_capacity_log_std</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">2.0</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_ac_capacity_mu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_ac_capacity</span><span class="p">)))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_ac_capacity_log_std</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">2.0</span><span class="p">))</span>
+
+        <span class="c1"># Observation-noise scale for the Gaussian reconstruction likelihood in</span>
+        <span class="c1"># `negative_elbo`: learnable, in log-space to stay strictly positive.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_obs_noise</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
+
+        <span class="c1"># Fixed priors. Weakly-informative: &quot;panels point roughly south at a UK roof pitch,</span>
+        <span class="c1"># with a capacity near nameplate&quot;. These also keep the posterior spreads from collapsing.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">priors</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;raw_tilt&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">special</span><span class="o">.</span><span class="n">logit</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_tilt</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)),</span>
+            <span class="s2">&quot;azimuth&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_azimuth</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)),</span>
+            <span class="s2">&quot;log_dc_capacity&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_dc_capacity</span><span class="p">)),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span><span class="p">)),</span>
+            <span class="s2">&quot;log_ac_capacity&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">prior_ac_capacity</span><span class="p">)),</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.3</span><span class="p">)),</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">posteriors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current variational posterior for each physical parameter.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;raw_tilt&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_tilt_mu</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">raw_tilt_log_std</span><span class="o">.</span><span class="n">exp</span><span class="p">()),</span>
+            <span class="s2">&quot;azimuth&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">azimuth_mu</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">azimuth_log_std</span><span class="o">.</span><span class="n">exp</span><span class="p">()),</span>
+            <span class="s2">&quot;log_dc_capacity&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_dc_capacity_mu</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_dc_capacity_log_std</span><span class="o">.</span><span class="n">exp</span><span class="p">()),</span>
+            <span class="s2">&quot;log_ac_capacity&quot;</span><span class="p">:</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">log_ac_capacity_mu</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_ac_capacity_log_std</span><span class="o">.</span><span class="n">exp</span><span class="p">()),</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">kl_divergence</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sum of KL(posterior || prior) over all parameters — the regulariser in the ELBO.&quot;&quot;&quot;</span>
+        <span class="n">q</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">posteriors</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">priors</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">dist</span><span class="o">.</span><span class="n">kl_divergence</span><span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="n">key</span><span class="p">])</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">q</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">negative_elbo</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">predicted_power</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">observed_power</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">dataset_size</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Minibatch training loss: Gaussian reconstruction likelihood + scaled KL.</span>
+
+<span class="sd">        The KL term regularises the whole-dataset objective once, so on a minibatch it is</span>
+<span class="sd">        weighted by batch_size / dataset_size — otherwise the effective prior strength</span>
+<span class="sd">        would depend on how the data happens to be batched.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">obs_noise</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_obs_noise</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+        <span class="n">log_lik</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">Normal</span><span class="p">(</span><span class="n">predicted_power</span><span class="p">,</span> <span class="n">obs_noise</span><span class="p">)</span><span class="o">.</span><span class="n">log_prob</span><span class="p">(</span><span class="n">observed_power</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+        <span class="n">kl_weight</span> <span class="o">=</span> <span class="n">observed_power</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="o">/</span> <span class="n">dataset_size</span>
+        <span class="k">return</span> <span class="n">kl_weight</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">kl_divergence</span><span class="p">()</span> <span class="o">-</span> <span class="n">log_lik</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dni</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>             <span class="c1"># direct normal irradiance (W/m^2)</span>
+        <span class="n">dhi</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>             <span class="c1"># diffuse horizontal irradiance (W/m^2)</span>
+        <span class="n">ghi</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>             <span class="c1"># global horizontal irradiance (W/m^2)</span>
+        <span class="n">sun_zenith_rad</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">sun_azimuth_rad</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">air_temp</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>        <span class="c1"># ambient air temperature (°C)</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Predict DC power with steady-state temperature derate. All inputs and operations preserve gradients.&quot;&quot;&quot;</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">posteriors</span><span class="p">()</span>
+
+        <span class="c1"># Reparameterised samples (one per forward pass). tilt is sampled in logit-space</span>
+        <span class="c1"># and squashed to (0, pi/2) — a sigmoid, not a clamp, so gradients flow everywhere</span>
+        <span class="c1"># and the sample stays consistent with the Normal posterior used in the KL.</span>
+        <span class="n">tilt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sigmoid</span><span class="p">(</span><span class="n">q</span><span class="p">[</span><span class="s2">&quot;raw_tilt&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">rsample</span><span class="p">())</span> <span class="o">*</span> <span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">azimuth</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;azimuth&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">rsample</span><span class="p">()</span>
+        <span class="n">dc_capacity</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;log_dc_capacity&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">rsample</span><span class="p">()</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>  <span class="c1"># strictly positive by construction</span>
+
+        <span class="c1"># Angle of incidence on the tilted plane.</span>
+        <span class="n">cos_aoi</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">sun_zenith_rad</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">tilt</span><span class="p">)</span>
+            <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">sun_zenith_rad</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">tilt</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">sun_azimuth_rad</span> <span class="o">-</span> <span class="n">azimuth</span><span class="p">)</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">clamp</span><span class="p">(</span><span class="nb">min</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>  <span class="c1"># no beam contribution when the sun is behind the panel</span>
+
+        <span class="c1"># Isotropic-sky transposition to plane-of-array (POA) irradiance.</span>
+        <span class="n">poa_beam</span> <span class="o">=</span> <span class="n">dni</span> <span class="o">*</span> <span class="n">cos_aoi</span>
+        <span class="n">poa_sky_diffuse</span> <span class="o">=</span> <span class="n">dhi</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">tilt</span><span class="p">))</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">poa_ground</span> <span class="o">=</span> <span class="n">ghi</span> <span class="o">*</span> <span class="n">GROUND_ALBEDO</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">tilt</span><span class="p">))</span> <span class="o">/</span> <span class="mf">2.0</span>
+        <span class="n">poa</span> <span class="o">=</span> <span class="n">poa_beam</span> <span class="o">+</span> <span class="n">poa_sky_diffuse</span> <span class="o">+</span> <span class="n">poa_ground</span>
+
+        <span class="c1"># DC power: capacity is the nameplate at the reference irradiance, derated for cell temperature.</span>
+        <span class="n">cell_temp</span> <span class="o">=</span> <span class="n">air_temp</span> <span class="o">+</span> <span class="n">NOCT_TEMP_RISE</span> <span class="o">*</span> <span class="n">poa</span>
+        <span class="n">temp_derate</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">TEMP_COEFF_POWER</span> <span class="o">*</span> <span class="p">(</span><span class="n">cell_temp</span> <span class="o">-</span> <span class="n">STC_CELL_TEMP</span><span class="p">)</span>
+        <span class="n">dc_power</span> <span class="o">=</span> <span class="n">dc_capacity</span> <span class="o">*</span> <span class="n">poa</span> <span class="o">/</span> <span class="n">STC_IRRADIANCE</span> <span class="o">*</span> <span class="n">temp_derate</span>
+        <span class="n">ac_capacity</span> <span class="o">=</span> <span class="n">q</span><span class="p">[</span><span class="s2">&quot;log_ac_capacity&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">rsample</span><span class="p">()</span><span class="o">.</span><span class="n">exp</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">dc_power</span><span class="p">,</span> <span class="n">ac_capacity</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="panel-temperature">Panel temperature</h3>
+<p><strong>Steady-state derate.</strong> Cell temperature is not directly measured, and it is not a simple function of air temperature. On a hot, still, clear-sky summer day a panel can reach 60–70 °C — hot enough for efficiency to fall noticeably below its standard-test-condition (STC) value. What drives the cell above ambient is absorbed irradiance, moderated by convective cooling from wind. The standard Faiman relation captures this:</p>
+<div class="arithmatex">\[T_{\text{cell}} \approx T_{\text{air}} + \frac{\text{POA}}{U_0 + U_1\,v_{\text{wind}}}\]</div>
+<p>Efficiency then falls roughly linearly with temperature above the 25 °C STC reference. The correction factor applied to DC output is:</p>
+<div class="arithmatex">\[\eta_T = 1 + \gamma\,(T_{\text{cell}} - 25\,^\circ\text{C})\]</div>
+<p>with <span class="arithmatex">\(\gamma \approx -0.004\,/\,^\circ\text{C}\)</span> (<span class="arithmatex">\(-0.4\,\%/^\circ\text{C}\)</span>) for crystalline silicon. The constant <code>NOCT_TEMP_RISE</code> in the sketch is <span class="arithmatex">\(1/U_0\)</span> with wind neglected — a useful simplification that removes the need for a wind-speed input in the code example. In the full variational model, <span class="arithmatex">\(U_0\)</span>, <span class="arithmatex">\(U_1\)</span>, and <span class="arithmatex">\(\gamma\)</span> become learnable posteriors with tight physical priors, exactly like <code>tilt</code>, <code>azimuth</code>, and <code>dc_capacity</code>; the two new inputs (air temperature and POA) are already available: NWP temperature, and POA computed midway through the forward pass.</p>
+<p><strong>Thermal-mass upgrade and the broken-cloud effect.</strong> The steady-state model assumes the panel equilibrates to the current irradiance instantaneously. Real panels have thermal mass and lag by several minutes — and this is exactly what produces the <em>broken-cloud effect</em>: a panel emerging cool from beneath cloud cover is briefly more efficient than one that has been baking under a clear sky, so the power peak immediately after cloud clearance can transiently <em>exceed</em> the steady-state clear-sky peak. This is also why peak daily yield on a partly-cloudy summer day can occasionally beat that on a fully clear day.</p>
+<p>Capture this by promoting cell temperature from an instantaneous quantity to a dynamic latent state — first-order relaxation toward the equilibrium temperature with a learnable thermal time constant <span class="arithmatex">\(\tau\)</span>:</p>
+<div class="arithmatex">\[\frac{dT_{\text{cell}}}{dt} = \frac{T_{\text{eq}} - T_{\text{cell}}}{\tau}, \qquad T_{\text{eq}} = T_{\text{air}} + \frac{\text{POA}}{U_0 + U_1\,v_{\text{wind}}}\]</div>
+<p>This is a state-space recurrence — the same pattern as a battery charge/discharge component.</p>
+<p><strong>Resolution caveat.</strong> The thermal time constant <span class="arithmatex">\(\tau\)</span> is on the order of minutes, and the cloud transients that drive the broken-cloud effect occur on the same sub-half-hourly timescale. Half-hourly-mean POA discards exactly the sub-grid variability the dynamic model needs. This upgrade therefore only earns its keep with higher-frequency irradiance inputs — satellite-derived irradiance at ~5-minute intervals, or sub-hourly metering — and the steady-state derate remains the right choice until that data is available.</p>
+<hr />
+<h2 id="scaling-to-aggregate-fleets-universalsolarfleetnode">Scaling to aggregate fleets: <code>UniversalSolarFleetNode</code></h2>
+<p>A single tilt/azimuth pair cannot represent a "mishmash" of hundreds or thousands of rooftops. A fleet facing east, south and west produces a broad, flat "mound" of power, whereas a single south-facing parameter produces a sharp "hill". Used on a primary substation, the single-array model will fail to fit the wide shoulders of morning and evening generation.</p>
+<p>We fix this with a <strong>physics-informed basis expansion</strong> rather than simulating every individual system. (Aggregate, unmetered fleets behind a primary are a v2 concern — this node becomes one of the node types in
+<a href="../../roadmap/disaggregation/#the-graph-structured-engine">the graph-structured engine</a>.)</p>
+<h3 id="1-the-basis-function-insight">1. The basis-function insight</h3>
+<p>Think of the fleet not as a physical simulation of thousands of houses but as a signal-reconstruction problem. The aggregate curve of many fixed-tilt systems is a linear combination of a few fundamental shapes. East, south and west span the space of fixed-tilt orientations: by mixing them (e.g. 30% east, 70% south) you can approximate almost any aggregate fixed-tilt curve, including SE/SW.</p>
+<h3 id="2-when-to-add-a-tracking-basis">2. When to add a tracking basis</h3>
+<p>Single-axis trackers produce a flat-topped "top hat" shape that no mixture of fixed-tilt "bell curves" can reproduce. So <em>where trackers are present</em>, we add tracking as a fourth basis function. This matters mainly for <strong>commercial / utility ground-mount</strong> sitting behind a primary; domestic rooftop fleets are almost entirely fixed-tilt, so for a purely-domestic fleet the tracking weight should learn to ≈zero (or be dropped to save parameters).</p>
+<h3 id="3-soft-clipping-for-diverse-inverters">3. Soft clipping for diverse inverters</h3>
+<p>A fleet contains many inverters of different sizes. An individual inverter hard-clips (a brick wall), but the <em>aggregate</em> clips softly: as irradiance rises the most undersized inverters saturate first, then the average ones, then the oversized ones — a smooth, curved shoulder rather than a sharp corner.</p>
+<p>A <code>tanh</code> clip is tempting but wrong: <code>P_max · tanh(P / P_max)</code> already attenuates <em>mid-range</em> power (at <code>P = P_max</code> it returns only ≈0.76 <code>P_max</code>), so it biases the whole curve down, not just the shoulder. Instead use a <strong>smooth-min</strong> that stays roughly linear until the limit and only then rolls off:</p>
+<div class="arithmatex">\[\text{smin}(P, P_{\max}) = P_{\max} - \frac{1}{\beta}\,\operatorname{softplus}\!\bigl(\beta\,(P_{\max} - P)\bigr)\]</div>
+<p>The learnable <span class="arithmatex">\(P_{\max}\)</span> is the effective aggregate inverter (AC) capacity; the learnable sharpness <span class="arithmatex">\(\beta\)</span> sets the curvature of the shoulder.</p>
+<h3 id="4-implementation-universalsolarfleetnode">4. Implementation: <code>UniversalSolarFleetNode</code></h3>
+<p>This upgrades the node to handle installed-capacity growth, orientation mix, tracking, and soft clipping in a single differentiable module. Note the division of labour: the softmax mix weights sum to 1, so the mixture alone is magnitude-free ("which way does the fleet face"); the magnitude ("how much is installed") is carried by a separate per-week capacity series, built as a cumulative sum of non-negative weekly increments so it is non-decreasing by construction — exactly the monotone representation from
+<a href="../../roadmap/disaggregation/#unmetered-installed-capacity-grows-monotonically">the disaggregation plan</a>.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nn</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch.nn.functional</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">F</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">UniversalSolarFleetNode</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregate solar fleet behind one substation: capacity growth + orientation mix + soft clip.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_weeks</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># Installed DC capacity, tracked per week as a cumulative sum of non-negative</span>
+        <span class="c1"># increments (installs only ever add capacity — see the disaggregation</span>
+        <span class="c1"># roadmap page). An L1 penalty on the increments (not shown) pushes most weeks</span>
+        <span class="c1"># to exactly zero growth, because installs arrive in occasional bursts.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_capacity_increments</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">n_weeks</span><span class="p">,),</span> <span class="o">-</span><span class="mf">2.0</span><span class="p">))</span>
+
+        <span class="c1"># Orientation mix over [east, south, west, tracking], tracked per week because the</span>
+        <span class="c1"># fleet composition drifts over time as new systems are installed.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mix_logits</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_weeks</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+
+        <span class="c1"># Effective aggregate inverter (AC) capacity and the curvature of the clip shoulder.</span>
+        <span class="c1"># Both pushed through softplus so they stay strictly positive.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_inverter_capacity</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">2.3</span><span class="p">))</span>  <span class="c1"># softplus(2.3) ~ 10</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_clip_sharpness</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">sun_vec</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">weather</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">week_idx</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+        <span class="c1"># 1. The four physical basis curves (ideal shapes from geometry + weather), each</span>
+        <span class="c1">#    normalised to unit DC capacity.</span>
+        <span class="c1">#    calc_fixed / calc_tracker would come from pvlib-pytorch (see below).</span>
+        <span class="c1">#    Azimuth convention matches the single-site model: south = 0, east = -90, west = +90.</span>
+        <span class="n">p_east</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_fixed</span><span class="p">(</span><span class="n">sun_vec</span><span class="p">,</span> <span class="n">weather</span><span class="p">,</span> <span class="n">azimuth_deg</span><span class="o">=-</span><span class="mf">90.0</span><span class="p">)</span>
+        <span class="n">p_south</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_fixed</span><span class="p">(</span><span class="n">sun_vec</span><span class="p">,</span> <span class="n">weather</span><span class="p">,</span> <span class="n">azimuth_deg</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+        <span class="n">p_west</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_fixed</span><span class="p">(</span><span class="n">sun_vec</span><span class="p">,</span> <span class="n">weather</span><span class="p">,</span> <span class="n">azimuth_deg</span><span class="o">=</span><span class="mf">90.0</span><span class="p">)</span>
+        <span class="n">p_track</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_tracker</span><span class="p">(</span><span class="n">sun_vec</span><span class="p">,</span> <span class="n">weather</span><span class="p">)</span>  <span class="c1"># single-axis backtracking logic</span>
+
+        <span class="c1"># 2. Mix the unit bases with this week&#39;s weights (the &quot;asset identification&quot;),</span>
+        <span class="c1">#    then scale by this week&#39;s installed capacity — non-decreasing by construction.</span>
+        <span class="n">basis</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">p_east</span><span class="p">,</span> <span class="n">p_south</span><span class="p">,</span> <span class="n">p_west</span><span class="p">,</span> <span class="n">p_track</span><span class="p">],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mix_logits</span><span class="p">[</span><span class="n">week_idx</span><span class="p">],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">capacity</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_capacity_increments</span><span class="p">)</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">p_raw</span> <span class="o">=</span> <span class="n">capacity</span><span class="p">[</span><span class="n">week_idx</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">basis</span> <span class="o">*</span> <span class="n">weights</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># 3. Aggregate soft clip. Smooth-min stays ~linear until p_raw nears the limit,</span>
+        <span class="c1">#    then rolls off — unlike tanh it does not suppress mid-range power.</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_inverter_capacity</span><span class="p">)</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_clip_sharpness</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-3</span>
+        <span class="k">return</span> <span class="n">limit</span> <span class="o">-</span> <span class="n">F</span><span class="o">.</span><span class="n">softplus</span><span class="p">(</span><span class="n">beta</span> <span class="o">*</span> <span class="p">(</span><span class="n">limit</span> <span class="o">-</span> <span class="n">p_raw</span><span class="p">))</span> <span class="o">/</span> <span class="n">beta</span>
+</code></pre></div>
+<h3 id="a-convex-twin-for-initialisation-and-sanity-checking">A convex twin, for initialisation and sanity checking</h3>
+<p>With the four basis curves held fixed, most of this node is
+<a href="../convex-optimisation/#the-recurring-pattern-fixed-shapes-unknown-coefficients">fixed shapes × unknown coefficients</a>:
+reparameterise (mix weights × capacity) as four non-negative per-basis capacity series, and the
+fleet's below-clip output is <em>linear</em> in them, with monotone growth and sparse increments
+available as hard convex constraints and an <span class="arithmatex">\(\ell_1\)</span> penalty. The one part that breaks convexity
+is the soft clip, so the convex twin is exact only below the clip (or with the clip frozen). That
+is still enough for two jobs: a principled <strong>initialiser</strong> for the PyTorch fit, and an
+independent <strong>sanity check</strong> — if the convex twin and the trained node disagree materially on
+installed capacity, the neural fit deserves investigation before its answer is trusted.</p>
+<h2 id="pvlib-pytorch"><code>pvlib-pytorch</code></h2>
+<p><code>pvlib-pytorch</code> is a planned Open Climate Fix open-source library — a differentiable,
+PyTorch-native port of <a href="https://pvlib-python.readthedocs.io/">pvlib</a> — that we intend to spin out
+of this project. It would generalise the hand-rolled transposition and panel geometry in the
+<a href="#the-core-building-block-differentiablesolarplant">single-site</a> and
+<a href="#scaling-to-aggregate-fleets-universalsolarfleetnode">fleet</a> sketches into a reusable, tested
+component; treat those sketches as the prototype it grows from.</p>
+<h2 id="applications-in-this-project">Applications in this project</h2>
+<ul>
+<li><strong>Metered-generator effective capacity (<a href="../../roadmap/#v07-dynamic-generator-capacity">roadmap v0.7</a>)</strong> —
+  the single-site model, with orientation and capacity as variational posteriors, is
+  <a href="../../roadmap/capacity-estimation/#candidate-b-the-differentiable-physics-estimator">Candidate B</a>
+  in the capacity-estimation head-to-head.</li>
+<li><strong>Net-demand disaggregation (<a href="../../roadmap/#v20-scale-up-future-research">v2 research</a>)</strong> —
+  the fleet node and its wind/demand/heat-pump siblings become node types in the
+  <a href="../../roadmap/disaggregation/#the-graph-structured-engine">graph-structured engine</a>; the fuller
+  forecasting architecture combining DP with
+  <a href="../encoders/">learned weather encoders</a> is also described on
+  <a href="../../roadmap/disaggregation/#combining-the-physics-with-the-weather-encoder">that page</a>.</li>
+<li><strong>Switching events</strong> — the type-resolved mixture routes the outputs of per-type DP modules
+  over the neighbourhood graph; see
+  <a href="../../roadmap/switching-events/">Switching events &amp; latent demand</a>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

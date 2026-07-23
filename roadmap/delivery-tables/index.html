@@ -1,0 +1,3025 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../data-sources/">
+      
+      
+        <link rel="next" href="../engineering-health/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Delivery Tables - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#delivery-tables-delta-lake-on-s3" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Delivery Tables
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-forecasts-are-delivered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How forecasts are delivered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-1-power_forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 1 — power_forecast
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table 1 — power_forecast">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields-common-to-all-three-representations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields common to all three representations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-1-ensemble-of-deterministic-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 1 — ensemble of deterministic forecasts ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-2-percentiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 2 — percentiles 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-3-ensemble-of-percentile-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 3 — ensemble of percentile forecasts 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-2-power_forecast_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 2 — power_forecast_warnings 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-3-asset_health_history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 3 — asset_health_history 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-4-effective_capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 4 — effective_capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-5-substation_switching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 5 — substation_switching 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-forecasts-are-delivered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How forecasts are delivered
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-1-power_forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 1 — power_forecast
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Table 1 — power_forecast">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fields-common-to-all-three-representations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fields common to all three representations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-1-ensemble-of-deterministic-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 1 — ensemble of deterministic forecasts ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-2-percentiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 2 — percentiles 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#representation-3-ensemble-of-percentile-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation 3 — ensemble of percentile forecasts 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-2-power_forecast_warnings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 2 — power_forecast_warnings 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-3-asset_health_history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 3 — asset_health_history 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-4-effective_capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 4 — effective_capacity
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#table-5-substation_switching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table 5 — substation_switching 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="delivery-tables-delta-lake-on-s3">Delivery tables (Delta Lake on S3)</h1>
+<p>How OCF delivers forecasts and supporting data to NGED.</p>
+<blockquote>
+<p><strong>Status legend</strong> — ✅ Implemented in code · 🚧 Planned · 🔬 Research (v2). See the
+<a href="../">roadmap index</a> for the version timeline these statuses refer to.</p>
+</blockquote>
+<hr />
+<h2 id="how-forecasts-are-delivered">How forecasts are delivered</h2>
+<p>For v1 of the live service, OCF delivers live forecasts (and the supporting tables below) as
+<strong>Delta Lake</strong> tables in an AWS S3 bucket. We are <strong>not</strong> building a REST API for v1 (a REST API is a v2
+<a href="../#v20-scale-up-future-research">stretch goal</a>); an API may be added later if it brings
+additional benefit.</p>
+<ul>
+<li><strong>Why Delta Lake?</strong> It is just Parquet files plus a transaction log, giving ACID guarantees
+  on cheap object storage — NGED never reads a half-written forecast, and the tables are
+  readable from Excel, Polars, pandas, DuckDB, Power BI, etc. The full rationale (including the
+  comparison with a custom REST API) is on the durable
+  <a href="../../architecture/forecast-delivery/">Forecast Delivery</a> architecture page.</li>
+<li><strong>Which bucket</strong>: these five tables live in a dedicated <code>nged-forecast-delivery</code> S3 bucket,
+  physically separate from OCF's own working tables (NWP, raw power telemetry, forecast metrics,
+  …) in a second <code>nged-forecast-internal</code> bucket. NGED gets read access to both — there's no
+  reason to withhold the internal tables — but only the five below are a <strong>stable contract</strong>: the
+  internal bucket's tables may change shape at any time with no notice. See
+  <a href="../../architecture/forecast-delivery/#securing-it">Forecast Delivery: Securing it</a> for why, and
+  <a href="https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-1-create-the-s3-buckets">Setting up the live service on AWS</a>
+  for the concrete bucket/IAM setup.</li>
+<li><strong>Access</strong>: both buckets hold data about NGED's customers, so neither is public — both are
+  protected with S3 authentication (mirroring how NGED protects their own time-series JSON
+  bucket).</li>
+<li><strong>Update cadence</strong>: every 6 hours, when a new forecast run is generated.</li>
+<li><strong>Reading it</strong> is a one-liner — <code>scan_delta</code> is lazy and only fetches the partitions a query
+  touches, so a single forecast comes back in a fraction of a second even though the full dataset is
+  billions of rows:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">dataframe</span> <span class="o">=</span> <span class="n">polars</span><span class="o">.</span><span class="n">scan_delta</span><span class="p">(</span><span class="s2">&quot;s3://path-to-forecast&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>There are <strong>five</strong> tables. This table tracks where each one stands today:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Table</th>
+<th>Status</th>
+<th>Where the schema lives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>power_forecast</code></td>
+<td>✅ Deterministic-ensemble flavour implemented (v0.1); percentile flavours planned for v0.5</td>
+<td><code>contracts.power_schemas.PowerForecast</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>power_forecast_warnings</code></td>
+<td>🚧 Planned (partial at first; complete by v1.0)</td>
+<td>not yet in code</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>asset_health_history</code></td>
+<td>🚧 Planned</td>
+<td>not yet in code</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>effective_capacity</code></td>
+<td>✅ Implemented in v0.1 (static P99 estimate); time-varying upgrade planned for v0.7</td>
+<td><code>contracts.power_schemas.EffectiveCapacity</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>substation_switching</code></td>
+<td>🚧 Planned (v0.6), conditional — see the Table 5 status note</td>
+<td>not yet in code</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Naming note.</strong> The Milestone 1 report drafted these tables with the column name <code>timeseries_id</code>,
+but the codebase uses <strong><code>time_series_id</code></strong> everywhere. The implemented <code>PowerForecast</code> schema uses
+<code>time_series_id</code>, and the planned tables below should adopt the same name for consistency.</p>
+</blockquote>
+<hr />
+<h2 id="table-1-power_forecast">Table 1 — <code>power_forecast</code></h2>
+<blockquote>
+<p><strong>Status: ✅ Implemented</strong> as <code>contracts.power_schemas.PowerForecast</code>, but only the
+<strong>deterministic-ensemble</strong> representation of uncertainty (below; v0.1). The two
+percentile-based representations are 🚧 planned for v0.5.</p>
+</blockquote>
+<p>Stores OCF's probabilistic power forecasts. The table extends ~14 days <strong>forwards</strong> in time (the
+forecast horizon) and <strong>backwards</strong> to the start of the backtesting period.</p>
+<p>The Milestone 1 report describes <strong>three</strong> ways of expressing uncertainty. We may deliver one or
+several of these:</p>
+<ol>
+<li><strong>Ensemble of deterministic forecasts</strong> — one row per NWP ensemble member.
+   ✅ <strong>Implemented in v0.1</strong>.</li>
+<li><strong>Percentiles</strong> — one row per <code>valid_time</code>, with a column per percentile. 🚧 Planned (v0.5).</li>
+<li><strong>Ensemble of percentile forecasts</strong> — per-member <em>and</em> per-percentile. 🚧 Planned (v0.5).</li>
+</ol>
+<p>Representations 2 and 3 are two stages of one pipeline, not independent options:
+Representation 3 (per-member conditional quantiles) is produced by the model, and
+Representation 2 is <strong>derived from it</strong> by linear-pool mixing — see
+<a href="../../techniques/probabilistic-forecasting/">Probabilistic forecasting from NWP ensembles</a> for
+the theory and
+<a href="../metrics-and-leaderboard/#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2">Phase D of the probabilistic evaluation plan</a>
+for the implementation plan.</p>
+<h3 id="fields-common-to-all-three-representations">Fields common to all three representations</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_series_id</code></td>
+<td><code>int32</code></td>
+<td>The time-series ID provided by NGED. E.g. ID 1 is the raw MW flow for the "BOSTON" BSP; ID 10 is the disaggregated demand for the "SPILSBY" primary; ID 21 is the MW flow for a customer's PV site.</td>
+</tr>
+<tr>
+<td><code>valid_time</code></td>
+<td><code>datetime</code> (UTC)</td>
+<td>The time the forecast is <em>about</em>.</td>
+</tr>
+<tr>
+<td><code>nwp_init_time</code></td>
+<td><code>datetime</code> (UTC), nullable</td>
+<td>When the NWP model was initialised. Uniquely identifies the NWP ensemble member, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines).</td>
+</tr>
+<tr>
+<td><code>power_fcst_init_time</code></td>
+<td><code>datetime</code> (UTC)</td>
+<td>When OCF's power-forecast model was initialised (the "t0").</td>
+</tr>
+<tr>
+<td><code>power_fcst_model_name</code></td>
+<td><code>categorical</code> (string)</td>
+<td>Name of OCF's model, e.g. <code>"xgboost_baseline"</code>. Set by the <code>BaseForecaster</code> subclass.</td>
+</tr>
+<tr>
+<td><code>power_fcst_model_version</code></td>
+<td><code>int16</code></td>
+<td>Version of OCF's model.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Implemented extensions (beyond the report draft):</strong> the live <code>PowerForecast</code> schema also carries
+<code>ml_flow_experiment_id</code> (<code>int32</code>, nullable) and <code>fold_id</code> (<code>categorical</code>; the CV validation year, or
+<code>"live"</code> for production forecasts). These let cross-validation rows and live rows share one table —
+filter on <code>fold_id</code> to select the population you need. See
+<a href="../metrics-and-leaderboard/">metrics &amp; leaderboard</a>.</p>
+<h3 id="representation-1-ensemble-of-deterministic-forecasts">Representation 1 — ensemble of deterministic forecasts ✅</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ensemble_member</code></td>
+<td><code>int8</code></td>
+<td>ID of the NWP ensemble member driving this forecast. ECMWF ENS has 51 members.</td>
+</tr>
+<tr>
+<td><code>power_fcst</code></td>
+<td><code>float32</code></td>
+<td>OCF's power forecast. <strong>In this early version</strong> the value is in physical units (MW for active power, MVA for apparent power).</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>🚧 Planned change — normalise <code>power_fcst</code> to [−1, +1]
+(<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/246">#246</a>, v0.1).</strong> The
+delivery contract is a normalised forecast in the range <strong>[−1, +1]</strong>, which NGED multiplies by a
+capacity to obtain MW/MVA (see <a href="../forecast-building-blocks/">forecast building blocks</a>). The code
+still forecasts raw MW/MVA, but now that the static P99 <code>effective_capacity</code> estimate exists
+there is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
+<strong>v0.1</strong>. This is also noted in a comment on the <code>PowerForecast.power_fcst</code> field in
+<code>power_schemas.py</code>.</p>
+</blockquote>
+<h3 id="representation-2-percentiles">Representation 2 — percentiles 🚧</h3>
+<p>One row per <code>valid_time</code>, with one column per percentile. This is the primary NGED-facing
+probabilistic representation, derived from
+<a href="#representation-3-ensemble-of-percentile-forecasts">Representation 3</a> by pooling the
+per-member quantiles (the equal-weight mixture — <em>not</em> per-level averaging, which would discard
+the between-member spread; see
+<a href="../../techniques/probabilistic-forecasting/#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles">the explainer</a>):</p>
+<table>
+<thead>
+<tr>
+<th>Fields</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>p1, p2, p5, p10, p20, p35, p50, p65, p80, p90, p95, p98, p99</code></td>
+<td><code>float32</code></td>
+<td>The power forecast at each percentile. NGED is far more interested in the <strong>tails</strong> than the shoulders. Read <code>p50</code> as "50% chance the true power flow is below this value", <code>p99</code> as "99% chance below", etc. (Scaled to [−1, +1] once normalisation lands.)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="representation-3-ensemble-of-percentile-forecasts">Representation 3 — ensemble of percentile forecasts 🚧</h3>
+<p>Each ensemble member is itself a percentile forecast — "given this member's weather, power will
+land in this range with this shape" — produced by a quantile-objective model (see
+<a href="../metrics-and-leaderboard/#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2">Phase D</a>).
+Primarily an <em>internal</em> stage that Representation 2 is pooled from, but it may also be
+delivered for power users who want the weather-scenario structure:</p>
+<table>
+<thead>
+<tr>
+<th>Fields</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ensemble_member</code></td>
+<td><code>int8</code></td>
+<td>ID of the NWP ensemble member.</td>
+</tr>
+<tr>
+<td><code>p1, p2, p5, p10, p20, p35, p50, p65, p80, p90, p95, p98, p99</code></td>
+<td><code>float32</code></td>
+<td>The power forecast.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="table-2-power_forecast_warnings">Table 2 — <code>power_forecast_warnings</code> 🚧</h2>
+<blockquote>
+<p><strong>Status: 🚧 Planned.</strong> Some warning types depend on switching-event detection and effective-capacity
+estimation, which do not exist yet — so this table will be <strong>partial when it first ships</strong> and
+complete by v1.0.</p>
+</blockquote>
+<p>Tells NGED whenever we detect abnormal behaviour in the <strong>most recent meter reading</strong> for a
+<code>time_series_id</code>. Such abnormality means the asset's actual performance may deviate from the
+"normal operation" forecast over the next 14 days. Each warning is valid for one entire forecast run
+and is refreshed every 6 hours.</p>
+<blockquote>
+<p><em>Example:</em> a generator has run at only 60% of nominal capacity for the last month. The
+"normal operation" forecast still assumes 100% capacity, so we must flag that the forecast is
+deliberately deviating from reality.</p>
+</blockquote>
+<p>Join <code>power_forecast_warnings</code> to <code>power_forecast</code> on <code>time_series_id</code> <strong>and</strong>
+<code>power_fcst_init_time</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_series_id</code></td>
+<td><code>int32</code>, <strong>primary key</strong></td>
+<td>Time-series ID provided by NGED.</td>
+</tr>
+<tr>
+<td><code>power_fcst_init_time</code></td>
+<td><code>datetime</code> (UTC), <strong>primary key</strong></td>
+<td>When OCF's model was initialised.</td>
+</tr>
+<tr>
+<td><code>last_observation_time</code></td>
+<td><code>datetime</code> (UTC)</td>
+<td>Time of the last valid meter reading available when this forecast was created.</td>
+</tr>
+<tr>
+<td><code>warning_type</code></td>
+<td>enum (see below)</td>
+<td>Refers to the meter reading as of <code>last_observation_time</code>.</td>
+</tr>
+<tr>
+<td><code>warning_description</code></td>
+<td><code>string</code> or null</td>
+<td>Human-readable detail, e.g. <em>"The meter's value has been stuck at 2.1 MW for the previous 52 hours."</em></td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>warning_type</code> enum values</strong> (mostly mutually exclusive — there is a hierarchy: a meter error
+blinds us to all other errors at that timestep; a generator/circuit fault blinds us to reduced
+capacity):</p>
+<ul>
+<li><code>HEALTHY</code></li>
+<li><code>MISSING VALUE</code></li>
+<li><code>STUCK TIMESERIES</code></li>
+<li><code>INVALID TIMESERIES VALUE</code> — note: <em>not</em> "invalid meter value"; NGED call meters "analogues"</li>
+<li><code>GENERATOR OR CIRCUIT FAULT</code></li>
+<li><code>GENERATOR REDUCED CAPACITY</code></li>
+<li><code>SUBSTATION ABNORMAL RUNNING ARRANGEMENT</code></li>
+<li><code>STALE NWP</code> — the weather feed was delayed, forcing the forecast onto stale NWP</li>
+<li><code>STALE POWER</code> — the live power data was delayed</li>
+</ul>
+<p><strong>Self-assembly note:</strong> NGED (or any user) can build their own forecast by multiplying the
+(future) [−1, +1] <code>power_forecast</code> by a capacity derived from the
+<a href="#table-4-effective_capacity"><code>effective_capacity</code></a> table's <code>effective_capacity_mw</code> column —
+its <strong>maximum</strong> over history (→ a "normal" forecast) or its <strong>most recent</strong> value (→ a
+"prevailing conditions" forecast). See <a href="../forecast-building-blocks/">forecast building blocks</a>.</p>
+<hr />
+<h2 id="table-3-asset_health_history">Table 3 — <code>asset_health_history</code> 🚧</h2>
+<blockquote>
+<p><strong>Status: 🚧 Planned.</strong></p>
+</blockquote>
+<p>A complete <strong>historical</strong> record of the health of each <code>time_series_id</code>. The main use case: when an
+NGED engineer sees a warning, they can manually investigate the recent behaviour of that time series.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_series_id</code></td>
+<td><code>int32</code>, <strong>primary key</strong></td>
+<td>Time-series ID provided by NGED.</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>datetime</code> (UTC), <strong>primary key</strong></td>
+<td>Timestamp from the original NGED time series.</td>
+</tr>
+<tr>
+<td><code>warning_type</code></td>
+<td>enum</td>
+<td>Same vocabulary as Table 2, but only the <em>backward-looking</em> subset (no <code>STALE NWP</code> / <code>STALE POWER</code>): <code>HEALTHY</code>, <code>MISSING VALUE</code>, <code>STUCK TIMESERIES</code>, <code>INVALID TIMESERIES VALUE</code>, <code>GENERATOR OR CIRCUIT FAULT</code>, <code>GENERATOR REDUCED CAPACITY</code>, <code>SUBSTATION ABNORMAL RUNNING ARRANGEMENT</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Notes on specific flags:</p>
+<ul>
+<li><strong><code>GENERATOR OR CIRCUIT FAULT</code></strong> is set whenever metered generation is zero when the generator
+  <em>should</em> be generating (e.g. a solar farm reading zero at midday on a sunny day). It can also be
+  set manually to represent, e.g., a maintenance schedule supplied by the generator.</li>
+<li><strong><code>STUCK TIMESERIES</code></strong> / <strong><code>INVALID TIMESERIES VALUE</code></strong> are set for any historical timestep where
+  the metered values are "stuck", or are physically implausible (e.g. 1 GW from a 1 MW solar farm).</li>
+</ul>
+<hr />
+<h2 id="table-4-effective_capacity">Table 4 — <code>effective_capacity</code></h2>
+<blockquote>
+<p><strong>Status: ✅ Implemented (v0.1)</strong> — the <code>effective_capacity</code> Dagster asset writes P99 of observed
+power as a static capacity proxy.
+Schema lives in <code>contracts.power_schemas.EffectiveCapacity</code>.
+<strong>Planned upgrade in v0.7</strong>
+(<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/247">#247</a>) to time-varying
+capacity estimation, produced by whichever candidate estimator wins the head-to-head — see
+<a href="../capacity-estimation/">Capacity estimation</a>.</p>
+</blockquote>
+<p>OCF's estimate of each generator's or substation's <strong>effective capacity</strong> at every half-hourly
+timestep of the historical time series data. This table is <strong>backward-looking only</strong> — it does
+not cover the forecast period.</p>
+<p><strong>v0.1 approach:</strong> one row per <code>time_series_id</code>, <code>effective_capacity_mw</code> = P99 of
+<code>|power|</code> over the full available observation history. This is a static scalar per series — a
+robust capacity proxy that is less sensitive to outlier spikes than the maximum, and more
+capacity-representative than the mean (which is dragged down by zero-output periods for PV/wind).
+It is also the denominator used to normalise NMAE in the <code>forecast_metrics</code> table — see
+<a href="../metrics-and-leaderboard/#normalising-nmae-by-effective_capacity">Normalising NMAE by <code>effective_capacity</code></a>
+for why v0.1 stores one scalar row per series (rather than repeating the value at every half-hour)
+and how the metrics join evolves for the v0.7 upgrade.</p>
+<p><strong>v0.7 upgrade:</strong> replace the static P99 with a time-varying estimate from the winning
+<a href="../capacity-estimation/#several-estimators-one-winner">capacity estimator</a>. For generators, the
+prior comes from the Embedded Capacity Register
+and is updated at each half-hour from the generator's power time series, absorbing PV-panel
+degradation, partial inverter trips, etc., but <strong>ignoring ANM</strong> (a wind farm ANM-capped at 5 MW
+with 10 MW physical capability has <code>effective_capacity_mw = 10</code>). For substations, the 99th
+percentile of observed load over a rolling window, under normal running arrangement only. During a
+switching event, effective capacity = last known normal-arrangement value plus the "switched
+power" from <a href="#table-5-substation_switching">Table 5</a> — a step that inherits Table 5's
+conditional status, since it needs the per-event magnitudes only the discrete detector produces
+(see
+<a href="../switching-events/#the-decision-point-a-feature-based-mainline-vs-the-staged-detector">the decision point</a>);
+if the discrete detector is not built, in-event effective capacity falls back to the last known
+normal-arrangement value alone. The v0.7 estimate should carry uncertainty
+(a <a href="../capacity-estimation/#uncertainty-a-first-class-judging-criterion">first-class judging criterion</a>
+in the head-to-head), so the
+single <code>effective_capacity_mw</code> column is upgraded to a mean + std pair
+(<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/247">#247</a>, matching Table 5's
+Normal-distribution convention); the asset body changes to emit one row per
+<code>(time_series_id, time)</code>, and the metrics pipeline swaps
+its <code>time_series_id</code>-only capacity join for a temporal as-of join (see
+<a href="../metrics-and-leaderboard/#normalising-nmae-by-effective_capacity">Normalising NMAE by <code>effective_capacity</code></a>).</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_series_id</code></td>
+<td><code>int32</code></td>
+<td>NGED's time-series ID.</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>datetime</code> (UTC), every half hour</td>
+<td>The half-hourly timestep this estimate applies to. In v0.1, set to the end of the available observation history for that series.</td>
+</tr>
+<tr>
+<td><code>effective_capacity_mw</code></td>
+<td><code>float32</code></td>
+<td>OCF's estimate of the effective capacity (MW) at this timestep.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="table-5-substation_switching">Table 5 — <code>substation_switching</code> 🚧</h2>
+<blockquote>
+<p><strong>Status: 🚧 Planned (v0.6), now conditional.</strong> Depends on switching-event detection — and
+whether a discrete event table ships at all is an open question: continuous per-substation
+switching-state signals may be delivered instead. See
+<a href="../switching-events/#the-decision-point-a-feature-based-mainline-vs-the-staged-detector">the decision point in the switching-events plan</a>.</p>
+</blockquote>
+<p>Captures the amount of power OCF estimates has been <strong>switched</strong> from a "donor" substation to a
+"recipient" substation. OCF estimates switching events purely from the power-flow time series and
+the known electrical connections between substations — it has <strong>no</strong> access to NGED's operational
+switch-control system. Represented as the mean + std of a Normal distribution.</p>
+<p>A single donor can split power across multiple recipients (e.g. donor A loses 1 MW, emerging as
+0.6 MW to B, 0.3 MW to C, 0.1 MW to D). The table therefore uses <strong>one row per recipient</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Data type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>donor_time_series_id</code></td>
+<td><code>int32</code></td>
+<td>Time-series ID of the substation that has had power diverted <em>away</em> from it.</td>
+</tr>
+<tr>
+<td><code>recipient_time_series_id</code></td>
+<td><code>int32</code></td>
+<td>Time-series ID of the substation power has been diverted <em>to</em>.</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td><code>datetime</code> (UTC)</td>
+<td>Timestamp from the original NGED time series.</td>
+</tr>
+<tr>
+<td><code>switched_power_MW_mean</code></td>
+<td><code>float32</code> (strictly positive)</td>
+<td>Mean of OCF's estimate of power diverted from the donor to the recipient.</td>
+</tr>
+<tr>
+<td><code>switched_power_MW_std</code></td>
+<td><code>float32</code></td>
+<td>Standard deviation of that estimate.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Known simplification.</strong> Switching events transfer <em>behaviour</em>, not a constant amount of power.
+v1 (the v0.6 statistical detector) estimates only the transferred magnitude. Reconstructing the
+latent demand under the normal running arrangement — and capturing the fact that a transferred
+slice can carry a different demand/PV/wind mix than its parent — is the job of the v2-scale
+mixture models. See <a href="../switching-events/">Switching events &amp; latent demand</a>.</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

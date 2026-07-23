@@ -1,0 +1,2816 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../production-deployment/">
+      
+      
+        <link rel="next" href="../why-dagster-not-airflow/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>AWS Running Costs - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#aws-running-costs" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              AWS Running Costs
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pricing-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pricing basis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v1-32-time-series-2535month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1 (32 time series): ~£25–35/month
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1 (32 time series): ~£25–35/month">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workload-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workload model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-data-transfer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage &amp; data transfer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v2-scale-2500-time-series-projected-70140month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2 scale (~2,500 time series): projected ~£70–140/month
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v2 scale (~2,500 time series): projected ~£70–140/month">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inference-compute-the-dominant-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference compute — the dominant uncertainty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-grows-linearly-with-accumulated-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage grows linearly with accumulated history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-transfer-depends-on-how-nged-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data transfer depends on how NGED read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backtests-and-training-scale-with-forecast-rows-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backtests and training scale with forecast rows too
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pricing-basis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pricing basis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v1-32-time-series-2535month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1 (32 time series): ~£25–35/month
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v1 (32 time series): ~£25–35/month">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workload-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workload model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-data-transfer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage &amp; data transfer
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v2-scale-2500-time-series-projected-70140month" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v2 scale (~2,500 time series): projected ~£70–140/month
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="v2 scale (~2,500 time series): projected ~£70–140/month">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inference-compute-the-dominant-uncertainty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inference compute — the dominant uncertainty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#storage-grows-linearly-with-accumulated-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage grows linearly with accumulated history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-transfer-depends-on-how-nged-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data transfer depends on how NGED read
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backtests-and-training-scale-with-forecast-rows-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backtests and training scale with forecast rows too
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="aws-running-costs">AWS Running Costs</h1>
+<p>What the live service costs to run on AWS: the costed estimate for the v1 deployment as built
+(32 time series), and a projected estimate at v2 scale (~2,500 time series). The architecture
+these costs price — one small always-on control-plane VM dispatching every run to an ephemeral
+Fargate task — is described in <a href="../production-deployment/">Production Deployment — Design</a>; the
+alternatives it was costed against, with their per-option prices, are recorded in
+<a href="../../roadmap/live-service/#aws-architecture">Live service: AWS architecture</a>.</p>
+<h2 id="pricing-basis">Pricing basis</h2>
+<p>All prices are for <strong>eu-west-2 (London)</strong> — the nearest AWS region to the UK — taken from
+the AWS price-list API (2026-07-03). AWS bills in USD; figures here are converted at
+<strong>$1 = £0.75</strong> (ECB rate, 2026-07-03). Why we deploy in eu-west-2 rather than the slightly
+cheaper eu-west-1 is a data-transfer question, not a compute-price question — the reasoning
+and the region price comparison are in
+<a href="../forecast-delivery/#securing-it">Forecast Delivery: Securing it</a>.</p>
+<p>The Fargate rates used throughout: x86 £0.0349/vCPU-hr + £0.0038/GB-hr; <strong>ARM 20% cheaper</strong>
+(£0.0279 + £0.0031), and polars/XGBoost run fine on arm64, so every task below is ARM.</p>
+<p><strong>These estimates exclude ML experimentation but include routine re-training.</strong> For v1 we
+expect most — maybe all — experimental training to run on our own laptops; the only
+experimentation AWS sees is an optional UI-launched backtest, priced per run below. (At v2
+scale that assumption weakens — see
+<a href="#backtests-and-training-scale-with-forecast-rows-too">Backtests and training at v2</a>.)
+Re-training the <em>deployed</em> model is different: we plan to re-train it roughly <strong>once a week</strong>,
+probably on a GPU, and both estimates below carry a line for it. Fargate offers no GPUs, so
+the weekly re-train is priced as an ephemeral EC2 GPU instance (start, train, promote the new
+model, terminate); the GPU rates are from the price-list API on 2026-07-23, converted at the
+same $1 = £0.75.</p>
+<h2 id="v1-32-time-series-2535month">v1 (32 time series): ~£25–35/month</h2>
+<p><strong>Headline cost: ~£25–35/month</strong> (nudging ~£40 only if the polling-and-ingest line lands at
+its pessimistic top). The headline covers everything needed to keep the deployed service
+running unattended: the always-on control plane, every scheduled Fargate run (inference,
+ingest, and polling), S3 storage and requests, data transfer, and the planned weekly
+re-train. It excludes ML experimentation — backtests are priced per run rather than per
+month, and laptop training costs AWS nothing — and anything NGED spend on their own AWS
+account to read the delivery bucket. It is made up of:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>£/month</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Always-on control plane (EC2 <code>t4g.medium</code> + 20 GB EBS)</td>
+<td>15–22 (1-yr reserved vs on-demand)</td>
+</tr>
+<tr>
+<td>Live Fargate inference (4 runs/day) + hourly polling &amp; ingest</td>
+<td>5–12</td>
+</tr>
+<tr>
+<td>S3 storage (~100 GB) + requests</td>
+<td>2–4</td>
+</tr>
+<tr>
+<td>Data transfer (ingress + egress)</td>
+<td>≈0</td>
+</tr>
+<tr>
+<td>Weekly re-training (planned; ephemeral GPU instance)</td>
+<td>~£1</td>
+</tr>
+<tr>
+<td>Backtests</td>
+<td>~£0.65 per run, as needed</td>
+</tr>
+</tbody>
+</table>
+<p>The weekly re-train row is a <em>planned</em> addition rather than an as-built cost: v0.1 bakes a
+frozen champion model into the image, and any re-training still happens on a laptop. Once the
+weekly re-train moves to AWS, the arithmetic stays small: the v1 model trains in ~10 minutes
+on a laptop, so budgeting ~30 minutes of <code>g4dn.xlarge</code> (1× T4 GPU, 4 vCPU / 16 GB;
+$0.615/hr → £0.46/hr on-demand) per weekly run — instance provisioning and data reads
+included — is ~£0.25/run, about <strong>£1/month</strong>.</p>
+<p>The roadmap's <a href="../../roadmap/live-service/#access-phasing">access phasing</a> (team read-only
+Dagster access, then a public dashboard) adds negligible spend on top of this estimate:
+Stage 2's Caddy and oauth2-proxy, and Stage 3's wake-proxy, all run as plain processes on the
+existing control-plane box — nothing new billable beyond a DNS domain and hosted zone
+(pennies per month). The only material new billable resource across all three stages is the
+second Fargate task/service for Stage 3's public Marimo instance, roughly priced by the
+same-shaped workload in
+<a href="../../roadmap/live-service/#option-d-serverless-control-plane-no-pets-4145month">Option D</a>
+(~£6.20/month for Marimo as its own tiny Fargate service).</p>
+<h3 id="workload-model">Workload model</h3>
+<p>Live cadence: <code>ecmwf_ens</code> 1/day (daily 00Z partition), <code>power_time_series_and_metadata</code> 4/day,
+<code>live_forecasts</code> 4/day (6-hourly partitions), the monitoring <code>metrics(production_monitoring)</code>
+step ~4/day (planned —
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/224">#224</a>) →
+<strong>~13 materialisations/day ≈ 395/month</strong>. This cadence ingests only ECMWF ENS and
+the NGED power feed today; a near-real-time ERA5/ERA5T ingest would join it <em>only if</em> live capacity
+estimation is made to depend on ERA5 — a new external dependency we may prefer to avoid by
+<a href="../../roadmap/capacity-estimation/#irradiance-inputs">keeping ERA5 offline</a>. A backtest
+experiment today is ~4–6 materialisations (<code>eligible_time_series</code> + <code>trained_cv_model</code> +
+<code>cv_power_forecasts</code> per fold, plus <code>metrics</code>; single leaderboard fold), rising to ~15–20 under
+the future multi-yearly-fold epoch.</p>
+<p>Fargate compute: a right-sized 4 vCPU / 16 GB ARM task (measured inference peak ~9 GB) is
+£0.16/hr → 4 × 15-min live runs/day ≈ <strong>£5/month</strong>; a 2-hour 8 vCPU / 32 GB ARM backtest ≈
+<strong>£0.65/run</strong>. The hourly polling wake-ups add ~£2/month at their billed floor of about one
+minute each — but every wake-up also bills image pull and worker startup, and the real ingest
+runs share the same oversized task definition, so
+<a href="../production-deployment/#running-the-data-ingest-runs-on-the-control-plane-vm">Production Deployment — Design</a>
+bounds the whole hourly-task workload at ~$5–10/month (£4–7.50). The runbook's closing
+Cost Explorer check is what settles this line.</p>
+<h3 id="storage-data-transfer">Storage &amp; data transfer</h3>
+<p>These costs are the same under every architecture option the roadmap decision considered, and
+at v1 scale come to <strong>~£2–4/month in total</strong>:</p>
+<ul>
+<li><strong>S3 Standard storage — ~£2/month.</strong> The working set is ~100 GB, dominated by NWP — the
+  entire v1 <code>power_forecasts</code> table, ~407 M rows of it, packs into under 1 GB (see
+  <a href="../forecast-delivery/#how-big-is-flexpectations-power-forecast-data">How big is Flexpectation's power forecast data?</a>)
+  — at £0.018/GB-month → ~£1.80/month, plus headroom for Delta version history between
+  vacuums. Grows ~40 GB/year as daily NWP partitions accumulate.</li>
+<li><strong>S3 requests — ~£0.50–1.50/month.</strong> Delta Lake is request-heavy (transaction-log JSON
+  reads, checkpoints, many small parquet GETs per scan), but ~13 materialisations/day is
+  tiny volume: a generous 1–2 M GET (£0.00031/1k) + 100–200 k PUT/COPY/POST/LIST
+  (£0.0040/1k) per month lands well under £1.50.</li>
+<li><strong>Data transfer — ≈£0/month.</strong> Ingress is free (the daily NWP download from Dynamical
+  costs nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free;
+  internet egress (the Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few
+  GB/month, inside AWS's account-wide 100 GB/month free egress allowance (£0.067/GB
+  beyond).</li>
+<li><strong>Everything else — pennies.</strong> ECR image storage and CloudWatch Logs ingestion for ~700
+  task runs/month are each well under £0.50/month.</li>
+</ul>
+<h2 id="v2-scale-2500-time-series-projected-70140month">v2 scale (~2,500 time series): projected ~£70–140/month</h2>
+<blockquote>
+<p><strong>Status: projection, not a measurement.</strong> The v1 figures above are anchored in measured
+task sizes and observed run times; nothing has yet run at v2 scale. The figures below scale
+the measured v1 workload by the components that grow with the series count and hold fixed
+the components that don't, with each assumption stated inline. The inference task size and
+per-run wall time are the projections to re-measure first when v2-scale runs begin.</p>
+</blockquote>
+<p>Scaling from 32 to ~2,500 time series multiplies the series count by ~78×, but most of the
+bill does not follow it:</p>
+<ul>
+<li><strong>NWP is unchanged.</strong> The ECMWF ENS download covers the whole GB grid regardless of how many
+  time series consume it — the same daily download, the same ingest compute, and the same
+  ~40 GB/year of Delta growth.</li>
+<li><strong>The control plane is unchanged.</strong> The box coordinates runs but does no per-series work —
+  keeping pipeline compute off the box was a design requirement precisely so that v2 scaling
+  would be
+  <a href="../production-deployment/#running-the-data-ingest-runs-on-the-control-plane-vm">a task-size change, not a box resize</a>.</li>
+<li><strong>Power-telemetry ingest grows 78× from a tiny base.</strong> 2,500 series at half-hourly
+  resolution is ~120k rows/day — trivial for both compute and storage, so the hourly polling
+  cost barely moves.</li>
+<li><strong>What genuinely scales is the forecast itself.</strong> Each 6-hourly run grows from ~1.1 M rows
+  (32 series × 51 ensemble members × 672 half-hours) to <strong>~86 M rows</strong> — the row arithmetic is
+  in
+  <a href="../forecast-delivery/#how-big-is-flexpectations-power-forecast-data">How big is Flexpectation's power forecast data?</a>
+  — dragging inference compute and forecast storage with it.</li>
+</ul>
+<p><strong>Headline cost: projected ~£70–140/month</strong> — roughly 3–4× the v1 bill, dominated by
+inference compute. The headline includes the same things as v1's: the control plane, every
+scheduled run (with inference on a larger task), storage and requests (now growing
+~£5/month with each further year of history), and the weekly GPU re-train at its
+heavier-model bracket. It excludes the same things too — per-run backtests and
+experimentation, and NGED's read-side compute — plus any internet-egress spend if NGED pull
+bulk history over the public internet rather than reading from eu-west-2 (both priced
+below). It is made up of:</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>£/month</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Always-on control plane (unchanged)</td>
+<td>15–22</td>
+</tr>
+<tr>
+<td>Live Fargate inference (4 runs/day, larger task)</td>
+<td>45–90</td>
+</tr>
+<tr>
+<td>Hourly polling wake-ups (unchanged)</td>
+<td>~2</td>
+</tr>
+<tr>
+<td>S3 storage + requests (first v2 year)</td>
+<td>5–10, growing ~£5/month with each further year of history</td>
+</tr>
+<tr>
+<td>Data transfer</td>
+<td>≈0 (assuming NGED read via eu-west-2 compute)</td>
+</tr>
+<tr>
+<td>Weekly re-training (heavier model, ephemeral GPU instance)</td>
+<td>~2–15</td>
+</tr>
+<tr>
+<td>Backtests</td>
+<td>very roughly £10–50 per run, as needed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="inference-compute-the-dominant-uncertainty">Inference compute — the dominant uncertainty</h3>
+<p>A v1 live run takes ~15 min on a 4 vCPU / 16 GB ARM task (~£0.04/run, ~£5/month). Much of
+that quarter-hour is work that does <em>not</em> scale with the series count — task provisioning,
+reading the day's NWP partitions, the GB-wide spatial join — while the row-proportional part
+(feature engineering and per-series prediction over the ~1.1 M-row <code>AllFeatures</code> frame) is a
+small slice of it that multiplies by ~78×.</p>
+<p>Bracketing that split on a 16 vCPU / 96 GB ARM task (£0.74/hour at the
+<a href="#pricing-basis">rates above</a>): if ~1 min of the v1 run is row-proportional, a v2 run is
+~30 min (£0.37/run → <strong>~£45/month</strong>); if ~2.5 min is, a v2 run is ~60 min (£0.74/run →
+<strong>~£90/month</strong>). Either way the run fits comfortably inside the 6-hourly cadence.</p>
+<p>Memory is the other axis: 86 M rows of <code>AllFeatures</code> is roughly 17 GB for the feature columns
+alone, several times that with join intermediates. If a single frame doesn't fit a 96 GB task,
+the fallback is chunking inference into per-series batches — Fargate's ARM pricing is linear
+in vCPU and GB, so a smaller task running proportionally longer costs about the same, and the
+choice can be made empirically once v2-scale data exists.</p>
+<h3 id="storage-grows-linearly-with-accumulated-history">Storage grows linearly with accumulated history</h3>
+<p>Live v2 forecasts add ~86 M rows/run × 4 runs/day ≈ <strong>125 billion rows/year</strong>, which at the
+measured ~1.8 bytes/row is <strong>~225 GB/year</strong> of Delta growth — each year of accumulated v2
+history adds ~£4/month at £0.018/GB-month, and NWP accumulation adds a further ~40 GB/year
+(~£0.75/month per year). Starting from the ~100 GB v1 working set, the first v2 year
+therefore averages ~£4/month of storage and ends at ~£7/month, plus £1–3/month of
+requests (commit cadence is unchanged, but each forecast commit writes more parquet files).
+Left unpruned this grows without bound; if it ever matters, the lever is lifecycle policy on
+old forecast history (colder S3 tiers or deletion), not a format change.</p>
+<h3 id="data-transfer-depends-on-how-nged-read">Data transfer depends on how NGED read</h3>
+<p>S3 → AWS compute in the same region is free even across accounts, so NGED reading the
+delivery bucket via their own eu-west-2 compute (Athena, Glue, EC2) costs nothing — that is
+the read path v2 scale points towards anyway, and a load-bearing part of
+<a href="../forecast-delivery/#securing-it">why we deploy in eu-west-2</a>. Reads over the public
+internet instead cost £0.067/GB beyond the account-wide 100 GB/month free allowance — a full
+pull of one year of v2 forecast history (~225 GB) would be ~£8–15 depending on how much of
+that month's free allowance is left, so routine bulk reads that way would make this line item
+real rather than ≈0.</p>
+<h3 id="backtests-and-training-scale-with-forecast-rows-too">Backtests and training scale with forecast rows too</h3>
+<p>A v1 backtest is ~£0.65/run (2 hours, 8 vCPU / 32 GB). Its compute is dominated by the same
+row-proportional work as inference, so a v2-scale backtest lands <strong>very roughly at £10–50 per
+run</strong> (strict 78× linear scaling gives ~£50; the fixed NWP-reading share pulls it below
+that). At those prices a heavy experimentation month becomes a real line item — and training
+2,500 per-series models may also outgrow the laptop assumption in the
+<a href="#pricing-basis">pricing basis</a> — so re-cost this properly before planning sustained v2
+experimentation.</p>
+<p>The weekly re-train scales the same way. We may also adopt somewhat heavier models at v2, so
+the ~10-minute v1 laptop train (~£1/month as an AWS GPU run — see the
+<a href="#v1-32-time-series-2535month">v1 estimate</a>) grows on both axes at once. Bracketing one to
+four hours per weekly run on a single-GPU instance — <code>g4dn.xlarge</code> (1× T4, £0.46/hr) up to
+<code>g6.xlarge</code> (1× L4, $1.02/hr → £0.77/hr) — gives ~£0.50–3/run, or <strong>~£2–15/month</strong>. That
+range is wide because both the model family and its training time are still open; like the
+inference figures above, it is a bracket to re-measure, not a commitment.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../production-deployment/">Production Deployment — Design</a> — the architecture these costs
+  price, and why it was chosen.</li>
+<li><a href="../../roadmap/live-service/#aws-architecture">Live service: AWS architecture</a> — the costed
+  decision record: the accepted option and the four rejected alternatives, with per-option
+  prices.</li>
+<li><a href="../forecast-delivery/#securing-it">Forecast Delivery: Securing it</a> — the eu-west-1 vs
+  eu-west-2 price comparison and the data-transfer reasoning behind the region choice.</li>
+<li><a href="../../live_service/aws/">Setting up the live service on AWS</a> — the bring-up runbook whose
+  final verification step checks Cost Explorer against this page.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

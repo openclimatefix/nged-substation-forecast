@@ -1,0 +1,3962 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../live-service/">
+      
+      
+        <link rel="next" href="../disaggregation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Metrics & Leaderboard - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#metrics-leaderboard" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Metrics & Leaderboard
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-leaderboard-concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The leaderboard concept 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#baseline-forecasters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline forecasters 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Baseline forecasters 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-headline-baseline-nged_incumbent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The headline baseline — nged_incumbent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-faithful-replica-and-a-cheap-upgrades-variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A faithful replica and a "cheap upgrades" variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistence-and-climatology-diagnostic-bookends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence and climatology — diagnostic bookends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-baselines-deleted-when-they-ship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — baselines (deleted when they ship)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-fold-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-fold validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cross-fold validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fold-hygiene-selection-bias-and-a-final-test-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fold hygiene: selection bias and a final-test window 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fold hygiene: selection bias and a final-test window 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-final-test-window-deleted-when-it-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — final-test window (deleted when it ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evaluation metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-ensemble-collapse-defines-the-deterministic-point-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which ensemble collapse defines the deterministic point forecast? 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Which ensemble collapse defines the deterministic point forecast? 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-versus-median-the-trade-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean versus median — the trade-off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalising-nmae-by-effective_capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalising NMAE by effective_capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tail-exceedance-metrics-scoring-the-question-nged-actually-asks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tail &amp; exceedance metrics — scoring the question NGED actually asks 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tail &amp; exceedance metrics — scoring the question NGED actually asks 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-tail-exceedance-metrics-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — tail &amp; exceedance metrics (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tricky-days-a-calendar-deterministic-metric-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tricky days — a calendar-deterministic metric filter 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tricky days — a calendar-deterministic metric filter 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-tricky-days-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — tricky days (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-slices-for-performance-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-slices for performance evaluation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Time-slices for performance evaluation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measuring-performance-during-switching-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring performance during switching events 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivering-the-probabilistic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivering the probabilistic metrics 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Delivering the probabilistic metrics 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-a-horizon-sliced-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase A — horizon-sliced metrics ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-b-probabilistic-metrics-from-the-existing-ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase B — probabilistic metrics from the existing ensemble ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-c-cheap-calibration-after-b-proves-the-diagnosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase C — cheap calibration (after B proves the diagnosis)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grouping-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping the results
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-leaderboard-concept" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The leaderboard concept 🚧
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#baseline-forecasters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Baseline forecasters 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Baseline forecasters 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-headline-baseline-nged_incumbent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The headline baseline — nged_incumbent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-faithful-replica-and-a-cheap-upgrades-variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A faithful replica and a "cheap upgrades" variant
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistence-and-climatology-diagnostic-bookends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence and climatology — diagnostic bookends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-baselines-deleted-when-they-ship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — baselines (deleted when they ship)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-fold-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-fold validation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Cross-fold validation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fold-hygiene-selection-bias-and-a-final-test-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fold hygiene: selection bias and a final-test window 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Fold hygiene: selection bias and a final-test window 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-final-test-window-deleted-when-it-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — final-test window (deleted when it ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evaluation-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Evaluation metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Evaluation metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-ensemble-collapse-defines-the-deterministic-point-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which ensemble collapse defines the deterministic point forecast? 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Which ensemble collapse defines the deterministic point forecast? 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mean-versus-median-the-trade-off" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mean versus median — the trade-off
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normalising-nmae-by-effective_capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normalising NMAE by effective_capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tail-exceedance-metrics-scoring-the-question-nged-actually-asks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tail &amp; exceedance metrics — scoring the question NGED actually asks 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tail &amp; exceedance metrics — scoring the question NGED actually asks 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-tail-exceedance-metrics-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — tail &amp; exceedance metrics (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tricky-days-a-calendar-deterministic-metric-filter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tricky days — a calendar-deterministic metric filter 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tricky days — a calendar-deterministic metric filter 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-details-tricky-days-deleted-when-this-ships" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation details — tricky days (deleted when this ships)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#time-slices-for-performance-evaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Time-slices for performance evaluation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Time-slices for performance evaluation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#measuring-performance-during-switching-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measuring performance during switching events 🚧
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#delivering-the-probabilistic-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Delivering the probabilistic metrics 🚧
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Delivering the probabilistic metrics 🚧">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-a-horizon-sliced-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase A — horizon-sliced metrics ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-b-probabilistic-metrics-from-the-existing-ensemble" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase B — probabilistic metrics from the existing ensemble ✅
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-c-cheap-calibration-after-b-proves-the-diagnosis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase C — cheap calibration (after B proves the diagnosis)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grouping-the-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Grouping the results
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="metrics-leaderboard">Metrics &amp; leaderboard</h1>
+<p>How OCF measures the skill of its forecasts and compares forecasting approaches.</p>
+<blockquote>
+<p><strong>Status legend</strong> — ✅ Implemented · 🚧 Planned · 🔬 Research. The <code>Metrics</code> schema, the
+<code>metrics</code> Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the
+probabilistic metrics (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the
+<a href="../../techniques/evaluation-metrics/">evaluation-metrics reference</a>) are ✅ implemented. The
+interactive leaderboard visualisation is 🚧 planned.
+The implemented <a href="../../ml_experimentation/cross-validation-folds/">cross-validation protocol</a> has
+moved out of the roadmap. See the <a href="../">roadmap index</a> for status conventions.
+The 🚧 items are tracked under the v0.3 epic
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/6">#6</a>:
+baseline forecasters <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/147">#147</a> ·
+probabilistic evaluation <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/225">#225</a> ·
+tail &amp; exceedance metrics <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/254">#254</a> ·
+tricky-days filter <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/255">#255</a> ·
+fold hygiene <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/226">#226</a>.</p>
+</blockquote>
+<hr />
+<h2 id="the-leaderboard-concept">The leaderboard concept 🚧</h2>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/4">#4</a></p>
+<p>A key deliverable is a <strong>leaderboard</strong> comparing many forecasting approaches. We plan <strong>one
+leaderboard per <code>time_series_type</code></strong>, e.g. primary substations, GSPs, BSPs, solar PV sites, wind
+farms, BESS, etc.</p>
+<p>Each leaderboard will have tens (maybe hundreds) of rows. Each row is one <strong>ML experiment</strong>: a
+particular model, trained with a particular set of features, processed a particular way. Entrants
+must be compared apples-to-apples — same test dataset, same metrics, same assumptions.</p>
+<p>Per-experiment configuration, trained weights, and metrics are stored in the project's <strong>MLflow</strong>
+database. The leaderboard will be displayed as an interactive table showing multiple metrics at a
+glance, inspired by the <a href="https://htihle.github.io/weirdml.html">WeirdML leaderboard</a>:</p>
+<p><img alt="WeirdML leaderboard" src="../assets/WeirdML_leaderboard.png" /></p>
+<hr />
+<h2 id="baseline-forecasters">Baseline forecasters 🚧</h2>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/147">#147</a></p>
+<p>No naive baseline exists anywhere in the codebase (only docstring mentions, e.g.
+<code>contracts/power_schemas.py:242</code>). Until the leaderboard carries naive rows, XGBoost's NMAE
+numbers aren't interpretable — and, more to the point, we can't answer the question this project
+exists to answer: <strong>do we beat what NGED does today?</strong></p>
+<h3 id="the-headline-baseline-nged_incumbent">The headline baseline — <code>nged_incumbent</code></h3>
+<p><code>nged_incumbent</code> is a faithful reproduction of
+<a href="../../background/nged-incumbent-forecast/">NGED's incumbent forecast</a> — the analogue-ensemble method
+they use today, with no weather model and no ML. In brief (full description and the operator's-eye
+view are in the background page): for each target half-hour it takes the observed power at the
+<strong>same weekday &amp; time-of-day</strong> from the <strong>last 6 weeks</strong> and from <strong>49–55 weeks back</strong> — <strong>13
+analogues</strong> — which NGED plot and read by eye (taking the 95th percentile if they need a single
+number). Reproducing it matters because it is <em>the bar we have to clear to justify the project</em> —
+"XGBoost beats persistence" is table stakes; "XGBoost beats the incumbent" is the deliverable. It is
+the first baseline we implement; if we implement only one, it is this one.</p>
+<p>It slots into our machinery beautifully, because every one of its 13 members is just a <strong>power
+lag</strong>:</p>
+<ul>
+<li>Weekly group (last 6 weeks, same weekday &amp; time): <code>power_lag_168h, 336h, 504h, 672h, 840h, 1008h</code></li>
+<li>Annual group (49–55 weeks ago, same weekday &amp; time): <code>power_lag_8232h, 8400h, 8568h, 8736h,
+  8904h, 9072h, 9240h</code></li>
+</ul>
+<p>So it rides the same audited, no-lookahead pipeline as <code>PersistenceForecaster</code> (below) with zero
+new time-series logic. <code>_nullify_leaky_lags</code> already sheds the shortest members as lead time grows
+(past 7 days the 168 h member nullifies, past 14 days the 336 h, and so on), leaving the annual
+members to carry the full 14-day horizon. Because the shortest member is a week old, the incumbent
+has <em>no</em> short-horizon skill from recent power — realistic, since that is exactly what NGED do
+today, and a reason to keep the pure <code>PersistenceForecaster</code> as a contrast rather than to sneak a
+recent-power member in.</p>
+<p><strong>It is also our first <em>probabilistic</em> baseline — and this is the faithful representation, not a
+bonus.</strong> The plotted spread <em>is</em> the incumbent's output — an operator reads it by eye. We emit the
+13 analogues as 13 <code>ensemble_member</code> rows and let the <a href="#phase-b-probabilistic-metrics-from-the-existing-ensemble">probabilistic
+metrics</a> score them for free — scoring
+the spread is the closest automatable proxy for the plot a human actually reads. Two consequences
+worth stating plainly:</p>
+<ul>
+<li><strong><code>ensemble_member</code> is overloaded here.</strong> For NWP models that column indexes an NWP ensemble
+  member; for <code>nged_incumbent</code> it indexes a <em>historical analogue</em>. Same column, different meaning.
+  We document this on the <code>PowerForecast</code> / <code>AllFeatures</code> schema so nobody assumes
+  <code>ensemble_member ⇒ NWP</code>. The incumbent <em>synthesises</em> its ensemble inside <code>predict()</code> (by
+  unpivoting its analogue-lag columns into member rows) rather than consuming an NWP ensemble; it
+  runs with <code>weather_source: "none"</code>.</li>
+<li><strong>Deterministic collapse is a property of the metrics layer, not the incumbent.</strong> The incumbent
+  emits its 13 members and nothing else; the <a href="#which-ensemble-collapse-defines-the-deterministic-point-forecast">metric-matched collapse
+  decision</a> then scores its MAE
+  on the members' median (apples-to-apples with every other model's central forecast) and reports
+  NGED's <em>actual</em> operating point — the <strong>95th percentile</strong> — as a labelled secondary number
+  (<code>mae</code>/<code>mbe</code> at <code>metric_param="p95"</code>). Being deliberately conservative, the P95 carries a large
+  <em>positive</em> MBE <strong>by design</strong> (a peak-safety choice, not a forecasting error), so it belongs
+  <em>beside</em> the central metric, not in place of it. Either way NGED weight the analogues equally ("no
+  further processing at all"), so equiprobable members — and the probabilistic metrics (CRPS etc.)
+  computed over them — are faithful, not an approximation.</li>
+</ul>
+<h3 id="a-faithful-replica-and-a-cheap-upgrades-variant">A faithful replica and a "cheap upgrades" variant</h3>
+<p>We implement two closely-related incumbent baselines, and the <em>pair</em> carries a message that is
+itself a valuable project outcome — <strong>most of the benefit may come from a few simple upgrades to
+what NGED already do, not from heavy ML</strong>:</p>
+<ul>
+<li><code>nged_incumbent</code> — the faithful replica above. No holiday handling; warts and all. Pure lag
+  features.</li>
+<li><code>nged_incumbent_holiday_aligned</code> — the same skeleton, but analogue <em>selection</em> becomes
+  calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type
+  (a bank-holiday Monday behaves like a Sunday), and moveable feasts align holiday-to-holiday
+  (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
+  the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
+  bank-holiday calendar (the pure-Python <code>holidays</code> package), and ships as an immediate follow-up
+  PR, not part of the first one.</li>
+</ul>
+<h3 id="persistence-and-climatology-diagnostic-bookends">Persistence and climatology — diagnostic bookends</h3>
+<p>The incumbent is really a <em>hybrid</em> — its weekly group is persistence-like recency, its annual
+group is climatology-like seasonality — so the two pure forms are still worth having: they isolate
+short-horizon vs long-horizon naive skill (at 0–6 h persistence is famously hard to beat; at day
+8–14 seasonal climatology often beats everything). A model could "win" the leaderboard while
+adding no skill over either, and without these rows nobody would know.</p>
+<p>Side benefit: several more <code>BaseForecaster</code> implementations pressure-test the abstraction (the
+docs promise the interface is model-agnostic; today only <code>XGBoostForecaster</code> exercises it).</p>
+<h3 id="implementation-details-baselines-deleted-when-they-ship">Implementation details — baselines (deleted when they ship)</h3>
+<p>Five PRs, in order. PRs 1–2 are shared-framework groundwork (no baseline yet); PRs 3–5 add one
+baseline each. The <code>nged_incumbent_holiday_aligned</code> variant (described under <a href="#a-faithful-replica-and-a-cheap-upgrades-variant">A faithful replica
+and a "cheap upgrades" variant</a>) is a later
+sixth PR, out of scope for this arc but given its own tracked issue so it is not lost when #147
+closes.</p>
+<p><strong>Guiding principle — no special path.</strong> New workspace package <code>packages/baseline_forecasters/</code>
+mirroring the <code>xgboost_forecaster</code> layout (<code>pyproject.toml</code>, <code>src/baseline_forecasters/</code>,
+<code>tests/</code>), added to the root <code>pyproject.toml</code> <code>[tool.uv.sources]</code> and dependencies. Every baseline
+subclasses <code>BaseForecaster</code> and rides the <strong>identical</strong> asset chain
+(<code>register_experiment_job</code> → <code>trained_cv_model</code> → <code>cv_power_forecasts</code> → <code>metrics</code>) that
+<code>XGBoostForecaster</code> uses — a <code>train()</code> that only records <code>trained_time_series_ids</code> and a
+<code>meta.json</code>-only <code>save()</code> cost nothing, and the uniform provenance is exactly what makes re-running
+routine. Re-running CV for any algo is then a native Dagster operation: select <strong><code>trained_cv_model++</code></strong>
+in the asset graph (two <code>+</code> — <code>metrics</code> is two hops downstream, so a single <code>+</code> would silently stop
+at <code>cv_power_forecasts</code> and skip scoring), choose the experiment's partitions, launch a backfill;
+the unpartitioned <code>metrics</code> asset materialises once afterwards with its default config (no filter,
+<code>leaderboard</code> scope). Verify this drill end-to-end on a smoke-test fold before documenting it — the
+Dagster version supports mixed partitioned/unpartitioned backfill selections, but confirm the UI
+behaviour rather than assuming it. To re-score a <em>single</em> experiment without touching the rest, use
+the <code>metrics</code> asset's <code>PopulationFilter</code> config instead.</p>
+<p><strong>PR 1 — deterministic-collapse rework in <code>compute_metrics</code>.</strong> Implements the <a href="#which-ensemble-collapse-defines-the-deterministic-point-forecast">metric-matched
+collapse decision</a>. Forecasters
+emit <strong>members only</strong>; every collapse lives in the metrics layer, so there is no per-experiment
+collapse config and no designated point-forecast columns on <code>PowerForecast</code>. In
+<code>packages/ml_core/src/ml_core/metrics.py</code>:</p>
+<ul>
+<li>In the per-run aggregation, emit both <code>power_fcst_mean</code> (<code>.mean()</code>) and <code>power_fcst_median</code> (reuse
+  the already-computed <code>q_p50</code> empirical-quantile column — Polars <code>.quantile(0.5, "linear")</code> is
+  exactly <code>.median()</code>), and keep <code>q_p95</code>.</li>
+<li>Score <code>mae</code>/<code>nmae</code> on the median error; <code>rmse</code>/<code>mbe</code> on the mean error; the spread-skill
+  denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
+  mean). Add extra labelled rows: <code>mae</code>/<code>mbe</code> at <code>metric_param="p95"</code> (NGED's operating point) and
+  <code>mbe</code> at <code>metric_param="p50"</code> (bias of the delivered median). <code>METRIC_PARAMS</code> already contains
+  <code>"p95"</code> and <code>"p50"</code> (both are in <code>DELIVERY_QUANTILES</code>), so <strong>no <code>Metrics</code> schema change</strong> — and
+  the primary key includes <code>metric_param</code>, so the new rows do not collide with the <code>metric_param="all"</code>
+  headline rows.</li>
+<li>Extend the MLflow allowlist <code>_MLFLOW_LOGGED_PARAMETRIC</code> with <code>("mbe", "p95")</code> and <code>("mbe", "p50")</code>
+  so the operating-point bias and the median's bias appear on the leaderboard (aggregate keys come
+  out distinct, e.g. <code>mbe_p95__all</code> vs <code>mbe__all</code>).</li>
+<li>Update the docstrings that currently say deterministic metrics are "scored on the per-run ensemble
+  mean" (<code>METRIC_NAMES</code> in <code>contracts/ml_schemas.py</code>), the <code>Metrics.metric_param</code> field description
+  (no longer pinball-only), and the <code>_MLFLOW_LOGGED_PARAMETRIC</code> key-count claims. The promoted
+  <a href="../../techniques/evaluation-metrics/">evaluation-metrics reference</a> section must state explicitly
+  that MAE/NMAE and RMSE/MBE score <em>different point forecasts</em> and why (otherwise the first person to
+  recompute RMSE from the stored median members files a bug), and note the identity
+  <code>mae ≡ 2 × pinball_loss@p50</code> as a deliberate internal consistency check.</li>
+<li>Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
+  single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
+  identity. Recompute existing expected values — never relax a test to absorb the shift.</li>
+<li>No standalone re-score needed: the one backfill after PR 2 (below) covers it.</li>
+</ul>
+<p><strong>PR 2 — CV predict-path framework: <code>uses_nwp_ensemble</code>, power-lag lookback, <code>ensemble_member</code>
+docs.</strong> Three changes to the shared rails, none baseline-specific.</p>
+<ul>
+<li><strong><code>uses_nwp_ensemble: ClassVar[bool] = True</code> on <code>BaseForecaster</code>.</strong> <code>cv_power_forecasts</code> passes
+  <code>ensemble_members=[0]</code> to <code>_load_engineering_inputs</code> when a class sets it <code>False</code>. Semantics to
+  document: <code>True</code> → the forecaster consumes the NWP member axis (output members = NWP members);
+  <code>False</code> → the forecaster does <strong>not fan out across NWP members</strong> — it either passes member 0
+  through (persistence) or synthesises its own member axis (<code>nged_incumbent</code>: 13 analogues;
+  <code>climatology</code>: quantile-derived members). This is model-family identity, like <code>MODEL_NAME</code>, so a
+  <code>ClassVar</code> is correct — and the class is resolved from the experiment's <code>forecaster_target</code> MLflow
+  tag <em>before</em> inputs are loaded, so the flag is available in time. Document alongside it that
+  <code>weather_source: "none"</code> does <strong>not</strong> mean "no NWP input": in bulk mode the control-member NWP scan
+  defines the shared <code>(init_time, valid_time)</code> forecast-run grid, which is what keeps every
+  leaderboard row — baseline or ML — scored on the identical grid.</li>
+<li><strong>Power-lag lookback at feature-engineering load time.</strong> Today <code>_load_engineering_inputs</code> filters
+  power to <code>[window_start, window_end]</code>, and <code>_apply_power_lag</code> reads lags from that same frame — so
+  any lag longer than the elapsed window is null. This is a real existing gap: XGBoost's 336 h lag is
+  null for the first fortnight of every validation window, and the incumbent's 49–55-week lags would
+  be null for all but roughly the last three weeks of the fold (lag targets only re-enter the window
+  from <code>val_start + 49 weeks</code>). Fix: a <code>power_lookback: timedelta</code> parameter that widens <strong>only the
+  power scan's</strong> lower bound (<code>window_start − power_lookback</code>); callers derive it from the
+  experiment's <code>selected_features</code> via <code>ParsedFeatures</code> (max power-lag hours), so it is automatic
+  per-experiment (~2 weeks for XGBoost, ~55 weeks for the incumbent). Safe because the bulk-mode
+  spine is NWP-centric (<code>_join_nwp_bulk_mode</code> left-joins power <em>onto</em> NWP rows), so the extra early
+  power rows feed only the lag lookup and add no spine rows and no label rows (labels live on spine
+  rows, bounded by the NWP <code>valid_time</code> filter); and <code>_nullify_leaky_lags</code> (which nulls any lag with
+  <code>lead ≥ lag_hours</code>) still guards leakage, so a longer lookback cannot leak. Apply to both
+  <code>trained_cv_model</code> and <code>cv_power_forecasts</code>. <code>LIVE_POWER_HISTORY</code> in <code>production_assets.py</code> is a
+  hard-coded 15-day equivalent for the live path — leave it, but cross-reference it from the new
+  parameter so a future long-lag live model is not silently starved. Add a comment where
+  <code>cv_power_forecasts</code> re-scans the widened power window per <code>init_time</code> chunk (cheap next to NWP,
+  but worth flagging so nobody blames the wrong thing when profiling).</li>
+<li><strong>Document the <code>ensemble_member</code> overload</strong> on <code>PowerForecast</code> and <code>AllFeatures</code>: an NWP-member
+  index for NWP-consuming models, a historical-analogue index for <code>nged_incumbent</code>, a
+  quantile-sample index for <code>climatology</code>. Nobody may assume <code>ensemble_member ⇒ NWP</code>.</li>
+<li>Tests: a dummy <code>uses_nwp_ensemble = False</code> forecaster exercising the member-0 path; a feature-
+  engineer test that a 336 h lag at the window edge is non-null <em>with</em> lookback while the spine row
+  count is unchanged; the leak test unchanged; the single-run (live) path unaffected by
+  <code>power_lookback</code>.</li>
+<li><strong>After PRs 1 + 2 land back-to-back, run one <code>trained_cv_model++</code> backfill over every existing
+  experiment partition</strong> — retrain, re-predict, and re-score everything under the fixed lag lookback
+  and the new collapse. This is deliberately the exact "re-run everything after a pipeline fix"
+  drill, and it doubles as the empirical verification of the backfill mechanics before the recipe is
+  written into <code>docs/ml_experimentation/dagster-workflow.md</code>. Treat both PRs as a single leaderboard
+  epoch event, since each shifts existing numbers.</li>
+</ul>
+<p><strong>PR 3 — package skeleton + <code>PersistenceForecaster</code> (seasonal-naive; the cheapest end-to-end
+probe).</strong> Ships the package and proves the PR-2 framework on the simplest model.</p>
+<ul>
+<li>Shared helper <code>_meta_io.py</code>: the <code>meta.json</code> save/load round-trip (config dump,
+  <code>trained_time_series_ids</code>, the fully-qualified <code>model_class</code>). No <code>StatelessForecaster</code> base class
+  until a third stateless model exists.</li>
+<li><code>MODEL_NAME = "persistence"</code>, <code>MODEL_VERSION = 1</code>, <code>uses_nwp_ensemble = False</code>. Config default
+  <code>selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}</code>.</li>
+<li><code>train()</code> records the sorted <code>trained_time_series_ids</code> (the requested ids present in the data,
+  mirroring XGBoost's "no usable rows → not trained" semantics). <code>predict()</code> = <code>pl.coalesce</code> of the
+  lag columns in ascending-lag order — <code>_nullify_leaky_lags</code> nulls any lag with <code>lead ≥ lag_hours</code>
+  (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest <em>non-leaky</em>
+  lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
+  lookahead risk because it rides the audited pipeline. Output keeps the spine's <code>ensemble_member</code>
+  (= 0 only, given member-0 inputs), cast UInt8 → Int8 via an <em>expression</em> cast, following
+  <code>XGBoostForecaster._build_part</code> (a dict-<code>.cast({...})</code> on the concat-of-group-by frames would hit
+  the Patito cast trap). Rows where all lags are null are dropped, the count logged, and the
+  per-series dropped/coverage counts recorded in asset metadata.</li>
+<li><code>conf/model/persistence.yaml</code>: <code>weather_source: "none"</code>, <code>training_strategy: "none"</code>.</li>
+<li>Tests: unit (shortest-non-leaky selection on a hand-built <code>AllFeatures</code> fixture; all-null-row
+  dropping; <code>save</code>/<code>load</code> round-trip freezing ids) plus an integration smoke fold via the
+  <code>tests/test_trained_cv_model.py</code> fixture pattern.</li>
+<li>Register (<code>smoke_test</code> → <code>full_cv</code>), materialise the chain, sanity-check: NMAE worse than XGBoost
+  overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
+  interval width degenerate (expected and ignorable for a deterministic baseline).</li>
+<li><strong>Coverage caveat:</strong> persistence's longest lag is 336 h, so leads in <code>[336 h, ~360 h]</code> drop out and
+  its <code>all</code> / <code>extended_range</code> aggregates cover a shorter lead population than other models'. Fair
+  CRPS is size-comparable so nothing is <em>wrong</em>, but state the caveat where the sanity numbers are
+  read, backed by the per-series coverage counts in asset metadata.</li>
+</ul>
+<p><strong>PR 4 — <code>NGEDIncumbentForecaster</code> (<code>nged_incumbent</code>; the deliverable).</strong> The faithful replica,
+landing on a now-proven rail.</p>
+<ul>
+<li><code>MODEL_NAME = "nged_incumbent"</code>, <code>MODEL_VERSION = 1</code>, <code>uses_nwp_ensemble = False</code>,
+  <code>weather_source: "none"</code>. Config <code>n_weekly_analogues = 6</code> and <code>annual_week_span = (49, 55)</code> drive
+  the 13 analogue lags (weekly <code>168h × {1..6}</code>; annual <code>168h × {49..55}</code> = 8232…9240 h — all within
+  the feature parser's 17 520 h cap), with <code>selected_features</code> derived from them so variants stay one
+  override cheap.</li>
+<li><code>predict()</code> unpivots the 13 analogue-lag columns into <code>ensemble_member</code> rows (member index =
+  analogue index; Int8 holds 0–12). Members nulled by <code>_nullify_leaky_lags</code> (as lead time grows, the
+  short weekly members shed first) or by insufficient history are dropped; rows where <em>all</em> members
+  are null are dropped with the count logged and per-series surviving-member counts recorded in asset
+  metadata. No point forecast is emitted — PR 1's metrics layer produces the median headline and the
+  p95 / p50 labelled rows.</li>
+<li>Depends on PR 2's lookback (the 55-week annual lags are all-null without it).</li>
+<li><strong>Data check before interpreting results:</strong> <code>val_start − 55 weeks</code> ≈ mid-2024. Confirm which
+  eligible series actually have observations that far back — eligibility requires only
+  <code>min_training_months</code> of history, so a series can qualify yet have too little for the annual
+  analogues, degrading silently to a weekly-only (≤6-member) ensemble. Nothing crashes and fair CRPS
+  stays size-comparable, but the leaderboard means then average differently-shaped ensembles across
+  series, so surface the per-series member counts rather than discovering it later in a dashboard.</li>
+<li>Tests: hand-computed unpivot to the expected members; the median, p95, and p50 collapses match
+  hand-computed values through <code>compute_metrics</code>; leaky-lag shedding as lead grows; <code>save</code>/<code>load</code>
+  round-trip; an integration smoke fold with a synthetic power history spanning the annual lags.
+  Sanity-check: the median is a roughly unbiased central estimate while <code>mbe@p95</code> shows a clear
+  positive bias (the conservative operating point — <strong>not</strong> a bug); no short-horizon skill (the
+  shortest member is a week old, which is realistic).</li>
+<li>Ship-time triage: delete this item's details (summary → PR body); cross-link the <a href="../../background/nged-incumbent-forecast/">NGED's incumbent
+  forecast</a> background page.</li>
+</ul>
+<p><strong>PR 5 — <code>ClimatologyForecaster</code> (<code>climatology</code>; the pure probabilistic reference).</strong> The calendar-
+only skill floor the NWP ensemble must clear at long horizons.</p>
+<ul>
+<li><code>MODEL_NAME = "climatology"</code>, <code>MODEL_VERSION = 1</code>, <code>uses_nwp_ensemble = False</code>.</li>
+<li><code>train()</code>: from the features frame take <code>(time_series_id, valid_time, power)</code> and <strong>dedupe on
+  <code>(time_series_id, valid_time)</code> first</strong> — bulk-mode <code>AllFeatures</code> repeats each target row once per
+  covering <code>(nwp_init_time, ensemble_member)</code> (~15× at a 15-day horizon), so without the dedupe the
+  per-cell samples would be weighted by NWP-run coverage rather than by calendar. Then, per
+  <code>(time_series_id, month, half-hour-of-day, is_weekend)</code> cell, store the empirical quantiles of that
+  cell's power samples. Cell keys derive from <strong>local</strong> (Europe/London) time computed inside the
+  forecaster from <code>valid_time</code>, aligning with the demand rhythm (and matching the <code>local_*</code> time
+  features). <code>save()</code> writes the lookup as one parquet + <code>meta.json</code>.</li>
+<li><strong>Member emission — deliberate deviation from an earlier draft.</strong> Emit members at <em>equiprobable</em>
+  quantile levels <code>(i − 0.5)/m</code>, <strong>not</strong> at the tail-heavy <code>DELIVERY_QUANTILES</code> levels. Fair CRPS and
+  the per-run empirical delivery quantiles the metrics layer derives from members treat members as an
+  equiprobable sample; feeding 13 members at the delivery levels in with equal weight would put 7.7 %
+  of the mass at <code>q(0.01)</code> and <code>q(0.02)</code>, i.e. an ensemble materially wider-tailed than the
+  climatology it represents, corrupting CRPS, PICP, and the derived delivery quantiles. The delivery
+  quantiles are still produced — by <code>compute_metrics</code>' per-run quantile aggregation, same as every
+  other model. Keep <code>m = 13</code>: over the ~14-month training window a weekend cell holds only ~9–17
+  samples (weekday ~21–43), so quantile levels below ~0.06 are already min-sample extrapolation and
+  51 members would be false precision plus ~4× more <code>power_forecasts</code> rows; only raise it with
+  empirical justification.</li>
+<li><code>predict()</code>: join the lookup onto the prediction rows by the cell keys (rows in an unseen cell
+  dropped with the count logged), then unpivot the quantile columns into <code>ensemble_member</code> rows.</li>
+<li><strong>Why a distribution, not a mean:</strong> a deterministic climatology forecast collapses CRPS to MAE, so
+  it could only be compared against the ML ensemble on point accuracy — the axis a squared-error
+  XGBoost is built to win. The claim we need to test is distributional: does the NWP-driven ensemble
+  know more about day 8–14 power than the plain seasonal/time-of-day distribution, or is it dressing
+  up climatology in weather-shaped clothing? (See <a href="../../techniques/probabilistic-forecasting/#long-horizons-are-not-automatically-safe">Probabilistic forecasting from NWP
+  ensembles</a>.)
+  Only a quantile/ensemble climatology answers that, via <code>crps__all__extended_range</code> head-to-head.
+  Caveat to record where that comparison is read: a <em>deterministic-quantile</em> ensemble slightly
+  out-scores an i.i.d. ensemble of the same size under fair CRPS (a known property of Ferro's
+  correction), so climatology carries a small structural edge in exactly this comparison — read a
+  near-tie as "the NWP ensemble is worth little out here", not as climatology winning outright.</li>
+<li>Known limitation, documented not solved: small per-cell samples make the tail quantiles noisy;
+  pooling adjacent months is a possible refinement if the numbers look ragged.</li>
+<li>Tests: hand-computed per-cell quantiles; the dedupe (a duplicated spine must not change the
+  quantiles); <code>save</code>/<code>load</code> round-trip; an integration smoke fold; CRPS flows over the members.</li>
+<li>Ship-time triage: unblocks
+  <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/354">#354</a> (the dashboard
+  climatology reference band). As the last 🚧 baseline item, delete the whole "Implementation
+  details — baselines" section (summary → PR body), close #147, and update the status banner plus the
+  milestone section in <a href="../"><code>docs/roadmap/index.md</code></a> if the arc changed.</li>
+</ul>
+<p><strong>Recipe confirmed by NGED (July 2026).</strong> No open questions remain. Full write-up in
+<a href="../../background/nged-incumbent-forecast/">NGED's incumbent forecast</a>; the implementation spec:</p>
+<ul>
+<li><strong>Weekly analogues:</strong> the last <strong>6</strong> weeks, same weekday &amp; time-of-day.</li>
+<li><strong>Annual analogues:</strong> the <strong>seven</strong> weeks spanning <strong>49–55 weeks back</strong>, same weekday &amp; time.</li>
+<li><strong>Deterministic value:</strong> NGED's own operating point is the <strong>95th percentile</strong> of all 13 analogue
+  values ("more of a vibe") — reported alongside the metric-matched <strong>median</strong> headline (PR 1).</li>
+<li><strong>No further processing:</strong> no weighting, no holiday handling, no anomaly rejection, no
+  load-growth scaling. (This is precisely why the holiday-aligned variant is a genuine, un-done
+  upgrade — not a reimplementation of something NGED already do.)</li>
+</ul>
+<p><strong>Cross-cutting.</strong> (1) <strong>Issue hygiene:</strong> create one tracked sub-issue per PR under epic
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/6">#6</a> / #147 following the
+CLAUDE.md issue-creation rules (labels, Type, OCF project fields, sub-issue ordering), <em>including</em>
+one for <code>nged_incumbent_holiday_aligned</code> so it survives #147 closing. (2) <strong>Re-run recipe:</strong> add a
+short "Re-running CV for an experiment" subsection to <code>docs/ml_experimentation/dagster-workflow.md</code>
+describing the <code>trained_cv_model++</code> backfill, written only after the drill is verified end-to-end,
+and mentioning <code>PopulationFilter</code> for single-experiment scoring. (3) <strong>MLflow re-logging</strong> on a
+re-run is idempotent in effect (latest value wins; history accumulates harmlessly).</p>
+<hr />
+<h2 id="cross-fold-validation">Cross-fold validation</h2>
+<p>The cross-validation protocol is <strong>implemented</strong>, so it has moved to its permanent home:
+<a href="../../ml_experimentation/cross-validation-folds/">ML Experimentation → Cross-validation folds</a>.
+That page covers the expanding-window protocol, the current single fold (and why the available
+weather data constrains us to it), the target multiple-yearly-fold protocol, and the fold-design
+alternatives we considered.</p>
+<h3 id="fold-hygiene-selection-bias-and-a-final-test-window">Fold hygiene: selection bias and a final-test window 🚧</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/226">#226</a></p>
+<p>The single leaderboard fold (<code>mid_2025_to_mid_2026</code> in <code>conf/cv/default.yaml</code>: train 2024-04 →
+2025-06, validate 2025-07 → 2026-06) serves as <strong>both</strong> the model-selection set and the
+reported skill number. Every hyperparameter choice, feature ablation, and model comparison is
+adjudicated on the same 12 months that the leaderboard reports. With hundreds of planned
+experiments (the roadmap mentions LLM-driven auto-experimentation in v0.5), the winner's
+reported skill will be optimistically biased — classic leaderboard overfitting. The epoch
+mechanism handles <em>data</em> changes but not <em>adaptive selection</em> on a fixed fold.</p>
+<p>Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller
+than fold-level noise should not drive decisions; and the number of experiments per epoch is
+itself a relevant statistic (visible as the MLflow experiment count).</p>
+<h4 id="implementation-details-final-test-window-deleted-when-it-ships">Implementation details — final-test window (deleted when it ships)</h4>
+<p><strong>1. Document the caveat (immediately).</strong> A short "Selection bias" subsection in
+<code>docs/ml_experimentation/cross-validation-folds.md</code> restating the paragraph above.</p>
+<p><strong>2. Reserve a final-test window (next leaderboard epoch).</strong> Found a new epoch in
+<code>conf/cv/default.yaml</code> (the epoch mechanism exists for exactly this):</p>
+<ul>
+<li>Shrink the leaderboard fold's validation window to <code>2025-07-01 → 2026-03-31</code>.</li>
+<li>Add a <code>final_test</code> fold <code>2026-04-01 → 2026-06-30</code> with a new per-fold flag
+  <code>final_test: true</code> (extend <code>CvConfig</code> / the fold schema in
+  <code>packages/contracts/src/contracts/hydra_schemas.py</code>; it is neither a leaderboard fold nor a
+  dev fold — <code>_fold_ids_for_run_mode</code> in <code>defs/jobs.py:96</code> must <em>not</em> include it in any
+  run mode, so no experiment trains or scores on it in the normal flow).</li>
+<li>Scoring against the final-test window is a deliberate, rare act — only for champion
+  candidates immediately before promotion — via the <code>metrics</code> asset with
+  <code>evaluation_scope="ad_hoc"</code> and the window's <code>valid_time</code> bounds in the existing
+  <code>PopulationFilter</code>. No new asset needed; the discipline is procedural. Note: the model
+  trained for the leaderboard fold is reused as-is (train window unchanged), so final-test
+  scoring needs a <code>cv_power_forecasts</code> run over the reserved window — check whether the
+  existing asset can forecast a window disjoint from the fold's <code>val_start/val_end</code>, and add a
+  window override to its config if not.</li>
+<li>Rule, documented alongside: final-test results are never used to <em>choose between</em>
+  candidates (that re-creates the problem); they exist to report honest skill for the chosen
+  champion and to detect gross overfitting (final-test NMAE ≫ validation NMAE).</li>
+</ul>
+<p><strong>A multi-fold gotcha to handle when folds proliferate.</strong> The parent-MLflow-run aggregation in
+the <code>metrics</code> asset averages each metric key over <em>only the folds in which that key appears</em>
+(<code>exp_metrics.setdefault(key, []).append(value)</code> then <code>sum/len</code> in <code>defs/cv_assets.py</code>). Today
+every fold emits the same key set, so this is invisible — but folds with <em>different horizon
+coverage</em> (one fold's forecasts stop at 36 h, another's reach day 14) would emit different
+per-horizon-slice keys, and a key like <code>rmse__all__extended_range</code> would then silently average
+over a different fold subset than <code>rmse__all</code>, with nothing marking the smaller denominator.
+Per-<code>time_series_type</code> keys have the same property if fold populations differ. When adding
+folds (the multi-fold epoch below, or the <code>final_test</code> fold), either guarantee every
+leaderboard fold emits an identical key set, or make the parent-run aggregation record its
+per-key denominator.</p>
+<p><strong>3. Trade-off (decide at implementation time).</strong> This costs 3 of the 12 validation months, on
+a dataset that is already short. The alternative — accepting documented bias until
+Dynamical.org backfills enable multiple yearly folds — is defensible; if the backfill is
+expected within a couple of months, do part 1 now and fold part 2 into the multi-fold epoch
+instead of spending a separate epoch on it. Decide based on the backfill outlook.</p>
+<p><strong>Verification.</strong> (1) <code>register_experiment_job</code> in all three run modes never creates a
+partition for the <code>final_test</code> fold (extend <code>tests/test_register_experiment_job.py</code>).
+(2) Eligibility for the leaderboard fold is unchanged by the shrunk validation window (the
+eligibility rule keys off <code>val_start</code>/<code>val_end</code> — re-materialise <code>eligible_time_series</code> and
+diff). (3) End-to-end: score one existing experiment against the reserved window via the
+<code>ad_hoc</code> metrics path and confirm rows land in <code>forecast_metrics.delta</code> with the window label,
+and nothing is logged to the leaderboard MLflow runs.</p>
+<hr />
+<h2 id="evaluation-metrics">Evaluation metrics</h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Type</th>
+<th>Status</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mean absolute error (MAE)</td>
+<td>Deterministic</td>
+<td>✅</td>
+<td>Typical error magnitude (MW).</td>
+</tr>
+<tr>
+<td>Normalised MAE (NMAE)</td>
+<td>Deterministic</td>
+<td>✅</td>
+<td>MAE normalised by the series' <a href="#normalising-nmae-by-effective_capacity">effective capacity</a> (full-history P99) — comparable across substations of different sizes.</td>
+</tr>
+<tr>
+<td>Root mean squared error (RMSE)</td>
+<td>Deterministic</td>
+<td>✅</td>
+<td>Heavily penalises large misses (one 100 MW error costs more than two 50 MW errors).</td>
+</tr>
+<tr>
+<td>Mean bias error (MBE)</td>
+<td>Deterministic</td>
+<td>✅</td>
+<td>Systematic over/under-prediction.</td>
+</tr>
+<tr>
+<td>Histogram of errors</td>
+<td>Deterministic</td>
+<td>🚧</td>
+<td>Visual check that errors are ~Normal.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#pinball-loss">Pinball loss (quantile loss)</a></td>
+<td>Quantile</td>
+<td>✅</td>
+<td>Penalises asymmetrically by target quantile, at the 13 NGED delivery quantiles. Averaged across quantiles for a single quantile-skill score.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#picp-prediction-interval-coverage-probability">PICP (Prediction Interval Coverage Probability)</a></td>
+<td>Quantile</td>
+<td>✅</td>
+<td>Coverage of six symmetric bands (p1–p99 … p35–p65). Judge against the finite-ensemble calibrated reference (≈ 0.769 for p10–p90 at 51 members), not the nominal rate.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#interval-width">Interval width</a></td>
+<td>Quantile</td>
+<td>✅</td>
+<td>Mean band width (MW) — the sharpness companion that stops PICP being gamed by over-widening.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#crps-continuous-ranked-probability-score">CRPS (Continuous Ranked Probability Score)</a></td>
+<td>Ensemble</td>
+<td>✅</td>
+<td>Probabilistic equivalent of MAE; rewards both accuracy and sharpness. Fair (finite-ensemble-unbiased) form — the one metric comparable across ensemble sizes.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#spread-skill-ratio">Spread-Skill Ratio</a></td>
+<td>Ensemble</td>
+<td>✅</td>
+<td>Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; &lt; 1 under-dispersed (overconfident); &gt; 1 over-dispersed (underconfident).</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#threshold-weighted-crps-twcrps">Threshold-weighted CRPS (twCRPS)</a></td>
+<td>Ensemble</td>
+<td>🚧</td>
+<td>CRPS confined to behaviour above a per-series threshold — the ranking-grade metric for skill near the network limit. See <a href="#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">Tail &amp; exceedance metrics</a>.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#exceedance-rate-of-the-upper-delivery-quantiles">Exceedance rate of upper quantiles</a></td>
+<td>Quantile</td>
+<td>🚧</td>
+<td>"When we said p95, was it exceeded ~5% of the time?" — one-sided calibration check for the delivered tail quantiles.</td>
+</tr>
+<tr>
+<td><a href="../../techniques/evaluation-metrics/#brier-score-for-threshold-exceedance">Brier score for threshold exceedance</a></td>
+<td>Ensemble</td>
+<td>🚧</td>
+<td>Grades the ensemble's "chance load exceeds the threshold" probability — the score for the yes/no warning NGED acts on.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>The <code>Metrics</code> schema (<code>contracts.ml_schemas.Metrics</code>) stores results as
+<code>(time_series_id, power_fcst_model_name, fold_id, horizon_slice, metric_name, metric_param,
+metric_value)</code>. <code>metric_param</code> carries, e.g., the quantile for Pinball Loss (<code>p10</code>) or the band
+for PICP (<code>p10_p90</code>). The <code>metrics</code> Dagster asset computes every ✅ metric above and writes
+per-series rows to <code>forecast_metrics</code> Delta (partitioned by <code>experiment_name, fold_id</code>), with
+per-fold and mean-across-folds aggregates logged to MLflow — see
+<a href="../../ml_experimentation/dagster-workflow/#step-8-materialise-metrics">Running an ML experiment end-to-end</a>.</p>
+</blockquote>
+<p><strong>Every metric above is also broken out by named population-filter slices</strong>, which appear as
+extra leaderboard columns. Most are legitimate ranking columns, because the filter is fixed by
+information known <em>before</em> the outcome: the
+<a href="#time-slices-for-performance-evaluation">horizon slice</a> a forecast falls in, the
+<a href="#tricky-days-a-calendar-deterministic-metric-filter">Tricky days</a> calendar, and logged
+<a href="#measuring-performance-during-switching-events">switching events</a>. Two are <strong>diagnostic only
+and must never drive ranking</strong>, because they select hours by what actually happened and so
+reward a model that simply over-forecasts (the
+<a href="../../techniques/evaluation-metrics/#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened">forecaster's-dilemma trap</a>):
+the <strong>peak-events slice</strong> (the top 5% highest <em>observed</em> demand) and NGED's hand-picked <strong>hard
+examples</strong>. Both are described under
+<a href="#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">Tail &amp; exceedance metrics</a>.</p>
+<h3 id="which-ensemble-collapse-defines-the-deterministic-point-forecast">Which ensemble collapse defines the deterministic point forecast? 🚧</h3>
+<p><strong>Decided: metric-matched collapse, uniform across every model.</strong> Implemented as part of the
+baseline work (<a href="#implementation-details-baselines-deleted-when-they-ship">PR 1 in the baseline implementation
+details</a>); the reasoning below is the
+durable design rationale, promoted to
+<a href="../../techniques/evaluation-metrics/">the evaluation-metrics reference</a> when that PR ships.</p>
+<h4 id="the-problem">The problem</h4>
+<p>The deterministic metrics (MAE, NMAE, RMSE, MBE) score a <strong>single point forecast</strong>, but every model
+on the leaderboard is really an <em>ensemble</em> (51 NWP members for the ML models; 13 historical analogues
+for <code>nged_incumbent</code>; a quantile sample for <code>climatology</code>). Something has to collapse each ensemble
+to one number. <code>compute_metrics</code> today collapses every ensemble to its <strong>mean</strong>
+(<code>packages/ml_core/src/ml_core/metrics.py</code>), and the risk we were guarding against was that
+different models would be scored on <em>different</em> collapses — e.g. the ML models on their mean and
+<code>nged_incumbent</code> on the median NGED effectively reads off its analogue spread. Mean and median
+diverge for skewed or underdispersed ensembles, so scoring some models on one and some on the other
+is <strong>not apples-to-apples</strong> — a silent trap that quietly mis-ranks models.</p>
+<h4 id="mean-versus-median-the-trade-off">Mean versus median — the trade-off</h4>
+<p>The instinct is to "pick one central statistic and apply it everywhere". But mean and median are not
+interchangeable, and the reason is the crux of the decision:</p>
+<ul>
+<li>The <strong>mean</strong> is the point forecast that minimises <strong>squared error</strong> — so RMSE (and MBE, which is
+  a mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading)
+  is <em>consistent</em> with the mean. Our squared-error XGBoost models literally learn a conditional
+  mean, and the ensemble mean of 51 such members is a coherent estimate of <code>E[power]</code>. Scoring the
+  mean on RMSE rewards a model for doing the statistically correct thing; the mean also averages out
+  member noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
+  verification practice.</li>
+<li>The <strong>median</strong> is the point forecast that minimises <strong>absolute error</strong> — so MAE and NMAE are
+  <em>consistent</em> with the median. It is robust to the skew that is real in this problem (holiday
+  weeks, solar clipping) and to the ensemble underdispersion the <a href="#delivering-the-probabilistic-metrics">probabilistic
+  section</a> documents, it is the faithful reading of NGED's
+  equally-weighted analogue spread, and it is coherent with the quantile columns already on the
+  leaderboard: median MAE is exactly <code>2 × pinball_loss@p50</code>, so a median headline makes the
+  deterministic and probabilistic columns tell one story.</li>
+</ul>
+<p>The key realisation is that <strong>MAE and RMSE elicit <em>different</em> functionals, so no single collapse is
+fair on both columns.</strong> A uniform median is inconsistent for RMSE (it penalises squared-error models
+for forecasting their honest mean); a uniform mean is inconsistent for MAE (a model could improve its
+MAE ranking by warping its forecast away from its honest mean — Gneiting 2011, <em>Making and Evaluating
+Point Forecasts</em>). The apples-to-apples requirement is only that the collapse be uniform <em>across
+models</em>, not <em>across metrics</em>.</p>
+<h4 id="the-decision">The decision</h4>
+<p>Score each deterministic metric on the ensemble collapse it is consistent with, <strong>the same way for
+every model</strong>:</p>
+<ul>
+<li><strong>MAE / NMAE ← ensemble median</strong> (NMAE is the headline cross-series metric, so the headline is
+  effectively median-based).</li>
+<li><strong>RMSE / MBE ← ensemble mean.</strong></li>
+<li><strong>Spread-skill ratio ← ensemble mean, internally, unchanged</strong> — its Fortin calibration target
+  (RMSE of the ensemble mean = <code>√((m+1)/m) ×</code> RMS spread, so "1.0 = calibrated") is <em>defined</em>
+  against the mean; switching its internal collapse would silently break that reading.</li>
+</ul>
+<p>Everything else is an <strong>extra, labelled</strong> row, never a headline: NGED's <strong>P95</strong> operating point
+(<code>mae</code>/<code>mbe</code> at <code>metric_param="p95"</code> — conservative by design, so a large positive MBE that belongs
+<em>beside</em> the central number, not in place of it), and the <strong>median's own bias</strong> (<code>mbe</code> at
+<code>metric_param="p50"</code>, so the delivered central forecast has an honest bias number distinct from the
+mean's energy-balance bias). No model is structurally disadvantaged on any column — which a single
+uniform statistic cannot achieve — and the trap is closed because the collapse is uniform across
+models. Because the collapse lives entirely <em>downstream</em> of the stored forecasts, switching it
+re-scores the whole leaderboard from a single <code>metrics</code> re-materialisation with no retraining or
+re-prediction — and doing it now, before the leaderboard adjudicates anything, is the cheapest moment
+to shift every existing deterministic number.</p>
+<h3 id="normalising-nmae-by-effective_capacity">Normalising NMAE by <code>effective_capacity</code></h3>
+<p>NMAE is MAE divided by a per-series <strong>effective capacity</strong>, not by the mean or a per-fold P99. A
+capacity-like denominator is what makes NMAE comparable across asset types: intermittent generators
+(PV, wind) spend much of their time near zero output, so normalising by the <em>mean</em> would inflate
+their NMAE relative to a demand substation of similar peak size. Computing the denominator over each
+series' <strong>full history</strong> (rather than within the validation window) also keeps it stable across
+folds — an unusually calm year for a wind farm would otherwise give a low in-window P99 and an
+inflated NMAE.</p>
+<p>Normalisation is also why NMAE is the <strong>headline cross-series metric</strong>: the aggregate <code>mae__all</code> /
+<code>rmse__all</code> values logged to MLflow are unweighted means across series whose scales span roughly
+two orders of magnitude, so the GSPs dominate them. They are useful for tracking a single model
+over time, not for comparing skill across the population.</p>
+<p>The denominator comes from the <a href="../delivery-tables/#table-4-effective_capacity"><code>effective_capacity</code></a>
+Delta table (schema <code>contracts.power_schemas.EffectiveCapacity</code>), consumed by <code>compute_metrics</code>
+(<code>ml_core.metrics</code>).</p>
+<p><strong>v0.1 representation: one scalar row per series.</strong> The <code>effective_capacity</code> asset writes one
+row per <code>time_series_id</code> — <code>effective_capacity_mw</code> = P99 of <code>|power|</code> over the whole observation
+history, <code>time</code> = the latest observed timestep. <code>compute_metrics</code> joins it onto the per-series
+metrics <strong>on <code>time_series_id</code> alone</strong> and divides.</p>
+<p><strong>Why v0.1 is a single row per series, not the value repeated at every half-hour.</strong> The
+v0.7 upgrade below <em>will</em> store one row per <code>(time_series_id, time)</code> half-hour — but with a
+genuinely <em>time-varying</em> value. In v0.1 the value is a single constant per series, so repeating it
+across every half-hour would just be a denormalised encoding of one number: at V2 scale (~2,500
+series × ~4 years × 17,520 half-hours/yr ≈ 175M rows) that is hundreds of millions of rows to
+express ~2,500 scalars, for zero extra information. It would also <em>not</em> buy forward-compatibility,
+because the real v0.1→v0.7 interface change is not the data shape but <strong>the join</strong> (below). The
+<code>EffectiveCapacity</code> schema — <code>(time_series_id, time, effective_capacity_mw)</code> — already accommodates
+both the one-row-per-series v0.1 shape and the one-row-per-half-hour v0.7 shape; that is the
+forward-compatibility we want. (The v0.7 upgrade does widen the <em>columns</em> — the value becomes a
+mean + std pair,
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/247">#247</a> — but the row shape
+and the join are unaffected by that.)</p>
+<p><strong>v0.7 upgrade: time-varying, and the join changes.</strong> The
+<a href="../capacity-estimation/">differentiable-physics</a> capacity model produces a value that changes over
+time (panel degradation, inverter trips, seasonal derating). At that point two things change, and
+nothing else:</p>
+<ul>
+<li>the <code>effective_capacity</code> asset body emits one row per <code>(time_series_id, time)</code>; and</li>
+<li><code>compute_metrics</code> changes its capacity join from <code>time_series_id</code>-only to a <strong>temporal as-of join</strong>
+  on <code>(time_series_id, valid_time)</code> — matching each forecast's <code>valid_time</code> to the capacity in effect
+  at that time.</li>
+</ul>
+<p>The <code>Metrics</code> schema and the rest of the metrics pipeline are untouched. Note the table is
+<strong>backward-looking only</strong> (it holds no future <code>valid_time</code>s): fine for historical CV folds (whose
+validation windows lie inside the observed history), but live-forecast scoring
+(<a href="../live-service/#production-monitoring">production monitoring</a>) must
+choose which reference time's capacity to apply rather than expecting a row at a future <code>valid_time</code>.</p>
+<p>One related distinction to keep straight: the <em>metric denominator</em> may use the full-history
+<strong>smoothed</strong> capacity estimate, but any capacity used to normalise model inputs at forecast init
+time (the two-pass training scheme) must be the <strong>causal</strong> estimate available at that init time, or
+backtests gain lookahead — see
+<a href="../capacity-estimation/#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme">Capacity estimation</a>.</p>
+<h3 id="tail-exceedance-metrics-scoring-the-question-nged-actually-asks">Tail &amp; exceedance metrics — scoring the question NGED actually asks 🚧</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/254">#254</a></p>
+<p>NGED's goal is <strong>flexibility procurement</strong>: paying flexible customers to reduce demand when a
+substation risks running beyond its capability. The question they ask of a forecast is therefore
+"<strong>will load cross the limit?</strong>" — their operator tool plots demand as headroom below a
+constraint line (see <a href="../../background/nged-incumbent-forecast/#the-operators-view">NGED's incumbent
+forecast</a>), and the
+<a href="../../background/requirements/#the-worst-case-matters-most-forecasting-threshold-exceedance">requirements</a>
+name threshold exceedance as the core concept. The existing metrics lean toward the tails (the
+mean pinball loss is deliberately tail-weighted; PICP covers the p1–p99 band) but they measure
+upper-quantile skill <em>at every hour equally</em> — including hours when nothing is anywhere near a
+limit. This section adds the metrics that measure skill <em>near the limit</em> itself.</p>
+<p>One design rule governs the whole section: <strong>never rank models on a sample selected by what
+actually happened.</strong> Scoring models only on the top-N% highest <em>observed</em> half-hours rewards
+models that simply bias every forecast upward — the "forecaster's dilemma", explained in
+plain language in the <a href="../../techniques/evaluation-metrics/#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened">evaluation-metrics
+reference</a>.
+Ranking-grade tail emphasis instead comes from proper scores re-weighted toward the tail and
+computed over <strong>all</strong> hours. Concretely, three metrics — definitions, equations, and intuitive
+explanations in the <a href="../../techniques/evaluation-metrics/#tail-and-exceedance-metrics">evaluation-metrics
+reference</a>:</p>
+<ul>
+<li>
+<p><strong>Threshold-weighted CRPS
+  (<a href="../../techniques/evaluation-metrics/#threshold-weighted-crps-twcrps">twCRPS</a>)</strong> — CRPS
+  confined to behaviour above a per-series threshold; the headline <em>ranking</em> metric for tail
+  skill. Implementation is nearly free: replace members and observation by <code>max(value,
+  threshold)</code> and reuse the existing fair-CRPS aggregation unchanged, inheriting its
+  comparability across ensemble sizes.</p>
+</li>
+<li>
+<p><strong><a href="../../techniques/evaluation-metrics/#exceedance-rate-of-the-upper-delivery-quantiles">Exceedance rate of the upper delivery
+  quantiles</a></strong>
+  (p80–p99) — "when we said p95, was it exceeded ~5% of the time?"; the plain-language
+  <em>calibration</em> check for the tail quantiles NGED reads, one-sided where PICP's bands are
+  symmetric.</p>
+</li>
+<li>
+<p><strong><a href="../../techniques/evaluation-metrics/#brier-score-for-threshold-exceedance">Brier score for threshold
+  exceedance</a></strong> —
+  grades the ensemble's "chance that load exceeds the threshold" the way one would grade a
+  "70% chance of rain" forecast; the most <em>decision-legible</em> number, scoring exactly the
+  warning NGED acts on.</p>
+</li>
+</ul>
+<p>All three fit the existing <code>Metrics</code> schema — <code>metric_param</code> carries the threshold or quantile
+label — so there is no schema change.</p>
+<p><strong>Thresholds: static, per-series, quantile-derived.</strong> A substation's true limit is not a
+single number (ratings vary with ambient temperature; transformers tolerate short overloads,
+so exceedance <em>duration</em> matters; switching changes what a feeder carries — NGED's own limit
+line is a time-varying "Flex Profile"). We deliberately do not model any of that for scoring.
+Each series gets two static thresholds — the P90 and P98 of its full observation history, in
+the series type's constraint-side direction (high load for demand; reverse power flow for
+generation) — chosen because they guarantee every series a scoreable event rate, mean the same
+thing across series, and stay stable across CV folds. Physical firm/flex ratings, where NGED
+supplies them, feed ad-hoc case studies and dashboard overlays instead: a rating that is never
+breached in the validation window yields zero events, and a warning system cannot be graded on
+events that never happen. The full rationale, and the explicit "this is a proxy" caveat, live
+in <a href="../../techniques/evaluation-metrics/#choosing-the-thresholds-static-per-series-quantile-derived">the threshold-choice
+section</a>
+of the reference.</p>
+<p><strong>Diagnostic slices — never ranking columns.</strong> Two observed-outcome views stay available for
+<em>understanding</em> a model's errors, clearly labelled as ineligible for ranking (the design rule
+above): a <strong>peak-events slice</strong> (the top 5% highest-observed-demand half-hours, via the same
+population-filter mechanism as the Tricky-days filter) and <strong>hand-picked "hard examples"</strong> —
+historically difficult periods NGED supplies, scored as case studies.</p>
+<p>These metrics also serve the <a href="#delivering-the-probabilistic-metrics">probabilistic-calibration
+work</a>: an underdispersed ensemble pushes its exceedance
+probabilities to 0 or 1 too early, so the Brier score and exceedance rates are the sharpest
+before/after instruments for Phases C and D.</p>
+<h4 id="implementation-details-tail-exceedance-metrics-deleted-when-this-ships">Implementation details — tail &amp; exceedance metrics (deleted when this ships)</h4>
+<ul>
+<li><strong>Thresholds:</strong> compute per-series <code>hist_p90</code> / <code>hist_p98</code> scalars from the full observation
+  history alongside (or within) the <code>effective_capacity</code> asset — same full-history stability
+  rationale, same join shape (<code>time_series_id</code>-only). Constraint-side direction resolved per
+  <code>time_series_type</code>; confirm the mapping with NGED for ambiguous types (BESS charges <em>and</em>
+  discharges).</li>
+<li><strong>twCRPS:</strong> transform members and observation with <code>pl.max_horizontal(col, threshold)</code> and
+  reuse the existing fair-CRPS expression (sorted-member identity, Float64 accumulation)
+  verbatim, once per threshold rung.</li>
+<li><strong>Exceedance rates:</strong> compare <code>y</code> against the already-computed empirical quantile columns
+  for p80, p90, p95, p98, p99 — one boolean mean per level.</li>
+<li><strong>Brier score:</strong> exceedance probability = member fraction above the threshold; outcome
+  indicator from <code>y</code>; squared difference, averaged.</li>
+<li><strong>MLflow allowlist:</strong> extend <code>_MLFLOW_LOGGED_PARAMETRIC</code> with a small headline subset (e.g.
+  <code>twcrps@hist_p98</code>, exceedance rate at p95, <code>brier@hist_p98</code>); decide the exact set at
+  implementation time and keep it small — everything is in Delta regardless.</li>
+<li><strong>Peak-events diagnostic slice:</strong> one more named population filter on the shared mechanism
+  (with the Tricky-days filter), flagged in the leaderboard UI as diagnostic-only.</li>
+<li><strong>Verification:</strong> hand-computed toy-ensemble values for all three metrics; cross-check
+  twCRPS against the <code>scoringrules</code> reference implementation; Monte-Carlo the finite-ensemble
+  one-sided exceedance references (mirroring the PICP reference-table verification); on a
+  smoke fold, confirm <code>nged_incumbent</code>'s P95 operating point scores well on the p95 exceedance
+  rate while paying for its conservatism on Brier/twCRPS sharpness.</li>
+</ul>
+<h3 id="tricky-days-a-calendar-deterministic-metric-filter">Tricky days — a calendar-deterministic metric filter 🚧</h3>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/255">#255</a></p>
+<p>Alongside the tail &amp; exceedance metrics, we add a <strong>"Tricky days"</strong> filter: score models separately on the handful of
+calendar dates whose demand shape departs sharply from the usual weekly rhythm. We scope it
+deliberately to the <strong>calendar-deterministic</strong> set — fixed and moveable public holidays (Christmas,
+Easter, and the rest of the GB bank holidays) plus the two annual daylight-saving transitions —
+because these are exactly the days our weekday/seasonal analogues are <em>built</em> to mishandle. Days
+that are hard for <em>data-dependent</em> reasons stay in their own already-planned filters:
+<a href="#measuring-performance-during-switching-events">switching-event days</a> and NGED's hand-picked
+"hard examples" (above). One shared filter <em>mechanism</em>, several named filters — folding genuinely
+different failure modes into one bucket would make the number impossible to act on ("bad on tricky
+days" — is that Christmas, or a switching event?).</p>
+<p>Mechanically it is another population filter (the same mechanism the peak-events diagnostic
+slice uses): a boolean flag per timestep, derived from <code>valid_time</code> alone. Unlike that
+observed-peak slice, this one <em>is</em> a legitimate ranking column: the flag depends only on the
+calendar, which every forecaster knew in advance, so it does not fall into the
+<a href="../../techniques/evaluation-metrics/#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened">forecaster's-dilemma
+trap</a>. Because it is purely
+calendar-driven it <strong>shares its calendar module with <code>nged_incumbent_holiday_aligned</code></strong> — the same
+GB bank-holiday calendar (the pure-Python <code>holidays</code> package) plus the two DST dates feed both the
+holiday-aligned baseline and this metric filter. And the two reinforce each other: <code>nged_incumbent</code>
+(no holiday logic) should be <em>visibly</em> worst on tricky days, and <code>nged_incumbent_holiday_aligned</code>
+should recover most of the gap — turning "we added holiday alignment" into a <em>measurable</em> number,
+exactly the cheap-upgrades story we want to show NGED.</p>
+<p><strong>Flag the day <em>and</em> its analogue-relevant neighbours, not just the day itself.</strong> The disruption
+spills onto surrounding timesteps:</p>
+<ul>
+<li><strong>DST transitions</strong>: the hard part is not only the 23/25-hour day but that lag and analogue
+  features are misaligned by an hour on the days either side.</li>
+<li><strong>The Christmas run-up</strong>: demand in the days <em>before</em> Christmas is already atypical, so the window
+  must cover the run-up, not just the 25th.</li>
+</ul>
+<p>So the flag covers a small <strong>window</strong> around each date rather than a single day; the exact per-event
+widths are an implementation-time choice.</p>
+<p><strong>A subtlety to document now but <em>not</em> model yet.</strong> The shape of the Christmas run-up depends not
+just on the number of days before Christmas but also on <strong>which weekday Christmas falls on</strong> — the
+run-up demand pattern shifts year to year with that day-of-week alignment. We record it here as a
+known effect; the v0.3 tricky-days <em>flag</em> ignores it (it simply marks the window), and we defer any
+explicit day-of-week-aware modelling of the run-up until there is evidence it moves the leaderboard.</p>
+<h4 id="implementation-details-tricky-days-deleted-when-this-ships">Implementation details — tricky days (deleted when this ships)</h4>
+<ul>
+<li>A small calendar module (shared with baseline 2, <code>nged_incumbent_holiday_aligned</code>) answers, for
+  any <code>valid_time</code>, whether it falls inside a tricky-days window. Back it with the <code>holidays</code> GB
+  calendar plus the two annual DST dates; expose the per-event window widths as config.</li>
+<li>Represent the tricky-days slice the same way the peak-events diagnostic slice is represented —
+  one more named population filter, resolved by the same mechanism, <strong>not</strong> a new schema axis —
+  so the leaderboard gains a <strong>Tricky days</strong> column with no <code>Metrics</code> schema change.</li>
+<li>Verification: unit-test the flag on known dates (a Christmas week, an Easter, both DST
+  switchovers, and a plain week that must be <em>excluded</em>); on a smoke-test fold, confirm
+  <code>nged_incumbent</code> scores worse on the tricky-days slice than overall.</li>
+</ul>
+<hr />
+<h2 id="time-slices-for-performance-evaluation">Time-slices for performance evaluation</h2>
+<p>We compute every metric separately per horizon slice, because the driver of model skill changes
+with lead time:</p>
+<table>
+<thead>
+<tr>
+<th>Horizon slice</th>
+<th>Industry term</th>
+<th>Primary driver of model skill</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0–6 hours</td>
+<td>Intraday / Nowcasting</td>
+<td>Lagged power &amp; persistence. NWP is often too coarse to beat simple autoregressive features here.</td>
+</tr>
+<tr>
+<td>6–36 hours</td>
+<td>Day-Ahead</td>
+<td>Deterministic NWP. Covers the critical day-ahead market gate; relies on the diurnal cycle + high-res weather.</td>
+</tr>
+<tr>
+<td>Day 2–7</td>
+<td>Short/Medium Range</td>
+<td>Synoptic weather. Skill driven by mapping large weather fronts to power; ensemble spread starts to matter.</td>
+</tr>
+<tr>
+<td>Day 8–14</td>
+<td>Extended Range</td>
+<td>Ensemble probabilities. Deterministic weather is essentially noise; skill comes from processing ensemble uncertainty.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="measuring-performance-during-switching-events">Measuring performance during switching events 🚧</h3>
+<p>We will flag each timestep for whether it contains a switching event, and compute metrics separately
+for periods with switching events in the model inputs (or in the forecast's <code>valid_time</code>). This
+distinguishes models that perform well <em>only</em> on clean periods from models that handle switching
+events in their inputs. In v1 the flags can come straight from NGED's logged switching events
+for the trial area; a fleet-scale version would need the discrete detector described in
+<a href="../switching-events/">Switching events &amp; latent demand</a>, whose fate is an open question — see
+<a href="../switching-events/#the-decision-point-a-feature-based-mainline-vs-the-staged-detector">the decision point</a>.</p>
+<hr />
+<h2 id="delivering-the-probabilistic-metrics">Delivering the probabilistic metrics 🚧</h2>
+<p>Issue: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/225">#225</a></p>
+<p>The 51-member ensemble is very likely <strong>underdispersed</strong>: XGBoost trained with squared error on
+the control member (<code>cv_assets.py:373</code>) learns a conditional mean, so pushing 51 members through
+it yields spread from <em>weather uncertainty only</em> — no model or observation uncertainty. Such
+ensembles are systematically overconfident, worst at short horizons where members haven't
+diverged. Flexibility procurement is a tails problem (P90+ peaks), so this hits the use case
+directly. Phases A and B below (both shipped) built the measurement machinery — every metric in
+the <a href="../../techniques/evaluation-metrics/">evaluation-metrics reference</a>, per horizon slice; the
+remaining phases act on what those numbers show. The planned
+<a href="#tail-exceedance-metrics-scoring-the-question-nged-actually-asks">tail &amp; exceedance metrics</a>
+will sharpen the picture further: an underdispersed ensemble pushes its exceedance
+probabilities to 0 or 1 too early, so the Brier score and the quantile exceedance rates are
+the clearest before/after instruments for Phases C and D.</p>
+<p>The theory behind this diagnosis — the three-term uncertainty decomposition, why a
+deterministic model driven by an NWP ensemble captures only the weather term, and what the
+principled fix looks like — is the durable explainer
+<a href="../../techniques/probabilistic-forecasting/">Probabilistic forecasting from NWP ensembles</a>.
+This section is the <em>plan</em> that applies it.</p>
+<p>Fix in four phases, each an independent PR (Phase D is itself several PRs). Phases A and B are
+pure evaluation (no model changes) and should land before any further MAE-driven
+experimentation.</p>
+<h3 id="phase-a-horizon-sliced-metrics">Phase A — horizon-sliced metrics ✅</h3>
+<p>Shipped. <code>compute_metrics</code> now scores every metric per <code>HORIZON_SLICES</code> band (derived from
+<code>valid_time − power_fcst_init_time</code>, with the ensemble collapsed per forecast run), and
+<code>build_mlflow_aggregate_metrics</code> logs overall per-slice keys like <code>nmae__all__day_ahead</code>.</p>
+<h3 id="phase-b-probabilistic-metrics-from-the-existing-ensemble">Phase B — probabilistic metrics from the existing ensemble ✅</h3>
+<p>Shipped. <code>compute_metrics</code> now computes fair CRPS, the Fortin-corrected spread-skill ratio,
+pinball loss at the thirteen NGED delivery quantiles (plus their mean), and PICP and interval
+width for the six symmetric delivery bands — all member-aware, computed before the
+ensemble-mean collapse, per horizon slice. Definitions, equations, and the design decisions
+(fair CRPS divisor, RMS spread, delivery quantiles, MLflow allowlist) live in the
+<a href="../../techniques/evaluation-metrics/">evaluation-metrics reference</a>.</p>
+<h3 id="phase-c-cheap-calibration-after-b-proves-the-diagnosis">Phase C — cheap calibration (after B proves the diagnosis)</h3>
+<p>Decide based on Phase B's spread-skill numbers — and on the <strong>rank (Talagrand) histogram</strong> of
+the observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms
+plain underdispersion (a single multiplicative inflation can fix it), whereas a sloped or
+asymmetric histogram means bias or shape error, which a symmetric inflation cannot repair and
+which would push toward a rank-dependent correction instead. <strong>Post-hoc spread inflation</strong>
+(EMOS-lite): per
+horizon slice, fit a scalar <code>s</code> on the <em>training</em> window so that inflating members around the
+ensemble mean (<code>mean + s·(member − mean)</code>) makes spread match error. Zero schema change, zero
+new model — implementable as an optional step in <code>predict</code> or as a wrapper forecaster. Fit on
+train, apply on validation (no tuning on the fold being scored).</p>
+<p>Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
+forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn its
+build cost.</p>
+<h3 id="phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2">Phase D — ensemble of quantile forecasts (Representation 3 → pooled Representation 2)</h3>
+<p>The full fix from the
+<a href="../../techniques/probabilistic-forecasting/">probabilistic-forecasting explainer</a>: have the
+model emit a <strong>conditional distribution per ensemble member</strong> (per-member quantiles —
+<a href="../delivery-tables/#representation-3-ensemble-of-percentile-forecasts">Representation 3</a> in the
+delivery tables), then recombine the 51 members with the <strong>linear-pool mixture</strong> into one set
+of delivered percentiles
+(<a href="../delivery-tables/#representation-2-percentiles">Representation 2</a>). Three steps, one PR
+each:</p>
+<ol>
+<li><strong>Percentile representations in <code>PowerForecast</code></strong>
+   (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/262">#262</a>) — extend the
+   contract (and the Delta write/read paths) with the Rep 2 and Rep 3 percentile columns,
+   alongside the existing deterministic-ensemble representation.</li>
+<li><strong>Quantile XGBoost model family</strong>
+   (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/263">#263</a>) —
+   <code>objective: reg:quantileerror</code> with several
+   <code>quantile_alpha</code>s, as a separate experiment/model family emitting Rep 3. Sort each member's
+   quantiles at predict time (monotonic rearrangement fixes quantile crossing). The lead-time
+   feature and training on multiple members
+   (<a href="../xgboost-improvements/">xgboost-improvements</a> — the lead-time feature and ensemble-member training) are the double-counting
+   mitigations discussed in the explainer — land them first or measure without them
+   consciously.</li>
+<li><strong>Linear-pool combining step</strong>
+   (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/264">#264</a>) — pool the
+   per-member quantiles into delivered Rep 2
+   percentiles (the pseudo-sample recipe in the explainer), with a per-horizon affine
+   recalibration hook (fit on train) applied only if the pooled spread-skill/PICP numbers
+   demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C inflated
+   deterministic champion.</li>
+</ol>
+<hr />
+<h2 id="grouping-the-results">Grouping the results</h2>
+<p>Each ML experiment is tagged with metadata so we can group experiments and compute average
+performance per group (e.g. "does lagged power <em>always</em> help, regardless of model sophistication?",
+or "how robust is each model to weather-forecast uncertainty — ERA5 reanalysis vs. operational
+NWP?"). Example tags:</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Example values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_series_type</code></td>
+<td>PV, Wind, disaggregated demand (primaries)</td>
+</tr>
+<tr>
+<td><code>model_family</code></td>
+<td>nged_incumbent, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp</td>
+</tr>
+<tr>
+<td><code>weather_source</code></td>
+<td>none, ecmwf_control, full_ecmwf_ensemble, era5</td>
+</tr>
+<tr>
+<td><code>input_features</code></td>
+<td>datetime, power_lag_24h, power_lag_7d, temperature</td>
+</tr>
+<tr>
+<td><code>training_strategy</code></td>
+<td>direct_multistep, horizon_as_feature, end_to_end</td>
+</tr>
+<tr>
+<td><code>generator_capacity_estimation</code></td>
+<td>none, simple_p99, convex_envelope, differentiable_physics</td>
+</tr>
+<tr>
+<td><code>switching_event_detection</code></td>
+<td>none, simple_statistical</td>
+</tr>
+<tr>
+<td><code>pre_training</code></td>
+<td>none, ERA5</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Estimating <strong>cost savings (£)</strong> attributable to each forecasting approach, per leaderboard row, is
+a 🔬 v2 stretch goal.</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

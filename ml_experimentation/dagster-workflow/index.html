@@ -1,0 +1,2886 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../model-configuration/">
+      
+      
+        <link rel="next" href="../cross-validation-folds/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Running an experiment end-to-end - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#running-an-ml-experiment-end-to-end" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Running an experiment end-to-end
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-materialise-power_time_series_and_metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Materialise power_time_series_and_metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-materialise-h3_grid_weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Materialise h3_grid_weights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-materialise-ecmwf_ens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Materialise ecmwf_ens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-materialise-eligible_time_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Materialise eligible_time_series
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-launch-register_experiment_job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Launch register_experiment_job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-materialise-trained_cv_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Materialise trained_cv_model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-materialise-cv_power_forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — Materialise cv_power_forecasts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspecting-a-forecast-the-view_forecasts-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a forecast — the view_forecasts dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-8-materialise-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8 — Materialise metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-results-in-the-mlflow-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing results in the MLflow UI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-reconstructing-a-run-from-its-stamped-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility: reconstructing a run from its stamped provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-trained_cv_model-reads-config-from-mlflow-not-from-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why trained_cv_model reads config from MLflow, not from YAML
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-materialise-power_time_series_and_metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Materialise power_time_series_and_metadata
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-materialise-h3_grid_weights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Materialise h3_grid_weights
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-materialise-ecmwf_ens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Materialise ecmwf_ens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-materialise-eligible_time_series" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Materialise eligible_time_series
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-launch-register_experiment_job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Launch register_experiment_job
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-materialise-trained_cv_model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Materialise trained_cv_model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-materialise-cv_power_forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — Materialise cv_power_forecasts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspecting-a-forecast-the-view_forecasts-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a forecast — the view_forecasts dashboard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-8-materialise-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8 — Materialise metrics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#viewing-results-in-the-mlflow-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viewing results in the MLflow UI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducibility-reconstructing-a-run-from-its-stamped-provenance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducibility: reconstructing a run from its stamped provenance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-trained_cv_model-reads-config-from-mlflow-not-from-yaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why trained_cv_model reads config from MLflow, not from YAML
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="running-an-ml-experiment-end-to-end">Running an ML experiment end-to-end</h1>
+<p>How to go from raw data to a trained, MLflow-tracked model using the Dagster pipeline.</p>
+<p>The pipeline has two layers. The <strong>data layer</strong> (steps 1–4) is built once and refreshed as new
+data arrives; it is shared by all experiments. The <strong>experiment layer</strong> (steps 5–8) is repeated
+for each new model or hyperparameter configuration — see <a href="../model-configuration/">Model configuration</a>
+for how to choose features and set hyperparameters.</p>
+<hr />
+<h2 id="step-1-materialise-power_time_series_and_metadata">Step 1 — Materialise <code>power_time_series_and_metadata</code></h2>
+<p><strong>Trigger:</strong> Materialise in the Dagster UI (unpartitioned — no partition to select).</p>
+<p>Pulls the latest NGED telemetry from S3, appends new rows to the <code>power_time_series.delta</code> Delta
+table (partitioned by <code>time_series_id</code>), and upserts <code>metadata.parquet</code>. Re-materialise whenever
+you want to bring in new NGED data.</p>
+<h2 id="step-2-materialise-h3_grid_weights">Step 2 — Materialise <code>h3_grid_weights</code></h2>
+<p><strong>Trigger:</strong> Materialise (unpartitioned). Only needs to be done once unless the GB boundary
+geometry or H3 resolution changes.</p>
+<p>Computes the fractional overlap of H3 cells with the GB boundary at the NWP grid resolution
+(0.25°). The result (<code>h3_grid_weights.parquet</code>) is the lookup table <code>ecmwf_ens</code> uses to map
+gridded NWP forecasts onto the H3 cells attached to each substation.</p>
+<h2 id="step-3-materialise-ecmwf_ens">Step 3 — Materialise <code>ecmwf_ens</code></h2>
+<p><strong>Trigger:</strong> Materialise the daily partitions from <code>2024-04-01</code> up to today (or up to the end
+of your training window). Use "Materialise all" or select a date range in the Dagster UI.</p>
+<p>Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
+appends it to <code>nwp_data.delta</code> (partitioned by <code>[nwp_model_id, init_time]</code>) as physical-unit
+<code>Float32</code> rounded to a 13-bit significand at write time by <code>delta_store.nwp</code>. The <code>pool="ECMWF"</code> concurrency limit prevents OOM errors when
+backfilling — Dagster schedules downloads one at a time if you materialise many partitions at
+once.</p>
+<h2 id="step-4-materialise-eligible_time_series">Step 4 — Materialise <code>eligible_time_series</code></h2>
+<p><strong>Trigger:</strong> Materialise the fold partition(s) you need, e.g. <code>mid_2025_to_mid_2026</code>.</p>
+<p>Scans <code>power_time_series.delta</code> to determine which <code>time_series_id</code>s have enough data coverage
+for the fold: at least <code>min_training_months</code> (default 6) of observations before <code>val_start</code>,
+and observations through <code>val_end</code>. The result is written to <code>eligible_time_series.delta</code> as an
+idempotent partition overwrite, so re-materialising replaces rather than appends.</p>
+<p>Eligibility is a function of data coverage only — it is independent of any model or config —
+so every experiment is scored on the identical population for a given fold. <strong>Do not skip this
+step before training.</strong></p>
+<hr />
+<h2 id="step-5-launch-register_experiment_job">Step 5 — Launch <code>register_experiment_job</code></h2>
+<p><strong>Trigger:</strong> Dagster UI → Jobs → <code>register_experiment_job</code> → "Launch run". Fill in the
+<code>RegisterExperimentConfig</code> fields in the run config dialog:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>experiment_name</code></td>
+<td><code>"xgboost_smoke_test"</code></td>
+<td>Unique; becomes the MLflow experiment name and partition-key prefix</td>
+</tr>
+<tr>
+<td><code>base_model_config</code></td>
+<td><code>"conf/model/xgboost.yaml"</code></td>
+<td>Path relative to <code>PROJECT_ROOT</code></td>
+</tr>
+<tr>
+<td><code>config_overrides</code></td>
+<td><code>{"n_estimators": 100}</code></td>
+<td>Merged onto <code>model_params</code> in the YAML</td>
+</tr>
+<tr>
+<td><code>run_mode</code></td>
+<td><code>"smoke_test"</code></td>
+<td><code>smoke_test</code> adds the non-leaderboard dev folds (e.g. <code>smoke_test</code>); <code>full_cv</code> or <code>register_only</code> adds the leaderboard folds</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>"Quick sanity check"</code></td>
+<td>Stored as an MLflow tag — optional</td>
+</tr>
+</tbody>
+</table>
+<p><code>smoke_test</code> is the right choice for a first run: it adds only one partition key, so you can
+verify the full pipeline is wired up before committing to a potentially long <code>full_cv</code> training.</p>
+<p><strong>What the job does:</strong></p>
+<ol>
+<li>Loads <code>base_model_config</code> with OmegaConf and merges <code>config_overrides</code> onto <code>model_params</code>.</li>
+<li>Instantiates the <code>BaseForecasterConfig</code> subclass via Hydra.</li>
+<li>Creates the MLflow experiment (or resolves the existing one if the name already exists) and
+   stamps four tags onto it: the resolved config as JSON (<code>config</code>), the fully-qualified Python
+   class path of the forecaster (<code>forecaster_target</code>), the class path of the config class
+   (<code>config_target</code>), and your <code>description</code>.</li>
+<li>Creates the experiment's parent run (<code>cv_summary</code>) and logs the config as flattened params.</li>
+<li>Adds dynamic partition keys (<code>"{experiment_name}__{fold_id}"</code>) to the <code>cv_experiment_folds</code>
+   partition set, one per fold included in the <code>run_mode</code>.</li>
+</ol>
+<p>The job is <strong>idempotent</strong>: re-running it with the same <code>experiment_name</code> resolves the existing
+MLflow experiment and partition keys rather than creating duplicates.</p>
+<h2 id="step-6-materialise-trained_cv_model">Step 6 — Materialise <code>trained_cv_model</code></h2>
+<p><strong>Trigger:</strong> Materialise the partition <code>"{experiment_name}__{fold_id}"</code>, e.g.
+<code>"xgboost_smoke_test__smoke_test"</code>. The partition only appears after step 5 has run.</p>
+<p><strong>What the asset does:</strong></p>
+<ol>
+<li>Parses the partition key into <code>experiment_name</code> and <code>fold_id</code>.</li>
+<li>Reads the forecaster class and resolved config from the MLflow experiment tags (see below).</li>
+<li>Determines the training window: <code>[train_start 00:00 UTC, train_end 23:59 UTC]</code>.</li>
+<li>Reads the eligible <code>time_series_id</code>s from the <code>eligible_time_series</code> asset for this fold. If the
+   set is empty (the fold was never materialised in step 4, or no series meets the eligibility
+   window) the asset <strong>raises</strong> rather than silently training nothing.</li>
+<li>Loads inputs for the training window and eligible population. The NWP scan is pruned at the
+   source — control member only, the eligible series' H3 cells, and the window's <code>init_time</code>
+   partitions — and collected with the <strong>streaming engine</strong>, so a multi-month fold trains in a few
+   GB rather than OOMing on the tens-of-GB NWP table (see the "Bounding feature-engineering memory"
+   notes in <code>docs/architecture/overview.md</code>).</li>
+<li>Engineers features via the forecaster's <code>feature_engineer.engineer()</code>.</li>
+<li>Calls <code>forecaster.train(features, eligible_ids)</code> (the population is passed explicitly). The asset
+   then <strong>raises</strong> if zero boosters were trained (e.g. no series had usable power in the window).</li>
+<li>Resolves the MLflow fold run by tag and uploads the trained model artifacts via
+   <code>forecaster.save_to_mlflow(fold_run_id)</code>.</li>
+<li>Logs training params (<code>fold_id</code>, <code>train_start</code>, <code>train_end</code>, <code>n_eligible_time_series</code>,
+   <code>n_trained_time_series</code>) to the fold run.</li>
+</ol>
+<p>The MLflow run structure after training looks like this:</p>
+<div class="highlight"><pre><span></span><code>Experiment &quot;xgboost_smoke_test&quot;
+└── cv_summary (parent run)   tags={cv_role: parent}
+    │   params: n_estimators=100, learning_rate=0.05, …
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
+            params: train_start, train_end, n_eligible_time_series, n_trained_time_series
+            artifacts: model/   ← trained model binary files
+</code></pre></div>
+<hr />
+<h2 id="step-7-materialise-cv_power_forecasts">Step 7 — Materialise <code>cv_power_forecasts</code></h2>
+<p><strong>Trigger:</strong> Materialise the same <code>"{experiment_name}__{fold_id}"</code> partition (it depends on
+<code>trained_cv_model</code>).</p>
+<p><strong>What the asset does:</strong></p>
+<ol>
+<li>Loads the fold's model back from MLflow (via the local-disk cache) and reads its
+   <code>trained_time_series_ids</code> — the population it scores (the train==predict invariant). Raises if
+   the loaded model has no trained series.</li>
+<li>Forecasts the <strong>inclusive validation window</strong> across <strong>all ~51 NWP ensemble members</strong> (the
+   probabilistic leaderboard metrics are meaningless on a single member).</li>
+<li>Bounds memory by predicting <strong>one <code>init_time</code> chunk at a time</strong> (<code>_PREDICT_INIT_CHUNK</code>, 14 days):
+   the full ensemble over the whole window is tens of GB, so chunking on <code>init_time</code> (the partition
+   key and the axis that fans the output out across runs) keeps each chunk's forecast frame small
+   while every partition is read once. Measured ~9 GB peak for a 10-month fold.</li>
+<li>Writes to the <code>power_forecasts</code> Delta table keyed by <code>(experiment_name, fold_id)</code>: the <strong>first</strong>
+   chunk overwrites the partition (clearing any prior run), the rest <strong>append</strong>, so a full
+   re-materialisation replaces the fold's rows without ever holding all forecasts in memory.</li>
+<li>Logs <code>val_start</code>/<code>val_end</code> params and <code>n_forecast_rows</code>/<code>n_forecast_time_series</code>/
+   <code>n_ensemble_members</code> metrics to the fold run.</li>
+</ol>
+<hr />
+<h2 id="inspecting-a-forecast-the-view_forecasts-dashboard">Inspecting a forecast — the <code>view_forecasts</code> dashboard</h2>
+<p>Once forecasts exist in the <code>power_forecasts</code> Delta table, the <code>view_forecasts</code> marimo app plots
+a single forecast so you can eyeball it. It is independent of the training flow above — launch it
+any time there are forecasts on disk to inspect:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>marimo<span class="w"> </span>edit<span class="w"> </span>packages/dashboard/view_forecasts.py
+</code></pre></div>
+<p>Pick the population with the dropdowns: the <strong>Fold</strong> dropdown lists every <code>fold_id</code> present in
+the <code>power_forecasts</code> table (a CV fold label, a smoke-test fold, or <code>live</code> for production
+forecasts), and an <strong>Experiment</strong> dropdown appears when the chosen fold holds more than one
+<code>experiment_name</code>. Then choose a <strong>time series</strong> (the dropdown groups the 32 series by type, so
+all the PV sites or all the primaries sit together), a <strong>forecast date</strong>, and one of that day's
+<strong>forecast runs</strong>.</p>
+<p>The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
+including past the init time) as a thick blue line, and a vertical rule at the forecast init
+time, spanning 24 hours before the init time to 14 days after it. The x-axis is labelled at
+midnight (Europe/London) with the day of week and date, with unlabelled minor ticks every 3
+hours. Scroll to zoom, drag to pan, hover for the <code>ensemble_member</code> and value.</p>
+<p>The <strong>Data source</strong> radio switches the app between the local data tables (the root <code>.env</code>) and
+the production S3 buckets without restarting marimo — see the
+<a href="https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard">dashboard README</a>
+for the <code>.env.s3</code> setup, and
+<a href="../../live_service/operations/#inspecting-a-live-forecast">Operating the live service: Inspecting a live forecast</a>
+for the production workflow.</p>
+<hr />
+<h2 id="step-8-materialise-metrics">Step 8 — Materialise <code>metrics</code></h2>
+<p><strong>Trigger:</strong> Materialise (unpartitioned — not tied to a single fold). Fill in <code>MetricsConfig</code>
+in the run config dialog before launching.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Example</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>population_filter.experiment_name</code></td>
+<td><code>"xgboost_smoke_test"</code></td>
+<td>Filters <code>power_forecasts</code> to one experiment; leave null to score all experiments at once</td>
+</tr>
+<tr>
+<td><code>population_filter.fold_id</code></td>
+<td><code>"mid_2025_to_mid_2026"</code></td>
+<td>Filters to one fold; leave null to score all folds for the experiment</td>
+</tr>
+<tr>
+<td><code>population_filter.valid_time_min/max</code></td>
+<td><code>"2025-10-01T00:00:00+00:00"</code></td>
+<td>ISO-8601 UTC; trims the valid_time window for ad_hoc scoring</td>
+</tr>
+<tr>
+<td><code>evaluation_scope</code></td>
+<td><code>"leaderboard"</code></td>
+<td><code>"leaderboard"</code> logs to MLflow; <code>"ad_hoc"</code> writes Delta only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What the asset does:</strong></p>
+<ol>
+<li>Scans <code>power_forecasts</code> Delta, applying any non-null <code>PopulationFilter</code> predicates. The
+   partition columns (<code>experiment_name</code> / <code>fold_id</code>) are <code>String</code>, matching what delta-rs stores,
+   so the predicates push straight into the Delta scan: naming an experiment/fold prunes to just
+   that partition rather than reading the whole (unbounded) table.</li>
+<li>Discovers the matching <code>(experiment_name, fold_id)</code> groups, then loads and scores <strong>one group at
+   a time</strong> — peak memory is a single fold, not the entire matched population. (A whole fold is
+   the <em>coarsest</em> chunk Polars can safely materialise: fine at V1 scale, but a V2-scale fold will
+   need sub-fold chunking — see
+   <a href="../../architecture/overview/#the-other-hard-ceiling-polars-32-bit-row-index">The other hard ceiling: Polars' 32-bit row index</a>.)
+   For each group:
+   a. Calls <code>compute_metrics()</code> — joins observed power, collapses each forecast run's ensemble
+      members into per-timestamp quantities, and computes the deterministic metrics
+      (MAE / NMAE / RMSE / MBE on the ensemble mean) plus the probabilistic metrics (fair
+      CRPS, spread-skill ratio, pinball loss at the 13 delivery quantiles, PICP and interval
+      width for the 6 symmetric bands) per
+      <code>(time_series_id, fold_id, power_fcst_model_name, horizon_slice)</code> — see the
+      <a href="../../techniques/evaluation-metrics/">evaluation-metrics reference</a> for definitions.
+   b. Enriches rows with scope (<code>evaluation_scope</code>), window bounds (<code>window_start</code>, <code>window_end</code>,
+      <code>window_label</code>), <code>computed_at</code>, and the MLflow fold run id (leaderboard scope only).
+   c. Writes to <code>forecast_metrics</code> Delta, partitioned by <code>(experiment_name, fold_id)</code> with an
+      idempotent overwrite predicate — safe to re-run without duplicating rows.</li>
+<li>For <code>evaluation_scope="leaderboard"</code>: builds an aggregate metric dict and logs it to the
+   fold's MLflow child run, then averages across folds and logs the mean to the parent run.
+   The key token is <code>{metric_name}</code> for scalar metrics and <code>{metric_name}_{metric_param}</code> for
+   parametric ones, in three families: overall (<code>rmse__all</code>, <code>crps__all</code>), per type
+   (<code>rmse__disaggregated_demand</code>), and per horizon slice (<code>nmae__all__day_ahead</code>). Parametric
+   metrics are restricted to a headline subset in MLflow (<code>pinball_loss</code> at p10/p50/p90;
+   <code>picp</code>/<code>interval_width</code> at p10_p90) — the full 13-quantile / 6-band detail stays in the
+   <code>forecast_metrics</code> Delta table.</li>
+</ol>
+<p>After step 8, the MLflow run structure looks like this:</p>
+<div class="highlight"><pre><span></span><code>Experiment &quot;xgboost_smoke_test&quot;
+└── cv_summary (parent run)   tags={cv_role: parent}
+    │   params: n_estimators=100, learning_rate=0.05, …
+    │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
+            params: train_start, train_end, …
+            metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
+            artifacts: model/
+</code></pre></div>
+<p>The <code>forecast_metrics</code> Delta table stores one row per
+<code>(time_series_id, fold_id, power_fcst_model_name, horizon_slice, metric_name, metric_param)</code>,
+with <code>time_series_type</code> populated from metadata so per-type queries need only a simple filter.</p>
+<hr />
+<h2 id="viewing-results-in-the-mlflow-ui">Viewing results in the MLflow UI</h2>
+<p>To browse experiments, compare the leaderboard, and inspect per-fold metrics and artifacts, launch
+the MLflow web UI against the same tracking store the pipeline writes to:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>mlflow<span class="w"> </span>ui<span class="w"> </span>--gunicorn-opts<span class="w"> </span><span class="s2">&quot;--workers 1&quot;</span>
+</code></pre></div>
+<p>Then open <code>http://localhost:5000</code>.</p>
+<p><strong>The <code>--gunicorn-opts</code> flag is required on Python 3.14.</strong> MLflow 3.14's default server
+(uvicorn + FastAPI) fails to start on Python 3.14 — <code>mlflow.server.assistant</code> imports
+<code>importlib.abc.Traversable</code>, which was removed in 3.14. Passing <code>--gunicorn-opts</code> selects the
+Flask/gunicorn server instead, which works. Drop the flag once MLflow ships a Python 3.14-compatible
+FastAPI server.</p>
+<p>Full MLflow (which bundles the web server) is in the <code>dev</code> dependency group, so <code>uv sync</code> installs
+it; production runs use <code>mlflow-skinny</code> (the client, without the server).</p>
+<h2 id="reproducibility-reconstructing-a-run-from-its-stamped-provenance">Reproducibility: reconstructing a run from its stamped provenance</h2>
+<p>Every run carries the code and data provenance needed to answer "exactly which code and which data
+produced this?". Each asset stamps <strong>stage-prefixed</strong> MLflow tags on the run it writes:</p>
+<ul>
+<li><code>register_git_sha</code> / <code>register_git_dirty</code> on the <strong>parent run</strong> — the code that registered the
+  experiment. (<code>git_dirty</code> is <code>true</code> when the working tree had uncommitted changes.)</li>
+<li><code>train_*</code>, <code>predict_*</code>, <code>metrics_*</code> on the <strong>fold run</strong> — one snapshot per stage, because
+  <code>trained_cv_model</code>, <code>cv_power_forecasts</code> and <code>metrics</code> all write to the same fold run and may run
+  days apart on different code. Each carries that stage's <code>git_sha</code> / <code>git_dirty</code> plus a
+  <code>{stage}_delta_version__{table}</code> tag holding the <a href="https://delta.io/">Delta Lake</a> version of every
+  table it read (e.g. <code>train_delta_version__power_time_series</code>, <code>train_delta_version__nwp_data</code>).
+  The git SHA is stamped explicitly rather than via MLflow's auto-detection, which needs gitpython
+  and a repo working directory — neither present in a production container (there the SHA degrades
+  to <code>unknown</code>, never failing the run).</li>
+</ul>
+<p>To reconstruct the training-time state of a fold: <code>git checkout {train_git_sha}</code>, then read each
+table at its logged version with Delta time travel —
+<code>pl.scan_delta(power_time_series_path, version=&lt;train_delta_version__power_time_series&gt;)</code>.</p>
+<hr />
+<h2 id="why-trained_cv_model-reads-config-from-mlflow-not-from-yaml">Why <code>trained_cv_model</code> reads config from MLflow, not from YAML</h2>
+<p>When <code>register_experiment_job</code> runs, it resolves the base YAML plus any overrides into a single
+concrete config and stamps it as a JSON tag on the MLflow experiment. <strong>The YAML file is only
+read at registration time.</strong> From that point on, the MLflow experiment record is the authoritative
+source for the experiment's config.</p>
+<p><code>trained_cv_model</code> reads the config back from those MLflow tags (via
+<code>load_experiment_forecaster(experiment_name)</code>) for three reasons:</p>
+<ol>
+<li>
+<p><strong>Immutability.</strong> The YAML on disk is mutable — someone could edit it between registering
+   the experiment and training fold 2. Reading from MLflow guarantees every fold of the same
+   experiment trains on exactly the config that was registered, no matter when it runs.</p>
+</li>
+<li>
+<p><strong>Process independence.</strong> Each <code>trained_cv_model</code> materialisation is a separate Dagster
+   process. There is no live handle to pass between the job and the asset; the MLflow experiment
+   name is the only shared identifier. The asset discovers everything it needs — forecaster class,
+   config — by looking up the experiment by name.</p>
+</li>
+<li>
+<p><strong>Safe retries.</strong> If a training run fails and Dagster retries it, the asset re-reads the same
+   MLflow tags and resumes the same MLflow fold run (which is identified by tag, not by a
+   transient handle). The retry is guaranteed to use the same config and land in the same run
+   as the original attempt.</p>
+</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

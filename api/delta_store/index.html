@@ -1,0 +1,3376 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../contracts/">
+      
+      
+        <link rel="next" href="../dynamical_data/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Delta Store - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#delta-store-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Delta Store
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="delta-store-api">Delta Store API</h1>
+<h1 id="delta_store"><code>delta_store</code></h1>
+<p>Physical storage policy for the project's Delta tables.</p>
+<h2 id="why-this-package-exists">Why this package exists</h2>
+<p><code>contracts</code> owns each table's <em>logical</em> shape and meaning. This package owns its <em>physical</em>
+layout: parquet writer properties (codec + per-column encodings), compression-friendly sort
+orders, and significand-precision rounding, plus the write helpers that apply them. Dagster
+assets stay thin by writing through this package rather than calling <code>write_deltalake</code> with
+ad-hoc settings — and it becomes impossible to land rows in a table without its storage format
+applied.</p>
+<p>The flagship example is the internal <code>power_forecasts</code> table: ZSTD + <code>DELTA_BINARY_PACKED</code>
+timestamps + <code>BYTE_STREAM_SPLIT</code> floats + member-adjacent sorting + rounding <code>power_fcst</code> to a
+13-bit significand shrank the 403.6M-row development table from 6.33 GB to 0.73 GB.</p>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><code>precision.round_to_significand_bits()</code> — rounds a <code>Float32</code> expression to a chosen number of
+  significand bits in pure Polars arithmetic (Veltkamp splitting), zeroing the low mantissa bits
+  so <code>BYTE_STREAM_SPLIT</code> + zstd can compress them away. The trick and its preconditions are
+  rigorously documented on the function.</li>
+<li><code>power_forecasts</code> — the <code>power_forecasts</code> table's writer properties, sort order, precision
+  policy, and <code>write_power_forecasts()</code>.</li>
+</ul>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="delta_store.precision" class="doc doc-heading">
+            <code>delta_store.precision</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Reduce the significand precision of <code>Float32</code> columns so parquet compression can work.</p>
+<p>Nearly every full-precision <code>Float32</code> value in a large forecast or weather table is distinct,
+so the low significand bits are incompressible noise — they defeat every general-purpose codec.
+Rounding each value to a small number of significand bits zeroes those low bits, after which
+<code>BYTE_STREAM_SPLIT</code> + zstd compress the column dramatically (see
+<code>delta_store.power_forecasts</code> for measured numbers), at the cost of a strictly bounded
+<em>relative</em> error.</p>
+<p>The rounding here is pure Polars arithmetic (no bit-twiddling, no numpy round-trip), which works
+because of a classical floating-point identity — Veltkamp splitting — documented in detail on
+:func:<code>round_to_significand_bits</code>.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h3 id="delta_store.precision-attributes">Attributes</h3>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.precision.FLOAT32_SIGNIFICAND_BITS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">FLOAT32_SIGNIFICAND_BITS</span> <span class="o">=</span> <span class="mi">24</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>IEEE 754 binary32 significand precision <code>p</code>: 23 explicit fraction bits + 1 implicit bit.</p>
+
+    </div>
+
+</div>
+
+
+<h3 id="delta_store.precision-functions">Functions:</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="delta_store.precision.round_to_significand_bits" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">round_to_significand_bits</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">keep_bits</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Round a <code>Float32</code> expression to <code>keep_bits</code> significand bits (round-to-nearest).</p>
+<p>The result is exactly representable with a <code>keep_bits</code>-bit significand, so the low
+<code>24 - keep_bits</code> explicit fraction bits of every finite output are zero — which is what
+lets <code>BYTE_STREAM_SPLIT</code> + zstd compress the column — and the relative error is bounded by
+the unit roundoff of a <code>keep_bits</code>-bit format:</p>
+<div class="highlight"><pre><span></span><code>|result - x| &lt;= 2**-keep_bits * |x|
+</code></pre></div>
+<p>(e.g. <code>keep_bits=13</code> -&gt; max relative error 2^-13 ~= 1.2e-4). Rounding is to nearest, so
+unlike truncation it introduces no systematic bias toward zero.</p>
+<p><strong>How it works — Veltkamp splitting.</strong> With <code>s = 24 - keep_bits</code> and the constant
+<code>C = 2**s + 1</code>, the expression computes, entirely in <code>Float32</code> round-to-nearest
+arithmetic (<code>RN</code>)::</p>
+<div class="highlight"><pre><span></span><code>c = RN(x * C)  # = RN(x*2^s + x)
+result = RN(c - RN(c - x))
+</code></pre></div>
+<p>Veltkamp's theorem (Veltkamp 1968; Dekker 1971, "A floating-point technique for extending
+the available precision", <em>Numerische Mathematik</em> 18; Muller et al., <em>Handbook of
+Floating-Point Arithmetic</em>, 2nd ed., §4.4, Algorithm 4.9 "Split") states that for
+<code>2 &lt;= s &lt;= p - 2</code> and no overflow, both subtractions are <strong>exact</strong> and <code>result</code> is <code>x</code>
+rounded to nearest onto <code>p - s = keep_bits</code> significand bits. The intuition: <code>x*C</code>
+stacks a copy of <code>x</code> shifted <code>s</code> exponent positions above itself; rounding that sum to
+<code>p</code> bits (forming <code>c</code>) is precisely what discards — with correct rounding — the low
+<code>s</code> bits of the original <code>x</code>; the two exact subtractions then peel the shifted copy back
+off, leaving <code>x</code> with its low <code>s</code> significand bits rounded away.</p>
+<p><strong>Preconditions — each one is load-bearing:</strong></p>
+<ul>
+<li><code>expr</code> must be <code>Float32</code>. The splitting constant is pinned to <code>Float32</code>, but Polars
+  promotes mixed arithmetic: if a <code>Float64</code> expression is passed, the whole computation
+  runs at <code>p = 53</code> and silently keeps <code>53 - s</code> bits instead of <code>keep_bits</code>. (A
+  <code>.cast(pl.Float32)</code> is deliberately <em>not</em> applied here — silently changing the dtype of
+  a <code>Float64</code> column would be its own trap; callers own their dtypes.)</li>
+<li>Arithmetic must be evaluated operation-by-operation in IEEE round-to-nearest. Polars
+  (Rust) guarantees this: floats are never reassociated and <code>a*b + c</code> is never contracted
+  into an FMA, either of which would break the exactness of the subtractions.</li>
+<li>Non-finite and overflow cases are guarded: for <code>|x| &gt; f32_max / C</code> the product <code>c</code>
+  overflows to <code>inf</code> and the naive result would be <code>inf - inf = NaN</code>; for <code>x</code> NaN or
+  <code>±inf</code>, <code>c</code> is likewise non-finite. Wherever <code>c</code> is non-finite the input value is
+  passed through unchanged (a huge-but-finite value is stored at full precision rather than
+  corrupted; <code>NaN</code>/<code>±inf</code> survive verbatim).</li>
+<li>Subnormal <code>x</code> (<code>|x| &lt; 2**-126</code>) degrades gracefully: the relative-error bound loosens
+  because precision is already at the absolute floor of the format, but the result is still
+  a faithful nearby value.</li>
+</ul>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>expr</code>
+            </td>
+            <td>
+                  <code><span title="polars.Expr">Expr</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A <code>Float32</code> expression (see the dtype precondition above).</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>keep_bits</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Significand bits to keep, in <code>[2, 22]</code> (the theorem's <code>2 &lt;= s &lt;= p - 2</code>).
+Note this counts <em>significand</em> bits — the implicit leading 1 plus explicit fraction
+bits — so <code>keep_bits=13</code> keeps 12 explicit fraction bits.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.Expr">Expr</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A <code>Float32</code> expression: <code>expr</code> rounded to <code>keep_bits</code> significand bits, with</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="polars.Expr">Expr</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>non-finite and overflowing inputs passed through unchanged.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/delta_store/src/delta_store/precision.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">round_to_significand_bits</span><span class="p">(</span><span class="n">expr</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">keep_bits</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">Expr</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Round a ``Float32`` expression to ``keep_bits`` significand bits (round-to-nearest).</span>
+
+<span class="sd">    The result is exactly representable with a ``keep_bits``-bit significand, so the low</span>
+<span class="sd">    ``24 - keep_bits`` explicit fraction bits of every finite output are zero — which is what</span>
+<span class="sd">    lets ``BYTE_STREAM_SPLIT`` + zstd compress the column — and the relative error is bounded by</span>
+<span class="sd">    the unit roundoff of a ``keep_bits``-bit format:</span>
+
+<span class="sd">        |result - x| &lt;= 2**-keep_bits * |x|</span>
+
+<span class="sd">    (e.g. ``keep_bits=13`` -&gt; max relative error 2^-13 ~= 1.2e-4). Rounding is to nearest, so</span>
+<span class="sd">    unlike truncation it introduces no systematic bias toward zero.</span>
+
+<span class="sd">    **How it works — Veltkamp splitting.** With ``s = 24 - keep_bits`` and the constant</span>
+<span class="sd">    ``C = 2**s + 1``, the expression computes, entirely in ``Float32`` round-to-nearest</span>
+<span class="sd">    arithmetic (``RN``)::</span>
+
+<span class="sd">        c = RN(x * C)  # = RN(x*2^s + x)</span>
+<span class="sd">        result = RN(c - RN(c - x))</span>
+
+<span class="sd">    Veltkamp&#39;s theorem (Veltkamp 1968; Dekker 1971, &quot;A floating-point technique for extending</span>
+<span class="sd">    the available precision&quot;, *Numerische Mathematik* 18; Muller et al., *Handbook of</span>
+<span class="sd">    Floating-Point Arithmetic*, 2nd ed., §4.4, Algorithm 4.9 &quot;Split&quot;) states that for</span>
+<span class="sd">    ``2 &lt;= s &lt;= p - 2`` and no overflow, both subtractions are **exact** and ``result`` is ``x``</span>
+<span class="sd">    rounded to nearest onto ``p - s = keep_bits`` significand bits. The intuition: ``x*C``</span>
+<span class="sd">    stacks a copy of ``x`` shifted ``s`` exponent positions above itself; rounding that sum to</span>
+<span class="sd">    ``p`` bits (forming ``c``) is precisely what discards — with correct rounding — the low</span>
+<span class="sd">    ``s`` bits of the original ``x``; the two exact subtractions then peel the shifted copy back</span>
+<span class="sd">    off, leaving ``x`` with its low ``s`` significand bits rounded away.</span>
+
+<span class="sd">    **Preconditions — each one is load-bearing:**</span>
+
+<span class="sd">    - ``expr`` must be ``Float32``. The splitting constant is pinned to ``Float32``, but Polars</span>
+<span class="sd">      promotes mixed arithmetic: if a ``Float64`` expression is passed, the whole computation</span>
+<span class="sd">      runs at ``p = 53`` and silently keeps ``53 - s`` bits instead of ``keep_bits``. (A</span>
+<span class="sd">      ``.cast(pl.Float32)`` is deliberately *not* applied here — silently changing the dtype of</span>
+<span class="sd">      a ``Float64`` column would be its own trap; callers own their dtypes.)</span>
+<span class="sd">    - Arithmetic must be evaluated operation-by-operation in IEEE round-to-nearest. Polars</span>
+<span class="sd">      (Rust) guarantees this: floats are never reassociated and ``a*b + c`` is never contracted</span>
+<span class="sd">      into an FMA, either of which would break the exactness of the subtractions.</span>
+<span class="sd">    - Non-finite and overflow cases are guarded: for ``|x| &gt; f32_max / C`` the product ``c``</span>
+<span class="sd">      overflows to ``inf`` and the naive result would be ``inf - inf = NaN``; for ``x`` NaN or</span>
+<span class="sd">      ``±inf``, ``c`` is likewise non-finite. Wherever ``c`` is non-finite the input value is</span>
+<span class="sd">      passed through unchanged (a huge-but-finite value is stored at full precision rather than</span>
+<span class="sd">      corrupted; ``NaN``/``±inf`` survive verbatim).</span>
+<span class="sd">    - Subnormal ``x`` (``|x| &lt; 2**-126``) degrades gracefully: the relative-error bound loosens</span>
+<span class="sd">      because precision is already at the absolute floor of the format, but the result is still</span>
+<span class="sd">      a faithful nearby value.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        expr: A ``Float32`` expression (see the dtype precondition above).</span>
+<span class="sd">        keep_bits: Significand bits to keep, in ``[2, 22]`` (the theorem&#39;s ``2 &lt;= s &lt;= p - 2``).</span>
+<span class="sd">            Note this counts *significand* bits — the implicit leading 1 plus explicit fraction</span>
+<span class="sd">            bits — so ``keep_bits=13`` keeps 12 explicit fraction bits.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A ``Float32`` expression: ``expr`` rounded to ``keep_bits`` significand bits, with</span>
+<span class="sd">        non-finite and overflowing inputs passed through unchanged.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">shift</span> <span class="o">=</span> <span class="n">FLOAT32_SIGNIFICAND_BITS</span> <span class="o">-</span> <span class="n">keep_bits</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">2</span> <span class="o">&lt;=</span> <span class="n">shift</span> <span class="o">&lt;=</span> <span class="n">FLOAT32_SIGNIFICAND_BITS</span> <span class="o">-</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;keep_bits must be in [2, </span><span class="si">{</span><span class="n">FLOAT32_SIGNIFICAND_BITS</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">2</span><span class="si">}</span><span class="s2">], got </span><span class="si">{</span><span class="n">keep_bits</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="n">splitter</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">shift</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">Float32</span><span class="p">)</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">expr</span> <span class="o">*</span> <span class="n">splitter</span>
+    <span class="n">rounded</span> <span class="o">=</span> <span class="n">c</span> <span class="o">-</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="n">expr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">pl</span><span class="o">.</span><span class="n">when</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">is_finite</span><span class="p">())</span><span class="o">.</span><span class="n">then</span><span class="p">(</span><span class="n">rounded</span><span class="p">)</span><span class="o">.</span><span class="n">otherwise</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="delta_store.power_forecasts" class="doc doc-heading">
+            <code>delta_store.power_forecasts</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Storage policy for the internal <code>power_forecasts</code> Delta table.</p>
+<p>Owns everything about how <code>PowerForecast</code> rows are laid out on disk: the parquet writer
+properties (codec + per-column encodings), the compression-friendly row order, and the
+<code>power_fcst</code> precision reduction. Callers write through :func:<code>write_power_forecasts</code> so it is
+impossible to land rows in the table without this format applied.</p>
+<p>Measured impact: rewriting the full 403.6M-row development table into this format shrank it from
+6.33 GB (delta-rs defaults: SNAPPY, dictionary encoding, unsorted, full precision) to 0.73 GB.
+See the <code>POWER_FORECASTS_WRITER_PROPERTIES</code> docstring for the per-lever breakdown.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h3 id="delta_store.power_forecasts-attributes">Attributes</h3>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.power_forecasts.POWER_FCST_SIGNIFICAND_BITS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">POWER_FCST_SIGNIFICAND_BITS</span> <span class="o">=</span> <span class="mi">13</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Significand bits kept when storing <code>power_fcst</code> (1 implicit + 12 explicit fraction bits).</p>
+<p>Rounding to nearest at 13 significand bits caps the relative error at 2⁻¹³ ≈ 1.2×10⁻⁴ — orders
+of magnitude below forecast error — and zeroes the 11 low fraction bits, which are otherwise
+pure entropy that defeats every compression codec (nearly every full-precision <code>power_fcst</code>
+value is distinct). Mirrors the significand-rounding scheme <code>delta_store.nwp</code> applies to NWP
+data — but with different writer properties; see that module's docstring for why the choice
+doesn't transfer between tables. See <code>POWER_FORECASTS_WRITER_PROPERTIES</code> for the measured
+size impact.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.power_forecasts.POWER_FORECASTS_SORT_COLS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">POWER_FORECASTS_SORT_COLS</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;time_series_id&#39;</span><span class="p">,</span> <span class="s1">&#39;power_fcst_init_time&#39;</span><span class="p">,</span> <span class="s1">&#39;valid_time&#39;</span><span class="p">,</span> <span class="s1">&#39;ensemble_member&#39;</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Within-file row order for <code>power_forecasts</code> writes.</p>
+<p>Placing the ~51 ensemble members of one (series, init time, valid time) target on adjacent rows
+makes <code>power_fcst</code> locally smooth and the timestamp columns stepped sequences — exactly what
+the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED encodings in <code>POWER_FORECASTS_WRITER_PROPERTIES</code>
+need to compress well. Leading with <code>time_series_id</code> also lets parquet row-group statistics
+prune scans that filter on one series.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.power_forecasts.POWER_FORECASTS_WRITER_PROPERTIES" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">POWER_FORECASTS_WRITER_PROPERTIES</span> <span class="o">=</span> <span class="n">WriterProperties</span><span class="p">(</span><span class="n">compression</span><span class="o">=</span><span class="s1">&#39;ZSTD&#39;</span><span class="p">,</span> <span class="n">compression_level</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">column_properties</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;valid_time&#39;</span><span class="p">:</span> <span class="n">_TIMESTAMP_COLUMN_PROPERTIES</span><span class="p">,</span> <span class="s1">&#39;power_fcst_init_time&#39;</span><span class="p">:</span> <span class="n">_TIMESTAMP_COLUMN_PROPERTIES</span><span class="p">,</span> <span class="s1">&#39;nwp_init_time&#39;</span><span class="p">:</span> <span class="n">_TIMESTAMP_COLUMN_PROPERTIES</span><span class="p">,</span> <span class="s1">&#39;power_fcst&#39;</span><span class="p">:</span> <span class="n">ColumnProperties</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;BYTE_STREAM_SPLIT&#39;</span><span class="p">,</span> <span class="n">dictionary_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)})</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Parquet writer settings for the <code>power_forecasts</code> Delta table.</p>
+<p>The delta-rs defaults (SNAPPY + dictionary encoding everywhere) leave <code>power_fcst</code> — ~76% of
+the bytes — essentially uncompressed. Measured on the table's largest single file (18.3M rows,
+105 MB): ZSTD-3 alone → 80% of the original size; adding these column encodings plus the
+<code>POWER_FORECASTS_SORT_COLS</code> row order → 50%; adding the <code>POWER_FCST_SIGNIFICAND_BITS</code>
+precision reduction → 29%. (That file is the table's least compressible slice — across the full
+table the format achieved 11.5%.)</p>
+
+    </div>
+
+</div>
+
+<h3 id="delta_store.power_forecasts-classes">Classes</h3>
+<h3 id="delta_store.power_forecasts-functions">Functions:</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="delta_store.power_forecasts.write_power_forecasts" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write_power_forecasts</span><span class="p">(</span><span class="n">forecasts</span><span class="p">,</span> <span class="n">table_uri</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">replace_partition</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">replace_predicate_extra</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Write <code>PowerForecast</code> rows to the <code>power_forecasts</code> Delta table in its storage format.</p>
+<p>Applies the three storage levers before writing: rounds <code>power_fcst</code> to
+<code>POWER_FCST_SIGNIFICAND_BITS</code> significand bits, sorts rows by
+<code>POWER_FORECASTS_SORT_COLS</code>, and writes with <code>POWER_FORECASTS_WRITER_PROPERTIES</code>.</p>
+<p>The table is partitioned by <code>(experiment_name, fold_id)</code>. A multi-chunk materialisation
+passes <code>replace_partition</code> on its first chunk — overwriting that partition so prior rows
+are always replaced, even when the first chunk is empty — and <code>None</code> (append) on the rest.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>forecasts</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="PowerForecast (contracts.power_schemas.PowerForecast)" href="../contracts/#contracts.power_schemas.PowerForecast">PowerForecast</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Validated forecast rows. <code>experiment_name</code> / <code>fold_id</code> are <code>String</code>
+(their <code>PowerForecast</code> dtype), which is exactly what delta-rs needs for Hive-style
+partition directories — no cast required.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>table_uri</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path or URI of the <code>power_forecasts</code> Delta table.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>replace_partition</code>
+            </td>
+            <td>
+                  <code><span title="tuple">tuple</span>[<span title="str">str</span>, <span title="str">str</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>(experiment_name, fold_id)</code> to overwrite, or <code>None</code> to append.
+Passed explicitly rather than derived from <code>forecasts</code> so an <em>empty</em> first chunk
+still clears the partition.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>replace_predicate_extra</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An additional <code>AND</code>-ed SQL predicate clause narrowing the
+overwrite below the <code>(experiment_name, fold_id)</code> partition — e.g.
+<code>"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"</code> so <code>live_forecasts</code> can
+replace one 6-hourly slot's rows without wiping the rest of the <code>"live"</code> fold's
+partition. delta-rs' <code>replaceWhere</code> supports predicates on non-partition columns
+(confirmed empirically: a <code>datetime.isoformat()</code> literal round-trips correctly
+against a <code>Timestamp</code> column). Only meaningful alongside <code>replace_partition</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>storage_options</code>
+            </td>
+            <td>
+                  <code><span title="contracts._uri.ObjectStoreOptions">ObjectStoreOptions</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>delta-rs object-store options (credentials/endpoint) for a remote
+<code>table_uri</code>; <code>None</code>/empty for a local path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/delta_store/src/delta_store/power_forecasts.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_power_forecasts</span><span class="p">(</span>
+    <span class="n">forecasts</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerForecast</span><span class="p">],</span>
+    <span class="n">table_uri</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">replace_partition</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">replace_predicate_extra</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Write ``PowerForecast`` rows to the ``power_forecasts`` Delta table in its storage format.</span>
+
+<span class="sd">    Applies the three storage levers before writing: rounds ``power_fcst`` to</span>
+<span class="sd">    ``POWER_FCST_SIGNIFICAND_BITS`` significand bits, sorts rows by</span>
+<span class="sd">    ``POWER_FORECASTS_SORT_COLS``, and writes with ``POWER_FORECASTS_WRITER_PROPERTIES``.</span>
+
+<span class="sd">    The table is partitioned by ``(experiment_name, fold_id)``. A multi-chunk materialisation</span>
+<span class="sd">    passes ``replace_partition`` on its first chunk — overwriting that partition so prior rows</span>
+<span class="sd">    are always replaced, even when the first chunk is empty — and ``None`` (append) on the rest.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        forecasts: Validated forecast rows. ``experiment_name`` / ``fold_id`` are ``String``</span>
+<span class="sd">            (their ``PowerForecast`` dtype), which is exactly what delta-rs needs for Hive-style</span>
+<span class="sd">            partition directories — no cast required.</span>
+<span class="sd">        table_uri: Path or URI of the ``power_forecasts`` Delta table.</span>
+<span class="sd">        replace_partition: ``(experiment_name, fold_id)`` to overwrite, or ``None`` to append.</span>
+<span class="sd">            Passed explicitly rather than derived from ``forecasts`` so an *empty* first chunk</span>
+<span class="sd">            still clears the partition.</span>
+<span class="sd">        replace_predicate_extra: An additional ``AND``-ed SQL predicate clause narrowing the</span>
+<span class="sd">            overwrite below the ``(experiment_name, fold_id)`` partition — e.g.</span>
+<span class="sd">            ``&quot;power_fcst_init_time = &#39;2026-07-04T06:00:00+00:00&#39;&quot;`` so ``live_forecasts`` can</span>
+<span class="sd">            replace one 6-hourly slot&#39;s rows without wiping the rest of the ``&quot;live&quot;`` fold&#39;s</span>
+<span class="sd">            partition. delta-rs&#39; ``replaceWhere`` supports predicates on non-partition columns</span>
+<span class="sd">            (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly</span>
+<span class="sd">            against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.</span>
+<span class="sd">        storage_options: delta-rs object-store options (credentials/endpoint) for a remote</span>
+<span class="sd">            ``table_uri``; ``None``/empty for a local path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">prepared</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">forecasts</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+            <span class="n">power_fcst</span><span class="o">=</span><span class="n">round_to_significand_bits</span><span class="p">(</span>
+                <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;power_fcst&quot;</span><span class="p">),</span> <span class="n">keep_bits</span><span class="o">=</span><span class="n">POWER_FCST_SIGNIFICAND_BITS</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="o">*</span><span class="n">POWER_FORECASTS_SORT_COLS</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">to_arrow</span><span class="p">()</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">replace_partition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">experiment_name</span><span class="p">,</span> <span class="n">fold_id</span> <span class="o">=</span> <span class="n">replace_partition</span>
+        <span class="n">predicate</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;experiment_name = &#39;</span><span class="si">{</span><span class="n">experiment_name</span><span class="si">}</span><span class="s2">&#39; AND fold_id = &#39;</span><span class="si">{</span><span class="n">fold_id</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+        <span class="k">if</span> <span class="n">replace_predicate_extra</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">predicate</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">predicate</span><span class="si">}</span><span class="s2"> AND </span><span class="si">{</span><span class="n">replace_predicate_extra</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">write_deltalake</span><span class="p">(</span>
+            <span class="n">table_or_uri</span><span class="o">=</span><span class="n">table_uri</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">prepared</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;overwrite&quot;</span><span class="p">,</span>
+            <span class="n">predicate</span><span class="o">=</span><span class="n">predicate</span><span class="p">,</span>
+            <span class="n">partition_by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;experiment_name&quot;</span><span class="p">,</span> <span class="s2">&quot;fold_id&quot;</span><span class="p">],</span>
+            <span class="n">writer_properties</span><span class="o">=</span><span class="n">POWER_FORECASTS_WRITER_PROPERTIES</span><span class="p">,</span>
+            <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">write_deltalake</span><span class="p">(</span>
+            <span class="n">table_or_uri</span><span class="o">=</span><span class="n">table_uri</span><span class="p">,</span>
+            <span class="n">data</span><span class="o">=</span><span class="n">prepared</span><span class="p">,</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;append&quot;</span><span class="p">,</span>
+            <span class="n">partition_by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;experiment_name&quot;</span><span class="p">,</span> <span class="s2">&quot;fold_id&quot;</span><span class="p">],</span>
+            <span class="n">writer_properties</span><span class="o">=</span><span class="n">POWER_FORECASTS_WRITER_PROPERTIES</span><span class="p">,</span>
+            <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">),</span>
+        <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="delta_store.nwp" class="doc doc-heading">
+            <code>delta_store.nwp</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Storage policy for the <code>nwp</code> Delta table.</p>
+<p>Owns everything about how <code>Nwp</code> rows are laid out on disk: the parquet writer properties, the
+compression-friendly row order, and the significand-precision reduction of the continuous
+weather variables. Callers write through :func:<code>write_nwp</code> so it is impossible to land rows in
+the table without this format applied.</p>
+<p>Stores plain <code>Float32</code> + <code>delta_store.precision.round_to_significand_bits</code> — the technique
+used by <code>delta_store.power_forecasts</code>, but with <em>different</em> writer properties. Measured on
+real NWP data (9 partitions spread across two years of history): <code>BYTE_STREAM_SPLIT</code> made every
+continuous column <em>larger</em>, not smaller — the opposite of the <code>power_forecasts</code> result.
+Working hypothesis: significand rounding collapses NWP values into a small set of repeats (many
+H3 cells / ensemble members round to the same value), which Parquet's <em>default</em> dictionary+RLE
+encoding captures directly; <code>BYTE_STREAM_SPLIT</code> scatters that repetition across four separate
+byte planes and loses more than it gains. <code>power_forecasts</code>'s target values have no such
+repetition (near-continuous ML output), so <code>BYTE_STREAM_SPLIT</code> wins there instead — the two
+tables need different writer properties. See <code>docs/architecture/overview.md</code> for the measured
+GB/yr and read-latency numbers.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h3 id="delta_store.nwp-attributes">Attributes</h3>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.nwp.NWP_SIGNIFICAND_BITS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">NWP_SIGNIFICAND_BITS</span> <span class="o">=</span> <span class="mi">13</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Significand bits kept for every continuous NWP variable (1 implicit + 12 explicit fraction
+bits) — the same budget as <code>delta_store.power_forecasts.POWER_FCST_SIGNIFICAND_BITS</code>. Caps the
+relative error at 2⁻¹³ ≈ 1.2×10⁻⁴. Measured max absolute error on real data: ≤0.004 °C for
+temperature, ≤8 Pa (0.08 hPa) for mean-sea-level pressure — both well inside tolerance
+(temperature ≤0.25 K, MSL pressure ≤1 hPa).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.nwp.NWP_SORT_COLS" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">NWP_SORT_COLS</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;init_time&#39;</span><span class="p">,</span> <span class="s1">&#39;ensemble_member&#39;</span><span class="p">,</span> <span class="s1">&#39;valid_time&#39;</span><span class="p">,</span> <span class="s1">&#39;h3_index&#39;</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Within-file row order for <code>nwp</code> writes — <strong>member before valid_time</strong> (the opposite
+priority from <code>power_forecasts</code>, which sorts member-adjacent for a different reason: there
+it's about compressing near-duplicate ensemble values; here it's about row-group pruning).
+Sorting <code>ensemble_member</code> early means each ~1M-row Parquet row group spans only a handful of
+member values instead of all ~51, so a single-member predicate (the control-member read every
+training run does) can skip most row groups via min/max stats instead of decoding the whole
+partition. Measured on a real 29-day/9-cell/control-member read: ~5x faster and ~5x less peak
+memory than the previous <code>valid_time</code>-first sort, for a ~2% storage cost.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="delta_store.nwp.NWP_WRITER_PROPERTIES" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">NWP_WRITER_PROPERTIES</span> <span class="o">=</span> <span class="n">WriterProperties</span><span class="p">(</span><span class="n">compression</span><span class="o">=</span><span class="s1">&#39;ZSTD&#39;</span><span class="p">,</span> <span class="n">compression_level</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Deliberately <strong>no</strong> per-column encoding overrides (no <code>BYTE_STREAM_SPLIT</code>,
+<code>DELTA_BINARY_PACKED</code>, or disabled dictionary encoding) — see this module's docstring for why
+that choice, which won for <code>power_forecasts</code>, measures worse here.</p>
+
+    </div>
+
+</div>
+
+<h3 id="delta_store.nwp-classes">Classes</h3>
+<h3 id="delta_store.nwp-functions">Functions:</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="delta_store.nwp.write_nwp" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">write_nwp</span><span class="p">(</span><span class="n">nwp</span><span class="p">,</span> <span class="n">table_uri</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Append <code>Nwp</code> rows to the <code>nwp</code> Delta table in its storage format.</p>
+<p>Rounds every continuous weather variable to <code>NWP_SIGNIFICAND_BITS</code> significand bits, sorts
+rows by <code>NWP_SORT_COLS</code>, and writes with <code>NWP_WRITER_PROPERTIES</code>. The table is
+partitioned by <code>(nwp_model_id, init_time)</code>, matching <code>Nwp.scan_delta</code>'s
+partition-pruning assumptions; the first write creates the table.</p>
+<p>Append-only: each <code>(nwp_model_id, init_time)</code> partition is written exactly once — the
+daily <code>ecmwf_ens</code> asset downloads one brand-new NWP run per Dagster partition. (No
+<code>replace_partition</code> option like <code>write_power_forecasts</code>: nothing re-materialises an
+existing NWP partition today, and a partition-replace predicate on a <code>Timestamp</code> partition
+column would need its own careful verification — add it only when a caller actually needs
+it.)</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>nwp</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="Nwp (contracts.weather_schemas.Nwp)" href="../contracts/#contracts.weather_schemas.Nwp">Nwp</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Validated NWP rows for a single <code>(nwp_model_id, init_time)</code> partition.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>table_uri</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Path or URI of the <code>nwp</code> Delta table.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>storage_options</code>
+            </td>
+            <td>
+                  <code><span title="contracts._uri.ObjectStoreOptions">ObjectStoreOptions</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>delta-rs object-store options (credentials/endpoint) for a remote
+<code>table_uri</code>; <code>None</code>/empty for a local path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/delta_store/src/delta_store/nwp.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">write_nwp</span><span class="p">(</span>
+    <span class="n">nwp</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">Nwp</span><span class="p">],</span>
+    <span class="n">table_uri</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append ``Nwp`` rows to the ``nwp`` Delta table in its storage format.</span>
+
+<span class="sd">    Rounds every continuous weather variable to ``NWP_SIGNIFICAND_BITS`` significand bits, sorts</span>
+<span class="sd">    rows by ``NWP_SORT_COLS``, and writes with ``NWP_WRITER_PROPERTIES``. The table is</span>
+<span class="sd">    partitioned by ``(nwp_model_id, init_time)``, matching ``Nwp.scan_delta``&#39;s</span>
+<span class="sd">    partition-pruning assumptions; the first write creates the table.</span>
+
+<span class="sd">    Append-only: each ``(nwp_model_id, init_time)`` partition is written exactly once — the</span>
+<span class="sd">    daily ``ecmwf_ens`` asset downloads one brand-new NWP run per Dagster partition. (No</span>
+<span class="sd">    ``replace_partition`` option like ``write_power_forecasts``: nothing re-materialises an</span>
+<span class="sd">    existing NWP partition today, and a partition-replace predicate on a ``Timestamp`` partition</span>
+<span class="sd">    column would need its own careful verification — add it only when a caller actually needs</span>
+<span class="sd">    it.)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        nwp: Validated NWP rows for a single ``(nwp_model_id, init_time)`` partition.</span>
+<span class="sd">        table_uri: Path or URI of the ``nwp`` Delta table.</span>
+<span class="sd">        storage_options: delta-rs object-store options (credentials/endpoint) for a remote</span>
+<span class="sd">            ``table_uri``; ``None``/empty for a local path.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">continuous_vars</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">Nwp</span><span class="o">.</span><span class="n">continuous_var_names</span><span class="p">())</span>
+    <span class="n">rounded</span> <span class="o">=</span> <span class="n">nwp</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span>
+        <span class="o">**</span><span class="p">{</span>
+            <span class="n">var</span><span class="p">:</span> <span class="n">round_to_significand_bits</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">var</span><span class="p">),</span> <span class="n">keep_bits</span><span class="o">=</span><span class="n">NWP_SIGNIFICAND_BITS</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">continuous_vars</span>
+        <span class="p">}</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="o">*</span><span class="n">NWP_SORT_COLS</span><span class="p">)</span>
+
+    <span class="c1"># Strip the Patito model before the dict-cast: `nwp_model_id` is declared `Enum` for</span>
+    <span class="c1"># in-memory type safety, but delta-rs can&#39;t store `Enum`/`Categorical` (see the &quot;Delta Lake</span>
+    <span class="c1"># dictionary-encoded columns&quot; gotcha in CLAUDE.md). A dict-cast on a *model-bearing* frame</span>
+    <span class="c1"># would silently swallow the mapping and revert other columns to the model&#39;s declared dtypes</span>
+    <span class="c1"># instead — strip first so this is a plain-Polars cast.</span>
+    <span class="n">prepared</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">_from_pydf</span><span class="p">(</span><span class="n">rounded</span><span class="o">.</span><span class="n">_df</span><span class="p">)</span><span class="o">.</span><span class="n">cast</span><span class="p">({</span><span class="s2">&quot;nwp_model_id&quot;</span><span class="p">:</span> <span class="n">pl</span><span class="o">.</span><span class="n">String</span><span class="p">})</span><span class="o">.</span><span class="n">to_arrow</span><span class="p">()</span>
+
+    <span class="n">write_deltalake</span><span class="p">(</span>
+        <span class="n">table_or_uri</span><span class="o">=</span><span class="n">table_uri</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">prepared</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;append&quot;</span><span class="p">,</span>
+        <span class="n">partition_by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;nwp_model_id&quot;</span><span class="p">,</span> <span class="s2">&quot;init_time&quot;</span><span class="p">],</span>
+        <span class="n">writer_properties</span><span class="o">=</span><span class="n">NWP_WRITER_PROPERTIES</span><span class="p">,</span>
+        <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

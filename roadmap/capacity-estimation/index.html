@@ -1,0 +1,3229 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../data-sources/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Capacity Estimation - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#effective-capacity-estimation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Capacity Estimation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#several-estimators-one-winner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several estimators, one winner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-every-candidate-must-get-right" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What every candidate must get right
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What every candidate must get right">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-effective-capacity-must-exclude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What effective capacity must exclude
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-regularisation-prior-piecewise-constant-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regularisation prior: piecewise-constant capacity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The regularisation prior: piecewise-constant capacity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metered-effective-capacity-can-go-up-or-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metered effective capacity (can go up or down)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#identifiability-the-data-goes-silent-at-night" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identifiability: the data goes silent at night
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-weather-bias-out-of-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping weather bias out of capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Causal vs smoothed capacity — a lookahead trap in the two-pass scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#candidate-a-the-convex-estimator-cvxpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate A — the convex estimator (CVXPY)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Candidate A — the convex estimator (CVXPY)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-clip-is-censoring-not-an-obstacle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clip is censoring, not an obstacle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loss-and-penalties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss and penalties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-same-structure-simpler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind: same structure, simpler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sketch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#honest-caveats-of-the-convex-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Honest caveats of the convex route
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#candidate-b-the-differentiable-physics-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate B — the differentiable-physics estimator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cheap-baselines-to-beat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cheap baselines to beat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uncertainty-a-first-class-judging-criterion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uncertainty — a first-class judging criterion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-head-to-head-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The head-to-head protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#irradiance-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Irradiance inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-comes-after-v07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What comes after v0.7
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#several-estimators-one-winner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Several estimators, one winner
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-every-candidate-must-get-right" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What every candidate must get right
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What every candidate must get right">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-effective-capacity-must-exclude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What effective capacity must exclude
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-regularisation-prior-piecewise-constant-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The regularisation prior: piecewise-constant capacity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The regularisation prior: piecewise-constant capacity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metered-effective-capacity-can-go-up-or-down" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Metered effective capacity (can go up or down)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#identifiability-the-data-goes-silent-at-night" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identifiability: the data goes silent at night
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-weather-bias-out-of-capacity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping weather bias out of capacity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Causal vs smoothed capacity — a lookahead trap in the two-pass scheme
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#candidate-a-the-convex-estimator-cvxpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate A — the convex estimator (CVXPY)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Candidate A — the convex estimator (CVXPY)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-clip-is-censoring-not-an-obstacle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The clip is censoring, not an obstacle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loss-and-penalties" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Loss and penalties
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-same-structure-simpler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind: same structure, simpler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sketch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#honest-caveats-of-the-convex-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Honest caveats of the convex route
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#candidate-b-the-differentiable-physics-estimator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Candidate B — the differentiable-physics estimator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cheap-baselines-to-beat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cheap baselines to beat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uncertainty-a-first-class-judging-criterion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Uncertainty — a first-class judging criterion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-head-to-head-protocol" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The head-to-head protocol
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#irradiance-inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Irradiance inputs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-comes-after-v07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What comes after v0.7
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="effective-capacity-estimation">Effective-capacity estimation</h1>
+<blockquote>
+<p><strong>Status: 🚧 Planned (v0.7).</strong> Epic:
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/141">#141</a>; issues:
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/157">#157</a> (solar),
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/158">#158</a> (wind). This
+page is the plan for estimating the time-varying <strong>effective capacity of metered generators</strong>
+(<a href="../#v07-dynamic-generator-capacity">roadmap v0.7</a>) — run as a <strong>head-to-head between
+candidate estimators</strong>, with the winner shipping in v1. The methods the candidates build on
+are explained in the techniques pages:
+<a href="../../techniques/convex-optimisation/">Convex Optimisation</a> and
+<a href="../../techniques/differentiable-physics/">Differentiable Physics</a>. The v2 work this feeds —
+full disaggregation of unmetered DERs — has its own canonical page,
+<a href="../disaggregation/">Net-demand disaggregation</a>. The Python in this document is illustrative
+sketch code, not the implementation. See the <a href="../">roadmap index</a> for status conventions.</p>
+</blockquote>
+<h2 id="the-problem">The problem</h2>
+<p>A generator's effective capacity drifts over time — turbines fail, inverters drop out, panels
+soil and degrade (or are cleaned and replaced), arrays are extended. A static nameplate value
+introduces large downstream errors. The v0.7 deliverable is a <strong>time-varying effective-capacity
+series per metered generator</strong>, feeding the
+<a href="../delivery-tables/#table-4-effective_capacity"><code>effective_capacity</code></a> delivery table. Because
+this turns v0.1's single scalar-per-series capacity into a time-varying series, the metrics
+pipeline must also swap its <code>time_series_id</code>-only NMAE-denominator join for a temporal as-of
+join — see
+<a href="../metrics-and-leaderboard/#normalising-nmae-by-effective_capacity">Normalising NMAE by <code>effective_capacity</code></a>.</p>
+<p><strong>How capacity feeds the forecast:</strong> a <strong>two-pass</strong> approach. The first pass estimates effective
+capacity (this page); the second normalises each generator's time series by its effective
+capacity before the power-forecast model trains on it. XGBoost continues to do the actual power
+forecasting in v1; the estimators here are responsible only for <em>estimating capacity</em> of
+<em>metered</em> generators. None of the "clever" latent-demand or switching inversion happens here —
+that is <a href="../disaggregation/">v2 research</a>.</p>
+<p>The changepoints in the fitted capacity series are a deliverable in their own right: sudden,
+sustained drops are exactly the generator-fault signal worth surfacing to NGED, and a capacity
+series that names its change dates doubles as a real-time health and availability monitor.</p>
+<h2 id="several-estimators-one-winner">Several estimators, one winner</h2>
+<p>There is more than one credible way to estimate effective capacity, and they occupy genuinely
+different corners of the tooling space. Rather than pick on paper, <strong>v0.7 races the candidates
+head-to-head on the same data and the same judging criteria, and the winner ships in v1.</strong> The
+losers do not disappear: they stay on the leaderboard as permanent baselines and honesty checks.</p>
+<p>The contest has a second, deliberate purpose beyond picking the best estimator: <strong>building
+hands-on experience with convex optimisation (CVXPY) during v1</strong>, so that its fit for the v2
+problems — and our advice to NGED about tooling — rests on first-hand evidence rather than
+paper argument. The
+<a href="../../techniques/convex-optimisation/">Convex Optimisation</a> page makes a strong prior case;
+v0.7 is where that case meets NGED data.</p>
+<p>The candidates:</p>
+<ul>
+<li><strong><a href="#candidate-a-the-convex-estimator-cvxpy">Candidate A — the convex estimator</a></strong>: a censored
+  quantile-envelope fit with fused-lasso changepoints, solved exactly by CVXPY, with panel
+  orientation found by grid search.</li>
+<li><strong><a href="#candidate-b-the-differentiable-physics-estimator">Candidate B — the differentiable-physics estimator</a></strong>:
+  the variational PyTorch model, fitting orientation and capacities as posteriors.</li>
+<li><strong><a href="#cheap-baselines-to-beat">Cheap baselines</a></strong>: a rolling quantile of clear-sky-normalised
+  output, and SLAC's off-the-shelf convex capacity-change detection.</li>
+</ul>
+<p>Despite coming from different toolchains, the two serious candidates are the <em>same kind of
+thing</em>: both are <strong>inverse modelling</strong> — write down a forward model mapping unknown parameters
+(capacities, orientation) to predicted power, then invert it against the observed power to
+recover the parameters. Neither is "more physical" than the other; a fixed pvlib per-unit curve
+inside a convex problem is exactly as much a physics model as a transposition calculation inside
+a PyTorch module. What genuinely separates them is <strong>expressiveness versus guarantees</strong>:
+Candidate A restricts its forward model to what convexity can certify and gets the exact,
+reproducible global optimum in return; Candidate B may write down any differentiable physics it
+likes — and gives up the certificates. The head-to-head is therefore also a live measurement of
+that trade-off on NGED data; the framing is developed fully in
+<a href="../../techniques/convex-optimisation/#two-routes-to-the-same-inverse-problem">Two routes to the same inverse problem</a>.</p>
+<p>There is a testable prediction to settle, made when this contest was designed: <strong>the convex
+estimator wins per-site, and the PyTorch route only pulls ahead when pooling many sites to
+<em>learn</em> shared physics corrections</strong> (soiling, snow, systematic irradiance-model bias) — which is
+fleet-scale work beyond v0.7. The
+<a href="#the-head-to-head-protocol">head-to-head protocol</a> is shaped to confirm or kill that
+prediction.</p>
+<h2 id="what-every-candidate-must-get-right">What every candidate must get right</h2>
+<p>The requirements in this section belong to the <em>problem</em>, not to any particular estimator. Each
+candidate meets them with its own machinery, and the judging checks each one.</p>
+<h3 id="what-effective-capacity-must-exclude">What effective capacity must exclude</h3>
+<p>ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability.
+Folding curtailment into capacity would corrupt exactly the signal NGED needs. We identify
+curtailed periods from NGED's curtailment/ANM feed and keep them out of the capacity estimate —
+in the physics-model formulation this is a separate multiplicative <strong>curtailment gate</strong> on the
+generator's output (see
+<a href="../disaggregation/#node-definitions">the v2 engine's node definitions</a> for where the same gate
+reappears at scale); in the convex formulation it amounts to masking or down-weighting flagged
+periods.</p>
+<p><strong>The ANM feed is imperfect, in both directions.</strong> NGED have told us plainly: there will be
+periods when generators are curtailed with nothing in the ANM logs, and logged events that do
+not match reality. So the feed is a <em>noisy label</em>, not ground truth — use it, but do not lean on
+it:</p>
+<ul>
+<li><strong>Unlogged curtailment</strong> (including <strong>economic self-curtailment</strong> during negative-price
+  periods, which never appears in the ANM feed) would read as capacity loss to any estimator
+  that fits the <em>middle</em> of the data. The structural defence is to fit an <strong>upper envelope</strong>
+  instead — an asymmetric, quantile-flavoured loss under which curtailed samples fall below the
+  fitted capacity without dragging it down. This defence matters for <em>every</em> candidate: it is
+  native to the convex estimator's
+  <a href="../../techniques/convex-optimisation/#fitting-an-envelope-with-the-quantile-pinball-loss">pinball loss</a>,
+  and the differentiable-physics candidate should adopt the same asymmetric loss in place of a
+  plain Gaussian likelihood for the same reason. Masking periods flagged as negative-price from
+  public market data is a complementary mitigation.</li>
+<li><strong>Spuriously-logged curtailment</strong> merely discards good samples (the period is masked though
+  the generator ran freely) — a milder failure, but one more reason the estimate should not
+  <em>depend</em> on the feed being right.</li>
+</ul>
+<h3 id="the-regularisation-prior-piecewise-constant-capacity">The regularisation prior: piecewise-constant capacity</h3>
+<p>The capacity series must not be free to bounce around at the data's sampling rate, or it will
+simply soak up whatever noise the rest of the model cannot explain.</p>
+<h4 id="metered-effective-capacity-can-go-up-or-down">Metered effective capacity (can go up <em>or</em> down)</h4>
+<p>The effective capacity of a metered generator changes in both directions: it drops when turbines
+fail or inverters trip, and recovers when they are repaired. The right prior is
+<strong>piecewise-constant</strong>: capacity holds a level, then steps to a new one — which is expressed as a
+penalty on step-to-step change (a total-variation penalty, equivalently the <strong>fused lasso</strong>: an
+<span class="arithmatex">\(\ell_1\)</span> penalty on successive differences). This lets capacity track genuine, persistent changes
+(a turbine offline for a fortnight) while refusing to chase half-hourly noise.</p>
+<p>The prior is shared; how exactly each candidate realises it is part of the contest. A proximal
+convex solver produces <strong>exactly zero</strong> change on most days — so the nonzero steps <em>are</em> a
+literal event log — while gradient descent produces approximately-zero changes that need a
+threshold to read as events (see
+<a href="../../techniques/convex-optimisation/#the-corners-are-a-feature-exact-zeros">the exact-zeros property</a>).</p>
+<p>(The <em>installed</em> capacity of an <strong>unmetered</strong> fleet behaves differently — it essentially only
+grows — and its monotone prior is documented with the v2 work:
+<a href="../disaggregation/#unmetered-installed-capacity-grows-monotonically">Unmetered installed capacity grows monotonically</a>.)</p>
+<h3 id="identifiability-the-data-goes-silent-at-night">Identifiability: the data goes silent at night</h3>
+<p>At night, and deep in winter gloom, the observed power says almost nothing about capacity — a
+5 MW site and a 50 MW site both meter ≈0. Fitting those samples adds noise, not information.
+Every candidate should weight the fit by the per-unit physics output (or drop low-irradiance /
+low-wind samples outright), and let the piecewise-constant prior carry the estimate across the
+uninformative gaps — that is precisely what the prior is for.</p>
+<h3 id="keeping-weather-bias-out-of-capacity">Keeping weather bias out of capacity</h3>
+<p>The irradiance driving any physics-based estimator is itself biased: NWP and satellite products
+carry regional, <em>seasonal</em> error (satellite retrievals degrade at low UK winter sun angles, for
+example). Per site, that bias is indistinguishable from slow capacity drift — an unconstrained
+fit will alias it into exactly the signal we deliver to NGED. The mitigation exploits structure:
+every site in a region sees the <strong>same</strong> weather bias, while genuine capacity changes are
+site-specific. Fitting a <strong>shared regional irradiance-bias term jointly across the metered
+fleet</strong> separates the two. This is the v0.7-sized version of what
+<a href="../disaggregation/#combining-the-physics-with-the-weather-encoder">the weather encoder</a> does in
+v2.</p>
+<p>How naturally each candidate accommodates this term differs sharply — it is a genuine structural
+advantage of the differentiable-physics route and a documented
+<a href="#honest-caveats-of-the-convex-route">caveat of the convex route</a>.</p>
+<h3 id="causal-vs-smoothed-capacity-a-lookahead-trap-in-the-two-pass-scheme">Causal vs smoothed capacity — a lookahead trap in the two-pass scheme</h3>
+<p>A capacity series regularised over the whole record is a <em>smoother</em>: it uses future
+observations, so the estimate for a given day changes once a later fault is seen. That is
+correct for the historical
+<a href="../delivery-tables/#table-4-effective_capacity"><code>effective_capacity</code></a> table and the NMAE
+denominator — but the capacity used to normalise at forecast init time, in live running <em>and in
+backtests</em>, must be the <strong>causal (filtered) estimate available at that init time</strong>, or backtest
+skill is quietly inflated by lookahead. This is the same no-lookahead invariant the feature
+pipeline enforces for power lags. It binds every candidate equally.</p>
+<h2 id="candidate-a-the-convex-estimator-cvxpy">Candidate A — the convex estimator (CVXPY)</h2>
+<p>At first sight capacity estimation looks non-convex: predicted power is
+capacity × per-unit output, and the per-unit output depends non-linearly on panel tilt and
+azimuth. But the non-convexity lives <em>entirely</em> in two angles. <strong>Conditional on orientation, the
+whole problem is convex</strong> — and two angles are cheap to enumerate. That decomposition is the
+whole design:</p>
+<ol>
+<li><strong>Outer loop:</strong> grid-search tilt × azimuth (~30 tilts × ~70 azimuths), computing the per-unit
+   output curve <span class="arithmatex">\(u_t\)</span> with plain <a href="https://pvlib-python.readthedocs.io/">pvlib</a> at each grid
+   point. (No PyTorch, and no <code>pvlib-pytorch</code>, anywhere in this candidate.)</li>
+<li><strong>Inner solve:</strong> given <span class="arithmatex">\(u_t\)</span>, fit the capacity traces by solving one convex problem —
+   certified global optimum, deterministic, warm-started from the previous grid point.</li>
+</ol>
+<p>An exhaustive outer search wrapped around a certified inner solve is fully deterministic and, up
+to the grid resolution, leaves no valley unvisited — see
+<a href="../../techniques/convex-optimisation/#where-pytorch-is-the-right-tool">the tooling page</a> for
+where this trick sits in the convex/non-convex landscape.</p>
+<h3 id="the-model">The model</h3>
+<p>Two piecewise-constant traces per site, in daily blocks: <strong>DC effective capacity</strong>
+<span class="arithmatex">\(c^{\text{dc}}_{d}\)</span> (the array side) and <strong>AC effective capacity</strong> <span class="arithmatex">\(c^{\text{ac}}_{d}\)</span> (the
+inverter side). Predicted power is the DC output hard-clipped at the AC limit:</p>
+<div class="arithmatex">\[
+\hat{y}_t \;=\; \min\!\bigl(c^{\text{dc}}_{d(t)} \cdot u_t,\;\; c^{\text{ac}}_{d(t)}\bigr)
+\]</div>
+<p>where <span class="arithmatex">\(u_t\)</span> is the fixed per-unit physics output and <span class="arithmatex">\(d(t)\)</span> maps each half-hour to its day.
+Daily blocks keep the problem small — roughly 730 unknowns per trace per year, which solves in
+well under a second.</p>
+<h3 id="the-clip-is-censoring-not-an-obstacle">The clip is censoring, not an obstacle</h3>
+<p>The hard <span class="arithmatex">\(\min\)</span> looks like it breaks convexity, but clipped samples are <em>observable</em> in the
+data — flat plateaus at a common ceiling on bright days. Pre-classify each timestep as
+clipped/unclipped and the problem splits into convex pieces, exactly the
+<a href="../../techniques/convex-optimisation/#hard-limits-as-censoring">censoring pattern</a> from the
+tooling page:</p>
+<ul>
+<li><strong>Unclipped samples</strong>: observed power ≈ <span class="arithmatex">\(c^{\text{dc}}_{d(t)} u_t\)</span> — linear in the unknowns.</li>
+<li><strong>Clipped samples</strong>: the plateau level is a direct noisy measurement of <span class="arithmatex">\(c^{\text{ac}}\)</span>;
+  <em>and</em> the DC-side output must have exceeded the AC limit for clipping to occur — a linear
+  inequality, added as a hinge penalty. Even censored points carry information.</li>
+</ul>
+<p>This is Tobit regression in energy clothing — and the plateau classifier is the formulation's
+weakest joint; see <a href="#honest-caveats-of-the-convex-route">the caveats</a>.</p>
+<h3 id="loss-and-penalties">Loss and penalties</h3>
+<ul>
+<li><strong>Fit: a quantile envelope, not least squares.</strong> Curtailment appears as excursions <em>below</em> the
+  physics prediction; least squares would drag capacity down. A
+  <a href="../../techniques/convex-optimisation/#fitting-an-envelope-with-the-quantile-pinball-loss">pinball loss</a>
+  at a high quantile <span class="arithmatex">\(\tau\)</span> fits the envelope: capacity = "what the site delivers when nothing
+  holds it back", with curtailed samples falling below the envelope without biasing it. <span class="arithmatex">\(\tau\)</span>
+  is a real tuning choice (too low: curtailment leaks in; too high: the fit chases meter
+  glitches) and should be validated on synthetic injections.</li>
+<li><strong>Penalty: fused lasso on both traces.</strong>
+  <span class="arithmatex">\(\lambda \bigl( \lVert \Delta c^{\text{dc}} \rVert_1 + \lVert \Delta c^{\text{ac}} \rVert_1 \bigr)\)</span>
+  gives sparse, <em>exactly-zero</em> day-to-day changes. The payoff is the deliverable itself: the
+  fitted changepoints — each with a date and a magnitude — <strong>are</strong> the site's event log
+  (inverter trips, feeder outages, array expansions, deratings), directly cross-checkable
+  against NGED's maintenance records.</li>
+<li><strong>Priors, where records exist.</strong> A registered capacity, a previous year's fit, or a connection
+  record enters as one more convex penalty
+  (<a href="../../techniques/convex-optimisation/#priors-as-convex-penalties-and-the-uncertainty-you-dont-get">priors as penalties</a>) —
+  including <strong>asymmetric</strong> priors (cheap to sit below the registered value, expensive to exceed
+  it, since registers overstate more than they understate) and <strong>timing</strong> priors (a known March
+  expansion makes jumps cheap at that date, expensive elsewhere).</li>
+</ul>
+<h3 id="wind-same-structure-simpler">Wind: same structure, simpler</h3>
+<p>A turbine has no separate inverter limit, but its power curve's <strong>rated plateau</strong> plays the
+identical censoring role: saturated high-wind samples measure capacity directly, and the same
+envelope + fused-lasso machinery applies with <span class="arithmatex">\(u_t\)</span> from a reference power curve. Curtailment is
+a larger fraction of life for wind than for solar, which makes the quantile-envelope loss even
+more clearly right there.</p>
+<h3 id="sketch">Sketch</h3>
+<p>Illustrative, untested sketch, not the implementation — one site, one candidate orientation
+(the inner solve of the grid search):</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cvxpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
+
+<span class="c1"># Inputs for one site at one candidate orientation:</span>
+<span class="c1">#   u:       (T,) per-unit output from pvlib at that orientation</span>
+<span class="c1">#   y:       (T,) observed power (MW)</span>
+<span class="c1">#   clipped: (T,) bool — the plateau classifier&#39;s verdict (see caveats)</span>
+<span class="c1">#   day:     (T,) int — maps each half-hour to its daily capacity block</span>
+<span class="n">c_dc</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">n_days</span><span class="p">,</span> <span class="n">nonneg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># DC effective capacity (MW)</span>
+<span class="n">c_ac</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">n_days</span><span class="p">,</span> <span class="n">nonneg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># AC (inverter) effective capacity (MW)</span>
+
+<span class="c1"># Unclipped, informative samples: pinball loss at a high quantile fits the envelope.</span>
+<span class="n">informative</span> <span class="o">=</span> <span class="o">~</span><span class="n">clipped</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">u</span> <span class="o">&gt;</span> <span class="mf">0.15</span><span class="p">)</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">informative</span><span class="p">]</span> <span class="o">-</span> <span class="n">cp</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="n">informative</span><span class="p">],</span> <span class="n">c_dc</span><span class="p">[</span><span class="n">day</span><span class="p">[</span><span class="n">informative</span><span class="p">]])</span>
+<span class="n">fit_dc</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">TAU</span> <span class="o">*</span> <span class="n">cp</span><span class="o">.</span><span class="n">pos</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">TAU</span><span class="p">)</span> <span class="o">*</span> <span class="n">cp</span><span class="o">.</span><span class="n">pos</span><span class="p">(</span><span class="o">-</span><span class="n">r</span><span class="p">))</span>
+
+<span class="c1"># Clipped samples: the plateau level directly measures AC capacity...</span>
+<span class="n">fit_ac</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">sum_squares</span><span class="p">(</span><span class="n">y</span><span class="p">[</span><span class="n">clipped</span><span class="p">]</span> <span class="o">-</span> <span class="n">c_ac</span><span class="p">[</span><span class="n">day</span><span class="p">[</span><span class="n">clipped</span><span class="p">]])</span>
+<span class="c1"># ...and the DC-side output must have *exceeded* the AC limit for clipping to occur.</span>
+<span class="n">censor</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">pos</span><span class="p">(</span><span class="n">c_ac</span><span class="p">[</span><span class="n">day</span><span class="p">[</span><span class="n">clipped</span><span class="p">]]</span> <span class="o">-</span> <span class="n">cp</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="n">clipped</span><span class="p">],</span> <span class="n">c_dc</span><span class="p">[</span><span class="n">day</span><span class="p">[</span><span class="n">clipped</span><span class="p">]])))</span>
+
+<span class="c1"># Fused lasso: sparse, exactly-zero day-to-day changes -&gt; piecewise-constant traces.</span>
+<span class="n">fused</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">norm1</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">c_dc</span><span class="p">))</span> <span class="o">+</span> <span class="n">cp</span><span class="o">.</span><span class="n">norm1</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">c_ac</span><span class="p">))</span>
+
+<span class="n">problem</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">Problem</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">Minimize</span><span class="p">(</span><span class="n">fit_dc</span> <span class="o">+</span> <span class="n">fit_ac</span> <span class="o">+</span> <span class="n">mu</span> <span class="o">*</span> <span class="n">censor</span> <span class="o">+</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">fused</span><span class="p">))</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">solver</span><span class="o">=</span><span class="n">cp</span><span class="o">.</span><span class="n">CLARABEL</span><span class="p">)</span>  <span class="c1"># certified global optimum, warm-startable</span>
+</code></pre></div>
+<h3 id="honest-caveats-of-the-convex-route">Honest caveats of the convex route</h3>
+<ul>
+<li><strong>Effective capacity, not nameplate truth.</strong> Any systematic bias in the pvlib per-unit model —
+  soiling, unmodelled horizon shading — is absorbed into the capacity estimate. For forecasting
+  that is a feature (it <em>is</em> effective capacity), but the fitted MW must not be read as nameplate
+  truth against capacity registers.</li>
+<li><strong>The plateau classifier sits outside the guarantee.</strong> The censoring split is a heuristic
+  pre-step, and at half-hourly resolution with real meter noise it is fiddly: misclassified
+  samples poison both the AC fit and the censoring constraint. It needs its own validation
+  (synthetic clipping injected into unclipped sites is the obvious test).</li>
+<li><strong>The shared regional irradiance-bias term breaks the one-shot convexity.</strong> A multiplicative
+  regional bias × per-site capacity is bilinear — the same structure that makes
+  <a href="../switching-events/#approach-4-the-magnitude-only-mixture-model-the-workhorse">the mixture model alternation-only</a>.
+  The convex route must then choose between: <strong>alternation</strong> (bias given capacities, capacities
+  given bias — each step convex, but the certified-global-optimum headline no longer applies to
+  the joint answer); a <strong>plug-in pre-estimate</strong> (e.g. the fleet-median clear-sky-normalised
+  residual per region, fixed before the capacity solve — every solve stays certified but the
+  two-step answer has no joint certificate); or an <strong>additive-only bias</strong> (jointly convex, but a
+  physically weaker model of what irradiance error does). None is free. The
+  differentiable-physics candidate fits the shared bias jointly without contortion — a genuine
+  structural advantage to weigh in the head-to-head.</li>
+<li><strong>Uncertainty is a bolt-on.</strong> The solve returns a point estimate; error bars come from
+  bootstrap or sensitivity re-solves, with
+  <a href="../../techniques/convex-optimisation/#priors-as-convex-penalties-and-the-uncertainty-you-dont-get">known weaknesses</a>.
+  See <a href="#uncertainty-a-first-class-judging-criterion">the uncertainty criterion below</a>.</li>
+<li><strong>Grid-search compute grows with the fleet.</strong> ~2,000 warm-started sub-second solves per site
+  is trivial for the trial area's metered generators; at V2 scale (~2,500 series, though far
+  fewer <em>metered generators</em>) it wants revisiting — e.g. a coarse-to-fine grid.</li>
+</ul>
+<h2 id="candidate-b-the-differentiable-physics-estimator">Candidate B — the differentiable-physics estimator</h2>
+<p>The variational single-site model
+(<a href="../../techniques/differentiable-physics/#the-core-building-block-differentiablesolarplant"><code>DifferentiableSolarPlant</code></a>
+and its wind analogue): site coordinates locked, live weather passed through the physics, and
+tilt, azimuth, DC and AC capacity fitted as mean-field posteriors by gradient descent on an
+ELBO. Its distinct strengths in this contest:</p>
+<ul>
+<li><strong>Native posteriors.</strong> Every parameter carries a fitted spread, so capacity uncertainty comes
+  out of the estimator rather than being bolted on — directly relevant to
+  <a href="#uncertainty-a-first-class-judging-criterion">the uncertainty criterion</a>.</li>
+<li><strong>Joint fleet-wide corrections without contortion.</strong> The shared regional irradiance-bias term —
+  and, later, learned corrections for soiling, snow, or systematic pvlib bias — drop into the
+  same training loop. This is the "fleet-wide-with-learning" regime where the
+  <a href="#several-estimators-one-winner">crossover prediction</a> expects PyTorch to win.</li>
+<li><strong>Continuity with v2.</strong> The fitted modules and the experience of training them carry straight
+  into <a href="../disaggregation/">the v2 engine</a>, where PyTorch is unavoidable.</li>
+</ul>
+<p>And its costs, mirror-images of Candidate A's strengths: gradient descent brings learning rates,
+schedules, seeds and stopping criteria for a per-site problem the convex route solves exactly;
+the fused-lasso-style penalty yields approximately-zero changes, so reading changepoints off the
+capacity trace needs a threshold; and there is no global-optimum certificate. Candidate B should
+also adopt the envelope-flavoured asymmetric reconstruction loss
+(<a href="#what-effective-capacity-must-exclude">above</a>) — a plain Gaussian likelihood fits the middle
+of the data and inherits the curtailment bias.</p>
+<h2 id="cheap-baselines-to-beat">Cheap baselines to beat</h2>
+<p>Both headline candidates must beat deliberately simple baselines on the same leaderboard:</p>
+<ul>
+<li>a <strong>rolling quantile of clear-sky-normalised output</strong> (observed power ÷ physics-predicted
+  clear-sky power);</li>
+<li>the convex capacity-change detection in SLAC's
+  <a href="https://github.com/slacgismo/solar-data-tools">solar-data-tools</a>.</li>
+</ul>
+<p>If neither candidate can beat the cheap estimators, that is a finding worth surfacing early —
+and the baselines slot into the same leaderboard discipline used for the forecasting models.</p>
+<h2 id="uncertainty-a-first-class-judging-criterion">Uncertainty — a first-class judging criterion</h2>
+<p>Our working hypothesis (a hunch, stated so the contest can test it): <strong>capacity-estimate error
+will contribute a share of total energy-forecast error comparable to every other source
+combined.</strong> If that is even half right, a capacity estimate without honest uncertainty quietly
+launders one of the largest error sources in the system into numbers that look exact.</p>
+<p>The hypothesis is cheap to test, and the contest should: perturb the capacity series by its
+plausible error band, run the perturbed series through the two-pass normalisation, and measure
+the change in downstream forecast NMAE. That experiment directly quantifies how much forecast
+error flows through the capacity channel.</p>
+<p>What we ideally want from the winning estimator, in order:</p>
+<ol>
+<li><strong>Uncertainty captured in the capacity estimate itself</strong> — a spread, not a point.</li>
+<li><strong>Propagated through the two-pass scheme</strong> — run the normalisation per capacity-sample
+   (posterior draws for Candidate B; bootstrap ensemble for Candidate A), so the forecast
+   inherits the capacity uncertainty rather than ignoring it.</li>
+<li><strong>Decomposable</strong> — the final forecast's spread should be attributable: this much from
+   capacity, this much from weather, this much from the model. Per-sample propagation is what
+   makes that attribution possible at all.</li>
+</ol>
+<p><strong>The judging stance, stated plainly:</strong> calibrated, decomposable uncertainty is a first-class
+criterion, <em>not</em> a hard shipping gate — a point-estimate-only winner may still ship in v1 with
+uncertainty deferred. But between candidates of comparable point accuracy, the one with honest,
+decomposable uncertainty wins — <strong>even at a slight cost in mean accuracy</strong>. This criterion
+structurally favours Candidate B's native posteriors over Candidate A's bootstrap; the docs say
+so openly rather than pretending the criteria are neutral, and Candidate A can close the gap by
+demonstrating that its bootstrap intervals are actually calibrated (see the evaluation hooks
+below).</p>
+<h2 id="the-head-to-head-protocol">The head-to-head protocol</h2>
+<p>All candidates run on the same sites, the same weather inputs, and the same folds. There is no
+direct ground truth for capacity, so judging combines proxies, each targeting a claim a
+candidate makes:</p>
+<ol>
+<li><strong>Downstream forecast skill</strong> — the deciding metric. Each candidate's capacity series feeds
+   the two-pass normalisation; the resulting forecasts compete on the existing leaderboard
+   (NMAE and pinball, per
+   <a href="../metrics-and-leaderboard/">metrics-and-leaderboard</a>).</li>
+<li><strong>Synthetic fault injection</strong> — scale a known period of a healthy site's output down by a
+   known factor and check: does the estimator find the changepoint, at the right date, with the
+   right magnitude? Does its uncertainty interval cover the truth? (The same injection
+   discipline the <a href="../switching-events/">switching detector</a> uses.)</li>
+<li><strong>Event-log quality</strong> — precision/recall of fitted changepoints against NGED maintenance and
+   outage records, where records exist.</li>
+<li><strong>Robustness to curtailment label noise</strong> — inject unlogged synthetic curtailment and measure
+   how far each estimate is dragged.</li>
+<li><strong>Uncertainty calibration</strong> — coverage of the stated intervals under (2) and on held-out
+   periods, per <a href="#uncertainty-a-first-class-judging-criterion">the criterion above</a>.</li>
+<li><strong>Runtime and operability</strong> — wall-clock per site, determinism across re-runs, and the count
+   of tunable knobs that had to be tuned.</li>
+</ol>
+<p>The winner ships in v1 and populates the
+<a href="../delivery-tables/#table-4-effective_capacity"><code>effective_capacity</code></a> table; the rest remain on
+the leaderboard as standing baselines. Whichever way it goes, the result settles the
+<a href="#several-estimators-one-winner">crossover prediction</a> with evidence — which is itself a
+deliverable of the contest, feeding the v2 tooling choice and our advice to NGED.</p>
+<h2 id="irradiance-inputs">Irradiance inputs</h2>
+<p>The beam/diffuse decomposition the physics needs (for either candidate — pvlib's transposition
+wants the same inputs as
+<a href="../../techniques/differentiable-physics/#the-core-building-block-differentiablesolarplant">the differentiable model</a>)
+is covered by the v0.7 weather ingests. <strong>CM SAF SARAH-3</strong> provides global (SIS), direct (SID)
+and direct-normal (DNI) irradiance at 0.05° / 30-minute resolution from 1983 (diffuse =
+SIS − SID) — the primary input, matching the half-hourly metering. <strong>ERA5</strong> provides global plus
+<strong>direct</strong> (<code>fdir</code>) short-wave (diffuse by subtraction), and its near-real-time ERA5T stream
+(~5 days behind) suits the near-real-time capacity estimate — unlike CERRA, whose ~3.5-month
+latency <a href="../data-sources/#weather-data">rules it out here</a>. The live <strong>ECMWF ENS</strong> feed carries only GHI — fine for
+v0.7, but v2 physics <em>forecasting</em> of PV needs a differentiable GHI → DNI/DHI decomposition
+model (or <code>fdir</code> added to the upstream dataset). See
+<a href="../data-sources/#weather-data">data sources</a>.</p>
+<blockquote>
+<p><strong>Design caveat — should ERA5 stay offline?</strong> Feeding ERA5 into the <em>live</em> system adds a new
+near-real-time data dependency: another external feed to ingest on a daily-ish cadence, monitor,
+and recover when it lags. Because effective capacity moves slowly (daily blocks), a tempting
+alternative is to run the ERA5-based capacity estimation <strong>offline</strong> on a periodic job that
+refreshes the <a href="../delivery-tables/#table-4-effective_capacity"><code>effective_capacity</code></a> table, and
+keep the <strong>production forecast path dependent only on ECMWF ENS</strong> (plus the power feed) — no new
+real-time dependency, and the live forecast just reads the slowly-updated capacity table. The
+cost is that ECMWF-only would almost certainly give a slightly <em>worse</em> capacity estimate than
+ERA5 would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
+<a href="../../architecture/aws-costs/#workload-model">live-service cadence</a>.</p>
+</blockquote>
+<h2 id="what-comes-after-v07">What comes after v0.7</h2>
+<p>Once the metered assets are accurately tracked, the harder v2 goal — disaggregating the
+<em>unmetered</em> DERs behind every substation — builds directly on this work. That plan lives on its
+own canonical page: <a href="../disaggregation/">Net-demand disaggregation</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

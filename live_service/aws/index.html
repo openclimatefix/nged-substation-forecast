@@ -1,0 +1,4080 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../local/">
+      
+      
+        <link rel="next" href="../connecting/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Setting up the live service on AWS - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#setting-up-the-live-service-on-aws" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Setting up the live service on AWS
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-create-the-s3-buckets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Create the S3 buckets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-grant-data-access-with-iam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Grant data access with IAM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-pick-and-promote-a-champion-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Pick and promote a champion model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-build-and-verify-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Build and verify the image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-create-the-ecr-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Create the ECR repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-push-the-image-to-ecr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Push the image to ECR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-iam-roles-for-the-fargate-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — IAM roles for the Fargate task
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-8-store-secrets-in-parameter-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8 — Store secrets in Parameter Store
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 9 — Create the ECS cluster and Fargate task definition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-10-verify-run-a-forecast-task-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 10 — Verify: run a forecast task manually
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-11-launch-the-control-plane-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 11 — Launch the control-plane box
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-12-join-the-tailnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 12 — Join the tailnet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-13-install-docker-and-pull-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 13 — Install Docker and pull the image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-14-configure-dagster-on-the-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 14 — Configure Dagster on the box
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 14 — Configure Dagster on the box">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-image-four-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One image, four roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-15-start-the-stack-and-connect-over-tailscale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 15 — Start the stack and connect over Tailscale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-16-turn-on-the-schedules-and-verify-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 16 — Turn on the schedules and verify end-to-end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 16 — Turn on the schedules and verify end-to-end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#redeploying-a-new-champion-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Redeploying a new champion model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#granting-nged-read-access-recommended-confirm-before-doing-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Granting NGED read access (recommended; confirm before doing this)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-create-the-s3-buckets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Create the S3 buckets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-grant-data-access-with-iam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Grant data access with IAM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-pick-and-promote-a-champion-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Pick and promote a champion model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-build-and-verify-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4 — Build and verify the image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-create-the-ecr-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5 — Create the ECR repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-push-the-image-to-ecr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6 — Push the image to ECR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-iam-roles-for-the-fargate-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7 — IAM roles for the Fargate task
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-8-store-secrets-in-parameter-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8 — Store secrets in Parameter Store
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 9 — Create the ECS cluster and Fargate task definition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-10-verify-run-a-forecast-task-manually" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 10 — Verify: run a forecast task manually
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-11-launch-the-control-plane-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 11 — Launch the control-plane box
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-12-join-the-tailnet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 12 — Join the tailnet
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-13-install-docker-and-pull-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 13 — Install Docker and pull the image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-14-configure-dagster-on-the-box" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 14 — Configure Dagster on the box
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 14 — Configure Dagster on the box">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#one-image-four-roles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One image, four roles
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-15-start-the-stack-and-connect-over-tailscale" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 15 — Start the stack and connect over Tailscale
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-16-turn-on-the-schedules-and-verify-end-to-end" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 16 — Turn on the schedules and verify end-to-end
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 16 — Turn on the schedules and verify end-to-end">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#redeploying-a-new-champion-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Redeploying a new champion model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#granting-nged-read-access-recommended-confirm-before-doing-this" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Granting NGED read access (recommended; confirm before doing this)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="setting-up-the-live-service-on-aws">Setting up the live service on AWS</h1>
+<p>Every step to stand up the v0.1 live service on AWS, in order, ending with the full stack
+running unattended: data tables on S3 (Simple Storage Service, AWS's object store), the champion
+model baked into a container image, an always-on control-plane box running Dagster behind
+Tailscale, and 6-hourly forecasts executing on ephemeral Fargate (AWS's serverless container
+compute) tasks. When you finish this page, you open the Dagster UI from your laptop over
+Tailscale and watch forecasts land.</p>
+<p>You can point a coding agent (e.g. Claude Code) at this page and have it drive the console steps
+alongside you. It's also worth asking the agent to check your work as you go: after completing a
+step (or a run of steps), ask it to verify what you just did using the <code>aws</code> CLI — e.g. "check
+that I've completed all steps up to and including step 7" — rather than trusting a screenshot or
+your own memory of which button you clicked.</p>
+<p>This is one-time setup (per AWS environment). Day-to-day driving of the running service —
+promoting a champion, backfilling a missed slot, inspecting a forecast — lives in
+<a href="../operations/">Operating the live service</a>. What each <code>Settings</code> field means (the three storage
+roots, the derive-from-root convention) lives in the
+<a href="../setup/">Configuration reference</a>. Design rationale for <em>why</em> the deployment looks like this —
+bake the model in at build time, an always-on control plane rather than EventBridge — lives in
+<a href="../../architecture/production-deployment/">Production Deployment — Design</a>.</p>
+<blockquote>
+<p><strong>Scope: everything here is done by hand</strong> — AWS console plus SSH; no infrastructure-as-code
+(Terraform, or CDK — AWS's Cloud Development Kit) yet.
+That's deliberate: this is Stage 1 ("solo, Tailscale only") of the
+<a href="../../roadmap/live-service/#access-phasing">access-phasing plan</a>, and infrastructure-as-code
+(<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/326">#326</a>) is scheduled
+to start at Stage 2, when team access adds enough moving parts to justify it.
+Sentry error telemetry and the missed-check-in alarm are wired (set the <code>SENTRY_*</code> vars in
+<a href="#step-14-configure-dagster-on-the-box">Step 14</a>); only per-task failure emails (SNS) are still
+to come — see <a href="../../roadmap/live-service/#alert-on-absence-the-missed-check-in-alarm">the roadmap</a>.</p>
+</blockquote>
+<h2 id="step-1-create-the-s3-buckets">Step 1 — Create the S3 buckets</h2>
+<p>We split storage across <strong>two</strong> buckets so the five tables that form NGED's stable delivery
+contract are physically separate from OCF's own working data, which may change shape at any time
+with no notice. See <a href="../../architecture/forecast-delivery/#securing-it">Forecast Delivery: Securing it</a>
+for why this split exists, and <a href="https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/">Delivery tables</a>
+for exactly which five tables count as "delivery."</p>
+<p>In the AWS console → <strong>S3</strong> → <strong>Create bucket</strong>, twice:</p>
+<ul>
+<li><strong>Region</strong> <code>eu-west-2</code> (London) for both — keep every resource in one region so S3 ↔ compute
+  transfer stays free. It isn't the cheapest region available (<code>eu-west-1</code> runs meaningfully
+  cheaper for Fargate); see <a href="../../architecture/forecast-delivery/#securing-it">Forecast Delivery: Securing it</a>
+  for the price comparison and why <code>eu-west-2</code> is picked anyway, provisionally, pending NGED
+  confirmation.</li>
+<li><strong>Names</strong>: <code>nged-forecast-delivery</code> (the 5 NGED-facing tables) and <code>nged-forecast-internal</code>
+  (NWP, raw power telemetry, forecast metrics, and everything else OCF's pipeline needs but
+  hasn't promised to keep stable). Bucket names are globally unique; pick your own if these are
+  taken.</li>
+<li><strong>Bucket URIs</strong> — with those names and the <code>eu-west-2</code> region above, each bucket is reachable
+  two ways:<ul>
+<li><code>s3://nged-forecast-delivery</code> and <code>s3://nged-forecast-internal</code> — the <code>s3://</code> root URI each
+  table path is built from (e.g. <code>DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data</code> in
+  <a href="#step-14-configure-dagster-on-the-box">Step 14</a>). This is what the <code>deltalake</code>/Polars
+  clients described in <a href="../../architecture/forecast-delivery/">Forecast Delivery</a> use for
+  day-to-day access, and it's region-agnostic — the client discovers <code>eu-west-2</code> from the
+  bucket itself.</li>
+<li><code>https://nged-forecast-delivery.s3.eu-west-2.amazonaws.com</code> and
+  <code>https://nged-forecast-internal.s3.eu-west-2.amazonaws.com</code> — the virtual-hosted-style
+  HTTPS endpoint, region baked into the hostname. <strong>Block Public Access</strong> (below) stays on
+  for both, so browsing either URL directly returns <code>AccessDenied</code>; this form matters only to
+  tools that speak S3's HTTPS API directly with signed (SigV4) requests — e.g. a BI tool's S3
+  connector (see <a href="../../architecture/forecast-delivery/#securing-it">Forecast Delivery: Securing it</a>
+  on Power BI needing a plain access key and secret).</li>
+</ul>
+</li>
+<li><strong>Every other setting on the create-bucket form can stay at its console default:</strong><ul>
+<li><strong>Bucket namespace</strong> — leave at <strong>Global namespace</strong>; do not switch to "Account Regional
+  namespace", even though the console marks it "(recommended)". That option changes the
+  bucket's ARN (Amazon Resource Name — AWS's canonical resource identifier) shape and scopes
+  name-uniqueness to your account/region instead of globally, which the IAM (Identity and
+  Access Management — AWS's permissions system) policies below (Step 2) and the
+  <code>deltalake</code>/<code>object_store</code> machinery all assume it isn't.</li>
+<li><strong>Object Ownership</strong> (ACLs disabled) — access is controlled entirely by IAM/bucket policy;
+  ACLs (legacy per-object access-control lists) stay off.</li>
+<li><strong>Block Public Access</strong> (all four boxes on) — nothing here is public.</li>
+<li><strong>Bucket Versioning</strong> (disabled) — not required by the app.</li>
+<li><strong>Default encryption</strong> (SSE-S3 — server-side encryption with S3-managed keys) — the app
+  needs no more than this; <strong>Bucket Key</strong> only affects SSE-KMS (encryption via AWS KMS, the
+  Key Management Service), so it's irrelevant here either way.</li>
+<li><strong>Object Lock</strong>, <strong>Tags</strong> — unused by the app.</li>
+</ul>
+</li>
+</ul>
+<p>No DynamoDB lock table is needed for either bucket. The <code>deltalake</code> version we use commits via
+S3's native conditional-put, so concurrent-safe Delta writes work on plain S3 with no lock table
+and no <code>AWS_S3_ALLOW_UNSAFE_RENAME</code> flag.</p>
+<h2 id="step-2-grant-data-access-with-iam">Step 2 — Grant data access with IAM</h2>
+<p>OCF's own pipeline needs to read and write <strong>both</strong> buckets (internal tables during ingestion and
+training; delivery tables at forecast time), so one IAM policy covers both:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;Statement&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;s3:GetObject&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;s3:PutObject&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;s3:DeleteObject&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;s3:ListBucket&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-delivery&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-delivery/*&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-internal&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-internal/*&quot;</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p><strong>Create it once</strong>, in the AWS console → <strong>IAM</strong> → <strong>Policies</strong> → <strong>Create policy</strong> → switch to the
+<strong>JSON</strong> editor → paste the JSON above → <strong>Next</strong> → name it (e.g. <code>nged-forecast-read-and-write</code>) →
+<strong>Create policy</strong>. IAM is global, so there's no region selector to worry about.</p>
+<p>Then attach it to <strong>whichever identity runs the code</strong>:</p>
+<ul>
+<li><strong>Compute running on AWS</strong> → attach the policy to that resource's <strong>IAM role</strong>. This page does
+  that twice: the Fargate <strong>task role</strong> (<a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>) and the
+  control-plane box's <strong>instance role</strong> (<a href="#step-11-launch-the-control-plane-box">Step 11</a>). Nothing
+  else is needed: <code>object_store</code> (used by <code>delta-rs</code>) auto-discovers the role's temporary
+  credentials and region at runtime, so all four <code>DATA_STORE_*</code> settings stay <strong>empty</strong> (see the
+  <a href="../setup/#the-configuration-model">Configuration reference</a>).</li>
+<li><strong>Your laptop, running the pipeline</strong> — <strong>not set up yet, deliberately</strong>: for now, only AWS
+  compute gets write access, so there's exactly one writer touching the buckets at a time. Running
+  Dagster from both a laptop and AWS against the same tables risks two instances racing on the
+  same Delta commits. If a one-off laptop write is ever needed (e.g. hand-patching bad data), it
+  can reuse the same read/write policy above via its own <strong>IAM user</strong>, created the same way as the
+  dashboard user below — just with <code>nged-forecast-read-and-write</code> attached instead of
+  <code>nged-forecast-read-only</code>.</li>
+<li>
+<p><strong>Your laptop, running only the dashboard</strong> (the marimo apps at <code>packages/dashboard/</code>, e.g.
+  <code>view_forecasts.py</code>) → it only ever
+  reads, so give it a separate, read-only <strong>IAM user</strong> instead of reusing the read/write
+  credential:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;Statement&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;s3:GetObject&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;s3:ListBucket&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-delivery&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-delivery/*&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-internal&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::nged-forecast-internal/*&quot;</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>Same console flow as the read/write policy above for the policy: <strong>IAM</strong> → <strong>Policies</strong> →
+<strong>Create policy</strong> → <strong>JSON</strong> editor → paste the JSON above → <strong>Next</strong> → name it (e.g.
+<code>nged-forecast-read-only</code>) → <strong>Create policy</strong>. Then create the user: <strong>IAM</strong> → <strong>Users</strong> →
+<strong>Create user</strong> → name it (e.g. <code>nged-forecast-dashboard</code>) → leave <strong>Provide user access to the
+AWS Management Console</strong> unchecked (programmatic-only) → <strong>Next</strong> → <strong>Attach policies
+directly</strong> → select the policy → <strong>Next</strong> → <strong>Create user</strong>. Then its access key: open the
+user → <strong>Security credentials</strong> tab → <strong>Access keys</strong> → <strong>Create access key</strong> → use case
+<strong>Application running outside AWS</strong> → acknowledge the warning → <strong>Create access key</strong> → copy
+the <strong>Access key ID</strong> and <strong>Secret access key</strong> immediately (shown once) into the laptop's
+<code>.env</code> as <code>DATA_STORE_*</code> values (see the
+<a href="../setup/#at-a-glance-which-settings-for-which-environment">at-a-glance table</a> for the exact
+shape). Losing this key can't corrupt any table, only leak read access to it.</p>
+</li>
+</ul>
+<h2 id="step-3-pick-and-promote-a-champion-model">Step 3 — Pick and promote a champion model</h2>
+<p>Follow <a href="../operations/#step-1-pick-a-champion-model">Operating the live service: Step 1</a>
+and <a href="../operations/#step-2-materialise-promoted_model">Step 2</a> to materialise
+<code>promoted_model</code>. Promotion always happens <strong>on your laptop</strong> — the candidate models live in the
+laptop's local MLflow file store — and populates <code>data/production_model/</code> on disk, the same
+directory the image build below <code>COPY</code>s from.</p>
+<h2 id="step-4-build-and-verify-the-image">Step 4 — Build and verify the image</h2>
+<p>With a champion model on disk (Step 3), one script builds the image and smoke-tests it with
+<strong>zero network access</strong> — the test that matters, since the entire point of baking the model in is
+that production inference has no MLflow dependency at runtime:</p>
+<div class="highlight"><pre><span></span><code>scripts/build_and_verify_image.sh<span class="w">    </span><span class="c1"># no arguments — everything is derived</span>
+</code></pre></div>
+<p>The script always builds for <strong>linux/arm64</strong>, whatever the host is, because the deployment is
+ARM end-to-end: the Fargate task definition declares ARM64
+(<a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a>) and the control-plane box
+is a Graviton instance (<a href="#step-11-launch-the-control-plane-box">Step 11</a>), so an amd64 image
+would push fine but then fail every task launch with <code>image Manifest does not contain
+descriptor matching platform 'linux/arm64 v8'</code>. On an x86 laptop the build and smoke test run
+under QEMU emulation — noticeably slower than native, but correct. The script checks the
+emulator is registered and prints the one-time fix
+(<code>docker run --privileged --rm tonistiigi/binfmt --install arm64</code>) if it isn't.</p>
+<blockquote>
+<p>Note that, during the smoke test, <strong>Dagster is EXPECTED halt with the exception</strong>
+<code>_internal.TableNotFoundError: Local path
+"/app/.venv/data/NWP" does not exist or you don't have access!</code>. That is correct behaviour.</p>
+</blockquote>
+<p>The script builds the image tagged with the promoted model's run id, runs it offline, and prints
+the container log with a pass/fail summary. (The smoke test's one-shot run uses a hard-coded,
+arbitrary partition key — the offline run fails at the NWP lookup long before the slot's
+validity could matter, so there is no key worth choosing.)
+It hard-fails only if the runtime touches MLflow — the hermeticity guarantee worth automating —
+and otherwise asks you to confirm by eye that the run loaded the model and failed <em>only</em> on
+missing NWP data (expected: no data tables are mounted for this isolated test). The script header
+documents every choice it makes and is the source of truth for the mechanics.</p>
+<h2 id="step-5-create-the-ecr-repository">Step 5 — Create the ECR repository</h2>
+<p>ECR (Elastic Container Registry) is AWS's private Docker-image store — where the image just built
+gets pushed so AWS compute can pull it. In the <a href="https://eu-west-2.console.aws.amazon.com">AWS
+console</a> →
+<strong><a href="https://eu-west-2.console.aws.amazon.com/ecr">ECR</a></strong> → <strong>Create repository</strong> → private (same
+<code>eu-west-2</code> region as the S3 buckets in <a href="#step-1-create-the-s3-buckets">Step 1</a>):</p>
+<ul>
+<li><strong>Repository name</strong>: <code>nged-forecast</code>, with <strong>no namespace prefix</strong>. The scripts hard-code this
+  exact flat name — <code>scripts/push_and_deploy_image.sh</code> derives the remote URI as
+  <code>&lt;account-id&gt;.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:&lt;tag&gt;</code> — and it matches the local
+  image tag <code>nged-forecast:&lt;tag&gt;</code> from <a href="#step-4-build-and-verify-the-image">Step 4</a>. A namespace
+  is only an optional <code>prefix/</code> for grouping many repositories; adding one would break that
+  derived URI.</li>
+<li><strong>Every other setting on the create-repository form can stay at its console default:</strong><ul>
+<li><strong>Image tag mutability</strong> (Mutable) and <strong>Mutable tag exclusions</strong> (empty) — image tags here
+  are already unique per promoted model (the run id's short prefix from
+  <a href="#step-4-build-and-verify-the-image">Step 4</a>), so nothing relies on retagging — but nothing
+  needs immutability enforced, either.</li>
+<li><strong>Encryption settings</strong> (AES-256) — the console warns this can't be changed after creation,
+  which is fine: the app has no KMS requirement, for the same reason the S3 buckets in
+  <a href="#step-1-create-the-s3-buckets">Step 1</a> stay on SSE-S3.</li>
+<li><strong>Scan on push</strong> (off) — the console marks this per-repository setting deprecated; scanning
+  is now configured once at the <em>registry</em> level, which is done right after creating the
+  repository (next bullet).</li>
+</ul>
+</li>
+<li>Click <strong>Create</strong>, then turn on registry-level scanning so every push still gets free vulnerability
+  scanning: <strong>ECR</strong> → <strong>Private registry</strong> → <strong>Features &amp; Settings</strong> → <a href="https://eu-west-2.console.aws.amazon.com/ecr/private-registry/edit-scanning"><strong>Scanning</strong> →
+  <strong>configure</strong></a> → keep
+  the scan type at <strong>Basic</strong> ("basic" is free; Enhanced hands scanning to Amazon Inspector, which
+  costs money) → either check the <strong>Scan on push all repositories</strong> check box <em>or</em> add a filter of
+  <code>nged-forecast</code>. This is a one-time registry setting, so it also covers any repository created
+  later under a matching filter.</li>
+</ul>
+<h2 id="step-6-push-the-image-to-ecr">Step 6 — Push the image to ECR</h2>
+<p>One script pushes the image built in <a href="#step-4-build-and-verify-the-image">Step 4</a> and — on
+later redeploys — points the ECS task definition at it:</p>
+<div class="highlight"><pre><span></span><code>scripts/push_and_deploy_image.sh<span class="w">    </span><span class="c1"># no arguments — everything is derived</span>
+</code></pre></div>
+<p>It takes no arguments by design, so nothing can be mistyped: the tag is derived from
+<code>data/production_model/promotion.json</code> exactly as Step 4's build script derives it (so only an
+image that was built and verified can be pushed), and the AWS account id comes from
+<code>aws sts get-caller-identity</code>. The script logs Docker into ECR, tags, and pushes; then, if the
+<code>nged-forecast</code> task-definition family already exists
+(<a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a>), it registers a new
+revision pointing at the new image. If this is the first pass through the runbook then the family
+doesn't exist yet — the script says so and exits cleanly, and the push is all this step needs. The
+script header documents every choice it makes and is the source of truth for the mechanics.</p>
+<h2 id="step-7-iam-roles-for-the-fargate-task">Step 7 — IAM roles for the Fargate task</h2>
+<p>Fargate tasks run inside ECS (Elastic Container Service — the AWS orchestrator that launches and
+supervises containers), and they need <strong>two</strong> separate IAM roles, not one — they serve different
+principals. Both roles are created with the same console flow — <a href="https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles/create"><strong>IAM</strong> → <strong>Roles</strong> → <strong>Create
+role</strong></a> → trusted
+entity type <strong>AWS service</strong> → under <strong>Use case</strong>, search for and pick <strong>Elastic Container Service</strong>,
+then select the <strong>Elastic Container Service Task</strong> radio button (the <em>Task</em> variant is what puts
+<code>ecs-tasks.amazonaws.com</code> in the role's trust policy, so that ECS tasks can assume the role) →
+<strong>Next</strong>. As with <a href="#step-2-grant-data-access-with-iam">Step 2</a>, IAM is global, so there's no region
+selector to worry about. From the <strong>Add permissions</strong> page onwards the two roles diverge:</p>
+<ul>
+<li>
+<p><strong>Task execution role</strong>, <code>nged-forecast-task-execution-role</code> — used by the <em>ECS agent</em> itself,
+  before your code ever runs: pulling the image from ECR, shipping container output to
+  CloudWatch Logs, and injecting the secrets from
+  <a href="#step-8-store-secrets-in-parameter-store">Step 8</a>.</p>
+<p>On the <strong>Add permissions</strong> page, search for and tick the AWS-managed
+<strong><code>AmazonECSTaskExecutionRolePolicy</code></strong> (covers the ECR pull + CloudWatch Logs) → <strong>Next</strong> →
+<strong>Role name</strong> <code>nged-forecast-task-execution-role</code> → <strong>Create role</strong>.</p>
+<p>Then add one small inline policy for the secrets — it's the <em>execution</em> role that reads
+them, not the task role, because the ECS agent resolves secrets before the container
+starts. Open the role you just created → <strong>Permissions</strong> tab → <strong>Add permissions</strong> →
+<strong>Create inline policy</strong> → switch to the <strong>JSON</strong> editor → paste the JSON below, replacing
+<code>&lt;account-id&gt;</code> with your 12-digit AWS account id (shown in the account menu at the top right of
+the console, or run this locally:
+<code>aws sts get-caller-identity --query Account --output text</code>) → <strong>Next</strong> →
+name it (e.g. <code>nged-forecast-read-ssm-parameters</code>) → <strong>Create policy</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;Statement&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ssm:GetParameters&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;arn:aws:ssm:eu-west-2:&lt;account-id&gt;:parameter/nged-forecast/*&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>(No KMS statement needed as long as the parameters use the default <code>aws/ssm</code> key.)</p>
+</li>
+<li>
+<p><strong>Task role</strong>, <code>nged-forecast-task-role</code> — used by <em>your code</em> once it's running: this is what
+  lets the container read and write <strong>both</strong> data buckets (delivery and internal). Run the whole
+  create-role flow a second time (trusted entity <strong>AWS service</strong> → <strong>Elastic Container Service
+  Task</strong>), but on the <strong>Add permissions</strong> page reuse the same S3 policy from
+  <a href="#step-2-grant-data-access-with-iam">Step 2</a>: search for and tick the customer-managed
+  <code>nged-forecast-read-and-write</code> policy → <strong>Next</strong> → <strong>Role name</strong> <code>nged-forecast-task-role</code> →
+  <strong>Create role</strong>. Nothing else is needed — with this role attached, delta-rs' <code>object_store</code>
+  auto-discovers temporary credentials at runtime, so <code>DATA_STORE_*</code> stays unset.</p>
+</li>
+</ul>
+<p>No static AWS keys anywhere in either role — the same IAM-role auto-discovery
+<a href="#step-2-grant-data-access-with-iam">Step 2</a> relies on for all compute running on AWS.</p>
+<h2 id="step-8-store-secrets-in-parameter-store">Step 8 — Store secrets in Parameter Store</h2>
+<p>The container can't start without <code>NGED_S3_BUCKET_URL</code>, <code>NGED_S3_BUCKET_ACCESS_KEY</code>, and
+<code>NGED_S3_BUCKET_SECRET</code> (<code>Settings</code> requires them at import — see the smoke test in
+<a href="#step-4-build-and-verify-the-image">Step 4</a>), and the deployed service genuinely uses them: the
+hourly <code>power_time_series_and_metadata</code> schedule pulls fresh telemetry from NGED's bucket.</p>
+<p>They are also the one credential in this deployment that can't come from an IAM role: NGED's
+bucket lives in NGED's AWS account, so these are unavoidably static third-party keys. Don't
+paste them into the task definition as plain-text environment values — anyone with ECS
+describe access could read them there. Store them in <strong>SSM Parameter Store</strong> (SSM is AWS
+Systems Manager; Parameter Store is its encrypted key-value configuration service) as
+SecureStrings and let ECS inject them at container start:</p>
+<p>In the AWS console → <a href="https://eu-west-2.console.aws.amazon.com/systems-manager/home?region=eu-west-2"><strong>Systems
+Manager</strong></a> →
+<strong>Application Tools</strong> → <a href="https://eu-west-2.console.aws.amazon.com/systems-manager/parameters?region=eu-west-2"><strong>Parameter
+Store</strong></a> →
+<strong>Create parameter</strong>, four times, in <code>eu-west-2</code> (same region as everything else):</p>
+<ul>
+<li><strong>Name</strong> — one parameter each. The shared <code>/nged-forecast/</code> prefix is exactly what
+  <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>'s execution-role policy grants access to,
+  so a new secret added under the same prefix later needs no IAM change.<ul>
+<li><code>/nged-forecast/nged-s3-bucket-url</code> — the URL of NGED's source S3 bucket, which the
+  hourly <code>power_time_series_and_metadata</code> schedule pulls raw telemetry from (the
+  <code>nged_s3_bucket_url</code> field of <code>Settings</code>).</li>
+<li><code>/nged-forecast/nged-s3-bucket-access-key</code> — the access-key ID for NGED's bucket
+  (<code>nged_s3_bucket_access_key</code>) - a static credential issued by NGED, since the bucket
+  lives in NGED's AWS account.</li>
+<li><code>/nged-forecast/nged-s3-bucket-secret</code> — the secret access key paired with NGED's
+  access-key ID (<code>nged_s3_bucket_secret</code>).</li>
+<li><code>/nged-forecast/dagster-pg-password</code> — the password for the control-plane box's
+  Postgres (<a href="#step-14-configure-dagster-on-the-box">Step 14</a>). It's stored here because
+  every launched run connects back to that Postgres to record its events, so the Fargate
+  containers need it injected exactly like the NGED credentials.</li>
+</ul>
+</li>
+<li><strong>Tier</strong>: Standard (free; these values are tiny, nowhere near the 4 KB limit).</li>
+<li><strong>Type</strong>: <strong>SecureString</strong>, with the default <code>aws/ssm</code> KMS key — using the default key is
+  what lets Step 7's inline policy skip a <code>kms:Decrypt</code> statement.</li>
+<li><strong>KMS key source</strong> and <strong>KMS Key ID</strong> — these two fields appear once <strong>SecureString</strong> is
+  selected; leave both at their defaults: <strong>My current account</strong> and <code>alias/aws/ssm</code>.
+  (<code>alias/aws/ssm</code> is the console's name for the default <code>aws/ssm</code> key the Type bullet just
+  referred to.) The console shows a blue notice that the default AWS-managed key "cannot be
+  shared with other AWS accounts, and all users in this AWS account and Region have access to
+  the key" — both limitations are fine here: nothing outside this account ever reads these
+  parameters, and having access to the <em>key</em> doesn't grant access to the <em>parameters</em> — reading
+  them still requires the <code>ssm:GetParameters</code> permission that
+  <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>'s policy grants only to the execution role.</li>
+<li><strong>Value</strong>:<ul>
+<li>The three <code>nged-s3-bucket-*</code> values are copied from the matching
+  <code>NGED_S3_BUCKET_*</code> lines of your local <code>.env</code>.</li>
+<li><code>dagster-pg-password</code> can't be copied from anywhere, because it doesn't exist yet:
+  Postgres isn't installed until <a href="#step-14-configure-dagster-on-the-box">Step 14</a>, and
+  when it is, <em>you</em> choose its password rather than receiving one. So mint it now: run
+  <code>openssl rand -hex 24</code> in a terminal on your laptop (any machine with <code>openssl</code> works —
+  the command just prints 48 random hex characters and touches nothing), and paste the
+  output straight into this parameter's <strong>Value</strong> field. That's the whole minting step:
+  this parameter <em>is</em> the authoritative copy, and there is nowhere else to record the
+  password now — no need to keep it in a password manager or a local file. It gets read
+  back in two places later: <a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a>
+  injects it into every Fargate run as the <code>DAGSTER_PG_PASSWORD</code> environment variable,
+  and in Step 14 you copy the same value (view it again in the Parameter Store console
+  via <strong>Show decrypted value</strong>) into <code>~/nged-forecast/.env</code> on the box — whose
+  <code>docker-compose.yml</code> hands it to Postgres as <code>POSTGRES_PASSWORD</code> on first start, which
+  is the moment the password actually gets <em>set</em> on a real database.</li>
+</ul>
+</li>
+</ul>
+<p>There is no wiring to do in this step — that happens in the task definition
+(<a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a>), where each parameter is
+referenced as a <strong>ValueFrom</strong> environment variable. The ECS agent, authenticated as the
+<em>execution</em> role, fetches and decrypts the values just before the container starts; they never
+appear in the task definition, the ECS console, or CloudWatch.</p>
+<p>Parameter Store is picked over Secrets Manager deliberately: Standard parameters are free
+(Secrets Manager is $0.40/secret/month), and these credentials don't need Secrets Manager's
+flagship feature, automatic rotation — NGED's keys rotate on NGED's schedule, not ours. When
+NGED does rotate them, just update the parameter values (and your local <code>.env</code>); running tasks
+keep the old values until they next start, since injection happens once per container launch.</p>
+<h2 id="step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9 — Create the ECS cluster and Fargate task definition</h2>
+<p>First, a reminder of the deployment's shape, because from this step onwards it matters which half
+of it you're building. The stack runs <strong>two different kinds of compute</strong>, on two different AWS
+technologies:</p>
+<ul>
+<li>The <strong>always-on control plane</strong> — the Dagster daemon, webserver, code-location server, and
+  Postgres — runs on a plain <strong>EC2 virtual machine</strong> (EC2 is Elastic Compute Cloud), launched by
+  hand in <a href="#step-11-launch-the-control-plane-box">Step 11</a> and managed with Docker Compose. ECS
+  and Fargate play no part in running it. Its schedules are responsible for <strong>every recurring
+  job</strong>, not just the forecasts: pulling fresh telemetry from NGED's bucket hourly, downloading
+  the daily ECMWF ensemble NWP from Dynamical.org, and issuing each 6-hourly forecast — though
+  the runs themselves execute on Fargate (next bullet). This is the <strong>only compute in the deployment whose
+  operating system we install and maintain ourselves</strong>: <a href="#step-11-launch-the-control-plane-box">Step 11</a>
+  chooses its OS image (an Ubuntu Server AMI), and from then on the OS is ours to look after —
+  installing software on it (<a href="#step-12-join-the-tailnet">Step 12</a> and
+  <a href="#step-13-install-docker-and-pull-the-image">Step 13</a>) and keeping it patched (Ubuntu's
+  <code>unattended-upgrades</code>, checked in <a href="#optional-hardening">Optional hardening</a>). (Running the
+  control plane on Fargate too would have removed even that OS burden — why we don't is covered
+  in <a href="../../architecture/production-deployment/#an-always-on-fargate-service-for-the-control-plane">Considered but rejected designs</a>.)
+  That maintenance never needs a scheduled outage agreed with NGED: forecasts are produced only
+  every 6 hours, and NGED reads published forecasts straight from S3, so the gap between one
+  forecast run and the next is a built-in maintenance window in which the box can be stopped,
+  patched, and rebooted — see
+  <a href="../../background/requirements/#uptime-lenient-by-design">Requirements → Uptime: lenient by design</a>.</li>
+<li>The <strong>ephemeral workers</strong> — each scheduled run: the hourly NGED telemetry ingest, the daily
+  Dynamical.org NWP download, and the 6-hourly forecast — run as <strong>ECS tasks on Fargate</strong>: a
+  container is created for one run and destroyed when it exits. The control plane <em>dispatches</em>
+  these tasks but never executes one itself. Here there is <strong>no
+  operating system for us to install or maintain</strong>: AWS owns and patches the machines Fargate
+  tasks run on, and everything we are responsible for travels inside the container image from
+  <a href="#step-6-push-the-image-to-ecr">Step 6</a>.</li>
+</ul>
+<p>This step builds the scaffolding for the ephemeral half: the cluster its tasks launch into, and
+the task definition describing how to run them. Why the compute is split this way is the
+<a href="../../architecture/production-deployment/#run-the-dagster-control-plane-continuously-on-one-small-vm">orchestration design</a>.</p>
+<p>Two AWS terms do a lot of work in this step, so it's worth being precise about how they relate.
+<strong>ECS</strong> (Elastic Container Service) is AWS's container orchestrator: it takes a <strong>task definition</strong>
+— a recipe naming the container image to run plus the CPU, memory, IAM roles, environment variables,
+and secrets to run it with — and launches and supervises containers from that recipe. <strong>Fargate</strong> is
+one of ECS's two "launch types" — the two ways of providing the compute the containers run on. The
+other launch type (named "EC2") has ECS place containers onto EC2 instances that you provision and
+patch yourself. In contrast, with Fargate, AWS conjures right-sized compute for each task when it
+launches and tears it down when the task exits, billed by the second. We use ECS on Fargate so that
+every scheduled run — data ingest and forecast alike — gets a fresh, ephemeral machine and
+nothing sits idle between runs.</p>
+<p><strong>Why create a "cluster" when nothing here auto-scales?</strong> On the EC2 launch type, a cluster
+really is a fleet — the pool of instances that tasks get placed onto. On Fargate there are no
+instances, so the cluster is purely a <strong>logical namespace for running tasks</strong>, and we need one
+only because every task has to launch <em>into</em> a cluster: it's the <code>--cluster</code> that
+<a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a>'s manual <code>run-task</code> call targets and the
+<code>cluster:</code> the <code>EcsRunLauncher</code> config in
+<a href="#step-14-configure-dagster-on-the-box">Step 14</a> names, and it's where the console groups the
+running tasks you'll watch. An empty cluster manages no capacity and costs nothing, so a single
+<code>nged-forecast</code> cluster is all this deployment ever needs.</p>
+<ol>
+<li>
+<p><a href="https://eu-west-2.console.aws.amazon.com/ecs?region=eu-west-2"><strong>ECS</strong></a> → <strong>Clusters</strong> →
+   <strong>Create cluster</strong> → <strong>Cluster name</strong> <code>nged-forecast</code> → under <strong>Infrastructure</strong>, keep
+   <strong>Fargate only</strong>, the pre-selected default (no EC2 instances to manage, per the explanation
+   above). <strong>Every other section on the create-cluster form can stay at its console default:</strong></p>
+<ul>
+<li><strong>Service Connect defaults</strong> (unset) — Service Connect wires long-running ECS <em>services</em>
+  to each other; this deployment runs only standalone tasks, so it has nothing to connect.</li>
+<li><strong>Monitoring → Container Insights</strong> (turned off) — the default CloudWatch metrics are
+  enough at this scale, and both Container Insights options bill for the extra metrics they
+  ingest, which is why the console's "Recommended" tag on the enhanced option is ignored
+  here.</li>
+<li><strong>ECS Exec encryption and logging</strong> (no KMS key; logging <strong>Default</strong>) — nothing in this
+  deployment uses ECS Exec (interactive shells into running containers).</li>
+<li><strong>Encryption</strong> (both KMS fields empty) — no KMS requirement, for the same reason the S3
+  buckets in <a href="#step-1-create-the-s3-buckets">Step 1</a> stay on SSE-S3.</li>
+<li><strong>Tags</strong> (none) — unused, as everywhere else on this page.</li>
+</ul>
+<p>Then click <strong>Create</strong>.</p>
+</li>
+<li>
+<p><strong>ECS</strong> → <a href="https://eu-west-2.console.aws.amazon.com/ecs/v2/task-definitions?region=eu-west-2"><strong>Task definitions</strong></a> → <strong>Create new task definition</strong>.
+   Work down the form; anything not named below stays at its console default:</p>
+<ul>
+<li><strong>Task definition family</strong>: <code>nged-forecast</code> — not a free choice: it's the
+  <code>--task-definition</code> in <a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a>'s manual
+  run, the <code>task_definition:</code> in <a href="#step-14-configure-dagster-on-the-box">Step 14</a>'s launcher
+  config, and the family <code>scripts/push_and_deploy_image.sh</code> registers new revisions into.</li>
+<li><strong>Launch type</strong>: keep <strong>AWS Fargate</strong>, the pre-ticked default.</li>
+<li><strong>Operating system/Architecture</strong>: <strong>Linux/ARM64</strong> — the console defaults to
+  <code>Linux/X86_64</code>, but <a href="#step-4-build-and-verify-the-image">Step 4</a>'s script always builds
+  the image for ARM, and ARM Fargate is also ~20% cheaper than x86 for the same task size.
+  (<strong>Network mode</strong> is greyed out at <code>awsvpc</code> — the only mode Fargate supports.)</li>
+<li><strong>Task size</strong>: <strong>4 vCPU</strong> / <strong>16 GB</strong> — comfortably above the measured inference peak
+  (~9 GB).</li>
+<li><strong>Task role</strong>: the task role from <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>, e.g.
+  <code>nged-forecast-task-role</code>.</li>
+<li><strong>Task execution role</strong>: the execution role from
+  <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>, e.g. <code>nged-forecast-task-execution-role</code>.
+  The field defaults to <strong>Create default role</strong> — don't leave it there: the generic role the
+  console would mint has no Parameter Store access, so the secrets injection below would
+  fail at container start.</li>
+<li><strong>Container – 1 → Name</strong>: <code>nged-forecast</code> — <a href="#step-14-configure-dagster-on-the-box">Step 14</a>'s
+  run-launcher config names this container, so keep it predictable. Leave <strong>Essential
+  container</strong> at <strong>Yes</strong>.</li>
+<li><strong>Image URI</strong>: <code>&lt;account-id&gt;.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:&lt;tag&gt;</code> from
+  <a href="#step-6-push-the-image-to-ecr">Step 6</a> — <code>&lt;tag&gt;</code> is the first 12 characters of the
+  promoted model's MLflow run id. Step 6's script prints the full URI as it pushes; to
+  recover it later, copy it from the pushed image in the ECR console, or run
+  <code>jq -r '.mlflow_run_id[:12]' data/production_model/promotion.json</code> on the machine that
+  built the image.</li>
+<li><strong>Port mappings</strong>: <strong>Remove</strong> the pre-filled port-80/HTTP row — every task here is a batch
+  run that listens on nothing; port mappings are for services that accept traffic.</li>
+<li><strong>Environment variables</strong>: <code>DATA_PATH_INTERNAL=s3://nged-forecast-internal/data</code> and
+  <code>DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data</code> — both are needed, since the delivery
+  tables live in a separate bucket from everything else (see the
+  <a href="../setup/#the-configuration-model">Configuration reference</a>). Leave
+  <code>DATA_STORE_*</code> unset, since the task role supplies credentials. These are plain
+  environment values (<strong>Value type</strong> = <strong>Value</strong>), not secrets — bucket URIs are safe in
+  clear text.</li>
+<li><strong>Secrets — the four Parameter Store entries.</strong> In the same <strong>Environment variables</strong>
+  section, add each parameter from <a href="#step-8-store-secrets-in-parameter-store">Step 8</a> as a
+  variable whose <strong>Value type</strong> is <strong>ValueFrom</strong> (the console's secrets mechanism). The
+  <strong>Key</strong> is the env-var name exactly as the code expects; the <strong>Value</strong> is the matching
+  Parameter Store name:<ul>
+<li><strong>Key</strong> <code>NGED_S3_BUCKET_URL</code> — <strong>Value</strong> <code>/nged-forecast/nged-s3-bucket-url</code></li>
+<li><strong>Key</strong> <code>NGED_S3_BUCKET_ACCESS_KEY</code> — <strong>Value</strong>
+  <code>/nged-forecast/nged-s3-bucket-access-key</code></li>
+<li><strong>Key</strong> <code>NGED_S3_BUCKET_SECRET</code> — <strong>Value</strong> <code>/nged-forecast/nged-s3-bucket-secret</code></li>
+<li><strong>Key</strong> <code>DAGSTER_PG_PASSWORD</code> — <strong>Value</strong> <code>/nged-forecast/dagster-pg-password</code></li>
+</ul>
+</li>
+<li><strong>Logging</strong>: keep <strong>Use log collection</strong> ticked with destination <strong>Amazon CloudWatch</strong> and
+  the pre-filled options, setting <strong>awslogs-group</strong> to <code>/ecs/nged-forecast</code>. (The blue
+  "sidecar" notice concerns the <em>other</em> destinations, which route logs through an extra
+  container; the CloudWatch option is a plain Docker log driver — no sidecar.) One catch:
+  the pre-filled <code>awslogs-create-group: true</code> asks the <em>ECS agent</em> to create the log group
+  at first task start, which needs <code>logs:CreateLogGroup</code> — a permission neither the
+  AWS-managed <code>AmazonECSTaskExecutionRolePolicy</code> nor
+  <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>'s inline policy grants. Rather than widen
+  the role, create the log group yourself now: <strong>CloudWatch</strong> → <strong>Logs</strong> → <a href="https://eu-west-2.console.aws.amazon.com/cloudwatch/home?region=eu-west-2#logsV2:log-groups"><strong>Log
+  Management</strong></a> (the console's name for the log-groups list) → <strong>Create log group</strong> → name
+  <code>/ecs/nged-forecast</code>, region <code>eu-west-2</code> — or in one CLI call:
+  <code>aws logs create-log-group --log-group-name /ecs/nged-forecast --region eu-west-2</code>. With
+  the group already in place the agent never attempts creation, so the missing permission is
+  never exercised.</li>
+<li><strong>Docker configuration</strong> (a collapsed section near the bottom of the container panel) →
+  <strong>Entry point</strong>: <code>/usr/bin/env</code>; leave <strong>Command</strong> and <strong>Working directory</strong> empty. This
+  <strong>overrides the image's own <code>ENTRYPOINT ["dagster"]</code></strong>, and matters more than it looks.
+  ECS concatenates entry point + command into one argv, and both the manual verification in
+  <a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a> and the <code>EcsRunLauncher</code> in
+  <a href="#step-14-configure-dagster-on-the-box">Step 14</a> supply a <em>full</em> command that already
+  starts with <code>dagster</code> (the launcher generates <code>dagster api execute_run …</code> and can't be
+  told otherwise). With the image's default entry point, the argv would come out as
+  <code>dagster dagster api execute_run …</code> and fail; <code>/usr/bin/env dagster …</code> simply resolves
+  <code>dagster</code> from <code>PATH</code> and runs it. The image's own entry point remains convenient for
+  local <code>docker run</code> smoke tests, which is why it isn't changed in the Dockerfile itself.</li>
+</ul>
+<p>Everything else — <strong>Task placement</strong>, <strong>Fault injection</strong>, the container's <strong>Restart
+policy</strong> / <strong>HealthCheck</strong> / timeouts, <strong>Storage</strong> (the 20 GiB ephemeral default is
+plenty), <strong>Monitoring</strong>, <strong>Tags</strong> — stays at its default. Then click <strong>Create</strong>.</p>
+</li>
+</ol>
+<p>Creating the task definition in the console is one-time. Later image changes never repeat it —
+<code>scripts/push_and_deploy_image.sh</code> registers new revisions of this family automatically (see
+<a href="#redeploying-a-new-champion-model">Redeploying a new champion model</a>).</p>
+<h2 id="step-10-verify-run-a-forecast-task-manually">Step 10 — Verify: run a forecast task manually</h2>
+<p>Before building the control plane, trigger one task directly and confirm the compute path
+end-to-end — this manual <code>RunTask</code> also remains the fallback verification path once the
+schedules exist.</p>
+<p><strong>This command is a template — it will not run as pasted.</strong> It contains three placeholders you
+must replace first: <code>&lt;subnet-id&gt;</code>, <code>&lt;sg-id&gt;</code>, and the partition key <code>&lt;key&gt;</code>. How to fill in each
+one is explained below the command.</p>
+<div class="highlight"><pre><span></span><code>aws<span class="w"> </span>ecs<span class="w"> </span>run-task<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cluster<span class="w"> </span>nged-forecast<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task-definition<span class="w"> </span>nged-forecast<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--launch-type<span class="w"> </span>FARGATE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--network-configuration<span class="w"> </span><span class="s2">&quot;awsvpcConfiguration={subnets=[&lt;subnet-id&gt;],securityGroups=[&lt;sg-id&gt;],assignPublicIp=ENABLED}&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--overrides<span class="w"> </span><span class="s1">&#39;{&quot;containerOverrides&quot;: [{&quot;name&quot;: &quot;nged-forecast&quot;, &quot;command&quot;: [</span>
+<span class="s1">    &quot;dagster&quot;, &quot;job&quot;, &quot;execute&quot;, &quot;-m&quot;, &quot;nged_substation_forecast.definitions&quot;, &quot;-j&quot;, &quot;live_forecasts_job&quot;,</span>
+<span class="s1">    &quot;--tags&quot;, &quot;{\&quot;dagster/partition\&quot;: \&quot;&lt;key&gt;\&quot;}&quot;</span>
+<span class="s1">  ]}]}&#39;</span>
+</code></pre></div>
+<p>Note the command starts with <code>dagster</code> — Step 9's <code>/usr/bin/env</code> entry point means every command
+spells out the full argv.</p>
+<p>Fill in the three placeholders:</p>
+<ul>
+<li>
+<p><strong><code>&lt;subnet-id&gt;</code></strong> — a <strong>public</strong> subnet in the VPC the task will run in. Unless you have built
+  custom networking in this account, that VPC is the default VPC, and every subnet in a default
+  VPC is public (it routes to the internet gateway and auto-assigns public IPs). List them in
+  the console under <strong>VPC → Subnets</strong>, or with:</p>
+<div class="highlight"><pre><span></span><code>aws<span class="w"> </span>ec2<span class="w"> </span>describe-subnets<span class="w"> </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--filters<span class="w"> </span><span class="nv">Name</span><span class="o">=</span>default-for-az,Values<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;Subnets[].[SubnetId,AvailabilityZone]&#39;</span><span class="w"> </span>--output<span class="w"> </span>table
+</code></pre></div>
+<p>Any one of them will do.</p>
+</li>
+<li>
+<p><strong><code>&lt;sg-id&gt;</code></strong> — the security group the Fargate tasks run with. Create a dedicated one now:
+  <strong>EC2 → Security Groups → Create security group</strong> → name <code>nged-forecast-task-sg</code>, any
+  description, and the same VPC as the subnet above → leave <strong>Inbound rules</strong> empty (the task
+  only dials <em>out</em>: ECR, S3, CloudWatch, and later Postgres on the control-plane box) → keep
+  the default allow-all <strong>Outbound rules</strong> → <strong>Create</strong>. The id (<code>sg-…</code>) is shown on the
+  group's detail page. Don't reuse the VPC's <code>default</code> group:
+  <a href="#step-14-configure-dagster-on-the-box">Step 14</a> opens the control-plane box's Postgres port
+  to exactly this group, so a dedicated group keeps that inbound rule tightly scoped.</p>
+</li>
+<li>
+<p><strong><code>&lt;key&gt;</code></strong> — the <code>live_forecasts</code> partition to run, formatted <code>YYYY-MM-DD-HH:MM</code> with the
+  time at a 6-hourly boundary (e.g. <code>2026-07-04-00:00</code>). A key names the <em>start</em> of its 6-hour
+  window, and the forecast init time is that window's <em>end</em> — read the
+  <a href="../operations/#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand">partition-semantics note</a>
+  before picking one; the most recent <em>completed</em> window is the natural choice for this
+  verification run.</p>
+</li>
+</ul>
+<blockquote>
+<p><strong>Region matters here.</strong> Unlike <a href="#step-6-push-the-image-to-ecr">Step 6</a>'s script (which
+passes <code>--region</code> explicitly on every call), a hand-typed AWS CLI command falls back to your
+configured default region if <code>--region</code> is omitted — check yours with
+<code>aws configure get region</code> and don't assume it's <code>eu-west-2</code>.</p>
+</blockquote>
+<p><code>assignPublicIp=ENABLED</code> (with a public subnet) is the simplest way to give the task internet
+egress for its ECR pull and S3/CloudWatch calls without a NAT gateway. Keep this <code>&lt;subnet-id&gt;</code>
+and <code>&lt;sg-id&gt;</code> to hand — the run launcher in
+<a href="#step-14-configure-dagster-on-the-box">Step 14</a> launches tasks with exactly the same network
+configuration.</p>
+<p>Follow the run in <strong>ECS</strong> → the cluster → <strong>Tasks</strong>, then <strong>CloudWatch Logs</strong> (log group
+<code>/ecs/nged-forecast</code>) for the container's output. What counts as a pass depends on whether any
+data has been ingested yet:</p>
+<ul>
+<li>
+<p><strong>On the first pass through this runbook, the buckets are still empty</strong> — nothing ingests
+  data until <a href="#step-16-turn-on-the-schedules-and-verify-end-to-end">Step 16</a>'s schedules turn
+  on — so the run <em>cannot</em> produce a forecast. The pass here is the cloud twin of
+  <a href="#step-4-build-and-verify-the-image">Step 4</a>'s offline smoke test: the task starts (proving
+  the image pulled and all four secrets resolved), its logs stream to CloudWatch, and the run
+  fails <em>only</em> at the NWP-availability lookup — a traceback ending in <code>TableNotFoundError</code>,
+  raised from <code>_available_nwp_init_times</code>. Loading the model writes no log line, so that
+  specific failure <em>is</em> the proof the model loaded: the <code>live_forecasts</code> asset loads the model
+  first and checks NWP availability second, so dying at the lookup means
+  <code>load_forecaster_from_dir</code> already succeeded. This exercises every AWS-side link in the
+  chain — cluster, task definition, IAM roles, secrets, networking, logging — which is exactly
+  what this step exists to verify.</p>
+</li>
+<li>
+<p><strong>Once data exists</strong> (after <a href="#step-16-turn-on-the-schedules-and-verify-end-to-end">Step 16</a>,
+  when this command is the fallback verification path), additionally confirm the run succeeds
+  and a new forecast lands under <code>s3://nged-forecast-delivery/data/power_forecasts/…</code> — the
+  delivery bucket, not the internal one, since <code>power_forecasts</code> is one of the five NGED-facing
+  tables.</p>
+</li>
+</ul>
+<h2 id="step-11-launch-the-control-plane-box">Step 11 — Launch the control-plane box</h2>
+<p>We will now set up one small always-on EC2 instance to run the Dagster daemon (schedules, sensors,
+run dispatch), the Dagster webserver (the UI), the code-location server, and Postgres
+(run/event/schedule history) — everything except the actual forecast compute and data fetching jobs,
+which stay on ephemeral Fargate. (To read about why we're using an always-on box, and why this
+shape, see the <a href="../../architecture/production-deployment/#run-the-dagster-control-plane-continuously-on-one-small-vm">orchestration
+decision</a>;
+the sizing and cost are the roadmap's <a href="../../roadmap/live-service/#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month">accepted
+option</a>.)</p>
+<p>First create its IAM role: <strong>IAM</strong> →
+<a href="https://us-east-1.console.aws.amazon.com/iam/home?region=eu-west-2#/roles"><strong>Roles</strong></a> → <strong>Create
+role</strong> → trusted entity type <strong>AWS service</strong> → under <strong>Use case</strong>, pick <strong>EC2</strong> from the <strong>Service
+or use case</strong> dropdown, then select the <strong>EC2</strong> radio button (the plain <em>EC2</em> variant, not
+<em>EC2 - Spot Instances</em> or the other sub-options — it's what puts <code>ec2.amazonaws.com</code> in the role's
+trust policy, so the instance can assume the role) → <strong>Next</strong> → attach <code>nged-forecast-read-and-write</code>
+(<a href="#step-2-grant-data-access-with-iam">Step 2</a>) and the AWS-managed
+<code>AmazonEC2ContainerRegistryReadOnly</code> (pull the image) → <strong>Next</strong>. On the final <strong>Name, review, and
+create</strong> page, set <strong>Role name</strong> <code>nged-forecast-ctrl-role</code> and a <strong>Description</strong> such as <em>"Control-plane
+box for the NGED forecast service: runs the Dagster daemon/webserver, reads and writes the forecast S3
+buckets, pulls the image from ECR, and dispatches forecast runs to Fargate."</em> Leave the auto-generated
+<strong>Trust policy</strong> (the <code>ec2.amazonaws.com</code> principal) exactly as shown — it's correct and never
+hand-edited here. Then <strong>Create role</strong>.</p>
+<p>Now add one inline policy (e.g. <code>nged-forecast-launch-runs</code>) so the daemon can dispatch runs to
+Fargate — this is a <em>permissions</em> policy, separate from the trust policy above, and it's added after
+the role exists, exactly as in <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>. Open the role you
+just created → <strong>Permissions</strong> tab → <strong>Add permissions</strong> → <strong>Create inline policy</strong> → switch to the
+<strong>JSON</strong> editor → paste the JSON below, replacing <code>&lt;account-id&gt;</code> with your 12-digit AWS account id
+(the account menu at the top right of the console, or
+<code>aws sts get-caller-identity --query Account --output text</code>) → <strong>Next</strong> → name it → <strong>Create policy</strong>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;Statement&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;ecs:RunTask&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:StopTask&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:DescribeTasks&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:DescribeTaskDefinition&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:RegisterTaskDefinition&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:TagResource&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;ecs:ListTagsForResource&quot;</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;*&quot;</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;iam:PassRole&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:iam::&lt;account-id&gt;:role/nged-forecast-task-role&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:iam::&lt;account-id&gt;:role/nged-forecast-task-execution-role&quot;</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;Condition&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;StringEquals&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;iam:PassedToService&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ecs-tasks.amazonaws.com&quot;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>(<code>iam:PassRole</code> is what lets the daemon hand <a href="#step-7-iam-roles-for-the-fargate-task">Step 7</a>'s
+roles to the tasks it launches; the condition stops the box passing them to anything but ECS.
+<code>ecs:RegisterTaskDefinition</code> is included because <code>EcsRunLauncher</code> may register a derived task
+definition depending on config — harmless to grant, confusing to debug when missing.)</p>
+<p>Leave the role's <strong>Maximum session duration</strong> at its 1-hour default — it's irrelevant to how this
+role is used. <code>MaxSessionDuration</code> only bounds sessions created by an explicit <code>sts:AssumeRole</code> call
+that requests a duration (a human assuming a role, or role chaining). An <strong>EC2 instance profile</strong>
+takes neither path: the Instance Metadata Service auto-issues and auto-rotates the role's temporary
+credentials on the instance's behalf, refreshing them before expiry for as long as the box runs, so
+this field is never consulted and the box's credentials never lapse.</p>
+<p>Then <strong>EC2</strong> → <strong>Instances</strong> → <strong>Launch instance</strong>. Nearly every default the wizard pre-fills —
+Amazon Linux, 64-bit x86, <code>t3.micro</code>, an 8 GiB volume, and a security group that allows SSH from
+anywhere — is <em>not</em> what we want, so work through each section and change it:</p>
+<ul>
+<li><strong>Name and tags</strong> → <strong>Name</strong>: <code>nged-forecast-ctrl</code>.</li>
+<li><strong>Application and OS Images (Amazon Machine Image)</strong>: click the <strong>Ubuntu</strong> quick-start tile,
+  set the <strong>Architecture</strong> dropdown to <strong>64-bit (Arm)</strong> <em>first</em> (it defaults to x86, and the AMI
+  ID and the entire OS image change when you switch it), then in the <strong>Amazon Machine Image
+  (AMI)</strong> dropdown choose <strong>Ubuntu Server 26.04 LTS</strong>. Confirm the panel then shows
+  <strong>Username: ubuntu</strong> — that is the login name <a href="#step-12-join-the-tailnet">Step 12</a>'s SSH uses.</li>
+<li><strong>Instance type</strong>: <code>t4g.medium</code> (2 vCPU / 4 GiB — comfortable for daemon + webserver + code
+  server + Postgres; the costed sizing is in the roadmap link above). The <code>t4g</code> family is
+  Graviton (Arm), which is why the Arm AMI above is required — an x86 AMI won't offer these types.</li>
+<li><strong>Key pair (login)</strong> → <strong>Create new key pair</strong>: name it <code>nged-forecast-ctrl</code>, <strong>Key pair
+  type</strong> <strong>ED25519</strong>, <strong>Private key file format</strong> <strong>.pem</strong>, then <strong>Create key pair</strong> and the
+  browser downloads <code>nged-forecast-ctrl.pem</code>. ED25519 over RSA: shorter keys, faster handshakes,
+  and every client in this runbook supports it. Move the file somewhere durable and lock it down
+  — <code>mv ~/Downloads/nged-forecast-ctrl.pem ~/.ssh/ &amp;&amp; chmod 400 ~/.ssh/nged-forecast-ctrl.pem</code>
+  (<code>ssh</code> refuses a private key with group/other-readable permissions). It's only needed for the
+  first login below — Tailscale SSH takes over in <a href="#step-12-join-the-tailnet">Step 12</a>.</li>
+<li>
+<p><strong>Network settings</strong> → <strong>Edit</strong> (the collapsed summary can't set the subnet or edit the
+  security-group rules, so you must expand it):</p>
+<ul>
+<li><strong>VPC</strong>: the same one (the default <code>vpc-…</code>) as
+  <a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a>'s task.</li>
+<li><strong>Subnet</strong>: change it from <strong>No preference</strong> to a specific <strong>public subnet</strong> in that VPC —
+  the same subnet Step 10's task ran in is the natural pick (every default-VPC subnet is
+  public, so any of them works).</li>
+<li><strong>Auto-assign public IP</strong>: <strong>Enable</strong> (internet egress for apt/ECR/S3/Tailscale without a
+  NAT gateway).</li>
+<li><strong>Firewall (security groups)</strong>: keep <strong>Create security group</strong> and set its <strong>Security
+  group name</strong> to <code>nged-forecast-ctrl-sg</code>. The wizard pre-adds one inbound rule — <strong>Allow SSH
+  traffic from Anywhere</strong> — so <strong>delete it</strong>, leaving <strong>no inbound rules at all</strong>. Tailscale
+  needs none (it dials out), and "no public inbound ports" is a load-bearing security
+  decision, since the Dagster UI has no authentication of its own. Leave the default
+  allow-all <strong>outbound</strong> rule untouched. One inbound rule is added later, for Postgres
+  (<a href="#step-14-configure-dagster-on-the-box">Step 14</a>).</li>
+</ul>
+</li>
+<li>
+<p><strong>Configure storage</strong>: change the single <strong>Root volume</strong> from the default 8 GiB to <strong>20 GiB</strong>,
+  volume type <strong>gp3</strong> (general-purpose SSD). Leave <strong>File systems</strong> at <strong>None</strong>.</p>
+</li>
+<li><strong>Advanced details</strong> (expand this section near the bottom of the form):<ul>
+<li><strong>IAM instance profile</strong>: <code>nged-forecast-ctrl-role</code>.</li>
+<li><strong>Metadata version</strong>: <strong>V2 only (token required)</strong>, and — easy to miss, breaks everything
+  quietly if skipped — <strong>Metadata response hop limit: 2</strong>. The Dagster containers fetch the
+  instance role's credentials from the instance metadata service, and Docker's bridge adds a
+  network hop; with the default hop limit of 1, boto3 and <code>object_store</code> inside the
+  containers silently find no credentials.</li>
+</ul>
+</li>
+</ul>
+<p>Check the <strong>Summary</strong> panel on the right (it should read Ubuntu 26.04, <code>t4g.medium</code>, your new
+<code>nged-forecast-ctrl-sg</code>, 20 GiB gp3), then <strong>Launch instance</strong>.</p>
+<h2 id="step-12-join-the-tailnet">Step 12 — Join the tailnet</h2>
+<p><a href="#step-11-launch-the-control-plane-box">Step 11</a>'s security group has <strong>no inbound rules</strong>, so
+there is no way in yet: a plain <code>ssh</code> from your laptop <em>and</em> the console's browser <strong>EC2 Instance
+Connect</strong> both fail with <em>"Port 22 (SSH) is not authorized"</em>. Open <strong>one temporary inbound rule</strong>
+for this single bootstrap login, then delete it the moment Tailscale is up (from then on Tailscale
+dials out and the box needs no inbound SSH ever again).</p>
+<p>Add the rule scoped to your laptop's current public IP — <strong>EC2</strong> → <strong>Security Groups</strong> →
+<code>nged-forecast-ctrl-sg</code> → <strong>Inbound rules</strong> → <strong>Edit inbound rules</strong> → <strong>Add rule</strong>: <strong>Type</strong>
+<code>SSH</code>, <strong>Source</strong> <strong>My IP</strong> (the console fills in your laptop's <code>/32</code>) → <strong>Save rules</strong>.</p>
+<p>Now find the address to SSH <em>to</em>: the <strong>control-plane box's own public IPv4 address</strong> — the one
+AWS auto-assigned the instance at launch (Step 11's <em>Auto-assign public IP</em>), <strong>not</strong> your laptop's
+IP from the rule you just added. Read it off <strong>EC2</strong> → <strong>Instances</strong> → select <code>nged-forecast-ctrl</code>
+→ the <strong>Details</strong> tab → <strong>Public IPv4 address</strong>, or from the CLI:</p>
+<div class="highlight"><pre><span></span><code>aws<span class="w"> </span>ec2<span class="w"> </span>describe-instances<span class="w"> </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--filters<span class="w"> </span><span class="nv">Name</span><span class="o">=</span>tag:Name,Values<span class="o">=</span>nged-forecast-ctrl<span class="w"> </span><span class="nv">Name</span><span class="o">=</span>instance-state-name,Values<span class="o">=</span>running<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;Reservations[].Instances[].PublicIpAddress&#39;</span><span class="w"> </span>--output<span class="w"> </span>text
+</code></pre></div>
+<p>A stop/start reassigns this address, but you only need it for this one login — Tailscale's stable
+MagicDNS name takes over afterwards. SSH in with
+<a href="#step-11-launch-the-control-plane-box">Step 11</a>'s key pair, substituting that address for
+<code>&lt;public-ip&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code>ssh<span class="w"> </span>-i<span class="w"> </span>~/.ssh/nged-forecast-ctrl.pem<span class="w"> </span>ubuntu@&lt;public-ip&gt;
+</code></pre></div>
+<p><strong>First, bring the box fully up to date.</strong> Now — before anything runs on it — is the clean moment,
+because an <code>apt upgrade</code> can pull a new kernel that only takes effect on reboot, and it's far
+nicer to bounce an empty box than one running Dagster and Postgres. A fresh cloud image runs
+<code>cloud-init</code> and <code>unattended-upgrades</code> at first boot, which hold the dpkg lock, so wait for those
+to finish first:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>cloud-init<span class="w"> </span>status<span class="w"> </span>--wait<span class="w">          </span><span class="c1"># returns once first-boot automation releases the dpkg lock</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>upgrade<span class="w"> </span>-y
+</code></pre></div>
+<p>If that upgraded the kernel or libc, <code>sudo reboot</code> and reconnect (<code>ssh -i
+~/.ssh/nged-forecast-ctrl.pem ubuntu@&lt;public-ip&gt;</code> again) before continuing.</p>
+<p><strong>Then install Tailscale and join the tailnet.</strong> Use Tailscale's install script rather than
+<code>apt install tailscale</code>: the script adds Tailscale's <em>own</em> APT repository and installs from it, so
+the box tracks Tailscale's current stable release and keeps getting it through <code>apt upgrade</code>;
+Ubuntu's <code>universe</code> package is frozen at the release's snapshot and lags. (If you'd rather not pipe
+a script to a shell, Tailscale's <a href="https://tailscale.com/kb/1476/install-ubuntu-2404">manual APT repo
+steps</a> do exactly what the script automates.)</p>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://tailscale.com/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+sudo<span class="w"> </span>tailscale<span class="w"> </span>up<span class="w"> </span>--ssh<span class="w"> </span>--hostname<span class="o">=</span>nged-forecast-ctrl
+</code></pre></div>
+<p>Open the authentication URL that <code>tailscale up</code> prints and sign in <strong>with the OCF Google Workspace
+account (<code>…@openclimatefix.org</code>)</strong>, so the box joins the shared OCF org tailnet rather than a
+personal one. <code>--ssh</code> enables Tailscale SSH, so from now on any device on the tailnet can
+<code>ssh ubuntu@nged-forecast-ctrl</code> with no key management; <code>--hostname</code> gives the box a stable MagicDNS
+name. Confirm from your laptop:</p>
+<div class="highlight"><pre><span></span><code>tailscale<span class="w"> </span>ping<span class="w"> </span>nged-forecast-ctrl
+ssh<span class="w"> </span>ubuntu@nged-forecast-ctrl
+</code></pre></div>
+<p><strong>Disable key expiry for this node.</strong> A device authenticated as a <em>user</em> inherits Tailscale's
+default node-key expiry (~180 days); when it lapses, an always-on box silently drops off the
+tailnet and you lose SSH and UI access until someone re-authenticates it. In the
+<a href="https://login.tailscale.com/admin/machines">Tailscale admin console</a>, open the
+<code>nged-forecast-ctrl</code> machine → <strong>Disable key expiry</strong>. (The tidier long-term option is to re-auth
+the box with a <em>tagged</em> auth key, e.g. <code>tag:nged-forecast</code>, which makes it org-owned and
+non-expiring in one step; disabling expiry on the user-owned node is the quick fix.)</p>
+<p>Because the tailnet is the <em>only</em> way in and the Dagster UI has no authentication of its own,
+anyone who can reach this box over the OCF tailnet gets its UI and — via <code>--ssh</code> — a shell as
+<code>ubuntu</code>, governed by the tailnet's ACLs. That is intended here (OCF-wide access is fine for this
+box); tighten it later with Tailscale ACLs or tags if that ever changes.</p>
+<p>Now <strong>delete the temporary inbound rule</strong> (<strong>Edit inbound rules</strong> → <strong>Delete</strong> → <strong>Save rules</strong>),
+returning <code>nged-forecast-ctrl-sg</code> to zero inbound rules — Tailscale establishes its connections
+outbound, so nothing else needs the port open. The only inbound rule the box ever keeps is the
+Postgres one added in <a href="#step-14-configure-dagster-on-the-box">Step 14</a>.</p>
+<blockquote>
+<p><strong>Prefer never opening a public port, even briefly?</strong> Two alternatives keep the group at zero
+inbound rules throughout, at the cost of more setup: create an <strong>EC2 Instance Connect Endpoint</strong>
+in the subnet and connect through it, or attach the AWS-managed <code>AmazonSSMManagedInstanceCore</code>
+policy to <code>nged-forecast-ctrl-role</code> and use <strong>SSM Session Manager</strong> — a browser shell needing no
+keys and no inbound ports (the Ubuntu AMI ships the SSM agent by default). For a single
+bootstrap login the temporary rule above is the least work.</p>
+</blockquote>
+<h2 id="step-13-install-docker-and-pull-the-image">Step 13 — Install Docker and pull the image</h2>
+<p>On the box:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
+sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>docker.io<span class="w"> </span>docker-compose-v2
+sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>docker
+sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span>ubuntu<span class="w">    </span><span class="c1"># then log out and back in for it to take effect</span>
+
+sudo<span class="w"> </span>snap<span class="w"> </span>install<span class="w"> </span>aws-cli<span class="w"> </span>--classic
+<span class="nv">REGISTRY</span><span class="o">=</span><span class="k">$(</span>aws<span class="w"> </span>sts<span class="w"> </span>get-caller-identity<span class="w"> </span>--query<span class="w"> </span>Account<span class="w"> </span>--output<span class="w"> </span>text<span class="k">)</span>.dkr.ecr.eu-west-2.amazonaws.com
+aws<span class="w"> </span>ecr<span class="w"> </span>get-login-password<span class="w"> </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span>login<span class="w"> </span>--username<span class="w"> </span>AWS<span class="w"> </span>--password-stdin<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$REGISTRY</span><span class="s2">&quot;</span>
+docker<span class="w"> </span>pull<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$REGISTRY</span><span class="s2">/nged-forecast:&lt;tag&gt;&quot;</span>
+</code></pre></div>
+<p><code>REGISTRY</code> builds itself from the box's own 12-digit account id, which <code>aws sts get-caller-identity</code>
+reads from the instance role (<a href="#step-11-launch-the-control-plane-box">Step 11</a>) — so there is
+nothing to paste for the account id. <strong>You do still have to fill in <code>&lt;tag&gt;</code></strong>: it is the first 12
+characters of the promoted model's MLflow run id, naming exactly which image to deploy. Step 6's
+script prints the full URI as it pushes; to recover it later, copy it from the pushed image in the
+ECR console, or run <code>jq -r '.mlflow_run_id[:12]' data/production_model/promotion.json</code> on the machine
+that built the image.</p>
+<p>No <code>aws configure</code> is needed — the instance role from
+<a href="#step-11-launch-the-control-plane-box">Step 11</a> supplies credentials. The ECR login token
+expires after 12 hours, which is fine: image pulls here are a manual, per-deploy event, so just
+re-run the <code>docker login</code> line whenever you pull a new tag.</p>
+<h2 id="step-14-configure-dagster-on-the-box">Step 14 — Configure Dagster on the box</h2>
+<p>Everything lives in one directory:</p>
+<div class="highlight"><pre><span></span><code>~/nged-forecast/
+├── docker-compose.yml
+├── .env                     # chmod 600
+└── dagster_home/
+    ├── dagster.yaml
+    └── workspace.yaml
+</code></pre></div>
+<h3 id="one-image-four-roles">One image, four roles</h3>
+<p>The deployment runs two kinds of job — the always-on Dagster control plane on this box, and the
+6-hourly forecast run on ephemeral Fargate — yet the repository builds a <strong>single Dockerfile</strong>.
+There is no contradiction: a container image is not a program, it's a packaged <strong>filesystem</strong> —
+here, the Python environment (with every dependency installed), the <code>nged_substation_forecast</code>
+code, and the baked-in champion model. <em>Which program runs</em> is chosen per container, by the
+command each one is started with. The same image therefore plays four roles:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Runs where</th>
+<th>Started as</th>
+<th>What it uses from the image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Code-location server</td>
+<td>this box (compose)</td>
+<td><code>dagster code-server start …</code></td>
+<td>the Python env + project code, served to the other services over gRPC</td>
+</tr>
+<tr>
+<td>Webserver (the UI)</td>
+<td>this box (compose)</td>
+<td><code>dagster-webserver …</code></td>
+<td>just the installed <code>dagster-webserver</code> binary — it asks the code server for definitions</td>
+</tr>
+<tr>
+<td>Daemon</td>
+<td>this box (compose)</td>
+<td><code>dagster-daemon run …</code></td>
+<td>the <code>dagster-daemon</code> binary, plus <code>dagster-aws</code> for the run launcher</td>
+</tr>
+<tr>
+<td>Forecast run</td>
+<td>ephemeral Fargate task</td>
+<td><code>dagster api execute_run …</code> (generated by the launcher)</td>
+<td>everything: env, code, <strong>and the champion model</strong> — the only role that loads it</td>
+</tr>
+</tbody>
+</table>
+<p>One image rather than a slim control-plane image plus a fat run image is deliberate:</p>
+<ul>
+<li><strong>No version skew.</strong> The code location that evaluates schedules and the Fargate worker that
+  executes the run see byte-identical code and dependencies, because they are literally the
+  same image tag. With two images, a partial deploy could leave the control plane and the run
+  worker disagreeing about what <code>live_forecasts</code> <em>is</em> — a failure mode this design cannot have.</li>
+<li><strong>One pipeline.</strong> A single build/verify/push (<a href="#step-4-build-and-verify-the-image">Steps 4</a>
+  <a href="#step-6-push-the-image-to-ecr">–6</a>) and a single tag to reason about, instead of two builds
+  to keep in lockstep.</li>
+<li>The only cost is that the three control-plane containers carry the champion model as dead
+  weight — a few megabytes of XGBoost files they never load. Cheap, and harmless.</li>
+</ul>
+<p>The one place the single-image design needs care is <strong>entrypoints</strong>, because the image can only
+declare one default (<code>ENTRYPOINT ["dagster"]</code>) while the four roles start three different
+executables: <code>dagster code-server start</code> is an ordinary <code>dagster</code> subcommand, so the image's
+entrypoint stands for it; <code>dagster-webserver</code> and <code>dagster-daemon</code> are <strong>separate
+console-script binaries</strong>, not <code>dagster</code> subcommands, so those two compose services carry
+<code>entrypoint:</code> overrides; and the Fargate run container neutralises the entrypoint with
+<code>/usr/bin/env</code> because the launcher's generated command already starts with <code>dagster</code> (the
+<a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a> gotcha).</p>
+<p><code>~/nged-forecast/.env</code> (readable by you alone — <code>chmod 600 .env</code>):</p>
+<div class="highlight"><pre><span></span><code>IMAGE=&lt;account-id&gt;.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:&lt;tag&gt;
+DATA_PATH_INTERNAL=s3://nged-forecast-internal/data
+DATA_PATH_DELIVERY=s3://nged-forecast-delivery/data
+NGED_S3_BUCKET_URL=&lt;same value as the Parameter Store entry&gt;
+NGED_S3_BUCKET_ACCESS_KEY=&lt;same value as the Parameter Store entry&gt;
+NGED_S3_BUCKET_SECRET=&lt;same value as the Parameter Store entry&gt;
+DAGSTER_PG_PASSWORD=&lt;same value as /nged-forecast/dagster-pg-password from Step 8&gt;
+SENTRY_DSN=&lt;OCF Sentry project DSN&gt;
+SENTRY_ENVIRONMENT=production
+SENTRY_MONITOR_FORECASTS=true
+</code></pre></div>
+<p>The three <code>SENTRY_*</code> lines turn on error telemetry and the missed-check-in alarm (see
+<a href="../../architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry</a>).
+<code>SENTRY_ENVIRONMENT=production</code> is what the alarm's alert rule is scoped to; a developer testing
+from a laptop instead sets <code>SENTRY_ENVIRONMENT=&lt;name&gt;-laptop</code> and leaves <code>SENTRY_MONITOR_FORECASTS</code>
+unset (so a laptop never registers a stale check-in on the production monitor). An empty/absent
+<code>SENTRY_DSN</code> disables Sentry entirely, so this is safe to omit while bringing the box up.</p>
+<p>(The Fargate containers get these injected from Parameter Store; the box's containers read this
+file instead — Stage-1 simplicity, one hand-managed box.)</p>
+<p><code>~/nged-forecast/docker-compose.yml</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:17</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">POSTGRES_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagster</span>
+<span class="w">      </span><span class="nt">POSTGRES_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${DAGSTER_PG_PASSWORD}</span>
+<span class="w">      </span><span class="nt">POSTGRES_DB</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagster</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;5432:5432&quot;</span><span class="w">   </span><span class="c1"># reachable by the Fargate run workers; see the security-group rule below</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pgdata:/var/lib/postgresql/data</span>
+
+<span class="w">  </span><span class="nt">code-server</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${IMAGE}</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w">    </span><span class="c1"># `code-server start` is a `dagster` subcommand, so the image&#39;s ENTRYPOINT [&quot;dagster&quot;] stands</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">[</span><span class="s">&quot;code-server&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;start&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;--host&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;0.0.0.0&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;--port&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;4266&quot;</span><span class="p p-Indicator">,</span>
+<span class="w">       </span><span class="s">&quot;-m&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;nged_substation_forecast.definitions&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">env_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">DAGSTER_HOME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/dagster/dagster_home</span>
+<span class="w">      </span><span class="nt">AWS_DEFAULT_REGION</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eu-west-2</span><span class="w">   </span><span class="c1"># boto3 has no other region source on the box; see note below</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dagster_home:/opt/dagster/dagster_home</span>
+<span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postgres</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">webserver</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${IMAGE}</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w">    </span><span class="nt">entrypoint</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;dagster-webserver&quot;</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># separate binary, NOT a `dagster` subcommand</span>
+<span class="w">    </span><span class="c1"># --db-pool-max-overflow lifts the Postgres pool ceiling above its default of 20; see note below</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">[</span><span class="s">&quot;-h&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;0.0.0.0&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-p&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3000&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-w&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;workspace.yaml&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;--db-pool-max-overflow&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;40&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">working_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/dagster/dagster_home</span>
+<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;3000:3000&quot;</span>
+<span class="w">    </span><span class="nt">env_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">DAGSTER_HOME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/dagster/dagster_home</span>
+<span class="w">      </span><span class="nt">AWS_DEFAULT_REGION</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eu-west-2</span><span class="w">   </span><span class="c1"># boto3 has no other region source on the box; see note below</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dagster_home:/opt/dagster/dagster_home</span>
+<span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postgres</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">code-server</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="nt">daemon</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${IMAGE}</span>
+<span class="w">    </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w">    </span><span class="nt">entrypoint</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;dagster-daemon&quot;</span><span class="p p-Indicator">]</span><span class="w">      </span><span class="c1"># separate binary, NOT a `dagster` subcommand</span>
+<span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;run&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-w&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;workspace.yaml&quot;</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">working_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/dagster/dagster_home</span>
+<span class="w">    </span><span class="nt">env_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
+<span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">DAGSTER_HOME</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/opt/dagster/dagster_home</span>
+<span class="w">      </span><span class="nt">AWS_DEFAULT_REGION</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eu-west-2</span><span class="w">   </span><span class="c1"># boto3 has no other region source on the box; see note below</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./dagster_home:/opt/dagster/dagster_home</span>
+<span class="w">    </span><span class="nt">depends_on</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">postgres</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">code-server</span><span class="p p-Indicator">]</span>
+
+<span class="nt">volumes</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">pgdata</span><span class="p">:</span>
+</code></pre></div>
+<p><strong><code>AWS_DEFAULT_REGION</code> is set on every box container</strong> because boto3 does not fall back to
+instance metadata for its <em>region</em> the way it does for credentials. The instance role
+(<a href="#step-11-launch-the-control-plane-box">Step 11</a>) supplies credentials over IMDS, but region has
+no such fallback — so without this the daemon's <code>EcsRunLauncher</code> fails the moment it tries to launch
+a run, with <code>botocore.exceptions.NoRegionError: You must specify a region</code>, and the box's other
+boto3 calls (S3) would fail the same way. The Fargate run workers don't need it: a task reads its
+region from the ECS task metadata automatically, so this gap is box-only.</p>
+<p><strong><code>--db-pool-max-overflow 40</code> on the webserver</strong> raises its Postgres connection-pool ceiling. Every
+<code>dagster-postgres</code> storage hard-codes <code>pool_size: 1</code>, and the webserver's overflow defaults to 20 —
+a 21-connection ceiling. The UI's live asset-status poll (<code>AssetGraphLiveQuery</code>) fans out one
+connection per asset node across a threadpool, and on this small box those queries hold their
+connections long enough (Postgres shares 2 vCPU / 4 GiB with the daemon, webserver, and code-server)
+that concurrent polling drains the pool. When it does, connection checkouts wait 30 s, time out, and
+the GraphQL query dies with <code>too many retries for DB connection</code> /
+<code>QueuePool limit of size 1 overflow 20 reached</code>. Lifting the overflow to 40 (41 connections) clears
+it with headroom, still well under <code>postgres:17</code>'s default <code>max_connections</code> of 100 — leaving room
+for the daemon, code-server, and the Fargate run workers that also connect back. Only the webserver
+takes this flag; the daemon and code-server don't run the live query, so they don't need it.</p>
+<p><code>~/nged-forecast/dagster_home/workspace.yaml</code> — tells the webserver and daemon where user code
+lives (only ever read on the box, so the compose-network hostname is fine here):</p>
+<div class="highlight"><pre><span></span><code><span class="nt">load_from</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">grpc_server</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">code-server</span>
+<span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4266</span>
+<span class="w">      </span><span class="nt">location_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nged_substation_forecast</span>
+</code></pre></div>
+<p><code>~/nged-forecast/dagster_home/dagster.yaml</code> — the instance config. The <code>concurrency</code>,
+<code>run_monitoring</code>, and <code>python_logs</code> blocks are the same ones the local <code>dagster.yaml</code> in the
+<a href="https://github.com/openclimatefix/nged-substation-forecast#setup">repository README</a> uses, and
+for the same reasons; what's new is Postgres storage and the run launcher:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">storage</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">postgres</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">postgres_db</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">hostname</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;box-private-ip&gt;</span><span class="w">   </span><span class="c1"># NOT &quot;postgres&quot; — see note below</span>
+<span class="w">      </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span>
+<span class="w">      </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagster</span>
+<span class="w">      </span><span class="nt">password</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">env</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DAGSTER_PG_PASSWORD</span>
+<span class="w">      </span><span class="nt">db_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagster</span>
+
+<span class="nt">run_launcher</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">module</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dagster_aws.ecs</span>
+<span class="w">  </span><span class="nt">class</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">EcsRunLauncher</span>
+<span class="w">  </span><span class="nt">config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">task_definition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nged-forecast</span><span class="w">    </span><span class="c1"># the family from Step 9; latest revision is used</span>
+<span class="w">    </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nged-forecast</span><span class="w">     </span><span class="c1"># must match Step 9&#39;s container name</span>
+<span class="w">    </span><span class="nt">use_current_ecs_task_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">   </span><span class="c1"># the daemon runs on EC2, not inside an ECS task</span>
+<span class="w">    </span><span class="nt">secrets_tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">                 </span><span class="c1"># we use Parameter Store, not Secrets Manager; see note below</span>
+<span class="w">    </span><span class="nt">run_task_kwargs</span><span class="p">:</span><span class="w">                  </span><span class="c1"># boto3 RunTask kwargs, hence the camelCase</span>
+<span class="w">      </span><span class="nt">cluster</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nged-forecast</span>
+<span class="w">      </span><span class="nt">launchType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FARGATE</span>
+<span class="w">      </span><span class="nt">networkConfiguration</span><span class="p">:</span>
+<span class="w">        </span><span class="nt">awsvpcConfiguration</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">subnets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;&lt;subnet-id&gt;&quot;</span><span class="p p-Indicator">]</span><span class="w">          </span><span class="c1"># same as Step 10&#39;s manual run-task</span>
+<span class="w">          </span><span class="nt">securityGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;&lt;sg-id&gt;&quot;</span><span class="p p-Indicator">]</span><span class="w">       </span><span class="c1"># same as Step 10&#39;s manual run-task</span>
+<span class="w">          </span><span class="nt">assignPublicIp</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ENABLED</span>
+
+<span class="nt">concurrency</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">pools</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">default_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w">  </span><span class="c1"># Used to limit concurrency of the ecmwf_ens asset.</span>
+
+<span class="nt">run_monitoring</span><span class="p">:</span>
+<span class="w">  </span><span class="c1"># Without this, a crashed/killed run can leak its concurrency-pool slot (e.g. the pool</span>
+<span class="w">  </span><span class="c1"># above) forever, since nothing else frees a slot held by a run that never reached a</span>
+<span class="w">  </span><span class="c1"># normal finally-block exit. This lets the daemon self-heal: any run finished (in any</span>
+<span class="w">  </span><span class="c1"># terminal status) for longer than the threshold has its slots freed automatically.</span>
+<span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">  </span><span class="nt">free_slots_after_run_end_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+
+<span class="nt">python_logs</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">managed_python_loggers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nged_data</span>
+<span class="w">  </span><span class="nt">python_log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEBUG</span>
+</code></pre></div>
+<p>Four things in <code>dagster.yaml</code> deserve explanation:</p>
+<ul>
+<li>
+<p><strong><code>secrets_tag: null</code> disables Secrets Manager enumeration.</strong> <code>EcsRunLauncher.secrets_tag</code>
+  defaults to <code>"dagster"</code>, which makes the launcher call <code>secretsmanager:ListSecrets</code> (filtered by
+  that tag) on every run launch to inject matching secrets as env vars. This stack uses Parameter
+  Store, not Secrets Manager (<a href="#step-8-store-secrets-in-parameter-store">Step 8</a>), so that
+  call finds nothing useful and the instance role deliberately doesn't grant the permission —
+  leaving the default in place fails run launch with <code>AccessDeniedException ... secretsmanager:ListSecrets</code>.
+  Setting it to <code>null</code> skips the lookup entirely.</p>
+</li>
+<li>
+<p><strong>The Postgres hostname is the box's VPC private IP</strong> — the <code>172.31.x.x</code> address on its primary
+  network interface (it matches the box's <code>ip-172-31-…</code> hostname), <em>not</em> the compose service name
+  <code>postgres</code>, and <em>not</em> the Tailscale (<code>100.x</code> / <code>fd7a:…</code>) or Docker-bridge (<code>172.17.x</code>) addresses
+  that <code>hostname -I</code> also lists now that Tailscale and Docker are installed. To read just that one
+  address, ask the instance metadata service (an IMDSv2 token is required, because
+  <a href="#step-11-launch-the-control-plane-box">Step 11</a> set token-required):</p>
+<div class="highlight"><pre><span></span><code><span class="nv">TOKEN</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-sX<span class="w"> </span>PUT<span class="w"> </span><span class="s2">&quot;http://169.254.169.254/latest/api/token&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;X-aws-ec2-metadata-token-ttl-seconds: 60&quot;</span><span class="k">)</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;X-aws-ec2-metadata-token: </span><span class="nv">$TOKEN</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>http://169.254.169.254/latest/meta-data/local-ipv4
+</code></pre></div>
+<p>This instance config is not only read on the box: the daemon serializes it into every run it
+launches, and the <strong>Fargate run worker connects back to this same Postgres</strong> to record its
+events and heartbeats. The compose-network alias only resolves on the box, whereas the private
+IP is reachable both from Fargate (same VPC) and from the box's own containers (via the
+published port). A private IPv4 persists across stop/start — it only changes if the instance is
+terminated and replaced, at which point this file needs the new IP.</p>
+</li>
+<li>
+<p><strong><code>&lt;subnet-id&gt;</code> and <code>&lt;sg-id&gt;</code> in the run launcher</strong> are the public subnet and security group the
+  Fargate run workers launch into — the same pair
+  <a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a>'s manual <code>run-task</code> used: the
+  <code>nged-forecast-task-sg</code> group, and any public subnet in the default VPC. Read them off the
+  console (<strong>EC2 → Security Groups →</strong> <code>nged-forecast-task-sg</code> for the group id; <strong>VPC → Subnets</strong>
+  for a subnet id), or from the CLI:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># &lt;sg-id&gt; — the Fargate task security group</span>
+aws<span class="w"> </span>ec2<span class="w"> </span>describe-security-groups<span class="w"> </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--filters<span class="w"> </span><span class="nv">Name</span><span class="o">=</span>group-name,Values<span class="o">=</span>nged-forecast-task-sg<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;SecurityGroups[0].GroupId&#39;</span><span class="w"> </span>--output<span class="w"> </span>text
+
+<span class="c1"># &lt;subnet-id&gt; — any public subnet in the default VPC (all default-VPC subnets are public)</span>
+aws<span class="w"> </span>ec2<span class="w"> </span>describe-subnets<span class="w"> </span>--region<span class="w"> </span>eu-west-2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--filters<span class="w"> </span><span class="nv">Name</span><span class="o">=</span>default-for-az,Values<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;Subnets[].[SubnetId,AvailabilityZone]&#39;</span><span class="w"> </span>--output<span class="w"> </span>table
+</code></pre></div>
+<p>The same <code>&lt;sg-id&gt;</code> is used twice: here, and as the source of the Postgres inbound rule below.</p>
+</li>
+<li>
+<p>Because the run workers connect in, <strong>add the one inbound security-group rule now</strong>. It lives on
+  the <em>security group's</em> own page, not the instance's <strong>Networking</strong> tab: <strong>EC2 → Security Groups</strong>
+  (left sidebar, under <em>Network &amp; Security</em>) → open <code>nged-forecast-ctrl-sg</code> → the <strong>Inbound rules</strong>
+  tab → <strong>Edit inbound rules</strong> → <strong>Add rule</strong>: <strong>Type</strong> <code>PostgreSQL</code> (fills in TCP 5432), <strong>Source</strong>
+  <code>Custom</code> → the Fargate task security group <code>nged-forecast-task-sg</code> (<code>&lt;sg-id&gt;</code> from
+  <a href="#step-10-verify-run-a-forecast-task-manually">Step 10</a>) → <strong>Save rules</strong>. (From the instance's
+  <strong>Security</strong> tab you can click the <code>nged-forecast-ctrl-sg</code> link to jump straight to that page.)
+  Scoped to that security group — the box still has no publicly-reachable ports. This is also why <code>DAGSTER_PG_PASSWORD</code> was
+  added to the task definition's secrets in
+  <a href="#step-9-create-the-ecs-cluster-and-fargate-task-definition">Step 9</a>: <code>dagster.yaml</code>
+  references it as <code>env:</code>, so the run worker resolves it at startup from its own environment.</p>
+</li>
+</ul>
+<p>The authoritative schema for the <code>EcsRunLauncher</code> block is
+<a href="https://docs.dagster.io/deployment/oss/deployment-options/aws">Dagster's ECS deployment docs</a> —
+if the daemon fails to start with a config-validation error after a Dagster upgrade, check there
+first.</p>
+<h2 id="step-15-start-the-stack-and-connect-over-tailscale">Step 15 — Start the stack and connect over Tailscale</h2>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>~/nged-forecast
+docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+docker<span class="w"> </span>compose<span class="w"> </span>ps<span class="w">            </span><span class="c1"># all four services should be Up</span>
+docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>daemon<span class="w">    </span><span class="c1"># watch it start its schedule/sensor loops</span>
+</code></pre></div>
+<blockquote>
+<p><strong>Expected on a cold start: one <code>Could not reach user code server</code> warning.</strong> The first daemon
+log lines often include a <code>UserWarning: Error loading repository location
+nged_substation_forecast</code> with a gRPC <code>UNAVAILABLE</code> / <code>Connection refused</code> traceback pointing at
+the code-server's port 4266. This is a harmless startup race, not a failure. The daemon and
+webserver <code>depends_on</code> the code-server, but plain Compose <code>depends_on</code> waits only for the
+code-server <em>container to start</em>, not for its gRPC server to be <em>ready</em> — and the code-server
+has to import the whole project (all code plus the baked-in champion model) before it binds
+4266, which takes several seconds. The daemon starts sooner, polls once too early, logs the
+warning, and retries. You can confirm it self-healed a few seconds later: a
+<code>Received LocationStateChangeEventType.LOCATION_UPDATED event for location
+nged_substation_forecast, refreshing</code> line means the location loaded successfully. Only treat it
+as a real problem if the UI (checked below) shows a <em>persistent</em> load error on the code
+location, or the daemon keeps logging the failure with no <code>LOCATION_UPDATED</code> recovery.</p>
+</blockquote>
+<p>From your laptop, open <strong><code>http://nged-forecast-ctrl:3000</code></strong> (Tailscale MagicDNS; the raw
+Tailscale IP works too). This is safe without any login because of the network design: the
+webserver's port 3000 is published on the box's interfaces, but the security group allows no
+inbound traffic — the only way in is through the Tailscale tunnel, and tailnet membership <em>is</em>
+the authentication (the open-source Dagster webserver has none of its own — see
+<a href="../../roadmap/live-service/#access-phasing">the access-phasing plan</a>).</p>
+<p>In the UI, confirm the box is healthy: <strong>Deployment</strong> should show the
+<code>nged_substation_forecast</code> code location loaded, and <strong>Deployment → Daemons</strong> should show the
+scheduler and run-monitoring daemons with green heartbeats.</p>
+<h2 id="step-16-turn-on-the-schedules-and-verify-end-to-end">Step 16 — Turn on the schedules and verify end-to-end</h2>
+<ol>
+<li><strong>UI → Automation</strong>: switch on <code>power_time_series_and_metadata_schedule</code>,
+   <code>ecmwf_ens_schedule</code>, and <code>live_forecasts_schedule</code>. Schedule state lives in Postgres, so
+   this is a one-time action — it survives restarts and reboots.</li>
+<li>
+<p><strong>First time only — materialise the upstream assets once so <code>live_forecasts</code> has something
+   to read.</strong> A Dagster <code>deps=[...]</code> declaration records lineage; it does <em>not</em> make
+   materialising <code>live_forecasts</code> reach back and build its parents first. On a brand-new box the
+   Delta tables are empty, so the very first <code>live_forecasts</code> run has no NWP, no telemetry, and no
+   grid weights to consume. Materialise these once, from the UI, in order (each is its own asset
+   because they run on different cadences and, for <code>ecmwf_ens</code> vs <code>live_forecasts</code>, different
+   partition definitions — so there is no single run that can build the whole chain):</p>
+<ol>
+<li><code>h3_grid_weights</code> (unpartitioned) — <code>ecmwf_ens</code> depends on it, so do this first.</li>
+<li>the latest <code>ecmwf_ens</code> partition — gives <code>live_forecasts</code> an NWP run to forecast from.</li>
+<li><code>power_time_series_and_metadata</code> (unpartitioned) — the power spine and substation metadata.</li>
+</ol>
+<p>(The production model is not in this list. It is deliberately <em>not</em> a Dagster dependency of
+<code>live_forecasts</code>: its artifacts were promoted back in
+<a href="#step-3-pick-and-promote-a-champion-model">Step 3</a> and baked into the image, so there is
+nothing to materialise for it here — do not materialise <code>promoted_model</code> on the box, which has
+no MLflow.) Once
+the schedules from step 1 are on, each of these upstream assets is kept fresh by its own
+schedule; this manual pass is only to seed the empty tables for the first tick.</p>
+</li>
+<li>
+<p><strong>Kick a run now rather than waiting for a tick</strong>: materialise the latest <code>live_forecasts</code>
+   partition from the UI (see
+   <a href="../operations/#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand">Operating the live service: Step 3</a>).
+   Watch the run get dispatched by the launcher: it appears in the Dagster UI, a Fargate task
+   spins up in the ECS console, its logs stream to CloudWatch, and forecast rows land under
+   <code>s3://nged-forecast-delivery/data/power_forecasts/…</code>.</p>
+</li>
+<li><strong>Reboot test</strong>: <code>sudo reboot</code> on the box. Docker's systemd unit plus <code>restart: always</code>
+   must bring all four services back unattended; the UI comes back over Tailscale with run
+   history intact.</li>
+<li><strong>Leave it running for several days</strong>: a forecast appears after every 6-hourly slot and a
+   fresh NWP ingest after each daily 00Z publication; check Cost Explorer against the
+   <a href="../../architecture/aws-costs/#v1-32-time-series-2535month">cost model</a>.</li>
+</ol>
+<p>If a slot gets missed (box down, failed run), backfill it from the same UI —
+<a href="../operations/#backfilling-a-missed-slot">Operating the live service: Backfilling a missed slot</a>.</p>
+<h3 id="optional-hardening">Optional hardening</h3>
+<ul>
+<li>
+<p><strong>Nightly Postgres dump to S3</strong> — Dagster's run history is rebuildable in principle but nice
+  to keep. On the box, <code>crontab -e</code>:</p>
+<div class="highlight"><pre><span></span><code>15 2 * * * docker compose -f /home/ubuntu/nged-forecast/docker-compose.yml exec -T postgres pg_dump -U dagster dagster | gzip | aws s3 cp - s3://nged-forecast-internal/backups/dagster-$(date +\%F).sql.gz
+</code></pre></div>
+</li>
+<li>
+<p><strong>Security patches</strong>: Ubuntu Server installs security updates automatically via
+  <code>unattended-upgrades</code>; confirm it's active with <code>systemctl status unattended-upgrades</code>.</p>
+</li>
+</ul>
+<p>The missed-check-in alarm that catches a silently-dead daemon is wired via Sentry cron monitoring
+(the <code>SENTRY_*</code> vars in <a href="#step-14-configure-dagster-on-the-box">Step 14</a>); the one console step it
+needs is to <strong>scope its alert rule to <code>environment:production</code></strong> in Sentry, so a developer testing
+from a laptop never trips it. The one remaining operational safety net is per-task failure alerts
+(email via SNS, the Simple Notification Service) — still to come; see
+<a href="../../roadmap/live-service/#alert-on-absence-the-missed-check-in-alarm">the roadmap</a> and
+<a href="../../architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry</a>.</p>
+<h2 id="redeploying-a-new-champion-model">Redeploying a new champion model</h2>
+<p>Once the service is live, shipping a better model is a repeat of a slice of this page:</p>
+<ol>
+<li>Promote the new champion locally —
+   <a href="../operations/#step-1-pick-a-champion-model">Operating the live service: Steps 1–2</a>.</li>
+<li>Build and verify the new image (<a href="#step-4-build-and-verify-the-image">Step 4</a>) — it gets a
+   new tag (the new model's run id).</li>
+<li><code>scripts/push_and_deploy_image.sh</code> (<a href="#step-6-push-the-image-to-ecr">Step 6</a>) — one command
+   that pushes the new tag and registers a new task-definition revision pointing at it. The
+   run launcher resolves the family's latest revision at launch time, so the next scheduled
+   run picks it up with no restart on the box.</li>
+<li>The control-plane containers can keep running the old image — the baked-in model is dead
+   weight to them, so a <em>model</em> change doesn't affect them. When the <em>code</em> changes (assets,
+   schedules, a Dagster upgrade), also update the box: <code>docker login</code> + <code>docker pull</code> the new
+   tag (<a href="#step-13-install-docker-and-pull-the-image">Step 13</a>), update <code>IMAGE</code> in
+   <code>~/nged-forecast/.env</code>, and <code>docker compose up -d</code>.</li>
+</ol>
+<h2 id="granting-nged-read-access-recommended-confirm-before-doing-this">Granting NGED read access (recommended; confirm before doing this)</h2>
+<blockquote>
+<p>This step hasn't been agreed as final yet — recorded here as the current recommendation so it
+isn't lost, but check before actually creating anything.</p>
+</blockquote>
+<p><a href="../../architecture/forecast-delivery/#securing-it">Forecast Delivery: Securing it</a> already
+assumes <strong>a single authenticated AWS user</strong> for NGED, with no per-user entitlement matrix needed
+— NGED is the only consumer. That points at a dedicated <strong>IAM user</strong> (not a cross-account role):
+Excel and Power BI are named as expected client tools in that same page, and neither supports
+AWS role-assumption — they need a plain access key and secret, the same shape of credential an
+IAM user provides.</p>
+<p>Recommended shape: <strong>one</strong> IAM user (not one per bucket — the stability signal comes from the
+bucket split itself, not from access segmentation), with a read-only policy across both bucket
+ARNs (<code>s3:GetObject</code>, <code>s3:ListBucket</code> — no <code>PutObject</code>/<code>DeleteObject</code>), and an access key handed
+to NGED the same way <a href="#step-2-grant-data-access-with-iam">Step 2</a>'s dashboard credentials are
+configured. Rotate the key periodically once this is live.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../operations/">Operating the live service</a> — driving the deployed service day to day:
+  promotion, the 6-hourly schedule, inspecting forecasts, backfilling missed slots.</li>
+<li><a href="../local/">Running the whole stack locally</a> — the same service end-to-end on a laptop, no
+  AWS involved.</li>
+<li><a href="../setup/">Configuration reference</a> — what the storage roots and <code>DATA_STORE_*</code>/credential
+  settings mean, and which combination each environment uses.</li>
+<li><a href="../../architecture/production-deployment/">Production Deployment — Design</a> — why the image is
+  built this way, and why the control plane is an always-on box rather than EventBridge.</li>
+<li><a href="../../roadmap/live-service/#aws-architecture">Live service: AWS architecture</a> — the costed
+  options behind this design, access phasing (team read-only access, the public dashboard), and
+  the still-to-come alerting and infra-as-code work.</li>
+<li><a href="../../architecture/aws-costs/">AWS Running Costs</a> — what the deployed service costs to run,
+  and the projected cost at v2 scale.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

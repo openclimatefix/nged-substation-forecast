@@ -1,0 +1,2989 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../differentiable-physics/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Convex Optimisation - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#convex-optimisation-when-the-best-answer-is-guaranteed" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Convex Optimisation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem class
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convexity-the-one-bowl-property" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convexity: the one-bowl property
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-solver-is-and-why-convexity-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a solver is, and why convexity matters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-corners-are-a-feature-exact-zeros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The corners are a feature: exact zeros
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cvxpy-the-modelling-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVXPY: the modelling language
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-just-pytorch-for-the-convex-problems-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not just PyTorch for the convex problems too?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-routes-to-the-same-inverse-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two routes to the same inverse problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-recurring-pattern-fixed-shapes-unknown-coefficients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The recurring pattern: fixed shapes, unknown coefficients
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hard-limits-as-censoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hard limits as censoring
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitting-an-envelope-with-the-quantile-pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fitting an envelope with the quantile (pinball) loss
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priors-as-convex-penalties-and-the-uncertainty-you-dont-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priors as convex penalties — and the uncertainty you don't get
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-pytorch-is-the-right-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where PyTorch is the right tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-bridge-welding-cvxpy-into-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The bridge: welding CVXPY into PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applications-in-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applications in this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-problem-class" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The problem class
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#convexity-the-one-bowl-property" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Convexity: the one-bowl property
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-a-solver-is-and-why-convexity-matters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What a solver is, and why convexity matters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-corners-are-a-feature-exact-zeros" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The corners are a feature: exact zeros
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cvxpy-the-modelling-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CVXPY: the modelling language
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-not-just-pytorch-for-the-convex-problems-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why not just PyTorch for the convex problems too?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-routes-to-the-same-inverse-problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two routes to the same inverse problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-recurring-pattern-fixed-shapes-unknown-coefficients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The recurring pattern: fixed shapes, unknown coefficients
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hard-limits-as-censoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hard limits as censoring
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fitting-an-envelope-with-the-quantile-pinball-loss" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fitting an envelope with the quantile (pinball) loss
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#priors-as-convex-penalties-and-the-uncertainty-you-dont-get" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Priors as convex penalties — and the uncertainty you don't get
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-pytorch-is-the-right-tool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where PyTorch is the right tool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-bridge-welding-cvxpy-into-pytorch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The bridge: welding CVXPY into PyTorch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applications-in-this-project" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Applications in this project
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="convex-optimisation-when-the-best-answer-is-guaranteed">Convex Optimisation — When the Best Answer Is Guaranteed</h1>
+<blockquote>
+<p><strong>Status: durable method explainer.</strong> This page explains what convex optimisation is, why a
+convex formulation is a fundamentally better deal than gradient-descent training wherever it is
+available, and the project's practical tooling rule — <strong>CVXPY for convex estimation
+subproblems, PyTorch for physics + learning</strong>. The first planned applications are the
+<a href="../../roadmap/switching-events/#approach-3-the-joint-edge-flow-estimator">joint edge-flow estimator</a>
+for switching-event detection and the
+<a href="../../roadmap/capacity-estimation/#candidate-a-the-convex-estimator-cvxpy">convex candidate</a> in
+the v0.7 effective-capacity head-to-head; further applications are expected. The Python in this
+document is illustrative sketch code, not the implementation.</p>
+</blockquote>
+<h2 id="the-problem-class">The problem class</h2>
+<p>An optimisation problem has three parts: <strong>unknowns</strong> (numbers we want to find), a <strong>score</strong> (a
+function that says how bad any candidate setting of the unknowns is), and optionally
+<strong>constraints</strong> (rules a candidate must obey). "Solving" means finding the setting with the
+lowest score. Most estimation tasks in this project fit this shape once said out loud: <em>find the
+edge flows that best explain every substation's residual, preferring stories with few active
+pipes and few changes</em> (the switching-events estimator); <em>find the latent capacities that make
+the physics model reproduce the meter readings</em>
+(<a href="../differentiable-physics/">differentiable physics</a>).</p>
+<p>The two examples differ not in the question but in the <strong>shape of the score landscape</strong> — and
+that shape decides which tool can answer.</p>
+<h2 id="convexity-the-one-bowl-property">Convexity: the one-bowl property</h2>
+<p>Picture the score as a landscape over every possible setting of the unknowns. A problem is
+<strong>convex</strong> when that landscape is a single bowl: pick any two points on the surface, draw the
+straight line between them, and the surface never rises above that line. The payoff: <strong>a convex
+landscape has no false valleys.</strong> Anywhere that looks like a bottom locally <em>is</em> the bottom
+globally. (If the score is <em>strictly</em> convex the bottom is a single point; with penalties like
+the absolute value the bottom can be a small flat face — but every point on it scores
+identically, so any answer the solver returns is a best answer.)</p>
+<p>Formally, a function <span class="arithmatex">\(f\)</span> is convex when, for all <span class="arithmatex">\(x\)</span>, <span class="arithmatex">\(y\)</span> and <span class="arithmatex">\(0 \le \lambda \le 1\)</span>:</p>
+<div class="arithmatex">\[
+f(\lambda x + (1-\lambda) y) \;\le\; \lambda f(x) + (1-\lambda) f(y)
+\]</div>
+<p>You rarely check this by hand, because convexity has a <em>calculus</em> — a small rulebook that builds
+complicated convex functions from simple ones:</p>
+<ul>
+<li><strong>Atoms.</strong> Squared error <span class="arithmatex">\(x^2\)</span>; absolute value <span class="arithmatex">\(|x|\)</span>; norms, including group norms such as the
+  <span class="arithmatex">\(\ell_2\)</span> norm of a vector of increments; <span class="arithmatex">\(\max\)</span>; the quantile/pinball loss; the Huber loss — all
+  convex.</li>
+<li><strong>Combination rules.</strong> A non-negative weighted sum of convex functions is convex (so
+  <span class="arithmatex">\(\text{fit} + \lambda \cdot \text{penalty}\)</span> is safe). A convex function of an <em>affine</em> expression (<span class="arithmatex">\(A \cdot x + b\)</span>) is convex
+  (so "residual = data − incidence-matrix × flows, then sum of squares" is safe). A pointwise max
+  of convex functions is convex.</li>
+</ul>
+<p>Every term in the edge-flow estimator is assembled from exactly these pieces — that is <em>why</em> it
+is convex — and the rulebook is mechanical enough for software to verify (two sections down).</p>
+<h2 id="what-a-solver-is-and-why-convexity-matters">What a solver is, and why convexity matters</h2>
+<p>A solver is off-the-shelf software whose whole job is finding the best answer to an optimisation
+problem: hand it a scoring rule and a set of unknowns, and it returns the values that score best.
+Convex problems are the friendly kind — the score landscape is a single bowl with no false
+valleys. The solver rolls downhill and is <em>guaranteed</em> to stop at the true bottom. Contrast training a neural network, where the landscape is full of dents and you
+never know whether you found the best one. Here you always do, deterministically: no learning
+rates, no convergence babysitting, no random seeds, and the identical answer every run.</p>
+<p>That last property is quietly important for this project's deliverables: an event list handed to
+NGED should not change because a fit was re-run.</p>
+<h2 id="the-corners-are-a-feature-exact-zeros">The corners are a feature: exact zeros</h2>
+<p>Lasso-family penalties (<span class="arithmatex">\(|x|\)</span> and its group cousins) have a sharp corner at zero, and the corner
+is the point: it makes the optimum sit at <em>exactly</em> zero for most variables, rather than merely
+near it. Designs like the edge-flow estimator lean on this — "this pipe's stretch of nonzero
+flow" literally <em>is</em> the detected event, which only works if inactive pipes read 0.000 MW.</p>
+<p>Specialised convex solvers (proximal and interior-point methods) handle those corners exactly.
+Plain gradient descent does not: it slides around the corner and leaves every variable carrying a
+tiny residual trickle — ±0.03 MW on every pipe, everywhere — forcing a threshold to decide what
+counts as an event, and thereby reintroducing exactly the arbitrary cutoff the formulation was
+designed to remove. Fixing this in PyTorch means hand-rolling the proximal machinery that convex
+solvers provide for free.</p>
+<h2 id="cvxpy-the-modelling-language">CVXPY: the modelling language</h2>
+<p><a href="https://www.cvxpy.org/">CVXPY</a> is a Python modelling language for convex problems. You write the
+score in NumPy-like syntax; CVXPY checks <em>at construction time</em> — using the compositional
+rulebook above, formalised as <strong>disciplined convex programming (DCP)</strong> — that the problem really
+is convex, and refuses to build it otherwise. It then compiles the problem and hands it to a
+solver backend (Clarabel, ECOS, SCS, …).</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">cvxpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">cp</span>
+
+<span class="n">x</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+<span class="n">score</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">sum_squares</span><span class="p">(</span><span class="n">A</span> <span class="o">@</span> <span class="n">x</span> <span class="o">-</span> <span class="n">b</span><span class="p">)</span> <span class="o">+</span> <span class="n">lam</span> <span class="o">*</span> <span class="n">cp</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+<span class="n">problem</span> <span class="o">=</span> <span class="n">cp</span><span class="o">.</span><span class="n">Problem</span><span class="p">(</span><span class="n">cp</span><span class="o">.</span><span class="n">Minimize</span><span class="p">(</span><span class="n">score</span><span class="p">),</span> <span class="p">[</span><span class="n">x</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">])</span>
+<span class="n">problem</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">solver</span><span class="o">=</span><span class="n">cp</span><span class="o">.</span><span class="n">CLARABEL</span><span class="p">)</span>  <span class="c1"># certified global optimum in x.value</span>
+</code></pre></div>
+<p>The construction-time check cuts both ways, and both directions are useful: it <em>certifies</em> the
+formulations it accepts, and it <em>refuses</em> the ones it cannot certify — which is a feature, not an
+obstacle, because it says honestly when a problem has left the convex world and needs the other
+toolchain.</p>
+<h2 id="why-not-just-pytorch-for-the-convex-problems-too">Why not just PyTorch for the convex problems too?</h2>
+<p>Because the same loss implemented in PyTorch surrenders the two properties that motivated the
+convex formulation in the first place:</p>
+<ol>
+<li><strong>The guarantee.</strong> CVXPY exploits convexity to deliver the certified global optimum,
+   identically, every run. Gradient descent doesn't know the landscape is one bowl and inherits
+   all the usual tuning — learning rates, schedules, stopping criteria, seeds — for a problem that
+   required none.</li>
+<li><strong>Exact zeros.</strong> As above: crisp zeros come from solvers that respect the <span class="arithmatex">\(\ell_1\)</span> corner; gradient
+   descent leaves trickles and brings thresholds back.</li>
+</ol>
+<p>The residual attractions of PyTorch are real — one toolchain across the project, GPUs at
+~2,500-series scale, and the freedom to later make a model non-convex — but they do not outweigh
+the two properties above <em>for a formulation that is actually convex</em>. And the bridge below means
+the choice is not a wall.</p>
+<h2 id="two-routes-to-the-same-inverse-problem">Two routes to the same inverse problem</h2>
+<p>It is tempting to file CVXPY and PyTorch under different activities — "optimisation" versus
+"physics modelling". That framing is wrong, and correcting it makes the tooling rule much easier
+to hold in your head. Both toolchains, as this project uses them, are doing <strong>inverse
+modelling</strong>: write down a <em>forward model</em> mapping unknown parameters to a predicted signal
+(capacities and orientations to power; edge flows to substation residuals), then invert it
+against observations to recover the parameters. And both host physics — a fixed per-unit
+<a href="https://pvlib-python.readthedocs.io/">pvlib</a> curve inside a CVXPY problem is exactly as much a
+physical model as a transposition calculation inside a PyTorch module.</p>
+<p>The genuine difference is a single trade-off:</p>
+<ul>
+<li><strong>CVXPY restricts what the forward model may contain</strong> — only expressions the
+  <a href="#cvxpy-the-modelling-language">DCP rulebook</a> can certify as convex in the unknowns — <strong>and in
+  exchange guarantees the inversion</strong>: the certified global optimum, identically every run, with
+  <a href="#the-corners-are-a-feature-exact-zeros">exact zeros</a>, no initialisation, no learning rates,
+  no "did I converge?" anxiety. The restriction bites on real physics: capacity × an
+  orientation-dependent per-unit curve is convex only once the orientation is fixed
+  (<a href="#where-pytorch-is-the-right-tool">grade 2 below</a>), and capacity × a shared irradiance bias
+  is bilinear, full stop.</li>
+<li><strong>PyTorch accepts any differentiable forward model</strong> — temperature-dependent efficiency, hard
+  clips, neural components, variational posteriors — <strong>and gives up the guarantees</strong>: the
+  inversion is gradient descent on a dented landscape, managed with initialisation, restarts,
+  and validation. In return it gains unrestricted expressiveness and composability —
+  minibatching, joint training with neural nets, amortisation across sites.</li>
+</ul>
+<p>So the axis separating the tools is <strong>expressiveness of the forward model versus guarantees on
+the inversion</strong> — not whether physics is involved, and not whether differentiation is involved.</p>
+<p>That last point deserves spelling out, because "CVXPY doesn't use differentiation" is a natural
+misreading. The interior-point solvers behind CVXPY use derivative information heavily — that is
+how they navigate to the bottom of the bowl — and
+<a href="#the-bridge-welding-cvxpy-into-pytorch"><code>cvxpylayers</code></a> literally differentiates <em>through</em> a
+convex solve. What CVXPY does not do is backpropagate through an arbitrary user-written
+simulator, because it never sees a simulator: it sees a structured algebraic problem, and it is
+precisely by exploiting that structure that it can promise the global optimum. Conversely,
+"<a href="../differentiable-physics/">differentiable physics</a>" is shorthand for <em>a physics simulator
+written in an autodiff framework so that it composes with gradient-based learning</em> — the
+differentiability is the enabling property, not the point.</p>
+<p>One honest wrinkle in the inverse-modelling framing: it covers the <em>estimation</em> applications on
+this page cleanly, but convex optimisation is broader — a future scheduling or dispatch problem
+would be a <em>forward</em> optimisation (choose the best actions), not an inversion. The framing
+describes the applications this project currently plans, not the whole convex world.</p>
+<h2 id="the-recurring-pattern-fixed-shapes-unknown-coefficients">The recurring pattern: fixed shapes, unknown coefficients</h2>
+<p>Many estimation problems in this project share one algebraic skeleton. Physics (or a previously
+learnt model) fixes the <strong>shape</strong> of a signal, and the data only has to decide <strong>how much</strong> of
+that shape is present:</p>
+<div class="arithmatex">\[
+\text{predicted signal} \;=\; \text{known shape} \times \text{unknown coefficient}
+\]</div>
+<p>The predicted signal is then <em>linear</em> in the unknowns — and a convex loss on a linear predictor,
+plus convex penalties on the coefficients, is a convex problem end to end. The pattern shows up
+everywhere once you look for it:</p>
+<ul>
+<li>a metered PV site's per-unit output curve (fixed, from
+  <a href="https://pvlib-python.readthedocs.io/">pvlib</a> at a given orientation) × its unknown DC
+  capacity — the
+  <a href="../../roadmap/capacity-estimation/#candidate-a-the-convex-estimator-cvxpy">convex capacity candidate</a>;</li>
+<li>a small set of orientation basis curves × unknown per-basis installed capacity — the convex
+  view of the
+  <a href="../differentiable-physics/#scaling-to-aggregate-fleets-universalsolarfleetnode">fleet node</a>;</li>
+<li>a menu of candidate DER output curves × the unknown amount of each behind a substation — the
+  <a href="../../roadmap/disaggregation/#the-convex-dictionary-baseline">convex dictionary baseline</a> for
+  disaggregation;</li>
+<li>a frozen dictionary of universal demand shapes × a substation's unknown "style vector"
+  (see the <code>BasisLoadNode</code> in
+  <a href="../../roadmap/disaggregation/#node-definitions">the graph-structured engine</a>).</li>
+</ul>
+<p>The coefficients in all four cases want the same <em>priors</em>, and each prior is convex:
+non-negativity (a hard constraint), sparsity (<span class="arithmatex">\(\ell_1\)</span>, giving
+<a href="#the-corners-are-a-feature-exact-zeros">exact zeros</a>), piecewise-constancy (an <span class="arithmatex">\(\ell_1\)</span> penalty on
+successive differences — the <strong>fused lasso</strong>), and monotone growth (a hard constraint on the
+differences).</p>
+<p>It is worth comparing this with the devices the
+<a href="../differentiable-physics/">differentiable-physics</a> sketches use to express the <em>same</em> priors
+inside PyTorch:</p>
+<table>
+<thead>
+<tr>
+<th>Prior on a coefficient</th>
+<th>In a PyTorch (non-convex) host</th>
+<th>In a CVXPY (convex) host</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Capacity never decreases</td>
+<td>Cumulative sum of softplus-transformed increments</td>
+<td>Hard constraint on the increments (one line)</td>
+</tr>
+<tr>
+<td>Growth arrives in sparse bursts</td>
+<td><span class="arithmatex">\(\ell_1\)</span> penalty under gradient descent → <em>approximate</em> zeros</td>
+<td><span class="arithmatex">\(\ell_1\)</span> penalty under a proximal solver → <em>exact</em> zeros</td>
+</tr>
+<tr>
+<td>Output cannot exceed a hard limit</td>
+<td>Smooth clip, to keep gradients alive</td>
+<td>Censoring split (<a href="#hard-limits-as-censoring">next section</a>)</td>
+</tr>
+</tbody>
+</table>
+<p>The PyTorch devices are <strong>not mistakes</strong>. Inside a model that is non-convex anyway — because it
+is also <em>learning the shapes</em> — they are the right way to keep gradients flowing, and CVXPY could
+not host that model at all. The comparison cuts the other way: when a problem reduces entirely to
+fixed shapes × unknown coefficients, the convex host expresses each prior exactly, in a line,
+with the guarantees of <a href="#why-not-just-pytorch-for-the-convex-problems-too">the sections above</a>.
+(And the two hosts converge in the end: under a
+<a href="#the-bridge-welding-cvxpy-into-pytorch"><code>cvxpylayers</code> bridge</a>, the hard constraints come back
+<em>inside</em> PyTorch.)</p>
+<h2 id="hard-limits-as-censoring">Hard limits as censoring</h2>
+<p>Physical systems are full of hard limits: an inverter clips PV output at its AC rating, a wind
+turbine's power curve is flat at rated power. A hard limit looks like an obstacle to convexity —
+the observed power is <span class="arithmatex">\(\min(\text{capacity} \times \text{per-unit output},\ \text{limit})\)</span>, and
+fitting <em>through</em> a min of unknowns is not a convex operation.</p>
+<p>The way out is old and comes from econometrics (<strong>Tobit regression</strong>, 1958): treat the limit as
+<strong>censoring</strong>, and classify each sample <em>before</em> fitting. A clipped sample is usually observable
+directly in the data — on a bright day a clipped PV site sits on a flat plateau at a common
+ceiling. Once each timestep is labelled clipped / unclipped, the problem falls apart into convex
+pieces:</p>
+<ul>
+<li><strong>Unclipped samples</strong> behave linearly: observed power ≈ shape × coefficient, and any convex
+  loss applies.</li>
+<li><strong>Censored (clipped) samples</strong> still carry information — two pieces of it. The plateau level is
+  a direct, noisy <em>measurement of the limit itself</em>. And the un-clipped signal must have
+  <em>exceeded</em> the limit for clipping to occur at all, which is a linear inequality on the
+  unknowns, enforceable softly as a hinge penalty:</li>
+</ul>
+<div class="arithmatex">\[
+\max\!\bigl(0,\; \text{limit} - \text{shape} \times \text{coefficient}\bigr)
+\]</div>
+<p>Both pieces are convex, so the censored formulation keeps every guarantee on this page while
+extracting information even from the samples the limit has flattened.</p>
+<p>One honest caution: the pre-classification step is a <em>heuristic that sits outside the convex
+problem</em>, and the guarantee downstream is conditional on it. Samples labelled wrongly poison both
+terms — an unclipped sample called clipped drags the limit estimate down; a clipped sample called
+unclipped biases the coefficient fit. Where this pattern is applied, the classifier needs its own
+validation (see
+<a href="../../roadmap/capacity-estimation/#candidate-a-the-convex-estimator-cvxpy">the capacity-estimation caveats</a>
+for the concrete case).</p>
+<h2 id="fitting-an-envelope-with-the-quantile-pinball-loss">Fitting an envelope with the quantile (pinball) loss</h2>
+<p>Least squares fits the <em>middle</em> of the data. Sometimes the quantity we want is the <em>top</em>: a
+generator's capacity is "what the site delivers when nothing holds it back", and the data is
+littered with samples where something <em>did</em> hold it back — curtailment, outages, faults — all of
+which push observations <strong>down</strong>, never up. Least squares would split the difference and drag the
+estimate below the truth.</p>
+<p>The <strong>quantile loss</strong> (also called the <strong>pinball loss</strong>) fits any chosen quantile instead of the
+mean. For residual <span class="arithmatex">\(r = \text{observed} - \text{predicted}\)</span> and quantile level
+<span class="arithmatex">\(\tau \in (0, 1)\)</span>:</p>
+<div class="arithmatex">\[
+\rho_\tau(r) \;=\; \tau \,\max(r, 0) \;+\; (1 - \tau)\,\max(-r, 0)
+\]</div>
+<p>At <span class="arithmatex">\(\tau = 0.5\)</span> the two sides weigh equally and the fit is the median. At a high <span class="arithmatex">\(\tau\)</span> (say
+0.95), an observation <em>above</em> the fitted curve costs <span class="arithmatex">\(19\times\)</span> more than one the same distance
+below — so the curve rises until only ~5% of points sit above it. The fit becomes an <strong>upper
+envelope</strong>: curtailed and faulted samples fall below it without biasing it. The loss is a
+non-negative weighted sum of <span class="arithmatex">\(\max\)</span> atoms, so it is convex and CVXPY-native.</p>
+<p><span class="arithmatex">\(\tau\)</span> is a genuine tuning choice with consequences in both directions: too low and curtailment
+leaks back into the estimate; too high and the envelope chases meter glitches and noise spikes.
+(Where the corruption is symmetric outliers rather than one-sided suppression, the <strong>Huber
+loss</strong> — quadratic near zero, linear in the tails — is the usual convex alternative.)</p>
+<h2 id="priors-as-convex-penalties-and-the-uncertainty-you-dont-get">Priors as convex penalties — and the uncertainty you don't get</h2>
+<p>Prior knowledge slots into a convex problem as one more penalty term charging deviation from the
+prior — the optimum is then a <em>maximum a posteriori</em> (MAP) estimate, and the rulebook keeps
+everything convex:</p>
+<ul>
+<li><strong>A prior value</strong> (a capacity register entry, last year's fit, a connection record): penalise
+  distance from it, e.g. <span class="arithmatex">\(\lambda \, |c - c_{\text{register}}|\)</span>.</li>
+<li><strong>An asymmetric prior</strong>: registers overstate more than they understate, so make it cheap for
+  the estimate to sit <em>below</em> the registered value and expensive to exceed it — two hinge terms
+  with different weights.</li>
+<li><strong>A timing prior</strong>: if works are known to have happened in a given week, make changes cheap at
+  that date and expensive elsewhere — simply weight a fused-lasso penalty per step.</li>
+</ul>
+<p>What this machinery <strong>cannot</strong> give is a <em>posterior</em>. A convex solve returns the single most
+plausible answer under the prior and the data; it does not say how confident to be, and there are
+no error bars. The available bolt-ons are all imperfect:</p>
+<ul>
+<li><strong>Bootstrap</strong> (re-solve on resampled residuals): mechanically easy, but bootstrap-after-lasso
+  is known to be statistically shaky exactly where we care — the uncertainty of <em>which</em>
+  changepoints exist.</li>
+<li><strong>Sensitivity re-solves</strong> (perturb the penalty strengths, watch the answer move): a cheap
+  honesty check, not a calibrated interval.</li>
+<li><strong>Bayesian reinterpretation</strong> (the fused lasso is the MAP estimate under Laplace priors):
+  obtaining the full posterior means leaving CVXPY for MCMC or variational inference.</li>
+</ul>
+<p>By contrast, the <a href="../differentiable-physics/">variational differentiable-physics route</a> produces
+(approximate) posteriors natively. Where calibrated, decomposable uncertainty is a first-class
+requirement — as it is for
+<a href="../../roadmap/capacity-estimation/#uncertainty-a-first-class-judging-criterion">effective-capacity estimates</a> —
+this is the honest structural con of the convex route, to be weighed against its guarantees.</p>
+<h2 id="where-pytorch-is-the-right-tool">Where PyTorch is the right tool</h2>
+<p>"Non-convex" is not one condition — it comes in grades, and the grade decides the tool:</p>
+<ol>
+<li>
+<p><strong>Convex outright.</strong> Everything above:
+   <a href="#the-recurring-pattern-fixed-shapes-unknown-coefficients">fixed shapes × unknown coefficients</a>
+   under convex losses, penalties and constraints. CVXPY, no contest.</p>
+</li>
+<li>
+<p><strong>Jointly non-convex, but convex once you condition on a small set of unknowns.</strong> Estimating a
+   metered PV site's capacity <em>and</em> its panel orientation is non-convex — capacity multiplies a
+   per-unit output curve that depends non-linearly on tilt and azimuth. But <em>given</em> the
+   orientation, the per-unit curve is a fixed shape and the capacity fit is convex. When the
+   conditioning set is low-dimensional — here just two angles — the right move is to <strong>enumerate
+   it</strong>: grid-search tilt × azimuth on the outside, and solve the fast, warm-started convex
+   capacity problem at each grid point. An exhaustive outer search wrapped around a certified
+   inner solve is deterministic and leaves no valley unvisited (up to the grid resolution) — no
+   gradients required. This is
+   <a href="../../roadmap/capacity-estimation/#candidate-a-the-convex-estimator-cvxpy">Candidate A in the v0.7 capacity head-to-head</a>.
+   The trick's limits are its dimensions: tens of sites × a few thousand grid points is cheap;
+   it does not scale to genuinely high-dimensional parameter spaces.</p>
+</li>
+<li>
+<p><strong>Intrinsically non-convex.</strong> Anything where the <em>shapes themselves</em> are being learnt —
+   wind-turbine power curves, heat-pump COP rolloff, thermal time constants, neural-network
+   layers — and all variational machinery (CVXPY has no notion of a posterior; the ELBO training
+   in <a href="../differentiable-physics/">differentiable physics</a> is outside its world). Some problems
+   are non-convex <em>by construction</em>: reconstructing signed flow from magnitude-only MVA metering
+   has a sign ambiguity, i.e. two valleys. CVXPY's DCP check refuses all of these at construction
+   time — correctly. PyTorch offers the opposite deal: write down almost anything, gradients flow
+   through it, GPUs make it fast, and the dented landscape is managed with initialisation,
+   restarts, and validation.</p>
+</li>
+</ol>
+<p><strong>Rule of thumb:</strong> convex estimation subproblems → <strong>CVXPY</strong>, for certainty, reproducibility, and
+little code. Learning shapes, or anything needing posteriors → <strong>PyTorch</strong>, because nothing else
+can express it. A low-dimensional non-convex remainder wrapped around a convex core → enumerate
+the remainder, solve the core.</p>
+<h2 id="the-bridge-welding-cvxpy-into-pytorch">The bridge: welding CVXPY into PyTorch</h2>
+<p>There is a bridge between the two worlds: <strong>differentiable convex optimisation layers</strong>
+(<a href="https://github.com/cvxgrp/cvxpylayers"><code>cvxpylayers</code></a>, from the same research group as CVXPY).
+It embeds a convex solve inside a PyTorch model as if it were another layer, with gradients
+flowing through the solve itself. Concretely for this project: the switching-event estimator need
+not remain a separate preprocessing step forever — the routing/switching solve can eventually sit
+<em>inside</em> the type-resolved mixture as a convex layer, with the differentiable-physics modules
+feeding it and gradients passing straight through, keeping exact zeros and built-in conservation
+where free tensors would lose both. (The magnitude-only mixture model, by contrast, needs no
+PyTorch at all: it is buildable as alternating CVXPY solves.) When each rung earns its place is
+documented in the
+<a href="../../roadmap/switching-events/#approach-4-the-magnitude-only-mixture-model-the-workhorse">mixture-model tooling note</a>
+on the switching-events roadmap page. Not a day-one build — but it means choosing CVXPY for
+switching now does not wall that code off from the PyTorch future.</p>
+<h2 id="applications-in-this-project">Applications in this project</h2>
+<ul>
+<li><strong>Switching-event detection — the
+  <a href="../../roadmap/switching-events/#approach-3-the-joint-edge-flow-estimator">joint edge-flow estimator</a></strong>
+  (first planned application): a group fused lasso on signed edge flows; implementation sketch on
+  the roadmap page.</li>
+<li><strong>Metered-generator effective capacity — the
+  <a href="../../roadmap/capacity-estimation/#candidate-a-the-convex-estimator-cvxpy">convex candidate</a></strong>
+  in the v0.7 head-to-head: censored quantile-envelope fit with fused-lasso changepoints, and
+  orientation by grid search.</li>
+<li><strong>The magnitude-only mixture model</strong> — bilinear, so not one convex problem, but buildable entirely as
+  <em>alternating</em> CVXPY solves (each step convex; global-optimum guarantee holds per step, not
+  overall). See the
+  <a href="../../roadmap/switching-events/#approach-4-the-magnitude-only-mixture-model-the-workhorse">mixture-model tooling note</a>.</li>
+<li><strong>The <a href="../../roadmap/disaggregation/#the-convex-dictionary-baseline">convex dictionary baseline</a></strong>
+  for unmetered-DER disaggregation: convex selection from a menu of precomputed candidate
+  systems — the transparent baseline the v2 engine must beat.</li>
+<li><strong>Convex companions to the differentiable-physics modules</strong>: a below-the-clip initialiser and
+  sanity check for the
+  <a href="../differentiable-physics/#scaling-to-aggregate-fleets-universalsolarfleetnode">fleet node</a>,
+  and cheap style-vector fitting against a frozen demand dictionary
+  (<a href="../../roadmap/disaggregation/#node-definitions"><code>BasisLoadNode</code></a>).</li>
+<li>More are expected to follow. Roadmap pages that adopt a convex formulation should cite this
+  page for the rationale and tooling choice rather than re-deriving them.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

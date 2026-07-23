@@ -1,0 +1,3512 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../ml_core/">
+      
+      
+        <link rel="next" href="../xgboost_forecaster/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>NGED Data - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nged-data-api" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              NGED Data
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="nged-data-api">NGED Data API</h1>
+<h1 id="nged-json-data">NGED JSON Data</h1>
+<p>This package handles the ingestion and processing of NGED's new JSON data format.</p>
+<h2 id="key-components">Key Components</h2>
+<ul>
+<li><code>load_nged_json</code>: Loads and parses NGED JSON files.</li>
+<li><code>clean_power_time_series</code>: Cleans power data, including filtering out "stuck" sensors based on daily variance and insane values.</li>
+<li><code>append_to_delta</code>: Appends cleaned data to a Delta table, ensuring no duplicates.</li>
+<li><code>upsert_metadata</code>: Upserts metadata to a Parquet file.</li>
+</ul>
+<h2 id="data-quality">Data Quality</h2>
+<p>NGED provides data every 6 hours via JSON files on S3. The data has several known quality issues that are handled during ingestion:</p>
+<ul>
+<li><strong>Stuck values</strong>: Detected by computing the standard deviation over a 24-hour rolling window; periods where std is below a threshold are removed.</li>
+<li><strong>Outliers / invalid values</strong>: Isolated zeros in non-zero time series and values beyond a threshold number of standard deviations from the mean are removed.</li>
+<li><strong>Early ramp-up period</strong>: The first ~two months of each time series are typically low quality (meter calibration period) and are discarded.</li>
+</ul>
+<h2 id="usage">Usage</h2>
+<p>This package is used by the <code>power_time_series_and_metadata</code> Dagster asset in <code>src/nged_substation_forecast/defs/assets.py</code>.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.read_nged_json" class="doc doc-heading">
+            <code>nged_data.read_nged_json</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+        <p>Extracts metadata and time series from NGED JSON data.</p>
+<p>The JSON is expected to have a structure where metadata fields are at the top level,
+and a 'data' field contains an array of time series data points.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<h3 id="nged_data.read_nged_json-classes">Classes</h3>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="nged_data.storage" class="doc doc-heading">
+            <code>nged_data.storage</code>
+
+
+</h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h3 id="nged_data.storage-attributes">Attributes</h3>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="nged_data.storage.log" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<h3 id="nged_data.storage-classes">Classes</h3>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.storage.NoNewData" class="doc doc-heading">
+            <code>NoNewData</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
+<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NoNewData</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="k">pass</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.storage.TimeSeriesCoverage" class="doc doc-heading">
+            <code>TimeSeriesCoverage</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="patito.Model">Model</span></code></p>
+
+
+
+        <p>Per-series observation-time span of the <code>power_time_series</code> Delta table.</p>
+<p><code>first_time</code>/<code>last_time</code> are the earliest/latest observation <code>time</code> for each
+<code>time_series_id</code>. A transient intermediate (never persisted): the freshness asset check
+reads <code>last_time</code> to detect staleness, <code>select_new_rows</code> reads <code>last_time</code> to find
+genuinely-new rows, and CV fold-eligibility (<code>eligible_time_series_ids</code>) reads both.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TimeSeriesCoverage</span><span class="p">(</span><span class="n">pt</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-series observation-time span of the ``power_time_series`` Delta table.</span>
+
+<span class="sd">    ``first_time``/``last_time`` are the earliest/latest observation ``time`` for each</span>
+<span class="sd">    ``time_series_id``. A transient intermediate (never persisted): the freshness asset check</span>
+<span class="sd">    reads ``last_time`` to detect staleness, ``select_new_rows`` reads ``last_time`` to find</span>
+<span class="sd">    genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">time_series_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">_get_time_series_id_dtype</span><span class="p">(</span><span class="n">unique</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">first_time</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span>
+    <span class="n">last_time</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h5 id="nged_data.storage.TimeSeriesCoverage-attributes">Attributes</h5>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.TimeSeriesCoverage.time_series_id" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">time_series_id</span> <span class="o">=</span> <span class="n">_get_time_series_id_dtype</span><span class="p">(</span><span class="n">unique</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.TimeSeriesCoverage.first_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">first_time</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">]))</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.TimeSeriesCoverage.last_time" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">last_time</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="p">(</span><span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="s1">&#39;time&#39;</span><span class="p">]))</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="nged_data.storage.UpsertMetadataStats" class="doc doc-heading">
+            <code>UpsertMetadataStats</code>
+
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.TypedDict">TypedDict</span></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UpsertMetadataStats</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">metadata_n_new_TimeSeriesIDs</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">metadata_n_updated_TimeSeriesIDs</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">metadata_updated_TimeSeriesIDs</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+<h5 id="nged_data.storage.UpsertMetadataStats-attributes">Attributes</h5>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.UpsertMetadataStats.metadata_n_new_TimeSeriesIDs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">metadata_n_new_TimeSeriesIDs</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.UpsertMetadataStats.metadata_n_updated_TimeSeriesIDs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">metadata_n_updated_TimeSeriesIDs</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h6 id="nged_data.storage.UpsertMetadataStats.metadata_updated_TimeSeriesIDs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">metadata_updated_TimeSeriesIDs</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+</h6>
+
+
+    <div class="doc doc-contents ">
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+<h3 id="nged_data.storage-functions">Functions:</h3>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.list_timeseries_json_files" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">list_timeseries_json_files</span><span class="p">(</span><span class="n">store</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>List all the timeseries JSON files in NGED's S3 bucket.</p>
+<p>The paths are assumed to be of the form:
+timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">list_timeseries_json_files</span><span class="p">(</span>
+    <span class="n">store</span><span class="p">:</span> <span class="n">obstore</span><span class="o">.</span><span class="n">store</span><span class="o">.</span><span class="n">S3Store</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List all the timeseries JSON files in NGED&#39;s S3 bucket.</span>
+
+<span class="sd">    The paths are assumed to be of the form:</span>
+<span class="sd">    timeseries/1774512000000_1774533600000/TimeSeries_23_20260326T080000Z_20260326T140000Z.json</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">raw_file_listing</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">_RawFileListItem</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">total_objects</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">store</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;timeseries&quot;</span><span class="p">):</span>
+        <span class="c1"># `list()` returns the file listing in chunks of `chunk_size=50` items per chunk.</span>
+        <span class="k">for</span> <span class="n">object_meta</span> <span class="ow">in</span> <span class="n">chunk</span><span class="p">:</span>
+            <span class="n">total_objects</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">object_meta</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.json&quot;</span><span class="p">):</span>
+                <span class="n">raw_file_listing</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">_RawFileListItem</span><span class="p">(</span>
+                        <span class="n">path</span><span class="o">=</span><span class="n">object_meta</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">],</span>
+                        <span class="n">filesize_bytes</span><span class="o">=</span><span class="n">object_meta</span><span class="p">[</span><span class="s2">&quot;size&quot;</span><span class="p">],</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;JSON files on NGED&#39;s S3: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">raw_file_listing</span><span class="p">)</span><span class="si">}</span><span class="s2"> out of </span><span class="si">{</span><span class="n">total_objects</span><span class="si">=}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_process_file_listing</span><span class="p">(</span><span class="n">raw_file_listing</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.remove_small_files_from_listing" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">remove_small_files_from_listing</span><span class="p">(</span><span class="n">file_listing</span><span class="p">,</span> <span class="n">size_threshold_bytes</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Remove files that are too small. This is used to remove NGED JSON files that have no <code>data</code>
+field.</p>
+
+
+<details class="typical-files-sizes-for-nged-json-files" open>
+  <summary>Typical files sizes for NGED JSON files</summary>
+  <ul>
+<li>486 bytes: no <code>data</code> and no <code>WKT</code>.</li>
+<li>2011 bytes: 12 timesteps in <code>data</code> and no <code>WKT</code>.</li>
+<li>4328 bytes: no <code>data</code> but a large <code>WKT</code> string.</li>
+</ul>
+</details>
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">remove_small_files_from_listing</span><span class="p">(</span>
+    <span class="n">file_listing</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">],</span>
+    <span class="n">size_threshold_bytes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove files that are too small. This is used to remove NGED JSON files that have no `data`</span>
+<span class="sd">    field.</span>
+
+<span class="sd">    Typical files sizes for NGED JSON files:</span>
+<span class="sd">        -  486 bytes: no `data` and no `WKT`.</span>
+<span class="sd">        - 2011 bytes: 12 timesteps in `data` and no `WKT`.</span>
+<span class="sd">        - 4328 bytes: no `data` but a large `WKT` string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">file_listing</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;filesize_bytes&quot;</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">size_threshold_bytes</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.download_and_parse_files" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">download_and_parse_files</span><span class="p">(</span><span class="n">store</span><span class="p">,</span> <span class="n">paths_df</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if
+there are any duplicates.</p>
+<p>Raises NoNewData if there is no new data.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">download_and_parse_files</span><span class="p">(</span>
+    <span class="n">store</span><span class="p">:</span> <span class="n">obstore</span><span class="o">.</span><span class="n">store</span><span class="o">.</span><span class="n">S3Store</span><span class="p">,</span> <span class="n">paths_df</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">TimeSeriesMetadata</span><span class="p">],</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerTimeSeries</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load data end_time by end_time, in order, so more recent data overwrites older duplicates, if</span>
+<span class="sd">    there are any duplicates.</span>
+
+<span class="sd">    Raises NoNewData if there is no new data.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">metadata_dfs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">power_time_series_dfs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_end_time</span><span class="p">,</span> <span class="n">df_for_end_time</span> <span class="ow">in</span> <span class="n">paths_df</span><span class="o">.</span><span class="n">group_by</span><span class="p">(</span><span class="s2">&quot;end_time&quot;</span><span class="p">,</span> <span class="n">maintain_order</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">df_for_end_time</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">]:</span>
+            <span class="c1"># TODO: Use `store.get_async` to get all files for this group concurrently.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="n">json_bytes</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">bytes</span><span class="p">())</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="n">json_bytes</span><span class="p">)</span>
+
+            <span class="c1"># Extract TimeSeriesMetadata from df:</span>
+            <span class="n">new_metadata_df</span> <span class="o">=</span> <span class="n">_extract_time_series_metadata</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+            <span class="n">metadata_dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_metadata_df</span><span class="p">)</span>
+            <span class="n">time_series_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">new_metadata_df</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+            <span class="c1"># Extract PowerTimeSeries from df:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">new_time_series_df</span> <span class="o">=</span> <span class="n">_extract_power_time_series</span><span class="p">(</span>
+                    <span class="n">df</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">time_series_id</span><span class="o">=</span><span class="n">time_series_id</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">pl</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">InvalidOperationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="k">if</span> <span class="s2">&quot;invalid dtype: expected &#39;Struct&#39;, got &#39;Null&#39; for &#39;data&#39;&quot;</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">):</span>
+                    <span class="n">log</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;The &#39;data&#39; field is &#39;null&#39; in </span><span class="si">{</span><span class="n">path</span><span class="si">=}</span><span class="s2">. This is expected behaviour if&quot;</span>
+                        <span class="s2">&quot; NGED&#39;s meter reported no values for the period covered by the JSON file.&quot;</span>
+                    <span class="p">)</span>
+                    <span class="c1"># TODO: Maybe we need a way to stop our system from downloading files with no</span>
+                    <span class="c1"># data in them, every time we run. Maybe filter out JSON files below a certain</span>
+                    <span class="c1"># filesize???</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">power_time_series_dfs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_time_series_df</span><span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">metadata_dfs</span><span class="p">)</span><span class="si">}</span><span class="s2"> new TimeSeriesMetadata DataFrames and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">power_time_series_dfs</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="s2">&quot; new PowerTimeSeries dataframes extracted from NGED JSON data.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">metadata_dfs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">power_time_series_dfs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">NoNewData</span>
+
+    <span class="c1"># Concatenate and return:</span>
+    <span class="n">metadata_df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">metadata_dfs</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;diagonal&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;last&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">time_series_df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">power_time_series_dfs</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">,</span> <span class="s2">&quot;time&quot;</span><span class="p">],</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;last&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">columns_to_sort_by</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">TimeSeriesMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">metadata_df</span><span class="p">),</span> <span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">time_series_df</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.time_series_coverage" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">time_series_coverage</span><span class="p">(</span><span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the earliest/latest observation <code>time</code> on disk per <code>time_series_id</code>.</p>
+<p>Returns an empty (but correctly typed) frame if the Delta table does not exist yet.
+<code>min</code>/<code>max</code> grouped by <code>time_series_id</code> are value aggregations, so they are safe from
+the Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).</p>
+<p>Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
+the <code>power</code> column, but a group-wise <code>min</code>/<code>max</code> cannot be answered from Parquet
+row-group statistics (no engine on our stack does aggregate-from-statistics), so every
+<code>time</code>/<code>time_series_id</code> value is read; computing both bounds instead of one is ~20%
+more wall-clock and no extra memory (the shared scan dominates). The <code>collect</code> uses the
+streaming engine to keep peak memory bounded — the freshness check runs hourly on a small
+control-plane VM. Measured on a synthetic V2 table (2,500 series, half-hourly, partitioned
+by <code>time_series_id</code>) for a year of history (43.8M rows): streaming ~0.21 s / ~190 MB peak,
+versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost scales
+linearly with accumulated history. If the scan ever becomes a problem, both bounds can
+instead be read from the Delta add-action <code>min.time</code>/<code>max.time</code> file statistics —
+metadata-only, O(files): ~0.02 s / &lt;100 MB at the same scale — the same Delta-log-metadata
+trick used to count whole-table rows without scanning.</p>
+<p><code>delta_path</code> is a local path or remote URI for the <code>power_time_series</code> Delta table;
+<code>storage_options</code> carries the object-store credentials/endpoint for a remote <code>delta_path</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">time_series_coverage</span><span class="p">(</span>
+    <span class="n">delta_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">TimeSeriesCoverage</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the earliest/latest observation ``time`` on disk per ``time_series_id``.</span>
+
+<span class="sd">    Returns an empty (but correctly typed) frame if the Delta table does not exist yet.</span>
+<span class="sd">    ``min``/``max`` grouped by ``time_series_id`` are value aggregations, so they are safe from</span>
+<span class="sd">    the Polars 32-bit row-count wraparound even on a very large table (see CLAUDE.md).</span>
+
+<span class="sd">    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops</span>
+<span class="sd">    the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet</span>
+<span class="sd">    row-group statistics (no engine on our stack does aggregate-from-statistics), so every</span>
+<span class="sd">    ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20%</span>
+<span class="sd">    more wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the</span>
+<span class="sd">    streaming engine to keep peak memory bounded — the freshness check runs hourly on a small</span>
+<span class="sd">    control-plane VM. Measured on a synthetic V2 table (2,500 series, half-hourly, partitioned</span>
+<span class="sd">    by ``time_series_id``) for a year of history (43.8M rows): streaming ~0.21 s / ~190 MB peak,</span>
+<span class="sd">    versus ~1.3 GB peak for the in-memory engine — same result, ~7x less memory. Cost scales</span>
+<span class="sd">    linearly with accumulated history. If the scan ever becomes a problem, both bounds can</span>
+<span class="sd">    instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —</span>
+<span class="sd">    metadata-only, O(files): ~0.02 s / &lt;100 MB at the same scale — the same Delta-log-metadata</span>
+<span class="sd">    trick used to count whole-table rows without scanning.</span>
+
+<span class="sd">    `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;</span>
+<span class="sd">    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">delta_table_exists</span><span class="p">(</span><span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="p">):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">delta_path</span><span class="si">=}</span><span class="s2"> does not exist yet; returning an empty coverage frame.&quot;</span><span class="p">)</span>
+        <span class="n">empty</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="n">schema</span><span class="o">=</span><span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">TimeSeriesCoverage</span><span class="o">.</span><span class="n">dtypes</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">TimeSeriesCoverage</span><span class="o">.</span><span class="n">columns</span><span class="p">}</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">empty</span><span class="p">)</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span><span class="n">TimeSeriesCoverage</span><span class="p">)</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+
+    <span class="n">coverage</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">scan_delta</span><span class="p">(</span><span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">group_by</span><span class="p">(</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">agg</span><span class="p">(</span><span class="n">first_time</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">),</span> <span class="n">last_time</span><span class="o">=</span><span class="n">pl</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">))</span>
+        <span class="c1"># Streaming engine: bounds peak memory (~7x lower than in-memory at V2 scale) so the</span>
+        <span class="c1"># hourly full-table aggregate stays comfortable on a small control-plane VM. See docstring.</span>
+        <span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="n">engine</span><span class="o">=</span><span class="s2">&quot;streaming&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Found on-disk coverage for </span><span class="si">{</span><span class="n">coverage</span><span class="o">.</span><span class="n">height</span><span class="si">}</span><span class="s2"> time_series_ids from </span><span class="si">{</span><span class="n">delta_path</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">coverage</span><span class="p">[</span><span class="s1">&#39;last_time&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">=}</span><span class="s2">. </span><span class="si">{</span><span class="n">coverage</span><span class="p">[</span><span class="s1">&#39;last_time&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">=}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">coverage</span><span class="p">)</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span><span class="n">TimeSeriesCoverage</span><span class="p">)</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.select_new_rows" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">select_new_rows</span><span class="p">(</span><span class="n">time_series</span><span class="p">,</span> <span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+          <div class="doc-overloads">
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">select_new_rows</span><span class="p">(</span>
+    <span class="n">time_series</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerTimeSeries</span><span class="p">],</span>
+    <span class="n">delta_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerTimeSeries</span><span class="p">]</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">select_new_rows</span><span class="p">(</span>
+    <span class="n">time_series</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">],</span>
+    <span class="n">delta_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">]</span>
+</code></pre></div>          </div>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return rows in <code>time_series</code> that are more recent than the most recent
+data already in our Delta table, on a time_series_id by time_series_id basis.</p>
+<p><code>delta_path</code> is a local path or remote URI for the <code>power_time_series</code> Delta table;
+<code>storage_options</code> carries the object-store credentials/endpoint for a remote <code>delta_path</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">select_new_rows</span><span class="p">(</span>
+    <span class="n">time_series</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerTimeSeries</span><span class="p">]</span> <span class="o">|</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">],</span>
+    <span class="n">delta_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">PowerTimeSeries</span><span class="p">]</span> <span class="o">|</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">_ProcessedFileListing</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return rows in `time_series` that are more recent than the most recent</span>
+<span class="sd">    data already in our Delta table, on a time_series_id by time_series_id basis.</span>
+
+<span class="sd">    `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;</span>
+<span class="sd">    `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">delta_table_exists</span><span class="p">(</span><span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="p">):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">delta_path</span><span class="si">=}</span><span class="s2"> does not exist yet.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">time_series</span>
+
+    <span class="c1"># Scan the existing delta table for the most recent time per time_series_id.</span>
+    <span class="n">coverage</span> <span class="o">=</span> <span class="n">time_series_coverage</span><span class="p">(</span><span class="n">delta_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="p">)</span>
+
+    <span class="c1"># Check whether `time_series` is a `PowerTimeSeries` or a `_ProcessedFileListing`</span>
+    <span class="k">if</span> <span class="s2">&quot;time&quot;</span> <span class="ow">in</span> <span class="n">time_series</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">pt_model</span> <span class="o">=</span> <span class="n">PowerTimeSeries</span>
+        <span class="n">time_col</span> <span class="o">=</span> <span class="s2">&quot;time&quot;</span>
+        <span class="n">columns_to_sort_by</span> <span class="o">=</span> <span class="n">PowerTimeSeries</span><span class="o">.</span><span class="n">columns_to_sort_by</span>
+    <span class="k">elif</span> <span class="s2">&quot;end_time&quot;</span> <span class="ow">in</span> <span class="n">time_series</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">pt_model</span> <span class="o">=</span> <span class="n">_ProcessedFileListing</span>
+        <span class="n">time_col</span> <span class="o">=</span> <span class="s2">&quot;end_time&quot;</span>
+        <span class="n">columns_to_sort_by</span> <span class="o">=</span> <span class="s2">&quot;end_time&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Expected `time_series` to have either a `time` column or an `end_time` column,&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot; not </span><span class="si">{</span><span class="n">time_series</span><span class="o">.</span><span class="n">columns</span><span class="si">=}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Strip the Patito model from `coverage` so Polars&#39; cross-subclass join check accepts it, and</span>
+    <span class="c1"># keep only `last_time` (the most recent time on disk per series) for the new-row filter.</span>
+    <span class="n">plain_last_times</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">LazyFrame</span><span class="o">.</span><span class="n">_from_pyldf</span><span class="p">(</span><span class="n">coverage</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span><span class="o">.</span><span class="n">_ldf</span><span class="p">)</span><span class="o">.</span><span class="n">select</span><span class="p">(</span>
+        <span class="s2">&quot;time_series_id&quot;</span><span class="p">,</span> <span class="s2">&quot;last_time&quot;</span>
+    <span class="p">)</span>
+    <span class="n">filtered_df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">time_series</span><span class="o">.</span><span class="n">lazy</span><span class="p">()</span>
+        <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">plain_last_times</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
+        <span class="c1"># If last_time is null for this time_series_id then this is a new time_series_id.</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;last_time&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_null</span><span class="p">()</span> <span class="o">|</span> <span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">time_col</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="s2">&quot;last_time&quot;</span><span class="p">)))</span>
+        <span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;last_time&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">columns_to_sort_by</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">filtered_df</span><span class="p">)</span><span class="o">.</span><span class="n">set_model</span><span class="p">(</span><span class="n">pt_model</span><span class="p">)</span><span class="o">.</span><span class="n">validate</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="nged_data.storage.upsert_metadata" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">upsert_metadata</span><span class="p">(</span><span class="n">new_metadata</span><span class="p">,</span> <span class="n">metadata_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Upserts metadata to a Parquet file.</p>
+<p>This function assumes it is called by one thread at a time so no
+explicit locking is required.</p>
+<p>If the local Parquet file does not exist, it saves the new_metadata.
+If it exists, it merges the new_metadata with the existing metadata,
+keeping the latest version for each time_series_id, and updates the
+Parquet file if there are differences.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>new_metadata</code>
+            </td>
+            <td>
+                  <code><span title="patito.DataFrame">DataFrame</span>[<a class="autorefs autorefs-internal" title="TimeSeriesMetadata (contracts.power_schemas.TimeSeriesMetadata)" href="../contracts/#contracts.power_schemas.TimeSeriesMetadata">TimeSeriesMetadata</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The new metadata DataFrame.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metadata_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Local path or remote URI of the Parquet file where we store our version
+of the metadata.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>storage_options</code>
+            </td>
+            <td>
+                  <code><span title="contracts._uri.ObjectStoreOptions">ObjectStoreOptions</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Object-store credentials/endpoint for a remote <code>metadata_path</code>;
+<code>None</code>/empty for a local path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p>Returns stats about new metadata</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>packages/nged_data/src/nged_data/storage.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">upsert_metadata</span><span class="p">(</span>
+    <span class="n">new_metadata</span><span class="p">:</span> <span class="n">pt</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">[</span><span class="n">TimeSeriesMetadata</span><span class="p">],</span>
+    <span class="n">metadata_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">storage_options</span><span class="p">:</span> <span class="n">ObjectStoreOptions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UpsertMetadataStats</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Upserts metadata to a Parquet file.</span>
+
+<span class="sd">    This function assumes it is called by one thread at a time so no</span>
+<span class="sd">    explicit locking is required.</span>
+
+<span class="sd">    If the local Parquet file does not exist, it saves the new_metadata.</span>
+<span class="sd">    If it exists, it merges the new_metadata with the existing metadata,</span>
+<span class="sd">    keeping the latest version for each time_series_id, and updates the</span>
+<span class="sd">    Parquet file if there are differences.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        new_metadata: The new metadata DataFrame.</span>
+<span class="sd">        metadata_path: Local path or remote URI of the Parquet file where we store our version</span>
+<span class="sd">            of the metadata.</span>
+<span class="sd">        storage_options: Object-store credentials/endpoint for a remote `metadata_path`;</span>
+<span class="sd">            ``None``/empty for a local path.</span>
+
+<span class="sd">    Returns stats about new metadata</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">COMPRESSION</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;zstd&quot;</span>
+
+    <span class="n">new_metadata</span> <span class="o">=</span> <span class="n">TimeSeriesMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">new_metadata</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">object_exists</span><span class="p">(</span><span class="n">metadata_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="p">):</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Metadata file not found at </span><span class="si">{</span><span class="n">metadata_path</span><span class="si">}</span><span class="s2">. Creating new file.&quot;</span><span class="p">)</span>
+        <span class="c1"># write_parquet doesn&#39;t create missing parent directories, so a first-ever run against a</span>
+        <span class="c1"># fresh local data root would fail here (this create branch runs before any Delta write</span>
+        <span class="c1"># that would otherwise create the dir). Create the parent for a local metadata_path.</span>
+        <span class="n">if_local_path_then_make_parent_dir</span><span class="p">(</span><span class="n">metadata_path</span><span class="p">)</span>
+        <span class="n">new_metadata</span><span class="o">.</span><span class="n">write_parquet</span><span class="p">(</span>
+            <span class="n">metadata_path</span><span class="p">,</span>
+            <span class="n">compression</span><span class="o">=</span><span class="n">COMPRESSION</span><span class="p">,</span>
+            <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">UpsertMetadataStats</span><span class="p">(</span>
+            <span class="n">metadata_n_new_TimeSeriesIDs</span><span class="o">=</span><span class="n">new_metadata</span><span class="o">.</span><span class="n">height</span><span class="p">,</span>
+            <span class="n">metadata_n_updated_TimeSeriesIDs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Read existing metadata</span>
+    <span class="n">existing_metadata</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span>
+        <span class="n">metadata_path</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">TimeSeriesMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">existing_metadata</span><span class="p">)</span>
+
+    <span class="c1"># Compare metadata. `metadata_diff` contains all rows in `new_metadata` that do not have an</span>
+    <span class="c1"># exact match in `existing_metadata`. Adapted from https://stackoverflow.com/a/79888719</span>
+    <span class="n">metadata_diff</span> <span class="o">=</span> <span class="n">new_metadata</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+        <span class="o">~</span><span class="n">new_metadata</span><span class="o">.</span><span class="n">hash_rows</span><span class="p">()</span><span class="o">.</span><span class="n">is_in</span><span class="p">(</span><span class="n">existing_metadata</span><span class="o">.</span><span class="n">hash_rows</span><span class="p">()</span><span class="o">.</span><span class="n">implode</span><span class="p">())</span>
+    <span class="p">)</span>
+    <span class="n">TimeSeriesMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">metadata_diff</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">metadata_diff</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;TimeSeriesMetadata is up to date.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">UpsertMetadataStats</span><span class="p">(</span>
+            <span class="n">metadata_n_new_TimeSeriesIDs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+            <span class="n">metadata_n_updated_TimeSeriesIDs</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">log</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;New TimeSeriesMetadata available for </span><span class="si">{</span><span class="n">metadata_diff</span><span class="o">.</span><span class="n">height</span><span class="si">}</span><span class="s2"> timeseries_ids.&quot;</span>
+        <span class="sa">f</span><span class="s2">&quot; Updating </span><span class="si">{</span><span class="n">metadata_path</span><span class="si">}</span><span class="s2">.&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Merge metadata. Put new_metadata first so that unique(keep=&quot;first&quot;) keeps the new version</span>
+    <span class="n">merged_metadata</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">pl</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">new_metadata</span><span class="p">,</span> <span class="n">existing_metadata</span><span class="p">])</span>
+        <span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">,</span> <span class="n">keep</span><span class="o">=</span><span class="s2">&quot;first&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">TimeSeriesMetadata</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">merged_metadata</span><span class="p">)</span>
+
+    <span class="n">merged_metadata</span><span class="o">.</span><span class="n">write_parquet</span><span class="p">(</span>
+        <span class="n">metadata_path</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="n">COMPRESSION</span><span class="p">,</span> <span class="n">storage_options</span><span class="o">=</span><span class="n">typeddict_to_dict</span><span class="p">(</span><span class="n">storage_options</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Compute stats</span>
+    <span class="n">new_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">new_metadata</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">])</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">existing_metadata</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">])</span>
+    <span class="n">updated_ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+        <span class="nb">set</span><span class="p">(</span><span class="n">metadata_diff</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">existing_metadata</span><span class="p">[</span><span class="s2">&quot;time_series_id&quot;</span><span class="p">])</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">UpsertMetadataStats</span><span class="p">(</span>
+        <span class="n">metadata_n_new_TimeSeriesIDs</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">new_ids</span><span class="p">),</span>
+        <span class="n">metadata_n_updated_TimeSeriesIDs</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">updated_ids</span><span class="p">),</span>
+        <span class="n">metadata_updated_TimeSeriesIDs</span><span class="o">=</span><span class="nb">sorted</span><span class="p">(</span><span class="n">updated_ids</span><span class="p">),</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

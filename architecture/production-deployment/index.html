@@ -1,0 +1,3185 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../ml-orchestration/">
+      
+      
+        <link rel="next" href="../aws-costs/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Production Deployment Design - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#production-deployment-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Production Deployment Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background & Challenges
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background & Challenges
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Network
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/nged-incumbent-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's Incumbent Forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/data-quality/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Quality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex Optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable Physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Disaggregation Evaluation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation Metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic Forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS Data-Quality Issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Orchestration Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production Deployment Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-dagster-control-plane-continuously-on-one-small-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Dagster control plane continuously on one small VM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warn-on-stale-power-data-with-a-dagster-asset-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warn on stale power data with a Dagster asset check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#send-telemetry-to-sentry-and-alarm-on-absence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send telemetry to Sentry, and alarm on absence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Send telemetry to Sentry, and alarm on absence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#separating-laptop-telemetry-from-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separating laptop telemetry from production
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#separate-is-this-run-usable-from-is-it-perfect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate "is this run usable?" from "is it perfect?"
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bake-the-model-into-the-image-at-build-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bake the model into the image at build time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-live-inference-in-single-run-mode-not-bulk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run live inference in single-run mode, not bulk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolve-nwp-availability-asymmetrically-live-vs-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolve NWP availability asymmetrically: live vs replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serve-only-the-trained-population" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serve only the trained population
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promote-the-champion-via-a-dagster-asset-not-a-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Promote the champion via a Dagster asset, not a script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#considered-but-rejected-designs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Considered but rejected designs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Considered but rejected designs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-control-plane-eventbridge-scheduler-launching-ecs-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No control plane: EventBridge Scheduler launching ECS tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-periodically-woken-control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A periodically-woken control plane
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-always-on-fargate-service-for-the-control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An always-on Fargate service for the control plane
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-the-data-ingest-runs-on-the-control-plane-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the data-ingest runs on the control-plane VM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-the-champion-model-from-mlflow-at-container-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fetching the champion model from MLflow at container startup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS Running Costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML Experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/mlops-approach/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Our approach to MLops
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/evaluating-new-data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating new data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live Service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/local/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the whole stack locally
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Capacity Estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery Tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering Health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast Building Blocks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live Service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics & Leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-Demand Disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching Events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED Data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost Forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#run-the-dagster-control-plane-continuously-on-one-small-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Dagster control plane continuously on one small VM
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#warn-on-stale-power-data-with-a-dagster-asset-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Warn on stale power data with a Dagster asset check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#send-telemetry-to-sentry-and-alarm-on-absence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Send telemetry to Sentry, and alarm on absence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Send telemetry to Sentry, and alarm on absence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#separating-laptop-telemetry-from-production" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separating laptop telemetry from production
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#separate-is-this-run-usable-from-is-it-perfect" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Separate "is this run usable?" from "is it perfect?"
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bake-the-model-into-the-image-at-build-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bake the model into the image at build time
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-live-inference-in-single-run-mode-not-bulk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run live inference in single-run mode, not bulk
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resolve-nwp-availability-asymmetrically-live-vs-replay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolve NWP availability asymmetrically: live vs replay
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#serve-only-the-trained-population" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serve only the trained population
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#promote-the-champion-via-a-dagster-asset-not-a-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Promote the champion via a Dagster asset, not a script
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#considered-but-rejected-designs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Considered but rejected designs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Considered but rejected designs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#no-control-plane-eventbridge-scheduler-launching-ecs-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No control plane: EventBridge Scheduler launching ECS tasks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-periodically-woken-control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A periodically-woken control plane
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-always-on-fargate-service-for-the-control-plane" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An always-on Fargate service for the control plane
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-the-data-ingest-runs-on-the-control-plane-vm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running the data-ingest runs on the control-plane VM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fetching-the-champion-model-from-mlflow-at-container-startup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fetching the champion model from MLflow at container startup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="production-deployment-design">Production Deployment — Design</h1>
+<p>How the live service is orchestrated, and how the champion model gets from an MLflow
+leaderboard into a running production container — and why. For the step-by-step recipe —
+promote a model, build the image, verify it, push it, and stand up the AWS deployment around
+it — see <a href="../../live_service/aws/">Setting up the live service on AWS</a>.</p>
+<h2 id="run-the-dagster-control-plane-continuously-on-one-small-vm">Run the Dagster control plane continuously on one small VM</h2>
+<p>The Dagster control plane — daemon + webserver + code-location server — runs continuously on
+one small VM, alongside MLflow and Marimo, managed via Docker Compose. Its schedules are
+responsible for the entire recurring pipeline, not just the forecasts: pulling fresh telemetry
+from NGED's bucket (hourly), downloading the ECMWF ensemble NWP from Dynamical.org (daily), and
+issuing the forecasts themselves (6-hourly). The box does none of that pipeline compute of its
+own, though: it dispatches every run — those schedules and UI-launched backtests alike — to an
+ephemeral Fargate task via <code>EcsRunLauncher</code>. Even the light data-ingest runs go to Fargate;
+the reasoning is in
+<a href="#running-the-data-ingest-runs-on-the-control-plane-vm">Running the data-ingest runs on the control-plane VM</a>. This is the roadmap's
+<a href="../../roadmap/live-service/#accepted-option-small-ec2-control-plane-box-ecsrunlauncher-2535month">accepted architecture</a>;
+see <a href="../../roadmap/live-service/#aws-architecture">Live service: AWS architecture</a> for the
+costed options, and <a href="../aws-costs/">AWS Running Costs</a> for what the deployed service costs to
+run — as built at v1, and projected at v2 scale.</p>
+<p>Because scheduling lives inside Dagster rather than in any cloud-specific service, the entire
+stack stays portable: the laptop deployment and the cloud deployment are the same artifact,
+started with <code>docker compose up</code>. What switches a deployment between local and Fargate
+execution is not code but <strong>Dagster instance configuration</strong>: the run launcher is declared in
+<code>dagster.yaml</code>, which lives outside the image. The laptop's <code>dagster.yaml</code> declares no run
+launcher, so runs execute as local subprocesses (Dagster's <code>DefaultRunLauncher</code>); the box's
+declares <code>EcsRunLauncher</code>
+(<a href="../../live_service/aws/#step-14-configure-dagster-on-the-box">Step 14 of the runbook</a>), so
+runs launch as Fargate tasks. The code and image are byte-identical either way. The always-on
+daemon also provides the cross-run coordination that only a daemon can: schedules, sensors, run
+monitoring, and declarative automation.</p>
+<p>The design accepts two trade-offs:</p>
+<ul>
+<li>
+<p><strong>Single point of failure.</strong> The daemon on one VM has no managed scheduler watching it; a
+  quiet box failure could silently miss slots. The blast radius is small, because the project's
+  <a href="../../background/requirements/#uptime-lenient-by-design">uptime requirements are lenient by design</a>:
+  previously published forecasts stay readable from S3 and extend 14 days ahead, so a missed
+  slot degrades forecast freshness rather than cutting NGED off. Mitigation: the
+  <a href="#send-telemetry-to-sentry-and-alarm-on-absence">missed-check-in alarm</a> — each successful
+  6-hourly run checks in with Sentry (external to the whole deployment), and an alert fires when
+  an expected check-in fails to arrive. The alarm is the only component that lives outside the
+  box, and the stack does not depend on it to function.</p>
+</li>
+<li>
+<p><strong>No run-level auto-retry after a hard crash.</strong> Accepted; covered by the existing
+  replay/backfill mode for missed slots plus the missed-check-in alarm.</p>
+</li>
+</ul>
+<p>"Always-on" is also less demanding than it sounds, because the box comes with <strong>built-in
+maintenance windows</strong>: forecasts are produced only every 6 hours, and NGED reads published
+forecasts directly from S3 (see <a href="../forecast-delivery/">Forecast Delivery</a>), so the gap between
+one forecast run and the next is a regular window in which the VM can be stopped, patched, or
+rebuilt without NGED noticing — and even an overrun costs only a single slot, recoverable via
+replay-mode backfill. See
+<a href="../../background/requirements/#uptime-lenient-by-design">Requirements → Uptime: lenient by design</a>.</p>
+<p>Several other orchestration shapes were considered and rejected — see
+<a href="#considered-but-rejected-designs">Considered but rejected designs</a>.</p>
+<h2 id="warn-on-stale-power-data-with-a-dagster-asset-check">Warn on stale power data with a Dagster asset check</h2>
+<p><code>power_time_series_and_metadata_job</code> runs hourly and succeeds even when NGED has published
+nothing new, so a job that merely <em>ran</em> tells the operator nothing about whether fresh data
+actually arrived. If NGED's feed stalls, the Delta table silently goes stale. The
+<code>power_data_is_fresh</code> asset check closes that gap: it reads the <code>power_time_series</code> Delta
+table's <em>actual</em> data recency — the maximum <code>time</code> per <code>time_series_id</code> — rather than the
+asset's materialisation timestamp, and warns when any series has no data within a 24-hour
+staleness threshold. A native materialisation-freshness policy would miss this exact failure,
+because the materialisation keeps succeeding.</p>
+<p>The check is attached to <code>power_time_series_and_metadata</code>, so the existing hourly schedule
+runs it every hour with no extra wiring. It reports two kinds of lateness: a series that once
+reported but has now gone <strong>stale</strong>, and a roster series (present in the <code>TimeSeriesMetadata</code>
+parquet) that has <strong>never</strong> sent data. The count of each, plus a table of the offending
+<code>time_series_id</code>s, lands in the check's Dagster metadata — Dagster's Checks view becomes the
+operator's at-a-glance "is the power data healthy?" status surface, showing a green tick when
+every series is current and a yellow warning naming the late count when the feed has stalled.
+The severity is a warning rather than a failure: a stalled feed is expected to self-heal once
+NGED recovers (the pipeline back-fills the gap automatically), so it must not block downstream
+assets.</p>
+<p>This in-Dagster check is complementary to — not a replacement for — the
+<a href="#send-telemetry-to-sentry-and-alarm-on-absence">missed-check-in alarm</a>. The alarm fires on total
+silence from <em>outside</em> the deployment, because a dead daemon cannot report itself; this check
+reports per-series staleness from <em>inside</em> Dagster while the daemon is alive, and forwards that
+same staleness to Sentry as a warning (see the freshness-warning bullet under
+<a href="#send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry</a>). The freshness
+evaluation is a pure function, so the Sentry warning reuses the same <code>PowerFreshnessResult</code> the
+check already computed rather than recomputing it; the same result will later also feed the
+forecast-warnings delivery table.</p>
+<h2 id="send-telemetry-to-sentry-and-alarm-on-absence">Send telemetry to Sentry, and alarm on absence</h2>
+<p>Three independent Sentry mechanisms live in <code>nged_substation_forecast._sentry</code>, all active
+in every Dagster process (daemon, webserver, and each Fargate run worker) only when a <code>SENTRY_DSN</code>
+is configured — so laptops and CI stay silent by default.</p>
+<ul>
+<li>
+<p><strong>Error telemetry.</strong> <code>init_sentry</code> initialises the SDK once per process at import of the Dagster
+  definitions module, and a Dagster <code>@failure_hook</code> (<code>sentry_capture_failure</code>, attached to the
+  scheduled asset jobs) reports a failed step's exception — traceback intact — from inside the run
+  worker. The explicit hook is used rather than relying on Sentry's logging integration alone
+  because Dagster logs a step failure without <code>exc_info</code>, so a purely log-based capture would yield
+  a message-only event with no stack trace. The hook is attached to the three <em>scheduled</em> asset
+  jobs, so it covers the whole unattended production workload; failures in a manual UI
+  materialisation, a replay backfill, or an experiment job are watched by the operator at the
+  Dagster UI, not routed to Sentry.</p>
+</li>
+<li>
+<p><strong>The missed-check-in alarm</strong> — the <em>primary</em> production alert. After each successful <em>live</em>
+  <code>live_forecasts</code> run, the asset sends one success check-in (a heartbeat) to a Sentry cron
+  monitor; Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule
+  plus ~2 h grace), regardless of cause. Evaluation must live outside the deployment because a dead
+  daemon cannot report itself — the reasoning for why this, not a Dagster sensor, is the mechanism
+  is in <a href="../../roadmap/live-service/#alert-on-absence-the-missed-check-in-alarm">Alert on absence</a>.
+  Only <em>success</em> heartbeats are ever sent (never an <code>error</code> check-in), so the alarm keys purely off
+  absence: an in-band run error is the failure hook's job, and a manual <code>replay</code> backfill — which
+  reprocesses the past rather than proving the service is live now — deliberately does not check in.</p>
+</li>
+<li>
+<p><strong>Freshness warnings.</strong> When the <code>power_data_is_fresh</code> asset check finds late series,
+  <code>report_power_freshness</code> forwards that per-series staleness to Sentry as a <code>warning</code>-level event,
+  reusing the <code>PowerFreshnessResult</code> the check already computed. It is gated on the DSN (like error
+  telemetry, not the heartbeat flag), so it fires from wherever a configured environment runs the
+  hourly check, separated by the <code>environment</code> tag. The event is fingerprinted <strong>per environment</strong>
+  (<code>["nged-power-data-stale", &lt;environment&gt;]</code>) — Sentry's <code>environment</code> is a filter facet, not a
+  grouping key, so without the environment in the fingerprint every deployment would share one
+  issue; with it, each deployment gets its own ongoing issue, and the hourly re-reports of a
+  continuing stall collapse into that one issue rather than a fresh issue each hour. The message
+  body lists the late series and how late each is (<code>series 12: 48.5h late (last seen …)</code>, or <code>never
+  reported</code>), and the full per-series detail is attached as structured event context. Both are
+  capped — the message to a short leading slice with an <code>…and N more</code> line, the context to a larger
+  slice — so a whole-feed stall at V2 scale can't attach thousands of rows; the true late count is
+  always carried by the <code>n_late</code> tag, so a capped list never makes a large stall look small. Sending
+  is best-effort: <code>report_power_freshness</code> never raises, so a Sentry hiccup can't fail the
+  <code>blocking=False</code> check (which, inside the hooked hourly job, would otherwise trip the failure hook
+  and fail the run).</p>
+</li>
+</ul>
+<p>Freshness is a <em>two-way</em> state (stale ↔ recovered) modelled with a <em>one-way</em> primitive: a warning
+  event has no "resolved" counterpart. So <strong>recovery is signalled by the events stopping</strong> — the
+  issue's "last seen" timestamp stops advancing — and the operator resolves the issue by hand. The
+  production alert rule should fire on <em>regressions</em> (and the project's Sentry auto-resolve window
+  kept short) so that a fresh stall after a recovery re-pages rather than silently appending to a
+  stale-but-unresolved issue. This is a deliberate trade: the missed-check-in alarm above is the
+  primary two-directional signal; this warning is the richer per-series breadcrumb layered on top.</p>
+<h3 id="separating-laptop-telemetry-from-production">Separating laptop telemetry from production</h3>
+<p>Sentry's <code>environment</code> tag (from <code>Settings.sentry_environment</code>) keeps the two apart. The always-on
+box sets <code>environment=production</code>; each developer overrides the <code>local</code> default with
+<code>&lt;name&gt;-laptop</code> (e.g. <code>jacks-laptop</code>, <code>alexs-laptop</code>), so error events filter cleanly by origin.
+The missed-check-in alert rule is scoped to <code>environment:production</code>, so an intermittently-run
+laptop never pages. When a developer wants to exercise the heartbeat path locally, they set
+<code>SENTRY_MONITOR_FORECASTS=true</code> and point it at a <em>throwaway</em> monitor slug (<code>live-forecasts-test</code>),
+never the production <code>live-forecasts</code> monitor — otherwise the shared production monitor would be
+left expecting a 6-hourly check-in that the laptop won't keep sending, and would flag it as missed.
+The <a href="../../live_service/aws/">AWS runbook</a> lists the exact environment variables set on the box.</p>
+<h2 id="separate-is-this-run-usable-from-is-it-perfect">Separate "is this run usable?" from "is it perfect?"</h2>
+<p>Data ingest poses two different questions, and we answer them with two different mechanisms so
+that neither compromises the other. <strong>"Is this run usable?"</strong> is a fatal gate: the contract
+<code>validate</code> inside the ingest asset rejects data that is structurally broken, so a bad run fails
+loudly and writes nothing rather than poisoning the table. <strong>"Is it perfect?"</strong> is a separate,
+non-fatal Dagster asset check: it records known-but-tolerable imperfections as a warning without
+blocking the materialisation or anything downstream. Collapsing the two — failing on every
+imperfection — throws away otherwise-good data; ignoring the distinction the other way lets
+genuinely broken data land silently.</p>
+<p>The <code>ecmwf_ens</code> asset is the worked example. Its <code>nwp_has_no_unexpected_nulls</code> check surfaces the
+scattered per-pixel nulls that ECMWF ENS is known to carry (a WARN), while <code>Nwp.validate</code> still
+hard-fails a wholesale structural gap. The reasoning behind exactly where that fatal/tolerated line
+sits is documented in
+<a href="../ecmwf-ens-known-issues/">Known ECMWF ENS data-quality issues</a>. The <code>power_data_is_fresh</code> check
+above is the same shape of tool pointed at a different question — staleness rather than
+completeness — and is likewise a warning, never a failure.</p>
+<h2 id="bake-the-model-into-the-image-at-build-time">Bake the model into the image at build time</h2>
+<p>Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster
+control plane described <a href="#run-the-dagster-control-plane-continuously-on-one-small-vm">above</a>.
+An ephemeral container has no persistent disk and, for v0.1, no MLflow tracking server to reach
+— so production inference needs some way to get a model without depending on either.</p>
+<p>The champion model is therefore baked into the image at build time and loaded via a plain
+<code>save</code>/<code>load</code> — no MLflow, run ID, or cache involved at runtime. The model directory is
+produced once, out of band (a researcher picks the champion fold from the MLflow leaderboard
+and downloads its artifacts to local disk), then <code>COPY</code>'d into the image at build time.
+Promotion becomes rebuild + redeploy, which is auditable (image tags) and keeps MLflow
+completely out of the production runtime. (The rejected alternative — fetching the model from
+MLflow at container startup — is covered in
+<a href="#fetching-the-champion-model-from-mlflow-at-container-startup">Considered but rejected designs</a>.)</p>
+<p>This design also serves the preferred post-NIA operating model, in which a non-expert at
+NGED operates the service day to day (see
+<a href="../../background/requirements/#operating-model-handover">Requirements → Operating model &amp; handover</a>):
+there is no tracking server on the hot path to break, and the model simply freezes between
+OCF's scheduled expert interventions — under a vendor-develops / operator-runs split, that is a
+feature, not a limitation.</p>
+<p>This is deliberately simpler than reusing <code>BaseForecaster.load_from_mlflow</code>'s cache (the
+mechanism the CV pipeline already uses — see
+<a href="../ml-orchestration/#model-artifacts-mlflow-artifact-store-immutable-local-cache">ML orchestration: model artifacts</a>):
+v0.1 has no MLflow dependency to cache against in the first place.</p>
+<p><strong>Future work:</strong> once production wants to pick up a new champion without a rebuild + redeploy
+(e.g. after the <a href="../../roadmap/xgboost-improvements/">XGBoost quick wins</a> start landing
+regularly), switch to fetching the champion model from MLflow dynamically — at that point
+<code>load_from_mlflow</code>'s local-disk cache becomes the production-resilience mechanism again (serving
+from disk on a cache hit so the live service survives an MLflow outage), exactly as it does for
+CV today.</p>
+<h2 id="run-live-inference-in-single-run-mode-not-bulk">Run live inference in single-run mode, not bulk</h2>
+<p>The <code>live_forecasts</code> asset engineers features in <strong>single-run mode</strong> — an explicit
+<code>power_fcst_init_time</code> supplied by the partition, joined across all 51 NWP ensemble members —
+never bulk mode's one-<code>power_fcst_init_time</code>-per-NWP-run derivation (see
+<a href="../ml-orchestration/#known-limitation-forecast-cadence-under-sampling-in-cv">ML orchestration: forecast cadence under-sampling</a>
+for where bulk mode's per-NWP-run derivation matters instead: CV/backtesting, not live inference).
+A production run issues one forecast for one explicit init time every 6 hours; bulk mode's
+derivation has no meaning for a single live materialisation.</p>
+<h2 id="resolve-nwp-availability-asymmetrically-live-vs-replay">Resolve NWP availability asymmetrically: <code>live</code> vs <code>replay</code></h2>
+<p><code>live_forecasts</code>' <code>availability_mode</code> config resolves which NWP run to join against, and the two
+modes are deliberately asymmetric:</p>
+<ul>
+<li><strong><code>"live"</code></strong> joins the freshest NWP run actually present in Delta, with <strong>no modelled
+  publication delay</strong> — reality already constrains the table to genuinely published runs, so a
+  faster provider is used automatically without a config change.</li>
+<li><strong><code>"replay"</code></strong> joins the freshest run at least <code>nwp_publication_delay_hours</code> old, reconstructing
+  what was genuinely available at that historical init time. Without the delay, a replay would
+  leak NWP runs that only landed after the fact — a lookahead-bias bug, not just an inaccuracy.</li>
+</ul>
+<p>The scheduled path always uses <code>"live"</code>; backfills of missed or historical partitions use
+<code>"replay"</code>. The mode is an explicit, manually-set flag rather than an automatic
+live-iff-recent rule — the ambiguity of "recent" isn't worth resolving for a backfill path that's
+already manually triggered.</p>
+<h2 id="serve-only-the-trained-population">Serve only the trained population</h2>
+<p><code>live_forecasts</code> forecasts exactly the production model's <code>trained_time_series_ids</code> (recorded in
+<code>meta.json</code>), never the current day's eligibility set. This is the train==predict population
+invariant: a time series the model never saw during training must never receive a live forecast,
+even if it would otherwise qualify today.</p>
+<h2 id="promote-the-champion-via-a-dagster-asset-not-a-script">Promote the champion via a Dagster asset, not a script</h2>
+<p>The "researcher downloads artifacts" step above is a manually-triggered Dagster asset,
+<code>promoted_model</code> (config <code>mlflow_run_id</code>), rather than a bare script — promotion becomes a
+materialisation, giving an audit trail and lineage for free. The download logic itself
+(<code>ml_core._production_helpers.fetch_model_artifacts</code>) is a pure, asset-independent helper, so
+nothing about this decision couples it to Dagster.</p>
+<p><strong>The Docker build reuses this same asset</strong> (headlessly, via <code>dagster asset materialize</code>) — no
+separate fetch script was built, since a bare script would have duplicated the asset's audit
+trail for no benefit. The <code>docker build</code> step itself stays outside Dagster: it only ever runs on
+a laptop today, and image build/push becomes a CI-shaped concern once an MLflow tracking server
+and AWS infra exist — not something worth orchestrating through Dagster in the meantime.</p>
+<h2 id="considered-but-rejected-designs">Considered but rejected designs</h2>
+<p>Each design below was seriously considered for the live service and rejected. Every subsection
+follows the same structure: first it describes the rejected design, then it explains why we
+rejected it.</p>
+<h3 id="no-control-plane-eventbridge-scheduler-launching-ecs-tasks">No control plane: EventBridge Scheduler launching ECS tasks</h3>
+<p><strong>The design.</strong> AWS EventBridge Scheduler fires on the 6-hourly cadence and launches an ECS
+<code>RunTask</code> that executes <code>dagster asset materialize</code> (or <code>dagster job execute</code>) directly in the
+production image. Dagster acts purely as the in-process execution framework, EventBridge acts
+as the scheduler, and compute is paid per run with nothing always-on; run history could still
+be inspected by pointing an on-demand <code>dagster-webserver</code> at shared Postgres run storage.</p>
+<p><strong>Why we rejected it (July 2026).</strong> Four reasons:</p>
+<ol>
+<li>
+<p><strong>Portability is a hard requirement.</strong> The entire stack must run on a local laptop (or any
+   cloud) without AWS-specific services. Once the schedule lives in EventBridge and run-level
+   retry lives in Step Functions, the stack no longer runs with <code>docker compose up</code>. The
+   Dagster-on-a-VM design keeps the laptop and the cloud deployment the same artifact.</p>
+</li>
+<li>
+<p><strong>Handover to NGED is simpler without AWS coupling.</strong> A Dagster deployment NGED can run
+   anywhere is an easier handover than an EventBridge + Step Functions + ECS arrangement they
+   would have to recreate inside their own AWS account. (This reverses an earlier assumption
+   that "a cron and a container" would be the easier handover — that only holds if the
+   receiving organisation is committed to AWS.) See
+   <a href="../../roadmap/handover/">Handover to NGED</a> for the full handover plan.</p>
+</li>
+<li>
+<p><strong>The cost saving is not real for this workload.</strong> EventBridge's pay-per-run economics
+   matter when the alternative is an idle fleet, but our alternative is one small VM that must
+   exist anyway to host MLflow and Marimo. Splitting the scheduler out of that box would save
+   roughly $10–15/month while adding architectural surface area.</p>
+</li>
+<li>
+<p><strong>Run-level retry is no better under EventBridge.</strong> EventBridge Scheduler retries the
+   <em>invocation</em> of a task (with backoff, a configurable max age/attempt count, and an SQS
+   dead-letter queue for failed invocations), but once ECS accepts the task, EventBridge
+   considers its job done — it does not notice a run that starts and then crashes. Relaunching
+   a whole crashed run would have required wrapping the task in a Step Functions state machine
+   using the <code>.sync</code> integration, while failures <em>inside</em> a run are already handled by
+   Dagster's <code>RetryPolicy</code> on individual assets/ops, which works in-process with or without a
+   daemon. So neither design gives run-level retry out of the box, and at four runs per day the
+   existing replay/backfill mode plus alerting is a sufficient answer in both worlds.</p>
+</li>
+</ol>
+<p>EventBridge is also graph-blind: it fires a cron and passes a payload, so asset dependency
+ordering would have been handled entirely by Dagster within a single self-contained run of the
+full asset selection, and cross-run coordination — sensors, declarative automation,
+freshness-driven materialisation — would not have been available without the daemon.</p>
+<p><strong>Door left open.</strong> EventBridge remains usable later as a <em>pure trigger</em> — an external service
+that pokes an otherwise portable stack (e.g. S3 event → EventBridge rule → webhook or task
+launch) — provided the stack never depends on it to run. Event-driven behaviour (e.g. "run when
+NGED drops a new file") can alternatively be handled natively by Dagster sensors, which the
+always-on daemon supports.</p>
+<h3 id="a-periodically-woken-control-plane">A periodically-woken control plane</h3>
+<p><strong>The design.</strong> Run the Dagster daemon only periodically (say, hourly) instead of continuously,
+to save cost; on each wake-up, the daemon's schedule catch-up (<code>max_catchup_runs</code>, default 5)
+would fire any 6-hourly ticks missed while it slept.</p>
+<p><strong>Why we rejected it.</strong> Sensors, run monitoring, and retries all assume an always-on daemon;
+the web UI would be unavailable most of the time; and something else would still need to
+reliably wake the daemon — which reintroduces the scheduling problem one level up.</p>
+<h3 id="an-always-on-fargate-service-for-the-control-plane">An always-on Fargate service for the control plane</h3>
+<p><strong>The design.</strong> Run the always-on control plane — daemon, webserver, code-location server, and
+Postgres — as a long-running ECS service on Fargate, instead of on an EC2 VM. The appeal is
+real: Fargate has no operating system for us to install or patch (AWS owns and maintains the
+hosts), so the one piece of self-maintained OS in the deployment would disappear.</p>
+<p><strong>Why we rejected it.</strong> Five reasons:</p>
+<ol>
+<li>
+<p><strong>Fargate's premium pays off exactly where this workload can't use it.</strong> Fargate's
+   per-second billing wins for compute that runs a few minutes per day — which is why the
+   forecast worker runs there. For a box that runs 24/7, the same premium just compounds: at
+   <code>eu-west-2</code> on-demand rates, an always-on 2 vCPU / 4 GB Fargate service costs roughly
+   <strong>2.4× the <code>t4g.medium</code> VM</strong> it would replace (~$66/month vs ~$27/month, from the ARM
+   Fargate and EC2 rates in the
+   <a href="../forecast-delivery/#securing-it">region price table</a>).</p>
+</li>
+<li>
+<p><strong>The box is planned to host more than the control plane.</strong> The same VM is the intended
+   home of the MLflow tracking server and the Marimo dashboard — which is why the
+   <a href="#no-control-plane-eventbridge-scheduler-launching-ecs-tasks">EventBridge rejection</a> counts
+   the VM as a cost that exists anyway. A VM absorbs each additional long-running service as
+   one more entry in the same <code>docker-compose.yml</code>, using headroom already paid for; as Fargate
+   services, each would be its own always-on task paying the premium above over again — and
+   MLflow brings its own persistence needs (its backend store and artifact root), running into
+   the disk problem below a second time.</p>
+</li>
+<li>
+<p><strong>Postgres needs a disk that Fargate doesn't have.</strong> A Fargate task has no persistent local
+   storage, so the Postgres container (run, event, and schedule history) could not come along.
+   It would have to move to managed RDS — more cost, and one more AWS-specific service to
+   recreate at handover — or onto EFS, a network filesystem that Postgres tolerates poorly. On
+   the VM, Postgres's data is simply a Docker volume on the instance's own disk.</p>
+</li>
+<li>
+<p><strong>It trades a portable artifact for AWS-specific glue.</strong> The control plane's deployment
+   description <em>is</em> its <code>docker-compose.yml</code>: the laptop and the cloud run the same artifact.
+   As an ECS service, that description becomes task definitions, service configuration, and
+   (per the previous point) RDS — the same AWS coupling that helped reject the
+   <a href="#no-control-plane-eventbridge-scheduler-launching-ecs-tasks">EventBridge design</a>, in both
+   its portability and its handover form. The Tailscale-based access design adds a quieter
+   version of the same friction: on the VM, joining the tailnet is one <code>tailscale up</code>, whereas
+   a Fargate service needs a Tailscale sidecar container with its own state management.</p>
+</li>
+<li>
+<p><strong>The benefit is smaller than it looks.</strong> The OS burden Fargate would remove is one Ubuntu
+   box that patches itself (<code>unattended-upgrades</code>), can be stopped for maintenance in any of
+   the built-in 6-hourly maintenance windows
+   (<a href="#run-the-dagster-control-plane-continuously-on-one-small-vm">above</a>), and is slated for a
+   tested rebuild-from-scratch script (see
+   <a href="../../roadmap/handover/#3-de-pet-the-control-plane-box">Handover: de-pet the control-plane box</a>)
+   so that the answer to a sick box is <em>destroy and recreate</em>, never <em>diagnose</em>.</p>
+</li>
+</ol>
+<h3 id="running-the-data-ingest-runs-on-the-control-plane-vm">Running the data-ingest runs on the control-plane VM</h3>
+<p><strong>The design.</strong> The recurring data-ingest jobs — the hourly NGED telemetry pull and the daily
+Dynamical.org NWP download — are deliberately much lighter than inference, so they could run
+directly on the always-on box instead of each being dispatched to its own Fargate task. That
+would save the per-run Fargate cost and the minute or so of task-provisioning latency each
+dispatch pays.</p>
+<p>One sizing fact frames the whole question: Dagster launches <strong>runs, not assets</strong>, onto Fargate.
+A schedule tick launches one job run, which becomes one Fargate task, and every asset in that
+job's selection executes inside that single task — so a tiny asset only pays for a task of its
+own if it has a schedule of its own (the one-off <code>h3_grid_weights</code>, materialised by hand, never
+does). The question is therefore about the recurring scheduled runs, and only one of them is
+genuinely tiny: the hourly NGED telemetry poll — which, because NGED publishes new files only
+roughly every 5 hours, spends most of its ticks discovering there is nothing to do.</p>
+<p><strong>Why we rejected it.</strong> Five reasons:</p>
+<ol>
+<li>
+<p><strong>Dagster has one run launcher per instance.</strong> The <code>EcsRunLauncher</code> configured in
+   <code>dagster.yaml</code> applies to <em>every</em> run the daemon launches — there is no per-job "run this
+   one locally" switch. "Ingest on the box, forecasts on Fargate" would therefore mean writing
+   a custom hybrid launcher that reads a run tag and delegates to one of two launchers. That is
+   only a few dozen lines, but it is bespoke glue on the critical path of every run — exactly
+   what the <a href="../../roadmap/handover/">handover constraint</a> says to avoid.</p>
+</li>
+<li>
+<p><strong>Blast-radius isolation.</strong> The box's only job is to always be up, and it is deliberately
+   tiny: a <code>t4g.medium</code> whose 4 GB is shared by the daemon, webserver, code-location server,
+   and Postgres, with MLflow and Marimo planned on top. The ingest jobs are lighter than
+   inference but not negligible — the NWP ingest decodes a full daily ENS run (~7 million
+   rows) and is CPU-hungry enough that its download once starved <em>itself</em> through thread
+   contention (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/276">#276</a>).
+   Several busy worker threads on a 2-vCPU box would starve daemon heartbeats and the UI, and
+   a memory spike (upstream format drift, an unusually large file) risks the OOM killer taking
+   out Postgres or the daemon. A bad data file killing an ephemeral task is a shrug; killing
+   the control plane is the exact failure this architecture exists to avoid.</p>
+</li>
+<li>
+<p><strong>The box would have to grow.</strong> Hosting ingest means sizing the box for ingest peaks rather
+   than for coordination — realistically a <code>t4g.large</code> at roughly double the <code>t4g.medium</code>'s
+   ~$27/month, which roughly cancels the Fargate saving.</p>
+</li>
+<li>
+<p><strong>One execution path.</strong> With everything on Fargate, every run has the same image, the same
+   log destination (CloudWatch), the same IAM story (the task role), and the same debugging
+   experience. Two execution environments means two sets of failure modes for an operator who
+   is, post-NIA, a non-expert at NGED.</p>
+</li>
+<li>
+<p><strong>V2 scaling.</strong> At ~2,500 time series the ingest workload grows roughly 78×. On Fargate
+   that is a task-size change; on the box it is another round of resizing the component that
+   is hardest to touch.</p>
+</li>
+</ol>
+<p><strong>What the accepted design costs.</strong> Every ingest run currently inherits the task definition's
+4 vCPU / 16 GB — sized for inference's ~9 GB peak, and oversized for an hourly telemetry pull.
+At the <code>eu-west-2</code> ARM rates in the <a href="../forecast-delivery/#securing-it">region price table</a>
+(~$0.21/hour for that task size), ~720 hourly runs of a few minutes each — most of them the
+no-ops described above — come to on the order of <strong>$5–10/month</strong>: the same magnitude of saving
+the <a href="#no-control-plane-eventbridge-scheduler-launching-ecs-tasks">EventBridge rejection</a>
+dismissed as "not real for this workload". A second, quieter cost: <code>ecmwf_ens</code>'s
+not-yet-published retry loop (<code>RetryRequested</code>, 30-minute waits) retries <em>inside the same run</em>,
+so on a late-publication day its 16 GB task sits idle for up to 4 hours, billed the whole time
+(still well under $1).</p>
+<p><strong>Door left open.</strong> If those figures ever start to matter, two fixes exist inside the accepted
+architecture, and neither moves work onto the box:</p>
+<ul>
+<li><strong>Right-size the ingest tasks.</strong> <code>EcsRunLauncher</code> supports per-run <code>ecs/cpu</code> and <code>ecs/memory</code>
+  tags, so the ingest jobs can declare a small task size while forecasts keep 4 vCPU / 16 GB —
+  a config change, not an architecture change.</li>
+<li><strong>Replace polling schedules with Dagster sensors</strong>
+  (<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/324">#324</a>). Sensor
+  evaluation functions run <strong>on the daemon</strong> — that is, on the always-on box — while only
+  genuine <em>runs</em> go through the launcher. A sensor that cheaply lists NGED's bucket every few
+  minutes and fires the ingest job only when new files actually exist puts the seconds-of-work
+  detection on the box, where Dagster runs it natively, and launches Fargate only for the ~5
+  real ingests a day; the same pattern lets a sensor watch for NWP publication instead of
+  holding a Fargate task idle through the retry loop. This is the hybrid that reason 1 said
+  would need a custom launcher — except Dagster already ships it, because the tiny recurring
+  work here is <em>detection</em>, and detection is what sensors are for.</li>
+</ul>
+<p>Either way: shrink or skip the ingest tasks; don't move the work onto the box.</p>
+<h3 id="fetching-the-champion-model-from-mlflow-at-container-startup">Fetching the champion model from MLflow at container startup</h3>
+<p><strong>The design.</strong> Host the MLflow artifact root on S3 and have each production container fetch
+the champion model from it at startup, instead of
+<a href="#bake-the-model-into-the-image-at-build-time">baking the model into the image</a>.</p>
+<p><strong>Why we rejected it.</strong> It adds runtime moving parts, needs tracking-store access from
+production, and slows cold starts — baking the model in has none of those costs. The rejection
+gets stronger under the preferred post-NIA operating model, in which NGED run this code
+themselves (see
+<a href="../../background/requirements/#operating-model-handover">Requirements → Operating model &amp; handover</a>):
+with the model baked in, NGED never has to run — or depend on — an MLflow tracking server at
+all, and the model simply freezes until a new image arrives. (OCF may well continue developing
+the model post-NIA and release new container images for NGED to test, but that arrangement is
+TBD — and either way it only changes which <em>image</em> NGED runs, never whether their production
+runtime needs MLflow.)</p>
+<p>Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
+experimentation: training runs log their models, configs, and metrics to it, and the champion
+is <em>chosen</em> from an MLflow leaderboard (see
+<a href="../ml-orchestration/#model-artifacts-mlflow-artifact-store-immutable-local-cache">ML orchestration: model artifacts</a>
+for the design, and <a href="../../ml_experimentation/">ML experimentation</a> for the day-to-day
+workflow). The boundary this rejection draws is between ML R&amp;D and production: research uses
+MLflow constantly, while production's hot path never touches it. MLflow's job ends at the
+moment of promotion, when the chosen champion is copied out of the tracking store and baked
+into the image.</p>
+<p>The idea may still return in a stronger form: the <strong>future work</strong> note at the end of
+<a href="#bake-the-model-into-the-image-at-build-time">Bake the model into the image at build time</a> —
+the section describing the accepted design this one lost to — describes fetching the champion
+dynamically once redeploys become frequent, with <code>load_from_mlflow</code>'s local-disk cache as the
+production-resilience mechanism.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="../../roadmap/live-service/">Live service roadmap</a> — the full v0.1 design, including the
+  costed AWS architecture options behind the accepted architecture (small control-plane box +
+  <code>EcsRunLauncher</code>) and its implementation workstreams.</li>
+<li><a href="../aws-costs/">AWS Running Costs</a> — what this architecture costs to run: the v1 estimate as
+  deployed, and the projected estimate at v2 scale.</li>
+<li><a href="../../live_service/aws/">Setting up the live service on AWS</a> — the step-by-step runbook:
+  promotion, image build/push, and the full AWS bring-up including the control-plane box.</li>
+<li><a href="../../live_service/sentry/">Setting up Sentry telemetry</a> — the how-to for the error reporting
+  and missed-check-in alarm designed above: get a DSN, test from a laptop, enable in production.</li>
+<li><a href="../../live_service/setup/">Configuration reference</a> — where data tables and local
+  artifacts live, and how to point <code>Settings</code> at S3.</li>
+<li><a href="../ml-orchestration/">ML Orchestration Design</a> — why production inference doesn't reuse the
+  CV pipeline's MLflow-artifact cache.</li>
+<li><a href="../why-dagster-not-airflow/">Why Dagster, not Airflow?</a> — why Dagster was chosen at design
+  time, whether a migration to Airflow would be possible today, and what a port would take.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
