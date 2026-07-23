@@ -32,8 +32,13 @@ same \$1 = £0.75.
 
 ## v1 (32 time series): ~£25–35/month
 
-Estimated total for the deployed architecture: **~£25–35/month** (nudging ~£40 only if the
-polling-and-ingest line lands at its pessimistic top), made up of:
+**Headline cost: ~£25–35/month** (nudging ~£40 only if the polling-and-ingest line lands at
+its pessimistic top). The headline covers everything needed to keep the deployed service
+running unattended: the always-on control plane, every scheduled Fargate run (inference,
+ingest, and polling), S3 storage and requests, data transfer, and the planned weekly
+re-train. It excludes ML experimentation — backtests are priced per run rather than per
+month, and laptop training costs AWS nothing — and anything NGED spend on their own AWS
+account to read the delivery bucket. It is made up of:
 
 | Component | £/month |
 |---|---|
@@ -133,8 +138,14 @@ bill does not follow it:
   [How big is Flexpectation's power forecast data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)
   — dragging inference compute and forecast storage with it.
 
-Projected total: **~£70–140/month** — roughly 3–4× the v1 bill, dominated by inference
-compute:
+**Headline cost: projected ~£70–140/month** — roughly 3–4× the v1 bill, dominated by
+inference compute. The headline includes the same things as v1's: the control plane, every
+scheduled run (with inference on a larger task), storage and requests (now growing
+~£5/month with each further year of history), and the weekly GPU re-train at its
+heavier-model bracket. It excludes the same things too — per-run backtests and
+experimentation, and NGED's read-side compute — plus any internet-egress spend if NGED pull
+bulk history over the public internet rather than reading from eu-west-2 (both priced
+below). It is made up of:
 
 | Component | £/month |
 |---|---|
