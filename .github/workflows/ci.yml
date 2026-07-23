@@ -1,0 +1,60 @@
+name: CI
+
+# Per-PR quality gate: lint, format, types, markdown, and the offline test suite.
+# The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
+# Design rationale (including why this is a bespoke workflow rather than OCF's reusable
+# branch_ci.yml template):
+# https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#continuous-integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Dummy values for the required Settings fields. Most tests monkeypatch these, but a few
+  # construct Settings() directly and read the environment; locally they are satisfied by the
+  # developer's .env, which CI doesn't have. No test talks to the real NGED bucket.
+  NGED_S3_BUCKET_URL: "https://example.com"
+  NGED_S3_BUCKET_ACCESS_KEY: "dummy"
+  NGED_S3_BUCKET_SECRET: "dummy"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installs the Python version pinned in .python-version; no setup-python step needed.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+
+      # --all-packages so that `ty check` can resolve imports for leaf workspace members
+      # (e.g. dashboard, notebooks) that nothing depends on and a plain sync would omit.
+      # --locked fails the build if uv.lock is out of date with the pyproject.toml files.
+      - name: Install workspace
+        run: uv sync --locked --all-packages
+
+      # Every step below uses --no-sync: a bare `uv run` re-syncs to the root environment,
+      # silently uninstalling the extra workspace members added by --all-packages above.
+      - name: Lint (ruff check)
+        run: uv run --no-sync ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run --no-sync ruff format --check .
+
+      - name: Type-check (ty)
+        run: uv run --no-sync ty check
+
+      - name: Markdown lint (pymarkdown)
+        run: uv run --no-sync pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md
+
+      - name: Test (pytest)
+        run: uv run --no-sync pytest
