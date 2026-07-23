@@ -35,7 +35,7 @@ Technical plans change as we learn more — treat this as a best-estimate, not a
   (runbooks, alert-on-absence, infra-as-code, NGED landing-zone probing, game days).
 - [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort
   tiers, ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
-- [Engineering health](engineering-health.md) — CI, reproducibility stamping, NWP
+- [Engineering health](engineering-health.md) — reproducibility stamping, NWP
   ingestion checks, Hydra removal, and scientific-rigor tests.
 - [Capacity estimation](capacity-estimation.md) — the v0.7 head-to-head between candidate
   estimators of the time-varying effective capacity of metered generators: a
@@ -77,7 +77,8 @@ AWS — see [Live service](live-service.md).
 
 - More unit tests, including scientific-rigor tests (CV-windowing no-lookahead,
   leaderboard-fairness, determinism)
-- CI on GitHub (ruff + ty + pytest on every PR)
+- CI on GitHub (ruff + ty + pytest on every PR) ✅ (per-PR gate + nightly network tests; see
+  [Testing → Continuous integration](../architecture/testing.md#continuous-integration))
 - Improve documentation
 - Verify daylight savings time handling is correct
 - Reproducibility stamping: git SHA + Delta table versions on every MLflow run

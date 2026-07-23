@@ -4,87 +4,10 @@
 > codebase review that don't change forecast behaviour. Each section is an independent,
 > roughly one-PR piece of work; sections are deleted as they ship. Mostly the v0.2 epic
 > [#138](https://github.com/openclimatefix/nged-substation-forecast/issues/138):
-> CI [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9) ·
 > NWP ingestion checks [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) ·
 > Hydra removal [#228](https://github.com/openclimatefix/nged-substation-forecast/issues/228) ·
 > rigor tests [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229).
 > Task ordering lives in the GitHub Project board.
-
-## CI: run lint, types, and tests on every PR
-
-Issue: [#9](https://github.com/openclimatefix/nged-substation-forecast/issues/9)
-
-The only GitHub workflows are `docs.yml` (MkDocs deploy) and `contribution-bot.yml`. Code
-quality is enforced solely by local pre-commit hooks, so a contributor (or an agent) who skips
-hooks can merge broken code. Additionally, `uv run pytest` from the repo root currently
-**fails collection**: `tests/test_metrics.py` and `packages/ml_core/tests/test_metrics.py`
-share a module basename and there are no `__init__.py` files in the test dirs, so pytest's
-default import mode refuses to collect both. Nobody noticed because nothing runs the full
-suite from the root.
-
-This is the highest-value fix in the whole review: a few hours of work, permanent payoff, and
-a prerequisite for trusting every other piece of planned work.
-
-### Implementation details — CI (deleted when it ships)
-
-**1. Fix root pytest collection.** In `pyproject.toml` `[tool.pytest.ini_options]` add:
-
-```toml
-addopts = "--import-mode=importlib"
-```
-
-`importlib` mode allows duplicate test-file basenames without `__init__.py` files. Verify
-`uv run pytest --collect-only -q` succeeds from the root (~165 tests) before touching CI.
-If any test breaks under importlib mode, fix that test rather than renaming files.
-
-**2. Add `.github/workflows/ci.yml`.** Trigger: `pull_request` + `push` to `main`. Single job
-on `ubuntu-latest`:
-
-```yaml
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-```
-
-Steps:
-
-1. `actions/checkout@v4`
-2. `astral-sh/setup-uv@v5` with `enable-cache: true`
-3. `uv sync --all-packages --dev` (workspace root alone doesn't install package test deps)
-4. `uv run ruff check .`
-5. `uv run ruff format --check .`
-6. `uv run ty check`
-7. `uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md`
-   (same command as CLAUDE.md / pre-commit)
-8. `uv run pytest` — with dummy env for the required `Settings` fields, since a few tests
-   construct `Settings()` directly (`tests/test_trained_cv_model.py:186`) and rely on the
-   local `.env` which CI doesn't have:
-
-   ```yaml
-   env:
-     NGED_S3_BUCKET_URL: "https://example.com"
-     NGED_S3_BUCKET_ACCESS_KEY: "dummy"
-     NGED_S3_BUCKET_SECRET: "dummy"
-   ```
-
-   (Most tests already monkeypatch these — see `tests/test_cv_assets.py:80` — the job-level
-   env just covers the stragglers.)
-
-Notes:
-
-- Python version comes from `requires-python` / `.python-version` via uv; no setup-python
-  needed.
-- The full-stack MLflow-server test (`tests/test_metrics.py`) spawns a real
-  `mlflow server` subprocess — `mlflow` (full) is already in the dev group, so it should run
-  in CI. If it proves flaky on runners, gate it behind `-m integration` and split into a
-  separate non-required job, but try it as-is first.
-
-**3. Branch protection.** After the workflow is green on `main`, mark the CI job as a required
-status check in the GitHub repo settings (manual step, note it in the PR description).
-
-**Verification.** (1) `uv run pytest` from the repo root passes locally after step 1. (2) Open
-the PR; the CI workflow runs and passes. (3) Push a deliberately broken commit to the PR
-branch (e.g. an unused import) and confirm the workflow fails, then revert.
 
 ## NWP ingestion: completeness checks and Dagster metrics
 

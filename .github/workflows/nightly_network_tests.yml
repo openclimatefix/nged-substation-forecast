@@ -1,0 +1,42 @@
+name: Nightly network tests
+
+# Runs ONLY the network-gated tests (@pytest.mark.network) against the real Dynamical.org
+# catalog, to catch the "shared-convention blind spot" that the offline suite cannot see:
+# https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#network-gated-tests
+# Failures notify (GitHub emails the workflow author) but do not block PRs.
+# No secrets needed: the Dynamical.org ECMWF ENS catalog is public.
+
+on:
+  schedule:
+    # Daily at 05:38 UTC — off the top of the hour, when GitHub's cron queue is congested
+    # and scheduled runs get delayed or dropped. The exact hour doesn't matter: the test
+    # targets a three-day-old 00Z ECMWF run, which is always published by now.
+    - cron: "38 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  network-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Dummy values for the required Settings fields, mirroring ci.yml: collection imports
+      # every test module, and a few construct Settings() directly. The network tests
+      # themselves never touch the NGED bucket.
+      NGED_S3_BUCKET_URL: "https://example.com"
+      NGED_S3_BUCKET_ACCESS_KEY: "dummy"
+      NGED_S3_BUCKET_SECRET: "dummy"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install workspace
+        run: uv sync --locked
+
+      # Both flags are needed: --run-network lifts the collection-time skip gate, and
+      # -m network deselects everything else so this job runs only the network tests.
+      - name: Network-gated tests
+        run: uv run --no-sync pytest --run-network -m network

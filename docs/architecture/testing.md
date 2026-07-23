@@ -61,7 +61,8 @@ shape (dimension order, latitude orientation, longitude range, dtypes, units) an
 
 Mark such a test `@pytest.mark.network`. The root `conftest.py` skips every `network`-marked test
 unless the caller passes `--run-network`, so a plain `uv run pytest` (local dev and the per-PR CI)
-never touches the network. Run them explicitly — nightly CI or on demand — with:
+never touches the network. Run them explicitly — the nightly CI job (see
+[Continuous integration](#continuous-integration) below) or on demand — with:
 
 ```bash
 uv run pytest --run-network              # whole suite, network tests included
@@ -77,6 +78,63 @@ The gate is a collection hook, **not** an `addopts = "... -m 'not network'"`. py
 silently replace an `addopts` `-m "not network"` and re-include the network tests. A skip applied
 during collection cannot be overridden that way — the gate holds whatever `-m` the caller passes, and
 even `-m network` alone stays skipped until `--run-network` is added.
+
+## Continuous integration
+
+Two GitHub workflows in `.github/workflows/` run the checks described on this page:
+
+- **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`:
+  `ruff check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md,
+  and the offline test suite (plain `uv run pytest` — the network gate above keeps CI off the
+  network). The job installs with `uv sync --locked --all-packages`: `--all-packages` because
+  `ty` type-checks the source of every workspace member, including leaf packages that a plain
+  sync would omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every
+  subsequent step passes `uv run --no-sync`, because a bare `uv run` re-syncs to the root
+  environment and would silently uninstall those extra workspace members. The job also sets
+  dummy values for the three required `NGED_S3_*` `Settings` fields: most tests monkeypatch
+  them, but a few construct `Settings()` directly and locally rely on the developer's `.env`,
+  which CI doesn't have. The `ci` job is a required status check on `main` (configured in the
+  GitHub branch-protection settings, not in the workflow file).
+- **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated
+  tests (`uv run pytest --run-network -m network`) on a daily schedule, plus
+  `workflow_dispatch` for on-demand runs. This is the only CI that touches the real
+  Dynamical.org catalog, and it needs no secrets — the catalog is public. A failure notifies
+  (GitHub emails the workflow author when a scheduled run fails) but deliberately does not
+  block PRs: a red nightly run signals drift in the upstream catalog's conventions, not a
+  defect in whatever PR happens to be open.
+
+### Why a bespoke workflow rather than OCF's template
+
+OCF's organisation template ([`openclimatefix/.github` →
+`workflow-templates/branch_ci.yml`](https://github.com/openclimatefix/.github/blob/main/workflow-templates/branch_ci.yml))
+is a thin caller of the org-wide reusable workflow
+[`branch_ci.yml`](https://github.com/openclimatefix/.github/blob/main/.github/workflows/branch_ci.yml).
+We deliberately don't use it, because it is built for OCF's standard single-package service
+repos and fits this repo poorly:
+
+- **Single-package assumptions.** The reusable workflow expects one `pyproject.toml` and one
+  test folder (its `tests_folder` input defaults to `src/tests`). This repo is a uv
+  *workspace* monorepo: the suite must run from the root so pytest collects `tests/` plus
+  every `packages/*/tests/`, and type-checking needs an `--all-packages` install (see above).
+- **Floating tool versions.** It lints and type-checks with `uvx ruff` / `uvx ty`, i.e.
+  whatever version is newest on the day the job runs — so org CI can disagree with the locked
+  dev-group versions used locally and by pre-commit, and a new upstream release can break CI
+  with no change in this repo. We run the locked versions via `uv run`.
+- **Missing checks, and no offline/network split.** It has no equivalent of
+  `ruff format --check` (formatting is opt-in and separate) or the `pymarkdown scan` command,
+  and no concept of this repo's network-gated nightly job.
+- **Container build baggage.** Roughly half the reusable workflow builds and publishes Docker
+  images to ghcr.io; this repo doesn't produce a container image.
+- **Trigger and pinning mismatch.** The template triggers on pushes to non-default branches,
+  whereas a required status check wants `pull_request` (+ push to `main`); and it pins the
+  reusable workflow `@main`, so upstream edits to the org workflow change this repo's CI
+  without any PR here.
+
+We did keep the template's good conventions: a concurrency group with `cancel-in-progress`, a
+cached `astral-sh/setup-uv`, and locked installs (`UV_LOCKED=1` there, `uv sync --locked`
+here). If OCF's reusable workflow ever grows first-class uv-workspace support, revisiting it
+would shrink `ci.yml` to a few lines — but until then the bespoke workflow is smaller than the
+configuration the template would need.
 
 ## NWP grid → H3 orientation coverage
 
