@@ -64,9 +64,7 @@ from nged_data.storage import time_series_coverage
 # env var is read directly here (rather than instantiating Settings, which needs the .env
 # secrets) so the partition set can be built without any credentials — while still respecting
 # the same env var Settings' cv_config_path field would use, unlike reading
-# Settings.model_fields["cv_config_path"].default directly, which silently ignores it (that
-# default is also PROJECT_ROOT-relative, which only resolves correctly for an editable install;
-# a production image built with `uv sync --no-editable` must set CV_CONFIG_PATH explicitly).
+# Settings.model_fields["cv_config_path"].default directly, which silently ignores it.
 _cv_config = load_cv_config(
     Path(os.environ.get("CV_CONFIG_PATH", Settings.model_fields["cv_config_path"].default))
 )

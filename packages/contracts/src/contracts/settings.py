@@ -11,7 +11,41 @@ from contracts._uri import ObjectStoreOptions, uri_join
 url_adapter = TypeAdapter(AnyHttpUrl)
 
 
-PROJECT_ROOT: Final[Path] = Path(__file__).parents[4]
+def _find_project_root(start: Path) -> Path:
+    """Walk up from ``start`` to the uv workspace root, marked by its ``uv.lock`` file.
+
+    ``uv.lock`` exists only at the workspace root, so the first ancestor holding one is the
+    project root. This resolves correctly for every install mode that keeps the virtualenv
+    inside the repo: an editable install walks up from the source checkout, and a
+    non-editable install (``uv sync --no-editable``) walks up from
+    ``<repo>/.venv/lib/python*/site-packages/`` past the venv to the same root. The
+    production Docker image copies ``uv.lock`` to ``/app``, so there the root resolves to
+    ``/app``, where the image's ``COPY conf/`` / ``COPY metadata/`` place the resource files.
+
+    When no ancestor holds a ``uv.lock`` — a wheel installed into a venv outside any
+    workspace checkout — fall back to the current working directory. Such a deployment must
+    either run with its working directory at a directory laid out like the repo root, or set
+    each path setting explicitly via its environment variable (``CV_CONFIG_PATH``, etc.).
+
+    Args:
+        start: File or directory to walk up from (typically ``Path(__file__)``).
+
+    Returns:
+        The workspace root, or ``Path.cwd()`` if no ancestor contains ``uv.lock``.
+    """
+    for parent in start.resolve().parents:
+        if (parent / "uv.lock").is_file():
+            return parent
+    return Path.cwd()
+
+
+PROJECT_ROOT: Final[Path] = _find_project_root(Path(__file__))
+"""The repo root — anchor for the repo-relative defaults below (``conf/``, ``metadata/``,
+``data/``, ``.env``).
+
+Resolved by :func:`_find_project_root`; see its docstring for the per-install-mode behaviour
+and the caveat for wheels installed outside a workspace checkout.
+"""
 
 
 class DataQualitySettings(BaseSettings):
