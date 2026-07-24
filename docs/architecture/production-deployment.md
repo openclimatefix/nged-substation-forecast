@@ -100,12 +100,14 @@ is configured — so laptops and CI stay silent by default.
 - **Error telemetry.** `init_sentry` initialises the SDK once per process at import of the Dagster
   definitions module, and a Dagster `@failure_hook` (`sentry_capture_failure`, attached to the
   scheduled asset jobs) reports a failed step's exception — traceback intact — from inside the run
-  worker. The explicit hook is used rather than relying on Sentry's logging integration alone
-  because Dagster logs a step failure without `exc_info`, so a purely log-based capture would yield
-  a message-only event with no stack trace. The hook is attached to the three *scheduled* asset
-  jobs, so it covers the whole unattended production workload; failures in a manual UI
-  materialisation, a replay backfill, or an experiment job are watched by the operator at the
-  Dagster UI, not routed to Sentry.
+  worker. The explicit hook is used rather than Sentry's log-to-event capture, which `init_sentry`
+  deliberately disables (it passes a `LoggingIntegration` with `event_level=None`): Dagster logs a
+  step failure without `exc_info`, so a purely log-based capture would yield a message-only event
+  with no stack trace, and — left at its default `event_level=ERROR` — it would turn *every* `ERROR`
+  log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs. The
+  hook is attached to the three *scheduled* asset jobs, so it covers the whole unattended production
+  workload; because log capture is off, failures in a manual UI materialisation, a replay backfill,
+  or an experiment job are watched by the operator at the Dagster UI, not routed to Sentry.
 
 - **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
   `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron
