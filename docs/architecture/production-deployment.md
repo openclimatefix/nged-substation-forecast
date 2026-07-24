@@ -209,6 +209,32 @@ regularly), switch to fetching the champion model from MLflow dynamically — at
 from disk on a cache hit so the live service survives an MLflow outage), exactly as it does for
 CV today.
 
+## Resolve repo-relative paths via a workspace marker, not directory depth
+
+`contracts.settings.PROJECT_ROOT` anchors every repo-relative default in `Settings` — the CV
+fold definitions (`conf/cv/default.yaml`), the NWP metadata CSV (`metadata/nwp_metadata.csv`),
+the local `data/` roots, and the `.env` location. It is resolved by walking up from the
+installed `settings.py` to the nearest ancestor directory holding `uv.lock` (the file that
+exists only at the uv workspace root), falling back to the current working directory when no
+ancestor qualifies.
+
+We resolve via a marker rather than a hard-coded directory depth (the previous
+`Path(__file__).parents[4]`) because the depth only held for an editable install. Under the
+production image's `uv sync --no-editable`, the installed file sits at
+`<venv>/lib/python3.14/site-packages/contracts/settings.py`, where the same depth silently
+resolved to the venv root and every default broke with `FileNotFoundError`
+([#287](https://github.com/openclimatefix/nged-substation-forecast/issues/287)). The marker
+walk handles both layouts: a dev checkout resolves to the repo root, and the production image
+resolves to `/app` because the Dockerfile copies `uv.lock` there alongside `conf/` and
+`metadata/` — so the image needs no per-path env-var overrides, and `conf/model/` stays
+available for running training jobs in-container.
+
+The fallback case — a wheel installed into a venv outside any workspace checkout — is a
+deployment shape we don't currently have. If one appears, it must either run with its working
+directory laid out like the repo root or set each path setting explicitly via its env var.
+(Packaging the resource files into a wheel via `importlib.resources` was considered for #287
+and deliberately deferred until such a target actually exists.)
+
 ## Run live inference in single-run mode, not bulk
 
 The `live_forecasts` asset engineers features in **single-run mode** — an explicit
