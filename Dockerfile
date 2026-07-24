@@ -48,22 +48,16 @@ LABEL org.opencontainers.image.source="https://github.com/openclimatefix/nged-su
 
 ENV GIT_SHA="${GIT_SHA}" \
     PATH="/app/.venv/bin:${PATH}" \
-    PRODUCTION_MODEL_PATH="/app/data/production_model" \
-    CV_CONFIG_PATH="/app/conf/cv/default.yaml" \
-    NWP_METADATA_CSV_PATH="/app/metadata/nwp_metadata.csv"
-# CV_CONFIG_PATH/NWP_METADATA_CSV_PATH override contracts.settings.Settings' PROJECT_ROOT-
-# relative defaults, which resolve to a path *inside* .venv under this --no-editable install
-# (PROJECT_ROOT = Path(__file__).parents[4] assumes an editable-install directory depth) —
-# empirically confirmed necessary: without them, importing nged_substation_forecast.definitions
-# (which eagerly loads the CV config at module scope, in defs/cv_assets.py) fails with
-# FileNotFoundError: /app/.venv/conf/cv/default.yaml. cv_assets.py now reads CV_CONFIG_PATH
-# directly (not via a Settings() instance, to stay credential-free at import time), so this env
-# var is honoured; nwp_metadata_csv_path was already read via an instantiated Settings and so
-# needed no source change.
+    PRODUCTION_MODEL_PATH="/app/data/production_model"
 
 WORKDIR /app
 
+# contracts.settings.PROJECT_ROOT walks up to the nearest ancestor holding uv.lock, so copying
+# uv.lock here anchors every repo-relative default (conf/, metadata/) at /app — which is where
+# the COPYs below place those files. conf/ also keeps conf/model/ available so training jobs
+# (register_experiment_job) can run in-container.
 COPY --from=builder /app/.venv /app/.venv
+COPY uv.lock ./
 COPY data/production_model/ data/production_model/
 COPY conf/ conf/
 COPY metadata/ metadata/
