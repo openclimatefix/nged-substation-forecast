@@ -95,6 +95,30 @@ def test_init_sentry_passes_environment_when_dsn_set(monkeypatch: pytest.MonkeyP
     assert calls[0]["send_default_pii"] is False
 
 
+def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A DSN ⇒ init installs a ``LoggingIntegration`` with event capture off (``event_level=None``).
+
+    This is the guard that keeps ``ERROR`` logs from anywhere in the process — Dagster's
+    startup/step logs, ad-hoc materialisations, the swallowed telemetry error in
+    ``report_power_freshness`` — from becoming Sentry events. Only the failure hook and the explicit
+    freshness ``capture_message`` should ever send. If someone drops the ``integrations`` argument,
+    the SDK's default ``LoggingIntegration`` (``event_level=ERROR``) comes back and this fails.
+    """
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "init", lambda **kw: calls.append(kw))
+    _sentry.init_sentry(_settings(sentry_dsn=_DSN))
+    (kwargs,) = calls
+    logging_integrations = [
+        integration
+        for integration in kwargs["integrations"]
+        if isinstance(integration, _sentry.LoggingIntegration)
+    ]
+    assert len(logging_integrations) == 1
+    # event_level=None ⇒ the integration builds no event handler, so ERROR logs aren't captured as
+    # events (only breadcrumbs, via the still-default level=INFO breadcrumb handler).
+    assert logging_integrations[0]._handler is None
+
+
 def test_send_forecast_checkin_is_noop_when_flag_off(monkeypatch: pytest.MonkeyPatch) -> None:
     """``sentry_monitor_forecasts`` False (the default) ⇒ no check-in is sent."""
     calls: list[dict[str, Any]] = []

@@ -6,9 +6,12 @@ Sentry configuration:
 - **Error telemetry** — :func:`init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the :data:`sentry_capture_failure` Dagster failure hook
   reports the real exception (with traceback) from inside the run worker. The hook is used rather
-  than relying on Sentry's ``LoggingIntegration`` alone because Dagster logs a step failure without
-  ``exc_info``, so the log-based path would yield a message-only event with no stack trace. The hook
-  is attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
+  than Sentry's ``LoggingIntegration`` log-to-event capture — which :func:`init_sentry` explicitly
+  disables — because Dagster logs a step failure without ``exc_info``, so the log-based path would
+  yield a message-only event with no stack trace, *and* would fire for every ``ERROR`` log anywhere
+  in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a swallowed
+  telemetry error), swamping Sentry with events the design never intended to send. The hook is
+  attached to the *scheduled* asset jobs only, so it covers the unattended production workload;
   manual/backfill/experiment runs are watched by the operator at the Dagster UI, not Sentry.
 - **The missed-check-in alarm** — :func:`send_forecast_checkin` sends a *success-only* heartbeat to
   a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
@@ -37,6 +40,7 @@ from contracts.settings import Settings
 from dagster import HookContext, failure_hook
 from sentry_sdk.crons import capture_checkin
 from sentry_sdk.crons.consts import MonitorStatus
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 if TYPE_CHECKING:
     from sentry_sdk._types import MonitorConfig
@@ -83,6 +87,15 @@ def init_sentry(settings: Settings) -> None:
     or CI unless a DSN is explicitly configured. Called once per process at import of the Dagster
     definitions module, so it runs in the daemon, the webserver, and every run worker.
 
+    Log-to-event capture is deliberately switched off: passing a ``LoggingIntegration`` with
+    ``event_level=None`` overrides the SDK's default integration (whose default ``event_level`` is
+    ``ERROR``), so ``ERROR``-level log records no longer become Sentry events. Without this, every
+    ``ERROR`` log anywhere in the process — Dagster's startup/step logs, ad-hoc materialisations,
+    even the swallowed telemetry error in :func:`report_power_freshness` — would be shipped as an
+    event, defeating the design where *only* the failure hook and the explicit freshness
+    ``capture_message`` reach Sentry. Breadcrumbs (the integration's default ``level=INFO``) are
+    kept, so log context still rides along with the events the two intended paths do send.
+
     Args:
         settings: The project settings carrying the Sentry DSN, environment, and sample rate.
     """
@@ -93,6 +106,7 @@ def init_sentry(settings: Settings) -> None:
         environment=settings.sentry_environment,
         traces_sample_rate=settings.sentry_traces_sample_rate,
         send_default_pii=False,
+        integrations=[LoggingIntegration(event_level=None)],
     )
 
 
