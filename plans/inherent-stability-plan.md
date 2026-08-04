@@ -384,6 +384,57 @@ Verified by reading the repo during this session.
 schema change. That is the operability argument, and it is more persuasive as a table of failure
 modes than as philosophy.
 
+Confirmed implemented in `METRIC_NAMES`: `mae`, `nmae`, `rmse`, `mbe`, `crps`, `spread_skill_ratio`,
+`pinball_loss`, `mean_pinball_loss`, `picp`, `interval_width`. So T1.3 needs no new metric — only a
+scenario dimension to slice them by.
+
+### 4.1 Audit: is the WARN/ERROR and Sentry discipline already in line with this plan?
+
+Audited 2026-08-04. **Largely yes — and more carefully than expected.** Three divergences, all in
+`live_forecasts`.
+
+**In line:**
+
+- **Both asset checks are WARN and non-blocking**, and **no ERROR-severity check exists anywhere in
+  the repo.** Both carry inline comments giving the fail-open reasoning explicitly.
+- **Sentry's log-to-event capture is deliberately disabled** — `LoggingIntegration(event_level=None)`
+  in `_sentry.py`. This is subtle and exactly right: without it every `ERROR` log becomes an event,
+  so a fail-open design would flood Sentry with events for conditions it deliberately tolerates.
+- **The failure hook is attached to the three *scheduled* jobs only** (`defs/schedules.py`), not to
+  manual, backfill, or experiment runs. The R&D/production asymmetry is therefore already
+  implemented at the telemetry layer.
+- **Three distinct Sentry channels** — exceptions (error), freshness (`capture_message`,
+  `level="warning"`), heartbeat (absence) — mapping cleanly onto the three audiences in §3.5.
+- **`report_power_freshness` never raises**, and its docstring gives the philosophy-correct reason:
+  a telemetry failure inside a `blocking=False` check would trip the failure hook and fail the run.
+  That is an explicit recognition that a bug in the *warning* path can silently convert fail-open
+  into fail-closed.
+- **The heartbeat is success-only and skipped on replay** — a replay backfill is not evidence that
+  the service is alive now.
+- **R&D fails fast.** All five `raise` sites in `cv_assets.py` are in the training/metrics path.
+
+**Divergences, all in `live_forecasts`:**
+
+1. **NWP more than ~15 days stale → hard failure.** A weeks-old NWP run no longer covers the
+   forecast window, so its rows join to a null `ensemble_member`, are filtered out at
+   `production_assets.py:280`, and the asset raises on `forecasts.height == 0` at `:286`. This is
+   exactly rung 2 of the degradation ladder and today NGED gets nothing at all.
+2. **Between 0 and ~15 days stale → silent degradation.** The forecast is built from an
+   increasingly ancient run with `nwp_init_time` recorded on the row but **no warning anywhere** —
+   no check, no Sentry event, no widened bands. Arguably worse than the hard failure, because it is
+   undetectable from the consumer side without deriving staleness by hand.
+3. **`select_nwp_init_time` raises when nothing qualifies** (`_production_helpers.py:71`). Narrower
+   in practice — it fires only when the NWP table holds no run at or before the cutoff — but it is
+   the same class, and it does bite `replay` backfills older than the retention window.
+
+**Correctly fail-fast, keep as-is:** the raise on empty `trained_ids` (`production_assets.py:241`).
+An empty model is a promotion bug, not a data outage. The codebase already distinguishes the two
+cases — just not consistently.
+
+**Ordering constraint this creates:** fixing divergence 1 *without* fixing 2 would make things
+worse, converting a loud failure into a silent one. The `live_forecasts` check must land **with or
+before** the degradation change. See issues 13 and 14 in §7.2.
+
 ---
 
 ## 5. Engineering hypotheses
@@ -394,7 +445,7 @@ modes than as philosophy.
 |---|---|
 | H1 | "Uptime: lenient by design" (L142) — "never a 2am page, and no on-call rota" |
 | H2 | "ML experimentation at scale" (L76) — "on the order of hundreds of ML experiments per month" |
-| H3 | "A short, safe path from R&D to production" (L98) — promotion as an audited config change |
+| H3 | "A short, safe path from R&D to production" (L94) — promotion as an audited config change |
 
 So this is **extract, elevate, and make falsifiable** — not a page from nothing. The new page must
 *link* to that prose rather than restate it, or we get two divergent copies.
@@ -448,7 +499,7 @@ H1 bundles three distinct claims. Keep the number (these will be cited from issu
 |---|---|---|---|---|---|
 | **H1** | Manual attention only for upstream format changes; graceful, legible degradation; faithful uncertainty | | | | |
 | T1.1 | *Operability* | Interventions per quarter, classified by cause | ≥90% attributable to upstream format/contract change; zero out-of-hours | Intervention log | ~2 quarters of v1.0 |
-| T1.2 | *Graceful degradation* | Forecast emitted for every series under every failure scenario, **and still beats `nged_incumbent`** | 100% emitted; beats incumbent at rungs 0–2 | Failure-scenario suite | v0.3 |
+| T1.2 | *Graceful degradation* | Forecast emitted for every series under every failure scenario, **and still beats `nged_incumbent`** | 100% emitted; beats incumbent at rungs 0–2 | Failure-scenario suite | v0.3, **after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)** |
 | T1.3 | *Faithful uncertainty* | PICP + pinball computed **per degradation regime** | PICP within tolerance of nominal in every regime | Leaderboard, scenario dimension | v0.5 |
 | **H2** | Hundreds of experiments per month | Registered leaderboard experiments/month, **and** median human-minutes each | ≥200/month; ≤5 human-min each | MLflow + timestamps | v0.5 |
 | **H3** | One-click promotion of the winner | Commands from "leaderboard says X won" to "X is serving" — **and the same for rollback** | ≤1 each way | Runbook + `promoted_model` | v0.3 |
@@ -456,7 +507,11 @@ H1 bundles three distinct claims. Keep the number (these will be cited from issu
 Notes:
 
 - **T1.2 now has the incumbent as its acceptance criterion**, not merely "output exists". This is
-  the direct consequence of Jack's insight, and it is strictly stronger.
+  the direct consequence of Jack's insight, and it is strictly stronger. **Dependency:**
+  `nged_incumbent` is *designed* (`docs/roadmap/metrics-and-leaderboard.md` → "The headline baseline")
+  but **not yet implemented** — there is no Python match for it in the repo. It is
+  [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147), also v0.3, so T1.2
+  is blocked on that landing first.
 - **T1.3 is the sharpest available test and needs no new metrics** — PICP, pinball and spread-skill
   are all ✅ from v0.3. Slicing them by degradation regime is the same "scenario dimension" that
   serves T1.2. One piece of machinery, three jobs.
@@ -474,9 +529,11 @@ Notes:
 Suggestions only. Stopping at six — hypothesis inflation makes the set unmemorable and each carries
 a measurement cost.
 
-- **H4 (cost)** — the service runs under £X/month at v1 scale and £Y at v2. Real numbers already
-  exist (~£25–35/month control plane). The most directly transferable NIA finding of the lot, and a
-  second independent answer to the devops-team worry.
+- **H4 (cost)** — the service runs under £X/month at v1 scale and £Y at v2. A real number already
+  exists: `docs/architecture/aws-costs.md` estimates **~£25–35/month for the whole v1 stack** at 32
+  time series (not merely the control-plane box), with a v2 estimate on the same page. The most
+  directly transferable NIA finding of the lot, and a second independent answer to the devops-team
+  worry.
 - **H5 (operability by a non-expert)** — an NGED operator can run the service from runbooks alone.
   Already designed as the operator contract in `docs/roadmap/handover.md`; framing it as a hypothesis
   turns the game days (handover §6) from a training exercise into a **measurement**.
@@ -496,8 +553,14 @@ a measurement cost.
    makes the spread respond to stale or missing inputs.
 3. **No failure-scenario evaluation** anywhere in docs or GitHub. Consequence: every v0.5 XGBoost
    experiment will pick a champion on clean-data skill alone.
-4. **No physical-envelope fallback.** Clear-sky as the always-computable floor is implied by the
-   differentiable-physics work but never framed as "what we say when we have nothing".
+4. **The physical envelope exists as a *feature*, but not as a *floor*.** Correcting an earlier
+   reading of this gap: clear-sky irradiance is already a named deliverable of
+   [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) ("Linearize weather
+   features for solar power and wind power"), designed in `docs/roadmap/xgboost-improvements.md` →
+   "Linearised physics features for solar and wind", with substantial further physics in
+   `docs/techniques/differentiable-physics.md` (POA transposition, Faiman thermal model, the planned
+   `pvlib-pytorch`). What is missing is only the *framing*: nothing says clear-sky is what we fall
+   back to when we have nothing. So this is an extension of #168, not new work.
 5. **No weather-blind guarantee.** §3.2 — the "beats the incumbent with no NWP" claim has no
    mechanism behind it yet.
 6. **No intervention log.** §5 — and this evidence is being lost daily.
@@ -562,6 +625,11 @@ Three-page division of labour, no duplication:
 Sequencing argument: **the evaluation machinery must precede the model experiments it is meant to
 judge.**
 
+**"Milestone" below means the roadmap milestone / parent epic, not a GitHub milestone field.** The
+repo has **zero** GitHub milestones defined (`gh api .../milestones` returns an empty list) — the
+ordering lives in epic sub-issue lists and the OCF project board, per CLAUDE.md. So each row below
+means "attach as a sub-issue of that epic, positioned by execution order".
+
 | # | Issue | Milestone | Rationale |
 |---|---|---|---|
 | 0 | **Intervention log** — artifact, cause taxonomy, runbook line | **now, ahead of everything** | Evidence is being lost daily |
@@ -573,14 +641,28 @@ judge.**
 | 6 | `power_forecast_warnings` **Phase 2**: meter-error types | **v0.4** | Depends on improved cleaning |
 | 7 | `asset_health_history` table | **v0.4** | Same dependency |
 | 8 | Degradation-conditional interval calibration (widening bands; conformal per regime) | **v0.5** | Directly after #263/#264 |
-| 9 | Clear-sky physical envelope: zero-data fallback + forecast ceiling | **v0.3** | Also useful as a feature — earns its keep twice. Moved earlier: it is rung 4 of the ladder and the scenario suite needs something to degrade *to* |
+| 9 | Clear-sky as the zero-data **floor** — extend [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168), don't duplicate it | **v0.3** for the clear-sky primitive; the feature use stays with #168 in v0.5 | #168 already delivers clear-sky irradiance as a *feature*. Only the floor/ceiling framing is new. Pull the shared computation forward so the scenario suite has something to degrade *to* |
 | 10 | Cost-per-experiment instrumentation (H2, H4) | **v0.5** | Piggybacks on aws-costs machinery |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5**, was v0.9 | Promoted because "never worse than incumbent" now depends on it |
 | 12 | Missingness contract on `BaseForecaster` — each family declares how it degrades | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2 |
+| 13 | **Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)** — the `live_forecasts` asset check — to also report **NWP age at forecast time**, WARN severity, non-blocking | **v0.3** | Not a new issue: #424 already exists ("catch if the forecast asset succeeds but writes invalid forecasts or none at all"). It is the missing third check — every production asset has one except the one NGED consumes. Needs the degradation dimension added, a WARN/non-blocking severity decision, an epic, and project fields (it currently has none) |
+| 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage — keep the `trained_ids` raise | **v0.3**, **after 13** | §4.1 divergences 1–3. Ordering is load-bearing: degrading before the check exists converts a loud failure into a silent one |
 
 Plus: extend remaining v0.6/v0.7 warning types as sub-tasks of the existing epics rather than new
 issues; add a note to [#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423)
 that the R&D/production tag is the mechanism behind the fail-fast/fail-forward asymmetry.
+
+**Existing issues this plan should attach to rather than duplicate** — checked 2026-08-04:
+
+| Existing | Relationship |
+|---|---|
+| [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) | *Is* plan item 13. Currently unlabelled beyond `enhancement`, no epic, no project fields |
+| [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) | Already delivers clear-sky irradiance; plan item 9 extends it |
+| [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | `nged_incumbent` baseline — **blocks T1.2** |
+| [#161](https://github.com/openclimatefix/nged-substation-forecast/issues/161) | NWP ingestion validation checks — sibling of item 13 on the ingest side |
+| [#420](https://github.com/openclimatefix/nged-substation-forecast/issues/420) | Silencing warnings for dead series — warning fatigue, directly downstream of items 4/6/7 |
+| [#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423) | R&D/production asset tags — the asymmetry's mechanism |
+| [#374](https://github.com/openclimatefix/nged-substation-forecast/issues/374) | "Add more data-validation functions" — **empty body**; the natural home for the missing-vs-wrong distinction (§1) |
 
 ### 7.3 A cross-cutting label, not a new epic
 
@@ -591,10 +673,15 @@ mapping. Cheap, and it is the artifact that makes the argument concrete for a sc
 
 ### 7.4 Scope caution
 
-Of these thirteen, only #4, #6 and #7 are on the critical path to a contractual v1.0 deliverable.
-The rest are quality and stability work. That is defensible given what the section is *for*, but it
-**is** a widening of scope against the 2026-07-01 "live service first" reprioritisation. That call
-is Jack's.
+Of these fifteen, items 4, 6 and 7 are on the critical path to a contractual v1.0 deliverable, and
+items **13 and 14 are production-correctness fixes rather than quality work** — §4.1 divergence 1
+is a live hard-failure mode that would cut NGED off entirely during an extended NWP outage. The
+rest are quality and stability work.
+
+So the scope widening is smaller than it first appears, and part of it is arguably overdue rather
+than new. It **is** still a widening against the 2026-07-01 "live service first" reprioritisation,
+and that call is Jack's — but items 13 and 14 sit *inside* "live service first" rather than against
+it.
 
 Mitigating this: per [§7.6](#76-effort-and-phasing--groundwork-now-or-the-whole-thing), the v0.3
 tranche (0–5 and 9) is small — mostly pure functions over frames plus two schema decisions. The
@@ -672,10 +759,16 @@ there is no real trade-off to make.
 | 8. Degradation-conditional calibration | **L** | Real ML work. **Blocked** on quantile output (#263/#264, v0.5) |
 | 11. Weather-blind training augmentation | **L** | Real ML work. **Blocked** on #2 and #3 existing to evaluate against |
 | 12. `BaseForecaster` missingness contract | **S** | But only meaningful once a second model family exists (the v0.9 NN spike) |
+| 13. `live_forecasts` check (#424) | **S** | Row-count and validity assertions plus an NWP-age metadata field. Reuses the `_to_asset_check_result` shape already established twice |
+| 14. `live_forecasts` degrades not raises | **S–M** | Deleting two raises is trivial; deciding *what* a no-NWP forecast contains is the real work, and overlaps item 11 |
 
-So: **items 0–5 and 9 can all land in v0.3, and together they are roughly one focused chunk of
-work** — not a milestone-sized programme. Items 8 and 11 land in v0.5 because that is when their
+So: **items 0–5, 9, 13 and 14 can all land in v0.3, and together they are roughly one focused chunk
+of work** — not a milestone-sized programme. Items 8 and 11 land in v0.5 because that is when their
 prerequisite exists, and item 12 in v0.9 because that is when the NN spike happens.
+
+**Within v0.3 the internal order is constrained**: 13 before 14 (§4.1), and
+[#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) before 3 (T1.2 needs
+the incumbent baseline to score against).
 
 #### The two things to front-load, because retrofitting them is painful
 
@@ -698,10 +791,10 @@ carries the rest.
 
 #### Revised recommendation
 
-Do **not** split groundwork-now / implementation-later. Do items 0–5 and 9 in **v0.3**, with the two
-schema decisions front-loaded, and accept that 8 and 11 arrive in v0.5 on their own dependency
-schedule. That gets Jack's stated goal — *all our ML experiments validated against this* — from v0.5
-onward, which is when the experiments that matter actually start.
+Do **not** split groundwork-now / implementation-later. Do items 0–5, 9, 13 and 14 in **v0.3**, with
+the two schema decisions front-loaded, and accept that 8 and 11 arrive in v0.5 on their own
+dependency schedule. That gets Jack's stated goal — *all our ML experiments validated against this*
+— from v0.5 onward, which is when the experiments that matter actually start.
 
 ---
 
@@ -715,8 +808,11 @@ onward, which is when the experiments that matter actually start.
    the v0.3 tranche is mostly pure functions plus two schema decisions.*
 
 2. **How do failure scenarios fit the evaluation model?** `EVALUATION_SCOPES` is currently
-   `("leaderboard", "production_monitoring", "ad_hoc")`. Either a fourth scope, or a new
-   **dimension** within `leaderboard` (every experiment scored *n* times, once per scenario).
+   `("leaderboard", "production_monitoring", "ad_hoc")`, with `EvalScopeType` a deliberately
+   *narrower* `Literal["leaderboard", "ad_hoc"]` — the subset the asset handles today, documented to
+   expand when Phase 8 lands. Any new scope must follow that established two-name pattern. Either a
+   fourth scope, or a new **dimension** within `leaderboard` (every experiment scored *n* times,
+   once per scenario).
    *Recommendation: the dimension, as a metrics **column**, not part of the partition key* — it
    makes degradation behaviour a first-class property of every experiment rather than an opt-in
    exercise, and it leaves partition counts unchanged. **This decision has a knock-on to
