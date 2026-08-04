@@ -617,8 +617,15 @@ Three-page division of labour, no duplication:
 | `roadmap/engineering-health.md` | Degradation smoke-tests in the scientific-rigor section. |
 | `roadmap/xgboost-improvements.md` | The NaN default-direction caveat (§3.1). |
 | `roadmap/index.md` | Milestone bullets for the new issues. |
-| `background/requirements.md` | Cross-links to the hypotheses page. |
+| `background/requirements.md` | Cross-links to the hypotheses page, **plus the fourth bullet in §7.7 finding 3**. |
 | `architecture/why-dagster-not-airflow.md` | Three surgical edits — see §7.5. |
+| `documentation-guide.md` | **Both new pages need a home in its four-place model — see §7.7 finding 1.** |
+| `live_service/operations.md` | **Two missing runbook sections — §7.7 finding 2.** |
+| `architecture/overview.md` | Cross-link; it is currently the "design philosophy" page and would otherwise compete. |
+| `background/data-quality.md` | Pointer: false zeros / stuck values are *wrong*, missing data is *missing*, handled differently. |
+| `architecture/production-deployment.md` | Upward link to the principle; **do not restate** — it already carries the reasoning. |
+| `architecture/testing.md` | Add the degradation smoke-tests to "notable test suites" once built. |
+| `docs/index.md` | Two entries in the Documentation list; one sentence in "More than a forecast". |
 
 ### 7.2 GitHub issues
 
@@ -647,6 +654,8 @@ means "attach as a sub-issue of that epic, positioned by execution order".
 | 12 | Missingness contract on `BaseForecaster` — each family declares how it degrades | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2 |
 | 13 | **Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)** — the `live_forecasts` asset check — to also report **NWP age at forecast time**, WARN severity, non-blocking | **v0.3** | Not a new issue: #424 already exists ("catch if the forecast asset succeeds but writes invalid forecasts or none at all"). It is the missing third check — every production asset has one except the one NGED consumes. Needs the degradation dimension added, a WARN/non-blocking severity decision, an epic, and project fields (it currently has none) |
 | 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage — keep the `trained_ids` raise | **v0.3**, **after 13** | §4.1 divergences 1–3. Ordering is load-bearing: degrading before the check exists converts a loud failure into a silent one |
+| 15 | **Runbook: degraded input data** — NWP feed dark, telemetry stalled, how to read the freshness check | **v0.3** | §7.7 finding 2. H1's "recovery next business day, via runbook" threshold is unmeasurable without it |
+| 16 | **Runbook + mechanism: roll back a promoted model** | **v0.3** | §7.7 finding 2. Pairs with item 5 — the code half and the docs half of H3's second direction |
 
 Plus: extend remaining v0.6/v0.7 warning types as sub-tasks of the existing epics rather than new
 issues; add a note to [#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423)
@@ -673,7 +682,7 @@ mapping. Cheap, and it is the artifact that makes the argument concrete for a sc
 
 ### 7.4 Scope caution
 
-Of these fifteen, items 4, 6 and 7 are on the critical path to a contractual v1.0 deliverable, and
+Of these seventeen, items 4, 6 and 7 are on the critical path to a contractual v1.0 deliverable, and
 items **13 and 14 are production-correctness fixes rather than quality work** — §4.1 divergence 1
 is a live hard-failure mode that would cut NGED off entirely during an extended NWP outage. The
 rest are quality and stability work.
@@ -761,6 +770,7 @@ there is no real trade-off to make.
 | 12. `BaseForecaster` missingness contract | **S** | But only meaningful once a second model family exists (the v0.9 NN spike) |
 | 13. `live_forecasts` check (#424) | **S** | Row-count and validity assertions plus an NWP-age metadata field. Reuses the `_to_asset_check_result` shape already established twice |
 | 14. `live_forecasts` degrades not raises | **S–M** | Deleting two raises is trivial; deciding *what* a no-NWP forecast contains is the real work, and overlaps item 11 |
+| 15, 16. The two runbooks | **S** each | Prose, but only writable once 13/14 and item 5 define what the operator actually does |
 
 So: **items 0–5, 9, 13 and 14 can all land in v0.3, and together they are roughly one focused chunk
 of work** — not a milestone-sized programme. Items 8 and 11 land in v0.5 because that is when their
@@ -795,6 +805,71 @@ Do **not** split groundwork-now / implementation-later. Do items 0–5, 9, 13 an
 the two schema decisions front-loaded, and accept that 8 and 11 arrive in v0.5 on their own
 dependency schedule. That gets Jack's stated goal — *all our ML experiments validated against this*
 — from v0.5 onward, which is when the experiments that matter actually start.
+
+### 7.7 Docs review (2026-08-04)
+
+Reviewed the whole of `docs/` (excluding generated `api/`) for content that this work makes wrong,
+content it would duplicate, and content it needs but that does not exist.
+
+**Headline: no doc currently overclaims.** I specifically searched for pages asserting degradation
+behaviour the code does not deliver (§4.1). None found. `production-deployment.md:42` and
+`requirements.md:152` both argue that *a missed slot* degrades freshness rather than cutting NGED
+off — which is true, because delivery is decoupled from compute and forecasts run 14 days ahead.
+Neither claims `live_forecasts` itself degrades under stale NWP. So this work adds to the docs; it
+does not have to correct them. With one exception, finding 3.
+
+**Finding 1 — the two new pages have no home in the repo's own documentation model.**
+`documentation-guide.md` defines four places with "deliberately non-overlapping jobs", and states
+that `architecture/` holds *why something already built works*, while `roadmap/` holds *only design
+for work that is not yet implemented*. Two problems:
+
+- `engineering-hypotheses.md` fits **none** of the four buckets. It is not unbuilt design, not an
+  explanation of built code, and not NGED-derived background. It is a fifth kind of content: our own
+  falsifiable claims. The guide needs a new row in both its tables, or the page violates the repo's
+  documented structure on arrival.
+- `architecture/inherent-stability.md` **spans** the architecture/roadmap line, because the
+  philosophy is partly built (WARN checks, static NWP selection) and partly not (widening bands, the
+  scenario suite). Resolution, and it should be stated in the page itself: the **principle and the
+  built mechanisms** go in `architecture/`; the **unbuilt mechanisms** stay in their roadmap pages
+  and are linked, not copied. Otherwise the page becomes a roadmap mirror and rots.
+
+**Finding 2 — `live_service/operations.md` is missing the two runbooks this philosophy depends on.**
+Its headings are: Prerequisites, Pick a champion, Materialise `promoted_model`, Let the schedule run,
+Inspecting a live forecast, Backfilling a missed slot. It contains **zero** occurrences of "stale",
+"outage", or "missing". So:
+
+- **No runbook for degraded input data.** H1's threshold is "recovery next business day, via
+  runbook" — which requires a runbook for the failures that actually occur. Needs: what to do when
+  the NWP feed goes dark, when power telemetry stalls, and how to read the freshness check.
+- **No rollback procedure.** There is "pick a champion → materialise `promoted_model`" and no way
+  back. This is H3's second half showing up as a *docs* gap as well as a code gap (item 5).
+
+Both are prerequisites for the H1/H3 measurements, not merely nice to have.
+
+**Finding 3 — `requirements.md` § "Uptime: lenient by design" has a hole that mirrors the code's.**
+It bounds the damage of an outage with three arguments (14-day horizon, delivery decoupled from
+compute, legacy fallback). All three assume the outage is *our compute stopping*. An extended NWP
+outage is a different shape: compute keeps running, forecasts keep being attempted, and — per §4.1
+divergence 1 — they hard-fail, while the last good forecast also ages out. The 14-day-horizon
+argument does not cover it. That section needs a fourth bullet, or an explicit caveat.
+
+**Finding 4 — three pages already carry this content and must be linked, not restated.** The
+divergent-copy risk is real here, since the philosophy is quotable and the temptation to restate is
+high:
+
+| Page | Already says |
+|---|---|
+| `background/data-quality.md` | Separate sections for **False zeros**, **Stuck values** and **Missing data** — the missing-vs-wrong distinction of §1, already documented empirically with plots. Link to it; add only a pointer that the two classes are handled differently |
+| `architecture/production-deployment.md` (~L80) | The WARN-not-failure reasoning almost verbatim, *and* the inside-Dagster / outside-deployment complementarity that §3.5 calls load-bearing |
+| `ml_experimentation/mlops-approach.md` | "Nothing gets rewritten on the way to production" — H3's substance |
+
+Also `architecture/forecast-delivery.md` § "Strict data contracts (machine-verifiable)" (L460) is the
+natural anchor for the Postel's-law disowning.
+
+**Finding 5 — `architecture/overview.md` is currently billed as the design-philosophy page**
+(`docs/index.md` describes it as "design philosophy, technical components, and data flow"). An
+inherent-stability page *is* design philosophy, so without a cross-link the two compete for the same
+job. Cheapest fix: overview keeps the structural tour and links out to the principle.
 
 ---
 
