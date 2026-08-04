@@ -5,14 +5,14 @@ The ``@alt.theme.register`` decorator fires at import time, so a bare
 ``import plotting.ocf_theme`` is sufficient to activate it.
 """
 
-from typing import Final
+from typing import Final, LiteralString
 
 import altair as alt
 
-# The colour constants below are annotated with a bare ``Final`` (rather than the usual
-# ``Final[str]``) so they keep their literal types: Altair's ``ThemeConfig`` declares every
-# colour field as ``LiteralString``, which a plain ``str`` does not satisfy.
-PALETTE: Final = (
+# The colour constants below are typed ``LiteralString`` rather than ``str`` because Altair's
+# ``ThemeConfig`` declares every colour field as ``LiteralString``, which a plain ``str`` does
+# not satisfy — see ``_ocf_theme``.
+PALETTE: Final[tuple[LiteralString, ...]] = (
     "#FF4901",  # Orange-Red
     "#306BFF",  # Blue
     "#B701FF",  # Purple
@@ -26,27 +26,27 @@ PALETTE: Final = (
 )
 """OCF brand colour palette, ordered by visual priority."""
 
-ORANGE_RED: Final = PALETTE[0]
-BLUE: Final = PALETTE[1]
-PURPLE: Final = PALETTE[2]
-SPRING_GREEN: Final = PALETTE[3]
-SKY_BLUE: Final = PALETTE[4]
-MUSTARD: Final = PALETTE[5]
-DARK_GREEN: Final = PALETTE[6]
-BROWN: Final = PALETTE[7]
-MINT: Final = PALETTE[8]
-LAVENDER: Final = PALETTE[9]
+ORANGE_RED: Final[LiteralString] = PALETTE[0]
+BLUE: Final[LiteralString] = PALETTE[1]
+PURPLE: Final[LiteralString] = PALETTE[2]
+SPRING_GREEN: Final[LiteralString] = PALETTE[3]
+SKY_BLUE: Final[LiteralString] = PALETTE[4]
+MUSTARD: Final[LiteralString] = PALETTE[5]
+DARK_GREEN: Final[LiteralString] = PALETTE[6]
+BROWN: Final[LiteralString] = PALETTE[7]
+MINT: Final[LiteralString] = PALETTE[8]
+LAVENDER: Final[LiteralString] = PALETTE[9]
 
-BACKGROUND: Final = "#FFFBF5"
+BACKGROUND: Final[LiteralString] = "#FFFBF5"
 """Chart background colour."""
 
-GRID: Final = "#EAEAEA"
+GRID: Final[LiteralString] = "#EAEAEA"
 """Axis grid line colour."""
 
-ENSEMBLE_LINE: Final = "#808080"
+ENSEMBLE_LINE: Final[LiteralString] = "#808080"
 """Colour for individual ensemble member lines; mid-grey stays visible at low opacity on BACKGROUND."""
 
-_TEXT: Final = "#292B2B"
+_TEXT: Final[LiteralString] = "#292B2B"
 
 
 def hex_to_rgb(hex_color: str) -> list[int]:
