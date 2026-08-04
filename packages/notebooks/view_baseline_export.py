@@ -157,22 +157,26 @@ def _(mean_df, quantiles_df, series_ui):
     band = (
         alt.Chart(quant_one)
         .mark_area(opacity=0.25, color="#4c78a8")
-        .encode(x=date_x(), y=alt.Y("power_fcst_p10:Q", title=y_title), y2="power_fcst_p90:Q")
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
+            x=date_x(),
+            y=alt.Y("power_fcst_p10:Q", title=y_title),
+            y2="power_fcst_p90:Q",
+        )
     )
     p50_line = (
         alt.Chart(quant_one)
         .mark_line(strokeWidth=1, color="#4c78a8")
-        .encode(x=date_x(), y="power_fcst_p50:Q")
+        .encode(x=date_x(), y="power_fcst_p50:Q")  # ty: ignore[unresolved-attribute]
     )
     mean_line = (
         alt.Chart(mean_one)
         .mark_line(strokeWidth=1, strokeDash=[4, 2], color="#f58518")
-        .encode(x=date_x(), y="power_fcst_mean:Q")
+        .encode(x=date_x(), y="power_fcst_mean:Q")  # ty: ignore[unresolved-attribute]
     )
     observed_line = (
         alt.Chart(mean_one)
         .mark_line(strokeWidth=1.2, color="#333333")
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=date_x(),
             y=alt.Y("observed_power:Q", title=y_title),
             tooltip=[
@@ -205,7 +209,7 @@ def _(mean_one, title_prefix, unit):
     residual_chart = mo.ui.altair_chart(
         alt.Chart(residual_df)
         .mark_line(strokeWidth=1, color="#54a24b")
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=date_x(),
             y=alt.Y("residual:Q", title=f"observed − ensemble mean ({unit})"),
             tooltip=[
@@ -254,7 +258,7 @@ def _(full_lf, series_id, title_prefix, unit, window_ui):
     members = (
         alt.Chart(ens_one)
         .mark_line(strokeWidth=0.5, opacity=0.3, color="#4c78a8")
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=date_x(),
             y=alt.Y("power_fcst:Q", title=f"power ({unit})"),
             detail="ensemble_member:N",
@@ -263,7 +267,7 @@ def _(full_lf, series_id, title_prefix, unit, window_ui):
     observed = (
         alt.Chart(ens_one.unique("valid_time"))
         .mark_line(strokeWidth=1.2, color="#333333")
-        .encode(x=date_x(), y="observed_power:Q")
+        .encode(x=date_x(), y="observed_power:Q")  # ty: ignore[unresolved-attribute]
     )
     mo.ui.altair_chart(
         (members + observed)

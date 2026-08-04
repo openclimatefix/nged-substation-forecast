@@ -5,11 +5,14 @@ The ``@alt.theme.register`` decorator fires at import time, so a bare
 ``import plotting.ocf_theme`` is sufficient to activate it.
 """
 
-from typing import Any, Final
+from typing import Final
 
 import altair as alt
 
-PALETTE: Final[tuple[str, ...]] = (
+# The colour constants below are annotated with a bare ``Final`` (rather than the usual
+# ``Final[str]``) so they keep their literal types: Altair's ``ThemeConfig`` declares every
+# colour field as ``LiteralString``, which a plain ``str`` does not satisfy.
+PALETTE: Final = (
     "#FF4901",  # Orange-Red
     "#306BFF",  # Blue
     "#B701FF",  # Purple
@@ -23,27 +26,27 @@ PALETTE: Final[tuple[str, ...]] = (
 )
 """OCF brand colour palette, ordered by visual priority."""
 
-ORANGE_RED: Final[str] = PALETTE[0]
-BLUE: Final[str] = PALETTE[1]
-PURPLE: Final[str] = PALETTE[2]
-SPRING_GREEN: Final[str] = PALETTE[3]
-SKY_BLUE: Final[str] = PALETTE[4]
-MUSTARD: Final[str] = PALETTE[5]
-DARK_GREEN: Final[str] = PALETTE[6]
-BROWN: Final[str] = PALETTE[7]
-MINT: Final[str] = PALETTE[8]
-LAVENDER: Final[str] = PALETTE[9]
+ORANGE_RED: Final = PALETTE[0]
+BLUE: Final = PALETTE[1]
+PURPLE: Final = PALETTE[2]
+SPRING_GREEN: Final = PALETTE[3]
+SKY_BLUE: Final = PALETTE[4]
+MUSTARD: Final = PALETTE[5]
+DARK_GREEN: Final = PALETTE[6]
+BROWN: Final = PALETTE[7]
+MINT: Final = PALETTE[8]
+LAVENDER: Final = PALETTE[9]
 
-BACKGROUND: Final[str] = "#FFFBF5"
+BACKGROUND: Final = "#FFFBF5"
 """Chart background colour."""
 
-GRID: Final[str] = "#EAEAEA"
+GRID: Final = "#EAEAEA"
 """Axis grid line colour."""
 
-ENSEMBLE_LINE: Final[str] = "#808080"
+ENSEMBLE_LINE: Final = "#808080"
 """Colour for individual ensemble member lines; mid-grey stays visible at low opacity on BACKGROUND."""
 
-_TEXT: Final[str] = "#292B2B"
+_TEXT: Final = "#292B2B"
 
 
 def hex_to_rgb(hex_color: str) -> list[int]:
@@ -57,7 +60,7 @@ def hex_to_rgb(hex_color: str) -> list[int]:
 
 
 @alt.theme.register("ocf", enable=True)
-def _ocf_theme() -> dict[str, Any]:
+def _ocf_theme() -> alt.theme.ThemeConfig:
     palette = list(PALETTE)
     return {
         "config": {

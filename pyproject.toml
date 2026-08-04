@@ -106,6 +106,12 @@ registry_modules = [
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+# ruff 0.16 widened its *default* rule set well beyond the E4/E7/E9/F that 0.15 and earlier
+# enabled. Pin that older selection explicitly, so upgrading ruff never silently changes which
+# rules this repo enforces. Adopting any of the newer rules is a deliberate, separate change.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

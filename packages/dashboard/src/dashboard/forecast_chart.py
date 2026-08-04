@@ -261,7 +261,7 @@ def _weekend_layer(window_start: datetime, window_end: datetime) -> alt.Chart:
     return (
         alt.Chart(_weekend_bands(window_start, window_end))
         .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=_x_encoding(window_start, window_end, field="start"),
             x2="end:T",
         )
@@ -387,7 +387,7 @@ def build_view_forecast_chart(
         layers.append(
             alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
             .mark_line(strokeWidth=1, opacity=0.3)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
                 y=alt.Y("power_fcst:Q", title=y_title, axis=_y_axis()),
                 color=alt.ColorDatum(_FORECAST_LABEL),
@@ -408,7 +408,7 @@ def build_view_forecast_chart(
                 .collect()
             )
             .mark_line(strokeWidth=1.5, opacity=0.8)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
                 y=alt.Y("power:Q", title=y_title, axis=_y_axis()),
                 color=alt.Color("lag:N", scale=line_color_scale, legend=line_legend),
@@ -427,7 +427,7 @@ def build_view_forecast_chart(
                 .collect()
             )
             .mark_line(strokeWidth=2.5)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
                 y=alt.Y("power:Q", title=y_title, axis=_y_axis()),
                 color=alt.ColorDatum(_ACTUALS_LABEL),
@@ -437,7 +437,7 @@ def build_view_forecast_chart(
     layers.append(
         alt.Chart(pl.DataFrame({"valid_time": [init_wall], "series": [_INIT_TIME_LABEL]}))
         .mark_rule(strokeWidth=1.5, strokeDash=[6, 4])
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=x,
             color=alt.Color("series:N", scale=line_color_scale, legend=line_legend),
             tooltip=[alt.Tooltip("valid_time", title="Power forecast init time")],
@@ -547,7 +547,7 @@ def build_nwp_ensemble_chart(
     layers.append(
         alt.Chart(data)
         .mark_line(strokeWidth=1, opacity=0.3)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=x,
             y=y,
             color=alt.ColorDatum(_NWP_ENSEMBLE_LABEL),
@@ -561,7 +561,7 @@ def build_nwp_ensemble_chart(
         layers.append(
             alt.Chart(analysis_data)
             .mark_line(strokeWidth=2.5)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
                 y=y,
                 color=alt.ColorDatum(_NWP_ANALYSIS_LABEL),
@@ -573,7 +573,7 @@ def build_nwp_ensemble_chart(
     layers.append(
         alt.Chart(pl.DataFrame({"valid_time": [init_wall], "series": [_INIT_TIME_LABEL]}))
         .mark_rule(strokeWidth=1.5, strokeDash=[6, 4])
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=x,
             color=alt.Color("series:N", scale=nwp_color_scale, legend=nwp_legend),
             tooltip=[alt.Tooltip("valid_time", title="Power forecast init time")],

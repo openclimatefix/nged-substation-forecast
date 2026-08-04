@@ -174,8 +174,8 @@ Build a frame, attach the model, cast, and validate for the happy path:
 
 ```python
 df = pt.DataFrame({...}).set_model(MySchema).cast()
-df.validate()                       # happy path: raises nothing
-MySchema.validate(existing_df)      # or validate a frame produced elsewhere
+df.validate()  # happy path: raises nothing
+MySchema.validate(existing_df)  # or validate a frame produced elsewhere
 ```
 
 For the unhappy path, assert that validation raises:

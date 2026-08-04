@@ -953,13 +953,15 @@ def extract_events(edge_flows, edge_list, times, tol=1e-4):
         for start, stop in zip(idx[::2], idx[1::2]):
             level = float(np.median(edge_flows[start:stop, k]))
             source, donor = (a, b) if level > 0 else (b, a)
-            events.append({
-                "source": source,  # lost the load
-                "donor": donor,  # picked it up
-                "start": times[start],
-                "end": times[stop - 1],
-                "magnitude_mw": abs(level),
-            })
+            events.append(
+                {
+                    "source": source,  # lost the load
+                    "donor": donor,  # picked it up
+                    "start": times[start],
+                    "end": times[stop - 1],
+                    "magnitude_mw": abs(level),
+                }
+            )
     return events
 ```
 
