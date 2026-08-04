@@ -100,11 +100,11 @@ import torch
 import torch.nn as nn
 import torch.distributions as dist
 
-STC_IRRADIANCE = 1000.0    # reference plane-of-array irradiance at standard test conditions (W/m^2)
-GROUND_ALBEDO = 0.2        # typical broadband ground reflectance
-STC_CELL_TEMP = 25.0       # cell temperature at standard test conditions (°C)
+STC_IRRADIANCE = 1000.0  # reference plane-of-array irradiance at standard test conditions (W/m^2)
+GROUND_ALBEDO = 0.2  # typical broadband ground reflectance
+STC_CELL_TEMP = 25.0  # cell temperature at standard test conditions (°C)
 TEMP_COEFF_POWER = -0.004  # relative power loss per °C above STC for crystalline silicon (1/°C)
-NOCT_TEMP_RISE = 0.03      # steady-state cell-temp rise per W/m² of POA (°C·m²/W)
+NOCT_TEMP_RISE = 0.03  # steady-state cell-temp rise per W/m² of POA (°C·m²/W)
 
 
 class DifferentiableSolarPlant(nn.Module):
@@ -119,13 +119,21 @@ class DifferentiableSolarPlant(nn.Module):
     Azimuth convention: measured from due south, east negative, west positive.
     """
 
-    def __init__(self, prior_tilt: float, prior_azimuth: float, prior_dc_capacity: float, prior_ac_capacity: float) -> None:
+    def __init__(
+        self,
+        prior_tilt: float,
+        prior_azimuth: float,
+        prior_dc_capacity: float,
+        prior_ac_capacity: float,
+    ) -> None:
         super().__init__()
         # Variational posteriors, each parameterised in an unconstrained space so no
         # gradient-breaking clamp is needed and the Normal posterior/prior stay
         # self-consistent: tilt in logit-space (squashed to (0, pi/2) in `forward`),
         # azimuth in radians, capacities in log-space (strictly positive).
-        self.raw_tilt_mu = nn.Parameter(torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2)))
+        self.raw_tilt_mu = nn.Parameter(
+            torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2))
+        )
         self.raw_tilt_log_std = nn.Parameter(torch.tensor(-2.0))
 
         self.azimuth_mu = nn.Parameter(torch.tensor(prior_azimuth))
@@ -144,10 +152,16 @@ class DifferentiableSolarPlant(nn.Module):
         # Fixed priors. Weakly-informative: "panels point roughly south at a UK roof pitch,
         # with a capacity near nameplate". These also keep the posterior spreads from collapsing.
         self.priors = {
-            "raw_tilt": dist.Normal(torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2)), torch.tensor(0.3)),
+            "raw_tilt": dist.Normal(
+                torch.special.logit(torch.tensor(prior_tilt) / (torch.pi / 2)), torch.tensor(0.3)
+            ),
             "azimuth": dist.Normal(torch.tensor(prior_azimuth), torch.tensor(0.5)),
-            "log_dc_capacity": dist.Normal(torch.log(torch.tensor(prior_dc_capacity)), torch.tensor(0.5)),
-            "log_ac_capacity": dist.Normal(torch.log(torch.tensor(prior_ac_capacity)), torch.tensor(0.3)),
+            "log_dc_capacity": dist.Normal(
+                torch.log(torch.tensor(prior_dc_capacity)), torch.tensor(0.5)
+            ),
+            "log_ac_capacity": dist.Normal(
+                torch.log(torch.tensor(prior_ac_capacity)), torch.tensor(0.3)
+            ),
         }
 
     def posteriors(self) -> dict[str, dist.Normal]:
@@ -155,8 +169,12 @@ class DifferentiableSolarPlant(nn.Module):
         return {
             "raw_tilt": dist.Normal(self.raw_tilt_mu, self.raw_tilt_log_std.exp()),
             "azimuth": dist.Normal(self.azimuth_mu, self.azimuth_log_std.exp()),
-            "log_dc_capacity": dist.Normal(self.log_dc_capacity_mu, self.log_dc_capacity_log_std.exp()),
-            "log_ac_capacity": dist.Normal(self.log_ac_capacity_mu, self.log_ac_capacity_log_std.exp()),
+            "log_dc_capacity": dist.Normal(
+                self.log_dc_capacity_mu, self.log_dc_capacity_log_std.exp()
+            ),
+            "log_ac_capacity": dist.Normal(
+                self.log_ac_capacity_mu, self.log_ac_capacity_log_std.exp()
+            ),
         }
 
     def kl_divergence(self) -> torch.Tensor:
@@ -180,12 +198,12 @@ class DifferentiableSolarPlant(nn.Module):
 
     def forward(
         self,
-        dni: torch.Tensor,             # direct normal irradiance (W/m^2)
-        dhi: torch.Tensor,             # diffuse horizontal irradiance (W/m^2)
-        ghi: torch.Tensor,             # global horizontal irradiance (W/m^2)
+        dni: torch.Tensor,  # direct normal irradiance (W/m^2)
+        dhi: torch.Tensor,  # diffuse horizontal irradiance (W/m^2)
+        ghi: torch.Tensor,  # global horizontal irradiance (W/m^2)
         sun_zenith_rad: torch.Tensor,
         sun_azimuth_rad: torch.Tensor,
-        air_temp: torch.Tensor,        # ambient air temperature (°C)
+        air_temp: torch.Tensor,  # ambient air temperature (°C)
     ) -> torch.Tensor:
         """Predict DC power with steady-state temperature derate. All inputs and operations preserve gradients."""
         q = self.posteriors()
@@ -215,7 +233,6 @@ class DifferentiableSolarPlant(nn.Module):
         dc_power = dc_capacity * poa / STC_IRRADIANCE * temp_derate
         ac_capacity = q["log_ac_capacity"].rsample().exp()
         return torch.minimum(dc_power, ac_capacity)
-
 ```
 
 ### Panel temperature

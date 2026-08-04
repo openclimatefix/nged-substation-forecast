@@ -48,7 +48,7 @@ def _(df):
             strokeWidth=1,
             opacity=0.3,
         )
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=alt.X(field="valid_time", type="temporal"),
             y=alt.Y(field=NWP_VAR_TO_PLOT, type="quantitative"),
             detail="ensemble_member:N",

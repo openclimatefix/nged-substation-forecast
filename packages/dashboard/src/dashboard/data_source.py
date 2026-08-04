@@ -36,9 +36,9 @@ def settings_for_source(source: DataSourceType) -> Settings:
     then falls back to the root .env's local paths (see :func:`source_status_message`).
     """
     if source == "s3":
-        # _env_file is a pydantic-settings builtin kwarg not modelled by ty's synthesised
-        # BaseModel __init__; the list layers .env.s3 over the root .env (later file wins).
-        return Settings(_env_file=[ROOT_ENV, DASHBOARD_S3_ENV])  # ty: ignore[unknown-argument]
+        # _env_file is a pydantic-settings builtin kwarg; the list layers .env.s3 over the
+        # root .env (later file wins).
+        return Settings(_env_file=[ROOT_ENV, DASHBOARD_S3_ENV])
     return Settings()
 
 

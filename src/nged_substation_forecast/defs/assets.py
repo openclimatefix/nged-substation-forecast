@@ -376,10 +376,10 @@ class _FileListingSummary(_BaseSummary[_ProcessedFileListing]):
             return cls(
                 stage=stage_name,
                 n_files=len(df),
-                start_time=df["start_time"].min(),  # ty: ignore[invalid-argument-type]
-                end_time=df["end_time"].max(),  # ty: ignore[invalid-argument-type]
+                start_time=df["start_time"].min(),
+                end_time=df["end_time"].max(),
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                time_series_ids=df["time_series_id"],  # ty: ignore[invalid-argument-type]
+                time_series_ids=df["time_series_id"],
                 min_file_size_bytes=df["filesize_bytes"].min(),  # ty: ignore[invalid-argument-type]
                 max_file_size_bytes=df["filesize_bytes"].max(),  # ty: ignore[invalid-argument-type]
             )
@@ -392,16 +392,14 @@ class _PowerTimeSeriesSummary(_BaseSummary[PowerTimeSeries]):
 
     @classmethod
     def from_data_frame(cls, stage_name: str, df: pt.DataFrame[PowerTimeSeries]) -> Self:
-        # The `ty: ignore` comments are because `ty` only looks at the types specified in the BaseModel.
-        # `ty` doesn't know that we're casting the types in the `field_validator` methods.
         if len(df) > 0:
             return cls(
                 stage=stage_name,
                 n_rows=len(df),
-                start_time=df["time"].min(),  # ty: ignore[invalid-argument-type]
-                end_time=df["time"].max(),  # ty: ignore[invalid-argument-type]
+                start_time=df["time"].min(),
+                end_time=df["time"].max(),
                 # TODO: We can't list *all* time_series_ids when we're handling 1,000s of IDs!
-                time_series_ids=df["time_series_id"],  # ty: ignore[invalid-argument-type]
+                time_series_ids=df["time_series_id"],
             )
         else:
             return cls(stage=stage_name, n_rows=0)

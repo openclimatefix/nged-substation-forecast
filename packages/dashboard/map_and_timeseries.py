@@ -146,7 +146,7 @@ def _(delta_df, df, layer_widget, map):
                 right_pane = (
                     alt.Chart(filtered_demand)
                     .mark_line()
-                    .encode(
+                    .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                         x=alt.X(
                             "time:T",
                             axis=alt.Axis(format="%H:%M %b %d"),
