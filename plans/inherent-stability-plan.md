@@ -310,13 +310,12 @@ Audited 2026-08-04 across `defs/checks.py`, `defs/assets.py`, `defs/production_a
 | `promoted_model` copies the champion to **local disk; inference makes no MLflow call** (`production_assets.py:120`) | The whole experiment-tracking stack can be down and 06:00 inference is unaffected. The best single production-stability example |
 | `live_forecasts` selects "the freshest NWP run present as of `power_fcst_init_time`" — a **relative** query, not "today's run" | A missed download degrades to an older run through the normal path. No fallback branch exists to get wrong |
 | `power_data_is_fresh` — `blocking=False`, `severity=WARN`, reading **on-disk data recency** not materialisation time | The canonical warn-don't-block pattern; its docstring explains why materialisation-freshness would miss the real failure |
-| `nwp_has_no_unexpected_nulls` — in-asset WARN from the frame already in memory (`assets.py:178`, `:275`) | Same pattern, without a second read |
+| `nwp_has_no_unexpected_nulls` — in-asset WARN from the frame already in memory (`assets.py:199`, `:275`) | Same pattern, without a second read |
 | **No ERROR-severity asset check exists anywhere in the repo** | The fail-open posture is applied consistently, with inline comments giving the reasoning |
 | Sentry's log-to-event capture **deliberately disabled** — `LoggingIntegration(event_level=None)` | Subtle and correct: otherwise every `ERROR` log becomes an event, so a fail-open design would flood Sentry with events for conditions it deliberately tolerates |
 | The failure hook is attached to the **three scheduled jobs only** (`schedules.py`) | The R&D/production asymmetry, already implemented at the telemetry layer |
-| Three distinct Sentry channels — exceptions, freshness (`capture_message`, `level="warning"`), heartbeat | Maps cleanly onto §3.5 |
+| Three distinct Sentry channels — exceptions, freshness (`capture_message`, `level="warning"`), and a **success-only** heartbeat skipped on replay | Maps cleanly onto §3.5; a replay backfill is not evidence the service is alive now |
 | `report_power_freshness` **never raises** | Its docstring recognises that a bug in the *warning* path would trip the failure hook and silently convert fail-open into fail-closed |
-| The heartbeat is **success-only and skipped on replay** | A replay backfill is not evidence the service is alive now |
 | `nwp_init_time` on `PowerForecast` (`power_schemas.py:245`) | Provenance travels in-band with every row |
 | All five `raise` sites in `cv_assets.py` are in the training and metrics path | R&D fails fast, as it should |
 | Daily and 6-hourly partitioning; Patito contracts at every boundary | Blast radius, and the strict half of §1 |
@@ -553,13 +552,14 @@ and "implementation later".
 | 14. `live_forecasts` degrades | **S–M** | Removing the raises is trivial; deciding *what* a no-NWP forecast contains is the real work, and it overlaps item 11 |
 | 15, 16. The two runbooks | **S** each | Prose, but writable only once 13, 14 and 5 define what the operator does |
 | 6, 7. Warnings Phase 2, health history | **M–L** | Contractual, genuinely gated on v0.4 cleaning |
+| 10. Cost-per-experiment | **S** | A tag and a query over machinery `aws-costs.md` already describes |
 | 8. Degradation-conditional calibration | **L** | Real ML work, **blocked** on quantile output |
 | 11. Outage-shaped training augmentation | **L** | Real ML work, **blocked** on items 2 and 3 existing to evaluate against |
 | 12. `BaseForecaster` missingness contract | **S** | Meaningful only once a second model family exists |
 
-So items 0–5, 9 and 14–16 land in **v0.3** as one focused chunk, not a milestone-sized programme,
-with items 1 and 13 in v0.2 ahead of them. Items 8 and 11 land in v0.5 because that is when their
-prerequisite exists, and item 12 in v0.9 with the NN spike.
+So items 2–5, 9 and 14–16 land in **v0.3** as one focused chunk, not a milestone-sized programme,
+with items 1 and 13 in v0.2 ahead of them and item 0 starting now. Items 8, 10 and 11 land in v0.5
+because that is when their prerequisites exist, and item 12 in v0.9 with the NN spike.
 
 Two orderings are constrained. **Item 13 must precede item 14**, and the v0.2/v0.3 split satisfies
 that naturally: after 13 ships the check reports NWP age while `live_forecasts` still fails loudly
@@ -619,11 +619,10 @@ Resolve decision 2 before touching this page.
 Of the seventeen items, 4, 6 and 7 are on the critical path to a contractual v1.0 deliverable, and
 **13 and 14 are production-correctness fixes rather than quality work** — divergence 1 is a live
 hard-failure mode that would cut NGED off entirely during an extended NWP outage. The rest is
-quality and stability work.
-
-So the widening is smaller than it first appears, and part of it is overdue rather than new. It is
-still a widening against the 2026-07-01 "live service first" reprioritisation, and that call is
-Jack's — but items 13 and 14 sit *inside* "live service first" rather than against it.
+quality and stability work. So the widening is smaller than it looks, and part of it is overdue
+rather than new. It is still a widening against the 2026-07-01 "live service first"
+reprioritisation, and that call is Jack's — but 13 and 14 sit *inside* that priority, not against
+it.
 
 ---
 
