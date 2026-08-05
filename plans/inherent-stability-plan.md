@@ -358,10 +358,16 @@ adaptive regularisation. The two real problems are different, and both apply her
    "dropped" from "genuinely zero", it learns `E[y | x with random zeros]`, biasing the conditional
    mean. With an explicit mask channel or token removal, dropout training is well-posed. This is a
    representation bug, not a law about regression.
-2. **Dropout trains for MCAR; production missingness is not MCAR.** Real outages correlate with time
-   of day, weather systems, and provider incidents. A model trained on random dropout and deployed
-   under structured missingness is calibrated for a world it does not live in, and the
-   miscalibration shows up as over-confident bands *during a real outage* — the worst possible time.
+2. **Dropout trains for MCAR; production missingness is not MCAR.** In Rubin's taxonomy a value is
+   **MCAR** (*missing completely at random*) when its absence is independent of everything, observed
+   or not; **MAR** (*missing at random*) when the absence depends only on data we can see; and
+   **MNAR** (*missing not at random*) when it depends on the missing value itself. Random dropout
+   simulates MCAR. Our outages are at best MAR — they correlate with time of day, weather systems
+   and provider incidents, all observable — and some are MNAR: a meter that drops out during the
+   storm that caused the extreme reading is missing *because* the value was extreme. MNAR is the
+   dangerous case, since the missing values are then systematically unlike the observed ones. Either
+   way, a model trained on random dropout is calibrated for a world it does not live in, and the
+   miscalibration surfaces as over-confident bands *during a real outage* — the worst possible time.
 
 So do not lean on MCAR dropout as the primary mechanism. Use architecture (token removal, masks,
 physics fallback) for capability under missingness, structured outage-shaped dropout for learned
