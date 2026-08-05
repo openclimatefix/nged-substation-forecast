@@ -471,8 +471,7 @@ reports, so **append, never renumber**.
 | T1.1 | Operability | ≥90% of interventions from an upstream format change; zero out-of-hours | ~2 quarters of v1.0 |
 | T1.2 | Graceful degradation | Every series emits; beats `nged_incumbent` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
 | T1.3 | Faithful uncertainty | PICP within tolerance of nominal in every regime | v0.5 |
-| T2.1 | Experiment throughput | ≥200 registered experiments per month | v0.5 |
-| T2.2 | Human cost per experiment | ≤5 human-minutes, median | v0.5 |
+| T2.1 | Experiment throughput | ≥100 registered experiments per person, in a peak month | v0.5 |
 | T3.1 | Promotion effort | ≤1 command | v0.3 |
 | T3.2 | Rollback effort | ≤1 command | v0.3, after item 5 |
 
@@ -482,8 +481,8 @@ reports, so **append, never renumber**.
 > and it propagates uncertainty faithfully.
 
 **T1.1 — Operability.** Interventions per quarter, classified by cause, counted from the
-intervention log. The only test in this document that cannot be measured retrospectively, which is
-why the log ships ahead of everything else — see below.
+intervention log. The only test in this document that cannot be measured retrospectively — see
+below for when the log ships and when its measurement window opens.
 
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every series and check two
 things: that a forecast is emitted at all, and that it still beats `nged_incumbent`. Blocked on
@@ -494,19 +493,19 @@ baseline to compare against.
 leaderboard's scenario dimension. The sharpest test we have, and it needs no new metric — only that
 scenario dimension, which is the same machinery T1.2 uses.
 
-#### H2 — hundreds of decision-grade experiments a month
+#### H2 — a hundred experiments per person in a peak month
 
-> Enough experiment throughput to search the design space properly, at negligible human cost per
-> experiment.
+> When experimentation is the active workstream, one person can register at least 100 leaderboard
+> experiments in a month.
 
-**T2.1 — Experiment throughput.** Registered leaderboard experiments per month, from MLflow run
-timestamps.
-
-**T2.2 — Human cost per experiment.** Median human-minutes from "idea" to "registered result", also
-from MLflow timestamps. **This is the hypothesis's real claim.** A single 200-config sweep clears
-T2.1 on its own; what is transferable is sustained throughput of *decision-grade* experiments that
-cost almost no human time. T2.1 can pass while T2.2 fails, and that combination is a falsification
-rather than a partial success.
+**T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, from
+MLflow run timestamps. Two deliberate framing choices. It is a **peak** claim: there will be months
+spent hardening the production system or writing docs, and a quiet month is not a falsification —
+the claim is about what the machinery allows when we lean on it. And it is **count-only**: a single
+N-config sweep can game it, and we accept that, because a simple number MLflow already records
+beats a "decision-grade experiments" qualifier that would need a human-effort log to measure. If
+the threshold is ever met only by config sweeps, that will be obvious from reading the runs, and
+the fix is to append a T2.2 then — never to redefine T2.1.
 
 #### H3 — one-click promotion, and one-click rollback
 
@@ -521,17 +520,23 @@ items 5 and 16, which build the mechanism and the runbook respectively. Promotio
 is not safe at any speed, and rollback is the damping half of
 [§1](#restoring-force-and-damping) — so this is not the optional half of H3.
 
-### The intervention log is time-critical
+### The intervention log
 
 **T1.1 is the only test that cannot be measured retrospectively.** Every other test can be
 reconstructed later: T1.2 and T1.3 are computed by re-running the scenario suite and the
-leaderboard, T2.1 and T2.2 come from MLflow timestamps that live forever, and T3.1 and T3.2 can be
-counted whenever the runbooks exist. But "how many times did a human have to intervene, and why?"
-is unrecoverable unless recorded as it happens — and the service is already running on AWS.
+leaderboard, T2.1 comes from MLflow timestamps that live forever, and T3.1 and T3.2 can be counted
+whenever the runbooks exist. But "how many times did a human have to intervene, and why?" is
+unrecoverable unless recorded as it happens.
 
-The artifact is cheap: an append-only log with date, trigger, cause category, human-minutes, and
-whether a runbook existed. The cause taxonomy is the point, since T1.1 predicts that essentially all
-entries fall into "upstream format or contract change". **This should ship before the docs pages.**
+Two clauses keep the measurement honest. The artifact is cheap — an append-only log with date,
+trigger, cause category, human-minutes, and whether a runbook existed — so it ships this milestone,
+when convenient. But its **measurement window opens at v1.0**: interventions during v0.2–v0.9,
+while the system is being actively rebuilt, are development churn, and counting them would
+spuriously falsify the ≥90%-upstream threshold. Log everything from day one — the pre-v1.0 entries
+still feed the cause taxonomy — but score T1.1 only from v1.0.
+
+The cause taxonomy is the point, since T1.1 predicts that essentially all entries fall into
+"upstream format or contract change".
 
 ### Candidate further hypotheses
 
@@ -540,7 +545,8 @@ Proposals only; six is the sensible ceiling, because each carries a measurement 
 - **H4 (cost)** — the service runs under £X/month at v1 scale and £Y at v2.
   `docs/architecture/aws-costs.md` already estimates **~£25–35/month for the whole v1 stack** at 32
   time series. The most transferable NIA finding of the lot, and a second independent answer to the
-  devops-team worry.
+  devops-team worry. Its measurement is reading the monthly AWS bill — training runs on laptops and
+  costs AWS nothing, so no per-experiment instrumentation is needed.
 - **H5 (operability by a non-expert)** — an NGED operator can run the service from runbooks alone.
   Already designed as the operator contract in `docs/roadmap/handover.md`; framing it as a
   hypothesis turns the game days into a measurement rather than a training exercise.
@@ -611,8 +617,6 @@ calibrates) and `evaluation-metrics.md` (PICP and interval width, which measure 
 | `live_service/operations.md` | **Two missing runbooks.** The page contains no occurrence of "stale", "outage", or "missing", and offers no way back from a promotion. Both gaps block the T1.1 and T3.2 measurements |
 | `background/requirements.md` | Cross-links to the hypotheses page, **plus a fourth bullet under "Uptime: lenient by design"**: its three bounded-damage arguments all assume the outage is *our compute stopping*. An extended NWP outage keeps compute running while forecasts hard-fail, and the last good forecast ages out too, so the 14-day-horizon argument does not cover it |
 | `architecture/overview.md` | Cross-link. It is currently billed as the design-philosophy page, so without one the two pages compete for the same job |
-| `background/data-quality.md` | A pointer that false zeros and stuck values are *wrong* while missing data is *missing*, and the two are handled differently. The evidence already lives there |
-| `architecture/production-deployment.md` | An upward link to the principle. **Do not restate** — it already carries the WARN-not-failure reasoning and the inside/outside monitoring complementarity almost verbatim |
 | `roadmap/delivery-tables.md` | Degradation-conditional band widening under Table 1; `warning_source` on Table 2 |
 | `roadmap/metrics-and-leaderboard.md` | The failure-scenario suite, how it is scored, and the incumbent as acceptance criterion |
 | `roadmap/engineering-health.md` | Degradation smoke-tests in the scientific-rigor section |
@@ -620,12 +624,10 @@ calibrates) and `evaluation-metrics.md` (PICP and interval width, which measure 
 | `roadmap/capacity-estimation.md` | **Missingness robustness as a head-to-head judging criterion**, under "What every candidate must get right". Both candidates ingest metered generation that really does have gaps, and the winner's capacity estimate feeds v1.0 forecasting, so an estimator that mis-estimates under an outage propagates downstream. The page already reasons about one kind of absent data — "Identifiability: the data goes silent at night" — so this extends existing reasoning rather than importing a new concern |
 | `techniques/differentiable-physics.md` | The mechanism from §3.6: a physical forward model has a defined output for any input state, so substitute a climatological prior or a physical bound for an absent input and let the physics propagate it. The page currently says **nothing** about missing data, yet it is the durable home for the strongest missingness story we have |
 | `techniques/encoders.md` | Token removal, not zero-fill (§3.6) — zero is a real physical value, so a zero-filled encoder input asserts something false |
-| `architecture/testing.md` | The degradation smoke-tests, under "notable test suites", once built |
-| `background/nged-incumbent-forecast.md` | A note that the incumbent is our degradation floor |
 | `docs/index.md` | Two entries in the Documentation list; one sentence in "More than a forecast" |
 | `roadmap/index.md` | Milestone bullets for the new issues, plus a missingness clause on the v0.7 capacity bullet and the v0.9 neural-net bullet |
 | `CLAUDE.md` | A short entry under Architecture. A docs page alone will not reliably reach future Claude sessions; CLAUDE.md is what is always in context |
-| `architecture/why-dagster-not-airflow.md` | Three edits — see §6.5 |
+| `architecture/why-dagster-not-airflow.md` | Two edits — see §6.5 |
 
 ### 6.3 Issues
 
@@ -638,21 +640,21 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 
 | # | Issue | Milestone | Rationale |
 |---|---|---|---|
-| 0 | **Intervention log** — artifact, cause taxonomy, runbook line | **now, ahead of everything** | Evidence is being lost daily |
-| 1 | Degradation smoke-tests: ablate input groups; assert output exists, stays in physical bounds, does not explode | **v0.2** | Cheap, CI-fast, no MLflow. Sibling of [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229) |
+| 0 | **Intervention log** — artifact, cause taxonomy, runbook line | **v0.2**, when convenient | T1.1 is the only retrospectively-unmeasurable test — but its measurement window opens at v1.0 (§5), so "convenient" beats "urgent" |
+| 1 | Degradation smoke-tests: ablate input groups; assert output exists, stays in physical bounds, does not explode | **v0.3**, with item 2 | Cheap, CI-fast, no MLflow. Sibling of [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229). Sits with item 2 because it consumes item 2's scenario vocabulary — writing it earlier against an ad-hoc vocabulary incurs exactly the retrofit cost §6.4 warns about |
 | 2 | Canonical failure-scenario suite — named, versioned degradation transforms over `AllFeatures` | **v0.3** | Shared by tests, leaderboard, and later training. Must exist before v0.5. Enumerate only §3.6's *episodic* class; the chronic de-accumulated scatter is in-distribution and needs no scenario, though an **elevated** scatter fraction is a good candidate — `assess_nwp_quality` already computes it |
 | 3 | Score every leaderboard experiment under each scenario, **against `nged_incumbent`** | **v0.3**, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | Otherwise v0.5 picks a champion blind to degradation behaviour |
-| 4 | `power_forecast_warnings` **Phase 1**: `STALE NWP` + `STALE POWER`, with `warning_source` | **v0.3** | No dependency on v0.4/v0.6/v0.7. The user-facing half, buildable now |
+| 4 | `power_forecast_warnings` **Phase 1**: `STALE NWP` + `STALE POWER`, with `warning_source` | **v0.4**, with items 6 and 7 | Its consumer is NGED, who first see forecasts around v0.6 — until then item 13's check and the Sentry channel serve the internal audience. Building the whole warnings table as one piece beats splitting it across two milestones |
 | 5 | Rollback path for `promoted_model` | **v0.3** | The mechanism behind T3.2 |
 | 6 | `power_forecast_warnings` **Phase 2**: meter-error types | **v0.4** | Depends on improved cleaning |
 | 7 | `asset_health_history` table | **v0.4** | Same dependency |
 | 8 | Degradation-conditional interval calibration — conformal per regime | **v0.5** | Directly after #263/#264. Must ship with the `techniques/conformal-prediction.md` explainer (§6.1) — the term appears nowhere in `docs/` today |
-| 9 | Clear-sky as the zero-data **floor** — extend [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) | **v0.3** for the shared primitive; feature use stays with #168 | #168 already delivers clear-sky irradiance. Only the floor framing is new, and the scenario suite needs something to degrade *to* |
-| 10 | Cost-per-experiment instrumentation | **v0.5** | Piggybacks on the aws-costs machinery |
+| 9 | Clear-sky as the zero-data **floor** — extend [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) | **v0.5**, with #168 | #168 already delivers clear-sky irradiance; only the floor framing is new. Nothing exercises the floor before v0.5 — item 2's episodic scenarios (missed runs, telemetry stalls) run without it, and rung 4 is only tested once quantile output exists |
+| 10 | ~~Cost-per-experiment instrumentation~~ | **Cut** | Training runs on laptops and costs AWS nothing (`aws-costs.md` bounds an AWS backtest at ~£0.65/run); H4's measurement is reading the monthly bill. Number kept so later items don't renumber |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5** | "Never worse than the incumbent" depends on it |
-| 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2. It binds `BaseForecaster` implementers only — the v0.7 DP estimators are not forecasters, so they are covered by the capacity-estimation judging criteria instead |
+| 12 | Missingness note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) — the NN spike must state and test its null-handling | **v0.9**, a bullet on #362 only | No `BaseForecaster` API change: the spike's MLP consumes the same `AllFeatures` frame as XGBoost, and designing an abstract-method contract for an optional experiment is speculative. If the spike graduates to a real second model family, design the contract then. The v0.7 DP estimators are not forecasters — they are covered by the capacity-estimation judging criteria instead |
 | 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **missed NWP runs at forecast time** (not raw age, per §3.5), WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
-| 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.3**, after 13 | §4 divergences. Ordering is load-bearing |
+| 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.5**, gated on evidence | §4 divergences — but §3.1/§3.2 cut the other way: before item 11 trains for outages, a no-NWP forecast rides *untested* default directions, so degrading in v0.3 would emit unvalidated output. Ship once item 3 shows rung-2 skill beats the incumbent, or together with item 11. Until then, loud failure plus item 13's check is strictly better than today — and there is no external consumer before ~v0.6 anyway |
 | 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | Without it, a degraded-data incident is an out-of-hours page rather than a next-day fix — exactly what T1.1 counts |
 | 16 | Runbook + mechanism: roll back a promoted model | **v0.3** | The docs half of item 5 |
 
@@ -695,25 +697,28 @@ and "implementation later".
 | 5. `promoted_model` rollback | **S** | The forward path exists; mostly config and runbook |
 | 9. Clear-sky primitive | **M** | Well-trodden; also useful as a feature, so it earns its keep twice |
 | 13. `live_forecasts` check | **S** | Reuses the `_to_asset_check_result` shape established twice already |
-| 14. `live_forecasts` degrades | **S–M** | Removing the raises is trivial; deciding *what* a no-NWP forecast contains is the real work, and it overlaps item 11 |
-| 15, 16. The two runbooks | **S** each | Prose, but writable only once 13, 14 and 5 define what the operator does |
+| 14. `live_forecasts` degrades | **S–M** | Removing the raises is trivial; deciding *what* a no-NWP forecast contains is the real work, which is why it ships with (or after) item 11 |
+| 15, 16. The two runbooks | **S** each | Prose, but writable only once 13 and 5 define what the operator does. Runbook 15 documents the v0.3 state — loud failure plus the check — and gains a degraded-output section when item 14 lands |
 | 6, 7. Warnings Phase 2, health history | **M–L** | Contractual, genuinely gated on v0.4 cleaning |
-| 10. Cost-per-experiment | **S** | A tag and a query over machinery `aws-costs.md` already describes |
 | 8. Degradation-conditional calibration | **L** | Real ML work, **blocked** on quantile output |
 | 11. Outage-shaped training augmentation | **L** | Real ML work, **blocked** on items 2 and 3 existing to evaluate against |
-| 12. `BaseForecaster` missingness contract | **S** | Meaningful only once a second model family exists |
+| 12. Missingness note on #362 | **XS** | A bullet in an issue body |
 
-So items 2–5, 9 and 14–16 land in **v0.3** as one focused chunk, not a milestone-sized programme,
-with items 1 and 13 in v0.2 ahead of them and item 0 starting now. Items 8, 10 and 11 land in v0.5
-because that is when their prerequisites exist, and item 12 in v0.9 with the NN spike.
+The milestone shape that falls out: items 0 and 13 in **v0.2**; items 1, 2, 3, 5, 15 and 16 in
+**v0.3** — six small items, genuinely one focused chunk (epic
+[#6](https://github.com/openclimatefix/nged-substation-forecast/issues/6) already carries fourteen
+open sub-issues, so restraint here is not optional); items 4, 6 and 7 in **v0.4**, where the
+warnings table lands whole; items 8, 9, 11 and 14 in **v0.5**, when their prerequisites exist; and
+item 12 as a bullet on #362 in v0.9.
 
-Two orderings are constrained. **Item 13 must precede item 14**, and the v0.2/v0.3 split satisfies
-that naturally: after 13 ships the check reports NWP age while `live_forecasts` still fails loudly
-on very stale NWP, which is strictly better than today and never opens the window the constraint
-guards against — silent degradation. The requirement this places on #424 is that it ships **WARN and
-non-blocking**, like the two existing checks; a blocking check would both contradict the principle
-and force item 14 to revisit it. Separately, [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
-must precede item 3, both within v0.3.
+Two orderings are constrained. **Item 13 must precede item 14**, and the v0.2/v0.5 split more than
+satisfies it: after 13 ships the check reports missed NWP runs while `live_forecasts` still fails
+loudly on very stale NWP, which is strictly better than today and never opens the window the
+constraint guards against — silent degradation. The requirement this places on #424 is that it
+ships **WARN and non-blocking**, like the two existing checks; a blocking check would both
+contradict the principle and force item 14 to revisit it. Separately,
+[#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) must precede item 3,
+both within v0.3.
 
 **Two things to front-load, because retrofitting them is painful:**
 
@@ -727,22 +732,24 @@ must precede item 3, both within v0.3.
    capacity estimators and the v0.9 neural-net spike are both judged against, so it must be stable
    well before either.
 
-One thing needs **no** change: `PowerForecast` requires no new degradation column, because a
-consumer can derive the regime from `nwp_init_time` versus `power_fcst_init_time`, both already
-present.
+One claim an earlier draft made here was wrong, and the correction feeds decision 2:
+`PowerForecast` is **not** exempt from the scenario question. Deriving the regime from
+`nwp_init_time` versus `power_fcst_init_time` works only for *organic* staleness; a synthetic
+ablation (telemetry absent, a variable nulled) leaves both columns untouched, so the regime is
+underivable from the row. And since the `metrics` asset computes metrics by scanning
+`power_forecasts`, item 3 requires per-scenario forecasts to be *persisted* — the table's key has
+no scenario slot today, so scenario variants of the same fold would collide. Decision 2 must settle
+the scenario key for **both** tables, not just metrics.
 
-### 6.5 Dagster-versus-Airflow: three edits, verdict unchanged
+### 6.5 Dagster-versus-Airflow: two edits, verdict unchanged
 
-Option C (stay on Dagster) still stands. But this work reweights one argument, adds a cost to
-Option B, and makes the page's own central premise falsifiable.
+Option C (stay on Dagster) still stands, and the page is a record of a *closed* decision, so it
+gets the minimum: one link and one genuinely new cost, not a re-argument.
 
-**Reweight the asset-checks row.** It currently reads as an observability nicety. It is a
-design-principle row: non-blocking WARN checks are the mechanism by which the system stays
-fail-operational while still telling the truth. In Airflow, data-quality checks are ordinary tasks
-and **blocking by default** (as of 3.3.0), so fail-open behaviour requires writing every check as a
-task that deliberately never fails and reports out-of-band. That makes inherent stability depend on
-developer discipline on every check, rather than on a first-class severity flag. Link the row to the
-new page and say the gap is architectural rather than cosmetic.
+**One sentence on the asset-checks row.** Non-blocking WARN checks are the mechanism by which the
+system stays fail-operational while still telling the truth; in Airflow data-quality checks are
+ordinary tasks and blocking by default (as of 3.3.0). Add a link to the new inherent-stability page
+saying the gap is architectural rather than cosmetic — no more than that.
 
 **Add a cost to Option B.** Option B ports *only the live service* to Airflow — which is precisely
 the half where the non-blocking check primitive matters most, since `power_data_is_fresh` and
@@ -751,26 +758,20 @@ there. It would move the fail-open half onto the orchestrator lacking a fail-ope
 leaving the R&D half — which wants fail-fast and would be content with blocking tasks — on Dagster.
 That is backwards. It does not kill Option B, but it belongs in the "Against" list.
 
-**Add a trigger under "What would change this assessment".** The page's central argument rests on
-experiment volume, which is now H2, with a threshold and a measurement. That cuts both ways: **if T2.1
-is falsified — 20 experiments a month rather than 200 — the central argument for Dagster weakens
-materially.** Saying so makes an architectural decision re-testable rather than permanent, which is
-what the page's "documented seam" framing is for.
-
-A fourth edit is conditional on [decision 2](#7-open-decisions): if scenarios become part of the
-partition key rather than a metrics column, the all-time partition catalog gets roughly ten times
-more cells, strengthening the existing "Airflow has the data model but no partition-status UI" gap.
-Resolve decision 2 before touching this page.
+An earlier draft also proposed a falsification trigger keyed to T2.1 ("if experiment volume is
+low, the case for Dagster weakens"). Dropped: T2.1 is now a peak-capability claim, so a quiet month
+says nothing about the architecture, and the page's argument rests on capability, not utilisation.
 
 ### 6.6 Scope
 
-Of the seventeen items, 4, 6 and 7 are on the critical path to a contractual v1.0 deliverable, and
-**13 and 14 are production-correctness fixes rather than quality work** — divergence 1 is a live
-hard-failure mode that would cut NGED off entirely during an extended NWP outage. The rest is
-quality and stability work. So the widening is smaller than it looks, and part of it is overdue
-rather than new. It is still a widening against the 2026-07-01 "live service first"
-reprioritisation, and that call is Jack's — but 13 and 14 sit *inside* that priority, not against
-it.
+Of the sixteen live items (item 10 is cut), 4, 6 and 7 are on the critical path to a contractual
+v1.0 deliverable, and **13 and 14 are production-correctness fixes rather than quality work**.
+Their urgency differs, though: today's hard-failure mode has no external victim — v0.1 is
+internal-only and NGED first see forecasts around v0.6 — which is exactly why item 14 can wait for
+its v0.5 evidence gate while item 13 lands now. So the widening is smaller than it looks, and part
+of it is overdue rather than new. It is still a widening against the 2026-07-01 "live service
+first" reprioritisation, and that call is Jack's — but 13 and 14 sit *inside* that priority, not
+against it.
 
 ---
 
@@ -779,8 +780,9 @@ it.
 1. **Is v0.3 the right home for the failure-scenario suite?** It widens v0.3, which currently
    carries leaderboard, baselines and production monitoring, and it delays v0.5. The alternative is
    to let v0.5 run on clean-data skill and retrofit scenario scoring, which is cheaper now but means
-   re-judging every v0.5 experiment later. *Recommendation: take the delay — per §6.4 it is small,
-   because the v0.3 tranche is mostly pure functions plus two schema decisions.*
+   re-judging every v0.5 experiment later. *Recommendation: take the delay — with items 4, 9 and 14
+   rescheduled out, the v0.3 tranche is down to six small items (1, 2, 3, 5, 15, 16), mostly pure
+   functions plus two schema decisions.*
 
 2. **How do failure scenarios fit the evaluation model?** `EVALUATION_SCOPES` is currently
    `("leaderboard", "production_monitoring", "ad_hoc")`, with `EvalScopeType` a deliberately
@@ -788,8 +790,11 @@ it.
    expand when Phase 8 lands. Any new scope must follow that two-name pattern. The choice is a
    fourth scope, or a new dimension within `leaderboard`. *Recommendation: the dimension, as a
    metrics **column**, not part of the partition key* — it makes degradation behaviour a first-class
-   property of every experiment, and leaves partition counts unchanged. This also settles the
-   conditional edit in §6.5.
+   property of every experiment, and leaves partition counts unchanged. **The same decision must
+   also cover `power_forecasts`** (see §6.4): synthetic ablations are underivable from the row, and
+   per-scenario forecasts must persist without colliding with the clean fold, so that table needs a
+   scenario slot in its key (or an explicit decision not to persist scenario forecasts, which would
+   break re-runnability and `view_forecasts` inspection).
 
 3. **Does the inherent-stability page cover the whole system, or production only?** The
    operability audience cares about production, but omitting the R&D asymmetry makes the page read
@@ -801,6 +806,7 @@ it.
    load-bearing rather than aspirational, item 11 belongs in v0.5 and we accept the training cost.
    *Recommendation: commit — it is the strongest sentence in the whole principle and should not be
    left unbacked.* The where-complexity-lives principle makes this more than a skill question: item
-   11 is what keeps the weather-blind fallback out of the production service.
+   11 is what keeps the weather-blind fallback out of the production service, and item 14 now ships
+   alongside it in v0.5, so the guarantee and the degrade-not-raise behaviour land together.
 
 5. **Six hypotheses, or three?** H4–H6 are proposals only.
