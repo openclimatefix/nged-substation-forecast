@@ -91,9 +91,25 @@ aggregated or partial metering would help. Using it would be new work rather tha
 already have, but it is much easier than working without any anchor at all. The physical
 background is also harder: Indian rooftop panels lose a substantial fraction of their output to
 dust between monsoons and recover when the rain washes them, and our method currently assumes
-installed capacity only ever grows, so it has no way to express a loss that reverses. High
-atmospheric dust also biases the satellite and forecast estimates of sunlight that the whole method
-leans on.
+installed capacity only ever grows, so it has no way to express a loss that reverses.
+
+Extending it to handle dust looks genuinely straightforward, though — and it is something **we
+should probably add for Britain anyway**. The fix is to stop treating "how much is installed" and
+"how well it is working" as one number: keep the existing installed-capacity term that only grows,
+and multiply it by a separate cleanliness factor between zero and one that dust pushes down and
+rain pushes back up. The physics is simple and well understood — soiling builds up roughly with
+time since the last decent rainfall, and washes off above a few millimetres of rain — so it needs
+only two or three new parameters per site, learned the same way as panel tilt and orientation
+already are. Crucially, **the input it needs is rainfall, which we already download** as part of
+our weather data. The honest caveat is that separating "the panels got dirty" from "someone
+installed fewer panels than we thought" is a real statistical question that would need testing, not
+just coding. Britain is normally rainy enough for soiling to be a small effect, but that is exactly
+what a rain-driven model would predict, and in a long dry spell — London roofs under Saharan dust
+after months without proper rain — it is not small at all. Work done here would pay off in both
+countries.
+
+Separately, high atmospheric dust also biases the satellite and forecast estimates of sunlight that
+the whole method leans on.
 
 Against that, 100,000 sites reporting every 15 minutes would be a far larger and finer-grained
 dataset than the 32 sites the method was designed against — more sites means the shared parts of
@@ -190,18 +206,26 @@ records too, but monthly means only, which is too coarse to be useful here.
   differently: the long capacity-factor series is **modelled**, so it is not independent evidence
   about irradiance, while the reported production is real but spatially aggregated.
 
-**[PVOutput.org](https://pvoutput.org) is a dead end for India, and it is worth knowing why.**
+**[PVOutput.org](https://pvoutput.org) has some Indian systems, but far too few to matter here.**
 PVOutput is the obvious place to look — a global community platform where rooftop owners publish
 live generation, and a genuinely useful source of per-site behind-the-meter data in other
-countries. But **India does not appear in its top 25 countries by system count**, a table headed
-by Australia at roughly 18,100 systems and including the Netherlands (~14,000), the USA (~4,100),
-the UK (~3,400) and Germany (~2,700). Indian coverage is therefore negligible — nothing like a
-usable sample against 100,000 substations. Two further caveats even if coverage improved: bulk
-access (5-minute data in 365-day batches, or whole-country daily output) sits behind PVOutput's
-paid **Data Services** tier, which is also where the **commercial-use licence** lives, so the free
-tier is not usable for funded work; and self-reported community data carries unknown
-capacity, orientation and shading metadata, which is precisely the metadata a disaggregation
-anchor needs to be trustworthy.
+countries. India *is* represented: filtering PVOutput's public system ladder to India returns a
+full page of **at least 30 registered systems**, real installations with named inverters and panel
+counts. But India does **not** appear in PVOutput's top-25 country table, whose 25th entry (New
+Zealand) has 228 systems and 1.1 MW, against Australia's 18,089 systems and 131 MW at the top. So
+Indian coverage sits somewhere between a few dozen and a couple of hundred systems.
+
+We could not pin the exact figure down: PVOutput's public pages expose only the top 25 countries
+and the first page of a filtered ladder, and an exact per-country count needs the PVOutput API,
+which requires a registered account and API key. The number is not worth chasing, because the
+conclusion does not change at any value in that range — a few dozen or even a few hundred
+self-selected rooftops is not a usable sample against 100,000 substations.
+
+Two further caveats even if coverage were better: bulk access (5-minute data in 365-day batches, or
+whole-country daily output) sits behind PVOutput's paid **Data Services** tier, which is also where
+the **commercial-use licence** lives, so the free tier is not usable for funded work; and
+self-reported community data carries unverified capacity, orientation and shading metadata, which
+is precisely the metadata a disaggregation anchor needs to be trustworthy.
 
 The *reason* for the gap is itself informative for the bid: rooftop systems sold in India ship
 with the manufacturer's own monitoring app, so the generation data exists but pools in **inverter
@@ -598,8 +622,20 @@ What is genuinely **harder** in India:
   structurally inexpressible in that prior. In the GB design the mechanism that absorbs this kind
   of variation is *effective*-capacity tracking, which
   [scopes itself to metered generators](../roadmap/capacity-estimation.md) — the very anchor the
-  previous bullet says is missing. The two gaps compound rather than being independent, and
-  closing them is real research, not a parameter change.
+  previous bullet says is missing. The two gaps compound rather than being independent.
+
+    The **fix is small and probably worth making for GB too**: factor the fleet's output into the
+    existing monotone installed capacity multiplied by a *reversible* soiling ratio in (0, 1], and
+    drive the soiling ratio with a two- or three-parameter differentiable state — accumulation
+    proportional to time since rain, wash-off above a rainfall threshold, a learnable floor. It
+    composes cleanly with `UniversalSolarFleetNode` rather than replacing it, keeps the monotone
+    prior intact (which is doing real work identifying installs), and needs no new input:
+    `precipitation_surface` is already in `_ECMWF_ENS_VARS_TO_DOWNLOAD`. The genuine cost is
+    **identifiability testing**, not implementation — soiling and slower-than-assumed capacity
+    growth both depress output, and they are separable only because soiling correlates with
+    rainfall history and has a sawtooth shape where installs are steps. That separation needs
+    demonstrating on synthetic data before it is trusted on real data.
+
 - **Aerosol and monsoon bias in the irradiance itself.** The Indo-Gangetic Plain carries among the
   world's highest aerosol optical depth, which systematically biases satellite- and NWP-derived
   irradiance, and monsoon convection is poorly resolved at 0.25°. Because installed capacity is
