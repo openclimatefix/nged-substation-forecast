@@ -396,6 +396,36 @@ scaling to the full 100,000. One question does follow from it:
   where someone independently knows roughly how much solar is installed, because those are what make
   the disaggregation results checkable rather than merely plausible.
 
+**About the substation measurements themselves:**
+
+- **Is the metering directional (MW) or magnitude-only (MVA)?** This is the question we most wish we
+  had asked NGED early. Apparent-power metering cannot see direction, so an exporting substation
+  "bounces" off zero instead of going negative, and the reverse-flow periods — exactly the ones that
+  reveal embedded PV — are the ones the reading destroys
+  ([Data quality](../background/data-quality.md#apparent-power-mva-metering)). We handle it, and the
+  [disaggregation design](../roadmap/disaggregation.md#apparent-power-mva-metering) reconstructs
+  signed flow and compares its *magnitude* against the meter, but it is strictly harder than having
+  the sign. India may well be **better** placed than NGED's trial area here: the Indian smart-meter
+  standard IS 16444 requires separate import and export registers and measures both kWh and kVAh,
+  so the instrument usually knows the direction. **The risk is the extract, not the instrument** —
+  a pipeline built around billing may hand us a single net or apparent-energy figure and discard
+  the sign. Ask what fields we actually receive, not what the meter is capable of.
+- **Does this population actually see reverse flow, and where?** Indian DISCOMs report midday
+  voltage rise and reverse power flow on high-penetration feeders, and a 2025 review of rooftop PV
+  at distribution-transformer level puts the onset at roughly 25% of daytime minimum load. This
+  matters twice: reverse flow is what makes magnitude-only metering lossy in the first place, and a
+  substation that never exports gives the disaggregation much less to work with.
+- **Are these distribution transformers or 11 kV feeders?** "Secondary substation" is a European
+  term and the Indian equivalent is ambiguous. It is worth resolving, because the arithmetic points
+  one way: India has roughly **15.1 million distribution transformers but only ~250,000 11 kV
+  feeders**, and as of March 2024 only **42% of distribution transformers were metered** (69% urban,
+  32% rural) against **99% of 11 kV feeders**. So 100,000 sites is under 1% of the transformer
+  population but around 40% of the feeder population, which makes a feeder-level dataset much more
+  likely. The answer changes the number of customers behind each measurement point by an order of
+  magnitude, and with it how much rooftop PV sits behind one and how much load diversity smooths
+  it. If it *is* transformer-level, expect the sample to be urban-skewed, which matters for
+  choosing the trial sites.
+
 **About the forecast itself:**
 
 - **What is the forecast horizon?** The single biggest driver of both storage and method.
@@ -762,6 +792,14 @@ What is genuinely **easier**:
   raw ratio to V1 suggests.
 - **15-minute data instead of half-hourly.** Finer sampling separates the solar shape from the load
   shape more cleanly, particularly around sunrise and sunset ramps.
+- **Directional metering is more likely than in NGED's trial area.** IS 16444, the Indian
+  smart-meter standard, requires separate import and export registers, so signed flow is usually
+  available at the instrument — where NGED reports 10 sites in its trial area as non-directional. If it
+  survives the extract (a question, not an assumption — see
+  [Questions we should ask them](#questions-we-should-ask-them)), the
+  [MVA-bounce reconstruction](../roadmap/disaggregation.md#apparent-power-mva-metering) is a
+  fallback we would not need. `TimeSeriesMetadata.units` is already a per-series
+  `pl.Enum(["MW", "MVA"])`, so a mixed population needs no schema change either way.
 
 #### Modelling load shedding and diesel backup
 
