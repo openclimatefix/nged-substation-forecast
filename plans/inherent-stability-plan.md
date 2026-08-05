@@ -510,7 +510,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 10 | Cost-per-experiment instrumentation | **v0.5** | Piggybacks on the aws-costs machinery |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5** | "Never worse than the incumbent" depends on it |
 | 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2 |
-| 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **NWP age at forecast time**, WARN and non-blocking | **v0.3** | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension, a severity decision, an epic, and project fields |
+| 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **NWP age at forecast time**, WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
 | 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.3**, after 13 | §4 divergences. Ordering is load-bearing |
 | 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | H1's "recovery next business day, via runbook" threshold is unmeasurable without it |
 | 16 | Runbook + mechanism: roll back a promoted model | **v0.3** | The docs half of item 5 |
@@ -557,10 +557,17 @@ and "implementation later".
 | 11. Outage-shaped training augmentation | **L** | Real ML work, **blocked** on items 2 and 3 existing to evaluate against |
 | 12. `BaseForecaster` missingness contract | **S** | Meaningful only once a second model family exists |
 
-So items 0–5, 9 and 13–16 all land in **v0.3** as one focused chunk, not a milestone-sized
-programme. Items 8 and 11 land in v0.5 because that is when their prerequisite exists, and item 12
-in v0.9 with the NN spike. Within v0.3, two orderings are constrained: 13 before 14, and #147 before
-item 3.
+So items 0–5, 9 and 14–16 land in **v0.3** as one focused chunk, not a milestone-sized programme,
+with items 1 and 13 in v0.2 ahead of them. Items 8 and 11 land in v0.5 because that is when their
+prerequisite exists, and item 12 in v0.9 with the NN spike.
+
+Two orderings are constrained. **Item 13 must precede item 14**, and the v0.2/v0.3 split satisfies
+that naturally: after 13 ships the check reports NWP age while `live_forecasts` still fails loudly
+on very stale NWP, which is strictly better than today and never opens the window the constraint
+guards against — silent degradation. The requirement this places on #424 is that it ships **WARN and
+non-blocking**, like the two existing checks; a blocking check would both contradict the principle
+and force item 14 to revisit it. Separately, [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147)
+must precede item 3, both within v0.3.
 
 **Two things to front-load, because retrofitting them is painful:**
 
