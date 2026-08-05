@@ -259,7 +259,11 @@ This is a state-space recurrence — the same pattern as a battery charge/discha
 
 ### Soiling
 
-Not yet modelled, and worth adding for Great Britain — not only for dustier climates. Dirt, dust, pollen and bird droppings accumulate on panel glass and depress output by a few percent, and a decent fall of rain washes most of it off. Britain is normally rainy enough for the long-run average effect to be small, but the effect is driven by *time since the last washing rainfall*, not by climate averages, so a multi-month dry spell — London rooftops under Saharan dust after a rainless summer — is exactly the regime in which it stops being small. It is also one of the largest remaining unmodelled losses for any deployment in a dry or dusty climate.
+Already anticipated in outline — [Capacity estimation](../roadmap/capacity-estimation.md) names
+soiling as one of the shared physics corrections a learned fleet-scale model should absorb, and
+notes that a capacity estimate silently absorbs it otherwise. This section makes the
+parameterisation concrete. It is not yet implemented, and it is worth adding for Great Britain —
+not only for dustier climates. Dirt, dust, pollen and bird droppings accumulate on panel glass and depress output by a few percent, and a decent fall of rain washes most of it off. Britain is normally rainy enough for the long-run average effect to be small, but the effect is driven by *time since the last washing rainfall*, not by climate averages, so a multi-month dry spell — London rooftops under Saharan dust after a rainless summer — is exactly the regime in which it stops being small. It is also one of the largest remaining unmodelled losses for any deployment in a dry or dusty climate.
 
 **How it would fit.** Soiling is a multiplicative loss, so it enters as a ratio $s_t \in (0, 1]$ applied to DC output alongside the temperature derate $\eta_T$, driven by a small differentiable state that accumulates with dry time and resets with rain:
 
