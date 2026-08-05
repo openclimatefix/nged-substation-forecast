@@ -128,6 +128,37 @@ WARN-versus-ERROR severity: R&D lives in the CV and training assets, so the natu
 strict-mode flag on the feature and validation layer, plus the asset tagging in
 [#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423).
 
+### Where complexity should live
+
+> **When a capability can be built into the training loop or into the production service, build it
+> into the training loop.**
+
+The service runs unattended at 06:00 on the day the inputs are strangest. Training runs in front of
+a human who can read the traceback and re-run it. Complexity in the two places therefore carries
+very different risk, and the reasoning that puts fail-fast in R&D and fail-operational in production
+says the same thing about code placement: keep the serving path as close to "load a model, call
+`predict`" as we can.
+
+This is descriptive as much as aspirational. `promoted_model` already copies the champion to local
+disk so inference makes no MLflow call. Regime-conditional conformal calibration
+([§3.6](#36-neural-nets-and-differentiable-physics)) has the same shape — computed offline,
+production does a table lookup.
+
+Two qualifiers keep it honest:
+
+- **It is a tie-break, not an override.** A single model spanning every degradation regime may spend
+  capacity on regimes that occur one day in a hundred. Where skill is comparable, prefer the simpler
+  service; where the gap is measured and real, skill wins.
+- **It relocates the branch rather than removing it.** A fallback cascade's `if` is reviewable and
+  directly testable; a model that "handles anything" holds the same branch internally as a learned
+  default direction, which can only be measured. So the principle is safe to apply only once the
+  failure-scenario suite exists to measure it — which makes items 1–3 a precondition for it rather
+  than merely adjacent work.
+
+It does not license unbounded training complexity: H2 and H3 depend on retraining staying cheap and
+promotion staying one-click, so a training harness nobody can run is also a production risk. And it
+has no bearing on work that *must* live in production — items 13 and 14 among them.
+
 ### Naming, and the analogy to use
 
 **Use "inherent stability", and lead with the steering analogy.** Avoid nuclear fission: in a
@@ -193,11 +224,13 @@ not on a well-trained weather-blind model. Two ways to make the claim true:
 
 | Option | Mechanism | Verdict |
 |---|---|---|
-| **A. Train for it** | Include outage-shaped scenarios in training so the default directions are learned | Purist: one model, no branch, genuinely inherent. Preferred if it performs |
-| **B. Fallback cascade** | Keep a cheap weather-blind model trained alongside; use it when NWP is absent | Pragmatic. A branch, but a deterministic function of what data exists — no detection step, so defensible |
+| **A. Train for it** | Include outage-shaped scenarios in training so the default directions are learned | **The default.** One model, nothing added to the serving path, genuinely inherent |
+| **B. Fallback cascade** | Keep a cheap weather-blind model trained alongside; use it when NWP is absent | A branch, but a deterministic function of what data exists — no detection step, so defensible if it is needed |
 
-Try A, keep B in reserve, and let the failure-scenario suite decide. That makes the choice empirical
-rather than aesthetic.
+Try A, keep B in reserve, and let the failure-scenario suite decide — but §1's where-complexity-lives
+principle sets the burden of proof. A is the default; B has to earn its place in production with a
+measured skill gap, not merely by being easier to implement. That makes the choice empirical rather
+than aesthetic.
 
 ### 3.3 Widening bands: the in-band signal
 
@@ -652,6 +685,7 @@ it.
 4. **Do we commit to the weather-blind guarantee?** If "never worse than the incumbent" is to be
    load-bearing rather than aspirational, item 11 belongs in v0.5 and we accept the training cost.
    *Recommendation: commit — it is the strongest sentence in the whole principle and should not be
-   left unbacked.*
+   left unbacked.* The where-complexity-lives principle makes this more than a skill question: item
+   11 is what keeps the weather-blind fallback out of the production service.
 
 5. **Six hypotheses, or three?** H4–H6 are proposals only.
