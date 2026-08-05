@@ -33,6 +33,7 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Documentation Guide: documentation-guide.md
+  - Engineering Hypotheses: engineering-hypotheses.md
   - Background & Challenges:
       - NGED Network: background/network.md
       - Requirements: background/requirements.md
@@ -49,6 +50,7 @@ nav:
       - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
   - Architecture:
       - Overview: architecture/overview.md
+      - Inherent Stability: architecture/inherent-stability.md
       - Forecast Delivery: architecture/forecast-delivery.md
       - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md

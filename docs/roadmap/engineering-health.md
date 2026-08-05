@@ -133,6 +133,15 @@ testing strategy remain unwritten, plus general cleanup.
   experiment-independence of `eligible_time_series`.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical
   predictions. This underpins idempotent retries and a stable leaderboard.
+- **Degradation smoke-tests**: ablate whole input groups — NWP absent, telemetry absent, a single
+  weather variable nulled — and assert that a forecast is still produced for every time series, that
+  every value stays inside physical bounds, and that nothing explodes. These consume the scenario
+  vocabulary defined by the failure-scenario suite in
+  [Metrics & Leaderboard](metrics-and-leaderboard.md#scoring-under-failure-scenarios), so they must
+  land alongside it rather than against an ad-hoc vocabulary of their own. They are cheap and
+  CI-fast — pure functions over an `AllFeatures` frame, no MLflow — and they check *survival*, not
+  skill; skill under degradation is the leaderboard's job. The principle they enforce is
+  [Inherent Stability](../architecture/inherent-stability.md).
 
 **Part 2 — cleanup:**
 

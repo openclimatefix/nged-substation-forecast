@@ -42,14 +42,21 @@ isn't reliably possible from power readings alone, that's a useful finding in it
 can use it as evidence to justify investing in extracting switching-event labels from their own
 operational systems, rather than us silently working around the gap.
 
+The same logic applies to the engineering, which is why our claims about it are written down as
+falsifiable [engineering hypotheses](engineering-hypotheses.md) with thresholds attached: a
+pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
+short of is not.
+
 ## Documentation
 
 > **Want to run this on your laptop?** Start with [Getting started](getting-started.md) — a single
 > walkthrough from a fresh clone to a running Dagster instance that downloads data and trains a
 > model.
 
+- [Engineering Hypotheses](engineering-hypotheses.md) — what we claim the engineering will achieve, the threshold that decides each claim, and what would falsify it
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
 - [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
+- [Inherent Stability](architecture/inherent-stability.md) — how the service behaves as its inputs degrade: the degradation ladder, the failure modes, and the rules to follow when changing production code
 - [Code Style](architecture/code-style.md) — code conventions
 - [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable test suites
 - [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML experimentation: cross-validation folds, the leaderboard, and how we evaluate models

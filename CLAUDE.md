@@ -122,6 +122,31 @@ must also:
 
 This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
 
+### Inherent stability (production code)
+
+**In production, never raise because an input is absent or stale — degrade, widen the uncertainty
+bands, and record the degradation on the row.** Raising is reserved for states that are our own bug
+(an empty promoted model, a contract violation), not for the outside world misbehaving. Corollaries
+that come up constantly when editing `defs/`:
+
+- **Liberal about missing inputs, strict about malformed ones.** Absent data routes into the
+  always-output path; malformed data is rejected at the Patito boundary. Detectably-*wrong* input
+  (a stuck meter) is treated as missing, not as data.
+- **Asset checks warn, they do not block** — `AssetCheckSeverity.WARN` with `blocking=False`. There
+  is deliberately no `ERROR`-severity check anywhere in the repo. A warning function must never be
+  able to raise, or fail-open silently becomes fail-closed.
+- **Measure degradation in missed NWP runs, never in hours of age.** We ingest one ECMWF run per
+  day, so healthy NWP is 12–30 hours old depending on the 6-hourly slot.
+- **R&D is the opposite**: the CV, training and metrics assets fail fast, because a quietly-degraded
+  training run poisons every comparison built on it.
+- **When a capability could live in the training loop or in the production service, put it in the
+  training loop.** Keep the serving path close to "load a model, call `predict`".
+
+Full rationale, the degradation ladder and the numbered rules:
+[`docs/architecture/inherent-stability.md`](docs/architecture/inherent-stability.md). The
+falsifiable claims it is meant to deliver — cite them as `H1`/`T1.2` and never renumber them — are
+in [`docs/engineering-hypotheses.md`](docs/engineering-hypotheses.md).
+
 ### Packages
 
 | Package | Purpose |

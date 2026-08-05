@@ -2,6 +2,8 @@
 
 The architecture prioritises developer velocity, idempotent re-runs, and strict **Training-Serving Symmetry**.
 
+One further design principle is large enough to have its own page: **[Inherent Stability](inherent-stability.md)** — when inputs degrade, the service gets less certain rather than stopping, and says so in the answer itself. That page carries the degradation ladder, the failure-mode table, and the numbered rules to follow when changing production code.
+
 The primary aim is to develop novel, ambitious, state-of-the-art ML approaches to forecasting. We are simultaneously building a "test-harness" production service so that ML research runs in a production-like environment from day one.
 
 The aim is to manage the *entire* data pipeline in Dagster: download data, validate data, train ML models, run inference, perform backtests. MLflow tracks every experiment. Re-running a backtest should be as easy as clicking a button in Dagster. Swapping a new model into production should require minimal friction.

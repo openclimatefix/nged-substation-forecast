@@ -202,6 +202,13 @@ around the Dagster UI and would need rewriting.
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Sensors / run-status coordination (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest → forecast ordering | Asset-triggered DAGs, event-driven scheduling | Parity, arguably cleaner in Airflow |
 
+The asset-checks row is worth one extra sentence, because the gap there is architectural rather
+than cosmetic: non-blocking WARN checks are the *mechanism* by which this service stays
+fail-operational while still telling the truth about degraded inputs (see
+[Inherent Stability](inherent-stability.md)), so an orchestrator whose data-quality checks are
+ordinary, blocking-by-default tasks makes the house pattern something we would have to rebuild by
+hand rather than something we would inherit.
+
 ### The three trickiest parts of a full port
 
 #### The CV layer: right data model, missing status surface
@@ -325,6 +332,12 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
 - There is an asymmetry worth noting: NGED would get a Dagster-free world, but OCF researchers
   would still live in both tools. The boundary is clean for the operator and leakier for the
   developer.
+- **It moves the fail-open half onto the orchestrator that lacks a fail-open primitive.** Option B
+  ports precisely the half where the non-blocking check matters most: `power_data_is_fresh` and
+  `nwp_has_no_unexpected_nulls` are both production-side, and the warning channel to NGED
+  originates there. Meanwhile the R&D half — which wants fail-fast and would be perfectly content
+  with blocking data-quality tasks — is the half that stays on Dagster. That is backwards with
+  respect to the [inherent-stability](inherent-stability.md) design.
 - The audit trail fragments: production run history in Airflow, promotion and experiment
   history in Dagster/MLflow.
 - If the deployment target were MWAA at its current version (3.2.1), the backfill-conf bug
