@@ -214,7 +214,6 @@ usually sinks projects like this.
 **What we should not claim.** Being straight about these protects the bid rather than weakening it,
 and each one has a natural follow-up question we can turn back on the client.
 
-- **Not 100,000 substations in year one.** We are proposing a 50–100 site trial first, deliberately.
 - **Not a number for disaggregation accuracy, before the trial.** We can say precisely *how* we
   would measure it; we cannot say what it will come out at, and anyone who does is guessing.
 - **Not per-site solar accuracy without an anchor.** With no metered PV anywhere in the dataset the
