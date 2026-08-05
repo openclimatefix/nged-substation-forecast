@@ -536,6 +536,26 @@ The three-page division of labour, with no duplication:
 | `engineering-hypotheses.md` | *What we claim*, how it is tested, what would falsify it |
 | `architecture/inherent-stability.md` | *How the design delivers H1* |
 
+**`docs/techniques/conformal-prediction.md` — deferred, written when item 8 reaches the roadmap.**
+Conformal prediction currently appears **nowhere** in `docs/`, so item 8 would introduce an
+unexplained term into a roadmap page. The techniques section exists for exactly this — a durable
+explainer of a solution method — so item 8 must not land without one, plus its bullet in
+`techniques/index.md`. Three things the page must cover beyond a generic tutorial:
+
+- **The guarantee and what it costs.** Distribution-free, finite-sample coverage computed from
+  held-out residuals, with no retraining and no distributional assumption about the model.
+- **Why *Mondrian*, not plain split conformal.** The guarantee rests on exchangeability between
+  calibration and test data, and a degradation regime is precisely a violation of it. Conditioning
+  on the regime restores exchangeability *within* each regime, which is why §3.6 says "per regime"
+  rather than simply "conformal". This is the project-specific point, and the one a generic
+  explainer would miss.
+- **The precondition and its limit.** Each regime needs enough held-out residuals of its own, and
+  the rarest regimes — a weeks-long NWP outage — may have too few. That is a real constraint on
+  item 8, not a footnote.
+
+It also needs cross-links to `probabilistic-forecasting.md` (which produces the intervals conformal
+calibrates) and `evaluation-metrics.md` (PICP and interval width, which measure whether it worked).
+
 ### 6.2 Edits to existing pages
 
 | Page | Edit |
@@ -579,7 +599,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 5 | Rollback path for `promoted_model` | **v0.3** | H3's second direction |
 | 6 | `power_forecast_warnings` **Phase 2**: meter-error types | **v0.4** | Depends on improved cleaning |
 | 7 | `asset_health_history` table | **v0.4** | Same dependency |
-| 8 | Degradation-conditional interval calibration — conformal per regime | **v0.5** | Directly after #263/#264 |
+| 8 | Degradation-conditional interval calibration — conformal per regime | **v0.5** | Directly after #263/#264. Must ship with the `techniques/conformal-prediction.md` explainer (§6.1) — the term appears nowhere in `docs/` today |
 | 9 | Clear-sky as the zero-data **floor** — extend [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) | **v0.3** for the shared primitive; feature use stays with #168 | #168 already delivers clear-sky irradiance. Only the floor framing is new, and the scenario suite needs something to degrade *to* |
 | 10 | Cost-per-experiment instrumentation | **v0.5** | Piggybacks on the aws-costs machinery |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5** | "Never worse than the incumbent" depends on it |
