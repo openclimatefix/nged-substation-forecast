@@ -55,7 +55,7 @@ nav:
       - Production Deployment Design: architecture/production-deployment.md
       - AWS Running Costs: architecture/aws-costs.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
-      - "Could this codebase forecast another country?": architecture/adapting-to-another-geography.md
+      - "Could this codebase forecast another country? (not planned)": architecture/adapting-to-another-geography.md
       - Code Style: architecture/code-style.md
       - Testing: architecture/testing.md
   - ML Experimentation:
