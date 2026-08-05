@@ -35,7 +35,12 @@ we would have to stop training a separate model for each substation and instead 
 that learns across all of them at once. That is already on our NGED roadmap for its own reasons,
 and at 100,000 sites it becomes clearly the favourable choice, because each part of the model is
 supported by far more data. Storage layouts would also need reworking, because a year of forecasts
-at that scale runs to tens of terabytes.
+at that scale runs to roughly 18 terabytes *stored* — that is, after the aggressive compression we
+already apply, described in
+[Forecast delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data). The same
+forecasts in an uncompressed form, such as the JSON a REST API would send, would be a couple of
+thousand terabytes. The distinction matters throughout this page, so every figure below says which
+one it is.
 
 **Estimating unmetered solar is the research bet — and it is the same bet we are already making
 for NGED.** Separating rooftop solar from underlying demand, with no generation meters and no
@@ -192,12 +197,30 @@ which would mean 100,000 Hive directories and a small-file explosion on every ap
 a date-based partition instead. `power_forecasts` partitions only by `(experiment_name, fold_id)`,
 with no time or series axis. At the brief's scale a single full-ensemble run is roughly 100,000
 series × 51 members × 14 days × 96 steps/day ≈ **6.9 billion rows per run**. At the current
-6-hourly cadence (4 runs/day) that is of order 10 trillion rows per year — around 18 TB per year at
-the measured ~1.8 bytes per row. That is storable on S3, but painful to read. The obvious
-mitigation is to persist the thirteen agreed
-[delivery quantiles](../roadmap/delivery-tables.md#representation-2-percentiles) rather than raw
-ensemble members: one row per `valid_time` instead of 51, so a 51× reduction in rows and roughly 4×
-fewer stored values.
+6-hourly cadence (4 runs/day) that is of order 10 trillion rows per year.
+
+Be careful which number that translates into, because the two differ by more than two orders of
+magnitude:
+
+| A year of forecasts at the brief's scale | Volume |
+|---|---|
+| **On disk**, in `delta_store`'s compressed Delta layout, at the measured ~1.8 bytes/row | **~18 TB** |
+| **Uncompressed**, as JSON on the wire, at the measured ~356 bytes/row | **~3.6 PB** |
+
+Both per-row figures are measurements from the existing `power_forecasts` table, recorded in
+[Forecast delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data); only the
+row count is extrapolated. **The ~18 TB is the storage bill; the petabyte figure is what you would
+move if you ever serialised it naively**, which is the same argument that page makes for delivering
+Delta rather than REST — it just gets 80× sharper here. In-memory footprint sits between the two
+and depends on the frame's column set, so it is not quoted.
+
+18 TB on disk is affordable on S3 but painful to read. The obvious mitigation is to persist the
+thirteen agreed [delivery quantiles](../roadmap/delivery-tables.md#representation-2-percentiles)
+rather than raw ensemble members: one row per `valid_time` instead of 51, so **51× fewer rows and
+roughly 4× fewer stored values**. Note those two ratios are not the on-disk saving, and the on-disk
+saving is the one that matters: compression already exploits much of the redundancy across members,
+so the byte reduction would land nearer the 4× than the 51×. That needs measuring through the real
+`delta_store` write path before anyone quotes a number for it.
 
 **Polars' 32-bit row-index cap stops being an edge case — it becomes a write-path blocker.** As
 documented in
@@ -208,9 +231,13 @@ run's 6.9 billion forecast rows exceed the 4.29-billion cap on their own**, so t
 inference run could not be materialised as one frame at all. Chunking the write is not an
 optimisation at this scale; it is a precondition.
 
-NWP volume, by contrast, scales with **area, not site count**. India is roughly 15× the land area
-of Great Britain, so a full ECMWF ensemble archive would be of order 600 GB per year against
-Britain's measured ~40 GB — an estimate by area, not a measurement. The bigger loss is that the
+NWP volume, by contrast, scales with **area, not site count**. Great Britain's full ECMWF ensemble
+archive measures **~40 GB per year on disk** in the same compressed Delta layout (the whole
+development table is ~93 GB for 5.9 billion rows). India is roughly 15× the land area, so the
+equivalent archive would be of order **600 GB per year on disk** — scaled by area, not measured,
+and it says nothing about the in-memory cost of a query against it, which the
+[input-pruning strategy](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+exists to bound separately. The bigger loss is that the
 `h3_index` pruning described in
 [Architecture Overview](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 stops helping: with 100,000 sites spread across the country, the cells the sites occupy *are* the
