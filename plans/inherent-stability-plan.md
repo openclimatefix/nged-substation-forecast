@@ -463,7 +463,10 @@ a threshold and a window, and we must be willing to record a falsification.
 
 ### The claims
 
-Numbers are citable from issues and reports, so **append, never renumber**.
+**H*n*** is a hypothesis; **T*n.m*** is the *m*th **test** of hypothesis *n*. H1 bundles three
+separable claims that each need their own measurement, so its row is a header and the three tests
+beneath it carry the thresholds. H2 and H3 make a single claim each, so their test sits inline and
+needs no number. Labels are citable from issues and reports, so **append, never renumber**.
 
 | | Claim | Test | Threshold | Source | Resolvable |
 |---|---|---|---|---|---|
