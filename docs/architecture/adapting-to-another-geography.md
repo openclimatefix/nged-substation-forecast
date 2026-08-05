@@ -92,7 +92,11 @@ sized against measured numbers instead of worst cases. What we should avoid prom
 substations in year one.
 
 **Estimating unmetered solar is the research bet — and it is the same bet we are already making
-for NGED.** Separating rooftop solar from underlying demand, with no generation meters and no
+for NGED.** This assumes they want the unmetered solar *recovered from the substation data* rather
+than simply forecast from a capacity figure they already hold, which is a much lighter job and a
+perfectly reasonable reading of the brief — **so check** (see
+[Questions we should ask them](#questions-we-should-ask-them)); it is the single largest fork in
+the project. Separating rooftop solar from underlying demand, with no generation meters and no
 capacity register, is exactly the problem described in
 [Net-demand disaggregation](../roadmap/disaggregation.md). The method there is designed for
 precisely this: it treats a substation's reading as demand minus solar generation, models the solar
@@ -509,7 +513,37 @@ any
 compression work.
 
 **About scope and phasing.** We are proposing to start with a trial of 50 to 100 substations before
-scaling to the full 100,000. Two questions follow from that.
+scaling to the full 100,000. Three questions sit alongside that, and the first of them is the
+largest question on this page.
+
+- **Do they actually want us to *disaggregate* PV from the substation data at all?** We have read
+  the brief as requiring it, and that reading may simply be wrong. There is a much lighter
+  alternative reading: forecast net substation demand as one product, and separately forecast PV
+  generation from weather and whatever installed-capacity figure they already hold, without
+  requiring the two to reconcile against the meter. Both readings satisfy the words "forecast net
+  demand, and also forecast PV".
+
+    The gap between them is enormous, and it is almost the whole risk in the project. Forecasting
+    PV from a known capacity is well-trodden work that we and many others can do. Recovering
+    *unmetered* PV from net flow with no capacity register is the research bet — it is the thing
+    that might not work, and it carries most of the cost, most of the schedule and essentially all
+    of the uncertainty (see
+    [PV disaggregation without capacity priors](#pv-disaggregation-without-capacity-priors)).
+
+    The sharp version of the question is: **must the two forecasts be consistent with each other and
+    with the meter?** If underlying demand is required to equal net demand plus PV, that *is*
+    disaggregation, whatever it is called. If the two are allowed to be independent products, it is
+    not, and the project is dramatically cheaper, faster and lower-risk.
+
+    Two things follow that we should raise rather than wait to be asked. First, if they intend to
+    supply a capacity figure, we need to know where it comes from and how much they trust it —
+    which connects directly to
+    [India does record domestic PV capacity](#india-does-record-domestic-pv-capacity). Second,
+    there is a **middle path worth offering**: do the straightforward work, and use disaggregation
+    as an independent *check* on their capacity register rather than as a dependency of the
+    forecast. That keeps the research upside without putting the deliverable at risk of it, and it
+    produces something they cannot get elsewhere. If they do not want disaggregation, we should say
+    so plainly and price accordingly, rather than selling them research they did not ask for.
 
 - **Is this a research project on historical data, or do they also want a live service?** Possibly
   the biggest single question on this page after the forecast horizon, and the one most likely to be
