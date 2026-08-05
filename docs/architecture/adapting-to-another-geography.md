@@ -26,7 +26,9 @@ The assessment assumed the following brief:
 - ~100,000 secondary substations, each reporting power flow every 15 minutes.
 - Forecast **net demand** per substation.
 - Additionally forecast **PV** per substation.
-- **No PV metering anywhere**, and **no prior on installed capacity** at any site.
+- **No PV metering anywhere**, and **no prior on installed capacity** at any site. (The second half
+  of this looks challengeable — see
+  [India does record domestic PV capacity](#india-does-record-domestic-pv-capacity).)
 
 ### The short answer
 
@@ -74,10 +76,10 @@ anything we could do to the storage format.** If the answers do come back at the
 there are further options — see
 [Radical options for shrinking what we store](#radical-options-for-shrinking-what-we-store).
 
-**We would also expect to start with a trial of roughly 50 to 100 substations, not with all
-100,000.** That is the same shape as our NGED programme, where we are running on a 32-substation
-trial area before scaling to around 2,500, and it is worth saying out loud in the pitch, because it
-changes the risk profile considerably. A trial at that size needs essentially none of the scale
+**We are proposing to start with a trial of roughly 50 to 100 substations, not with all 100,000.**
+That is the same shape as our NGED programme, where we are running on a 32-substation trial area
+before scaling to around 2,500, and it is worth saying out loud in the pitch, because it changes
+the risk profile considerably. A trial at that size needs essentially none of the scale
 engineering described above — it is comfortably within what the code handles today — so the first
 year could be spent proving the hard part, which is whether we can actually recover unmetered
 rooftop solar from Indian net-flow data, rather than on storage layouts. It also front-loads the
@@ -105,36 +107,44 @@ background is also harder: Indian rooftop panels lose a substantial fraction of 
 dust between monsoons and recover when the rain washes them, and our method currently assumes
 installed capacity only ever grows, so it has no way to express a loss that reverses.
 
-Extending it to handle dust looks genuinely straightforward, though — and it is something **we
+Extending it to handle soiling looks genuinely straightforward, though — and it is something **we
 should probably add for Britain anyway**. The fix is to stop treating "how much is installed" and
 "how well it is working" as one number: keep the existing installed-capacity term that only grows,
 and multiply it by a separate cleanliness factor between zero and one that dust pushes down and
-rain pushes back up. The physics is simple and well understood — soiling builds up roughly with
-time since the last decent rainfall, and washes off above a few millimetres of rain — so it needs
-only two or three new parameters per site, learned the same way as panel tilt and orientation
-already are. Crucially, **the input it needs is rainfall, which we already download** as part of
-our weather data. The honest caveat is that separating "the panels got dirty" from "someone
-installed fewer panels than we thought" is a real statistical question that would need testing, not
-just coding. Britain is normally rainy enough for soiling to be a small effect, but that is exactly
-what a rain-driven model would predict, and in a long dry spell — London roofs under Saharan dust
-after months without proper rain — it is not small at all. Work done here would pay off in both
-countries.
+rain pushes back up. That is two or three extra parameters, learned the same way as panel tilt and
+orientation already are, and **the only input it needs is rainfall, which we already download**.
+The honest caveat is that separating "the panels got dirty" from "someone installed fewer panels
+than we thought" is a real statistical question that would need testing, not just coding. Britain
+is rainy enough that the long-run average effect is small, but the effect is driven by time since
+the last washing rain rather than by climate averages — London roofs under Saharan dust after a
+rainless summer are not a small effect. Work done here would pay off in both countries. Separately,
+high atmospheric dust also biases the satellite and forecast irradiance the whole method leans on.
 
-Separately, high atmospheric dust also biases the satellite and forecast estimates of sunlight that
-the whole method leans on.
+Against that, 100,000 sites at 15 minutes would be a far larger and finer-grained dataset than the
+~2,500 sites we have been designing towards all along for NGED's V2 (the V1 trial area we are
+currently running on is 32 sites), and the shared parts of the model are much better constrained by
+more sites. There are also confounders India has and Britain does not: **load shedding** and
+**diesel backup generation**.
 
-Against that, 100,000 sites reporting every 15 minutes would be a far larger and finer-grained
-dataset than the ~2,500 sites we have been designing towards all along for NGED's V2 (the V1 trial
-area we are currently running on is 32 sites) — more sites means the shared parts of the model are
-much better constrained, and 15-minute data separates a solar signal from a demand signal more
-cleanly than half-hourly data does. There are also confounders India has and Britain
-does not: load shedding and diesel backup generation both break the assumption that underlying
-demand moves smoothly with the weather. Load shedding is the dangerous one, because it looks like
-demand collapsing for no meteorological reason. Agricultural pumping is a special case worth
-calling out as an opportunity rather than a problem: Indian agricultural feeders are largely
-segregated and run to a published supply schedule, so a load that would otherwise be invisible is
-partly *known in advance*. Whether we could actually obtain those schedules — and the load-shedding
-schedules, which would help just as much — is another thing to ask (see [Questions we should ask them](#questions-we-should-ask-them)).
+Neither is new territory for us, though, and that is worth being able to say. A sustained step down
+in metered power with no meteorological cause is precisely what NGED already presents us with when
+the network is reconfigured, and we have a designed method for detecting those events unsupervised
+([Switching events](../roadmap/switching-events.md)). The same detector applies here, and it
+distinguishes the two cases for free: switched load reappears at a neighbour, whereas shed load
+leaves the neighbourhood entirely, so conservation across the neighbourhood holds in one case and
+fails in the other. Load shedding is in some ways the *easier* target, because it is a collapse to
+near-zero rather than a partial transfer, and because it happens at night as well as by day —
+night-time outages let us characterise an outage with no PV present to confuse matters, and that
+transfers into daylight. Diesel separates from PV on shape and on the fact that it does not covary
+with irradiance day to day. Modelling both is a few weeks on top of the disaggregation itself, and
+much cheaper again if the shedding schedules are obtainable. Detail in
+[Modelling load shedding and diesel backup](#modelling-load-shedding-and-diesel-backup).
+
+Agricultural pumping is the happier case, and worth calling out as an opportunity: Indian
+agricultural feeders are largely segregated and run to a published supply schedule, so a large
+unmetered load is partly *known in advance*. Whether we can actually obtain those schedules — and
+the load-shedding schedules — is one of the
+[questions we should ask them](#questions-we-should-ask-them).
 
 **For the bid**, the defensible claim is not "we can forecast substations" — many people can. It is
 that OCF already has a designed, written-down method for recovering *unmetered* rooftop solar from
@@ -169,7 +179,54 @@ Claims here were checked in August 2026 and are dated where they may drift.
 | **IMDAA** — the Indian Monsoon Data Assimilation and Analysis regional reanalysis | A **12 km** reanalysis for the Indian monsoon region (4D-Var, Met Office Unified Model), against ERA5's 31 km — built by India's National Centre for Medium Range Weather Forecasting (NCMRWF) with the UK Met Office and the India Meteorological Department (IMD). Domain 30–120°E, 15°S–45°N, hourly. | Covers 1979–2018, extended to 2020. Ends too early for live capacity estimation, but a strong **pre-training** reanalysis where ERA5 is weakest. |
 | **Agricultural feeder supply schedules** | Turns the largest unmetered load into a known regressor, per the note above. | Published by DISCOMs (India's electricity distribution companies) where feeder segregation has been implemented. Worth asking for explicitly. |
 | **Load-shedding / outage schedules** | Lets the regime detector be *supervised* rather than having to infer outages from the power signal alone. | Same logic, same ask. |
-| **Rooftop net-metering registrations** | A *partial* capacity prior — not the register the brief says does not exist, but a lower bound on installed capacity in some areas. | Plausible via net-metering records held by the DISCOMs (India's electricity distribution companies) and rooftop subsidy schemes. Speculative until asked; would weaken the "no priors at all" framing in a good way. |
+| **Rooftop PV installed-capacity records** | A capacity prior, which the brief says does not exist. | It does exist, and better than we assumed — see [India does record domestic PV capacity](#india-does-record-domestic-pv-capacity) below. Publicly it is state-level; per-substation records sit inside the DISCOMs (India's electricity distribution companies). **Ask for this.** |
+
+#### India does record domestic PV capacity
+
+We went looking, because "no prior on installed capacity" is the single hardest constraint in the
+brief, and it turns out to be **less true than the brief implies**. Checked August 2026.
+
+India runs a large national residential rooftop scheme, **PM Surya Ghar: Muft Bijli Yojana**, and it
+is a registry: every installation is a registered consumer of a named DISCOM (electricity
+distribution company) with a sanctioned capacity in kW and an address. As of July 2026 it had
+recorded about **3.94 million completed installations totalling roughly 14 GW**, against a target of
+7.5 million households by December 2026. Separately, the Ministry of New and Renewable Energy
+(MNRE) put India's *total* rooftop solar at **23.2 GW as of November 2025**, about 17% of the
+country's solar fleet. So the installations are counted, and counted well.
+
+What is published is **state-level**: installation counts and capacity in MW per state, released
+routinely through government press releases and the national open-data portal, with district-level
+figures appearing occasionally as one-off answers to parliamentary questions rather than as a
+maintained series. That is far too coarse to be a per-substation prior on its own.
+
+**The more interesting finding is regulatory.** Indian net-metering rules cap the rooftop PV
+connected to a single distribution transformer at a fraction of its rating — 50% in the Telangana
+guidelines we read — and require the DISCOM to publish "the capacity available on each Distribution
+Transformer and 11 kV feeder of a substation". A distribution transformer is essentially the asset
+the brief calls a secondary substation. Two things follow. First, a **per-substation installed-capacity
+record must exist inside the DISCOM**, because the interconnection rules cannot be enforced without
+one — so the partner we would be working with plausibly holds exactly the prior the brief says is
+unavailable. Second, even with no data at all, the cap itself is a **free hard upper bound** on
+installed capacity per substation, which is a genuinely useful constraint for the disaggregation
+model (see [Modelling load shedding and diesel backup](#modelling-load-shedding-and-diesel-backup)
+for where bounds of this kind earn their keep). Two caveats: we read one state's rules, and Indian
+electricity regulation is state-by-state; and "shall provide information on its website" is an
+obligation, not evidence that it is actually published, current, or machine-readable.
+
+**Capacity is recorded; generation is the real gap — but that is changing on a useful timescale.**
+MNRE mandated in December 2025 that new PM Surya Ghar installations carry M2M SIM-based remote
+monitoring, streaming real-time generation from the inverter's data logger to central government
+servers, with at least one state regulator recognising the M2M inverter as a valid generation meter
+in November 2025. It applies only to new installations, so the existing fleet stays dark. But a
+project running through 2027 would coincide with a growing national stream of **per-site, real-time
+rooftop generation** — precisely the anchor that does not exist today. Whether we could get access
+is a question, not an assumption, and it is worth asking early because the answer could change the
+shape of the disaggregation work substantially.
+
+Finally, if none of that is obtainable, a capacity prior can be **built rather than sourced**:
+detecting rooftop panels from high-resolution satellite imagery is an active research area with
+published Indian work. We would treat that as a fallback, not a plan — it is a project in itself,
+and it yields panel *area*, not capacity or orientation.
 
 #### What we could get hold of today, without asking anyone
 
@@ -331,33 +388,24 @@ That is a **110× spread**, so the "worryingly large" number is really a stateme
 requirements rather than about India's. Answering these questions is worth more than any
 compression work.
 
-**About scope and phasing:**
+**About scope and phasing.** We are proposing to start with a trial of 50 to 100 substations before
+scaling to the full 100,000. One question does follow from it:
 
-- **Are they expecting all 100,000 substations from the start, or would they accept a trial of 50 to
-  100 first?** We should propose the trial. It removes essentially all of the scale engineering from
-  the first phase (see
-  [The real work is scale, not geography](#the-real-work-is-scale-not-geography)), which means the
-  first year can be spent on the part that might not work — recovering unmetered rooftop solar —
-  rather than on storage layouts. It also means the full rollout gets designed against measured
-  numbers instead of the worst-case assumptions in the table above.
-- **If a trial, which substations?** We would want the sample chosen for *variety* rather than
+- **Which substations go in the trial?** We would want the sample chosen for *variety* rather than
   convenience — a spread of rooftop-solar penetration, urban and rural, and at least a few feeders
   where someone independently knows roughly how much solar is installed, because those are what make
   the disaggregation results checkable rather than merely plausible.
 
 **About the forecast itself:**
 
-- **What is the forecast horizon?** The single biggest driver of both storage and method. Day-ahead
-  operational scheduling, a few days for maintenance planning, and seasonal planning are three
-  different products.
-- **What decision does the forecast actually support?** Everything else follows from this, and it
-  is the question most likely to change what we build. A forecast used to schedule a battery has
-  different accuracy and latency requirements from one used for annual network planning.
-- **Do they want probabilistic forecasts, or a single number?** We would strongly recommend
-  probabilistic, and it is a genuine OCF differentiator — but it costs roughly 13–51× the storage,
-  and it is only worth it if someone downstream will actually act on the uncertainty.
-- **How often must it update, and how quickly after data arrives?** Update cadence multiplies
-  storage directly; latency drives the whole deployment architecture.
+- **What is the forecast horizon?** The single biggest driver of both storage and method.
+- **What decision does the forecast actually support?** The question most likely to change what we
+  build, and the one everything else follows from.
+- **Do they want probabilistic forecasts?** We would strongly recommend it, and it is a genuine OCF
+  differentiator — but it costs roughly 13–51× the storage, so it is only worth it if someone
+  downstream will act on the uncertainty.
+- **How often must it update, and how quickly after data arrives?** Cadence multiplies storage
+  directly; latency drives the deployment architecture.
 - **Per substation, or aggregated?** The brief says per substation, but if most users consume a
   feeder- or region-level total, that changes both the model and the delivery format.
 
@@ -367,10 +415,8 @@ compression work.
   set out in [Forecast delivery](forecast-delivery.md) — but that suits one power user with Python
   skills. Indian consumers might instead want an HTTP API, or a control-system (SCADA/EMS) might
   want a push feed. Worth asking early, because it is the assumption most likely to be silently wrong.
-- **Do they want a user interface?** A control-room dashboard, a planner's map, or a web page an
-  engineer can open are all plausible, and none of them is implied by the brief as written. Ask
-  explicitly rather than inferring it, and ask *who* would use it — an operator making a decision in
-  the next hour and an analyst reviewing last quarter want almost opposite things.
+- **Do they want a user interface?** Nothing in the brief as written implies one, so ask explicitly
+  rather than inferring it — and ask *who* would use it.
 - **Who are the consumers, and how many?** A single utility analytics team and a hundred engineers
   spread across the DISCOMs (India's electricity distribution companies) imply different architectures.
 - **Do they need the full forecast history, or only the latest run?** NGED wanting routine access to
@@ -392,21 +438,31 @@ the same Delta tables directly with `pl.scan_delta`, added on top without changi
 layer at all. So "Delta Lake first, interfaces on top" is a pattern we have already exercised, not
 one we would be trying for the first time on someone else's project.
 
-**About data we would want:**
+**About additional data sources.** The full survey is in
+[Data sources that would materially help](#data-sources-that-would-materially-help); these are the
+five worth actually raising in the room, in the order they are worth raising. Every one of them
+makes the hard part of the project easier, and none of them is something we can obtain ourselves.
 
-- **Can we get access to the Solar Radiation Resource Assessment (SRRA) network, or is there a
-  partner who already has it?** See
-  [above](#what-we-could-get-hold-of-today-without-asking-anyone) — this is the highest-value
-  single ask, and it is a legal/commercial question rather than a technical one.
-- **Is there any metered PV generation we can use as an anchor**, at any spatial resolution, even
-  aggregated to feeder or state level? And is there a route to **monitoring data held by the inverter
-  manufacturers**, which is where per-site rooftop generation actually pools in India?
-- **Are agricultural feeder supply schedules and load-shedding schedules available?** Both convert
-  a confounder into a regressor.
-- **How much history comes with the substation data?** Two years is thin for seasonal effects, and
-  the ECMWF ensemble archive only reaches back to 2024-04-01 regardless.
-- **Do net-metering or rooftop-subsidy registrations exist** that would give partial installed
-  capacity, even for a subset of sites?
+1. **The DISCOM's own per-substation rooftop PV capacity records.** Indian interconnection rules cap
+   rooftop PV per distribution transformer, so a per-substation capacity record has to exist inside
+   the distribution company to enforce that cap — see
+   [India does record domestic PV capacity](#india-does-record-domestic-pv-capacity). This directly
+   contradicts the brief's "no prior on installed capacity", so it is the highest-value question we
+   can ask.
+2. **Any metered PV generation, at any resolution.** This is the anchor the method wants. Three
+   distinct routes are worth naming separately, because they are held by different people: the
+   **PM Surya Ghar M2M real-time feed** now being built for new rooftop installations, the
+   **inverter manufacturers' monitoring clouds** where per-site rooftop generation actually pools,
+   and utility-scale output from **Grid Controller of India (Grid-India)** and the State Load
+   Despatch Centres (SLDCs).
+3. **Access to the Solar Radiation Resource Assessment (SRRA) ground-station network** run by the
+   National Institute of Wind Energy (NIWE), or a partner who already holds it. The data exists and
+   is good; the obstacle is that it is charged and behind a non-disclosure agreement, so this is a
+   commercial question rather than a technical one.
+4. **Load-shedding schedules and agricultural feeder supply schedules.** Both turn a confounder we
+   would otherwise have to infer into a known input.
+5. **How much history comes with the substation data?** Two years is thin for seasonal effects, and
+   the ECMWF ensemble archive only reaches back to 2024-04-01 regardless.
 
 ## Part 2: what would have to change in the code
 
@@ -689,7 +745,10 @@ What is genuinely **harder** in India:
   assumption that latent demand is smooth and weather-driven. Load shedding is the dangerous one:
   it resembles a demand collapse uncorrelated with weather, and an unguarded optimiser would
   explain it with phantom solar. Explicit regime detection would need to be budgeted, not bolted
-  on. Unmetered agricultural pumping is the happier case — Indian agricultural feeders are largely
+  on — though much less of it is new than it first appears, because the machinery overlaps heavily
+  with the switching-event detector already designed for NGED. See
+  [Modelling load shedding and diesel backup](#modelling-load-shedding-and-diesel-backup) below.
+  Unmetered agricultural pumping is the happier case — Indian agricultural feeders are largely
   segregated and supplied on a published schedule, which makes a large unmetered load partly
   *observable exogenous information* rather than a pure confounder.
 
@@ -703,6 +762,111 @@ What is genuinely **easier**:
   raw ratio to V1 suggests.
 - **15-minute data instead of half-hourly.** Finer sampling separates the solar shape from the load
   shape more cleanly, particularly around sunrise and sunset ramps.
+
+#### Modelling load shedding and diesel backup
+
+Sketched here because "explicit regime detection would need to be budgeted" is not a plan, and
+because on inspection most of this is **reuse of the switching-event design rather than new
+machinery**. Everything below is a proposal, not a tested method.
+
+**Load shedding is structurally the switching-event problem, in its easy regime.** Both produce a
+*sustained level shift in metered power with no meteorological cause*, which is exactly what
+[Stage 1 of the staged statistical detector](../roadmap/switching-events.md#stage-1-changepoint-detection-on-the-baseline-residual)
+is designed to find —
+changepoint detection on a baseline residual that has first been **normalised** (per-substation,
+per-time-of-day, so one threshold works fleet-wide) and **whitened** (a low-order autoregressive
+fit, so slow NWP-error waves are not read as steps). That preparation is the hard-won part of the
+design and it transfers unchanged. What differs is the operating point, and it differs favourably:
+the switching page notes that the common, difficult case is a *partial* transfer whose magnitude
+"shade[s] continuously down into the measurement noise", so detection difficulty scales inversely
+with how much load moved. A shed feeder is the opposite extreme — a near-total collapse toward
+zero — which is the largest signal the detector will ever be asked to find.
+
+**The neighbourhood-sum test separates shedding from reconfiguration, and we get it for free.**
+Stage 2's conservation fingerprint is that over a candidate set of {source + donor} substations the
+*summed* residual should show no step, because a transfer moves load rather than destroying it.
+Load shedding has the opposite signature: the load leaves the neighbourhood entirely, so the
+summed residual steps down by the full amount. The same statistic, computed the same way,
+discriminates the two cases by the sign of its answer rather than needing a second detector. India
+presumably has both phenomena, so this matters — and it is a rare case where a British design
+constraint turns out to be an Indian asset.
+
+**Learning the rotation schedule from the fleet, if we are not given it.** Indian load shedding is
+typically *rotational*: groups of feeders are shed together, at repeating clock times, cycling
+across groups. That is a strong and unusual signature — synchronous, calendar-aligned, and
+group-structured — and at 100,000 substations it is recoverable by clustering substations on the
+co-occurrence of their detected gate events. Cloud cover also correlates events spatially, but with
+quite different structure: cloud is smooth, moves, and never aligns to the same clock time each
+day. Recovering the groups would let us treat shedding as a *predictable* input for the bulk of
+sites rather than a per-site latent nuisance, which is a much better place to be.
+
+**How it enters the disaggregation model: a multiplicative gate, not an additive offset.** Shedding
+does not subtract a load, it disconnects one, so the right form is
+
+$$y_t = g_t \cdot \left(d_t - p_t\right) + \varepsilon_t$$
+
+with $d_t$ latent demand, $p_t$ PV generation, and $g_t \in [0, 1]$ a **persistent, near-binary**
+gate. The constraint doing the work is the word "persistent": a free per-timestep gate can absorb
+any residual whatsoever and would demolish identifiability of everything else in the model. It must
+be regularised into being step-shaped and rare — a sticky two-state transition prior (a relaxed
+Markov switch, or a sigmoid over a latent driven by a total-variation penalty) so that turning the
+gate on and off is expensive and holding it is cheap. If the schedules are obtainable, $g_t$ stops
+being latent altogether and becomes a known regressor; this is the single largest reason
+[the schedules question](#questions-we-should-ask-them) is worth asking.
+
+**Night-time outages are free labelled data.** PV is zero at night, so any night-time shed episode
+identifies the gate's depth, duration and start-time distributions with **no solar confound at
+all**. Fit the gate's priors on night data, then carry them into daytime inference where the two
+signals genuinely do compete. This is cheap, and it is the single most useful structural fact about
+the problem.
+
+**The guard against phantom solar is the clear-sky envelope, and the physics gives it to us.** The
+feared failure is the optimiser explaining a shed interval with invented generation. The
+differentiable-physics model cannot do this, because fitted PV is a *physical* function of solar
+geometry and irradiance: it is identically zero at night, and bounded above by the clear-sky
+maximum during the day. So a midnight collapse is inexplicable by PV under any parameter setting,
+and a daytime one can be absorbed only up to a ceiling that scales with plausible installed
+capacity. This is a genuine advantage of the physics route over a purely statistical
+decomposition, and it is worth stating in the bid.
+
+**Cold-load pickup should be modelled, not ignored.** Restoration is not a clean return to the
+previous level: thermostatic and deferred load restarts together and overshoots, decaying back over
+tens of minutes. One learnable time constant and one amplitude, applied on each gate release,
+covers it. Leaving it out is worse than it sounds — a daily shed window produces a *repeating*
+overshoot at the same clock time each day, which is precisely the shape a diurnal component will
+happily absorb.
+
+**One statistical warning: shedding is not missing-at-random.** Feeders are shed when the system is
+stressed, which is to say during the hottest, highest-demand periods. So the cheap treatment —
+detect shed intervals and drop them from the likelihood — is *safe for the PV parameters* but
+**biased for the demand model**, because it systematically deletes the conditions the demand
+forecast most needs to get right. The workable split is to mask for disaggregation and to model the
+gate explicitly for forecasting.
+
+**Diesel backup is a smaller problem than it first appears, for a structural reason.** A generator
+serving premises on a shed feeder supplies that load *behind* the point of disconnection, so the
+substation sees nothing of it — diesel mostly removes signal rather than adding a confusing one. It
+bites in two narrower places. First, **staggered restoration**: load returns lower than expected
+because some premises stay on generator for a while, which distorts the cold-load pickup shape
+above rather than creating a separate phenomenon. Second, **peak-shaving gensets** running to a
+tariff schedule, which appear as a rectangular demand notch with no weather cause.
+
+Separating diesel from PV is easy on two independent grounds, and only one narrow case is
+genuinely awkward. A genset produces a flat-topped block whose edges align to tariff or outage
+boundaries, not to solar geometry, so it fails the shape test; and it fails the clear-sky-envelope
+test above for the same reason PV cannot explain a midnight step. The awkward case is a peak-tariff
+window that happens to sit across the solar peak — plausible in India, where the evening peak is
+the binding one but afternoon industrial tariffs exist. There the discriminator is **day-to-day
+covariation with irradiance**: PV varies with cloud from one day to the next, and diesel does not,
+so the fitted component can be regressed against satellite irradiance and the invariant part
+rejected. That test needs 100,000 sites and a decent irradiance record to have any power, which we
+would have.
+
+**What this costs.** The detector is shared with NGED's own switching work rather than additional.
+The gate, cold-load pickup, and the irradiance-covariation test are perhaps three to four weeks on
+top of the disaggregator. As with soiling, the real cost is **identifiability testing on synthetic
+data** — demonstrating that a sticky gate and a solar component do not trade off against each other
+at realistic noise levels — and that should be done before either is trusted on real Indian data.
 
 ### How we would structure it
 
