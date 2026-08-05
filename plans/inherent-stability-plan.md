@@ -310,6 +310,15 @@ degrades the residual head has less to work with so the answer relaxes toward th
 branching, no fallback logic, no `if data_is_missing:` — the same code path does the right thing
 because of how it is arranged.
 
+It is also the **nearest**. Differentiable physics arrives at **v0.7** as Candidate B in the
+capacity-estimation head-to-head
+([#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141),
+[#157](https://github.com/openclimatefix/nged-substation-forecast/issues/157),
+[#158](https://github.com/openclimatefix/nged-substation-forecast/issues/158)), two milestones
+ahead of the v0.9 neural-net spike. So none of this is v2 work: the first model family we must
+*build* for missingness is a DP estimator, and the requirement has to reach its design pages now
+rather than when we get there.
+
 **For honest bands, use conformal prediction per regime.** Split/Mondrian conformal calibration is
 post-hoc: calibrate interval widths separately for each degradation regime using held-out residuals
 from that regime, giving finite-sample coverage guarantees per regime with no retraining. It works
@@ -519,10 +528,13 @@ The three-page division of labour, with no duplication:
 | `roadmap/metrics-and-leaderboard.md` | The failure-scenario suite, how it is scored, and the incumbent as acceptance criterion |
 | `roadmap/engineering-health.md` | Degradation smoke-tests in the scientific-rigor section |
 | `roadmap/xgboost-improvements.md` | The NaN default-direction limit (§3.1) |
+| `roadmap/capacity-estimation.md` | **Missingness robustness as a head-to-head judging criterion**, under "What every candidate must get right". Both candidates ingest metered generation that really does have gaps, and the winner's capacity estimate feeds v1.0 forecasting, so an estimator that mis-estimates under an outage propagates downstream. The page already reasons about one kind of absent data — "Identifiability: the data goes silent at night" — so this extends existing reasoning rather than importing a new concern |
+| `techniques/differentiable-physics.md` | The mechanism from §3.6: a physical forward model has a defined output for any input state, so substitute a climatological prior or a physical bound for an absent input and let the physics propagate it. The page currently says **nothing** about missing data, yet it is the durable home for the strongest missingness story we have |
+| `techniques/encoders.md` | Token removal, not zero-fill (§3.6) — zero is a real physical value, so a zero-filled encoder input asserts something false |
 | `architecture/testing.md` | The degradation smoke-tests, under "notable test suites", once built |
 | `background/nged-incumbent-forecast.md` | A note that the incumbent is our degradation floor |
 | `docs/index.md` | Two entries in the Documentation list; one sentence in "More than a forecast" |
-| `roadmap/index.md` | Milestone bullets for the new issues |
+| `roadmap/index.md` | Milestone bullets for the new issues, plus a missingness clause on the v0.7 capacity bullet and the v0.9 neural-net bullet |
 | `CLAUDE.md` | A short entry under Architecture. A docs page alone will not reliably reach future Claude sessions; CLAUDE.md is what is always in context |
 | `architecture/why-dagster-not-airflow.md` | Three edits — see §6.5 |
 
@@ -549,7 +561,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 9 | Clear-sky as the zero-data **floor** — extend [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) | **v0.3** for the shared primitive; feature use stays with #168 | #168 already delivers clear-sky irradiance. Only the floor framing is new, and the scenario suite needs something to degrade *to* |
 | 10 | Cost-per-experiment instrumentation | **v0.5** | Piggybacks on the aws-costs machinery |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5** | "Never worse than the incumbent" depends on it |
-| 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2 |
+| 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2. It binds `BaseForecaster` implementers only — the v0.7 DP estimators are not forecasters, so they are covered by the capacity-estimation judging criteria instead |
 | 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **missed NWP runs at forecast time** (not raw age, per §3.5), WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
 | 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.3**, after 13 | §4 divergences. Ordering is load-bearing |
 | 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | H1's "recovery next business day, via runbook" threshold is unmeasurable without it |
@@ -557,7 +569,11 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 
 Remaining v0.6/v0.7 warning types attach as sub-tasks of the existing epics rather than new issues.
 [#423](https://github.com/openclimatefix/nged-substation-forecast/issues/423) gains a note that the
-R&D/production tag is the mechanism behind the fail-fast/fail-forward asymmetry.
+R&D/production tag is the mechanism behind the fail-fast/fail-forward asymmetry, and
+[#141](https://github.com/openclimatefix/nged-substation-forecast/issues/141),
+[#157](https://github.com/openclimatefix/nged-substation-forecast/issues/157) and
+[#158](https://github.com/openclimatefix/nged-substation-forecast/issues/158) gain a note that
+missingness robustness is a judging criterion, scored against item 2's scenario vocabulary.
 
 **Existing issues to attach to rather than duplicate:**
 
@@ -618,7 +634,9 @@ must precede item 3, both within v0.3.
    migration.
 2. **Design the scenario vocabulary before writing any code, and treat it as a contract.** It gets
    stamped into metrics rows, so changing it later invalidates historical comparisons — exactly the
-   re-runnability property `requirements.md` calls load-bearing.
+   re-runnability property `requirements.md` calls load-bearing. It is also the yardstick the v0.7
+   capacity estimators and the v0.9 neural-net spike are both judged against, so it must be stable
+   well before either.
 
 One thing needs **no** change: `PowerForecast` requires no new degradation column, because a
 consumer can derive the regime from `nwp_init_time` versus `power_fcst_init_time`, both already
