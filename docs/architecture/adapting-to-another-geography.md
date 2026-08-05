@@ -491,7 +491,29 @@ requirements rather than about India's. Answering these questions is worth more 
 compression work.
 
 **About scope and phasing.** We are proposing to start with a trial of 50 to 100 substations before
-scaling to the full 100,000. One question does follow from it:
+scaling to the full 100,000. Two questions follow from that.
+
+- **Is this a research project on historical data, or do they also want a live service?** Possibly
+  the biggest single question on this page after the forecast horizon, and the one most likely to be
+  left implicit by both sides until late. A retrospective study on a historical export and a
+  service that produces a forecast every morning are *different projects*: the second adds
+  scheduled operation, monitoring, alerting, failure recovery and on-call, none of which the first
+  needs at all. It also changes who we have to talk to on their side — a one-off bulk export is a
+  conversation with a data team, whereas an operational feed is a conversation with whoever runs
+  their control systems, and the second is usually much slower to arrange.
+
+    It changes the *method* too, not just the engineering. Estimating installed solar capacity in
+    near-real time needs weather inputs available in near-real time, and that is exactly where the
+    Indian data landscape is weakest — the best historical irradiance products for India either
+    stopped years ago or run well behind real time (see
+    [ERA6 does not arrive in time](#era6-does-not-arrive-in-time) and the sources table above). For
+    a purely retrospective study that constraint disappears entirely, and several options we had to
+    rule out come back onto the table.
+
+    Our recommendation, if they are undecided, is **research first with the live service as a
+    defined second phase**. That matches the trial-first shape we are already proposing, it defers
+    the operational cost until the method has been shown to work, and it means the live design gets
+    made against measured requirements rather than guesses.
 
 - **Which substations go in the trial?** We would want the sample chosen for *variety* rather than
   convenience — a spread of rooftop-solar penetration, urban and rural, and at least a few feeders
