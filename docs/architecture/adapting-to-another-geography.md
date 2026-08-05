@@ -37,7 +37,8 @@ and they are worth keeping apart because only one of them is genuinely hard.
 
 Several statements below rest on **assumptions we have not checked with the client** — mostly
 borrowed from what NGED wanted, because that is the only comparable project we know. Each one is
-flagged in place, and all of them are collected in [Questions we should ask them](#questions-we-should-ask-them) at the end of this part. If you read only
+flagged in place, and all of them are collected in [Questions we should ask
+them](#questions-we-should-ask-them) at the end of this part. If you read only
 one other section before the pitch, read that one.
 
 **Moving to a different country is easy.**  The weather data we already use (ECMWF ENS from
@@ -101,7 +102,8 @@ It does not need a capacity register.
 Qualifications belong alongside that, and they cut both ways. In Britain we plan to use the
 *metered* solar farms we can see to calibrate and sanity-check our estimates of the *unmetered*
 ones. We *assume* the Indian brief offers no metered solar inside the dataset, so that anchor would
-have to come from outside it — **but this is exactly the sort of thing to ask about** (see [Questions we should ask them](#questions-we-should-ask-them)),
+have to come from outside it — **but this is exactly the sort of thing to ask about** (see
+[Questions we should ask them](#questions-we-should-ask-them)),
 because India does have a large, metered, utility-scale solar fleet with published output. Even
 aggregated or partial metering would help. Using it would be new work rather than something we
 already have, but it is much easier than working without any anchor at all. The physical
@@ -176,27 +178,33 @@ nobody has ground truth for the thing being estimated — so it is easy to claim
 impossible to audit. Our
 [evaluation protocol](../techniques/disaggregation-evaluation.md) sets out **six complementary
 evaluations, each with different biases**, on the principle that agreement across them is the real
-signal. Two of the six — physical-consistency and conservation residuals — need **no labels at
-all**, which is precisely what lets the protocol survive a dataset with no metered generation; the
-rest strengthen as metered anchors become available, which is why the metering questions below
-matter so much. Anyone can assert a disaggregation result. Committing in advance to how it will be
+signal. Two of the six — physical-consistency and conservation residuals, and cross-source
+corroboration — need **no labels at all**, which is precisely what lets the protocol survive a
+dataset with no metered generation. The rest strengthen as metered anchors become available, which
+is why the metering questions below matter so much. Anyone can assert a disaggregation result.
+Committing in advance to how it will be
 falsified is a much stronger signal, and it is exactly what an innovation funder should want.
 
-**3. India would not be paying us to invent it.** The method is already funded and under
-construction for a British distribution network operator. An Indian project inherits it part-built
-and de-risked, and pays for the harder, more interesting half: making it work where there is no
-metered anchor, no clean irradiance product, and physics Britain does not have. The traffic runs
-both ways, which is worth saying — a 100,000-substation Indian dataset at 15-minute resolution
-would be a far better proving ground for the method than the ~2,500 British sites it is being
-designed against, so NGED's project benefits too. Very few bidders can offer a method that arrives
-co-funded by someone else's programme.
+**3. India would not be paying us to invent it.** The method is **designed and funded**, and
+scheduled to be built, for a British distribution network operator — designed, note, not yet built;
+the honest word is that it exists on paper and is committed. An Indian project therefore inherits a
+de-risked design rather than a blank sheet, and pays only for the extensions its own conditions
+require: working without a metered anchor, without a clean irradiance product, and against physics
+Britain does not have. Those extensions stay in the open codebase and are reusable by every Indian
+distribution company that comes after. Very few bidders can offer a method that arrives part-funded
+by another programme.
 
 **4. The by-product may be worth as much as the forecast.** Recovering unmetered solar means
 estimating **how much rooftop PV sits behind each substation, and how that grows over time** — an
-asset register the distribution company cannot currently buy. That is not a footnote in India. Only
-about 42% of the country's distribution transformers are metered at all, many state regulators cap
-rooftop PV at a fraction of each transformer's rating, and DISCOMs are already reporting midday
-voltage rise and reverse flow on high-penetration feeders. An inferred, continuously updated
+*observed*, continuously-updated estimate — as against the DISCOM's own register, which records
+*sanctioned* capacity for scheme and net-metered installations only and is never refreshed from
+measurement. That distinction is the whole point, and it is worth making before someone in the room
+says "we already have that register": theirs records what was approved, ours would record what is
+actually there and working. That is not a footnote in India. As of March 2025 only about 42% of the
+country's distribution transformers were metered at all, many state regulators cap
+rooftop PV at a fraction of each transformer's rating, and DISCOMs are reported to be seeing
+midday voltage rise and reverse flow on high-penetration feeders (reported in the trade press, not
+something we have verified in data). An inferred, continuously updated
 capacity estimate speaks directly to that: where the hosting headroom has gone, which transformers
 are about to be stressed, and where the next reverse-flow problem appears. We should pitch it as a
 second product, not as a side-effect.
@@ -208,7 +216,8 @@ during the day it can only be as large as the physics and the fitted installed c
 is what keeps Indian confounders like load shedding in check — a supply outage at midnight *cannot*
 be explained away as solar under any parameter setting, and a daytime one is bounded rather than
 free. The night-time half of that argument is airtight; the daytime half is only as tight as the
-capacity prior, which is one more reason to want the capacity records above. The same property makes the outputs explainable to an engineer,
+capacity prior, which is one more reason to want the capacity records above. The same property makes
+the outputs explainable to an engineer,
 which matters when a network planner has to act on them.
 
 **6. It is open, and it is running.** The codebase is MIT-licensed and developed in the open,
@@ -260,7 +269,7 @@ India runs a large national residential rooftop scheme, **PM Surya Ghar: Muft Bi
 is a registry: every installation is a registered consumer of a named DISCOM (electricity
 distribution company) with a sanctioned capacity in kW and an address. It reported **50.06 lakh
 (5.01 million) beneficiary households and about 14.8 GW as of 4 August 2026** — the scheme's
-official target is 10 million households by March 2027, with a ministerial expectation of passing
+official target is 10 million households by March 2027, with an interim government target of
 7.5 million by December 2026. Attach the date to any of these: the scheme is adding roughly a lakh
 of households every six days, so a figure quoted without one is wrong within a month. Note also
 that it publishes both *installations* and *beneficiary households*, and the two differ — 39.38
@@ -276,20 +285,24 @@ maintained series. That is far too coarse to be a per-substation prior on its ow
 
 **The more interesting finding is regulatory.** Many Indian *state* regulators cap the rooftop PV
 connected to a single distribution transformer at a fraction of its rating, and require the DISCOM
-to publish "the capacity available on each Distribution Transformer and 11 kV feeder of a
-substation and 33 kV feeder". A distribution transformer is essentially the asset the brief calls a
-secondary substation. The important consequence is that **a per-substation installed-capacity
-record must exist inside the DISCOM**, because a hosting-capacity rule cannot be enforced without
-one — so the partner we would be working with plausibly holds exactly the prior the brief says is
+to publish, in Telangana's wording, "the capacity available on each Distribution Transformer and
+11 kV feeder of a substation and 33 kV feeder". A distribution transformer is essentially the asset
+the brief calls a secondary substation. The important consequence is that **a per-substation
+installed-capacity
+record must exist inside the DISCOM**, because the distribution company has to run a
+technical-feasibility study against that transformer for every new connection, whether or not a cap
+binds — so the partner we would be working with plausibly holds exactly the prior the brief says is
 unavailable. The publication duty generalises well across states, which is what makes this worth
 asking about rather than a local curiosity.
 
 Be careful with the framing, though. There is **no central Indian rule** imposing a
 hosting-capacity fraction: the Electricity (Rights of Consumers) Rules delegate net-metering
-arrangements to each State Commission, so the fraction varies widely — 50% in Telangana, 70% in
-Maharashtra, 90% in Tamil Nadu, and effectively removed altogether in Gujarat and Uttar Pradesh. So
-the cap is **not** a reliable free upper bound on installed capacity: it is one in some states and
-vacuous in others, and we would have to check per state before leaning on it. And "shall be
+arrangements to each State Commission, so the fraction varies widely — 50% in Telangana's 2025
+regulations, 70% under Maharashtra's 2019 regulations, 90% in Tamil Nadu, raised to 100% of
+transformer rating in Uttar Pradesh, and deleted outright in Gujarat. Each of those needs
+re-checking against the current state regulation before anyone relies on it. So the cap is **not** a
+reliable free upper bound on installed capacity: it binds hard in some states and not at all in
+others. And "shall be
 uploaded on the DISCOM website" is an obligation, not evidence that it is actually published,
 current, or machine-readable.
 
@@ -331,7 +344,8 @@ public domain **free of cost**, with access by registration and click-through te
 negotiated agreement. Three limits survive: **raw high-frequency time series** (one-minute,
 ten-minute and hourly) are priced separately on NIWE's own data-sale page; stations sponsored by
 bodies other than MNRE may still carry a charge set by the sponsor; and the **unprocessed** raw
-data is released only for verification and collaborative work, by specific permission. Redistribution
+data is released only for verification and collaborative work, by specific permission.
+Redistribution
 to third parties is not permitted, and reproduction requires authorisation from NIWE.
 
 **Treat this as promising but unconfirmed.** NIWE's site blocks automated access, so we read an
@@ -382,17 +396,12 @@ counts. But India does **not** appear in PVOutput's top-25 country table, whose 
 Zealand) has 228 systems and 1.1 MW, against Australia's 18,089 systems and 131 MW at the top. So
 Indian coverage sits somewhere between a few dozen and a couple of hundred systems.
 
-We could not pin the exact figure down: PVOutput's public pages expose only the top 25 countries
-and the first page of a filtered ladder, and an exact per-country count needs the PVOutput API,
-which requires a registered account and API key. The number is not worth chasing, because the
-conclusion does not change at any value in that range — a few dozen or even a few hundred
-self-selected rooftops is not a usable sample against 100,000 substations.
-
-Two further caveats even if coverage were better: bulk access (5-minute data in 365-day batches, or
-whole-country daily output) sits behind PVOutput's paid **Data Services** tier, which is also where
-the **commercial-use licence** lives, so the free tier is not usable for funded work; and
-self-reported community data carries unverified capacity, orientation and shading metadata, which
-is precisely the metadata a disaggregation anchor needs to be trustworthy.
+The exact figure is not worth chasing, because the conclusion does not change anywhere in that
+range: a few dozen or even a few hundred self-selected rooftops is not a usable sample against
+100,000 substations. Two further caveats even if coverage were better: bulk access and the
+commercial-use licence both sit behind PVOutput's paid tier, so the free tier is not usable for
+funded work; and self-reported data carries unverified capacity, orientation and shading metadata,
+which is precisely what a disaggregation anchor cannot afford to have unverified.
 
 The *reason* for the gap is itself informative for the bid: rooftop systems sold in India ship
 with the manufacturer's own monitoring app, so the generation data exists but pools in **inverter
@@ -413,7 +422,8 @@ than implying the public data closes the metered-generation gap.
 #### ERA6 does not arrive in time
 
 We checked, because it would change the reanalysis answer if it did.
-[ERA6 production started on 6 March 2026](https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts),
+[ERA6 production started on 6 March
+2026](https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts),
 and the first data is scheduled for release **towards the end of 2027**, with four decades
 available by early 2028. Helpfully, the rollout is *recent-first* — the two most recent decades
 deploy before the backward extensions — so the release order is the one we would want. The timing
@@ -428,7 +438,8 @@ ERA6 blocks appear, and no date has been announced for ERA6 in near-real time, w
 
 ERA5 is not bad over India in aggregate — one 2025 ground-station evaluation found it the most
 balanced of the reanalyses tested, with a monthly mean bias of about **−3 W/m² (−0.8%)** against
-observations from the India Meteorological Department (IMD). That headline number is reassuring for demand forecasting and misleading for
+observations from the India Meteorological Department (IMD). That headline number is reassuring for
+demand forecasting and misleading for
 disaggregation, because disaggregation does not depend on the annual mean. It depends on
 conditional accuracy in specific regimes, and on a quantity the mean hides entirely.
 
@@ -458,11 +469,16 @@ conditional accuracy in specific regimes, and on a quantity the mean hides entir
 The practical conclusion is that ERA5 alone is not a sufficient irradiance basis for disaggregation
 in India, and the mitigation is not a better reanalysis but a **satellite** product — the Surface
 Solar Radiation Data Set – Heliosat, East (SARAH-E) for history, and the National Solar Radiation
-Database (NSRDB) over the Indian Ocean Data Coverage region for anything near-real-time — with ERA5
-or the Indian Monsoon Data Assimilation and Analysis (IMDAA) reanalysis carrying the non-radiative
+Database (NSRDB) over the Indian Ocean Data Coverage region for the recent past. Be clear about
+what that leaves open, though: **neither is available in near-real time**, so on what we found there
+is no confirmed high-quality irradiance input for a *live* capacity estimate over India — which is
+one more reason the research-versus-live-service question below matters. ERA5
+or the Indian Monsoon Data Assimilation and Analysis (IMDAA) reanalysis carry the non-radiative
 fields. In GB the equivalent role is played by
-[SARAH-3, from EUMETSAT's Satellite Application Facility on Climate Monitoring](../roadmap/data-sources.md),
-which cannot be reused here: it covers ±65° in both latitude and longitude, and India begins at 68.1°E — a miss of roughly 300 km, not a marginal clip.
+[SARAH-3, from EUMETSAT's Satellite Application Facility on Climate
+Monitoring](../roadmap/data-sources.md),
+which cannot be reused here: it covers ±65° in both latitude and longitude, and India begins at
+68.1°E — a miss of roughly 300 km, not a marginal clip.
 
 ### Questions we should ask them
 
@@ -486,8 +502,10 @@ exploits much of the similarity between ensemble members, so the real saving cou
 needs measuring through the actual write path before we quote it to anyone — see
 [Radical options for shrinking what we store](#radical-options-for-shrinking-what-we-store).
 
-That is a **110× spread**, so the "worryingly large" number is really a statement about NGED's
-requirements rather than about India's. Answering these questions is worth more than any
+That is a **110× spread** — or 28× if you strike the two unmeasured quantile rows and keep only the
+horizon and cadence arithmetic. Either way the "worryingly large" number is really a statement
+about NGED's requirements rather than about India's. Answering these questions is worth more than
+any
 compression work.
 
 **About scope and phasing.** We are proposing to start with a trial of 50 to 100 substations before
@@ -504,9 +522,11 @@ scaling to the full 100,000. Two questions follow from that.
 
     It changes the *method* too, not just the engineering. Estimating installed solar capacity in
     near-real time needs weather inputs available in near-real time, and that is exactly where the
-    Indian data landscape is weakest — the best historical irradiance products for India either
-    stopped years ago or run well behind real time (see
-    [ERA6 does not arrive in time](#era6-does-not-arrive-in-time) and the sources table above). For
+    Indian data landscape is weakest — the best irradiance products for India stop years short of
+    the present (see [the sources table above](#data-sources-that-would-materially-help): SARAH-E
+    ends in 2015, and the Indian Ocean coverage of the National Solar Radiation Database in 2019),
+    and the reanalyses that do run near-real-time have
+    [known weaknesses over India](#concerns-about-era5-over-india). For
     a purely retrospective study that constraint disappears entirely, and several options we had to
     rule out come back onto the table.
 
@@ -546,25 +566,29 @@ scaling to the full 100,000. Two questions follow from that.
 - **Does this population actually see reverse flow, and where?** Indian DISCOMs report midday
   voltage rise and reverse power flow on high-penetration feeders. We looked for a citable
   penetration threshold at which it begins and could not find a defensible one, so we should not
-  quote a number: reverse flow starts, near-tautologically, when local generation exceeds
-  coincident load, and the reason modest rooftop capacity triggers it is that minimum *daytime*
-  load is itself only a small fraction of peak. This matters twice: reverse flow is what makes
+  quote a number: reverse flow starts, near-tautologically, when local generation exceeds coincident
+  load, and where that threshold falls depends on the feeder's own daytime load shape — which we
+  cannot characterise for India without their data. This matters twice: reverse flow is what makes
   magnitude-only metering lossy in the first place, and a substation that never exports gives the
   disaggregation much less to work with.
 - **Are these distribution transformers or 11 kV feeders?** "Secondary substation" is a European
   term and the Indian equivalent is ambiguous. It is worth resolving, because the arithmetic points
-  one way: India has roughly **15.1 million distribution transformers but only ~250,000 11 kV
-  feeders**, and as of March 2024 only **42% of distribution transformers were metered** (69% urban,
-  39% rural) against **99% of 11 kV feeders**. Carry both through: there are roughly 6.3 million
-  *metered* distribution transformers but only about 250,000 metered 11 kV feeders. So 100,000 sites
-  is a routine ~1.6% slice of the metered transformer population, but would be **40% of every
+  one way: India has roughly **15.4 million distribution transformers but only ~259,000 11 kV
+  feeders**, and as of March 2025 only **42% of distribution transformers were metered** (59% urban,
+  39% rural) against **98% of 11 kV feeders**. Carry both through: there are about 6.5 million
+  *metered* distribution transformers but only about 255,000 metered 11 kV feeders. So 100,000 sites
+  is a routine ~1.5% slice of the metered transformer population, but would be **39% of every
   metered feeder in India** — which would mean spanning essentially every distribution company in
   the country. On that arithmetic a transformer-level dataset is the far more plausible reading,
   though it is the client's answer that settles it. This matters well beyond terminology: it changes
   the number of customers behind each measurement point by an order of magnitude, and with it how
   much rooftop PV sits behind one and how much load diversity smooths it. Transformer-level also
-  implies a **somewhat urban-skewed** sample, since transformer metering runs at about 63% urban
-  against 39% rural — which bears on choosing the trial sites.
+  implies a **somewhat urban-skewed** sample, since transformer metering runs at about 59% urban
+  against 39% rural. The reason matters for us specifically: the Central Electricity Authority
+  attributes the rural gap to transformers that feed **only agricultural consumers** being exempt
+  from the smart-metering programme. So the very feeders where agricultural pumping is the biggest
+  confounder are the ones least likely to be in the dataset at all — convenient for the modelling,
+  and worth knowing before we design around agricultural load.
 
 **About the forecast itself:**
 
@@ -800,10 +824,12 @@ archive measures **~40 GB per year on disk** in the same compressed Delta layout
 development table is ~93 GB for 5.9 billion rows). India is roughly 15× the land area, so the
 equivalent archive would be of order **600 GB per year on disk** — scaled by area, not measured,
 and it says nothing about the in-memory cost of a query against it, which the
-[input-pruning strategy](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+[input-pruning
+strategy](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 exists to bound separately. The bigger loss is that the
 `h3_index` pruning described in
-[Architecture Overview](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+[Architecture
+Overview](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 stops helping: with 100,000 sites spread across the country, the cells the sites occupy *are* the
 whole grid.
 
@@ -821,7 +847,8 @@ is not exhausted, not that any specific number is available.
 **Store residuals against a cheap deterministic baseline, not absolute power.** This is the one we
 would try first, because it attacks a *documented* weakness. `delta_store.power_forecasts` uses
 `BYTE_STREAM_SPLIT` on `power_fcst` precisely because
-"[near-continuous ML output has no repeats for a dictionary to exploit](overview.md#core-components)"
+"[near-continuous ML output has no repeats for a dictionary to
+exploit](overview.md#core-components)"
 — it is making the best of a column with no exploitable structure. Subtracting a cheap, exactly
 reproducible baseline (a per-site time-of-week climatology, say) leaves a residual that is small,
 centred on zero, and — crucially — *quantised*: after the existing 13-bit significand rounding, a
@@ -964,7 +991,8 @@ machinery**. Everything below is a proposal, not a tested method.
 
 **Load shedding is structurally the switching-event problem, in its easy regime.** Both produce a
 *sustained level shift in metered power with no meteorological cause*, which is exactly what
-[Stage 1 of the staged statistical detector](../roadmap/switching-events.md#stage-1-changepoint-detection-on-the-baseline-residual)
+[Stage 1 of the staged statistical
+detector](../roadmap/switching-events.md#stage-1-changepoint-detection-on-the-baseline-residual)
 is designed to find —
 changepoint detection on a baseline residual that has first been **normalised** (per-substation,
 per-time-of-day, so one threshold works fleet-wide) and **whitened** (a low-order autoregressive
@@ -972,7 +1000,8 @@ fit, so slow NWP-error waves are not read as steps). That preparation is the har
 design and it transfers unchanged. What differs is the operating point, and it differs favourably:
 the [background on switching events](../background/switching-events.md) notes that the common,
 difficult case is a *partial* transfer whose magnitude "shade[s] continuously down into the
-measurement noise", so detection difficulty scales inversely with how much load moved. A shed feeder is the opposite extreme — a near-total collapse toward
+measurement noise", so detection difficulty scales inversely with how much load moved. A shed feeder
+is the opposite extreme — a near-total collapse toward
 zero — which is the largest signal the detector will ever be asked to find.
 
 **The neighbourhood-sum test separates shedding from reconfiguration — but it is not free, and it
@@ -1068,12 +1097,14 @@ rejected. That test needs 100,000 sites and a decent irradiance record to have a
 would have.
 
 **What this costs, honestly.** The stage-1 *design* is shared with NGED, but whether NGED ever
-builds it is [an open decision](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
+builds it is [an open
+decision](../roadmap/switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector):
 the roadmap demotes the staged detector to a contingency behind a feature-based mainline, to be
 justified by a measured gap rather than by anticipation. If that mainline wins for NGED, India pays
 for the detector itself, and this is a materially larger number. Assuming the detector exists, the
 gate, cold-load pickup, and the irradiance-covariation test are perhaps three to four weeks on top
-of the disaggregator; assuming it does not, add the detector's own build. As with soiling, the real cost is **identifiability testing on synthetic
+of the disaggregator; assuming it does not, add the detector's own build. As with soiling, the real
+cost is **identifiability testing on synthetic
 data** — demonstrating that a sticky gate and a solar component do not trade off against each other
 at realistic noise levels — and that should be done before either is trusted on real Indian data.
 
