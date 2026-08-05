@@ -391,21 +391,40 @@ which is too coarse to be useful here.
   differently: the long capacity-factor series is **modelled**, so it is not independent evidence
   about irradiance, while the reported production is real but spatially aggregated.
 
-**[PVOutput.org](https://pvoutput.org) has some Indian systems, but far too few to matter here.**
+**[PVOutput.org](https://pvoutput.org) has Indian systems, but almost none of them are alive.**
 PVOutput is the obvious place to look — a global community platform where rooftop owners publish
 live generation, and a genuinely useful source of per-site behind-the-meter data in other
-countries. India *is* represented: filtering PVOutput's public system ladder to India returns a
-full page of **at least 30 registered systems**, real installations with named inverters and panel
-counts. But India does **not** appear in PVOutput's top-25 country table, whose 25th entry (New
-Zealand) has 228 systems and 1.1 MW, against Australia's 18,089 systems and 131 MW at the top. So
-Indian coverage sits somewhere between a few dozen and a couple of hundred systems.
+countries. We queried its API directly (August 2026) rather than relying on the public pages, and
+the finding is sharper than a headcount.
 
-The exact figure is not worth chasing, because the conclusion does not change anywhere in that
-range: a few dozen or even a few hundred self-selected rooftops is not a usable sample against
-100,000 substations. Two further caveats even if coverage were better: bulk access and the
-commercial-use licence both sit behind PVOutput's paid tier, so the free tier is not usable for
-funded work; and self-reported data carries unverified capacity, orientation and shading metadata,
-which is precisely what a disaggregation anchor cannot afford to have unverified.
+Sweeping 44 India-likely search terms turned up **42 distinct registered Indian systems**, and their
+upload histories look like this:
+
+| Indian systems on PVOutput (found August 2026) | Count |
+|---|---|
+| Registered | 42 (a lower bound — see below) |
+| Never uploaded a single day of data | 23 |
+| Uploaded at least 30 days | 10 |
+| Uploaded at least a year | 5 |
+| **Uploaded anything in the last month** | **2** |
+
+The last row is the one that matters. **Two** Indian systems are actively reporting — a 3.9 kW and a
+2.4 kW domestic rooftop, both with long histories (2,655 and 2,018 days) and both still uploading.
+Everything else has either never produced data or stopped, the next most recent having gone quiet
+16 weeks ago and the best-populated record (1,775 days) having stopped 77 weeks ago.
+
+The 42 is a floor rather than a count. PVOutput's API has **no country filter** — `country_code`
+supports seven countries and India is not among them — and its system search matches on *name*,
+returns at most 30 results alphabetically, and offers no pagination, so systems whose names carry no
+Indian place-name or surname are invisible to this method. Several sweeps hit the 30-result cap,
+so more certainly exist. An exact registered count is not obtainable through the public API.
+
+It does not matter, because the useful number is **2**, not 42, and no plausible correction to the
+floor changes that. Two live domestic rooftops cannot anchor anything at the scale of this brief.
+Two further caveats even if coverage were better: bulk access and the commercial-use licence both
+sit behind PVOutput's paid tier, so the free tier is not usable for funded work; and self-reported
+data carries unverified capacity, orientation and shading metadata, which is precisely what a
+disaggregation anchor cannot afford to have unverified.
 
 The *reason* for the gap is itself informative for the bid: rooftop systems sold in India ship
 with the manufacturer's own monitoring app, so the generation data exists but pools in **inverter
