@@ -529,15 +529,20 @@ scaling to the full 100,000. Two questions follow from that.
   ([Data quality](../background/data-quality.md#apparent-power-mva-metering)). We handle it, and the
   [disaggregation design](../roadmap/disaggregation.md#apparent-power-mva-metering) reconstructs
   signed flow and compares its *magnitude* against the meter, but it is strictly harder than having
-  the sign. India **may** be better placed than NGED's trial area, though less certainly than we
-  first wrote: the Indian smart-meter standards make export measurement **optional** — IS 16444
-  specifies meters capable of import "or both import and export" — and the register set that
-  carries import/export kWh and kVAh separately lives in the companion standard IS 15959. Separate
-  import and export registers *are* mandated for net-metered connections, but by the Central
-  Electricity Authority's net-meter specification and by state regulations, not by the smart-meter
-  standard itself. **So the risk is twofold: the instrument may not measure export, and even where
-  it does, the extract may discard it** — a pipeline built around billing can easily hand us a
-  single net or apparent-energy figure. Ask what fields we actually receive, per site.
+  the sign. We are **not confident either way for India**, and it is worth being clear why, because
+  the standards question is easy to get wrong. The meter at a distribution transformer or an 11 kV
+  feeder is a *transformer-operated* (CT/VT-connected) meter, which is a different device from the
+  domestic smart meter: the relevant specifications are IS 14697 for conventional ones and
+  IS 16444 **Part 2** for smart ones, under the Central Electricity Authority's metering
+  regulations — and much of the installed base is likely to be the conventional kind. IS 16444
+  Part 2 does cover meters "measuring energy in both directions", but it accommodates
+  bidirectional measurement rather than requiring it, so direction is a procurement and
+  configuration choice at each site rather than something the standard guarantees. Separate import
+  and export registers *are* required for net-metered *consumer* connections, but that is a
+  different metering point from the substation. **So the risk is twofold: the meter may not record
+  export, and even where it does, the extract may discard it** — a pipeline built around billing
+  can easily hand us a single net or apparent-energy figure. This is why the question is what
+  fields we actually receive per site, rather than what the standards permit.
 - **Does this population actually see reverse flow, and where?** Indian DISCOMs report midday
   voltage rise and reverse power flow on high-penetration feeders. We looked for a citable
   penetration threshold at which it begins and could not find a defensible one, so we should not
@@ -937,11 +942,14 @@ What is genuinely **easier**:
   raw ratio to V1 suggests.
 - **15-minute data instead of half-hourly.** Finer sampling separates the solar shape from the load
   shape more cleanly, particularly around sunrise and sunset ramps.
-- **Directional metering is plausibly more common than in NGED's trial area**, where NGED reports
-  10 sites as non-directional. Indian net-metered connections must carry separate import and export
-  registers under the Central Electricity Authority's net-meter specification and state
-  regulations — though the smart-meter standard IS 16444 itself makes export measurement optional,
-  so this is a likelihood rather than a guarantee. If signed flow
+- **Directional metering is *possibly* more common than in NGED's trial area**, where NGED reports
+  10 sites as non-directional — but we could not establish this, and should not assume it.
+  Transformer-operated meters at feeders and distribution transformers (IS 14697, or IS 16444
+  Part 2 for smart ones) can measure in both directions, but are not obliged to, so it is a
+  per-site procurement question. What matters for us is also the *delivery* format: Indian feeder
+  and transformer metering typically arrives as an interval load survey read from the meter's
+  registers rather than as instantaneous telemetry, and whether that survey carries import and
+  export separately is exactly the thing to ask. If signed flow
   survives the extract (a question, not an assumption — see
   [Questions we should ask them](#questions-we-should-ask-them)), the
   [MVA-bounce reconstruction](../roadmap/disaggregation.md#apparent-power-mva-metering) is a
