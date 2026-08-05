@@ -57,6 +57,7 @@ roadmap items that apply them.
 | Give an AI coding tool context on the broader plan | `docs/roadmap/` (plus `gh` for live task priorities) |
 | Understand a method (DP, encoders, …) | [`docs/techniques/`](techniques/index.md) |
 | Understand *why* something already built works the way it does | [`docs/architecture/`](architecture/overview.md) |
+| Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md), [Could this codebase forecast another country?](architecture/adapting-to-another-geography.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
 | Learn *how* to run/operate something already built, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
 | File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |
 | Write the mechanical checklist for the PR in flight | `plans/` (single file, deleted on merge) |
