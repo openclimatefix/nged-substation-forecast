@@ -33,13 +33,13 @@ The assessment assumed the following brief:
 What it would take to point this system at that brief splits into three quite different pieces,
 and they are worth keeping apart because only one of them is genuinely hard.
 
-**Moving to a different country is easy.**  The weather data we already use is a
-global product, so India needs no new weather source at all. The parts of the system that handle
-spatial gridding, storage, and feature building never learned that they were in Britain. What *is*
+**Moving to a different country is easy.**  The weather data we already use (ECMWF ENS from
+Dynamical) is a global product, so India needs no new weather source at all. The parts of the system
+that handle spatial gridding, storage, and feature building are geography-agnostic. What *is*
 British is a thin, well-contained layer: a map outline, a permitted latitude and longitude range,
-the names of British substation categories, and the assumption that readings arrive every half
-hour rather than every 15 minutes. Turning those from hard-coded facts into settings is a few
-weeks of work, not a rewrite.
+the names of British substation categories, and the assumption that readings arrive every half hour
+rather than every 15 minutes. Turning those from hard-coded facts into settings is a few weeks of
+work, not a rewrite.
 
 **Handling 100,000 substations is a real engineering project, but an ordinary one.** It is 40 times
 as many substations as we are currently building towards for NGED, and — because the readings
@@ -273,14 +273,32 @@ compression work.
 
 - **How do the forecast users want the data?** Our answer for NGED is Delta Lake on S3, for reasons
   set out in [Forecast delivery](forecast-delivery.md) — but that suits one power user with Python
-  skills. If the Indian consumers are control-room operators wanting a dashboard, or a SCADA/EMS
-  system wanting a push feed, that is a different build. Worth asking early, because it is the
-  assumption most likely to be silently wrong.
+  skills. Indian consumers might instead want an HTTP API, or a SCADA/EMS system might want a push
+  feed. Worth asking early, because it is the assumption most likely to be silently wrong.
+- **Do they want a user interface?** A control-room dashboard, a planner's map, or a web page an
+  engineer can open are all plausible, and none of them is implied by the brief as written. Ask
+  explicitly rather than inferring it, and ask *who* would use it — an operator making a decision in
+  the next hour and an analyst reviewing last quarter want almost opposite things.
 - **Who are the consumers, and how many?** A single utility analytics team and a hundred DISCOM
   engineers imply different architectures.
 - **Do they need the full forecast history, or only the latest run?** NGED wanting routine access to
   the entire backtest history is what drives our storage design. If India only needs recent
   forecasts, most of the volume problem disappears.
+
+**A reassuring point to be able to make in the room:** if the answer to either of the first two
+questions is "we want an API" or "we want a UI", that is **strictly additive** and costs us nothing
+we have already built. As
+[Forecast delivery](forecast-delivery.md#when-would-a-rest-api-earn-its-keep) puts it, adding a
+REST API later is a thin, stateless service that reads the same Delta tables and serves slices of
+them over HTTP — nothing has to be re-written, and the Delta tables remain the system of record
+either way. The same is true of a UI. We would not be replacing Delta Lake; we would be adding some
+code that *queries* Delta Lake.
+
+This is not a theoretical claim. This project already ships two Marimo web apps —
+`view_forecasts.py` and `map_and_timeseries.py` — that are exactly that: user interfaces which read
+the same Delta tables directly with `pl.scan_delta`, added on top without changing the storage
+layer at all. So "Delta Lake first, interfaces on top" is a pattern we have already exercised, not
+one we would be trying for the first time on someone else's project.
 
 **About data we would want:**
 
