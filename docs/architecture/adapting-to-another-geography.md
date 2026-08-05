@@ -158,6 +158,25 @@ too, but monthly means only, which is too coarse to be useful here.
   differently: the long capacity-factor series is **modelled**, so it is not independent evidence
   about irradiance, while the reported production is real but spatially aggregated.
 
+**[PVOutput.org](https://pvoutput.org) is a dead end for India, and it is worth knowing why.**
+PVOutput is the obvious place to look — a global community platform where rooftop owners publish
+live generation, and a genuinely useful source of per-site behind-the-meter data in other
+countries. But **India does not appear in its top 25 countries by system count**, a table headed
+by Australia at roughly 18,100 systems and including the Netherlands (~14,000), the USA (~4,100),
+the UK (~3,400) and Germany (~2,700). Indian coverage is therefore negligible — nothing like a
+usable sample against 100,000 substations. Two further caveats even if coverage improved: bulk
+access (5-minute data in 365-day batches, or whole-country daily output) sits behind PVOutput's
+paid **Data Services** tier, which is also where the **commercial-use licence** lives, so the free
+tier is not usable for funded work; and self-reported community data carries unknown
+capacity, orientation and shading metadata, which is precisely the metadata a disaggregation
+anchor needs to be trustworthy.
+
+The *reason* for the gap is itself informative for the bid: rooftop systems sold in India ship
+with the manufacturer's own monitoring app, so the generation data exists but pools in **inverter
+OEM clouds** rather than on community platforms. If per-site rooftop generation is wanted at any
+scale, the realistic route is a commercial agreement with inverter manufacturers or installers,
+not an open dataset. Worth raising as a question rather than assuming either way.
+
 **What none of this gives us.** There is no free, per-site, long-record, near-real-time metered PV
 generation for India — which is the thing that would actually anchor the unmetered inference. The
 free sources are good enough to *build and sanity-check* the physics; the anchor still has to come
@@ -213,6 +232,70 @@ history, NSRDB IODC for anything near-real-time — with ERA5 or IMDAA carrying 
 fields. In GB the equivalent role is played by
 [CM SAF SARAH-3](../roadmap/data-sources.md), which cannot be reused here: it covers ±65°
 longitude, and India begins at 68°E.
+
+### Questions we should ask them
+
+We have costed this against **NGED's** requirements, because those are the only ones we know. Every
+volume figure on this page inherits three assumptions we have no basis for in India: a **14-day
+horizon**, a **51-member ensemble**, and **four runs per day**. If any of them is wrong, the
+storage numbers move enormously — and they mostly move *down*:
+
+| If instead they want… | A year of forecasts, on disk |
+|---|---|
+| The assumed 14 days, 51 members, 4 runs/day | ~18 TB |
+| 13 delivery quantiles rather than 51 raw members | ~4.6 TB |
+| One run per day | ~4.5 TB |
+| A 2-day horizon rather than 14 | ~2.6 TB |
+| A 2-day horizon **and** quantiles | ~0.7 TB |
+| A 2-day horizon, quantiles **and** one run per day | ~0.16 TB |
+
+That is a **110× spread**, so the "worryingly large" number is really a statement about NGED's
+requirements rather than about India's. Answering these questions is worth more than any
+compression work.
+
+**About the forecast itself:**
+
+- **What is the forecast horizon?** The single biggest driver of both storage and method. Day-ahead
+  operational scheduling, a few days for maintenance planning, and seasonal planning are three
+  different products.
+- **What decision does the forecast actually support?** Everything else follows from this, and it
+  is the question most likely to change what we build. A forecast used to schedule a battery has
+  different accuracy and latency requirements from one used for annual network planning.
+- **Do they want probabilistic forecasts, or a single number?** We would strongly recommend
+  probabilistic, and it is a genuine OCF differentiator — but it costs roughly 13–51× the storage,
+  and it is only worth it if someone downstream will actually act on the uncertainty.
+- **How often must it update, and how quickly after data arrives?** Update cadence multiplies
+  storage directly; latency drives the whole deployment architecture.
+- **Per substation, or aggregated?** The brief says per substation, but if most users consume a
+  feeder- or region-level total, that changes both the model and the delivery format.
+
+**About delivery:**
+
+- **How do the forecast users want the data?** Our answer for NGED is Delta Lake on S3, for reasons
+  set out in [Forecast delivery](forecast-delivery.md) — but that suits one power user with Python
+  skills. If the Indian consumers are control-room operators wanting a dashboard, or a SCADA/EMS
+  system wanting a push feed, that is a different build. Worth asking early, because it is the
+  assumption most likely to be silently wrong.
+- **Who are the consumers, and how many?** A single utility analytics team and a hundred DISCOM
+  engineers imply different architectures.
+- **Do they need the full forecast history, or only the latest run?** NGED wanting routine access to
+  the entire backtest history is what drives our storage design. If India only needs recent
+  forecasts, most of the volume problem disappears.
+
+**About data we would want:**
+
+- **Can we get SRRA access, or is there a partner who already has it?** See
+  [above](#what-we-could-get-hold-of-today-without-asking-anyone) — this is the highest-value
+  single ask, and it is a legal/commercial question rather than a technical one.
+- **Is there any metered PV generation we can use as an anchor**, at any spatial resolution, even
+  aggregated to feeder or state level? And is there a route to **inverter-manufacturer monitoring
+  data**, which is where per-site rooftop generation actually pools in India?
+- **Are agricultural feeder supply schedules and load-shedding schedules available?** Both convert
+  a confounder into a regressor.
+- **How much history comes with the substation data?** Two years is thin for seasonal effects, and
+  the ECMWF ensemble archive only reaches back to 2024-04-01 regardless.
+- **Do net-metering or rooftop-subsidy registrations exist** that would give partial installed
+  capacity, even for a subset of sites?
 
 ## Part 2: what would have to change in the code
 
@@ -367,6 +450,66 @@ exists to bound separately. The bigger loss is that the
 [Architecture Overview](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 stops helping: with 100,000 sites spread across the country, the cells the sites occupy *are* the
 whole grid.
+
+### Radical options for shrinking what we store
+
+The volumes above assume we keep doing exactly what we do today, only more of it. If the
+[open questions](#questions-we-should-ask-them) come back badly — long horizon, full ensemble,
+frequent runs, full history retained — these are the levers worth reaching for. All four are
+**unmeasured proposals**, and none should be quoted at anyone until it has been benchmarked through
+the real `delta_store` write path on real data. The point of listing them is that the design space
+is not exhausted, not that any specific number is available.
+
+#### For `power_forecasts`
+
+**Store residuals against a cheap deterministic baseline, not absolute power.** This is the one we
+would try first, because it attacks a *documented* weakness. `delta_store.power_forecasts` uses
+`BYTE_STREAM_SPLIT` on `power_fcst` precisely because
+"[near-continuous ML output has no repeats for a dictionary to exploit](overview.md#core-components)"
+— it is making the best of a column with no exploitable structure. Subtracting a cheap, exactly
+reproducible baseline (a per-site time-of-week climatology, say) leaves a residual that is small,
+centred on zero, and — crucially — *quantised*: after the existing 13-bit significand rounding, a
+narrow-range residual collapses onto far fewer distinct values than a wide-range absolute power
+does, which is exactly the repetition dictionary and RLE encoding need. The baseline is stored once
+per site and added back on read. This does not change the schema's meaning, only its physical
+representation, and it is reversible, so it costs no accuracy beyond the rounding we already
+accept. Whether it beats `BYTE_STREAM_SPLIT` in practice is an empirical question and would need
+the same head-to-head treatment as
+[PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268).
+
+**Stop storing every init_time at full horizon.** At four runs a day against a 14-day horizon,
+every `valid_time` is forecast **56 times**, and we keep all 56. That redundancy is the single
+largest structural waste in the table, and most of it earns nothing: skill-versus-lead-time
+analysis needs a *sample* of lead times, not the complete cross-product. Keeping the newest
+forecast for each `valid_time` at full resolution, plus a deliberately sampled subset of older
+init_times (say, one run per day at a handful of lead times), would cut the table by something like
+an order of magnitude while preserving every analysis anyone has actually asked for. The cost is
+that it is *lossy at the table level* — a backtest we did not anticipate becomes impossible rather
+than merely slow — so it should follow the "do they need the full history?" question rather than
+precede it.
+
+#### For NWP
+
+**Store weather anomalies against a climatology, not absolute values.** The same trick as
+residualising forecasts, and it fits NWP even better: temperature at a given cell, day-of-year and
+hour is highly predictable, so the anomaly is small and repetitive where the absolute value is
+neither. `delta_store.nwp` currently gets nothing from dictionary encoding on the continuous
+fields; anomalies would give it something to work with. There is a pleasing efficiency here — the
+roadmap already plans to ingest a climatology for the
+[weather-abnormality z-score features](../roadmap/xgboost-improvements.md), so the climatology
+would be on hand for its own reasons and this becomes a storage-layout change rather than a new
+data dependency.
+
+**Delta-encode ensemble members against the control member.** Fifty-one members of the same run at
+the same cell and valid_time are highly similar, so storing member 0 in full and the other 50 as
+differences from it should compress far better after significand rounding. **But this collides
+head-on with a decision we already measured**: `NWP_SORT_COLS` sorts member-early
+(`init → member → valid → h3`) specifically so that single-member reads skip most row groups, which
+was measured at ~5× faster and ~5× less peak memory than the alternative. Delta-encoding across
+members needs members *adjacent* for the same cell and valid_time, which is the opposite ordering.
+So this is a real trade — training reads (one member, fast) against storage — and it should only be
+considered if storage genuinely becomes the binding constraint. Noting it mainly to record that the
+option exists and why we would not take it lightly.
 
 ### PV disaggregation without capacity priors
 
