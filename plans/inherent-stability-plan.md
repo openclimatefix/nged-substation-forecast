@@ -463,36 +463,74 @@ a threshold and a window, and we must be willing to record a falsification.
 
 ### The claims
 
-**H*n*** is a hypothesis; **T*n.m*** is the *m*th **test** of hypothesis *n*. H1 bundles three
-separable claims that each need their own measurement, so its row is a header and the three tests
-beneath it carry the thresholds. H2 and H3 make a single claim each, so their test sits inline and
-needs no number. Labels are citable from issues and reports, so **append, never renumber**.
+**H*n*** is a hypothesis; **T*n.m*** is its *m*th **test**. Labels are citable from issues and
+reports, so **append, never renumber**.
 
-| | Claim | Test | Threshold | Source | Resolvable |
-|---|---|---|---|---|---|
-| **H1** | Manual attention only for upstream format changes; graceful, legible degradation; faithful uncertainty | | | | |
-| T1.1 | *Operability* | Interventions per quarter, classified by cause | ≥90% attributable to upstream format or contract change; zero out-of-hours | Intervention log | ~2 quarters of v1.0 |
-| T1.2 | *Graceful degradation* | Forecast emitted for every series under every failure scenario, **and still beats `nged_incumbent`** | 100% emitted; beats incumbent at rungs 0–2 | Failure-scenario suite | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
-| T1.3 | *Faithful uncertainty* | PICP and pinball computed **per degradation regime** | PICP within tolerance of nominal in every regime | Leaderboard, scenario dimension | v0.5 |
-| **H2** | Hundreds of experiments per month | Registered leaderboard experiments per month, **and** median human-minutes each | ≥200/month; ≤5 human-min each | MLflow + timestamps | v0.5 |
-| **H3** | One-click promotion of the winner | Commands from "leaderboard says X won" to "X is serving" — **and the same for rollback** | ≤1 each way | Runbook + `promoted_model` | v0.3 |
+| | Test | Threshold | Resolvable |
+|---|---|---|---|
+| T1.1 | Operability | ≥90% of interventions from an upstream format change; zero out-of-hours | ~2 quarters of v1.0 |
+| T1.2 | Graceful degradation | Every series emits; beats `nged_incumbent` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
+| T1.3 | Faithful uncertainty | PICP within tolerance of nominal in every regime | v0.5 |
+| T2.1 | Experiment throughput | ≥200 registered experiments per month | v0.5 |
+| T2.2 | Human cost per experiment | ≤5 human-minutes, median | v0.5 |
+| T3.1 | Promotion effort | ≤1 command | v0.3 |
+| T3.2 | Rollback effort | ≤1 command | v0.3, after item 5 |
 
-T1.3 is the sharpest test available and needs no new metric — only the scenario dimension, which is
-the same machinery that serves T1.2. H3 must include rollback: one-click promotion without one-click
-demotion is not safe, and it is the damping half of §1. H2's real claim is its second number, since
-a 200-config sweep trivially clears "hundreds per month"; the transferable claim is throughput of
-*decision-grade* experiments with negligible human time, and it is worth pairing with
-cost-per-experiment.
+#### H1 — a service that mostly runs itself
+
+> Manual attention only when an upstream input format changes. It degrades gracefully and legibly,
+> and it propagates uncertainty faithfully.
+
+**T1.1 — Operability.** Interventions per quarter, classified by cause, counted from the
+intervention log. The only test in this document that cannot be measured retrospectively, which is
+why the log ships ahead of everything else — see below.
+
+**T1.2 — Graceful degradation.** Run the failure-scenario suite across every series and check two
+things: that a forecast is emitted at all, and that it still beats `nged_incumbent`. Blocked on
+[#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147), which builds the
+baseline to compare against.
+
+**T1.3 — Faithful uncertainty.** PICP and pinball loss computed per degradation regime, from the
+leaderboard's scenario dimension. The sharpest test we have, and it needs no new metric — only that
+scenario dimension, which is the same machinery T1.2 uses.
+
+#### H2 — hundreds of decision-grade experiments a month
+
+> Enough experiment throughput to search the design space properly, at negligible human cost per
+> experiment.
+
+**T2.1 — Experiment throughput.** Registered leaderboard experiments per month, from MLflow run
+timestamps.
+
+**T2.2 — Human cost per experiment.** Median human-minutes from "idea" to "registered result", also
+from MLflow timestamps. **This is the hypothesis's real claim.** A single 200-config sweep clears
+T2.1 on its own; what is transferable is sustained throughput of *decision-grade* experiments that
+cost almost no human time. T2.1 can pass while T2.2 fails, and that combination is a falsification
+rather than a partial success.
+
+#### H3 — one-click promotion, and one-click rollback
+
+> Moving the leaderboard winner into production, or reverting it, is a single command each way.
+
+**T3.1 — Promotion effort.** Commands from "the leaderboard says X won" to "X is serving",
+following the runbook. The mechanism already exists (`promoted_model`); what is missing is a runbook
+pinning down what counts as one command.
+
+**T3.2 — Rollback effort.** Commands from "X is serving" back to the previous champion. Blocked on
+items 5 and 16, which build the mechanism and the runbook respectively. Promotion without rollback
+is not safe at any speed, and rollback is the damping half of
+[§1](#restoring-force-and-damping) — so this is not the optional half of H3.
 
 ### The intervention log is time-critical
 
-H1 is the only hypothesis that **cannot be measured retrospectively**. Experiment counts live in
-MLflow forever and promotion steps can be counted at any time, but "how many times did a human have
-to intervene, and why?" is unrecoverable unless recorded as it happens — and the service is already
-running on AWS.
+**T1.1 is the only test that cannot be measured retrospectively.** Every other test can be
+reconstructed later: T1.2 and T1.3 are computed by re-running the scenario suite and the
+leaderboard, T2.1 and T2.2 come from MLflow timestamps that live forever, and T3.1 and T3.2 can be
+counted whenever the runbooks exist. But "how many times did a human have to intervene, and why?"
+is unrecoverable unless recorded as it happens — and the service is already running on AWS.
 
 The artifact is cheap: an append-only log with date, trigger, cause category, human-minutes, and
-whether a runbook existed. The cause taxonomy is the point, since H1 predicts that essentially all
+whether a runbook existed. The cause taxonomy is the point, since T1.1 predicts that essentially all
 entries fall into "upstream format or contract change". **This should ship before the docs pages.**
 
 ### Candidate further hypotheses
@@ -570,7 +608,7 @@ calibrates) and `evaluation-metrics.md` (PICP and interval width, which measure 
 | Page | Edit |
 |---|---|
 | `documentation-guide.md` | **Both new pages need a home in its four-place model.** `engineering-hypotheses.md` fits none of the four buckets — it is neither unbuilt design, nor an explanation of built code, nor NGED-derived background, but a fifth kind of content: our own falsifiable claims. It needs a new row in both of the guide's tables |
-| `live_service/operations.md` | **Two missing runbooks.** The page contains no occurrence of "stale", "outage", or "missing", and offers no way back from a promotion. Both gaps block the H1 and H3 measurements |
+| `live_service/operations.md` | **Two missing runbooks.** The page contains no occurrence of "stale", "outage", or "missing", and offers no way back from a promotion. Both gaps block the T1.1 and T3.2 measurements |
 | `background/requirements.md` | Cross-links to the hypotheses page, **plus a fourth bullet under "Uptime: lenient by design"**: its three bounded-damage arguments all assume the outage is *our compute stopping*. An extended NWP outage keeps compute running while forecasts hard-fail, and the last good forecast ages out too, so the 14-day-horizon argument does not cover it |
 | `architecture/overview.md` | Cross-link. It is currently billed as the design-philosophy page, so without one the two pages compete for the same job |
 | `background/data-quality.md` | A pointer that false zeros and stuck values are *wrong* while missing data is *missing*, and the two are handled differently. The evidence already lives there |
@@ -605,7 +643,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 2 | Canonical failure-scenario suite — named, versioned degradation transforms over `AllFeatures` | **v0.3** | Shared by tests, leaderboard, and later training. Must exist before v0.5. Enumerate only §3.6's *episodic* class; the chronic de-accumulated scatter is in-distribution and needs no scenario, though an **elevated** scatter fraction is a good candidate — `assess_nwp_quality` already computes it |
 | 3 | Score every leaderboard experiment under each scenario, **against `nged_incumbent`** | **v0.3**, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | Otherwise v0.5 picks a champion blind to degradation behaviour |
 | 4 | `power_forecast_warnings` **Phase 1**: `STALE NWP` + `STALE POWER`, with `warning_source` | **v0.3** | No dependency on v0.4/v0.6/v0.7. The user-facing half, buildable now |
-| 5 | Rollback path for `promoted_model` | **v0.3** | H3's second direction |
+| 5 | Rollback path for `promoted_model` | **v0.3** | The mechanism behind T3.2 |
 | 6 | `power_forecast_warnings` **Phase 2**: meter-error types | **v0.4** | Depends on improved cleaning |
 | 7 | `asset_health_history` table | **v0.4** | Same dependency |
 | 8 | Degradation-conditional interval calibration — conformal per regime | **v0.5** | Directly after #263/#264. Must ship with the `techniques/conformal-prediction.md` explainer (§6.1) — the term appears nowhere in `docs/` today |
@@ -615,7 +653,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2. It binds `BaseForecaster` implementers only — the v0.7 DP estimators are not forecasters, so they are covered by the capacity-estimation judging criteria instead |
 | 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **missed NWP runs at forecast time** (not raw age, per §3.5), WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
 | 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.3**, after 13 | §4 divergences. Ordering is load-bearing |
-| 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | H1's "recovery next business day, via runbook" threshold is unmeasurable without it |
+| 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | Without it, a degraded-data incident is an out-of-hours page rather than a next-day fix — exactly what T1.1 counts |
 | 16 | Runbook + mechanism: roll back a promoted model | **v0.3** | The docs half of item 5 |
 
 Remaining v0.6/v0.7 warning types attach as sub-tasks of the existing epics rather than new issues.
@@ -714,7 +752,7 @@ leaving the R&D half — which wants fail-fast and would be content with blockin
 That is backwards. It does not kill Option B, but it belongs in the "Against" list.
 
 **Add a trigger under "What would change this assessment".** The page's central argument rests on
-experiment volume, which is now H2, with a threshold and a measurement. That cuts both ways: **if H2
+experiment volume, which is now H2, with a threshold and a measurement. That cuts both ways: **if T2.1
 is falsified — 20 experiments a month rather than 200 — the central argument for Dagster weakens
 materially.** Saying so makes an architectural decision re-testable rather than permanent, which is
 what the page's "documented seam" framing is for.
