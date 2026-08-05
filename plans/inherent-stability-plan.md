@@ -302,9 +302,13 @@ using masks plus learned decay of the last observation toward an empirical mean.
 *Chronic and fine-grained.* Three de-accumulated variables — `precipitation_surface`,
 `downward_short_wave_radiation_flux_surface`, `downward_long_wave_radiation_flux_surface` — are
 legitimately null at lead-0 in **every** run, and beyond lead-0 carry *scattered per-pixel* nulls
-from a known Dynamical.org de-accumulation defect, empirically a few percent of a slice
-(`contracts/weather_schemas.py:231`, `docs/architecture/ecmwf-ens-known-issues.md`). This is
-element-wise, not blocky. But it is present in **every** training run, so it is in-distribution:
+rooted in **corrupt ECMWF source accumulation**: some fields report physically-impossible negative
+accumulation, which Dynamical's de-accumulation step correctly surfaces as null rather than
+clamping corrupt data to zero
+([dynamical-org/reformatters#722](https://github.com/dynamical-org/reformatters/issues/722), WONTFIX
+upstream — a looser clamp would only convert visibly-null corrupt data into invisibly-zeroed corrupt
+data). Empirically a few percent of a slice; see `contracts/weather_schemas.py:231` and
+`docs/architecture/ecmwf-ens-known-issues.md`. This is element-wise, not blocky. But it is present in **every** training run, so it is in-distribution:
 per §3.1 this is the one case where "XGBoost handles the missingness it saw during training"
 genuinely holds. It needs no scenario, and the main risk is that someone later "fixes" it by
 imputing.
