@@ -74,6 +74,18 @@ anything we could do to the storage format.** If the answers do come back at the
 there are further options — see
 [Radical options for shrinking what we store](#radical-options-for-shrinking-what-we-store).
 
+**We would also expect to start with a trial of roughly 50 to 100 substations, not with all
+100,000.** That is the same shape as our NGED programme, where we are running on a 32-substation
+trial area before scaling to around 2,500, and it is worth saying out loud in the pitch, because it
+changes the risk profile considerably. A trial at that size needs essentially none of the scale
+engineering described above — it is comfortably within what the code handles today — so the first
+year could be spent proving the hard part, which is whether we can actually recover unmetered
+rooftop solar from Indian net-flow data, rather than on storage layouts. It also front-loads the
+findings: we would have real results on a real Indian feeder within months, and the answers to the
+questions below would by then be known rather than assumed, so the full-rollout design could be
+sized against measured numbers instead of worst cases. What we should avoid promising is 100,000
+substations in year one.
+
 **Estimating unmetered solar is the research bet — and it is the same bet we are already making
 for NGED.** Separating rooftop solar from underlying demand, with no generation meters and no
 capacity register, is exactly the problem described in
@@ -112,9 +124,10 @@ Separately, high atmospheric dust also biases the satellite and forecast estimat
 the whole method leans on.
 
 Against that, 100,000 sites reporting every 15 minutes would be a far larger and finer-grained
-dataset than the 32 sites the method was designed against — more sites means the shared parts of
-the model are much better constrained, and 15-minute data separates a solar signal from a demand
-signal more cleanly than half-hourly data does. There are also confounders India has and Britain
+dataset than the ~2,500 sites we have been designing towards all along for NGED's V2 (the V1 trial
+area we are currently running on is 32 sites) — more sites means the shared parts of the model are
+much better constrained, and 15-minute data separates a solar signal from a demand signal more
+cleanly than half-hourly data does. There are also confounders India has and Britain
 does not: load shedding and diesel backup generation both break the assumption that underlying
 demand moves smoothly with the weather. Load shedding is the dangerous one, because it looks like
 demand collapsing for no meteorological reason. Agricultural pumping is a special case worth
@@ -132,7 +145,9 @@ it was built for, against a harder physical background.
 
 **Rough size of the job:** about one engineer for four to five and a half months to have India
 forecasting net demand at scale, with the solar-disaggregation research running alongside and
-shared with the NGED work rather than duplicated. Two caveats, both worth turning into questions
+shared with the NGED work rather than duplicated. Only around three of those months are needed to
+forecast a 50–100 substation trial; the rest is what it takes to go from a working trial to
+100,000 substations, and can follow it. Two caveats, both worth turning into questions
 (see [Questions we should ask them](#questions-we-should-ask-them)). It assumes the substation data
 arrives in a sane bulk format; if it has to be polled per-substation across 100,000 sites, that is
 a separate workstream we have not costed. And it assumes we are delivering *data* rather than a
@@ -316,6 +331,20 @@ That is a **110× spread**, so the "worryingly large" number is really a stateme
 requirements rather than about India's. Answering these questions is worth more than any
 compression work.
 
+**About scope and phasing:**
+
+- **Are they expecting all 100,000 substations from the start, or would they accept a trial of 50 to
+  100 first?** We should propose the trial. It removes essentially all of the scale engineering from
+  the first phase (see
+  [The real work is scale, not geography](#the-real-work-is-scale-not-geography)), which means the
+  first year can be spent on the part that might not work — recovering unmetered rooftop solar —
+  rather than on storage layouts. It also means the full rollout gets designed against measured
+  numbers instead of the worst-case assumptions in the table above.
+- **If a trial, which substations?** We would want the sample chosen for *variety* rather than
+  convenience — a spread of rooftop-solar penetration, urban and rural, and at least a few feeders
+  where someone independently knows roughly how much solar is installed, because those are what make
+  the disaggregation results checkable rather than merely plausible.
+
 **About the forecast itself:**
 
 - **What is the forecast horizon?** The single biggest driver of both storage and method. Day-ahead
@@ -468,6 +497,17 @@ Two different multipliers matter here, and it is worth keeping them apart. On **
 the axis that governs how many models we train — 100,000 sites is **40×** the V2 design point of
 ~2,500, which is itself ~78× V1's 32. On **forecast-row volume**, the 15-minute sampling doubles it
 again, so the storage and query pressure is around **80×**. Three things break.
+
+**None of it breaks in a trial, though, and that is the important scheduling fact.** A first phase
+of 50–100 substations — which is what we would expect to propose, mirroring NGED's own 32-site V1
+trial area — sits comfortably inside what the code handles today: per-series XGBoost is fine at that
+count, one run is a few million forecast rows rather than 6.9 billion, and `power_time_series`
+partitioned by `time_series_id` gives 100 directories rather than 100,000. So everything in this
+section is **rollout work, not entry cost**. It can be deferred until the disaggregation research —
+the part that might not work — has been shown to work on real Indian data, and by then the answers
+to [Questions we should ask them](#questions-we-should-ask-them) would be known, so it could be
+sized against measured numbers rather than the worst-case assumptions used below. The one thing a
+trial cannot defer is the 15-minute resolution work, because that is entry cost at any site count.
 
 **One model per substation stops working.** This is the 40× axis. `XGBoostForecaster.train`
 collects the whole population into memory and then loops over `group_by("time_series_id")` in
@@ -655,9 +695,12 @@ What is genuinely **harder** in India:
 
 What is genuinely **easier**:
 
-- **100,000 sites instead of 32.** The design's cross-site strength comes from hierarchical
-  parameter sharing — universal basis shapes plus a small per-site style vector. That structure
-  improves markedly with more sites; 32 is close to the worst case for it.
+- **100,000 sites instead of ~2,500.** The design's cross-site strength comes from hierarchical
+  parameter sharing — universal basis shapes plus a small per-site style vector. The method has
+  always been designed against V2's ~2,500 sites rather than against the 32 in the V1 trial area,
+  so this is a 40× improvement on the design point, not a 3,000× one. That structure keeps
+  improving with more sites, so the gain is real, but it is an easier win at the margin than the
+  raw ratio to V1 suggests.
 - **15-minute data instead of half-hourly.** Finer sampling separates the solar shape from the load
   shape more cleanly, particularly around sunrise and sunset ramps.
 
@@ -682,15 +725,20 @@ the single most expensive mistake available here. Instead, promote geography to 
 - `geo/great_britain/` becomes a small region registry.
 - Two Dagster code locations over one set of shared packages.
 
-Indicative sizing, and how much is shared with NGED's own V2 work:
+Indicative sizing, which phase each workstream falls in, and how much is shared with NGED's own V2
+work. "Trial" means needed to forecast 50–100 substations; "Rollout" means needed only to reach the
+full 100,000:
 
-| Workstream | Effort | Shared with NGED V2? |
-|---|---|---|
-| Region seam, 15-minute support, Indian ingest | 4–6 weeks | Seam yes; ingest no |
-| Global model, replacing per-series XGBoost | 6–10 weeks | **Yes — needed for V2 regardless** |
-| Storage partitioning and metrics chunking at 80× | 6–8 weeks | Mostly |
-| Convex dictionary disaggregator | 8–12 weeks | **Yes — it is the V2 baseline** |
-| Full differentiable-physics PV engine | 6–12 months | **Yes** |
+| Workstream | Effort | Phase | Shared with NGED V2? |
+|---|---|---|---|
+| Region seam, 15-minute support, Indian ingest | 4–6 weeks | Trial | Seam yes; ingest no |
+| Convex dictionary disaggregator | 8–12 weeks | Trial | **Yes — it is the V2 baseline** |
+| Global model, replacing per-series XGBoost | 6–10 weeks | Rollout | **Yes — needed for V2 regardless** |
+| Storage partitioning and metrics chunking at 80× | 6–8 weeks | Rollout | Mostly |
+| Full differentiable-physics PV engine | 6–12 months | Either | **Yes** |
+
+The phase column is the reason a 12-month project is plausible at all: only the first two rows are
+entry cost, and they are the two that answer the question the bid actually turns on.
 
 ### Why we are not doing any of this now
 

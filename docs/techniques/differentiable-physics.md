@@ -257,6 +257,22 @@ This is a state-space recurrence — the same pattern as a battery charge/discha
 
 **Resolution caveat.** The thermal time constant $\tau$ is on the order of minutes, and the cloud transients that drive the broken-cloud effect occur on the same sub-half-hourly timescale. Half-hourly-mean POA discards exactly the sub-grid variability the dynamic model needs. This upgrade therefore only earns its keep with higher-frequency irradiance inputs — satellite-derived irradiance at ~5-minute intervals, or sub-hourly metering — and the steady-state derate remains the right choice until that data is available.
 
+### Soiling
+
+Not yet modelled, and worth adding for Great Britain — not only for dustier climates. Dirt, dust, pollen and bird droppings accumulate on panel glass and depress output by a few percent, and a decent fall of rain washes most of it off. Britain is normally rainy enough for the long-run average effect to be small, but the effect is driven by *time since the last washing rainfall*, not by climate averages, so a multi-month dry spell — London rooftops under Saharan dust after a rainless summer — is exactly the regime in which it stops being small. It is also one of the largest remaining unmodelled losses for any deployment in a dry or dusty climate.
+
+**How it would fit.** Soiling is a multiplicative loss, so it enters as a ratio $s_t \in (0, 1]$ applied to DC output alongside the temperature derate $\eta_T$, driven by a small differentiable state that accumulates with dry time and resets with rain:
+
+$$s_t = \max\!\left(s_{\min},\; 1 - \delta \cdot d_t\right), \qquad d_t = \begin{cases} 0 & \text{if } r_t > r_{\text{wash}} \\ d_{t-1} + \Delta t & \text{otherwise}\end{cases}$$
+
+where $d_t$ is time since the last washing rainfall and $r_t$ is the rainfall rate. That is three learnable parameters — a soiling rate $\delta$, a wash-off threshold $r_{\text{wash}}$, and a floor $s_{\min}$ — each with a tight physical prior, learned exactly like `tilt` and `azimuth`. The hard reset above wants softening (a sigmoid in $r_t$, and a soft floor) so gradients flow, and the state-space recurrence is the same pattern as the thermal-mass upgrade above. **No new input is needed**: `precipitation_surface` is already in `_ECMWF_ENS_VARS_TO_DOWNLOAD`, so the rainfall history is in the NWP we already download.
+
+**Why it composes cleanly with the fleet node.** [`UniversalSolarFleetNode`](#4-implementation-universalsolarfleetnode) carries magnitude in a *non-decreasing* per-week capacity series, because installed capacity only ever grows. Soiling is the opposite — a loss that reverses — so it cannot be expressed by bending that series, and trying to would destroy the monotone prior that is doing real work identifying installations. Factoring the two apart (monotone installed capacity **×** reversible soiling ratio) keeps both intact and adds only the three parameters above.
+
+**The real cost is identifiability, not implementation.** Soiling and slower-than-assumed capacity growth both depress output, and they are separable only because soiling tracks rainfall history with a sawtooth shape whereas installations arrive as steps. Whether that separation actually holds at realistic noise levels needs demonstrating on synthetic data before the extra parameters are let anywhere near a real fit. In the aggregate-fleet case there is a second confound worth naming: real fleets are cleaned and rained on unevenly, so the fleet-level soiling ratio is a smeared average of many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\text{wash}}$.
+
+This came out of an assessment of what it would take to run this method over India, where soiling between monsoons is a first-order effect rather than a refinement — see [Could this codebase forecast another country?](../architecture/adapting-to-another-geography.md#pv-disaggregation-without-capacity-priors).
+
 ---
 
 ## Scaling to aggregate fleets: `UniversalSolarFleetNode`
