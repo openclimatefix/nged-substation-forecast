@@ -741,6 +741,40 @@ underivable from the row. And since the `metrics` asset computes metrics by scan
 no scenario slot today, so scenario variants of the same fold would collide. Decision 2 must settle
 the scenario key for **both** tables, not just metrics.
 
+**Keep `power_forecasts` denormalised.** The natural worry is that the table gets wider, so the
+run-level metadata could instead move to a dimension table keyed by a `power_fcst_id`. It should
+not, for four reasons. First, these columns are already nearly free: `nwp_init_time`,
+`power_fcst_init_time` and `scenario` are constant across every row of a write — one run spreads
+over ~51 ensemble members × the horizon × every series — so parquet dictionary-encodes each to a
+single entry and run-length-encodes the data page to almost nothing. That is why `experiment_name`,
+`power_fcst_model_name` and `nwp_init_time` already sit on the fact table. Second, the surrogate key
+would cost more than the columns it replaced: at run grain it merely duplicates the partition
+columns, and at row grain it is eight high-cardinality bytes — the one genuinely incompressible
+column — on a table that passes 2³² rows at V2. Third, it would break predicate pushdown, which the
+storage policy is built around: `CLAUDE.md`'s `String`-not-`Categorical` rule exists because even a
+*cast* between `pl.scan_delta` and `.filter()` blocks partition pruning, and a join is strictly
+worse. Fourth, it would break the existing write path, since `write_power_forecasts` overwrites one
+6-hourly slot with a `replaceWhere` predicate on `power_fcst_init_time` and delta-rs needs that
+column to be in the table. The usual argument for normalising — that adding a column to a huge table
+is painful — does not apply in Delta, where adding a column is a metadata-only operation and older
+files simply read it as null.
+
+The rule that generalises: **run-constant metadata belongs on the fact table, where it is nearly
+free; genuinely per-row-varying metadata deserves a second look.** `power_data_freshness` is the
+column worth checking against that rule, and it passes. It varies per `time_series_id` — one
+substation's telemetry can be stale while another's is fresh — but is constant across `valid_time`
+and `ensemble_member`, so it takes 32 distinct values per run at V1 and ~2,500 at V2, and it
+run-length-encodes well under the existing sort order.
+
+**`scenario` should be a sorted column, not a third partition column.** Partitioning by it would
+multiply partition cells by the size of the vocabulary, which at v0.5 experiment volumes means
+thousands of partitions per month and a small-file problem. It would also buy little, because item 3
+scores each experiment under *every* scenario, so the reader wants them all. Placing `scenario` at
+the head of `POWER_FORECASTS_SORT_COLS` instead clusters row groups by scenario and lets parquet
+min/max statistics skip them, and it can still narrow a `replaceWhere` predicate exactly as
+`power_fcst_init_time` does today. Including it in the logical primary key is what stops variants
+colliding; partitioning is not needed for that.
+
 ### 6.5 Dagster-versus-Airflow: two edits, verdict unchanged
 
 Option C (stay on Dagster) still stands, and the page is a record of a *closed* decision, so it
@@ -794,7 +828,10 @@ against it.
    also cover `power_forecasts`** (see §6.4): synthetic ablations are underivable from the row, and
    per-scenario forecasts must persist without colliding with the clean fold, so that table needs a
    scenario slot in its key (or an explicit decision not to persist scenario forecasts, which would
-   break re-runnability and `view_forecasts` inspection).
+   break re-runnability and `view_forecasts` inspection). *Recommendation for that table: a plain
+   `String` `scenario` column that joins the logical primary key and the head of the sort order, and
+   the run-level metadata left denormalised rather than moved behind a `power_fcst_id` — reasoning
+   in §6.4.*
 
 3. **Does the inherent-stability page cover the whole system, or production only?** The
    operability audience cares about production, but omitting the R&D asymmetry makes the page read
