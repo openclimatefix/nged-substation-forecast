@@ -57,7 +57,7 @@ That is currently an intention, not a measured fact — see [§3.2](#32-the-weat
 | Rung | Available inputs | Expected behaviour |
 |---|---|---|
 | 0 | Everything fresh | Best skill; narrowest bands |
-| 1 | NWP a few hours stale | Slightly worse; bands widen slightly |
+| 1 | One or two daily NWP runs missed | Slightly worse; bands widen slightly |
 | 2 | No NWP for days/weeks | Weather-blind: lags, calendar, per-series structure. **Should still beat the incumbent** |
 | 3 | No NWP *and* no recent power | Calendar + climatology + year-old history. Converges toward *being* the incumbent |
 | 4 | Nothing at all | Physical envelope (clear-sky) + climatology. Very wide bands, still bounded and still true |
@@ -272,9 +272,17 @@ looks identical to a system that is not running at all.** Both produce zero fail
 the Sentry missed-check-in alarm, firing from outside the deployment, is load-bearing rather than
 belt-and-braces — it is the one piece of active monitoring the design cannot do without.
 
-For the provider channel, a warning saying "NWP was 18 hours old" is only actionable if it also says
-*whose* NWP and *which* run. Warnings must name the upstream source, which implies a
-`warning_source` field on `power_forecast_warnings`.
+For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
+which implies a `warning_source` field on `power_forecast_warnings`.
+
+It must also count the right thing. We ingest **one ECMWF run per day** (00Z, downloaded at 08:30
+UTC by `ecmwf_ens_schedule`) and forecast at 00/06/12/18, so healthy NWP age at forecast time ranges
+from 12 h at the 12:00 slot to **30 h at the 06:00 slot**, just before the day's download lands. Raw
+age is therefore not a health signal — 18-hour-old NWP is exactly what the 18:00 slot is supposed to
+use, and any absolute threshold low enough to catch a real outage would fire on two of the four
+slots every day. The signal is **missed runs**: how many daily runs are absent between the freshest
+run on disk and the freshest that should exist by now. That is zero in every healthy slot, whichever
+slot it is. The degradation ladder's rungs are counted the same way.
 
 ### 3.6 Neural nets and differentiable physics
 
@@ -542,7 +550,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 | 10 | Cost-per-experiment instrumentation | **v0.5** | Piggybacks on the aws-costs machinery |
 | 11 | Weather-blind guarantee: outage-shaped training augmentation (§3.2 option A) | **v0.5** | "Never worse than the incumbent" depends on it |
 | 12 | Missingness contract on `BaseForecaster` | **v0.9**, note on [#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362) | Forces the NN spike to answer the question rather than discover it in v2 |
-| 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **NWP age at forecast time**, WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
+| 13 | Extend [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424) — the `live_forecasts` check — to report **missed NWP runs at forecast time** (not raw age, per §3.5), WARN and non-blocking | **v0.2**, where #424 already sits | Every production asset has a check except the one NGED consumes. #424 needs the degradation dimension and a severity decision |
 | 14 | Make `live_forecasts` **degrade rather than raise** when NWP is absent or out of coverage; keep the `trained_ids` raise | **v0.3**, after 13 | §4 divergences. Ordering is load-bearing |
 | 15 | Runbook: degraded input data — NWP dark, telemetry stalled, reading the freshness check | **v0.3** | H1's "recovery next business day, via runbook" threshold is unmeasurable without it |
 | 16 | Runbook + mechanism: roll back a promoted model | **v0.3** | The docs half of item 5 |
