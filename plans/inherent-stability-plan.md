@@ -297,11 +297,29 @@ The dense alternative is **value + mask channels**, so the network can distingui
 "unknown". GRU-D is the precedent: irregularly-sampled clinical time series with heavy missingness,
 using masks plus learned decay of the last observation toward an empirical mean.
 
-**Our missingness is blocky**, which changes the combinatorics. The explosion only bites if
-missingness is arbitrary per element. Ours is not: NWP {fresh, stale, absent} × telemetry {present,
-partial, absent} × metadata {present} is on the order of ten to twenty realistic regimes, not 2ⁿ. So
-training with **structured** dropout that mimics real outage patterns is tractable, and matches
-reality far better than element-wise random dropout.
+**Our missingness comes in two kinds, and only one of them needs scenarios.**
+
+*Chronic and fine-grained.* Three de-accumulated variables — `precipitation_surface`,
+`downward_short_wave_radiation_flux_surface`, `downward_long_wave_radiation_flux_surface` — are
+legitimately null at lead-0 in **every** run, and beyond lead-0 carry *scattered per-pixel* nulls
+from a known Dynamical.org de-accumulation defect, empirically a few percent of a slice
+(`contracts/weather_schemas.py:231`, `docs/architecture/ecmwf-ens-known-issues.md`). This is
+element-wise, not blocky. But it is present in **every** training run, so it is in-distribution:
+per §3.1 this is the one case where "XGBoost handles the missingness it saw during training"
+genuinely holds. It needs no scenario, and the main risk is that someone later "fixes" it by
+imputing.
+
+*Episodic and coarse-grained.* Missed or stale runs, a wholesale-absent variable, a telemetry
+stall. These are rare or wholly absent from training data, which is exactly why they must be
+enumerated — and here the combinatorics stay tractable: NWP {fresh, *n* runs missed, absent} ×
+telemetry {present, partial, absent} × metadata is on the order of ten to twenty realistic regimes,
+not 2ⁿ. So structured, outage-shaped dropout is feasible and matches reality far better than
+element-wise random dropout.
+
+The ingest gate already keeps the two apart. A *whole-slice* null in a de-accumulated variable is
+fatal in `Nwp.validate`, so wholesale corruption never lands as silently-broken data — it manifests
+downstream as a **missed run**, which is rung 1 of the ladder. Fine-grained catastrophic corruption
+is converted into coarse-grained absence, the form the rest of this design already handles.
 
 **Differentiable physics is the strongest piece.** A physical model has a defined output for any
 input state; where an input is absent, substitute a climatological prior or a physical bound and let
@@ -551,7 +569,7 @@ board. Each row means "attach as a sub-issue of that epic, positioned by executi
 |---|---|---|---|
 | 0 | **Intervention log** — artifact, cause taxonomy, runbook line | **now, ahead of everything** | Evidence is being lost daily |
 | 1 | Degradation smoke-tests: ablate input groups; assert output exists, stays in physical bounds, does not explode | **v0.2** | Cheap, CI-fast, no MLflow. Sibling of [#229](https://github.com/openclimatefix/nged-substation-forecast/issues/229) |
-| 2 | Canonical failure-scenario suite — named, versioned degradation transforms over `AllFeatures` | **v0.3** | Shared by tests, leaderboard, and later training. Must exist before v0.5 |
+| 2 | Canonical failure-scenario suite — named, versioned degradation transforms over `AllFeatures` | **v0.3** | Shared by tests, leaderboard, and later training. Must exist before v0.5. Enumerate only §3.6's *episodic* class; the chronic de-accumulated scatter is in-distribution and needs no scenario, though an **elevated** scatter fraction is a good candidate — `assess_nwp_quality` already computes it |
 | 3 | Score every leaderboard experiment under each scenario, **against `nged_incumbent`** | **v0.3**, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) | Otherwise v0.5 picks a champion blind to degradation behaviour |
 | 4 | `power_forecast_warnings` **Phase 1**: `STALE NWP` + `STALE POWER`, with `warning_source` | **v0.3** | No dependency on v0.4/v0.6/v0.7. The user-facing half, buildable now |
 | 5 | Rollback path for `promoted_model` | **v0.3** | H3's second direction |
