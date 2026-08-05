@@ -251,10 +251,10 @@ What is genuinely **harder** in India:
   world's highest aerosol optical depth, which systematically biases satellite- and NWP-derived
   irradiance, and monsoon convection is poorly resolved at 0.25°. Because installed capacity is
   inferred *from* irradiance, a systematic irradiance bias becomes a systematic capacity bias.
-  Worse, the planned high-resolution irradiance source — CM SAF SARAH-3, see
-  [Data sources](../roadmap/data-sources.md) — is a Meteosat prime-disc product that does not
-  reach India. A replacement would have to be sourced: Meteosat IODC (at 45.5°E, though eastern
-  India sits at an oblique viewing angle) or the INSAT-3D series (3D/3DR/3DS).
+  Worse, the high-resolution irradiance source the GB plan depends on — CM SAF SARAH-3, see
+  [Data sources](../roadmap/data-sources.md) — covers ±65° longitude, and India begins at 68°E, so
+  it does not reach India at all. A replacement has to be sourced; the candidates are in
+  [Data sources that would materially help](#data-sources-that-would-materially-help) below.
 - **Confounders with no British analogue.** Load shedding and diesel gensets both violate the
   assumption that latent demand is smooth and weather-driven. Load shedding is the dangerous one:
   it resembles a demand collapse uncorrelated with weather, and an unguarded optimiser would
@@ -270,6 +270,72 @@ What is genuinely **easier**:
   improves markedly with more sites; 32 is close to the worst case for it.
 - **15-minute data instead of half-hourly.** Finer sampling separates the solar shape from the load
   shape more cleanly, particularly around sunrise and sunset ramps.
+
+## Data sources that would materially help
+
+The gaps above are mostly *data* gaps rather than method gaps, so it is worth being concrete about
+what we would ask for or go and find. Claims here were checked in August 2026 and are dated where
+they may drift.
+
+| Source | What it gives us | Status for India |
+|---|---|---|
+| **Metered PV generation from India** | The missing anchor: known generation against which to calibrate the physics model before inverting it for unmetered fleets. | Exists, but utility-scale and spatially aggregated. [CEA](https://cea.nic.in/) and [Grid-India](https://en.wikipedia.org/wiki/Power_System_Operation_Corporation) (the renamed POSOCO, since November 2022) publish national and regional generation; the five RLDCs and the state SLDCs publish more granular real-time data. **Ask for this first.** |
+| **CM SAF SARAH-E** | The IODC sibling of the SARAH product we plan to use for GB — and, critically, it carries **SIS, SID and DNI**, so it has the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md) needs, at 0.05°. | Covers India. But Edition 1 runs **1999–2015** on Meteosat First Generation (Meteosat-5/7); we found no confirmed post-2015 extension. Useful for pre-training and for validating the physics, **not** for near-real-time. |
+| **NREL NSRDB, Meteosat IODC region (PSM v3)** | GHI, DNI and DHI at 4 km on a **15-minute** grid — the same cadence as the substation metering in the brief, so no temporal interpolation is needed. | Covers the IODC region including India. The most promising near-real-time-capable irradiance option we found; exact year coverage and licensing need confirming directly with NREL. |
+| **IMDAA regional reanalysis** | A **12 km** reanalysis for the Indian monsoon region (4D-Var, Met Office Unified Model), against ERA5's 31 km — built by NCMRWF with the UK Met Office and IMD. Domain 30–120°E, 15°S–45°N, hourly. | Covers 1979–2018, extended to 2020. Ends too early for live capacity estimation, but a strong **pre-training** reanalysis where ERA5 is weakest. |
+| **Agricultural feeder supply schedules** | Turns the largest unmetered load into a known regressor, per the note above. | Published by DISCOMs where feeder segregation has been implemented. Worth asking for explicitly. |
+| **Load-shedding / outage schedules** | Lets the regime detector be *supervised* rather than having to infer outages from the power signal alone. | Same logic, same ask. |
+| **Rooftop net-metering registrations** | A *partial* capacity prior — not the register the brief says does not exist, but a lower bound on installed capacity in some areas. | Plausible via DISCOM net-metering records and rooftop subsidy schemes. Speculative until asked; would weaken the "no priors at all" framing in a good way. |
+
+### ERA6 does not arrive in time
+
+We checked, because it would change the reanalysis answer if it did.
+[ERA6 production started on 6 March 2026](https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts),
+and the first data is scheduled for release **towards the end of 2027**, with four decades
+available by early 2028. Helpfully, the rollout is *recent-first* — the two most recent decades
+deploy before the backward extensions — so the release order is the one we would want. The timing
+is still wrong: a roughly twelve-month project running through 2027 would be finishing as the first
+ERA6 blocks appear, and no date has been announced for ERA6 in near-real time, which is what
+[capacity estimation](../roadmap/capacity-estimation.md) actually needs. ERA5 is stated to continue
+"as long as necessary".
+
+**So we would plan on ERA5, and should be explicit about what that costs in India.**
+
+### Concerns about ERA5 over India
+
+ERA5 is not bad over India in aggregate — one 2025 ground-station evaluation found it the most
+balanced of the reanalyses tested, with a monthly mean bias of about **−3 W/m² (−0.8%)** against
+IMD observations. That headline number is reassuring for demand forecasting and misleading for
+disaggregation, because disaggregation does not depend on the annual mean. It depends on
+conditional accuracy in specific regimes, and on a quantity the mean hides entirely.
+
+- **The error is seasonal, not uniform.** The same evaluation found ERA5 performs best under clear
+  to moderately clear skies in the dry season (February–May) and **underestimates during the
+  monsoon** (June–September), attributed to conservative cloud optical thickness. A bias that
+  switches sign with the season maps directly onto a *seasonally varying* capacity estimate, which
+  is exactly the artefact we would otherwise mistake for real fleet growth — and the
+  [monotone capacity prior](../roadmap/disaggregation.md#unmetered-installed-capacity-grows-monotonically)
+  cannot represent a correction that goes back down.
+- **The direct/diffuse split is worse than the total.** Work on ERA5 over China found that
+  misrepresented aerosols cause large deviations in the diffuse-to-direct ratio specifically,
+  larger than the deviation in total irradiance. This matters more to us than to most users,
+  because the DP solar model consumes the beam/diffuse split rather than GHI alone. A model can
+  get total irradiance right and the split wrong, and we would absorb the difference as an error
+  in panel tilt and azimuth.
+- **31 km cannot resolve monsoon convection.** This is the motivation for IMDAA above, and it is a
+  much bigger deal over India than over Britain, where the synoptic-scale argument for using a
+  coarse reanalysis genuinely holds.
+- **Aerosol loading over the Indo-Gangetic Plain is extreme and episodic** — crop-residue burning
+  and dust events — and reanalysis aerosol treatments are generally climatological rather than
+  event-resolving. We have not verified ERA5's specific aerosol configuration against this claim;
+  it should be checked before it goes in a bid.
+
+The practical conclusion is that ERA5 alone is not a sufficient irradiance basis for disaggregation
+in India, and the mitigation is not a better reanalysis but a **satellite** product — SARAH-E for
+history, NSRDB IODC for anything near-real-time — with ERA5 or IMDAA carrying the non-radiative
+fields. In GB the equivalent role is played by
+[CM SAF SARAH-3](../roadmap/data-sources.md), which cannot be reused here: it covers ±65°
+longitude, and India begins at 68°E.
 
 ## How we would structure it
 
