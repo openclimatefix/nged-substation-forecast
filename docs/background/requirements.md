@@ -80,7 +80,9 @@ detecting switching events, estimating effective capacity, flagging faulty meter
 disaggregating DERs — and we hold far more ideas than we can try at once. That turns
 experimentation throughput into an infrastructure requirement in its own right: we need to run
 **on the order of hundreds of ML experiments per month**, and the workflow must make each one
-as frictionless as possible. The pre-registered, testable version of that requirement is
+as frictionless as possible. The pre-registered version of that requirement — deliberately relaxed
+to a peak-month, per-person claim, so that months spent hardening the service are not spurious
+falsifications — is
 [H2](../engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month); the
 promotion half below is [H3](../engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 

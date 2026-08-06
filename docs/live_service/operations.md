@@ -147,7 +147,7 @@ that was previously deployed avoids the rebuild.
 This path works today but is not yet one command, which is what
 [T3.2](../engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) measures.
 
-## Degraded input data — NWP dark, or telemetry stalled
+## Degraded input data — NWP feed down, or telemetry stalled
 
 **Trigger:** an asset check reports a warning, or `live_forecasts` fails.
 

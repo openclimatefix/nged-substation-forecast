@@ -162,12 +162,11 @@ are checked: that the estimator still returns an estimate at all under each scen
 *uncertainty* widens honestly when it does — an estimator that quietly returns a confident number
 from half the data is worse than one that returns a wide interval.
 
-The differentiable-physics candidate has a structural advantage here, and it is worth stating
-plainly because it should count in the judging: a physical forward model has a defined output for
-any input state, so an absent input can be replaced with a climatological prior or a physical bound
-and the physics propagates it — no branching, no fallback path. See
-[Differentiable Physics](../techniques/differentiable-physics.md) and
-[Inherent Stability](../architecture/inherent-stability.md).
+The differentiable-physics candidate has a structural advantage here, and it should count in the
+judging: a physical forward model
+[degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing)
+— an absent input is replaced with a prior or a physical bound, with no branching and no fallback
+path. The wider principle is [Inherent Stability](../architecture/inherent-stability.md).
 
 ### Keeping weather bias out of capacity
 

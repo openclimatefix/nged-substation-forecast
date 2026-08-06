@@ -183,9 +183,9 @@ Join `power_forecast_warnings` to `power_forecast` on `time_series_id` **and**
 only actionable if it names whose feed broke and since when — "the weather feed was delayed" cannot
 be chased, but "the 2026-08-03 00Z ECMWF run never arrived" can. See
 [Inherent Stability → Three audiences, three channels](../architecture/inherent-stability.md#three-audiences-three-channels).
-`STALE NWP` should be raised on **missed runs**, not on raw NWP age: we ingest one run per day, so
-healthy NWP is 12–30 hours old depending on the slot, and any absolute age threshold low enough to
-catch a real outage would fire on two of the four slots every day.
+`STALE NWP` should be raised on **missed runs**, not on raw NWP age — healthy NWP is legitimately
+12–30 hours old depending on the slot
+([why age is not a health signal](../architecture/inherent-stability.md#three-audiences-three-channels)).
 
 **`warning_type` enum values** (mostly mutually exclusive — there is a hierarchy: a meter error
 blinds us to all other errors at that timestep; a generator/circuit fault blinds us to reduced

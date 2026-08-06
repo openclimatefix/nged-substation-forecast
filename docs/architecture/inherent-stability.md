@@ -16,11 +16,9 @@ page a roadmap mirror that rots. Sections carry the usual status markers: ✅ im
 
 ## Why "inherent stability"
 
-Lead with steering, not with reactors. In a nuclear reactor *safe means off*, so a reader told the
-system is "passively safe like a reactor" will reasonably infer that it fails to a stopped, cold
-state — the opposite of the thesis. "Passive safety" is no better: in the automotive industry it
-already means crashworthiness — seatbelts, airbags, crumple zones — and self-centring steering is
-filed under *inherent stability*, not passive safety.
+We say *inherent stability*, not "passively safe": in a nuclear reactor *safe means off* — the
+opposite of this thesis — and in the automotive industry "passive safety" already means
+crashworthiness, while self-centring steering is filed under *inherent stability*.
 
 Steering points the right way on its own. Front-end geometry tilts the steering axis back so the
 tyre's contact patch trails behind the point where that axis meets the ground, like a
@@ -76,22 +74,28 @@ Rungs are counted in **missed NWP runs**, never in hours of staleness — see
 [Three audiences, three channels](#three-audiences-three-channels) for why raw age is not a health
 signal.
 
+Three related words are used deliberately across these pages. A **regime** is one cell of the
+input-availability grid — NWP × telemetry × metadata,
+[ten to twenty realistic combinations](#missingness-in-learned-models). A **scenario** is a regime's
+named, versioned realisation in the failure-scenario suite. A **rung** of this ladder is a severity
+band of regimes.
+
 ## Failure modes
 
-What breaks, what the system does about it, and whether anyone is woken up. "Today" describes the
+What breaks, what the system does about it, and whether anyone is alerted. "Today" describes the
 code as it stands; "intended" describes where this principle takes it.
 
-| Failure | Today | Intended | Human paged? |
+| Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
-| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path ✅ | Unchanged, plus a check reporting the count of missed runs 🚧 | No |
-| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row, but nothing warns ✅⁄🚧 | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
-| NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing 🚧 | Weather-blind forecast, wide bands, warning row 🚧 | No |
-| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series ✅ | Unchanged, plus regime-appropriate band widening 🚧 | No |
+| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path | Unchanged, plus a check reporting the count of missed runs 🚧 | No |
+| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row, but nothing warns | Bands widen with the regime; `STALE NWP` warning row 🚧 | No |
+| NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row 🚧 | No |
+| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns and names the late series | Unchanged, plus regime-appropriate band widening 🚧 | No |
 | A meter reporting detectably wrong values | Partly detected at ingest; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path 🚧 | No |
-| A whole ECMWF slice corrupt | `Nwp.validate` rejects it at ingest, so it manifests downstream as a missed run ✅ | Unchanged | No |
-| The promoted model is empty or unloadable | **Hard failure** — the asset raises ✅ | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
-| The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment ✅ | Unchanged | Yes, next business day |
-| Any of the above during model R&D | Fails fast ✅ | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
+| A whole ECMWF slice corrupt | `Nwp.validate` rejects it at ingest, so it manifests downstream as a missed run | Unchanged | No |
+| The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | Yes, next business day |
+| The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | Yes, next business day |
+| Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
 
 Nothing here is a 2am page. The uptime posture that makes that acceptable is argued in
 [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
@@ -107,14 +111,15 @@ follow these.
 2. **Be liberal about missing inputs and strict about malformed ones.** Absent data routes into the
    always-output path; malformed data is rejected at the contract boundary. These are opposite
    postures and both are deliberate.
-3. **Treat detectably-wrong input as missing, not as data.** A stuck meter is worse than a silent
-   one, because a lag-feature model will propagate it happily.
+3. **Treat detectably-wrong input as missing, not as data** — see
+   [Missing versus wrong](#missing-versus-wrong).
 4. **Signal degradation in-band first.** The uncertainty band is the only number the consumer is
    certain to read. Side channels — warning tables, checks, Sentry — supplement it; they never
    substitute for it.
 5. **Measure degradation in missed runs and absent inputs, never in raw hours of age.** Healthy NWP
-   is between 12 and 30 hours old depending on the slot, so any absolute age threshold is either
-   useless or a source of daily false alarms.
+   is between 12 and 30 hours old depending on the slot, so an absolute age threshold is either a
+   daily false alarm or a magic number silently coupled to the ingest schedule — and either way it
+   cannot say how many runs are missing.
 6. **Asset checks warn; they do not block.** `AssetCheckSeverity.WARN` with `blocking=False` is the
    house pattern, and there is deliberately no `ERROR`-severity check anywhere in the repo.
 7. **Never let the warning path be able to fail the thing it is warning about.** A bug in a warning
@@ -124,8 +129,9 @@ follow these.
    training loop.** See [Where complexity should live](#where-complexity-should-live).
 9. **Fail in the direction where being wrong is cheapest to recover from.** In production that is
    forward; in model R&D it is backward. See [R&D fails the other way](#rd-fails-the-other-way).
-10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining, and hysteresis
-    on model promotion are as much a part of this principle as the degradation ladder is.
+10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
+    on model promotion (the latter two designed but not built 🚧) are as much a part of this
+    principle as the degradation ladder is.
 
 ## Where complexity should live
 
@@ -249,8 +255,11 @@ The provider channel must also count the right thing. We ingest **one ECMWF run 
 run, downloaded at 08:30 UTC — and we forecast at 00:00, 06:00, 12:00 and 18:00, so healthy NWP age
 at forecast time ranges from 12 hours at the 12:00 slot to **30 hours at the 06:00 slot**, just
 before the day's download lands. Raw age is therefore not a health signal: 18-hour-old NWP is
-exactly what the 18:00 slot is supposed to use, and any absolute threshold low enough to catch a
-real outage would fire on two of the four slots every day. The signal is **missed runs** — how many
+exactly what the 18:00 slot is supposed to use. An absolute age threshold would have to sit in the
+narrow window between the stalest healthy state (30 hours) and the freshest outage state (36 hours —
+one missed run, seen from the 12:00 slot): a magic number that silently goes wrong the moment the
+ingest schedule or the slot times change, and that still cannot say *how many* runs are missing.
+The signal is **missed runs** — how many
 daily runs are absent between the freshest run on disk and the freshest that ought to exist by now.
 That is zero in every healthy slot, whichever slot it is.
 
@@ -283,24 +292,20 @@ Three consequences for models we have not built yet, recorded here because they 
 constraints rather than roadmap items:
 
 - **Do not zero-fill; remove from the set.** Zero is a meaningful value in physical units — 0 MW,
-  0 W/m², 0 °C are all real states — so replacing a missing value with zero asserts something false.
-  Treat inputs as a set of tokens and simply do not emit tokens for absent inputs; attention is
-  natively permutation-invariant and variable-length. The dense alternative is value + mask
-  channels. See [Encoders](../techniques/encoders.md).
+  0 W/m² and 0 °C are all real states — so replacing a missing value with zero asserts something
+  false. The token-set alternative, and the dense value-plus-mask fallback, are in
+  [Encoders → Handling missing inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill).
 
-- **Do not lean on random dropout.** Random dropout simulates data that is *missing completely at
-  random*, and ours is not: outages correlate with time of day, weather systems and provider
-  incidents, and a meter that drops out during the storm that caused the extreme reading is missing
-  *because* the value was extreme. A model trained on random dropout is calibrated for a world it
-  does not live in, and the miscalibration surfaces as over-confident bands during a real outage —
-  the worst possible time. Use structured, outage-shaped dropout instead.
+- **Do not lean on random dropout.** Random dropout simulates data that is missing *completely at
+  random*, and ours is not — outages correlate with time of day, weather systems and provider
+  incidents — so a random-dropout-trained model surfaces its miscalibration as over-confident bands
+  during a real outage. Use structured, outage-shaped dropout instead; the full argument is in
+  [Encoders → Handling missing inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill).
 
-- **Physics degrades most gracefully of all.** A physical forward model has a defined output for any
-  input state, so where an input is absent you substitute a climatological prior or a physical bound
-  and let the physics propagate it. Physics gives the envelope, the learned residual sharpens it,
-  and as data degrades the residual head has less to work with, so the answer relaxes toward the
-  prior. No branching, no fallback logic — the same code path does the right thing because of how it
-  is arranged. See [Differentiable Physics](../techniques/differentiable-physics.md).
+- **Physics degrades most gracefully of all.** A physical forward model has a defined output for
+  any input state, so as inputs go missing the answer relaxes toward a physical prior — no
+  branching, no fallback logic. See
+  [Differentiable Physics → Graceful degradation](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing).
 
 For honest interval widths under degradation, the mechanism is **conformal prediction applied per
 regime**: post-hoc calibration from held-out residuals, which works with XGBoost today and so can

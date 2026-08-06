@@ -4,12 +4,9 @@ This page states what we claim Flexpectation's engineering will achieve, how eac
 and what would falsify it. It is deliberately written as a set of **hypotheses with numbers**
 rather than a set of aims.
 
-Its counterpart is the [design principles](architecture/overview.md#design-principles) list.
-Principles are constraints on *decisions* and can only be overridden or found not to be
-load-bearing; hypotheses are claims about *outcomes* and can be falsified by measurement. The
-principles are the bets we are making in order to achieve the hypotheses below, so every principle
-names the hypothesis it serves — and a hypothesis with no principle behind it is a claim we are
-merely hoping comes true.
+Its counterpart is the [design principles](architecture/overview.md#design-principles) list — the
+bets we are making in order to achieve the hypotheses below. The relationship between the two, and
+the admission test it implies, are stated at the top of that list.
 
 ## Why hypotheses rather than aims
 
@@ -46,7 +43,7 @@ from NIA reports, so **append, never renumber**.
 |---|---|---|---|
 | T1.1 | Operability | ≥90% of interventions caused by an upstream format change; zero out-of-hours | ~2 quarters of v1.0 |
 | T1.2 | Graceful degradation | Every series emits a forecast; beats `nged_incumbent` at rungs 0–2 | v0.3, after [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147) |
-| T1.3 | Faithful uncertainty | PICP within tolerance of nominal in every degradation regime | v0.5 |
+| T1.3 | Faithful uncertainty | PICP within ±5 percentage points of nominal in every degradation regime (tolerance provisional until [#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) | v0.5 |
 | T2.1 | Experiment throughput | ≥100 registered experiments per person, in a peak month | v0.5 |
 | T3.1 | Promotion effort | ≤1 command | v0.3 |
 | T3.2 | Rollback effort | ≤1 command | v0.3 |
@@ -78,7 +75,10 @@ baseline to compare against.
 
 **T1.3 — Faithful uncertainty.** PICP and pinball loss computed per degradation regime, from the
 leaderboard's scenario dimension. This is the sharpest test we have, and it needs no new metric —
-only the scenario dimension, which is the same machinery T1.2 uses.
+only the scenario dimension, which is the same machinery T1.2 uses. The tolerance is pre-registered
+at ±5 percentage points (a nominal 90% interval must achieve 85–95% coverage in every regime);
+[#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443) may tighten it before
+the first scoring, but any change must be recorded here.
 
 ## H2 — a hundred experiments per person in a peak month
 
@@ -126,8 +126,8 @@ at v2. The thresholds sit above those estimates deliberately, so that the hypoth
 about the architecture rather than a restatement of the spreadsheet.
 
 **T4.1 and T4.2 — Cost.** Read the monthly AWS bill. No per-experiment instrumentation is needed:
-training runs on laptops and costs AWS nothing, and a backtest on AWS is bounded at well under £1
-per run at v1 scale.
+training today runs on laptops, the planned weekly AWS retrain is bounded at ~£1/month, and a
+backtest on AWS is bounded at well under £1 per run at v1 scale — all inside the bill either way.
 
 ## H5 — operable by a non-expert
 
