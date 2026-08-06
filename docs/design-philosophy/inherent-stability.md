@@ -13,6 +13,18 @@ hypothesis that the service mostly runs itself. [The rules](#the-rules) below ar
 fine-grained form of the never-stop, complexity-offline and strict-contracts principles in that
 list.
 
+**The model does the work, not a fallback path.** The central mechanism behind everything below is
+that the ML model itself is built to keep producing a sensible forecast when some of its inputs are
+missing — rather than a chain of fallbacks wrapped around a model that assumes complete data. That
+is already partly true: the gradient-boosted trees we run today *route* missing features instead of
+requiring them to be filled in, so a forecast still comes out when a feature drops away. What is not
+yet true is that the model has been **trained** against realistic outages, which is what turns "it
+still produces a number" into "it still produces a number worth trusting". Much of what follows —
+the degradation ladder, the widening bands, the failure-scenario suite — exists to make that one
+design choice work; the mechanics are in [Default directions, and their
+limit](#default-directions-and-their-limit) and [Missingness in learned
+models](#missingness-in-learned-models).
+
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
 are designed but not yet built are **linked, not copied** — they live in
 [`docs/roadmap/`](../roadmap/index.md) until they ship, and duplicating them here would make this

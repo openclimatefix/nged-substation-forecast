@@ -60,7 +60,10 @@ principle behind it is a claim we are merely hoping comes true.
    (band-widening is designed but not yet built — see [Widening
    bands](inherent-stability.md#widening-bands-the-in-band-signal)). The
    forecast always does the best it can with whatever data it has, rather than blowing up; raising
-   is reserved for states that are our own bug. (Note that this decision to "never stop" will not be
+   is reserved for states that are our own bug. The plan is to deliver that through the **model
+   itself** — an ML model that can, at least partially, handle missing inputs — rather than through
+   fallback logic wrapped around a model that assumes complete data. (Note that this decision to
+   "never stop" will not be
    appropriate for energy-forecasting systems where an uncertain forecast might be more harmful than
    *no* forecast. But, in Flexpectation, there are strong arguments that our forecast will *always*
    be better than NGED's incumbent baseline, even when we have no live data.) *Without it:* every

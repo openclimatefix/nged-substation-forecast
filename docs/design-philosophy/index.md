@@ -4,8 +4,10 @@
 
 - **A service that mostly runs itself** — manual attention needed only when an upstream data format
   changes, with the forecast degrading gracefully rather than stopping when an input goes missing.
-  A consequence of that, if it holds, is a service an operator can run day to day from the
-  runbooks alone, without knowledge of the implementation details.
+  The mechanism matters as much as the outcome: we plan to get there by training an ML model that
+  can itself cope with missing inputs, rather than by wrapping fallback logic around a model that
+  assumes complete data. A consequence of that, if it holds, is a service an operator can run day
+  to day from the runbooks alone, without knowledge of the implementation details.
 - **A hundred experiments per person in a peak month** — most research ideas fail, so the number of
   good ones a project finds is set by how many it can attempt.
 - **Safe one-click promotion, and one-click rollback** — one *command*, not one leap of faith. By
