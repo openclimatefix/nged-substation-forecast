@@ -66,6 +66,10 @@ corrected by machinery bolted on around it.
 
 ## NGED's incumbent forecast is the floor
 
+Even in the worst case, when we have _no_ fresh data, we hope to still be able to provide a better
+power forecast that NGED's incumbent forecast, with appropriate confidence bands. This is what
+allows us to claim that we should _always_ be able to produce a power forecast, even when "blind".
+
 [NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
 analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
 back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
@@ -324,6 +328,24 @@ The ingest gate keeps the two apart. A *whole-slice* null in a de-accumulated va
 `Nwp.validate`, so wholesale corruption never lands as silently-broken data; it manifests downstream
 as a missed run, which is rung 1 of the ladder. Fine-grained catastrophe is converted into
 coarse-grained absence — the form the rest of this design already handles.
+
+**How each model family represents absence.** The mechanisms differ completely, and it is worth
+setting them side by side, because the differences are less instructive than what they share.
+
+| Approach | How absence is represented | What it falls back to | Where the guarantee ends |
+|---|---|---|---|
+| **Gradient-boosted trees** (XGBoost, today) | Routed, not imputed: every split learns a **default direction** for rows whose feature is missing | Whichever branch scored better during training | Only the missingness patterns seen in training. A feature never missing in training still gets a direction, but one that was never evaluated against anything |
+| **Attention encoder over a token set** (possible) | **Structurally absent**: the token is simply not in the set. Attention is permutation-invariant and variable-length, so nothing stands in for it, and masking is used for padding only | Whatever the remaining tokens support | Same training-distribution limit. Nothing about the architecture teaches it how an outage *behaves*; that has to be trained in |
+| **Dense network with value + mask channels** (the fixed-width fallback) | **Flagged**: an explicit mask channel beside each value, so "zero" and "unknown" stay distinguishable. GRU-D is the standard precedent, decaying the last observation toward an empirical mean | The learned decay target | Same training-distribution limit, and it spends model capacity representing absence that the token-set form gets for free |
+| **Physical forward model** | **No representation needed**: the model is defined for every input state | A physical prior — the clear-sky envelope of rung 4 | It only covers what the physics covers; it cannot supply the learned residual on top |
+
+Read down the last column and the point is not that one representation wins. It is that the first
+three share a single failure mode: **a learned model handles the missingness it was trained on, and
+nothing else.** Choosing a better representation of absence changes how gracefully the model can
+express "I do not know", but it does not, on its own, teach the model what a real outage looks like.
+Only the physical model is exempt, and only because it never learned anything to begin with. This is
+why the failure-scenario suite is load-bearing for every row of that table rather than a
+nice-to-have for one of them.
 
 Three consequences for models we have not built yet, recorded here because they are design
 constraints rather than roadmap items:
