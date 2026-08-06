@@ -242,7 +242,7 @@ forecast-skill milestones above. Items so far:
   detection, shadow deployment of a challenger model, a schema-evolution policy for the delivery
   contract (which may need pulling forward to v0.6), statistical process control on forecast
   error, and naming *poka-yoke* among the design principles — each discussed in
-  [Design Principles → Best practices we have not yet absorbed](../design-philosophy/design-principles.md#best-practices-we-have-not-yet-absorbed).
+  [Design Principles → Industry best practices we have not yet absorbed](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
   A holding issue: the task is
   to consider them once the live service has run for a while, not a commitment to build them.
 

@@ -12,7 +12,10 @@ Modern MLops (as used in this project) changes two things:
    try; the infrastructure runs those experiments. (See [Running an ML experiment end-to-end](dagster-workflow.md).)
 2. **No translation gap.** The artifact we experimented on *is* the artifact we deploy. There
    is no "now rewrite the research code for production" step, because every experiment runs on
-   the exact same code as the production pipeline from the start.
+   the exact same code as the production pipeline from the start. The gap is closed by raising
+   research to the production standard, not by lowering production to accept a research
+   notebook: an idea can be explored anywhere, but it only becomes a runnable experiment once
+   it lives in the pipeline's own code.
 
 ## An analogy
 

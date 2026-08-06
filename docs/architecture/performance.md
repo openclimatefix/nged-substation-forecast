@@ -1,8 +1,9 @@
 # Performance and Scale
 
-This page holds the measured performance engineering behind two of the
-[design principles](../design-philosophy/design-principles.md) — *push the work down to the engine; materialise
-once, as late as possible* and *measure; do not assume*. Everything here exists so that the full
+This page holds the measured performance engineering behind three of the
+[design principles](../design-philosophy/design-principles.md) — *the whole system must be
+exercisable on one laptop*, *push the work down to the engine; materialise once, as late as
+possible*, and *measure; do not assume*. Everything here exists so that the full
 pipeline — training and a complete 51-member backtest — runs on an ordinary laptop, which is what
 keeps experimentation fast
 ([H2](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)) and the

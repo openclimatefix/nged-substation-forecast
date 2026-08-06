@@ -6,7 +6,8 @@ This page argues in full the first and largest of the project's
 [design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
 the *how* behind [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
 hypothesis that the service mostly runs itself. [The rules](#the-rules) below are the
-fine-grained form of principles 1, 2 and 4 in that list.
+fine-grained form of the never-stop, complexity-offline and strict-contracts principles in that
+list.
 
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
 are designed but not yet built are **linked, not copied** — they live in
@@ -104,7 +105,8 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 ## The rules
 
 These are the imperative form of everything above. When in doubt while changing production code,
-follow these. Rules 1, 2 and 8 restate [principles 1, 4 and 2](design-principles.md) in imperative
+follow these. Rules 1, 2 and 8 restate the [never-stop, strict-contracts and complexity-offline
+principles](design-principles.md) in imperative
 form so that this checklist stands alone; if you change one, change both.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
