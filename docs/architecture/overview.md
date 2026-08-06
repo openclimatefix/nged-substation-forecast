@@ -145,8 +145,8 @@ are merely hoping comes true.
     proof, not a ban: where something we already run does the job, use it; where it genuinely does
     not, adopt the new thing deliberately and write down what it bought. The reason for the asymmetry
     is that every additional service is one more thing to deploy, monitor, secure, upgrade, document
-    and eventually hand over to NGED — a cost that is paid forever and is easy to overlook at the
-    moment of adoption.
+    and — if the service is one day handed over to NGED — teach to a new operator: a cost that is
+    paid forever and is easy to overlook at the moment of adoption.
     *Decided:* delivery to NGED reuses the Delta-on-S3 stack we already operate rather than adding a
     REST API — and the REST API is not rejected forever, it has a documented set of conditions under
     which it would earn its keep. We *did* adopt Delta Lake, Dagster, MLflow, Marimo and Sentry, each
