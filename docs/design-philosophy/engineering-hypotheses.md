@@ -9,7 +9,7 @@ Its counterpart is the [design principles](design-principles.md) list — the
 bets we are making in order to achieve the hypotheses below. The relationship between the two, and
 the admission test it implies, are stated on that page.
 
-## The claims
+## The claims, in brief
 
 **H*n*** is a hypothesis; **T*n.m*** is its *m*th **test**. These labels are cited from issues and
 from NIA reports, so **append, never renumber**.
@@ -34,11 +34,11 @@ not moved by "it's fine when it breaks".
 [intervention log](#the-intervention-log). The headline quote says "only"; the test operationalises
 that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-of-hours" means no
 intervention is ever needed outside normal working hours — the posture that makes
-next-business-day recovery honest. This is the only test on this page that cannot be measured
-retrospectively.
+next-business-day recovery honest.
 
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
-two things: that a forecast is emitted at all, and that it still beats `nged_incumbent`. Blocked on
+two things: that a forecast is emitted at all, and that it still beats `nged_incumbent` at rungs 0–2
+of the [degradation ladder](inherent-stability.md#the-degradation-ladder). Blocked on
 [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/147), which builds the
 baseline to compare against.
 
@@ -54,7 +54,7 @@ alone, is largely a consequence of the rest of H1 rather than a separate propert
 needs attention only when an upstream format changes is most of the way there already, because the
 set of situations the operator must ever handle is small enough to enumerate. That enumeration
 exists as the **operator contract** in
-[Handover to NGED](../roadmap/handover.md#1-the-operator-contract) — roughly ten or fewer actions
+[Handover to NGED](../roadmap/handover.md#1-the-operator-contract) — ten or fewer actions
 the operator is ever expected to take. What this test adds on top of T1.1 is that those few are
 *written down well enough to follow*, which is a documentation claim resting on an engineering one.
 The measurement: during the
@@ -85,13 +85,13 @@ The sharper consequence is that throughput changes *which* ideas are worth attem
 how quickly they are worked through. When an experiment is expensive, a speculative idea has to
 clear a far higher bar of prior plausibility than a safe one before it is worth the cost — so the
 wild ideas are the first to be cut, and they are exactly where the large wins live, because an idea
-everybody already expects to work is rarely worth much. Cheap failure is what makes a low-probability,
-high-payoff attempt rational. That is why the corresponding design principle is expressed as a
+everybody already expects to work is rarely worth much. Cheap failure is what makes a
+low-probability, high-payoff attempt rational. That is why the corresponding design principle is expressed as a
 *cost* rule — [an experiment must be cheap to try, and cheap to abandon](design-principles.md) —
 rather than as a speed one.
 
-**An idea also is not scored once.** Because H1 claims graceful degradation, a serious candidate has
-to be evaluated not only on complete data but across a range of data outages — a dead meter, a
+**And an idea is not scored just once.** Because H1 claims graceful degradation, a serious
+candidate has to be evaluated not only on complete data but across a range of data outages — a dead meter, a
 missed NWP run, a feed that has gone stale, several at once — which is exactly what T1.2 and T1.3
 measure. One idea therefore costs a handful of evaluations rather than one, and the multiplier is
 unforgiving in the wrong direction: when a scenario sweep is expensive, it quietly shrinks to the
@@ -133,7 +133,7 @@ never to redefine T2.1.
 **One command is not the same as one leap of faith, and that distinction is the substance of this
 hypothesis.** A promotion mechanism is only worth having if it is *safe* to use; a fast route to
 production that nobody trusts enough to press is no better than a slow one. What makes a
-single-command promotion defensible is everything that has already happened by the time the command
+single-command promotion defensible is everything that will have happened by the time the command
 becomes available to run:
 
 - **The candidate was scored against every model already on the board, identically.** The same
@@ -172,8 +172,8 @@ half of H3.
 
 > The whole running service costs under £50/month at v1 scale and under £200/month at v2 scale.
 
-This is probably the most transferable finding of the set, and it is a second, independent answer to
-the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
+This is probably the most transferable finding of the set, and it is an answer, independent of H1's,
+to the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
 [AWS Running Costs](../architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
 at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
 about the architecture rather than a restatement of the spreadsheet.
@@ -191,8 +191,8 @@ architecture during v1 rather than prototyping first and rewriting later, and it
 resolvable at v2 — which is an argument for writing it down now, while the prediction still costs
 something to make.
 
-**T5.1 — Scale without redesign.** At v2, no change was forced by scale alone to the data
-contracts, the asset graph, or the storage layout. Changes to configuration, partition counts and
+**T5.1 — Scale without redesign.** The test passes if, at v2, no change has been forced by scale
+alone to the data contracts, the asset graph, or the storage layout. Changes to configuration, partition counts and
 machine sizes do not count against it; a new table, a changed schema, or a restructured asset graph
 does.
 
@@ -230,7 +230,7 @@ about operational burden — are genuinely disputed, and a document that argues 
 nobody. A number that resolves itself is a better outcome, and pre-registering one signals
 confidence in a way that prose cannot.
 
-**It forces the measurement artifacts to exist in advance.** Most of these tests need something
+**It forces the measurement artefacts to exist in advance.** Most of these tests need something
 built before they can be scored: a baseline forecaster, a scenario suite, an intervention log.
 Writing the hypothesis first is what puts those on the roadmap early enough to be useful.
 
@@ -246,9 +246,9 @@ whenever the runbooks exist, T4.1 and T4.2 come from billing history, and T1.4 a
 measured at events that have not happened yet. But "how many times did a human have to intervene,
 and why?" is unrecoverable unless it is recorded as it happens.
 
-Two clauses keep that measurement honest.
+Three rules keep that measurement honest.
 
-The artifact is deliberately cheap — an append-only log with the date, the trigger, a cause
+The artefact is deliberately cheap — an append-only log with the date, the trigger, a cause
 category, the human-minutes spent, and whether a runbook already existed — so there is no excuse for
 not keeping it.
 

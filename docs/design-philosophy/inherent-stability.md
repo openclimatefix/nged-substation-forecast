@@ -1,6 +1,10 @@
 # Inherent Stability
 
-> **We never stop forecasting power. If the data inputs fail then we degrade gracefully by decreasing the confidence of our probabilistic power forecasts.**
+> **We never stop forecasting power. When an input goes missing or stale, the forecast degrades
+> gracefully instead of stopping: it becomes less certain, and it says so, through wider uncertainty
+> bands. Wherever possible, that stability should be an inherent property of the system's design,
+> rather than something bolted on afterwards by post-processing and `if-then-else` branches in the
+> production service.**
 
 This page argues in full the first and largest of the project's
 [design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
@@ -15,23 +19,27 @@ are designed but not yet built are **linked, not copied** — they live in
 page a roadmap mirror that rots. Sections carry the usual status markers: ✅ implemented,
 🚧 designed but not built.
 
-## Why "inherent stability"
+## What is "inherent stability"?
 
-We say *inherent stability*, not "passively safe": in a nuclear reactor *safe means off* — the
-opposite of this thesis — and in the automotive industry "passive safety" already means
-crashworthiness, while self-centring steering is filed under *inherent stability*.
+If you have ever built and ridden a simple "soap box" cart, you will know that the steering is
+worryingly unstable: you have to fight it constantly to keep the cart going straight. Let go of the
+steering ropes and the wheels whip hard left or hard right, probably ending in a crash. The machine
+is trying to hurt you! It is inherently *unstable*, and it requires constant, active control to keep
+it safe.
 
-Steering points the right way on its own. Front-end geometry tilts the steering axis back so the
-tyre's contact patch trails behind the point where that axis meets the ground, like a
-shopping-trolley caster. Any sideways force then generates a torque that swings the wheel back into
-line. Let go of the handlebars and the bike keeps going, correctly, without an operator. Cars add
-kingpin inclination and pneumatic trail, and together these produce the **self-aligning torque** —
-which is also the driver's feedback channel. As the front tyres approach the limit of grip,
-pneumatic trail collapses and the steering goes light. The car reports its own degradation through
-the very mechanism that keeps it centred.
+A proper car's **steering geometry** is the stark contrast. Its front wheels do not pivot about a
+vertical axis, as the cart's do. The steering axis is tilted — this is the **castor angle** — so
+that it meets the road slightly *ahead* of the point where the tyre actually touches it, which
+leaves each wheel trailing behind its own pivot, exactly like the castor on an office chair or the
+front wheel of a bicycle. Any deviation from straight-ahead therefore generates a force that pulls
+the wheel back towards the centre. Let go of the steering wheel and it returns there on its own. No
+sensor measures that error and no controller corrects it: the geometry is chosen so that the physics
+does the work. The machine is trying to keep you safe, not through lots of active control, but by
+its very shape.
 
-That is exactly what widening confidence bands do for us, and it is why the analogy is worth the
-paragraph.
+That is what we want from the forecasting service. Wherever we can manage it, sensible behaviour
+under disturbance should fall out of how the system is built, rather than being watched for and
+corrected by machinery bolted on around it.
 
 ## The incumbent is the floor
 
@@ -107,7 +115,8 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 These are the imperative form of everything above. When in doubt while changing production code,
 follow these. Rules 1, 2 and 8 restate the [never-stop, strict-contracts and complexity-offline
 principles](design-principles.md) in imperative
-form so that this checklist stands alone; if you change one, change both.
+form so that this checklist stands alone; if you change a rule, change its matching principle, and
+vice versa.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
    record the degradation on the row. Reserve raising for states that are our own bug — an empty
@@ -165,8 +174,9 @@ Two qualifiers keep it honest.
 
 It does not license unbounded training complexity, either: a training harness nobody can run is also
 a production risk, because
-[H2 and H3](engineering-hypotheses.md#the-claims) depend on retraining staying cheap and
-promotion staying one command.
+[H2](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month) and
+[H3](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on retraining
+staying cheap and promotion staying one command.
 
 ## Mechanisms
 
@@ -189,7 +199,7 @@ distinction.
 XGBoost uses sparsity-aware split finding. At every split it learns not just a threshold but a
 **default direction** for rows where that feature is missing: it tries sending all missing rows
 left, then right, and keeps whichever gives better gain. Missingness is routed, not imputed. This is
-why `_nullify_leaky_lags` can null a feature rather than drop a row.
+why a leaky lag feature can be nulled rather than the whole row dropped.
 
 The limit is that the default direction is learned **from the missingness present in the training
 data**. If a feature is never missing during training, XGBoost still picks a direction, but that

@@ -19,15 +19,22 @@ These are written down as [hypotheses with numbers and deadlines](engineering-hy
 than as aims: none of them is settled yet, and a threshold we miss gets published as a negative
 result rather than quietly revised.
 
-The remainder of this page is the **portable "why"** of the project: this page would survive a
-rewrite of every line of code, and is the page another team could adopt without adopting any of our
-stack. It is written to be readable without knowing Python or Polars — code names appear only as
-evidence that a claim is practised, never as a prerequisite for following the argument.
+The rest of this section is the **portable "why"** of the project: it would survive a rewrite of
+every line of code, and it is what another team could adopt without adopting any of our stack. It is
+written to be readable without knowing Python or Polars — code names appear only as evidence that a
+claim is practised, never as a prerequisite for following the argument.
 
-Flexpectation is a greenfield project, and that is a rare opportunity to research the best
-practices of several industries — not only energy forecasting; some of the most useful ideas here
-are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering —
-test-drive them against real data and a real production service, and report what we find. The
+These pages therefore sit deliberately *above* the level of software-engineering practice.
+Everything here is about the shape of the system rather than the shape of the code: which language
+we write in, how functions are named, how the dataframe library is used, how the tests are wired —
+none of that is settled here. Those finer-grained rules live in
+[Code Style](../architecture/code-style.md) and [Testing](../architecture/testing.md), and a team
+could disagree with every one of them while still adopting everything in this section.
+
+Flexpectation is a greenfield project, and that is a rare opportunity to research the best practices
+of several industries, test-drive them against real data and a real production service, and report
+what we find. Those industries are not only energy forecasting: some of the most useful ideas here
+are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering. The
 intended output is a field report, not a rulebook: a list of principles that any energy-forecasting
 project might find useful *to consider*, together with honest results about which practices earned
 their keep here, which we declined, which we have not yet absorbed — and, in time, which failed. A
