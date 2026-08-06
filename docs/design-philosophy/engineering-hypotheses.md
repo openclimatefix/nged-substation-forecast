@@ -6,7 +6,7 @@ rather than a set of aims.
 
 Its counterpart is the [design principles](design-principles.md) list — the
 bets we are making in order to achieve the hypotheses below. The relationship between the two, and
-the admission test it implies, are stated at the top of that list.
+the admission test it implies, are stated on that page.
 
 ## Why hypotheses rather than aims
 

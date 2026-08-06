@@ -47,8 +47,9 @@ falsifiable [engineering hypotheses](design-philosophy/engineering-hypotheses.md
 pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
 short of is not.
 
-A further aim runs alongside the forecasting itself: to gather **industry best practice into a
-single codebase for energy forecasting** — and deliberately not only best practice from the
+A further aim runs alongside the forecasting itself. Flexpectation is a greenfield project, which
+is a rare chance to **research industry best practice, test-drive it against real data and a real
+production service, and report what we find** — and deliberately not only best practice from the
 energy-forecasting industry. Some of the most useful ideas here are borrowed from disciplines that
 have been solving the same shape of problem for far longer than data engineering has existed. The
 [inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves when its
@@ -56,8 +57,9 @@ inputs degrade is taken from vehicle dynamics; the fail-operational posture come
 discipline of confining any failure to the partition it happened in — its *blast radius* — comes
 from site reliability engineering. The
 [design principles](design-philosophy/design-principles.md) list collects them, states what each
-one actually decided, and names the ones we considered and declined. Articulating and refining that
-list is itself intended as a transferable output of the project.
+one actually decided, names the ones we considered and declined, and is honest about the ones we
+have not yet absorbed. The intended output is a list of principles that any energy-forecasting
+project might find useful to consider — reported with results, not asserted.
 
 ## Documentation
 

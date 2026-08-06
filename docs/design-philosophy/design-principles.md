@@ -8,21 +8,39 @@ the principle buys: *Without it* paints the everyday failure the principle exist
 [engineering hypothesis](engineering-hypotheses.md) it is a bet on, and *Detail* links the full
 argument.
 
-**Where they come from.** An aim of this project is to gather **industry best practice into a
-single codebase for energy forecasting** — and not only best practice from the energy-forecasting
-industry. Several of the ideas on these pages are borrowed from disciplines that have been solving
-the same shape of problem for longer than data engineering has existed: *inherent stability* comes
-from vehicle dynamics, *fail-operational* from avionics autoland and ISO 26262, *blast radius* from
-site reliability engineering. Borrowing across disciplines is the point, not a flourish: a
-discipline that has been shipping safety-critical systems for fifty years has usually already made
-the mistake we are about to make. Not every borrowed idea survives contact, and we record those
-outcomes too: *error budgets* were examined and declined (see "Deliberately absent" below),
-*poka-yoke* (mistake-proofing, from manufacturing) remains a candidate
-([#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449)), and Postel's law is
-named on the [Inherent Stability](inherent-stability.md#not-postels-law) page precisely so that
-nobody mistakes it for what we do.
+Two disclaimers up front. These are **bets, not truths**: each one is scored by the
+[engineering hypotheses](engineering-hypotheses.md), and a principle that fails its test will be
+reported as a negative result, not quietly rewritten. And the defence against merely collecting
+fashionable engineering trends is the admission test described below: a principle earns its place
+by naming a real decision it made and a hypothesis that will judge it, and a practice adopted for
+fashion alone cannot pass that test.
 
-**How these relate to the [engineering hypotheses](engineering-hypotheses.md).** Principles are
+## Where these principles come from
+
+Flexpectation is a greenfield project, and that is a rare opportunity: we get to research the best
+practices of several industries, test-drive them against real data and a real production service,
+and report what we find. The intended output is not a rulebook but a field report — a list of
+principles that any energy-forecasting project might find useful *to consider*, together with
+honest results about which ones earned their keep here.
+
+Deliberately, the research is not limited to the energy-forecasting industry. Several of the ideas
+on these pages are borrowed from disciplines that have been solving the same shape of problem for
+longer than data engineering has existed: *inherent stability* comes from vehicle dynamics,
+*fail-operational* from avionics autoland and ISO 26262, *blast radius* from site reliability
+engineering. Borrowing across disciplines is the point, not a flourish: a discipline that has been
+shipping safety-critical systems for fifty years has usually already made the mistake we are about
+to make.
+
+Not every borrowed idea survives contact, and we record those outcomes too — that is what makes
+this a field report rather than a manifesto. *Error budgets* were examined and declined
+([Deliberately absent](#deliberately-absent) below); five practices we respect are
+[not yet absorbed](#best-practices-we-have-not-yet-absorbed); and Postel's law is named on the
+[Inherent Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes
+it for what we do.
+
+## How principles relate to hypotheses
+
+Principles are
 constraints on *decisions*; hypotheses are claims about *outcomes*. A hypothesis can be falsified by
 measurement, whereas a principle can only be overridden by a measurement or found not to be
 load-bearing. The two are connected in one direction: the principles are the bets we are making in
@@ -30,6 +48,8 @@ order to achieve the hypotheses. That gives a test for admission to this list �
 it serves and a decision it actually decided**. A principle serving no hypothesis is either
 decoration or a sign of a missing hypothesis; a hypothesis with no principle behind it is a claim we
 are merely hoping comes true.
+
+## The principles
 
 1. **The power forecast never stops.** If data inputs are disrupted, the forecast gets less certain
    instead of stopping — and says so in the answer itself, through wider uncertainty bands. The
@@ -47,15 +67,17 @@ are merely hoping comes true.
 2. **Complexity belongs offline, not in the serving path.** When a capability could be built into
    the training loop or into the production service, build it into the training loop: training runs
    in front of a human who can read the traceback, whereas the production service runs unattended.
-   Capabilities that forecasting services commonly bolt onto the serving path go inside the model
-   instead: correcting for recent forecast errors is not a post-processing step but a lagged-power
-   feature the model learns from; a missing input triggers no switch to a separately-trained
-   fallback model, because the one model is trained to tolerate missing inputs; and there is no
-   blending of a short-horizon model with a long-horizon one, because the one model spans the
-   horizon.
-   *Without it:* the serving path accumulates special cases — a correction here, a fallback switch
-   there, a blend per horizon — and each one is a branch that fires for the first time in
-   production, during a real outage, with nobody watching.
+   Production forecasting systems commonly solve real problems *in* the serving path — a
+   post-processing step that corrects for recent forecast errors, a switch to a separately-trained
+   fallback model when an input feed is down, a blend of models specialised per horizon — and each
+   of those is a reasonable answer to a real need. The bet this principle makes is that the same
+   needs can be met inside a single model: recent-error correction learned from lagged-power
+   features, missing-input tolerance trained in rather than switched to, one model spanning the
+   whole horizon. Whether that bet actually pays, and what it costs, is exactly what the
+   failure-scenario suite exists to measure.
+   *Without it:* the serving path grows branches — corrections, fallbacks, blends — that are
+   exercised least at exactly the moments they matter most: each first fires for real during an
+   incident, unattended.
    *Decided:* `promoted_model` copies the champion to local disk, so production inference makes no
    MLflow call at all. *Serves:*
    [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
@@ -182,7 +204,9 @@ are merely hoping comes true.
     [When would a REST API earn its keep?](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
     [Considered but rejected designs](../architecture/production-deployment.md#considered-but-rejected-designs).
 
-**Deliberately absent.** We have **no availability service-level objective (SLO) and no error
+## Deliberately absent
+
+We have **no availability service-level objective (SLO) and no error
 budget** — the pair of SRE practices that would normally quantify "how much downtime is acceptable"
 and then spend that allowance deliberately. We have consciously declined both: the requirement is
 recovery "next business day, via runbook", and the reasoning is in
@@ -190,7 +214,64 @@ recovery "next business day, via runbook", and the reasoning is in
 rejection is the point — a practice we considered and declined is more useful to a reader than one we
 never considered.
 
-**How to use this list.** A proposed change should be checkable against this list: if it violates a
+## Best practices we have not yet absorbed
+
+The list above is not finished, and pretending otherwise would undermine it. A review of what
+comparable systems practise surfaced five things we respect but have **not yet ingested into the
+code or the plan**. They are parked on
+[#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449), to be considered
+once the live service has run for long enough to inform them; we expect to adopt whichever of them
+earn their keep. Recording them here keeps the gap honest — a reader comparing this project
+against industry practice should find these named by us, not discovered as omissions.
+
+**Input drift detection.** Our checks detect input data that is *absent* or *malformed*; standard
+MLOps practice also watches for data that is present, well-formed, and *different* — an upstream
+model upgrade, a re-gridding, a re-metered substation. The case for it is strong here: on a 14-day
+horizon a forecast is not fully scoreable for a fortnight, so forecast *error* is a badly lagging
+indicator, while a shift in the *inputs* is visible the same day. But this is also the item with a
+genuinely open design question, because our inputs are **expected to drift**: climate change moves
+the weather distributions — a record-breaking hot, dry summer is climate signal, not sensor error —
+and the grid beneath the power data is changing fast (solar, EVs, heat pumps). A naive
+"distribution changed" alarm would either fire constantly or be tuned into silence. The question to
+answer before adopting the practice is whether the useful event is "the distribution changed" or
+"the model is extrapolating — being asked about conditions unlike anything it trained on". The two
+suggest different responses, and a record summer probably *should* be flagged — not as a fault, but
+as a legitimate reason for wider uncertainty bands, routing the signal into principle 1's in-band
+channel rather than to a pager. We do not yet know the right design; working it out is the task.
+
+**Shadow (champion–challenger) deployment.** Running a candidate model against live inputs in
+parallel with the champion, recorded but not delivered, so a promotion decision can rest on live
+behaviour rather than backtests alone — it catches the class of bug backtests cannot, such as
+training/serving skew and availability differences that only exist live. It should be unusually
+cheap here, because `power_forecasts` already partitions by `experiment_name`, so a shadow run is
+just another partition scored by the existing production-monitoring metrics. Two things to resolve
+first: a shadow lane is exactly the kind of serving-path complexity principle 2 pushes against, so
+it must earn its place; and it interacts with H3, since one-command rollback is less frightening
+when the champion was already shadowed.
+
+**A schema-evolution policy for the delivery contract.** The strict contracts of principle 4
+freeze a boundary; this is the missing account of how a frozen boundary is allowed to *change*
+once NGED consume it — additive-only changes, a deprecation window, a version field a consumer can
+branch on, and how a breaking change is announced. Of the five, this is the one with a deadline
+attached: NGED first consume forecasts around v0.6, and the cost of having no policy is paid the
+first time a delivered table needs to change.
+
+**Statistical process control on forecast error.** Control charts and CUSUM — manufacturing's
+answer to "detect a shift without picking an arbitrary fixed threshold", with decades of theory
+behind it. Fixed thresholds on a seasonal signal are either too loose in winter or too noisy in
+summer; SPC is designed for exactly that problem, and it answers "is the champion quietly
+degrading?" cheaply. It shares the open question above: a record summer will legitimately worsen
+forecast error, and the chart must not read that as a model regression.
+
+**Naming poka-yoke.** Mistake-proofing, from manufacturing: design names and interfaces so the
+wrong usage fails to parse rather than being merely discouraged. The codebase already practises
+this in places — closed string vocabularies are `Literal` types, tabular shapes are validated
+schemas, and `delta_store`'s write helpers make it impossible to land rows without the storage
+format applied — but it is a habit applied opportunistically, not yet a stated rule.
+
+## How to use this list
+
+A proposed change should be checkable against this list: if it violates a
 principle, that is not a veto, but it does require saying which principle is being traded away and
 what is bought in return. And a principle that stops deciding anything should be deleted rather than
 left as decoration — the same discipline the hypotheses page applies to its thresholds.
