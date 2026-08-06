@@ -11,8 +11,8 @@ are borrowed from vehicle dynamics, avionics, manufacturing and site reliability
 test-drive them against real data and a real production service, and report what we find. The
 intended output is a field report, not a rulebook: a list of principles that any energy-forecasting
 project might find useful *to consider*, together with honest results about which practices earned
-their keep here, which we declined, and which failed. A practice that did not survive contact with
-our data is as useful a finding as one that did.
+their keep here, which we declined, which we have not yet absorbed — and, in time, which failed. A
+practice that did not survive contact with our data is as useful a finding as one that did.
 
 Three pages, in reading order:
 

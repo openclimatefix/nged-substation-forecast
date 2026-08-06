@@ -43,7 +43,8 @@ you substitute a climatological prior or a physical bound and let the physics pr
 no branch, no fallback path, and no `if data_is_missing:`. The same code does the right thing
 because of how it is arranged.
 
-The behaviour that falls out is exactly what a forecasting service should do as its inputs degrade.
+The behaviour that falls out is exactly the degradation behaviour this project wants from its
+forecasts.
 Physics supplies the envelope, the learned residual sharpens it, and as data degrades the residual
 head has less to work with, so the answer relaxes toward the prior: wider, still bounded, and still
 true. Contrast a purely learned model, which under an unfamiliar missingness pattern rides

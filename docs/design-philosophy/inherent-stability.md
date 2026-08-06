@@ -6,7 +6,7 @@ This page argues in full the first and largest of the project's
 [design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
 the *how* behind [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
 hypothesis that the service mostly runs itself. [The rules](#the-rules) below are the
-fine-grained form of principles 1 and 2 in that list.
+fine-grained form of principles 1, 2 and 4 in that list.
 
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
 are designed but not yet built are **linked, not copied** — they live in
@@ -34,9 +34,10 @@ paragraph.
 
 ## The incumbent is the floor
 
-[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) averages 13 historical
-analogues at the same time-of-day on the same weekday: 6 from the last 6 weeks, 7 from 49–55 weeks
-back. No weather, no ML, no holiday alignment, no load-growth scaling.
+[NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
+analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks
+back — and reads them as an ensemble. No weather, no ML, no holiday alignment, no load-growth
+scaling.
 
 Two of its properties set our floor. It **consumes no NWP**, so an NWP outage does not degrade it at
 all — which makes an NWP outage the hard test for us. And it **survives a power-data outage**,
@@ -215,7 +216,7 @@ Two caveats. `XGBoostConfig.objective` currently defaults to `reg:squarederror`,
 a point forecast; quantile output
 ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) is a prerequisite.
 And bands widening *correctly* under degradation is not automatic even with quantile regression —
-the honest mechanism is regime-conditional conformal calibration, discussed in
+the mechanism we are betting on is regime-conditional conformal calibration, discussed in
 [Missingness in learned models](#missingness-in-learned-models).
 
 See [Probabilistic Forecasting](../techniques/probabilistic-forecasting.md) for how the intervals

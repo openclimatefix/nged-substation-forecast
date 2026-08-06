@@ -1,27 +1,22 @@
 # Design Principles
 
 The principles below govern this project's engineering decisions — what gets built, where code
-lives, and which technologies are adopted. They are deliberately short here and link out to the page
-that argues each one in full — this is an index, not the argument. Each entry says concretely what
-the principle buys: *Without it* paints the everyday failure the principle exists to prevent,
+lives, and which technologies are adopted. Each principle is stated compactly here, with the full
+argument behind its links — this list is an index, not the argument. Each entry says concretely
+what the principle buys: *Without it* paints the everyday failure the principle exists to prevent,
 *Decided* names a real decision it made, *Serves* names the
 [engineering hypothesis](engineering-hypotheses.md) it is a bet on, and *Detail* links the full
 argument.
 
 Two disclaimers up front. These are **bets, not truths**: each one is scored by the
 [engineering hypotheses](engineering-hypotheses.md), and a principle that fails its test will be
-reported as a negative result, not quietly rewritten. And the defence against merely collecting
-fashionable engineering trends is the admission test described below: a principle earns its place
-by naming a real decision it made and a hypothesis that will judge it, and a practice adopted for
-fashion alone cannot pass that test.
+reported as a negative result, not rewritten out of the record. And the defence against merely
+collecting fashionable engineering trends is the admission test described below.
 
 ## Where these principles come from
 
-Flexpectation is a greenfield project, and that is a rare opportunity: we get to research the best
-practices of several industries, test-drive them against real data and a real production service,
-and report what we find. The intended output is not a rulebook but a field report — a list of
-principles that any energy-forecasting project might find useful *to consider*, together with
-honest results about which ones earned their keep here.
+The framing — a greenfield chance to test-drive other industries' best practice and produce a field
+report rather than a rulebook — is stated on the [section overview](index.md).
 
 Deliberately, the research is not limited to the energy-forecasting industry. Several of the ideas
 on these pages are borrowed from disciplines that have been solving the same shape of problem for
@@ -62,7 +57,7 @@ are merely hoping comes true.
    `ERROR`-severity check anywhere. *Serves:*
    [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). *Detail:*
    [Inherent Stability](inherent-stability.md), whose [ten rules](inherent-stability.md#the-rules)
-   are the fine-grained form of this principle and principle 2.
+   are the fine-grained form of this principle together with principles 2 and 4.
 
 2. **Complexity belongs offline, not in the serving path.** When a capability could be built into
    the training loop or into the production service, build it into the training loop: training runs
@@ -75,9 +70,9 @@ are merely hoping comes true.
    features, missing-input tolerance trained in rather than switched to, one model spanning the
    whole horizon. Whether that bet actually pays, and what it costs, is exactly what the
    failure-scenario suite exists to measure.
-   *Without it:* the serving path grows branches — corrections, fallbacks, blends — that are
-   exercised least at exactly the moments they matter most: each first fires for real during an
-   incident, unattended.
+   *Without it:* the serving path grows branches — corrections, fallbacks, blends — that are easy
+   to leave under-exercised at exactly the moments they matter most: unless a team deliberately
+   drills them, their first real execution happens during an incident, unattended.
    *Decided:* `promoted_model` copies the champion to local disk, so production inference makes no
    MLflow call at all. *Serves:*
    [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
@@ -89,9 +84,10 @@ are merely hoping comes true.
 3. **One execution path from research to production.** The artifact that won the experiment *is* the
    artifact we deploy — not a re-implementation of it. There is no "now rewrite the research code for
    production" step, because every experiment already runs on the production pipeline.
-   *Without it:* the classic two-codebase failure — research code is rewritten "properly" for
-   production, the rewrite quietly diverges, and the deployed model no longer does what the winning
-   experiment measured.
+   *Without it:* research code is rewritten for production, the two implementations drift apart,
+   and the deployed model no longer does what the winning experiment measured. The price of
+   avoiding that is real — every experiment has to run on production-quality pipeline code from
+   day one — and we pay it deliberately.
    *Decided:* this was the deciding argument for Dagster over Airflow, and it is why splitting the
    live service onto a second orchestrator remains rejected. *Serves:*
    [H2](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
@@ -124,7 +120,7 @@ are merely hoping comes true.
    numbers on it are genuinely comparable, which requires the population, the folds, the metric
    definitions and the pipeline to be held constant by construction rather than by discipline.
    *Without it:* the leaderboard fills with numbers that cannot be compared — one model scored on
-   easy folds, another on hard ones — and every "which idea won?" decision is quietly built on sand.
+   easy folds, another on hard ones — and every "which idea won?" decision is built on sand.
    *Decided:* fold eligibility is derived from data coverage alone and **never** from the model or
    config; a fold enters the leaderboard only once its validation window is complete; a new data
    source is assessed by a controlled ablation before it may enter the leaderboard at all. *Serves:*
@@ -135,8 +131,9 @@ are merely hoping comes true.
 
 6. **Provenance travels with the data.** Every row carries enough to say where it came from, so a
    forecast can be explained, reproduced or invalidated without an external lookup.
-   *Without it:* "why was Tuesday's forecast odd?" becomes an archaeology project — nobody can say
-   which NWP run or which model produced the row, so the honest answer is a shrug.
+   *Without it:* "why was Tuesday's forecast odd?" becomes an afternoon of cross-referencing
+   deploy logs and run timestamps — answerable, but slowly, and only by whoever still remembers how
+   the pieces fit.
    *Decided:* `PowerForecast` carries `nwp_init_time`, model name and version, experiment name and
    MLflow experiment id; every MLflow run is stamped with the git SHA and the Delta table versions
    it read. *Serves:*
@@ -166,8 +163,8 @@ are merely hoping comes true.
    it is impossible.
    *Without it:* a full 51-member backtest needs a cluster instead of a laptop — an unpruned NWP
    materialisation is hundreds of gigabytes — and the pocket-money cost claim goes with it.
-   *Decided:* input pruning plus `init_time` chunking keeps a full 51-member validation prediction
-   (~321M rows) under 9 GB on a laptop. *Serves:*
+   *Decided:* input pruning plus `init_time` chunking holds a full 51-member validation prediction
+   (~321M rows) to a peak of ~9 GB on a laptop. *Serves:*
    [H4](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
    [H6](engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
    [Lazy evaluation strategy](../architecture/performance.md#lazy-evaluation-strategy).
@@ -266,8 +263,9 @@ forecast error, and the chart must not read that as a model regression.
 **Naming poka-yoke.** Mistake-proofing, from manufacturing: design names and interfaces so the
 wrong usage fails to parse rather than being merely discouraged. The codebase already practises
 this in places — closed string vocabularies are `Literal` types, tabular shapes are validated
-schemas, and `delta_store`'s write helpers make it impossible to land rows without the storage
-format applied — but it is a habit applied opportunistically, not yet a stated rule.
+schemas, and `delta_store`'s write helpers make the storage format the path of least resistance
+rather than something to remember — but it is a habit applied opportunistically, not yet a stated
+rule.
 
 ## How to use this list
 

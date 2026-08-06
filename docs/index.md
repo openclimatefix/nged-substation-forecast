@@ -50,16 +50,13 @@ short of is not.
 A further aim runs alongside the forecasting itself. Flexpectation is a greenfield project, which
 is a rare chance to **research industry best practice, test-drive it against real data and a real
 production service, and report what we find** — and deliberately not only best practice from the
-energy-forecasting industry. Some of the most useful ideas here are borrowed from disciplines that
-have been solving the same shape of problem for far longer than data engineering has existed. The
-[inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves when its
-inputs degrade is taken from vehicle dynamics; the fail-operational posture comes from avionics; the
-discipline of confining any failure to the partition it happened in — its *blast radius* — comes
-from site reliability engineering. The
-[design principles](design-philosophy/design-principles.md) list collects them, states what each
-one actually decided, names the ones we considered and declined, and is honest about the ones we
-have not yet absorbed. The intended output is a list of principles that any energy-forecasting
-project might find useful to consider — reported with results, not asserted.
+energy-forecasting industry: the
+[inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves
+when its inputs degrade is borrowed from vehicle dynamics, and it has company. The
+[design principles](design-philosophy/design-principles.md) list collects the results — what each
+principle actually decided, which practices we considered and declined, and which we have not yet
+absorbed. The intended output is a list of principles that any energy-forecasting project might
+find useful to consider — reported with results, not asserted.
 
 ## Documentation
 
@@ -69,6 +66,7 @@ project might find useful to consider — reported with results, not asserted.
 
 - [Design Philosophy](design-philosophy/index.md) — the portable *why*: the design principles, the falsifiable engineering hypotheses that score them, and the inherent-stability argument in full
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
+- [Techniques](techniques/index.md) — durable explainers of the solution methods: differentiable physics, convex optimisation, encoders, probabilistic forecasting, and evaluation metrics
 - [Architecture Overview](architecture/overview.md) — what is actually built: technical components and data flow
 - [Performance and Scale](architecture/performance.md) — the measured performance engineering: storage formats, lazy evaluation, memory bounds, and Polars' row-index ceiling
 - [Code Style](architecture/code-style.md) — code conventions

@@ -65,8 +65,11 @@ this is a defensive argument (an outage does not cost much) whereas H1 is a stro
 not moved by "it's fine when it breaks".
 
 **T1.1 — Operability.** Interventions per quarter, classified by cause, counted from the
-[intervention log](#the-intervention-log). This is the only test on this page that cannot be
-measured retrospectively.
+[intervention log](#the-intervention-log). The headline quote says "only"; the test operationalises
+that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-of-hours" means no
+intervention is ever needed outside normal working hours — the posture that makes
+next-business-day recovery honest. This is the only test on this page that cannot be measured
+retrospectively.
 
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
 two things: that a forecast is emitted at all, and that it still beats `nged_incumbent`. Blocked on
@@ -120,7 +123,7 @@ half of H3.
 > The whole running service costs under £50/month at v1 scale and under £200/month at v2 scale.
 
 This is probably the most transferable finding of the set, and it is a second, independent answer to
-the worry that a service like this needs a devops team. The estimates it is pinned to are in
+the worry that a service like this must carry heavy operational overhead. The estimates it is pinned to are in
 [AWS Running Costs](../architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
 at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
 about the architecture rather than a restatement of the spreadsheet.
@@ -142,7 +145,7 @@ purely a training exercise.
 **T5.1 — Operability by a non-expert.** During the game days, the NGED operator recovers from each
 scripted failure — NWP feed broken, disk full, daemon killed, credential expired, forecast slot
 missed — unaided, using only the runbooks. An exercise that needs OCF intervention is a
-falsification of T5.1 for that quarter, and a documentation bug to fix.
+falsification of T5.1 for that exercise, and a documentation bug to fix.
 
 ## H6 — scale without redesign
 

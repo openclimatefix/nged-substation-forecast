@@ -33,17 +33,12 @@ champion on the leaderboard fold; headline metric NMAE, sliced by horizon and
 interact (e.g. init-time-anchored features overlap short lags at short horizons), so land
 winners into `conf/model/xgboost.yaml` one at a time to keep attribution clean.
 
-**A limit worth knowing before you rely on NaN handling.** XGBoost's sparsity-aware split finding
-learns a **default direction** per split for rows where that feature is missing, which is why
-features can be nulled rather than rows dropped. But the direction is learned *from the missingness
-present in the training data*: if a feature is never missing during training, XGBoost still picks a
-direction, and that choice was never evaluated against anything. So the guarantee is narrower than
-"XGBoost handles NaN" — it handles the missingness patterns it saw during training. Two
-consequences for the wins below. A model trained with NWP features and run without them does **not**
-thereby behave like a weather-blind model; making it beat the incumbent during an NWP outage needs
-outage-shaped training data, not NaN routing. And the chronic per-pixel nulls in the de-accumulated
-ECMWF variables are the one case where the guarantee genuinely holds, because they appear in every
-training run — so they should be left alone rather than imputed. See
+**A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
+missingness patterns present in the training data. Two consequences for the wins below: a model
+trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
+the incumbent during an outage needs outage-shaped training data, not NaN routing), and the chronic
+per-pixel nulls in the de-accumulated ECMWF variables are the one case the guarantee genuinely
+covers, so they should be left un-imputed. Full argument:
 [Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
 
 ## Tier 1 — config-level changes (hours each)
