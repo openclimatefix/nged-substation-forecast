@@ -33,6 +33,14 @@ champion on the leaderboard fold; headline metric NMAE, sliced by horizon and
 interact (e.g. init-time-anchored features overlap short lags at short horizons), so land
 winners into `conf/model/xgboost.yaml` one at a time to keep attribution clean.
 
+**A limit worth knowing before you rely on NaN handling.** XGBoost's NaN routing only covers the
+missingness patterns present in the training data. Two consequences for the wins below: a model
+trained with NWP features does **not** behave like a weather-blind model when NWP vanishes (beating
+the incumbent during an outage needs outage-shaped training data, not NaN routing), and the chronic
+per-pixel nulls in the de-accumulated ECMWF variables are the one case the guarantee genuinely
+covers, so they should be left un-imputed. Full argument:
+[Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
+
 ## Tier 1 — config-level changes (hours each)
 
 ### Feed the model the forecast lead time (review discovery; ~one line)

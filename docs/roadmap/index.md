@@ -81,8 +81,15 @@ AWS — see [Live service](live-service.md).
   [Testing → Continuous integration](../architecture/testing.md#continuous-integration))
 - Improve documentation
 - Verify daylight savings time handling is correct
-- Reproducibility stamping: git SHA + Delta table versions on every MLflow run
+- Reproducibility stamping: git SHA + Delta table versions on every MLflow run ✅ (implemented in
+  `ml_core._repro`; every MLflow run carries the stamp)
 - Drop Hydra in favour of plain YAML + importlib + pydantic
+- Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
+  ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) — every
+  production asset has a check except the one NGED consume
+- Start the [intervention log](../design-philosophy/engineering-hypotheses.md#the-intervention-log)
+  ([#435](https://github.com/openclimatefix/nged-substation-forecast/issues/435)); its measurement
+  window opens at v1.0, but it cannot be reconstructed retrospectively
 
 ---
 
@@ -98,6 +105,19 @@ AWS — see [Live service](live-service.md).
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range (Day 8–14), peak events (top 5%)
 - Baseline forecasters (persistence + climatology) so leaderboard scores are interpretable
 - Production monitoring of the live service (`production_monitoring` metrics scope)
+- **Failure-scenario evaluation** — the evaluation machinery must precede the v0.5 experiments it
+  is meant to judge, or v0.5 picks a champion blind to how it behaves when inputs degrade:
+    - Canonical failure-scenario suite: named, versioned degradation transforms
+      ([#437](https://github.com/openclimatefix/nged-substation-forecast/issues/437)) —
+      see [Scoring under failure scenarios](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
+    - Degradation smoke-tests in CI
+      ([#436](https://github.com/openclimatefix/nged-substation-forecast/issues/436))
+    - Score every leaderboard experiment under each scenario, against `nged_incumbent`
+      ([#438](https://github.com/openclimatefix/nged-substation-forecast/issues/438))
+- One-command rollback for `promoted_model`
+  ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
+  that pin down what "one command" means
+  ([#448](https://github.com/openclimatefix/nged-substation-forecast/issues/448))
 
 ---
 
@@ -106,6 +126,13 @@ AWS — see [Live service](live-service.md).
 *Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
 - More sophisticated automatic cleaning of NGED's power data (building on the basic cleaning in v0.1)
+- `power_forecast_warnings` **Phase 1** — `STALE NWP` and `STALE POWER`, with `warning_source`
+  ([#439](https://github.com/openclimatefix/nged-substation-forecast/issues/439))
+- `power_forecast_warnings` **Phase 2** — the meter-error warning types, which are this milestone's
+  cleaning detections surfaced to NGED
+  ([#441](https://github.com/openclimatefix/nged-substation-forecast/issues/441))
+- The `asset_health_history` table — the historical view of the same detections
+  ([#442](https://github.com/openclimatefix/nged-substation-forecast/issues/442))
 
 ---
 
@@ -124,6 +151,23 @@ theory in
 [Probabilistic forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md)),
 which builds directly on the lead-time-feature and ensemble-member-training wins in that
 backlog.
+
+It also carries the **degradation** half of the
+[inherent-stability](../design-philosophy/inherent-stability.md) work, which is gated on that same
+quantile pipeline:
+
+- Degradation-conditional interval calibration — conformal prediction per regime
+  ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)), so the bands
+  widen honestly when the inputs degrade rather than staying over-confident
+- The weather-blind guarantee: outage-shaped training augmentation
+  ([#445](https://github.com/openclimatefix/nged-substation-forecast/issues/445)), which is what
+  makes "never worse than the incumbent" true rather than hopeful
+- Clear-sky as the zero-data **floor**
+  ([#444](https://github.com/openclimatefix/nged-substation-forecast/issues/444)), extending
+  [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)
+- Make `live_forecasts` degrade rather than raise when NWP is absent
+  ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — deliberately
+  gated on the two items above, since degrading earlier would emit output no scenario has tested
 
 **Automated experimentation ("auto-research")**:
 
@@ -154,7 +198,7 @@ only for first month, then shared with NGED.*
 
 **Dynamic effective capacity estimation for *metered* generators ([capacity estimation](capacity-estimation.md))**:
 
-- Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality) are on the [capacity estimation](capacity-estimation.md) page. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
+- Estimate the effective capacity of the *metered* wind and solar PV generators over time — it bumps up and down with maintenance, faults and build-out — by racing several candidate estimators head-to-head on the same data: a [convex (CVXPY)](../techniques/convex-optimisation.md) censored quantile-envelope estimator, a [differentiable-physics (PyTorch)](../techniques/differentiable-physics.md) variational estimator, and cheap baselines. The winner ships in v1; the judging criteria (including uncertainty quality and [robustness to missing inputs](capacity-estimation.md#robustness-to-missing-inputs), scored against the same failure-scenario vocabulary the forecasting leaderboard uses) are on the [capacity estimation](capacity-estimation.md) page. This is the first model family we must actively *build* for missingness — a differentiable-physics estimator [degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing), and that should count in the judging. A deliberate secondary goal of the contest is building hands-on CVXPY experience, to inform v2 tooling choices and our advice to NGED. The "clever" latent-demand and abnormal-running-arrangement inversion is explicitly **not** in scope here — that is [v2 research](disaggregation.md).
 - Two-pass approach: first pass estimates effective capacity; second pass normalises the time series by effective capacity before training the power forecast model
 - Ingest additional weather datasets needed for capacity estimation:
     - **ERA5** (ECMWF global reanalysis) — the project's single reanalysis: near-real-time (ERA5T, ~5 days behind) weather for capacity estimation, plus pre-training history back to 1940 ([data sources](data-sources.md#weather-data))
@@ -193,6 +237,14 @@ forecast-skill milestones above. Items so far:
   [live-service plan](live-service.md#deployment-workstream-3-aws-infrastructure); the
   account-portability requirement is in
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
+- Consider five pieces of industry best practice we currently lack
+  ([#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449)): input-drift
+  detection, shadow deployment of a challenger model, a schema-evolution policy for the delivery
+  contract (which may need pulling forward to v0.6), statistical process control on forecast
+  error, and naming *poka-yoke* among the design principles — each discussed in
+  [Design Principles → Industry best practices we have not yet absorbed](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
+  A holding issue: the task is
+  to consider them once the live service has run for a while, not a commitment to build them.
 
 ---
 
@@ -218,7 +270,12 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   win's prerequisites (per-series target normalisation, static per-series features, and
   init-time-anchored features) exist, so the comparison isolates the model family. A negative
   result de-risks the neural approaches on the [v2.0](#v20-scale-up-future-research) research
-  list before we spend research time on the fancier ones.
+  list before we spend research time on the fancier ones. The spike must also **state and test how
+  it handles missing inputs**: XGBoost gets NaN routing for free and an MLP does not, so a
+  zero-filled MLP would lose the comparison for a reason that has nothing to do with model family
+  (zero is a real physical value — see
+  [Encoders → Handling missing inputs](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill)),
+  and it should be scored under the failure-scenario suite like any other experiment.
 - **Additional NWP source, e.g. ICON-EU**
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore
   whether adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the

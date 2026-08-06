@@ -42,19 +42,54 @@ isn't reliably possible from power readings alone, that's a useful finding in it
 can use it as evidence to justify investing in extracting switching-event labels from their own
 operational systems, rather than us silently working around the gap.
 
+The same logic applies to the engineering, which is why our claims about it are written down as
+falsifiable [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached: a
+pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
+short of is not.
+
+A further aim runs alongside the forecasting itself. Flexpectation is a greenfield project, which
+is a rare chance to **research industry best practice, test-drive it against real data and a real
+production service, and report what we find** — and deliberately not only best practice from the
+energy-forecasting industry: the
+[inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves
+when its inputs degrade is borrowed from vehicle dynamics, and it has company. The
+[design principles](design-philosophy/design-principles.md) list collects the results — what each
+principle actually decided, which practices we considered and declined, and which we have not yet
+absorbed. The intended output is a list of principles that any energy-forecasting project might
+find useful to consider — reported with results, not asserted.
+
 ## Documentation
 
 > **Want to run this on your laptop?** Start with [Getting started](getting-started.md) — a single
 > walkthrough from a fresh clone to a running Dagster instance that downloads data and trains a
 > model.
 
+- [Design Philosophy](design-philosophy/index.md) — the portable *why*: the design principles, the falsifiable engineering hypotheses that score them, and the inherent-stability argument in full
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
-- [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
+- [Techniques](techniques/index.md) — durable explainers of the solution methods: differentiable physics, convex optimisation, encoders, probabilistic forecasting, and evaluation metrics
+- [Architecture Overview](architecture/overview.md) — what is actually built: technical components and data flow
+- [Performance and Scale](architecture/performance.md) — the measured performance engineering: storage formats, lazy evaluation, memory bounds, and Polars' row-index ceiling
 - [Code Style](architecture/code-style.md) — code conventions
 - [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable test suites
 - [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML experimentation: cross-validation folds, the leaderboard, and how we evaluate models
 - [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting a champion model and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders
+
+## How these docs were written
+
+The ideas, the decisions and the judgement calls in this documentation are human — they come from
+the team's own engineering and from reading what other industries do. Much of the *prose*, though,
+was drafted and refined with an LLM coding agent (Claude Code) over many hours of back-and-forth,
+and our experience is that this genuinely improved the writing: an argument that survives being
+questioned repeatedly tends to end up better evidenced than one written in a single pass.
+
+The division of labour matters most for the evidential claims. The performance, size and cost
+figures were measured on real data through the real code path rather than estimated — the
+[measure; do not assume](design-philosophy/design-principles.md) principle applies to the
+documentation as much as to the pipeline. Claims about what the code does are checked against the
+code, but we will not pretend that every sentence across this many pages has had a human's eye on
+it next to the source. Where the docs and the code disagree, the code is right, and we would rather
+hear about it than have it stand.
 
 > New to this repo? See the [Documentation Guide](documentation-guide.md) for how these sections
 > relate to each other and to GitHub issues — including the rule that `roadmap/` holds **only

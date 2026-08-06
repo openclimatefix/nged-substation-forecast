@@ -35,6 +35,27 @@ the computational graph, for three core reasons:
   explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
   audit the model's assumptions.
 
+### Graceful degradation when an input is missing
+
+A fourth reason, less often stated: **a physical forward model has a defined output for any input
+state.** Where an input is absent — a missed NWP run, an unavailable variable, stalled telemetry —
+you substitute a climatological prior or a physical bound and let the physics propagate it. There is
+no branch, no fallback path, and no `if data_is_missing:`. The same code does the right thing
+because of how it is arranged.
+
+The behaviour that falls out is exactly the degradation behaviour this project wants from its
+forecasts.
+Physics supplies the envelope, the learned residual sharpens it, and as data degrades the residual
+head has less to work with, so the answer relaxes toward the prior: wider, still bounded, and still
+true. Contrast a purely learned model, which under an unfamiliar missingness pattern rides
+default-routing decisions that were never evaluated against any data.
+
+This makes missingness robustness a **design requirement of any DP estimator we build**, not a
+nice-to-have: the priors and bounds substituted for each absent input have to be chosen
+deliberately, and the estimator's uncertainty must widen honestly when it leans on them. It is
+scored that way in the [capacity-estimation head-to-head](../roadmap/capacity-estimation.md#robustness-to-missing-inputs).
+The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
+
 ## The core idea: inversion through a differentiable forward model
 
 The fundamental insight is to treat a meter reading as the output of a **forward model** that

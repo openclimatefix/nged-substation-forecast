@@ -10,10 +10,11 @@ something, and where to put something new.
 
 ## How planning works
 
-Planning content lives in four places with deliberately non-overlapping jobs:
+Planning content lives in five places with deliberately non-overlapping jobs:
 
 | Place | Job |
 |---|---|
+| **[`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md)** | **Our own falsifiable claims** — what we assert the engineering will achieve, the threshold that decides it, and what would falsify it. Not design (that is `roadmap/` or `architecture/`) and not NGED-derived requirement (that is `background/`): a claim we are on the hook for, and a natural NIA deliverable. One page; append tests, never renumber them. |
 | **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
 | **[`docs/roadmap/`](roadmap/index.md)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
 | **`docs/`[techniques](techniques/index.md), [background](background/network.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. This is where content moves to from `docs/roadmap/` after implementation. |
@@ -40,8 +41,8 @@ section — e.g. [ML Orchestration Design](architecture/ml-orchestration.md) ↔
 rationale followed by a runbook with literal commands — is a sign it should split along this line.
 The `docs/roadmap/` folder therefore contains **only design for work that is not yet implemented**,
 and is never a mirror of the code. Because roadmap pages are deletable, **code must never link into
-`roadmap/`** — instead, code docstrings link to the durable sections (`techniques/`,
-`architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
+`roadmap/`** — instead, code docstrings link to the durable sections (`design-philosophy/`,
+`techniques/`, `architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
 behind these plans — differentiable physics, learned encoders, the disaggregation-evaluation
 protocol — live in [Techniques](techniques/index.md) for exactly this reason: they survive the
 roadmap items that apply them.
@@ -56,7 +57,9 @@ roadmap items that apply them.
 | Communicate direction to NGED / leadership | The [milestones](roadmap/index.md#milestones) (published site) |
 | Give an AI coding tool context on the broader plan | `docs/roadmap/` (plus `gh` for live task priorities) |
 | Understand a method (DP, encoders, …) | [`docs/techniques/`](techniques/index.md) |
-| Understand *why* something already built works the way it does | [`docs/architecture/`](architecture/overview.md) |
+| Understand the principles the whole design answers to | [`docs/design-philosophy/`](design-philosophy/index.md) — the portable argument, readable without knowing the codebase |
+| Understand *why* something already built works the way it does | [`docs/architecture/`](architecture/overview.md) — the local rationale, recorded next to each component |
+| State — or check — a measurable claim about the engineering | [`docs/design-philosophy/engineering-hypotheses.md`](design-philosophy/engineering-hypotheses.md). Add a test with a threshold and a resolution point; never renumber an existing one |
 | Record an assessment of work we decided **not** to do | [`docs/architecture/`](architecture/overview.md), with a `Status:` banner saying so — e.g. [Why Dagster, not Airflow?](architecture/why-dagster-not-airflow.md), [Could this codebase forecast another country?](architecture/adapting-to-another-geography.md). Not `docs/roadmap/`, which implies intent to build and is deleted on ship. |
 | Learn *how* to run/operate something already built, step by step | [`docs/ml_experimentation/`](ml_experimentation/index.md), [`docs/live_service/`](live_service/index.md) |
 | File a quick tweak or a non-code task | A GitHub issue only — no markdown needed |

@@ -147,6 +147,27 @@ Every candidate should weight the fit by the per-unit physics output (or drop lo
 low-wind samples outright), and let the piecewise-constant prior carry the estimate across the
 uninformative gaps — that is precisely what the prior is for.
 
+### Robustness to missing inputs
+
+Both candidates ingest metered generation that really does have gaps — stalled telemetry, missed
+NWP runs, a wholesale-absent weather variable — and the winner's capacity estimate feeds v1.0
+forecasting, so an estimator that mis-estimates under an outage propagates the error downstream.
+This is the same reasoning as the section above: the data going silent at night is missingness with
+a known cause, and an outage is missingness with an unknown one.
+
+So **missingness robustness is a head-to-head judging criterion**, scored against the same
+failure-scenario vocabulary the forecasting leaderboard uses
+([Metrics & Leaderboard](metrics-and-leaderboard.md#scoring-under-failure-scenarios)). Two things
+are checked: that the estimator still returns an estimate at all under each scenario, and that its
+*uncertainty* widens honestly when it does — an estimator that quietly returns a confident number
+from half the data is worse than one that returns a wide interval.
+
+The differentiable-physics candidate has a structural advantage here, and it should count in the
+judging: a physical forward model
+[degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing)
+— an absent input is replaced with a prior or a physical bound, with no branching and no fallback
+path. The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
+
 ### Keeping weather bias out of capacity
 
 The irradiance driving any physics-based estimator is itself biased: NWP and satellite products

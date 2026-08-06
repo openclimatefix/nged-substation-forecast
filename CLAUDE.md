@@ -39,9 +39,10 @@ live further down this file, with the other gotchas.)
 ## Docs
 
 `docs/` contains a lot of useful information beyond API reference: forward-looking plans and
-their ordering (`docs/roadmap/`), durable explainers of solution methods (`docs/techniques/`),
-background/requirements context (`docs/background/`), design rationale for what's already built
-(`docs/architecture/`), and step-by-step operational how-to for what's already built
+their ordering (`docs/roadmap/`), the portable design principles, engineering hypotheses and
+inherent-stability argument (`docs/design-philosophy/`), durable explainers of solution methods
+(`docs/techniques/`), background/requirements context (`docs/background/`), design rationale for
+what's already built (`docs/architecture/`), and step-by-step operational how-to for what's already built
 (`docs/ml_experimentation/`, `docs/live_service/` — design and how-to are deliberately separate
 pages, cross-linked via "See also"). When planning new features, check `docs/` for relevant prior
 discussion before proposing an approach.
@@ -66,6 +67,9 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   to roadmap milestones; dependencies are `blocked by` issue links).
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics
   sit inside each page under an "Implementation details (deleted when this ships)" section.
+- **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the
+  engineering is meant to deliver. Cite them by label (`H1`, `T1.2`); labels are append-only —
+  never renumber.
 - **`plans/`** holds at most one file: the in-flight PR's mechanical checklist, deleted on
   merge. Usually empty.
 
@@ -121,6 +125,36 @@ must also:
 ## Architecture
 
 This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
+
+**A short list of design principles** governs architectural decisions:
+[`docs/design-philosophy/design-principles.md`](docs/design-philosophy/design-principles.md).
+Read them before proposing a structural change. If a change violates one, that is not a veto, but
+say which principle is being traded away and what is bought in return.
+
+### Inherent stability (production code)
+
+**In production, never raise because an input is absent or stale — degrade, widen the uncertainty
+bands, and record the degradation on the row.** Raising is reserved for states that are our own bug
+(an empty promoted model, a contract violation), not for the outside world misbehaving. Corollaries
+that come up constantly when editing `defs/`:
+
+- **Liberal about missing inputs, strict about malformed ones.** Absent data routes into the
+  always-output path; malformed data is rejected at the Patito boundary. Detectably-*wrong* input
+  (a stuck meter) is treated as missing, not as data.
+- **Asset checks warn, they do not block** — `AssetCheckSeverity.WARN` with `blocking=False`. There
+  is deliberately no `ERROR`-severity check anywhere in the repo. A warning function must never be
+  able to raise, or fail-open silently becomes fail-closed.
+- **Measure degradation in missed NWP runs, never in hours of age.** We ingest one ECMWF run per
+  day, so healthy NWP is 12–30 hours old depending on the 6-hourly slot.
+- **R&D is the opposite**: the CV, training and metrics assets fail fast, because a quietly-degraded
+  training run poisons every comparison built on it.
+- **When a capability could live in the training loop or in the production service, put it in the
+  training loop.** Keep the serving path close to "load a model, call `predict`".
+
+Full rationale, the degradation ladder and the numbered rules:
+[`docs/design-philosophy/inherent-stability.md`](docs/design-philosophy/inherent-stability.md). The
+falsifiable claims it is meant to deliver — cite them as `H1`/`T1.2` and never renumber them — are
+in [`docs/design-philosophy/engineering-hypotheses.md`](docs/design-philosophy/engineering-hypotheses.md).
 
 ### Packages
 
@@ -182,7 +216,7 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
 - **Comments must reflect current state only** — never reference previous iterations of the
   code or deleted files.
-- **Code links only to durable docs** — `docs/background/`, `docs/techniques/`,
+- **Code links only to durable docs** — `docs/design-philosophy/`, `docs/background/`, `docs/techniques/`,
   `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never link from code *or* docs to `plans/`
   files, and never from code to `docs/roadmap/` pages or to any
   "Implementation details (deleted when this ships)" section — all of those are deleted when
@@ -343,7 +377,7 @@ row count, or row index at 2³² (~4.29 billion) rows. Past the cap there is **n
 wrap modulo 2³²: `pl.len()` over the 5.9-billion-row NWP dev table returns 1,652,180,189
 (= 5,947,147,485 mod 2³²), and `group_by(...).agg(pl.len())` wraps identically for any single
 group past the cap, streaming engine included. Full analysis:
-[Architecture Overview → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#the-other-hard-ceiling-polars-32-bit-row-index).
+[Performance and Scale → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#the-other-hard-ceiling-polars-32-bit-row-index).
 
 - **Never row-count a table that can exceed 2³² rows with Polars.** Use the Delta log instead —
   `DeltaTable(path).count()`, or sum `num_records` over `get_add_actions(flatten=True)` — both

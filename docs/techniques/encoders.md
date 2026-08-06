@@ -46,6 +46,33 @@ proximity to coast — that does not change over time. The DP modules already us
 solar geometry, so this encoder would capture residual structure the hard-coded geometry does not
 explain.
 
+## Handling missing inputs: remove the token, don't zero-fill
+
+Encoder inputs go missing in production — a missed NWP run, a variable absent from a slice, a
+stalled meter — so how absence is represented is an architectural decision, not an afterthought.
+
+**Do not zero-fill.** Zero is a meaningful value in physical units: 0 MW, 0 W/m² and 0 °C are all
+real physical states. Substituting zero for an unknown therefore asserts something false, and the
+network cannot tell the two apart, so it learns a conditional mean contaminated by fabricated data.
+
+**Treat inputs as a set of tokens and simply omit the absent ones.** Each token carries a value
+embedding, a feature-identity embedding and a time embedding; attention is natively
+permutation-invariant and variable-length, so a missing input is *structurally* absent rather than
+encoded as a sentinel. Mask the attention matrix for padding only. The dense alternative, for
+architectures that need a fixed-width input, is **value + mask channels**, so the network can still
+distinguish "zero" from "unknown" — GRU-D is the standard precedent, pairing masks with a learned
+decay of the last observation toward an empirical mean.
+
+**Do not train for missingness with random dropout alone.** Random dropout simulates data that is
+*missing completely at random*, and production missingness is not: outages correlate with time of
+day, weather systems and provider incidents, and a meter that drops out during the storm that caused
+an extreme reading is missing *because* the value was extreme. A model trained on random dropout is
+calibrated for a world it does not live in, and the miscalibration shows up as over-confident
+predictions during a real outage — the worst possible moment. Use **structured, outage-shaped**
+dropout drawn from the same failure-scenario vocabulary the rest of the project scores against.
+
+See [Inherent Stability](../design-philosophy/inherent-stability.md) for the whole principle.
+
 ## What the encoders do *not* need to learn
 
 Because the DP layer hard-codes solar geometry, the weather encoder does not need to learn that

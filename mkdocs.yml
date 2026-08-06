@@ -1,4 +1,9 @@
 site_name: NGED Substation Forecast
+
+validation:
+  links:
+    anchors: warn
+
 theme:
   name: material
   features:
@@ -33,6 +38,11 @@ nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - Documentation Guide: documentation-guide.md
+  - Design Philosophy:
+      - Overview: design-philosophy/index.md
+      - Design Principles: design-philosophy/design-principles.md
+      - Engineering Hypotheses: design-philosophy/engineering-hypotheses.md
+      - Inherent Stability: design-philosophy/inherent-stability.md
   - Background & Challenges:
       - NGED Network: background/network.md
       - Requirements: background/requirements.md
@@ -49,6 +59,7 @@ nav:
       - Probabilistic Forecasting: techniques/probabilistic-forecasting.md
   - Architecture:
       - Overview: architecture/overview.md
+      - Performance and Scale: architecture/performance.md
       - Forecast Delivery: architecture/forecast-delivery.md
       - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md

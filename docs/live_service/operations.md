@@ -123,6 +123,78 @@ partition's `power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnig
    will be tracked by production monitoring once it exists (not yet implemented — see
    [roadmap: Production monitoring](../roadmap/live-service.md#production-monitoring)).
 
+## Rolling back to the previous champion
+
+**Trigger:** a promoted model turns out to be worse in production than the one it replaced.
+
+Rollback is promotion run backwards: re-materialise `promoted_model` (step 2) with the *previous*
+champion's `mlflow_run_id`. Because promotion **replaces** the artifact directory outright rather
+than merging into it, there is nothing to undo — the previous model returns exactly as it was, and
+the next scheduled tick picks it up.
+
+The one thing to get right is finding the run id you are rolling back *to*. The current
+`promotion.json` records only the champion serving right now, and it is overwritten on every
+promotion, so the history lives in **Dagster's run history**: open Assets → `promoted_model` →
+"Runs", and read `PromotedModelConfig.mlflow_run_id` off the previous successful materialisation.
+Keeping a note of the outgoing run id *before* you promote is cheaper than looking it up under
+pressure afterwards.
+
+On AWS there is the same extra leg as for promotion: rebuild and push the image, then point the
+task definition at the tag — see
+[Redeploying a new champion model](aws.md#redeploying-a-new-champion-model). Rolling back to a tag
+that was previously deployed avoids the rebuild.
+
+This path works today but is not yet one command, which is what
+[T3.2](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) measures.
+
+## Degraded input data — NWP feed down, or telemetry stalled
+
+**Trigger:** an asset check reports a warning, or `live_forecasts` fails.
+
+The service is designed to keep answering as its inputs degrade rather than to stop — the
+reasoning, and the ladder of degradation states, are in
+[Inherent Stability](../design-philosophy/inherent-stability.md). None of the situations below is a
+same-day emergency; all are next-business-day fixes.
+
+**Reading the freshness check.** `power_data_is_fresh` runs against
+`power_time_series_and_metadata`, is **non-blocking** and **WARN**-severity, and reports on
+*on-disk data recency* rather than on whether the asset materialised. It flags any time series
+whose most recent reading is more than 24 hours old, and its metadata carries a table of the late
+series with `last_seen` and `hours_late`. A warning therefore never stops forecasts being
+produced; it tells you which feed to chase. A handful of persistently-late series is usually a
+decommissioned or renamed substation rather than an outage — check the roster before escalating.
+
+**Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from
+the frame already in memory, and is likewise non-blocking WARN. A small scattered fraction of
+nulls in the three de-accumulated variables is *expected* and is not a fault — see
+[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md). A whole slice of
+nulls is rejected at ingest by `Nwp.validate`, which means the day's run simply does not land: the
+symptom you will actually see is a **missed run**, not corrupt data.
+
+**When a daily NWP run is missing.** We ingest one ECMWF run per day (the 00Z run, downloaded at
+08:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
+forecasting. Raw age is not a fault signal; a missed *run* is. If one or two runs are missed,
+`live_forecasts` continues normally against the freshest run on disk — it selects "the freshest run
+present as of the forecast init time", so no intervention is needed beyond fixing the download.
+Materialise the missed `ecmwf_ens` partitions once the feed recovers.
+
+**When `live_forecasts` fails outright.** Today, if no NWP run on disk is recent enough to cover
+the forecast horizon (roughly 15 days of staleness), the asset raises rather than producing a
+degraded forecast, and NGED receive nothing for that slot. That is a known divergence from the
+design principle, tracked for v0.5; until it is fixed, treat it as an alert to restore the NWP feed
+and then backfill the missed slots in replay mode (see
+[Backfilling a missed slot](#backfilling-a-missed-slot)).
+
+**When the model fails to load.** A raise complaining that the promoted model has no trained time
+series is *not* a data outage — it is a promotion bug, and it is meant to fail loudly. Re-promote
+(step 2), or roll back
+([above](#rolling-back-to-the-previous-champion)).
+
+**Log the intervention.** Every entry above that needed a human is a data point for
+[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): record the date, the
+trigger, the cause, the minutes spent, and whether this runbook covered it. A gap in this page is
+itself the finding.
+
 ## Inspecting a live forecast
 
 Use the `view_forecasts` dashboard app — the same app
