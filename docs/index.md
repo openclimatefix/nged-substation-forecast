@@ -75,6 +75,22 @@ find useful to consider — reported with results, not asserted.
 - [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting a champion model and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics, switching events, disaggregation evaluation, and encoders
 
+## How these docs were written
+
+The ideas, the decisions and the judgement calls in this documentation are human — they come from
+the team's own engineering and from reading what other industries do. Much of the *prose*, though,
+was drafted and refined with an LLM coding agent (Claude Code) over many hours of back-and-forth,
+and our experience is that this genuinely improved the writing: an argument that survives being
+questioned repeatedly tends to end up better evidenced than one written in a single pass.
+
+The division of labour matters most for the evidential claims. The performance, size and cost
+figures were measured on real data through the real code path rather than estimated — the
+[measure; do not assume](design-philosophy/design-principles.md) principle applies to the
+documentation as much as to the pipeline. Claims about what the code does are checked against the
+code, but we will not pretend that every sentence across this many pages has had a human's eye on
+it next to the source. Where the docs and the code disagree, the code is right, and we would rather
+hear about it than have it stand.
+
 > New to this repo? See the [Documentation Guide](documentation-guide.md) for how these sections
 > relate to each other and to GitHub issues — including the rule that `roadmap/` holds **only
 > not-yet-implemented** design, moving out to a permanent home (`architecture/` for design
