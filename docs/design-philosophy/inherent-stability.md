@@ -27,6 +27,15 @@ steering ropes and the wheels whip hard left or hard right, probably ending in a
 is trying to hurt you! It is inherently *unstable*, and it requires constant, active control to keep
 it safe.
 
+![Soap box cart steering: a wooden beam axle carrying both front wheels, pivoting where it crosses
+the frame, with ropes running to each end](soapbox-steering.jpg)
+
+*Simple steering for a soapbox: one wooden beam carries both front wheels and pivots where it
+crosses the frame, with a rope to each end to pull it left or right. Both timbers are flat, so the
+pivot is vertical — there is no castor angle, and nothing returns the axle to centre. Photo by
+[Arne Groh](https://commons.wikimedia.org/wiki/File:Soapbox_Steering.JPG), resized, used under
+[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).*
+
 A proper car's **steering geometry** is the stark contrast. Its front wheels do not pivot about a
 vertical axis, as the cart's do. The steering axis is tilted — this is the **castor angle** — so
 that it meets the road slightly *ahead* of the point where the tyre actually touches it, which
@@ -36,6 +45,14 @@ the wheel back towards the centre. Let go of the steering wheel and it returns t
 sensor measures that error and no controller corrects it: the geometry is chosen so that the physics
 does the work. The machine is trying to keep you safe, not through lots of active control, but by
 its very shape.
+
+![Castor angle: a tilted steering axis meeting the road at a different point from the tyre's contact
+patch](castor-angle.svg){ width="320" }
+
+*Castor angle. The red line is the steering axis — solid where the axle itself lies, dashed where it
+is extended — and because it is tilted it meets the road at a different point from where the tyre
+touches down. That offset is what makes the wheel trail its own pivot, and what pulls it straight.
+Diagram by [Ktims](https://commons.wikimedia.org/wiki/File:Caster_angle.svg), public domain.*
 
 That is what we want from the forecasting service. Wherever we can manage it, sensible behaviour
 under disturbance should fall out of how the system is built, rather than being watched for and
