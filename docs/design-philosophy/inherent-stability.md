@@ -13,17 +13,16 @@ hypothesis that the service mostly runs itself. [The rules](#the-rules) below ar
 fine-grained form of the never-stop, complexity-offline and strict-contracts principles in that
 list.
 
-**The model does the work, not a fallback path.** The central mechanism behind everything below is
+**The model does the work, not a fallback path.** A central mechanism behind everything below is
 that the ML model itself is built to keep producing a sensible forecast when some of its inputs are
 missing — rather than a chain of fallbacks wrapped around a model that assumes complete data. That
 is already partly true: the gradient-boosted trees we run today *route* missing features instead of
-requiring them to be filled in, so a forecast still comes out when a feature drops away. What is not
-yet true is that the model has been **trained** against realistic outages, which is what turns "it
-still produces a number" into "it still produces a number worth trusting". Much of what follows —
-the degradation ladder, the widening bands, the failure-scenario suite — exists to make that one
-design choice work; the mechanics are in [Default directions, and their
-limit](#default-directions-and-their-limit) and [Missingness in learned
-models](#missingness-in-learned-models).
+requiring them to be filled in, so a forecast still comes out when a feature drops away. But the
+model has not yet been **trained** against realistic outages, which is what turns "it still produces
+a number" into "it still produces a number worth trusting". Much of what follows — the degradation
+ladder, the widening bands, the failure-scenario suite — exists to make that one design choice work;
+the mechanics are in [Default directions, and their limit](#default-directions-and-their-limit) and
+[Missingness in learned models](#missingness-in-learned-models).
 
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
 are designed but not yet built are **linked, not copied** — they live in
@@ -151,18 +150,19 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 
 ## The rules
 
-These are the imperative form of everything above. When in doubt while changing production code,
-follow these. Rules 1, 2 and 8 restate the [never-stop, strict-contracts and complexity-offline
-principles](design-principles.md) in imperative
-form so that this checklist stands alone; if you change a rule, change its matching principle, and
-vice versa.
+These are the imperative form of everything above: the checklist to follow when in doubt while
+changing production code. It is deliberately self-contained, so three of the ten restate a
+[design principle](design-principles.md) rather than adding anything new. Those three are marked
+below — if you change one, change its matching principle too. The remaining seven are specific to
+degradation and appear nowhere else.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
    record the degradation on the row. Reserve raising for states that are our own bug — an empty
-   promoted model, a contract violation — not for the outside world misbehaving.
+   promoted model, a contract violation — not for the outside world misbehaving. *(The never-stop
+   principle, in imperative form.)*
 2. **Be liberal about missing inputs and strict about malformed ones.** Absent data routes into the
    always-output path; malformed data is rejected at the contract boundary. These are opposite
-   postures and both are deliberate.
+   postures and both are deliberate. *(The strict-contracts principle, in imperative form.)*
 3. **Treat detectably-wrong input as missing, not as data** — see
    [Missing versus wrong](#missing-versus-wrong).
 4. **Signal degradation in-band first.** The uncertainty band is the only number the consumer is
@@ -178,7 +178,8 @@ vice versa.
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
    is why `report_power_freshness` never raises.
 8. **When a capability could live in the training loop or in the production service, put it in the
-   training loop.** See [Where complexity should live](#where-complexity-should-live).
+   training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
+   complexity-offline principle, in imperative form.)*
 9. **Fail in the direction where being wrong is cheapest to recover from.** In production that is
    forward; in model R&D it is backward. See [R&D fails the other way](#rd-fails-the-other-way).
 10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
