@@ -236,6 +236,13 @@ forecast-skill milestones above. Items so far:
   [live-service plan](live-service.md#deployment-workstream-3-aws-infrastructure); the
   account-portability requirement is in
   [Handover to NGED](handover.md#4-infrastructure-as-code-portable-to-ngeds-account).
+- Consider five pieces of industry best practice we currently lack
+  ([#449](https://github.com/openclimatefix/nged-substation-forecast/issues/449)): input-drift
+  detection, shadow deployment of a challenger model, a schema-evolution policy for the delivery
+  contract (which may need pulling forward to v0.6), statistical process control on forecast
+  error, and naming *poka-yoke* among the
+  [design principles](../architecture/overview.md#design-principles). A holding issue: the task is
+  to consider them once the live service has run for a while, not a commitment to build them.
 
 ---
 
