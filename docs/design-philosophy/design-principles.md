@@ -105,6 +105,9 @@ principle behind it is a claim we are merely hoping comes true.
    the pipeline's own code, behind the same data contracts and tests as everything else. There is
    then no "now rewrite the research code for production" step, because there was never a second,
    scruffier implementation to rewrite (and this should _accelerate_ research, not slow it down).
+   This is also what makes a one-command promotion *safe* rather than merely fast: the model that
+   won the leaderboard is, bit for bit, the model that serves, so there is no re-implementation
+   whose divergence from the measured version can only be discovered in production.
    *Without it:* research code is rewritten for production, the two implementations drift apart, and
    the deployed model no longer does what the winning experiment measured. And it takes _longer_
    to get the best model into production, which is bad for users, and bad for developers too because
@@ -176,8 +179,8 @@ principle behind it is a claim we are merely hoping comes true.
    are derived at runtime from whatever grid it is handed rather than from a hard-coded bounding
    box; `BaseForecaster` deliberately permits one sub-model per time series, a single global model,
    or anything in between; cross-validation fold eligibility is derived from data coverage alone and
-   **never** from the model or its config. *Serves:* [Hypothesis 6: scale without
-   redesign](engineering-hypotheses.md#h6-scale-without-redesign), [Hypothesis 2: a hundred
+   **never** from the model or its config. *Serves:* [Hypothesis 5: scale without
+   redesign](engineering-hypotheses.md#h5-scale-without-redesign), [Hypothesis 2: a hundred
    experiments per person in a peak
    month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month). *Detail:*
    [The Universal Model Interface](../architecture/overview.md#the-universal-model-interface), [What
@@ -212,7 +215,7 @@ principle behind it is a claim we are merely hoping comes true.
    is one an agent can be pointed at, while a system whose failures only reproduce in the cloud is
    not. The limit is worth stating plainly, and it is narrower than it might sound. Nothing here is
    in doubt about whether the architecture *serves* ~2,500 time series — that is [Hypothesis
-   6](engineering-hypotheses.md#h6-scale-without-redesign), and the production service runs on a
+   5](engineering-hypotheses.md#h5-scale-without-redesign), and the production service runs on a
    rented machine sized for the job. What v2 scale tests is the stronger, additional claim that the
    *whole* thing still fits on one developer's laptop. Even there the likely pinch is wall-clock
    rather than feasibility — a full v2-scale 51-member backtest may simply take too long to sit
@@ -254,7 +257,7 @@ principle behind it is a claim we are merely hoping comes true.
    `nwp_has_no_unexpected_nulls` check reports them as a `WARN`) — usefully converting fine-grained
    catastrophe into a coarse-grained missed run, the form principle 1 already handles. *Serves:*
    [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
-   [Hypothesis 6: scale without redesign](engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+   [Hypothesis 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign). *Detail:*
    [Strict data contracts](../architecture/forecast-delivery.md#strict-data-contracts-machine-verifiable),
    [Not Postel's law](inherent-stability.md#not-postels-law),
    [The guiding principle](../architecture/ecmwf-ens-known-issues.md#the-guiding-principle).
@@ -301,7 +304,7 @@ principle behind it is a claim we are merely hoping comes true.
    with the git SHA and the Delta table versions it read. *Serves:* [Hypothesis 2: a hundred experiments per
    person in a peak
    month](engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
-   [Hypothesis 6: scale without redesign](engineering-hypotheses.md#h6-scale-without-redesign).
+   [Hypothesis 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign).
    *Detail:* [Two metric
    stores](../architecture/ml-orchestration.md#two-metric-stores-one-division-of-labour), [The
    Universal Model Interface](../architecture/overview.md#the-universal-model-interface).
@@ -332,7 +335,7 @@ principle behind it is a claim we are merely hoping comes true.
     double-count; parallel experiments write to disjoint partition directories and never touch each
     other. *Serves:*
     [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
-    [Hypothesis 6: scale without redesign](engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+    [Hypothesis 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign). *Detail:*
     [ACID on object storage](../architecture/forecast-delivery.md#and-it-is-a-database-acid-on-object-storage),
     [Idempotent writes and concurrency](../architecture/ml-orchestration.md#idempotent-writes-and-concurrency),
     [Serve only the trained population](../architecture/production-deployment.md#serve-only-the-trained-population).
@@ -359,7 +362,7 @@ principle behind it is a claim we are merely hoping comes true.
     *Decided:* input pruning plus `init_time` chunking holds a full 51-member validation prediction
     (~321M rows) to a peak of ~9 GB on a laptop. *Serves:*
     [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
-    [Hypothesis 6: scale without redesign](engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+    [Hypothesis 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign). *Detail:*
     [Lazy evaluation strategy](../architecture/performance.md#lazy-evaluation-strategy).
 
 12. **Measure; do not assume.** Performance, size and cost claims are benchmarked on real data,
@@ -371,7 +374,7 @@ principle behind it is a claim we are merely hoping comes true.
     it measured *worse* there; the NWP scan-pruning rules were each verified with
     `LazyFrame.explain()` rather than reasoned about. *Serves:*
     [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
-    [Hypothesis 6: scale without redesign](engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+    [Hypothesis 5: scale without redesign](engineering-hypotheses.md#h5-scale-without-redesign). *Detail:*
     [Storage formats](../architecture/performance.md#storage-formats-measured-not-assumed),
     [Bounding feature-engineering memory](../architecture/performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output).
 
@@ -389,7 +392,8 @@ principle behind it is a claim we are merely hoping comes true.
     which it would earn its keep. We *did* adopt Delta Lake, Dagster, MLflow, Marimo and Sentry, each
     for a stated reason recorded at the time. *Serves:*
     [Hypothesis 4: it runs for pocket money](engineering-hypotheses.md#h4-it-runs-for-pocket-money),
-    [Hypothesis 5: operable by a non-expert](engineering-hypotheses.md#h5-operable-by-a-non-expert). *Detail:*
+    [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+    — specifically T1.4, operability by a non-expert. *Detail:*
     [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
     [When would a REST API earn its keep?](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
     [Considered but rejected designs](../architecture/production-deployment.md#considered-but-rejected-designs).

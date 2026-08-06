@@ -34,3 +34,10 @@ re-implementation of it. Promotion to production takes minutes, and that speed i
 candidate has already been trained, cross-validated (see
 [Cross-validation folds](cross-validation-folds.md)), and evaluated on the same pipeline,
 under the same standardised protocol, as every model before it.
+
+That is what makes a one-command promotion *safe* to press rather than merely quick. The
+largest risk in a conventional setup — that the artifact measured and the artifact deployed
+are two different pieces of code — does not exist here, the comparison that picked the winner
+was made against every other candidate on identical folds, and the way back to the previous
+champion is a single command too. A fast promotion route that nobody trusts enough to use is
+worth no more than a slow one.

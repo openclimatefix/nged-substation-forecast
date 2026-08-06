@@ -1,11 +1,30 @@
 # Design Philosophy
 
-This section is the **portable "why"** of the project: the part that would survive a rewrite of
-every line of code, and the part another team could adopt without adopting any of our stack. It is
-written to be readable without knowing Python or Polars — code names appear only as evidence that a
-claim is practised, never as a prerequisite for following the argument.
+**The one-minute description:** We believe that five things can be true at once:
 
-Flexpectation is a greenfield project, and that is a rare opportunity: we get to research the best
+- **A service that mostly runs itself** — manual attention needed only when an upstream data format
+  changes, with the forecast degrading gracefully rather than stopping when an input goes missing.
+  A consequence of that, if it holds, is a service an operator can run day to day from the
+  runbooks alone, without knowledge of the implementation details.
+- **A hundred experiments per person in a peak month** — most research ideas fail, so the number of
+  good ones a project finds is set by how many it can attempt.
+- **Safe one-click promotion, and one-click rollback** — one *command*, not one leap of faith. By
+  the time that command is available, the candidate has been scored against every other model on
+  identical folds, has run on the very same code that will serve it, and can be reverted just as
+  cheaply if it disappoints.
+- **It runs for pocket money** — under £50/month at v1 scale, under £200/month at v2.
+- **Scale without redesign** — 32 time series to ~2,500, with no structural change.
+
+These are written down as [hypotheses with numbers and deadlines](engineering-hypotheses.md) rather
+than as aims: none of them is settled yet, and a threshold we miss gets published as a negative
+result rather than quietly revised.
+
+The remainder of this page is the **portable "why"** of the project: this page would survive a
+rewrite of every line of code, and is the page another team could adopt without adopting any of our
+stack. It is written to be readable without knowing Python or Polars — code names appear only as
+evidence that a claim is practised, never as a prerequisite for following the argument.
+
+Flexpectation is a greenfield project, and that is a rare opportunity to research the best
 practices of several industries — not only energy forecasting; some of the most useful ideas here
 are borrowed from vehicle dynamics, avionics, manufacturing and site reliability engineering —
 test-drive them against real data and a real production service, and report what we find. The

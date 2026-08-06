@@ -1,6 +1,6 @@
 # Inherent Stability
 
-> **We never stop answering. We get less certain instead — and we say so in the answer itself.**
+> **We never stop forecasting power. If the data inputs fail then we degrade gracefully by decreasing the confidence of our probabilistic power forecasts.**
 
 This page argues in full the first and largest of the project's
 [design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
