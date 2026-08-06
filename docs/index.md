@@ -53,10 +53,10 @@ energy-forecasting industry. Some of the most useful ideas here are borrowed fro
 have been solving the same shape of problem for far longer than data engineering has existed. The
 [inherent stability](architecture/inherent-stability.md) that shapes how the service behaves when its
 inputs degrade is taken from vehicle dynamics; the fail-operational posture comes from avionics; the
-habit of designing an interface so the wrong thing is impossible rather than merely discouraged
-comes from manufacturing. The
-[design principles](architecture/overview.md#design-principles) page collects them, states what each
-one actually decided, and names the ones we considered and rejected. Articulating and refining that
+discipline of confining any failure to the partition it happened in — its *blast radius* — comes
+from site reliability engineering. The
+[design principles](architecture/overview.md#design-principles) list collects them, states what each
+one actually decided, and names the ones we considered and declined. Articulating and refining that
 list is itself intended as a transferable output of the project.
 
 ## Documentation
@@ -69,6 +69,7 @@ list is itself intended as a transferable output of the project.
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
 - [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
 - [Inherent Stability](architecture/inherent-stability.md) — how the service behaves as its inputs degrade: the degradation ladder, the failure modes, and the rules to follow when changing production code
+- [Performance and Scale](architecture/performance.md) — the measured performance engineering: storage formats, lazy evaluation, memory bounds, and Polars' row-index ceiling
 - [Code Style](architecture/code-style.md) — code conventions
 - [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable test suites
 - [ML Experimentation](ml_experimentation/index.md) — methodology for our implemented ML experimentation: cross-validation folds, the leaderboard, and how we evaluate models

@@ -66,6 +66,8 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   to roadmap milestones; dependencies are `blocked by` issue links).
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics
   sit inside each page under an "Implementation details (deleted when this ships)" section.
+- **`docs/engineering-hypotheses.md`** holds the falsifiable claims the engineering is meant to
+  deliver. Cite them by label (`H1`, `T1.2`); labels are append-only — never renumber.
 - **`plans/`** holds at most one file: the in-flight PR's mechanical checklist, deleted on
   merge. Usually empty.
 
@@ -122,7 +124,7 @@ must also:
 
 This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
 
-**Eleven design principles** govern architectural decisions:
+**A short list of design principles** governs architectural decisions:
 [`docs/architecture/overview.md` → Design principles](docs/architecture/overview.md#design-principles).
 Read them before proposing a structural change. If a change violates one, that is not a veto, but
 say which principle is being traded away and what is bought in return.
@@ -373,7 +375,7 @@ row count, or row index at 2³² (~4.29 billion) rows. Past the cap there is **n
 wrap modulo 2³²: `pl.len()` over the 5.9-billion-row NWP dev table returns 1,652,180,189
 (= 5,947,147,485 mod 2³²), and `group_by(...).agg(pl.len())` wraps identically for any single
 group past the cap, streaming engine included. Full analysis:
-[Architecture Overview → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/#the-other-hard-ceiling-polars-32-bit-row-index).
+[Performance and Scale → The other hard ceiling](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#the-other-hard-ceiling-polars-32-bit-row-index).
 
 - **Never row-count a table that can exceed 2³² rows with Polars.** Use the Delta log instead —
   `DeltaTable(path).count()`, or sum `num_records` over `get_add_actions(flatten=True)` — both

@@ -1,4 +1,9 @@
 site_name: NGED Substation Forecast
+
+validation:
+  links:
+    anchors: warn
+
 theme:
   name: material
   features:
@@ -51,6 +56,7 @@ nav:
   - Architecture:
       - Overview: architecture/overview.md
       - Inherent Stability: architecture/inherent-stability.md
+      - Performance and Scale: architecture/performance.md
       - Forecast Delivery: architecture/forecast-delivery.md
       - Known ECMWF ENS Data-Quality Issues: architecture/ecmwf-ens-known-issues.md
       - ML Orchestration Design: architecture/ml-orchestration.md

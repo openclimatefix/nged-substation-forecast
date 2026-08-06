@@ -731,7 +731,7 @@ so the byte reduction would land nearer the 4× than the 51×. That needs measur
 
 **Polars' 32-bit row-index cap stops being an edge case — it becomes a write-path blocker.** As
 documented in
-[Architecture Overview](overview.md#the-other-hard-ceiling-polars-32-bit-row-index), row counts
+[Performance and Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index), row counts
 silently wrap past 2³² rows, and materialising a single frame of ≥2³² rows is unsupported outright.
 At V2 the cap affects one code path (the `metrics` asset's whole-fold collect). Here, **a single
 run's 6.9 billion forecast rows exceed the 4.29-billion cap on their own**, so the output of one
@@ -743,10 +743,10 @@ archive measures **~40 GB per year on disk** in the same compressed Delta layout
 development table is ~93 GB for 5.9 billion rows). India is roughly 15× the land area, so the
 equivalent archive would be of order **600 GB per year on disk** — scaled by area, not measured,
 and it says nothing about the in-memory cost of a query against it, which the
-[input-pruning strategy](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+[input-pruning strategy](performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 exists to bound separately. The bigger loss is that the
 `h3_index` pruning described in
-[Architecture Overview](overview.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
+[Performance and Scale](performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)
 stops helping: with 100,000 sites spread across the country, the cells the sites occupy *are* the
 whole grid.
 
@@ -764,7 +764,7 @@ is not exhausted, not that any specific number is available.
 **Store residuals against a cheap deterministic baseline, not absolute power.** This is the one we
 would try first, because it attacks a *documented* weakness. `delta_store.power_forecasts` uses
 `BYTE_STREAM_SPLIT` on `power_fcst` precisely because
-"[near-continuous ML output has no repeats for a dictionary to exploit](overview.md#core-components)"
+"[near-continuous ML output has no repeats for a dictionary to exploit](performance.md#storage-formats-measured-not-assumed)"
 — it is making the best of a column with no exploitable structure. Subtracting a cheap, exactly
 reproducible baseline (a per-site time-of-week climatology, say) leaves a residual that is small,
 centred on zero, and — crucially — *quantised*: after the existing 13-bit significand rounding, a

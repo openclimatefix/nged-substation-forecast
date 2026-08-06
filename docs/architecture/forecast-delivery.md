@@ -337,7 +337,7 @@ at V2's ~86 million rows per run it's still only ~150 MB — a tiny fraction of 
 way. NGED writes **zero custom
 data-reading code** — they point existing tools (Polars, pandas, DuckDB, Spark) at
 the bucket and query it like a database. The same mechanism powers our own pipeline: the
-[lazy evaluation strategy](overview.md#lazy-evaluation-strategy) that keeps our training memory
+[lazy evaluation strategy](performance.md#lazy-evaluation-strategy) that keeps our training memory
 bounded is exactly what keeps NGED's reads cheap.
 
 One caveat for anyone querying the *whole* table with Polars: default Polars builds cap any
@@ -347,7 +347,7 @@ table already has, and `power_forecasts` will at V2 scale), whole-table row coun
 the Delta transaction log (`DeltaTable(path).count()`), not `pl.len()` over an unfiltered scan.
 Filtered queries whose results stay under the cap — i.e. every read pattern described above —
 are unaffected. Details in
-[Architecture Overview → The other hard ceiling](overview.md#the-other-hard-ceiling-polars-32-bit-row-index).
+[Performance and Scale → The other hard ceiling](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 
 ## An established industry pattern
 

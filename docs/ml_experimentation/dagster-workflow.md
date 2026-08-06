@@ -200,7 +200,7 @@ in the run config dialog before launching.
    a time** — peak memory is a single fold, not the entire matched population. (A whole fold is
    the *coarsest* chunk Polars can safely materialise: fine at V1 scale, but a V2-scale fold will
    need sub-fold chunking — see
-   [The other hard ceiling: Polars' 32-bit row index](../architecture/overview.md#the-other-hard-ceiling-polars-32-bit-row-index).)
+   [The other hard ceiling: Polars' 32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index).)
    For each group:
    a. Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble
       members into per-timestamp quantities, and computes the deterministic metrics
