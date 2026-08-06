@@ -27,38 +27,44 @@ steering ropes and the wheels whip hard left or hard right, probably ending in a
 is trying to hurt you! It is inherently *unstable*, and it requires constant, active control to keep
 it safe.
 
-![Soap box cart steering: a wooden beam axle carrying both front wheels, pivoting where it crosses
-the frame, with ropes running to each end](soapbox-steering.jpg)
+![A boy riding a homemade soap box cart: a plank on four small wheels, with a string running forward
+to the pivoting front axle](soapbox-cart.jpg)
 
-*Simple steering for a soapbox: one wooden beam carries both front wheels and pivots where it
-crosses the frame, with a rope to each end to pull it left or right. Both timbers are flat, so the
-pivot is vertical — there is no castor angle, and nothing returns the axle to centre. Photo by
-[Arne Groh](https://commons.wikimedia.org/wiki/File:Soapbox_Steering.JPG), resized, used under
-[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).*
+*A soap box cart, 1950. The whole steering mechanism is a front axle that pivots under the plank,
+pulled left or right by the length of string in the rider's hand. That pivot is vertical, so nothing
+returns the axle to centre. Photo from the
+[Nationaal Archief](https://commons.wikimedia.org/wiki/File:Zeepkist_(1950).jpg), resized, used
+under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).*
 
-A proper car's **steering geometry** is the stark contrast. Its front wheels do not pivot about a
-vertical axis, as the cart's do. The steering axis is tilted — this is the **castor angle** — so
-that it meets the road slightly *ahead* of the point where the tyre actually touches it, which
-leaves each wheel trailing behind its own pivot, exactly like the castor on an office chair or the
-front wheel of a bicycle. Any deviation from straight-ahead therefore generates a force that pulls
-the wheel back towards the centre. Let go of the steering wheel and it returns there on its own. No
+A proper car's steering is the stark contrast. Its front wheels do not pivot about a vertical axis,
+as the cart's do. Each one turns about a **kingpin** — the pin at the outer end of the axle, which
+carries the steering knuckle the wheel is bolted to — and that pin is deliberately *tilted*, both
+backwards (the **castor angle**) and inwards (**kingpin inclination**). The backward tilt is the
+important one here: it makes the steering axis meet the road slightly ahead of the point where the
+tyre actually touches it, which leaves each wheel trailing behind its own pivot, exactly like the
+castor on an office chair or the front wheel of a bicycle.
+
+![The front axle of a vintage car: a solid beam axle with the kingpin and steering knuckle at the
+wheel end, connected by a track rod](car-front-axle-kingpin.jpg)
+
+*The same job done properly: a car's front axle, with the kingpin and steering knuckle at the wheel
+end and the track rod running across to the other wheel. The tilt built into that pin is what makes
+the steering self-centring. Photo by Dr.-Ing. S. Wetzel of an exhibit in the August Horch Museum,
+Zwickau, [via Wikimedia Commons](https://commons.wikimedia.org/wiki/File:VorAchseHorchZwickau.jpg),
+resized, copyrighted free use.*
+
+The effect has a name: **self-aligning torque**. Any deviation from straight-ahead generates a force
+that pulls the wheel back towards the centre, and the vehicle-level property it produces is called
+**directional stability**. Let go of the steering wheel and it returns to centre on its own. No
 sensor measures that error and no controller corrects it: the geometry is chosen so that the physics
 does the work. The machine is trying to keep you safe, not through lots of active control, but by
 its very shape.
-
-![Castor angle: a tilted steering axis meeting the road at a different point from the tyre's contact
-patch](castor-angle.svg){ width="320" }
-
-*Castor angle. The red line is the steering axis — solid where the axle itself lies, dashed where it
-is extended — and because it is tilted it meets the road at a different point from where the tyre
-touches down. That offset is what makes the wheel trail its own pivot, and what pulls it straight.
-Diagram by [Ktims](https://commons.wikimedia.org/wiki/File:Caster_angle.svg), public domain.*
 
 That is what we want from the forecasting service. Wherever we can manage it, sensible behaviour
 under disturbance should fall out of how the system is built, rather than being watched for and
 corrected by machinery bolted on around it.
 
-## The incumbent is the floor
+## NGED's incumbent forecast is the floor
 
 [NGED's incumbent forecast](../background/nged-incumbent-forecast.md) assembles 13 historical
 analogues at the same time-of-day on the same weekday — 6 from the last 6 weeks, 7 from 49–55 weeks

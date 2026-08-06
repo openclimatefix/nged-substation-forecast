@@ -483,7 +483,8 @@ cheap experiments are too for any project that is doing research rather than onl
 model.
 Principle 1 ("*the power forecast never stops*") is the contingent one: it is downstream of the fact
 that [an outage is cheap here](../background/requirements.md#uptime-lenient-by-design) and that
-[the incumbent forecast is a floor beneath us](inherent-stability.md#the-incumbent-is-the-floor); a
+[the incumbent forecast is a floor beneath us](inherent-stability.md#ngeds-incumbent-forecast-is-the-floor);
+a
 system where a wrong-but-confident forecast costs real money — a trading desk, a control-room feed —
 should invert it and fail closed. And the push-work-to-the-engine and new-technology principles are
 general.
