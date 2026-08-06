@@ -4,7 +4,7 @@ This page states what we claim Flexpectation's engineering will achieve, how eac
 and what would falsify it. It is deliberately written as a set of **hypotheses with numbers**
 rather than a set of aims.
 
-Its counterpart is the [design principles](architecture/overview.md#design-principles) list — the
+Its counterpart is the [design principles](design-principles.md) list — the
 bets we are making in order to achieve the hypotheses below. The relationship between the two, and
 the admission test it implies, are stated at the top of that list.
 
@@ -57,9 +57,9 @@ from NIA reports, so **append, never renumber**.
 > Manual attention is needed only when an upstream input format changes. The service degrades
 > gracefully and legibly, and it propagates uncertainty faithfully.
 
-The design that is meant to deliver this is [Inherent Stability](architecture/inherent-stability.md).
+The design that is meant to deliver this is [Inherent Stability](inherent-stability.md).
 The background argument for *why* leniency is affordable is
-[Uptime: lenient by design](background/requirements.md#uptime-lenient-by-design) — but note that
+[Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design) — but note that
 this is a defensive argument (an outage does not cost much) whereas H1 is a stronger positive claim
 (interventions will be rare). The positive claim is the one actually in dispute, and a sceptic is
 not moved by "it's fine when it breaks".
@@ -86,7 +86,7 @@ the first scoring, but any change must be recorded here.
 > experiments in a month.
 
 The requirement this comes from is
-[ML experimentation at scale](background/requirements.md#ml-experimentation-at-scale).
+[ML experimentation at scale](../background/requirements.md#ml-experimentation-at-scale).
 
 **T2.1 — Experiment throughput.** Registered leaderboard experiments per person per month, taken
 from MLflow run timestamps. Two framing choices are deliberate.
@@ -107,12 +107,12 @@ never to redefine T2.1.
 
 **T3.1 — Promotion effort.** Commands required to get from "the leaderboard says X won" to "X is
 serving", following the runbook. The mechanism already exists (the `promoted_model` asset — see
-[Production Deployment](architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script));
+[Production Deployment](../architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script));
 what is missing is a runbook that pins down what counts as one command.
 
 **T3.2 — Rollback effort.** Commands required to get from "X is serving" back to the previous
 champion. Promotion without rollback is not safe at any speed, and rollback is the damping half of
-[inherent stability](architecture/inherent-stability.md#the-rules) — so this is not the optional
+[inherent stability](inherent-stability.md#the-rules) — so this is not the optional
 half of H3.
 
 ## H4 — it runs for pocket money
@@ -121,7 +121,7 @@ half of H3.
 
 This is probably the most transferable finding of the set, and it is a second, independent answer to
 the worry that a service like this needs a devops team. The estimates it is pinned to are in
-[AWS Running Costs](architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
+[AWS Running Costs](../architecture/aws-costs.md): ~£25–35/month at v1 and a projected ~£70–140/month
 at v2. The thresholds sit above those estimates deliberately, so that the hypothesis is a claim
 about the architecture rather than a restatement of the spreadsheet.
 
@@ -134,9 +134,9 @@ backtest on AWS is bounded at well under £1 per run at v1 scale — all inside 
 > An NGED operator can run the service day to day from the runbooks alone.
 
 This is already designed as the **operator contract** in
-[Handover to NGED](roadmap/handover.md#1-the-operator-contract) — an enumeration of roughly ten or
+[Handover to NGED](../roadmap/handover.md#1-the-operator-contract) — an enumeration of roughly ten or
 fewer actions the operator is ever expected to take. Framing it as a hypothesis turns the
-[game days](roadmap/handover.md#6-game-days-and-in-person-training) into a measurement rather than
+[game days](../roadmap/handover.md#6-game-days-and-in-person-training) into a measurement rather than
 purely a training exercise.
 
 **T5.1 — Operability by a non-expert.** During the game days, the NGED operator recovers from each

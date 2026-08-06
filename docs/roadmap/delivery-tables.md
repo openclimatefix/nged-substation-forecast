@@ -87,9 +87,9 @@ that a forecast is degraded: it is the only number the consumer is certain to re
 be left to the warnings table alone. The mechanism is conformal calibration **per degradation
 regime**, which works with today's XGBoost and needs no retraining
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
-[Inherent Stability → Widening bands](../architecture/inherent-stability.md#widening-bands-the-in-band-signal),
+[Inherent Stability → Widening bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal),
 and whether it worked is measured by
-[T1.3](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+[T1.3](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations
 
@@ -182,10 +182,10 @@ Join `power_forecast_warnings` to `power_forecast` on `time_series_id` **and**
 **Why `warning_source`.** This table is the channel aimed at **data providers**, and a warning is
 only actionable if it names whose feed broke and since when — "the weather feed was delayed" cannot
 be chased, but "the 2026-08-03 00Z ECMWF run never arrived" can. See
-[Inherent Stability → Three audiences, three channels](../architecture/inherent-stability.md#three-audiences-three-channels).
+[Inherent Stability → Three audiences, three channels](../design-philosophy/inherent-stability.md#three-audiences-three-channels).
 `STALE NWP` should be raised on **missed runs**, not on raw NWP age — healthy NWP is legitimately
 12–30 hours old depending on the slot
-([why age is not a health signal](../architecture/inherent-stability.md#three-audiences-three-channels)).
+([why age is not a health signal](../design-philosophy/inherent-stability.md#three-audiences-three-channels)).
 
 **`warning_type` enum values** (mostly mutually exclusive — there is a hierarchy: a meter error
 blinds us to all other errors at that timestep; a generator/circuit fault blinds us to reduced

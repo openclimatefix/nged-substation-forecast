@@ -166,7 +166,7 @@ The differentiable-physics candidate has a structural advantage here, and it sho
 judging: a physical forward model
 [degrades most gracefully of all](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing)
 — an absent input is replaced with a prior or a physical bound, with no branching and no fallback
-path. The wider principle is [Inherent Stability](../architecture/inherent-stability.md).
+path. The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
 
 ### Keeping weather bias out of capacity
 

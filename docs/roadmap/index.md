@@ -87,7 +87,7 @@ AWS — see [Live service](live-service.md).
 - Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
   ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) — every
   production asset has a check except the one NGED consume
-- Start the [intervention log](../engineering-hypotheses.md#the-intervention-log)
+- Start the [intervention log](../design-philosophy/engineering-hypotheses.md#the-intervention-log)
   ([#435](https://github.com/openclimatefix/nged-substation-forecast/issues/435)); its measurement
   window opens at v1.0, but it cannot be reconstructed retrospectively
 
@@ -153,7 +153,7 @@ which builds directly on the lead-time-feature and ensemble-member-training wins
 backlog.
 
 It also carries the **degradation** half of the
-[inherent-stability](../architecture/inherent-stability.md) work, which is gated on that same
+[inherent-stability](../design-philosophy/inherent-stability.md) work, which is gated on that same
 quantile pipeline:
 
 - Degradation-conditional interval calibration — conformal prediction per regime
@@ -242,7 +242,7 @@ forecast-skill milestones above. Items so far:
   detection, shadow deployment of a challenger model, a schema-evolution policy for the delivery
   contract (which may need pulling forward to v0.6), statistical process control on forecast
   error, and naming *poka-yoke* among the
-  [design principles](../architecture/overview.md#design-principles). A holding issue: the task is
+  [design principles](../design-philosophy/design-principles.md). A holding issue: the task is
   to consider them once the live service has run for a while, not a commitment to build them.
 
 ---

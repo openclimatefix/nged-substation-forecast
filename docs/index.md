@@ -43,7 +43,7 @@ can use it as evidence to justify investing in extracting switching-event labels
 operational systems, rather than us silently working around the gap.
 
 The same logic applies to the engineering, which is why our claims about it are written down as
-falsifiable [engineering hypotheses](engineering-hypotheses.md) with thresholds attached: a
+falsifiable [engineering hypotheses](design-philosophy/engineering-hypotheses.md) with thresholds attached: a
 pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
 short of is not.
 
@@ -51,11 +51,11 @@ A further aim runs alongside the forecasting itself: to gather **industry best p
 single codebase for energy forecasting** — and deliberately not only best practice from the
 energy-forecasting industry. Some of the most useful ideas here are borrowed from disciplines that
 have been solving the same shape of problem for far longer than data engineering has existed. The
-[inherent stability](architecture/inherent-stability.md) that shapes how the service behaves when its
+[inherent stability](design-philosophy/inherent-stability.md) that shapes how the service behaves when its
 inputs degrade is taken from vehicle dynamics; the fail-operational posture comes from avionics; the
 discipline of confining any failure to the partition it happened in — its *blast radius* — comes
 from site reliability engineering. The
-[design principles](architecture/overview.md#design-principles) list collects them, states what each
+[design principles](design-philosophy/design-principles.md) list collects them, states what each
 one actually decided, and names the ones we considered and declined. Articulating and refining that
 list is itself intended as a transferable output of the project.
 
@@ -65,10 +65,9 @@ list is itself intended as a transferable output of the project.
 > walkthrough from a fresh clone to a running Dagster instance that downloads data and trains a
 > model.
 
-- [Engineering Hypotheses](engineering-hypotheses.md) — what we claim the engineering will achieve, the threshold that decides each claim, and what would falsify it
+- [Design Philosophy](design-philosophy/index.md) — the portable *why*: the design principles, the falsifiable engineering hypotheses that score them, and the inherent-stability argument in full
 - [Background & Challenges](background/network.md) — NGED's network, project requirements, and data quality challenges
-- [Architecture Overview](architecture/overview.md) — design philosophy, technical components, and data flow
-- [Inherent Stability](architecture/inherent-stability.md) — how the service behaves as its inputs degrade: the degradation ladder, the failure modes, and the rules to follow when changing production code
+- [Architecture Overview](architecture/overview.md) — what is actually built: technical components and data flow
 - [Performance and Scale](architecture/performance.md) — the measured performance engineering: storage formats, lazy evaluation, memory bounds, and Polars' row-index ceiling
 - [Code Style](architecture/code-style.md) — code conventions
 - [Testing](architecture/testing.md) — how the test suite is wired, the house style, and the notable test suites

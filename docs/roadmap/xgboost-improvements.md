@@ -44,7 +44,7 @@ thereby behave like a weather-blind model; making it beat the incumbent during a
 outage-shaped training data, not NaN routing. And the chronic per-pixel nulls in the de-accumulated
 ECMWF variables are the one case where the guarantee genuinely holds, because they appear in every
 training run — so they should be left alone rather than imputed. See
-[Inherent Stability → Default directions, and their limit](../architecture/inherent-stability.md#default-directions-and-their-limit).
+[Inherent Stability → Default directions, and their limit](../design-philosophy/inherent-stability.md#default-directions-and-their-limit).
 
 ## Tier 1 — config-level changes (hours each)
 

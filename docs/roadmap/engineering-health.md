@@ -141,7 +141,7 @@ testing strategy remain unwritten, plus general cleanup.
   land alongside it rather than against an ad-hoc vocabulary of their own. They are cheap and
   CI-fast — pure functions over an `AllFeatures` frame, no MLflow — and they check *survival*, not
   skill; skill under degradation is the leaderboard's job. The principle they enforce is
-  [Inherent Stability](../architecture/inherent-stability.md).
+  [Inherent Stability](../design-philosophy/inherent-stability.md).
 
 **Part 2 — cleanup:**
 

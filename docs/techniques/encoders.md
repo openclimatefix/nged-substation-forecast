@@ -71,7 +71,7 @@ calibrated for a world it does not live in, and the miscalibration shows up as o
 predictions during a real outage — the worst possible moment. Use **structured, outage-shaped**
 dropout drawn from the same failure-scenario vocabulary the rest of the project scores against.
 
-See [Inherent Stability](../architecture/inherent-stability.md) for the whole principle.
+See [Inherent Stability](../design-philosophy/inherent-stability.md) for the whole principle.
 
 ## What the encoders do *not* need to learn
 

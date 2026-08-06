@@ -2,10 +2,10 @@
 
 > **We never stop answering. We get less certain instead — and we say so in the answer itself.**
 
-This page is the design philosophy behind how Flexpectation behaves when its inputs degrade. It is
-the *how* behind [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
-hypothesis that the service mostly runs itself — and it is the first and largest of the project's
-[design principles](overview.md#design-principles). [The rules](#the-rules) below are the
+This page argues in full the first and largest of the project's
+[design principles](design-principles.md): how Flexpectation behaves when its inputs degrade. It is
+the *how* behind [H1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
+hypothesis that the service mostly runs itself. [The rules](#the-rules) below are the
 fine-grained form of principles 1 and 2 in that list.
 
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
@@ -103,7 +103,8 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 ## The rules
 
 These are the imperative form of everything above. When in doubt while changing production code,
-follow these.
+follow these. Rules 1, 2 and 8 restate [principles 1, 4 and 2](design-principles.md) in imperative
+form so that this checklist stands alone; if you change one, change both.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
    record the degradation on the row. Reserve raising for states that are our own bug — an empty
@@ -161,7 +162,7 @@ Two qualifiers keep it honest.
 
 It does not license unbounded training complexity, either: a training harness nobody can run is also
 a production risk, because
-[H2 and H3](../engineering-hypotheses.md#the-claims) depend on retraining staying cheap and
+[H2 and H3](engineering-hypotheses.md#the-claims) depend on retraining staying cheap and
 promotion staying one command.
 
 ## Mechanisms
@@ -271,7 +272,7 @@ Our missingness comes in two kinds, and the distinction decides what has to be e
 `downward_short_wave_radiation_flux_surface` and `downward_long_wave_radiation_flux_surface` — are
 legitimately null at lead-0 in *every* run, and beyond lead-0 carry scattered per-pixel nulls rooted
 in corrupt ECMWF source accumulation. See
-[Known ECMWF ENS Data-Quality Issues](ecmwf-ens-known-issues.md) for the full account. This is
+[Known ECMWF ENS Data-Quality Issues](../architecture/ecmwf-ens-known-issues.md) for the full account. This is
 element-wise rather than blocky, but it is present in every training run, so it is in-distribution —
 the one case where "XGBoost handles the missingness it saw during training" genuinely holds. It
 needs no scenario, and the main risk is that someone later "fixes" it by imputing.
@@ -323,7 +324,7 @@ is sharper:
 
 The Patito contracts layer is the strict half, and it is what stops inherent stability from decaying
 into "accept anything and hope". See
-[Forecast Delivery → Strict data contracts](forecast-delivery.md#strict-data-contracts-machine-verifiable).
+[Forecast Delivery → Strict data contracts](../architecture/forecast-delivery.md#strict-data-contracts-machine-verifiable).
 
 ### Not blast radius
 
@@ -369,7 +370,7 @@ Borrowed terms, and how well each one fits.
 
 ## See also
 
-- [Engineering Hypotheses](../engineering-hypotheses.md) — the falsifiable claims this design is
+- [Engineering Hypotheses](engineering-hypotheses.md) — the falsifiable claims this design is
   meant to deliver, and how each is tested.
 - [Requirements → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design)
   — why an outage costs so little, which is what makes a fail-open posture affordable.

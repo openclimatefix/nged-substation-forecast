@@ -53,7 +53,7 @@ This makes missingness robustness a **design requirement of any DP estimator we 
 nice-to-have: the priors and bounds substituted for each absent input have to be chosen
 deliberately, and the estimator's uncertainty must widen honestly when it leans on them. It is
 scored that way in the [capacity-estimation head-to-head](../roadmap/capacity-estimation.md#robustness-to-missing-inputs).
-The wider principle is [Inherent Stability](../architecture/inherent-stability.md).
+The wider principle is [Inherent Stability](../design-philosophy/inherent-stability.md).
 
 ## The core idea: inversion through a differentiable forward model
 

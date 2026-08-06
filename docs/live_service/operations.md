@@ -145,7 +145,7 @@ task definition at the tag — see
 that was previously deployed avoids the rebuild.
 
 This path works today but is not yet one command, which is what
-[T3.2](../engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) measures.
+[T3.2](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) measures.
 
 ## Degraded input data — NWP feed down, or telemetry stalled
 
@@ -153,7 +153,7 @@ This path works today but is not yet one command, which is what
 
 The service is designed to keep answering as its inputs degrade rather than to stop — the
 reasoning, and the ladder of degradation states, are in
-[Inherent Stability](../architecture/inherent-stability.md). None of the situations below is a
+[Inherent Stability](../design-philosophy/inherent-stability.md). None of the situations below is a
 same-day emergency; all are next-business-day fixes.
 
 **Reading the freshness check.** `power_data_is_fresh` runs against
@@ -191,7 +191,7 @@ series is *not* a data outage — it is a promotion bug, and it is meant to fail
 ([above](#rolling-back-to-the-previous-champion)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for
-[T1.1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): record the date, the
+[T1.1](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself): record the date, the
 trigger, the cause, the minutes spent, and whether this runbook covered it. A gap in this page is
 itself the finding.
 

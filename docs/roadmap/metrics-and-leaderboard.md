@@ -764,7 +764,7 @@ explicit day-of-week-aware modelling of the run-up until there is evidence it mo
 > **Status: 🚧 Planned (v0.3).** Nothing scores a model under degraded inputs today, which means a
 > v0.5 champion would be picked on clean-data skill alone.
 
-The [inherent-stability principle](../architecture/inherent-stability.md) claims that the service
+The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the service
 keeps beating NGED's incumbent forecast as its inputs degrade. That claim is only worth anything if
 it is *scored*, so degradation becomes a dimension of the leaderboard rather than an aspiration in a
 design document.
@@ -775,7 +775,7 @@ metadata — on the order of ten to twenty realistic regimes rather than a combi
 Only the *episodic* class needs enumerating; the chronic per-pixel null scatter in the
 de-accumulated ECMWF variables is present in every training run and so is already in-distribution
 (see
-[Inherent Stability → Missingness in learned models](../architecture/inherent-stability.md#missingness-in-learned-models)).
+[Inherent Stability → Missingness in learned models](../design-philosophy/inherent-stability.md#missingness-in-learned-models)).
 The vocabulary is a **contract**: it is stamped onto every metrics row, so changing it later
 invalidates historical comparisons.
 
@@ -790,7 +790,7 @@ consumes no NWP and is indifferent to recent telemetry staleness, so it barely d
 makes it the honest bar to clear, and a far better failure criterion than any arbitrary staleness
 threshold. Concretely: at rungs 0–2 of the degradation ladder, every time series should still emit
 a forecast, and that forecast should still beat `nged_incumbent`. That is
-[T1.2](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself); the interval-calibration
+[T1.2](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself); the interval-calibration
 counterpart, PICP within tolerance in every regime, is T1.3.
 
 This suite is shared machinery: the same transforms drive the CI degradation smoke-tests in
