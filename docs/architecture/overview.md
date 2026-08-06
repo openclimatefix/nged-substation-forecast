@@ -10,7 +10,7 @@ The system is designed as a modular monorepo using [uv workspaces](https://docs.
 
 ## Design principles
 
-Ten principles govern the decisions on the rest of this page and across `architecture/`. They are
+Eleven principles govern the decisions on the rest of this page and across `architecture/`. They are
 deliberately short here and link out to the page that argues each one in full — this is an index,
 not the argument.
 
@@ -130,27 +130,42 @@ are merely hoping comes true.
    [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
    [Lazy Evaluation Strategy](#lazy-evaluation-strategy).
 
-10. **Measure; do not assume — and add no technology we do not already run.** Performance, size and
-    cost claims are benchmarked on real data through the real code path before they are believed.
-    Separately but relatedly, the operable surface is kept deliberately small: every additional
-    service is something to deploy, monitor, secure, upgrade, document and hand over.
-    *Decided:* `BYTE_STREAM_SPLIT` is used for `power_fcst` and *not* for NWP, because it measured
-    worse there; delivery to NGED reuses the Delta-on-S3 stack we already operate rather than adding
-    a REST API. *Serves:*
+10. **Measure; do not assume.** Performance, size and cost claims are benchmarked on real data,
+    through the real code path, before they are believed — and the measurement is written down next
+    to the decision it justified, so a later reader can tell which numbers are still true.
+    *Decided:* `BYTE_STREAM_SPLIT` is used for `power_fcst` but deliberately *not* for NWP, because
+    it measured *worse* there; the NWP scan-pruning rules were each verified with
+    `LazyFrame.explain()` rather than reasoned about. *Serves:*
+    [H4](../engineering-hypotheses.md#h4-it-runs-for-pocket-money),
+    [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+    [Core Components](#core-components) (the measured storage-format numbers),
+    [Bounding feature-engineering memory](#bounding-feature-engineering-memory-prune-the-inputs-not-the-output).
+
+11. **A new technology must earn its place against one we already operate.** This is a burden of
+    proof, not a ban: where something we already run does the job, use it; where it genuinely does
+    not, adopt the new thing deliberately and write down what it bought. The reason for the asymmetry
+    is that every additional service is one more thing to deploy, monitor, secure, upgrade, document
+    and eventually hand over to NGED — a cost that is paid forever and is easy to overlook at the
+    moment of adoption.
+    *Decided:* delivery to NGED reuses the Delta-on-S3 stack we already operate rather than adding a
+    REST API — and the REST API is not rejected forever, it has a documented set of conditions under
+    which it would earn its keep. We *did* adopt Delta Lake, Dagster, MLflow, Marimo and Sentry, each
+    for a stated reason recorded at the time. *Serves:*
     [H4](../engineering-hypotheses.md#h4-it-runs-for-pocket-money),
     [H5](../engineering-hypotheses.md#h5-operable-by-a-non-expert). *Detail:*
     [An established industry pattern](forecast-delivery.md#an-established-industry-pattern),
     [When would a REST API earn its keep?](forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
     [Considered but rejected designs](production-deployment.md#considered-but-rejected-designs).
 
-**Deliberately absent.** We have **no availability SLO and no error budget**, which is standard SRE
-practice we have consciously declined: the requirement is recovery "next business day, via runbook",
-and the reasoning is in
+**Deliberately absent.** We have **no availability service-level objective (SLO) and no error
+budget** — the pair of SRE practices that would normally quantify "how much downtime is acceptable"
+and then spend that allowance deliberately. We have consciously declined both: the requirement is
+recovery "next business day, via runbook", and the reasoning is in
 [Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design). Recording the
-rejection is the point — a principle we decided against is more useful to a reader than one we never
-considered.
+rejection is the point — a practice we considered and declined is more useful to a reader than one we
+never considered.
 
-**How to use this list.** A proposed change should be checkable against these ten: if it violates
+**How to use this list.** A proposed change should be checkable against these eleven: if it violates
 one, that is not a veto, but it does require saying which principle is being traded away and what is
 bought in return. And a principle that stops deciding anything should be deleted rather than left as
 decoration — the same discipline the hypotheses page applies to its thresholds.

@@ -122,7 +122,7 @@ must also:
 
 This is a `uv` workspace monorepo. The root `src/nged_substation_forecast/` is the Dagster application; all reusable logic lives in `packages/`.
 
-**Ten design principles** govern architectural decisions:
+**Eleven design principles** govern architectural decisions:
 [`docs/architecture/overview.md` → Design principles](docs/architecture/overview.md#design-principles).
 Read them before proposing a structural change. If a change violates one, that is not a veto, but
 say which principle is being traded away and what is bought in return.
