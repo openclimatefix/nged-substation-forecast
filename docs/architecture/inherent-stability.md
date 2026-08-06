@@ -4,7 +4,9 @@
 
 This page is the design philosophy behind how Flexpectation behaves when its inputs degrade. It is
 the *how* behind [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — the
-hypothesis that the service mostly runs itself.
+hypothesis that the service mostly runs itself — and it is the first and largest of the project's
+[design principles](overview.md#design-principles). [The rules](#the-rules) below are the
+fine-grained form of principles 1 and 2 in that list.
 
 **Scope.** The principle and the mechanisms that already exist are described here. Mechanisms that
 are designed but not yet built are **linked, not copied** — they live in

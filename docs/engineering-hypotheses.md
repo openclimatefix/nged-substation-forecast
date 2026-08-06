@@ -4,6 +4,13 @@ This page states what we claim Flexpectation's engineering will achieve, how eac
 and what would falsify it. It is deliberately written as a set of **hypotheses with numbers**
 rather than a set of aims.
 
+Its counterpart is the [design principles](architecture/overview.md#design-principles) list.
+Principles are constraints on *decisions* and can only be overridden or found not to be
+load-bearing; hypotheses are claims about *outcomes* and can be falsified by measurement. The
+principles are the bets we are making in order to achieve the hypotheses below, so every principle
+names the hypothesis it serves — and a hypothesis with no principle behind it is a claim we are
+merely hoping comes true.
+
 ## Why hypotheses rather than aims
 
 Three reasons.

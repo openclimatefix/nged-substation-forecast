@@ -47,6 +47,18 @@ falsifiable [engineering hypotheses](engineering-hypotheses.md) with thresholds 
 pre-registered number we then miss is a transferable finding, whereas an aspiration we quietly fall
 short of is not.
 
+A further aim runs alongside the forecasting itself: to gather **industry best practice into a
+single codebase for energy forecasting** — and deliberately not only best practice from the
+energy-forecasting industry. Some of the most useful ideas here are borrowed from disciplines that
+have been solving the same shape of problem for far longer than data engineering has existed. The
+[inherent stability](architecture/inherent-stability.md) that shapes how the service behaves when its
+inputs degrade is taken from vehicle dynamics; the fail-operational posture comes from avionics; the
+habit of designing an interface so the wrong thing is impossible rather than merely discouraged
+comes from manufacturing. The
+[design principles](architecture/overview.md#design-principles) page collects them, states what each
+one actually decided, and names the ones we considered and rejected. Articulating and refining that
+list is itself intended as a transferable output of the project.
+
 ## Documentation
 
 > **Want to run this on your laptop?** Start with [Getting started](getting-started.md) — a single

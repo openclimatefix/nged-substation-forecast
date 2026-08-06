@@ -1,14 +1,162 @@
 # Architecture Overview
 
-The architecture prioritises developer velocity, idempotent re-runs, and strict **Training-Serving Symmetry**.
-
-One further design principle is large enough to have its own page: **[Inherent Stability](inherent-stability.md)** — when inputs degrade, the service gets less certain rather than stopping, and says so in the answer itself. That page carries the degradation ladder, the failure-mode table, and the numbered rules to follow when changing production code.
+The architecture prioritises developer velocity, idempotent re-runs, and strict **Training-Serving Symmetry**. The [design principles](#design-principles) below are the short version; the rest of this page, and the rest of `architecture/`, is the detail behind them.
 
 The primary aim is to develop novel, ambitious, state-of-the-art ML approaches to forecasting. We are simultaneously building a "test-harness" production service so that ML research runs in a production-like environment from day one.
 
 The aim is to manage the *entire* data pipeline in Dagster: download data, validate data, train ML models, run inference, perform backtests. MLflow tracks every experiment. Re-running a backtest should be as easy as clicking a button in Dagster. Swapping a new model into production should require minimal friction.
 
 The system is designed as a modular monorepo using [uv workspaces](https://docs.astral.sh/uv/concepts/projects/workspaces/), with [Dagster](https://dagster.io/) orchestrating the data pipeline and [MLflow](https://mlflow.org/) tracking experiments.
+
+## Design principles
+
+Ten principles govern the decisions on the rest of this page and across `architecture/`. They are
+deliberately short here and link out to the page that argues each one in full — this is an index,
+not the argument.
+
+**Where they come from.** A stated aim of this project is to gather **industry best practice into a
+single codebase for energy forecasting** — and not only best practice from the energy-forecasting
+industry. Several of the principles below are borrowed from disciplines that have been solving the
+same shape of problem for longer than data engineering has existed: *inherent stability* comes from
+vehicle dynamics, *fail-operational* from avionics autoland and ISO 26262, *blast radius* and *error
+budgets* from site reliability engineering, *poka-yoke* (mistake-proofing) from manufacturing.
+Borrowing across disciplines is the point, not a flourish: a discipline that has been shipping
+safety-critical systems for fifty years has usually already made the mistake we are about to make.
+Where a borrowed term does not fit cleanly, we say so and disown it — Postel's law is named on the
+[Inherent Stability](inherent-stability.md#not-postels-law) page precisely so that nobody mistakes it
+for what we do.
+
+**How these relate to the [engineering hypotheses](../engineering-hypotheses.md).** Principles are
+constraints on *decisions*; hypotheses are claims about *outcomes*. A hypothesis can be falsified by
+measurement, whereas a principle can only be overridden by a measurement or found not to be
+load-bearing. The two are connected in one direction: the principles are the bets we are making in
+order to achieve the hypotheses. That gives a test for admission to this list — **name the hypothesis
+it serves and a decision it actually decided**. A principle serving no hypothesis is either
+decoration or a sign of a missing hypothesis; a hypothesis with no principle behind it is a claim we
+are merely hoping comes true.
+
+1. **The forecast never stops. It gets less certain instead — and says so in the answer itself.**
+   When inputs degrade, the system's normal path already moves toward a sensible, wider, still-true
+   answer, rather than raising. Raising is reserved for states that are our own bug.
+   *Decided:* every asset check in the repo is non-blocking `WARN`; there is deliberately no
+   `ERROR`-severity check anywhere. *Serves:*
+   [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). *Detail:*
+   [Inherent Stability](inherent-stability.md), whose [ten rules](inherent-stability.md#the-rules)
+   are the fine-grained form of this principle.
+
+2. **Complexity belongs offline, not in the serving path.** When a capability could be built into
+   the training loop or into the production service, build it into the training loop: training runs
+   in front of a human who can read the traceback, whereas the service runs unattended on the day
+   the inputs are strangest. Note that this *relocates* a branch rather than removing it — a model
+   that "handles anything" holds the same branch internally as a learned default direction — so it
+   is only safe to lean on once a failure-scenario suite exists to measure the result.
+   *Decided:* `promoted_model` copies the champion to local disk, so production inference makes no
+   MLflow call at all. *Serves:*
+   [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+   [H3](../engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback). *Detail:*
+   [Where complexity should live](inherent-stability.md#where-complexity-should-live),
+   [Bake the model into the image](production-deployment.md#bake-the-model-into-the-image-at-build-time).
+
+3. **One execution path from research to production.** The artifact that won the experiment *is* the
+   artifact we deploy — not a re-implementation of it. There is no "now rewrite the research code for
+   production" step, because every experiment already runs on the production pipeline.
+   *Decided:* this was the deciding argument for Dagster over Airflow, and it is why splitting the
+   live service onto a second orchestrator remains rejected. *Serves:*
+   [H2](../engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
+   [H3](../engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback). *Detail:*
+   [Nothing gets rewritten on the way to production](../ml_experimentation/mlops-approach.md#nothing-gets-rewritten-on-the-way-to-production),
+   [Why Dagster, not Airflow?](why-dagster-not-airflow.md).
+
+4. **Strict contracts at every boundary — liberal about missing inputs, strict about malformed
+   ones.** Every tabular boundary is a Patito schema, validated rather than assumed. This is the
+   deliberate *opposite* of Postel's law, and it is what stops principle 1 from decaying into
+   "accept anything and hope".
+   *Decided:* `AllFeatures`, `PowerForecast` and the rest are validated schemas rather than
+   conventions, and every `PowerForecast` row is self-describing. *Serves:*
+   [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+   [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+   [Strict data contracts](forecast-delivery.md#strict-data-contracts-machine-verifiable),
+   [Not Postel's law](inherent-stability.md#not-postels-law).
+
+5. **Reject structurally-broken data; tolerate locally-corrupt data a model can absorb.** The
+   granularity of rejection matters as much as the strictness. Throwing away an otherwise-good NWP
+   run because a few percent of its pixels are null would convert a tolerable problem into an
+   outage; failing to reject a wholly-broken slice would let silent corruption through.
+   *Decided:* `Nwp.validate` fails a run only on a *whole-slice* null in a de-accumulated variable,
+   and merely warns on scattered per-pixel nulls — which usefully converts fine-grained catastrophe
+   into a coarse-grained missed run, the form principle 1 already handles. *Serves:*
+   [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). *Detail:*
+   [The guiding principle](ecmwf-ens-known-issues.md#the-guiding-principle).
+
+6. **Every comparison must differ in exactly one thing.** A leaderboard is only worth having if two
+   numbers on it are genuinely comparable, which requires the population, the folds, the metric
+   definitions and the pipeline to be held constant by construction rather than by discipline.
+   *Decided:* fold eligibility is derived from data coverage alone and **never** from the model or
+   config; a fold enters the leaderboard only once its validation window is complete; a new data
+   source is assessed by a controlled ablation before it may enter the leaderboard at all. *Serves:*
+   [H2](../engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month). *Detail:*
+   [Eligibility](../ml_experimentation/cross-validation-folds.md#eligibility),
+   [Complete validation windows only](ml-orchestration.md#complete-validation-windows-only),
+   [Evaluating new data sources](../ml_experimentation/evaluating-new-data-sources.md).
+
+7. **Provenance travels with the data.** Every row carries enough to say where it came from, so a
+   forecast can be explained, reproduced or invalidated without an external lookup.
+   *Decided:* `PowerForecast` carries `nwp_init_time`, model name and version, experiment name and
+   MLflow experiment id; every MLflow run is stamped with the git SHA and the Delta table versions
+   it read. *Serves:*
+   [H2](../engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month),
+   [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+   [Two metric stores](ml-orchestration.md#two-metric-stores-one-division-of-labour),
+   [The Universal Model Interface](#the-universal-model-interface).
+
+8. **Every write is idempotent, and every failure is confined to one partition.** Re-running
+   anything must be safe, and a failure must not be able to spread beyond the partition it happened
+   in. Note that this is a *blast-radius* property — how much fails — which is a different axis from
+   principle 1, which is about which *way* a thing fails.
+   *Decided:* re-materialising a fold overwrites its `(experiment_name, fold_id)` partition rather
+   than appending, so a retry cannot silently double-count; parallel experiments write to disjoint
+   partition directories and never touch each other. *Serves:*
+   [H1](../engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself),
+   [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+   [Idempotent writes and concurrency](ml-orchestration.md#idempotent-writes-and-concurrency),
+   [Serve only the trained population](production-deployment.md#serve-only-the-trained-population).
+
+9. **Push the work down to the engine; materialise once, as late as possible.** No code between
+   storage and the model boundary may call `.collect()`, so the query engine sees the whole plan and
+   prunes the scan before any data crosses the wire. At this data scale the alternative is not slow,
+   it is impossible.
+   *Decided:* input pruning plus `init_time` chunking keeps a full 51-member validation prediction
+   (~321M rows) under 9 GB on a laptop. *Serves:*
+   [H6](../engineering-hypotheses.md#h6-scale-without-redesign). *Detail:*
+   [Lazy Evaluation Strategy](#lazy-evaluation-strategy).
+
+10. **Measure; do not assume — and add no technology we do not already run.** Performance, size and
+    cost claims are benchmarked on real data through the real code path before they are believed.
+    Separately but relatedly, the operable surface is kept deliberately small: every additional
+    service is something to deploy, monitor, secure, upgrade, document and hand over.
+    *Decided:* `BYTE_STREAM_SPLIT` is used for `power_fcst` and *not* for NWP, because it measured
+    worse there; delivery to NGED reuses the Delta-on-S3 stack we already operate rather than adding
+    a REST API. *Serves:*
+    [H4](../engineering-hypotheses.md#h4-it-runs-for-pocket-money),
+    [H5](../engineering-hypotheses.md#h5-operable-by-a-non-expert). *Detail:*
+    [An established industry pattern](forecast-delivery.md#an-established-industry-pattern),
+    [When would a REST API earn its keep?](forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
+    [Considered but rejected designs](production-deployment.md#considered-but-rejected-designs).
+
+**Deliberately absent.** We have **no availability SLO and no error budget**, which is standard SRE
+practice we have consciously declined: the requirement is recovery "next business day, via runbook",
+and the reasoning is in
+[Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design). Recording the
+rejection is the point — a principle we decided against is more useful to a reader than one we never
+considered.
+
+**How to use this list.** A proposed change should be checkable against these ten: if it violates
+one, that is not a veto, but it does require saying which principle is being traded away and what is
+bought in return. And a principle that stops deciding anything should be deleted rather than left as
+decoration — the same discipline the hypotheses page applies to its thresholds.
+
+For the finer-grained rules that sit underneath these — how to write the code rather than how to
+shape the system — see [Code Style](code-style.md) and [Testing](testing.md).
 
 ## Core Components
 
