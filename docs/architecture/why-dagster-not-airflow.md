@@ -198,7 +198,7 @@ around the Dagster UI and would need rewriting.
 | Per-fold retry and observability | CV layer | Dynamic task mapping (per-instance state, logs, clear; `map_index_template`) | Good on ≥3.1.4 |
 | Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`; conf-dropped bug fixed in 3.2.2 | Good on ≥3.2.2; MWAA (3.2.1) still affected |
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
-| Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`) | power ingest, `ecmwf_ens` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
+| Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`, `live_forecasts_are_healthy`) | power ingest, `ecmwf_ens`, `live_forecasts` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Data-arrival sensors (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest jobs | Asset-triggered DAGs, event-driven scheduling | Parity |
 
@@ -333,11 +333,12 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
   would still live in both tools. The boundary is clean for the operator and leakier for the
   developer.
 - **It moves the fail-open half onto the orchestrator that lacks a fail-open primitive.** Option B
-  ports precisely the half where the non-blocking check matters most: `power_data_is_fresh` and
-  `nwp_has_no_unexpected_nulls` are both production-side, and the warning channel to NGED
-  originates there. Meanwhile the R&D half — which wants fail-fast and would be perfectly content
-  with blocking data-quality tasks — is the half that stays on Dagster. That is backwards with
-  respect to the [inherent-stability](../design-philosophy/inherent-stability.md) design.
+  ports precisely the half where the non-blocking check matters most: `power_data_is_fresh`,
+  `nwp_has_no_unexpected_nulls` and `live_forecasts_are_healthy` are all production-side, and the
+  warning channel to NGED originates there. Meanwhile the R&D half — which wants fail-fast and
+  would be perfectly content with blocking data-quality tasks — is the half that stays on Dagster.
+  That is backwards with respect to the
+  [inherent-stability](../design-philosophy/inherent-stability.md) design.
 - The audit trail fragments: production run history in Airflow, promotion and experiment
   history in Dagster/MLflow.
 - If the deployment target were MWAA at its current version (3.2.1), the backfill-conf bug
