@@ -58,6 +58,19 @@ row counts wrapping past 2³² rows.
   SQLite has closed the database and print a bare `Exception during reset or similar` traceback
   *after* pytest's summary line, owned by no test. The fixture enters the instance as a context
   manager, so `dispose()` runs when the test ends.
+
+  A second, independent failure mode from the same root cause: `TemporaryLocalArtifactStorage`
+  (the artifact storage an ephemeral instance builds when given no `tempdir`) also defers its
+  `tempfile.TemporaryDirectory()` cleanup to `dispose()`, so an undisposed instance's temp
+  directory is left to the garbage collector too — via a `weakref.finalize` callback that can run
+  at any later point in the process, not just at shutdown. On the CI runner's CPython 3.14.7, that
+  GC-triggered path occasionally hit an upstream pathlib/weakref timing bug and turned into a hard
+  pytest failure *attributed to whatever unrelated test's setup happened to be running* when the
+  collector fired (`pytest.PytestUnraisableExceptionWarning`, since `filterwarnings` starts with
+  `error` — see below). One extra bare `DagsterInstance.ephemeral()` call added anywhere in the
+  suite was enough to tip a previously-clean run into failing 2/2 times in CI while never
+  reproducing locally, which is what surfaced this. The fixture's deterministic disposal removes
+  the trigger for both failure modes at once.
 - **In a script, use the context manager directly** — `with DagsterInstance.ephemeral() as
   instance:` — rather than a bare call. Letting the local go out of scope is *not* enough: once the
   instance has actually run a job, Dagster's own caches retain it (a `RunDomain`, and the
