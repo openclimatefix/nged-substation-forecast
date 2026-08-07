@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import ClassVar, Final, Self
+from typing import ClassVar, Final, NamedTuple, Self
 
 import patito as pt
 import polars as pl
@@ -15,6 +15,13 @@ from .common import (
     check_datetime_bounds,
     split_by_datetime_plausibility,
 )
+
+
+class DropImplausibleRowsResult(NamedTuple):
+    """Result of ``PowerTimeSeries.drop_implausible_rows``."""
+
+    survivors: pl.DataFrame
+    n_dropped: int
 
 
 class PowerTimeSeries(pt.Model):
@@ -82,11 +89,12 @@ class PowerTimeSeries(pt.Model):
         return validated_df
 
     @classmethod
-    def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> tuple[pl.DataFrame, int]:
+    def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> DropImplausibleRowsResult:
         """Drop rows with a malformed ``time``, returning ``(survivors, n_dropped)``.
 
-        A row is dropped when its ``time`` lies outside the plausible datetime range, or when it
-        does not fall on the top or bottom of the hour (minute 00 or 30). Both indicate a
+        A row is dropped when its ``time`` lies outside the plausible datetime range, is null (the
+        schema declares ``time`` non-nullable, so a null this early is already malformed), or does
+        not fall on the top or bottom of the hour (minute 00 or 30). All three indicate a
         malformed upstream reading — not a bug in our own pipeline — so under [inherent
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
@@ -106,9 +114,12 @@ class PowerTimeSeries(pt.Model):
             ``(survivors, n_dropped)``. ``survivors`` keeps ``dataframe``'s row order.
         """
         survivors, out_of_range = split_by_datetime_plausibility(dataframe, "time")
-        is_aligned = pl.col("time").dt.minute().is_in([0, 30])
+        # fill_null(False): a null `time` must land in exactly one of {aligned, misaligned}, not
+        # silently vanish from both — `dt.minute().is_in(...)` is null for a null `time`, and
+        # `.filter()` drops a row on both a null predicate and its negation.
+        is_aligned = pl.col("time").dt.minute().is_in([0, 30]).fill_null(False)
         survivors, misaligned = survivors.filter(is_aligned), survivors.filter(~is_aligned)
-        return survivors, out_of_range.height + misaligned.height
+        return DropImplausibleRowsResult(survivors, out_of_range.height + misaligned.height)
 
     # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")

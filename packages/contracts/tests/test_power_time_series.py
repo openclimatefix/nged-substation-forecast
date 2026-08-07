@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import patito as pt
+import polars as pl
 import pytest
 from contracts.common import MAX_PLAUSIBLE_DATETIME, MIN_PLAUSIBLE_DATETIME
 from contracts.power_schemas import PowerTimeSeries
@@ -263,3 +264,29 @@ def test_drop_implausible_rows_empty_frame() -> None:
 
     assert n_dropped == 0
     assert survivors.is_empty()
+
+
+def test_drop_implausible_rows_drops_and_counts_null_time() -> None:
+    """A null `time` must be dropped and counted, not silently vanish from the row accounting.
+
+    Regression test: `dt.minute().is_in(...)` is null for a null `time`, and `.filter()` treats
+    both a null predicate and its negation as False — without an explicit `fill_null`, a null
+    `time` row was excluded from both the "aligned" and "misaligned" partitions and disappeared
+    without being counted in `n_dropped`.
+    """
+    df = pl.DataFrame(
+        {
+            "time_series_id": [123, 123],
+            "time": pl.Series(
+                [None, datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)],
+                dtype=PowerTimeSeries.dtypes["time"],
+            ),
+            "power": [10.0, 20.0],
+        }
+    )
+
+    survivors, n_dropped = PowerTimeSeries.drop_implausible_rows(df)
+
+    assert survivors.height + n_dropped == df.height
+    assert n_dropped == 1
+    assert survivors["time"].to_list() == [datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)]
