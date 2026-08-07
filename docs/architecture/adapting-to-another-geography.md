@@ -1246,25 +1246,18 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 | H3 resolution 5 (~253 km² per cell) chosen for GB, and reached for via a **private** import from the ingest package | `defs/assets.py:40,141` | The NWP grid resolution currently lives inside `nged_data`; see the `PowerIngest` note [below](#how-we-would-structure-it). |
 | `nged_s3_bucket_url` / `_access_key` / `_secret` are **required** settings with no defaults | `contracts/settings.py` | `Settings()` raises for any deployment with no NGED bucket. |
 
-The exercise also surfaced a **latent correctness wart**, though a milder one than it first looks.
-`local_utc_offset` used to be computed as
-`(base_utc_offset + dst_offset).dt.total_seconds() // 3600` cast to `Int8`, so it could only ever
-represent whole-hour offsets, and because `//` floors rather than truncates, a negative fractional
-offset moved *away* from zero.
+One thing this exercise did change is the UTC-offset feature, which is **not** a British assumption.
+`local_utc_offset_minutes` holds the local offset from UTC in minutes, in an `Int16`, so every
+offset an inhabited time zone uses is represented exactly: India's +5:30 is `330` and Nepal's +5:45
+is `345`, two distinct values rather than one merged bucket, and Australia's +9:30 (`570`) stays
+distinct from +9:00 (`540`). A mixed-offset deployment is therefore representable, and the column
+name states its own units.
 
-In any single-timezone deployment this costs nothing: the feature is constant across the dataset,
-so mapping UTC+5:30 to `5` discards no information a model could have used. The genuine failure
-mode is **collision** in a mixed-offset deployment — India (+5:30) and Nepal (+5:45) both land on
-`5`, silently merging two distinct zones.
-
-We fixed the legibility half of this in
-[issue #431](https://github.com/openclimatefix/nged-substation-forecast/issues/431). The offset is
-still whole hours in an `Int8`, but `_whole_hour_utc_offset` now looks the offset up in a mapping
-of the whole-hour offsets rather than dividing, so a sub-hour offset raises instead of being
-rounded away. A mixed-offset deployment therefore fails loudly at the point the collision would
-happen, and whoever hits it has the docstring's explanation in front of them. Widening the feature
-to minutes remains the fix for actually *supporting* such a deployment; it needs a `MODEL_VERSION`
-bump and a retrain, so it waits until there is a deployment that needs it.
+Minutes stop just short of covering IANA in full, because IANA carries local mean time for the era
+before each zone standardised, and LMT offsets are not whole minutes — `Europe/London` ran on
+UTC−0:01:15 until 1847. `_local_utc_offset_minutes` divides only when the division is exact and
+raises otherwise, so that residue is explicit rather than quietly floored. In practice only a
+pre-1848 timestamp can reach it.
 
 ### What is hard-wired to half-hourly
 
@@ -1722,10 +1715,9 @@ not win. The correct move is to leave the British assumptions hard-coded and *le
 is a large part of what makes them legible — and to pay the refactoring cost only once there is a
 second consumer to amortise it against.
 
-The one exception left is the private `_H3_RESOLUTION` import, described above. It is not really a
+The one exception is the private `_H3_RESOLUTION` import, described above. It is not really a
 portability concern — it is an ordinary code-quality item that happened to surface here — so it can
-be fixed on its own merits whenever convenient, independently of anything on this page. The
-`local_utc_offset` whole-hour assumption was the other such item, and it has since been fixed.
+be fixed on its own merits whenever convenient, independently of anything on this page.
 
 **What would change our mind:**
 

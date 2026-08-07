@@ -94,7 +94,7 @@ DST). Electricity demand follows human behaviour, which tracks local time not UT
 | `local_day_of_week_sin` | Sine of day-of-week (7 day period) |
 | `local_day_of_week_cos` | Cosine of day-of-week (7 day period) |
 | `local_day_of_week` | Integer day-of-week (0 = Monday) |
-| `local_utc_offset` | UTC offset in hours (e.g. 0 or 1 for GB) |
+| `local_utc_offset_minutes` | UTC offset in minutes (0 or 60 for GB; 330 for India's +5:30) |
 
 ### Static derived features
 

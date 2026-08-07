@@ -55,7 +55,7 @@ SELECTED_FEATURES: list[str] = [
     "local_day_of_week_sin",
     "local_day_of_week_cos",
     "local_day_of_week",
-    "local_utc_offset",
+    "local_utc_offset_minutes",
     "temperature_2m",
     "dew_point_temperature_2m",
     "wind_speed_10m",

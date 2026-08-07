@@ -16,7 +16,7 @@ from ml_core.features.tabular_feature_engineer import (
     _apply_local_time_features,
     _apply_rolling_mean_feature,
     _engineer_features,
-    _whole_hour_utc_offset,
+    _local_utc_offset_minutes,
 )
 
 
@@ -261,8 +261,8 @@ def test_apply_local_time_features():
 
     result = _apply_local_time_features(df.lazy()).collect()
 
-    assert "local_utc_offset" in result.columns
-    assert result["local_utc_offset"].to_list() == [0.0, 1.0]
+    assert "local_utc_offset_minutes" in result.columns
+    assert result["local_utc_offset_minutes"].to_list() == [0, 60]
 
     # In winter, 12:00 UTC is 12:00 local.
     # In summer, 12:00 UTC is 13:00 local.
@@ -276,8 +276,8 @@ def test_apply_local_time_features():
     # 2023-07-10 is a Monday (1)
     assert result["local_day_of_week"].to_list() == ["Tuesday", "Monday"]
 
-    # local_utc_offset is a whole-hour offset, matching the AllFeatures Int8 dtype.
-    assert result["local_utc_offset"].dtype == pl.Int8
+    # The offset is in minutes, matching the AllFeatures Int16 dtype.
+    assert result["local_utc_offset_minutes"].dtype == pl.Int16
 
 
 def test_apply_local_time_features_dst_transitions():
@@ -293,9 +293,9 @@ def test_apply_local_time_features_dst_transitions():
             "valid_time": [
                 # Spring forward: 01:00 UTC, clocks jump 01:00 GMT -> 02:00 BST.
                 datetime(2023, 3, 26, 0, 30, tzinfo=timezone.utc),  # 00:30 GMT, offset 0
-                datetime(2023, 3, 26, 1, 0, tzinfo=timezone.utc),  # 02:00 BST, offset 1
+                datetime(2023, 3, 26, 1, 0, tzinfo=timezone.utc),  # 02:00 BST, offset 60
                 # Fall back: 01:00 UTC, clocks drop 02:00 BST -> 01:00 GMT (the 01:00 hour repeats).
-                datetime(2023, 10, 29, 0, 30, tzinfo=timezone.utc),  # 01:30 BST, offset 1
+                datetime(2023, 10, 29, 0, 30, tzinfo=timezone.utc),  # 01:30 BST, offset 60
                 datetime(2023, 10, 29, 1, 0, tzinfo=timezone.utc),  # 01:00 GMT, offset 0
                 datetime(2023, 10, 29, 1, 30, tzinfo=timezone.utc),  # 01:30 GMT, offset 0
             ]
@@ -305,7 +305,7 @@ def test_apply_local_time_features_dst_transitions():
     result = _apply_local_time_features(df.lazy()).collect()
 
     # The offset flips at exactly the transition instant, in both directions.
-    assert result["local_utc_offset"].to_list() == [0, 1, 1, 0, 0]
+    assert result["local_utc_offset_minutes"].to_list() == [0, 60, 60, 0, 0]
 
     # The cyclical time-of-day feature reflects the *local* wall clock, including the jump.
     # Spring-forward: 01:00 UTC -> 02:00 BST, so local_time_of_day_sin = sin(2/24 * 2pi) = 0.5.
@@ -316,61 +316,45 @@ def test_apply_local_time_features_dst_transitions():
     assert result["local_time_of_day_cos"][2] == pytest.approx(result["local_time_of_day_cos"][4])
 
 
-def test_whole_hour_utc_offset_gb():
-    """The GB path: both British offsets are whole hours, so the guard passes silently."""
-    lf = pl.LazyFrame(
-        {
-            "valid_time": [
-                datetime(2023, 1, 10, 12, 0, tzinfo=timezone.utc),  # GMT, UTC+0
-                datetime(2023, 7, 10, 12, 0, tzinfo=timezone.utc),  # BST, UTC+1
-            ]
-        }
-    ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone("Europe/London"))
-
-    result = lf.select(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time"))).collect()
-
-    assert result["local_utc_offset"].to_list() == [0, 1]
-    assert result["local_utc_offset"].dtype == pl.Int8
-
-
 @pytest.mark.parametrize(
-    ("time_zone", "month"),
+    ("time_zone", "month", "expected_minutes"),
     [
-        ("Asia/Kolkata", 1),  # UTC+5:30 — would collide with Nepal's +5:45 if we rounded.
-        ("Asia/Kathmandu", 1),  # UTC+5:45.
-        ("Australia/Adelaide", 6),  # UTC+9:30 — would collide with UTC+9:00.
-        ("America/St_Johns", 1),  # UTC-3:30 — the negative case a floored division moved to -4.
+        ("Europe/London", 1, 0),  # GMT.
+        ("Europe/London", 7, 60),  # BST.
+        ("Asia/Kolkata", 1, 330),  # UTC+5:30.
+        ("Asia/Kathmandu", 1, 345),  # UTC+5:45 — distinct from India's +5:30, not merged into it.
+        ("Australia/Adelaide", 6, 570),  # UTC+9:30 — distinct from UTC+9:00 (540).
+        ("America/St_Johns", 1, -210),  # UTC-3:30 — the case a floored division moved to -4 hours.
     ],
 )
-def test_whole_hour_utc_offset_rejects_sub_hour_zone(time_zone: str, month: int):
-    """A sub-hour offset is a contract violation, so it raises instead of being rounded away.
-
-    Only a code change to the hard-coded time zone can reach this state, which is why raising is
-    the right response rather than degrading. See ``_whole_hour_utc_offset``.
-    """
+def test_local_utc_offset_minutes_is_faithful(time_zone: str, month: int, expected_minutes: int):
+    """Every offset an inhabited zone uses is represented exactly, sub-hour zones included."""
     lf = pl.LazyFrame(
         {"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=timezone.utc)]}
     ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone(time_zone))
 
-    # Match on the message: `InvalidOperationError` is also what a *different* failure earlier in
-    # the same expression raises (e.g. `base_utc_offset` on a tz-naive column), so without this
-    # the test could pass for the wrong reason.
-    with pytest.raises(pl.exceptions.InvalidOperationError, match="incomplete mapping"):
-        lf.select(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time"))).collect()
+    result = lf.select(offset=_local_utc_offset_minutes(pl.col("local_time"))).collect()
+
+    assert result["offset"].to_list() == [expected_minutes]
+    assert result["offset"].dtype == pl.Int16
 
 
-def test_apply_local_time_features_raises_on_sub_hour_offset():
-    """The guard is wired into the production entry point, not just available beside it.
+def test_apply_local_time_features_raises_on_sub_minute_offset():
+    """A sub-minute offset raises rather than being floored, through the production entry point.
 
-    ``_apply_local_time_features`` hard-codes ``Europe/London``, which reaches a sub-hour offset
-    for one input: London ran on local mean time, UTC-0:01:15, until 1847. That makes this the
-    only way to exercise the guard through the function that production actually calls — and it
-    pins the wiring, which a test of ``_whole_hour_utc_offset`` alone would not.
+    Minutes cover every offset an inhabited zone has used since standardisation, but not the local
+    mean time IANA carries for the era before it: ``Europe/London`` ran on UTC-0:01:15 until 1847,
+    which a plain division would floor to -2 minutes. ``_apply_local_time_features`` hard-codes
+    ``Europe/London``, so a pre-1848 timestamp is both the only input that reaches the guard and
+    the only way to pin the guard to the function production actually calls.
     """
     lf = pl.LazyFrame(
         {"valid_time": [datetime(1840, 6, 1, 12, 0, tzinfo=timezone.utc)]}
     ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
 
+    # Match on the message: `InvalidOperationError` is also what a *different* failure earlier in
+    # the same expression raises (e.g. `base_utc_offset` on a tz-naive column), so without this
+    # the test could pass for the wrong reason.
     with pytest.raises(pl.exceptions.InvalidOperationError, match="incomplete mapping"):
         _apply_local_time_features(lf).collect()
 

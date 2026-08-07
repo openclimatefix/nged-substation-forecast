@@ -21,7 +21,6 @@ Nullify Leaky Lags Rationale:
 """
 
 import math
-from collections.abc import Mapping
 from datetime import datetime
 from typing import Final
 
@@ -42,18 +41,8 @@ from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFea
 from ml_core.features.feature_engineer import FeatureEngineer
 from weather_utils import select_analysis_proxy
 
-_SECONDS_PER_HOUR: Final[int] = 60 * 60
-"""Seconds in an hour, used to express a whole-hour UTC offset in seconds."""
-
-_WHOLE_HOUR_UTC_OFFSETS: Final[Mapping[int, int]] = {
-    hours * _SECONDS_PER_HOUR: hours for hours in range(-12, 15)
-}
-"""Every whole-hour UTC offset any IANA time zone uses, in seconds, mapped to that offset in hours.
-
-The range spans the real extremes, ``Etc/GMT+12`` (−12:00) to ``Pacific/Kiritimati`` (+14:00).
-Sub-hour offsets are **deliberately absent**: see ``_whole_hour_utc_offset`` for why we assume
-whole hours and how that assumption is enforced.
-"""
+_SECONDS_PER_MINUTE: Final[int] = 60
+"""Seconds in a minute, used to convert a UTC offset from seconds to minutes."""
 
 
 def _attach_nearest_nwp_cell(
@@ -346,46 +335,46 @@ def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: i
     return lf.join(rolled, on=join_keys, how="left")
 
 
-def _whole_hour_utc_offset(local_time: pl.Expr) -> pl.Expr:
-    """Returns the local UTC offset in whole hours, raising if the offset is not a whole hour.
+def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
+    """Returns the local offset from UTC in minutes, raising on a sub-minute offset.
 
-    We represent the offset as a whole number of hours, in an ``Int8``, and state that assumption
-    here rather than leaving it implicit in a division.
+    Minutes represent every offset any inhabited time zone has used since standardisation, so the
+    feature is faithful rather than approximate: India's +5:30 is ``330`` and Nepal's +5:45 is
+    ``345``, two distinct values, and Australia's +9:30 (``570``) does not collide with +9:00
+    (``540``). A mixed-offset deployment is therefore representable. ``Int16`` is ample — the real
+    extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
 
-    Why whole hours are enough. We deploy in a single time zone, so this feature takes the same
-    value in every row at any given instant, and rounding a fractional zone to whole hours would
-    discard no information a model could use: UTC+5:30 recorded as ``5`` is just a constant with a
-    different name. Whole hours are only insufficient in a **mixed-offset** deployment, where they
-    collide — India (+5:30) and Nepal (+5:45) would both land on ``5``, silently merging two
-    distinct zones, as would Australia's +9:30 and +9:00. That is the case this guard catches.
+    Minutes are not quite the whole story, which is why the guard is here. IANA carries local mean
+    time for the era before each zone standardised, and LMT offsets are not whole minutes:
+    ``Europe/London`` ran on UTC−0:01:15 — −75 seconds — until 1847. A plain division would floor
+    that to −2 minutes, so widening from hours to minutes narrows the assumption without
+    eliminating it. Rather than leave a smaller silent floor, we divide only when the division is
+    exact: ``replace_strict`` is passed no ``default``, so a non-zero residue raises
+    ``InvalidOperationError`` when the frame is collected. Because the residue is provably zero,
+    adding it back leaves the value unchanged; it is added rather than computed as a column of its
+    own so that projection pushdown cannot keep the offset while pruning the check.
 
     Why it raises rather than degrading. The time zone is a constant in our own source, so the way
-    to reach a sub-hour offset is to change that constant — a code change, which makes this a
+    to reach a sub-minute offset is to change that constant — a code change, which makes this a
     contract violation (our own bug) rather than the outside world misbehaving, the one category
-    the inherent-stability rules reserve raising for. There is one way a *timestamp* can reach it:
-    ``Europe/London`` ran on local mean time, UTC−0:01:15, until 1847, so a ``valid_time`` before
-    1848 raises here. Nothing bounds ``PowerTimeSeries.time`` at the Patito boundary, so a corrupt
-    feed could in principle deliver one — but such a row is already silently poisoning every other
-    local-time feature, and no timestamp in the era we forecast can fire the guard.
+    the inherent-stability rules reserve raising for. A ``valid_time`` before 1848 also reaches it,
+    and nothing bounds ``PowerTimeSeries.time`` at the Patito boundary, so a corrupt feed could in
+    principle deliver one — but such a row is already silently poisoning every other local-time
+    feature, and no timestamp in the era we forecast can fire the guard.
 
-    ``replace_strict`` is passed no ``default``, so any offset outside the mapping — sub-hour, or
-    an implausible whole-hour value — raises ``InvalidOperationError`` when the frame is collected.
-    Note that this makes the guard conditional on the column surviving projection pushdown: if a
-    feature set does not request ``local_utc_offset``, Polars prunes the whole expression and the
-    check does not run. That is harmless, because a column nobody asked for cannot be silently
-    wrong, but it does mean the guard protects the feature rather than the pipeline.
+    If a feature set does not request ``local_utc_offset_minutes``, Polars prunes the expression
+    and the check does not run. That is harmless, because a column nobody asked for cannot be
+    silently wrong, but it does mean the guard protects the feature rather than the pipeline.
 
-    Keeping the check inside the Polars expression means it forces no extra ``.collect()`` and no
-    Python round-trip over the data: it is one hash lookup per row. Over a 47M-row frame the
-    lookup measured a few nanoseconds per row more than the ``// 3600`` it replaces, against the
-    ~36 ns per row the surrounding time-zone conversion already costs. Looking the offset up
-    rather than dividing it also makes the floor-versus-truncate question moot: we never divide.
+    The check stays inside the Polars expression, so it forces no extra ``.collect()`` and no
+    Python round-trip over the data: a modulo and a hash lookup per row, a few nanoseconds against
+    the ~36 ns per row the surrounding time-zone conversion already costs.
 
     Args:
         local_time: An expression yielding a time-zone-aware datetime in the local time zone.
 
     Returns:
-        An ``Int8`` expression holding the offset from UTC in hours.
+        An ``Int16`` expression holding the offset from UTC in minutes.
 
     See the portability review for the wider picture,
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/adapting-to-another-geography/>.
@@ -393,7 +382,10 @@ def _whole_hour_utc_offset(local_time: pl.Expr) -> pl.Expr:
     offset_seconds = (
         local_time.dt.base_utc_offset() + local_time.dt.dst_offset()
     ).dt.total_seconds()
-    return offset_seconds.replace_strict(_WHOLE_HOUR_UTC_OFFSETS, return_dtype=pl.Int8)
+    zero_residue = (offset_seconds % _SECONDS_PER_MINUTE).replace_strict(
+        {0: 0}, return_dtype=pl.Int16
+    )
+    return (offset_seconds // _SECONDS_PER_MINUTE + zero_residue).cast(pl.Int16)
 
 
 def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
@@ -415,7 +407,7 @@ def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
         .dt.convert_time_zone("Europe/London")
     )
 
-    lf = lf.with_columns(local_utc_offset=_whole_hour_utc_offset(pl.col("local_time")))
+    lf = lf.with_columns(local_utc_offset_minutes=_local_utc_offset_minutes(pl.col("local_time")))
 
     local_hour_float = pl.col("local_time").dt.hour() + pl.col("local_time").dt.minute() / 60.0
     local_year_fraction = pl.col("local_time").dt.ordinal_day() / 366.0
