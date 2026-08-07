@@ -5,7 +5,12 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+      # 500 KB (the hook's default) is below what a Vega/Altair chart exported as SVG comes to:
+      # docs/example_power_forecast.svg is 571 KB, because a plot of half-hourly data carries one
+      # path point per reading. The guard is here to catch a data file committed by accident, and
+      # 1 MB still does that.
       - id: check-added-large-files
+        args: [--maxkb=1024]
 
   - repo: local
     hooks:
