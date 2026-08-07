@@ -85,7 +85,8 @@ def test_power_fcst_rounded_to_significand_bits(tmp_path: Path) -> None:
     rel_err = np.abs(stored - expected) / np.abs(expected)
     assert (rel_err <= 2.0**-POWER_FCST_SIGNIFICAND_BITS).all()
     discarded = np.uint32((1 << (23 - (POWER_FCST_SIGNIFICAND_BITS - 1))) - 1)
-    assert (stored.view(np.uint32) & discarded == 0).all()
+    # np.dtype(np.uint32), not a bare np.uint32 — see CLAUDE.md ("numpy Gotcha").
+    assert (stored.view(np.dtype(np.uint32)) & discarded == 0).all()
 
 
 def test_replace_partition_then_append(tmp_path: Path) -> None:
