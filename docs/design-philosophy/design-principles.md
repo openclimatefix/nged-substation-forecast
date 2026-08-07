@@ -473,14 +473,31 @@ model upgrade, a re-gridding, a re-metered substation. The case for it is strong
 horizon a forecast is not fully scoreable for a fortnight, so forecast *error* is a badly lagging
 indicator, while a shift in the *inputs* is visible the same day. But this is also the item with a
 genuinely open design question, because our inputs are **expected to drift**: climate change moves
-the weather distributions — a record-breaking hot, dry summer is climate signal, not sensor error —
-and the grid beneath the power data is changing fast (solar, EVs, heat pumps). A naive
-"distribution changed" alarm would either fire constantly or be tuned into silence. The question to
-answer before adopting the practice is whether the useful event is "the distribution changed" or
-"the model is extrapolating — being asked about conditions unlike anything it trained on". The two
-suggest different responses, and a record summer probably *should* be flagged — not as a fault, but
-as a legitimate reason for wider uncertainty bands, routing the signal into the in-band channel of
-principle 1 ("*the power forecast never stops*") rather than to a pager. We do not yet know the
+the weather distributions, and the grid beneath the power data is changing fast (solar, EVs, heat
+pumps).
+
+Great Britain's summer of 2026 is the concrete case, and it arrived while this page was being
+written. On the Met Office's provisional figures, July 2026 was the driest July in the England and
+Wales series that begins in 1836: England recorded 6.5 mm of rain, 10% of its long-term average,
+and southern England recorded 1.9 mm — 3% of average, and the driest month it has ever observed.
+The same month was the sunniest calendar month England and Wales have on record (a series starting
+in 1910) and the second-warmest July for the UK as a whole. At the season's halfway point the UK
+was running 1.8 °C above the seasonal norm on 42% of its average rainfall — warmer and drier than
+2025 at the same stage, and 2025 went on to be the UK's warmest summer on record. Every one of
+those is a real shift in the distribution of an input we feed the model, and not one of them is a
+fault. A naive "distribution changed" alarm would have fired continuously from May 2026 onwards
+while telling an operator nothing they could act on, which is exactly how such an alarm gets tuned
+into silence.
+
+The question to answer before adopting the practice is therefore whether the useful event is "the
+distribution changed" or "the model is extrapolating — being asked about conditions unlike anything
+it trained on". The two suggest different responses, and a summer like 2026's probably *should* be
+flagged — not as a fault, but as a legitimate reason for wider uncertainty bands, routing the
+signal into the in-band channel of principle 1 ("*the power forecast never stops*") rather than to
+a pager. There is also a model-side answer that is not monitoring at all: give the model features
+that let it *represent* the regime rather than merely detecting that it is unusual — the planned
+[weather-abnormality features](../roadmap/xgboost-improvements.md#weather-abnormality-climatology-z-score-features)
+are that answer, and the two are complementary rather than alternatives. We do not yet know the
 right design; working it out is the task.
 
 **Shadow (champion–challenger) deployment.** This means running a candidate model against live
@@ -506,9 +523,9 @@ first time a delivered table needs to change.
 answer to "detect a shift without picking an arbitrary fixed threshold", with decades of theory
 behind them. Fixed thresholds on a seasonal signal are either too loose in winter or too noisy in
 summer; SPC is designed for exactly that problem, and it answers "is the champion quietly
-degrading?" cheaply. It shares the open question raised under input drift detection above: a record summer will
-legitimately worsen
-forecast error, and the chart must not read that as a model regression.
+degrading?" cheaply. It shares the open question raised under input drift detection above: a summer
+like 2026's will legitimately worsen forecast error, and the chart must not read that as a model
+regression.
 
 **Naming poka-yoke.** Mistake-proofing, from manufacturing: design names and interfaces so the
 wrong usage fails to parse rather than being merely discouraged. The codebase already practises

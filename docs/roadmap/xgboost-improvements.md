@@ -491,7 +491,9 @@ Five scheduling notes specific to this page:
 ### Weather-abnormality (climatology z-score) features
 
 Give the booster a sense of whether the *forecast* weather is abnormal — a heatwave, an
-unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
+unusually warm spring, a storm, and (in
+[the long-window variant](#the-long-window-variant-drought-and-sustained-heat-state) below) a
+drought — by feeding it, per weather variable, a standardised anomaly
 `z = (x − μ) / σ` against a climatological norm for that calendar time. This promotes the
 [deferred feature-grammar note](#explicitly-deferred-not-quick-or-not-skill)'s
 weather-abnormality idea to a concrete experiment. The inductive-bias case is the one the
@@ -566,6 +568,71 @@ norm, and is not what this item builds.)
 [wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
 already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so the first
 experiment carries a *temperature* anomaly only.
+
+#### The long-window variant: drought and sustained-heat state
+
+Everything above z-scores an *instantaneous* forecast value against its norm for that calendar
+moment. A second family of features asks a different question: how abnormal has the recent
+*accumulated* weather been? Total precipitation over the past 30 or 90 days as a fraction of the
+climatological norm for that window, and the equivalent accumulated-temperature (or degree-day)
+anomaly, carry state that no instantaneous feature can hold. Great Britain's summer of 2026 is the
+regime in which the two diverge sharply: a single 25 °C afternoon tells the model nothing about
+whether the preceding quarter was
+[the driest on record since 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
+
+**Where the signal plausibly is**, in roughly descending order of confidence:
+
+- **Hydro.** `Hydro` is a real `time_series_type`, and run-of-river output is set by catchment
+  wetness — an accumulation over weeks to months — far more than by the rain falling during the
+  forecast window. This is the clearest physical case on the list, and the one where a 90-day
+  rainfall total is close to being the *primary* driver rather than a correction.
+- **Sustained-heat demand.** The Tier-2
+  [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
+  roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
+  thing: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
+  ground and building-fabric temperatures that a three-day EWM cannot represent.
+- **Agricultural irrigation pumping.** Drought raises it, and the licence area carries arable load.
+  Real, but concentrated in a minority of series.
+- **PV soiling.** A long dry spell lets dust and pollen build up on panels and rain washes them
+  clean, so a "days since meaningful rain" feature has a genuine mechanism behind it. Expect it to
+  sit under the noise floor.
+
+**Why this sits behind the instantaneous z-scores, and what it will and will not measure.** The
+obstacle is not the feature, it is the effective sample size. A 90-day accumulator moves slowly, so
+a training history of roughly 15 months of power data — against an ENS archive that only starts
+2024-04-01 — contains on the order of a *handful* of independent observations of it per series: one
+summer and one winter, not a distribution. A per-series booster will still happily split on it, and
+what it fits will largely be that particular year's idiosyncrasies, aliased with `day_of_year` and
+with any level drift over the same months. The instantaneous z-scores do not have this problem,
+because a heatwave anomaly recurs many times within a single year.
+
+The consequence is a *measurement* problem rather than a modelling one, and it is worth stating
+plainly before anyone registers the experiment: the value of a drought feature is out-of-sample
+robustness in a regime the training data barely contains, and a leaderboard scored on folds drawn
+from that same short history structurally cannot see it. This is the same argument the
+[monotone constraints](#monotone-constraints-for-the-generation-models) item makes — the win is
+"sane extrapolation in weather regimes the training year never saw" — and it should be judged the
+same way: expect roughly no leaderboard movement, and assess it on whether the model behaves
+sensibly when the accumulator is pushed to values the training set never held. It becomes a
+genuinely *measurable* feature only once
+[ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the effective history from
+one summer to several.
+
+**Anchor it to init time, and source it from ERA5.** The accumulator is a property of the forecast
+*moment*, not of the target time — a 14-day window shifts a 90-day total only marginally — so it is
+the same number for every horizon in a run and should be computed once at `power_fcst_init_time`
+and broadcast, exactly like the
+[init-time-anchored features](#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model).
+That anchoring also settles where the data comes from: a window reaching 90 days into the past
+cannot come from the forecast NWP trajectory at all, and stitching it together from archived ENS
+runs would ride the same uncut freshest-run join the residual-lag features flag. The clean source
+is the **ERA5 ingest** this item already depends on, which supplies the accumulation and its
+climatological norm from one table and one publication-time availability cut. Nothing here needs
+live data at forecast time beyond the ~5-day ERA5T latency, which is immaterial to a 90-day total.
+
+**Scope the first long-window experiment to precipitation**, since accumulated-heat effects are
+partly reachable by lengthening the effective-temperature EWM, which is a config change rather than
+a new data dependency and should be tried first as the cheap control.
 
 ## Tier 4 — structural model changes (weeks)
 
