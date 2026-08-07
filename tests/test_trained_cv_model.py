@@ -220,11 +220,14 @@ def _fold_run(client: MlflowClient) -> Run:
     return fold_runs[0]
 
 
-def test_trained_cv_model_trains_and_saves_to_mlflow(env: None) -> None:
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
+def test_trained_cv_model_trains_and_saves_to_mlflow(
+    env: None, dagster_instance: DagsterInstance
+) -> None:
+    _register(dagster_instance)
 
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     # The fold's identity (fold_id) is already a tag from run creation; the training window and
     # counters are logged as tags too, since a re-materialisation is allowed to change them and
@@ -243,7 +246,7 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: None) -> None:
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
-    env: None,
+    env: None, dagster_instance: DagsterInstance
 ) -> None:
     """The same ``(experiment, fold)`` partition materialises twice, updating the counters.
 
@@ -257,9 +260,10 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     # First pass: only ts1 is eligible.
     _write_eligible(eligible_path, (1,))
 
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+    _register(dagster_instance)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     client = MlflowClient()
     first_run_id = _fold_run(client).info.run_id
@@ -270,7 +274,9 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     # docstring), so it stays excluded by the training-window filter and the trained population
     # is unchanged; only the *eligible* count grows, which is what this test needs to change.
     _write_eligible(eligible_path, (1, 2))
-    assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
 
     # Still one run per (experiment, fold) — the leaderboard's one-run-per-fold model is intact —
     # and it now carries the updated counter.
@@ -282,7 +288,9 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
 
-def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: None) -> None:
+def test_trained_cv_model_fails_loudly_when_no_eligible_series(
+    env: None, dagster_instance: DagsterInstance
+) -> None:
     """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
     # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
     # un-materialised / coverage-excluded fold in production.
@@ -301,10 +309,12 @@ def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: None) -> Non
         partition_by=["fold_id"],
     )
 
-    instance = DagsterInstance.ephemeral()
-    _register(instance)
+    _register(dagster_instance)
     result = materialize(
-        [trained_cv_model], partition_key=PARTITION_KEY, instance=instance, raise_on_error=False
+        [trained_cv_model],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
     )
 
     assert not result.success

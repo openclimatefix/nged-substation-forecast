@@ -172,52 +172,56 @@ def _read_forecasts(env: dict[str, str]) -> pl.DataFrame:
     return pl.read_delta(env["forecasts"])
 
 
-def test_live_and_replay_select_different_nwp_runs(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-
-    assert _materialize(instance, "live").success
+def test_live_and_replay_select_different_nwp_runs(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    assert _materialize(dagster_instance, "live").success
     live_forecasts_df = _read_forecasts(env)
     assert (live_forecasts_df["nwp_init_time"] == _SAME_DAY_RUN).all()
 
-    assert _materialize(instance, "replay").success
+    assert _materialize(dagster_instance, "replay").success
     replay_forecasts_df = _read_forecasts(env)
     assert (replay_forecasts_df["nwp_init_time"] == _DAY_EARLIER_RUN).all()
 
 
-def test_only_trained_time_series_are_forecast(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    assert _materialize(instance, "live").success
+def test_only_trained_time_series_are_forecast(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    assert _materialize(dagster_instance, "live").success
 
     forecasts = _read_forecasts(env)
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 
 
-def test_all_ensemble_members_present(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    assert _materialize(instance, "live").success
+def test_all_ensemble_members_present(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    assert _materialize(dagster_instance, "live").success
 
     forecasts = _read_forecasts(env)
     assert set(forecasts["ensemble_member"].unique().to_list()) == set(_MEMBERS)
 
 
-def test_idempotency_same_partition_twice(env: dict[str, str]) -> None:
-    instance = DagsterInstance.ephemeral()
-    assert _materialize(instance, "live").success
+def test_idempotency_same_partition_twice(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
+    assert _materialize(dagster_instance, "live").success
     first_height = _read_forecasts(env).height
 
-    assert _materialize(instance, "live").success
+    assert _materialize(dagster_instance, "live").success
     assert _read_forecasts(env).height == first_height
 
 
-def test_accumulation_across_partitions(env: dict[str, str]) -> None:
+def test_accumulation_across_partitions(
+    env: dict[str, str], dagster_instance: DagsterInstance
+) -> None:
     """A second partition's rows coexist with the first (the write predicate doesn't wipe the
     whole "live" fold — only the one power_fcst_init_time it targets)."""
-    instance = DagsterInstance.ephemeral()
-    assert _materialize(instance, "live", partition_key=_EARLIER_TICK_PARTITION_KEY).success
+    assert _materialize(dagster_instance, "live", partition_key=_EARLIER_TICK_PARTITION_KEY).success
     first_rows = _read_forecasts(env)
     assert (first_rows["power_fcst_init_time"] == _EARLIER_TICK_POWER_FCST_INIT_TIME).all()
 
-    assert _materialize(instance, "live", partition_key=_PARTITION_KEY).success
+    assert _materialize(dagster_instance, "live", partition_key=_PARTITION_KEY).success
 
     combined = _read_forecasts(env)
     assert combined.height > first_rows.height
@@ -238,20 +242,20 @@ def _capture_checkins(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
 
 def test_live_run_sends_sentry_heartbeat(
-    env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """A successful live run emits exactly one OK heartbeat to the live-forecasts monitor."""
     calls = _capture_checkins(monkeypatch)
-    assert _materialize(DagsterInstance.ephemeral(), "live").success
+    assert _materialize(dagster_instance, "live").success
     assert len(calls) == 1
     assert calls[0]["monitor_slug"] == "live-forecasts"
     assert calls[0]["status"] == "ok"
 
 
 def test_replay_run_sends_no_sentry_heartbeat(
-    env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """A replay backfill reprocesses the past, so it must not check in to the live monitor."""
     calls = _capture_checkins(monkeypatch)
-    assert _materialize(DagsterInstance.ephemeral(), "replay").success
+    assert _materialize(dagster_instance, "replay").success
     assert calls == []

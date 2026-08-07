@@ -118,11 +118,8 @@ def _report_metrics() -> None:
         print(f"  {key:<40} {metrics_dict[key]:.4f}")
 
 
-def main() -> None:
-    settings = Settings()
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    instance = DagsterInstance.ephemeral()
-
+def _run_pipeline(instance: DagsterInstance) -> None:
+    """Run the five pipeline steps against ``instance``, asserting each one succeeded."""
     print(f"[1/5] Registering experiment {EXPERIMENT_NAME} ({len(SELECTED_FEATURES)} features)...")
     _register(instance)
 
@@ -154,6 +151,18 @@ def main() -> None:
         ),
         instance=instance,
     ).success, "metrics failed"
+
+
+def main() -> None:
+    settings = Settings()
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
+    # Context manager, not a bare ``DagsterInstance.ephemeral()``: ``__exit__`` calls ``dispose()``,
+    # closing the two SQLite connections the in-memory run and event-log storages hold open. Letting
+    # the local fall out of scope does not do this — Dagster caches retain a used instance until the
+    # interpreter exits. Rationale and measurements: docs/architecture/testing.md.
+    with DagsterInstance.ephemeral() as instance:
+        _run_pipeline(instance)
 
     _report_metrics()
     print("\nDone. Now run: uv run python scripts/export_forecasts_for_alex.py")
