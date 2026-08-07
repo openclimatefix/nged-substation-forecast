@@ -2,7 +2,7 @@
 
 **NGED Flexpectation** is an NIA-funded project by [Open Climate Fix](https://openclimatefix.org/) to deliver state-of-the-art, probabilistic power forecasts for National Grid Electricity Distribution (NGED). The forecasts help NGED optimise flexibility procurement and manage network congestion.
 
-![Example power forecast](example_power_forecast.png)
+![Example power forecast](example_power_forecast.svg)
 
 ## What the forecasts look like
 
