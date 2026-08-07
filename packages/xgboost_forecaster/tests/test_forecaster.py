@@ -178,6 +178,24 @@ def test_save_records_trained_time_series_ids(tmp_path: Path) -> None:
     assert meta["trained_time_series_ids"] == [10, 20, 30]
 
 
+def test_load_ignores_ubj_files_not_in_meta_json(tmp_path: Path) -> None:
+    """``meta.json`` decides the population, not whatever ``.ubj`` files are lying around.
+
+    An MLflow run's artifact directory is written with ``log_artifacts``, which *merges* rather
+    than replaces. Re-training a reused CV fold run on a smaller population therefore leaves the
+    dropped series' boosters in place; loading them back would silently score those series with a
+    superseded model, breaking the train==predict invariant.
+    """
+    save_dir = tmp_path / "m"
+    # An earlier training run over {10, 20, 30}...
+    _trained(_make_df(ts_ids=[10, 20, 30])).save(save_dir)
+    # ...then a re-train over just {10, 20}, merged into the same directory.
+    _trained(_make_df(ts_ids=[10, 20])).save(save_dir)
+
+    assert (save_dir / "30.ubj").exists()  # the stale booster is still on disk...
+    assert XGBoostForecaster.load(save_dir).trained_time_series_ids == [10, 20]  # ...but unused.
+
+
 def test_random_seed_makes_training_deterministic() -> None:
     """Two models trained with the same random_seed produce identical predictions."""
     df = _make_df()

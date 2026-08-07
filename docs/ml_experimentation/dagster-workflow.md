@@ -106,7 +106,8 @@ MLflow experiment and partition keys rather than creating duplicates.
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
    `forecaster.save_to_mlflow(fold_run_id, cache_base_path=…)`, which also clears that run's entry
-   in the local model cache so the freshly trained model is the one step 7 loads back.
+   in the local model cache so the freshly trained model is the one `cv_power_forecasts` loads
+   back.
 9. Records the training run on the fold run: `fold_id` as a **param**, the training window
    (`train_start`, `train_end`) as **tags**, and the populations (`n_eligible_time_series`,
    `n_trained_time_series`) as **metrics**.

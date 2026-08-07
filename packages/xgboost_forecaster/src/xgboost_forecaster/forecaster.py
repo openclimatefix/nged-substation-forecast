@@ -93,8 +93,8 @@ class XGBoostForecaster(BaseForecaster):
 
         For ``XGBoostForecaster`` this is exactly the set of series it holds a trained Booster for
         (one Booster per ``time_series_id``), so ``predict`` raises ``KeyError`` if asked for any
-        other series. ``save()`` records this set in ``meta.json`` and ``load()`` reconstructs it
-        from the ``.ubj`` files on disk. See ``BaseForecaster.trained_time_series_ids`` for the
+        other series. ``save()`` records this set in ``meta.json``, which is what ``load()`` reads
+        it back from. See ``BaseForecaster.trained_time_series_ids`` for the
         model-agnostic contract this implements (the train==predict population invariant).
         """
         return sorted(self._models.keys())
@@ -212,12 +212,21 @@ class XGBoostForecaster(BaseForecaster):
 
     @classmethod
     def load(cls, path: Path) -> Self:
-        """Reconstruct an XGBoostForecaster from a saved directory."""
+        """Reconstruct an XGBoostForecaster from a saved directory.
+
+        ``meta.json``'s ``trained_time_series_ids`` — not whatever ``.ubj`` files happen to be in
+        the directory — decides the population. The two can disagree: an MLflow run's artifact
+        directory is written with ``log_artifacts``, which *merges* rather than replaces, so
+        re-training a reused CV fold run on a **smaller** population leaves the dropped series'
+        boosters behind. Globbing would resurrect them, silently scoring those series with a
+        superseded model and breaking the train==predict invariant (see
+        ``BaseForecaster.trained_time_series_ids``).
+        """
         meta = json.loads((path / "meta.json").read_text())
         config = XGBoostConfig.model_validate(meta["model_params"])
         instance = cls(config)
-        for ubj_file in sorted(path.glob("*.ubj")):
+        for ts_id in meta["trained_time_series_ids"]:
             booster = xgb.Booster()
-            booster.load_model(str(ubj_file))
-            instance._models[int(ubj_file.stem)] = booster
+            booster.load_model(str(path / f"{ts_id}.ubj"))
+            instance._models[int(ts_id)] = booster
         return instance

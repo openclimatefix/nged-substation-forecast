@@ -16,6 +16,19 @@ _MLFLOW_ARTIFACT_PATH: Final[str] = "model"
 """Sub-path under an MLflow run's artifact root where the model directory is stored."""
 
 
+def _delete_cache_entry(cache_base_path: Path, run_id: str) -> None:
+    """Remove one run's entry from the local model cache, if it is there.
+
+    Deliberately does *not* pass ``ignore_errors`` to ``rmtree``: absence is the only condition
+    that is not a problem, and it is checked for explicitly. A permission or IO error must
+    propagate, because a silently-failed invalidation is exactly the state that makes a stale
+    cached model get served.
+    """
+    run_cache_dir = cache_base_path / run_id
+    if run_cache_dir.exists():
+        shutil.rmtree(run_cache_dir)
+
+
 class BaseForecasterConfig(BaseModel):
     """Universal configuration for all forecasting models.
 
@@ -139,17 +152,21 @@ class BaseForecaster(ABC):
         Args:
             run_id: The MLflow run to attach the artifacts to.
             cache_base_path: Root of the local model cache that ``load_from_mlflow`` reads from.
-                The run's cache entry is deleted once the upload has succeeded. This is required,
-                not optional, because a CV fold run is **reused** across re-materialisations: the
-                same ``run_id`` can hold a different model after re-training, so a surviving cache
-                entry would keep serving the previous model. Deleting only after a successful
-                upload means a failed upload leaves the cache still agreeing with MLflow.
+                The run's cache entry is deleted, both before and after the upload. This is
+                required, not optional, because a CV fold run is **reused** across
+                re-materialisations: the same ``run_id`` can hold a different model after
+                re-training, so a surviving cache entry would keep serving the previous model.
+                Deleting on *both* sides leaves no window in which a crash (or a partial
+                ``log_artifacts``, which is not atomic) can strand a cache entry that no longer
+                matches the run — the next load re-downloads and fails loudly on a partial
+                upload rather than quietly serving the superseded model.
         """
+        _delete_cache_entry(cache_base_path, run_id)
         with tempfile.TemporaryDirectory() as tmp_dir:
             self.save(Path(tmp_dir))
             with mlflow.start_run(run_id=run_id):
                 mlflow.log_artifacts(tmp_dir, artifact_path=_MLFLOW_ARTIFACT_PATH)
-        shutil.rmtree(cache_base_path / run_id, ignore_errors=True)
+        _delete_cache_entry(cache_base_path, run_id)
 
     @classmethod
     def load_from_mlflow(cls, run_id: str, cache_base_path: Path) -> Self:
