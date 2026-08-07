@@ -73,7 +73,7 @@ principle behind it is a claim we are merely hoping comes true.
    check in the repo is non-blocking `WARN`; there is deliberately no `ERROR`-severity check
    anywhere. *Serves:* [Hypothesis 1: a service that mostly runs
    itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). *Detail:* [Inherent
-   Stability](inherent-stability.md), whose [ten rules](inherent-stability.md#the-rules) are the
+   Stability](inherent-stability.md), whose [rules](inherent-stability.md#the-rules) are the
    fine-grained form of this principle together with the complexity-offline and strict-contracts
    principles.
 
@@ -400,6 +400,52 @@ principle behind it is a claim we are merely hoping comes true.
     [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
     [When would a REST API earn its keep?](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
     [Considered but rejected designs](../architecture/production-deployment.md#considered-but-rejected-designs).
+
+14. **Production jobs are coupled through data at rest, never through run status.** Each scheduled
+    production job reads whatever is on disk at the moment it runs. No production job asks whether
+    the job that produces its input succeeded, or ran at all. This is principle 10's blast-radius
+    property one layer up: principle 10 ("*every write is atomic and idempotent, and every failure is
+    confined to one partition*") confines a failure inside the write it happened in, and this
+    principle confines it inside the job it happened in.
+
+    The common alternative is a chain of scheduled jobs — A at 06:00, B at 06:15, C at 06:30 — in
+    which B's real input is *the event of A having run*. That design has no way to distinguish "A
+    failed" from "A is still running" from "A had nothing to do", so one bad morning upstream takes
+    out every job downstream of it for the rest of the day, and recovery means replaying the chain in
+    order.
+
+    Ours cannot propagate a failure that way, because there is no channel for it to propagate down.
+    `live_forecasts` does not care whether `ecmwf_ens` succeeded in the last 24 hours, or whether
+    this hour's telemetry pull ran: it selects the freshest NWP run genuinely present as of its own
+    init time, and stamps that run's `nwp_init_time` on every row it writes. A failed telemetry pull
+    makes the 06:00 forecast slightly staler; it cannot make it late, and it cannot make it absent.
+    One case still falls short of that today: a *sustained* NWP outage, where no run on disk still
+    covers the horizon, makes `live_forecasts` raise rather than degrade — the one hard failure left
+    in the [failure-modes table](inherent-stability.md#failure-modes), which
+    [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446) will convert into a
+    weather-blind forecast.
+
+    Note the deliberate distinction between the *lineage* graph and a runtime precondition. Dagster
+    still knows that `live_forecasts` depends on `ecmwf_ens` and `power_time_series_and_metadata`;
+    that edge is what lets a developer ask Dagster to materialise an asset *together with its
+    upstreams* on a laptop, and what makes the graph legible in the UI. What we decline is letting
+    that edge become a gate in production.
+    *Without it:* in a chained design, one failed 06:00 ingest suppresses the 06:00 forecast and the
+    slots behind it, and someone has to replay the chain in order, out of hours, to catch up — the
+    precise out-of-hours intervention that
+    [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts will never be
+    needed.
+    *Decided:* the three production jobs run on three independent schedules with no run-status
+    coupling between them, and the `:55` offset on the telemetry pull is an optimisation for
+    freshness, not a precondition — if it is missed, the forecast still runs. A related decision
+    shows how far the preference for filesystem coupling goes: `promoted_model` was removed from
+    `live_forecasts`' deps altogether once it became clear the model arrives by filesystem path
+    rather than by data flow, so even the lineage edge was not worth the permanently un-materialised
+    parent it rendered on the production box, which has no MLflow and never runs promotion.
+    *Serves:*
+    [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+    *Detail:* [Inherent Stability](inherent-stability.md#the-rules) — "*never make one production
+    job's run status a precondition for another's*".
 
 ## Deliberately absent
 

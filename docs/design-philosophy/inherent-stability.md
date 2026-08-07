@@ -151,10 +151,10 @@ Nothing here is a 2am page. The uptime posture that makes that acceptable is arg
 ## The rules
 
 These are the imperative form of everything above: the checklist to follow when in doubt while
-changing production code. It is deliberately self-contained, so three of the ten restate a
-[design principle](design-principles.md) rather than adding anything new. Those three are marked
-below — if you change one, change its matching principle too. The remaining seven are specific to
-degradation and appear nowhere else.
+changing production code. It is deliberately self-contained, so some of them restate a
+[design principle](design-principles.md) rather than adding anything new. Those are marked below —
+if you change one, change its matching principle too. The rest are specific to degradation and
+appear nowhere else.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
    record the degradation on the row. Reserve raising for states that are our own bug — an empty
@@ -185,6 +185,13 @@ degradation and appear nowhere else.
 10. **Damp the corrections.** Bounded retries with backoff, rate limits on retraining and hysteresis
     on model promotion (the latter two designed but not built 🚧) are as much a part of this
     principle as the degradation ladder is.
+11. **Never make one production job's run status a precondition for another's.** Couple them through
+    data at rest: read whatever is on disk, note which run it came from, and carry on. A dependency
+    in the *lineage* graph is fine and useful — it is what lets a developer ask for an asset and its
+    upstreams together on a laptop — but it must never become a runtime gate. A gate turns one
+    failed upstream run into a missing forecast, and a missing forecast is not on the ladder at all:
+    not even rung 4, where the service still emits a very wide but true forecast. *(The
+    coupling-through-data-at-rest principle, in imperative form.)*
 
 ## Where complexity should live
 
