@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 import pytest
@@ -424,6 +425,7 @@ _HEALTHY_NWP = _healthy_runs_at(_SLOT)
 
 _HEALTHY_ROWS = LiveForecastRows(
     n_rows=4800,
+    n_invalid=0,
     n_nonfinite_power=0,
     n_hindcast=0,
     n_ensemble_members=51,
@@ -469,16 +471,35 @@ def test_zero_rows_is_not_healthy() -> None:
 @pytest.mark.parametrize("n_bad", [1, 500])
 def test_non_finite_power_forecasts_are_invalid(n_bad: int) -> None:
     """Null, NaN and infinite ``power_fcst`` values all reach the evaluator as this one count."""
-    result = _evaluate(replace(_HEALTHY_ROWS, n_nonfinite_power=n_bad))
+    result = _evaluate(replace(_HEALTHY_ROWS, n_invalid=n_bad, n_nonfinite_power=n_bad))
     assert not result.is_healthy
     assert result.rows.n_invalid == n_bad
 
 
 def test_hindcast_rows_are_invalid() -> None:
     """``valid_time <= power_fcst_init_time`` is forbidden by ``PowerForecast`` itself."""
-    result = _evaluate(replace(_HEALTHY_ROWS, n_hindcast=7))
+    result = _evaluate(replace(_HEALTHY_ROWS, n_invalid=7, n_hindcast=7))
     assert not result.is_healthy
     assert result.rows.n_invalid == 7
+
+
+def test_a_truncated_forecast_horizon_is_not_healthy() -> None:
+    """Well-formed rows that stop a few hours ahead are still an undeliverable forecast.
+
+    Structural, not skill: ``live_forecasts`` drops rows outside the NWP run's coverage, so a
+    partly-ingested run shortens the delivered forecast without malforming a single row.
+    """
+    result = _evaluate(replace(_HEALTHY_ROWS, latest_valid_time=_SLOT + timedelta(hours=6)))
+    assert result.horizon_is_truncated
+    assert not result.is_healthy
+
+
+def test_a_nearly_full_horizon_is_healthy() -> None:
+    """The floor is loose enough that a normal slot — which stops just short of the 14 days asked
+    for, because the NWP run is already 12–30 hours old — never trips it."""
+    result = _evaluate(replace(_HEALTHY_ROWS, latest_valid_time=_SLOT + timedelta(days=13.5)))
+    assert not result.horizon_is_truncated
+    assert result.is_healthy
 
 
 def test_missing_trained_time_series_is_not_healthy() -> None:
@@ -529,24 +550,35 @@ def _current_slot() -> datetime:
     return now.replace(hour=now.hour // 6 * 6, minute=0, second=0, microsecond=0)
 
 
+_EXPERIMENT = "test_experiment"
+"""The promoted model's experiment; the check scopes its read to this Delta partition."""
+
+_FULL_HORIZON = timedelta(days=13, hours=18)
+"""How far ahead a healthy slot's furthest row reaches — just short of the 14 days
+``live_forecasts`` asks for, because the NWP run it used is already 12–30 hours old."""
+
+
 def _write_live_forecasts(
     path: str,
     power_fcst_init_time: datetime,
     *,
     time_series_ids: tuple[int, ...] = (1, 2),
     power_fcst: float = 12.5,
-    valid_time_offset: timedelta = timedelta(hours=1),
+    valid_time_offset: timedelta = _FULL_HORIZON,
     fold_id: str = "live",
+    experiment_name: str = _EXPERIMENT,
+    mode: Literal["error", "append"] = "error",
 ) -> None:
     """Write a minimal ``power_forecasts`` Delta table partitioned the way production writes it.
 
     Only the columns the check reads are written: the genuine ``write_power_forecasts`` path is
     exercised by ``tests/test_live_forecasts.py`` instead, and a full ``PowerForecast`` frame here
-    would obscure what each case is actually varying.
+    would obscure what each case is actually varying. ``mode="append"`` adds a second experiment's
+    rows to an existing table.
     """
     rows = [
         {
-            "experiment_name": "test_experiment",
+            "experiment_name": experiment_name,
             "fold_id": fold_id,
             "power_fcst_init_time": power_fcst_init_time,
             "valid_time": power_fcst_init_time + valid_time_offset,
@@ -572,7 +604,10 @@ def _write_live_forecasts(
         },
     )
     write_deltalake(
-        table_or_uri=path, data=frame.to_arrow(), partition_by=["experiment_name", "fold_id"]
+        table_or_uri=path,
+        data=frame.to_arrow(),
+        partition_by=["experiment_name", "fold_id"],
+        mode=mode,
     )
 
 
@@ -590,11 +625,20 @@ def _write_nwp_runs(path: str, init_times: list[datetime]) -> None:
     )
 
 
-def _write_promoted_model_meta(production_model_path: str, ids: list[int]) -> None:
-    """Write just enough of a promoted model's ``meta.json`` for the trained-population read."""
+def _write_promoted_model_meta(
+    production_model_path: str, ids: list[int], experiment_name: str = _EXPERIMENT
+) -> None:
+    """Write just enough of a promoted model's ``meta.json``, in ``BaseForecaster.save``'s shape."""
     directory = Path(production_model_path)
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / "meta.json").write_text(json.dumps({"trained_time_series_ids": ids}))
+    (directory / "meta.json").write_text(
+        json.dumps(
+            {
+                "trained_time_series_ids": ids,
+                "model_params": {"experiment_name": experiment_name},
+            }
+        )
+    )
 
 
 def _run_live_check() -> AssetCheckResult:
@@ -651,6 +695,53 @@ def test_live_forecasts_check_ignores_cv_fold_rows(env: Path) -> None:
     result = _run_live_check()
     assert result.passed is False
     assert result.metadata["n_rows"].value == 0
+
+
+def test_live_forecasts_check_ignores_a_previous_experiments_rows(env: Path) -> None:
+    """Rows left behind by the outgoing champion's experiment must not be read as this slot's.
+
+    ``write_power_forecasts`` replaces one ``(experiment_name, fold_id)`` partition at a time, so
+    promoting a model from a different experiment leaves the old experiment's rows for the same
+    slot on disk indefinitely. Here those stale rows are all NaN: without the experiment filter
+    they would be reported as this slot's fault.
+    """
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(
+        settings.power_forecasts_data_path,
+        slot,
+        experiment_name="outgoing_experiment",
+        power_fcst=float("nan"),
+    )
+    _write_live_forecasts(settings.power_forecasts_data_path, slot, mode="append")
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is True
+    assert result.metadata["n_rows"].value == 4  # the promoted experiment's rows only
+    assert result.metadata["n_nonfinite_power"].value == 0
+
+
+def test_live_forecasts_check_warns_on_a_truncated_horizon(env: Path) -> None:
+    """Well-formed rows that stop hours rather than days ahead are an undeliverable forecast."""
+    from contracts.settings import Settings
+
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(
+        settings.power_forecasts_data_path, slot, valid_time_offset=timedelta(hours=6)
+    )
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is False
+    assert result.metadata["n_invalid_rows"].value == 0  # every individual row is well-formed
+    assert result.metadata["forecast_horizon_hours"].value == 6.0
+    assert "reaches only" in str(result.description)
 
 
 @pytest.mark.parametrize("bad_power", [float("nan"), float("inf")])
@@ -723,7 +814,7 @@ def test_live_forecasts_check_reports_missed_nwp_runs_end_to_end(env: Path) -> N
     expected_missed = count_missed_nwp_runs(stale_runs, as_of=slot).n_missed
     assert expected_missed is not None and expected_missed >= 4
     assert result.metadata["n_missed_nwp_runs"].value == expected_missed
-    assert "NWP run(s) missed" in str(result.description)
+    assert "daily run(s) behind" in str(result.description)
 
 
 def test_live_forecasts_check_does_not_raise_with_no_tables_at_all(env: Path) -> None:
@@ -737,6 +828,12 @@ def test_live_forecasts_check_does_not_raise_with_no_tables_at_all(env: Path) ->
     assert result.passed is False
     assert result.severity == AssetCheckSeverity.WARN
     assert result.metadata["n_rows"].value == 0
+    # Unknown counts are omitted rather than replaced by text, so each numeric metadata key keeps
+    # one type across runs and stays plottable; the description carries the explanation instead.
+    assert "n_missed_nwp_runs" not in result.metadata
+    assert "n_time_series_expected" not in result.metadata
+    assert "forecast_horizon_hours" not in result.metadata
+    assert "no NWP run is available" in str(result.description)
 
 
 def test_live_forecasts_check_does_not_raise_on_an_empty_table(env: Path) -> None:

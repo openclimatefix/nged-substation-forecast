@@ -335,9 +335,10 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
 - **It moves the fail-open half onto the orchestrator that lacks a fail-open primitive.** Option B
   ports precisely the half where the non-blocking check matters most: `power_data_is_fresh`,
   `nwp_has_no_unexpected_nulls` and `live_forecasts_are_healthy` are all production-side, and the
-  warning channel to NGED originates there. Meanwhile the R&D half — which wants fail-fast and would be perfectly content
-  with blocking data-quality tasks — is the half that stays on Dagster. That is backwards with
-  respect to the [inherent-stability](../design-philosophy/inherent-stability.md) design.
+  warning channel to NGED originates there. Meanwhile the R&D half — which wants fail-fast and
+  would be perfectly content with blocking data-quality tasks — is the half that stays on Dagster.
+  That is backwards with respect to the
+  [inherent-stability](../design-philosophy/inherent-stability.md) design.
 - The audit trail fragments: production run history in Airflow, promotion and experiment
   history in Dagster/MLflow.
 - If the deployment target were MWAA at its current version (3.2.1), the backfill-conf bug

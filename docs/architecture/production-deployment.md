@@ -99,9 +99,20 @@ rows — or rows carrying a NaN forecast, or rows for only half the promoted mod
 `live_forecasts_are_healthy` closes that gap by reading the slot back out of the
 `power_forecasts` Delta table after the write and reporting what is actually there: the row count,
 the count of null/NaN/infinite `power_fcst` values, the count of rows targeting a `valid_time` at
-or before their own init time (which `PowerForecast` forbids), and any `time_series_id` the
-promoted model was trained on that the slot did not forecast. None of that is a measure of forecast
-*skill*, which is production monitoring's job, not a data-health check's.
+or before their own init time (which `PowerForecast` forbids), how far ahead the furthest row
+reaches, and any `time_series_id` the promoted model was trained on that the slot did not forecast.
+None of that is a measure of forecast *skill*, which is production monitoring's job, not a
+data-health check's.
+
+Two of those deserve a note. The **horizon** is checked because `live_forecasts` drops rows outside
+the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast than
+NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
+see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
+13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. And the
+read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
+replaces one `(experiment_name, fold_id)` partition at a time: promoting a champion from a
+different experiment leaves the outgoing experiment's rows for the same slot on disk, and without
+that filter the check would report faults sourced entirely from dead rows.
 
 The same check carries the **missed daily NWP run count**, because the second way a live slot goes
 quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count

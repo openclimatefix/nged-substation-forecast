@@ -29,9 +29,11 @@ old depending on the slot, so any absolute age threshold would fire on two slots
 day. See
 [Inherent Stability → Three audiences, three channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
-Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and neither can raise: a
-warning path that fails would turn fail-open into fail-closed at exactly the wrong moment (rule 7
-of [The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and ``live_forecasts_are_healthy``
+additionally cannot raise — every read it makes is guarded and its whole body sits under a
+catch-all — because a warning path that fails would turn fail-open into fail-closed at exactly the
+wrong moment (rule 7 of
+[The rules](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
 """
 
 import json
@@ -61,6 +63,7 @@ from nged_data.storage import time_series_coverage
 from nged_substation_forecast._sentry import report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
 from nged_substation_forecast.defs.production_assets import (
+    LIVE_FORECAST_HORIZON,
     _available_nwp_init_times,
     live_forecasts,
 )
@@ -328,6 +331,22 @@ _UNIX_EPOCH: Final[datetime] = datetime(1970, 1, 1, tzinfo=timezone.utc)
 """Origin for ``_floor_to_interval``'s arithmetic. Both cadences we floor to (daily NWP runs at
 00Z, 6-hourly forecast slots at 00/06/12/18) are aligned to it."""
 
+_MIN_HORIZON_FRACTION: Final[float] = 0.5
+"""Fraction of ``LIVE_FORECAST_HORIZON`` a slot's rows must span before the horizon is called
+truncated.
+
+Half is deliberately loose. A *healthy* slot reaches almost the full 14 days — ECMWF ENS covers
+about 15 days from its ``init_time`` and the run is 12–30 hours old at forecast time, leaving
+roughly 13.75 days — so the only ways to fall below 7 days are a partially-ingested run or NWP
+about a week stale, and the latter is already reported as missed runs. A tighter floor would start
+competing with the missed-run count for the same fault while risking false alarms; this one catches
+the case nothing else sees, which is fresh-but-truncated NWP."""
+
+_MIN_HORIZON_HOURS: Final[float] = (
+    LIVE_FORECAST_HORIZON.total_seconds() / 3600.0 * _MIN_HORIZON_FRACTION
+)
+"""``_MIN_HORIZON_FRACTION`` of the horizon ``live_forecasts`` asks for, in hours."""
+
 
 @dataclass(frozen=True)
 class LiveForecastRows:
@@ -338,6 +357,10 @@ class LiveForecastRows:
     """
 
     n_rows: int
+
+    n_invalid: int
+    """Rows that are present but unusable — the *union* of the two counts below, so a row that is
+    both non-finite and a hindcast is counted once and ``n_invalid`` can never exceed ``n_rows``."""
 
     n_nonfinite_power: int
     """Rows whose ``power_fcst`` is null, NaN, or infinite."""
@@ -352,11 +375,6 @@ class LiveForecastRows:
 
     nwp_init_time: datetime | None
     """The freshest ``nwp_init_time`` stamped on the rows (null for a model using no NWP)."""
-
-    @property
-    def n_invalid(self) -> int:
-        """Rows that are present but unusable."""
-        return self.n_nonfinite_power + self.n_hindcast
 
     @property
     def n_time_series(self) -> int:
@@ -405,12 +423,23 @@ class LiveForecastHealthResult:
         return (self.rows.latest_valid_time - self.power_fcst_init_time).total_seconds() / 3600.0
 
     @property
+    def horizon_is_truncated(self) -> bool:
+        """True when the slot's rows stop well short of the forecast horizon we asked for.
+
+        ``live_forecasts`` drops rows outside the selected NWP run's coverage, so a run that was
+        only partly ingested — or one so old that its remaining coverage is nearly used up —
+        silently delivers a much shorter forecast than NGED expect, with every row still perfectly
+        well-formed. That is structural, not a matter of skill, so it belongs here."""
+        return self.horizon_hours is not None and self.horizon_hours < _MIN_HORIZON_HOURS
+
+    @property
     def is_healthy(self) -> bool:
-        """True when the slot wrote usable rows for the whole trained population against a
-        complete NWP feed."""
+        """True when the slot wrote usable rows, over the expected horizon, for the whole trained
+        population, against a complete NWP feed."""
         return (
             self.rows.n_rows > 0
             and self.rows.n_invalid == 0
+            and not self.horizon_is_truncated
             and not self.missing_time_series_ids
             and self.nwp.is_healthy
         )
@@ -499,6 +528,7 @@ def evaluate_live_forecast_health(
 
 _EMPTY_LIVE_FORECAST_ROWS: Final[LiveForecastRows] = LiveForecastRows(
     n_rows=0,
+    n_invalid=0,
     n_nonfinite_power=0,
     n_hindcast=0,
     n_ensemble_members=0,
@@ -509,21 +539,49 @@ _EMPTY_LIVE_FORECAST_ROWS: Final[LiveForecastRows] = LiveForecastRows(
 """What a slot with nothing on disk looks like — also the answer when the table does not exist."""
 
 
+@dataclass(frozen=True)
+class PromotedModelFacts:
+    """The two things about the promoted model the check needs, read from its ``meta.json``.
+
+    Both are ``None`` when the corresponding field is absent, so an unreadable or partial
+    ``meta.json`` weakens the check rather than turning it permanently yellow.
+    """
+
+    experiment_name: str | None
+    """Which ``power_forecasts`` experiment partition this model's slots are written to."""
+
+    trained_time_series_ids: tuple[int, ...] | None
+    """The population every slot is expected to forecast (the train==predict invariant)."""
+
+
+_UNKNOWN_PROMOTED_MODEL: Final[PromotedModelFacts] = PromotedModelFacts(None, None)
+"""What an absent or unreadable promoted-model ``meta.json`` reduces to."""
+
+
 def _read_live_forecast_rows(
     power_forecasts_path: str,
     storage_options: ObjectStoreOptions | None,
     power_fcst_init_time: datetime,
+    experiment_name: str | None,
 ) -> LiveForecastRows:
     """Summarise the ``power_forecasts`` rows one live slot wrote, without materialising them.
 
     Returns the empty summary if the Delta table does not exist yet (a brand-new deployment), so
     "no table" and "no rows for this slot" reach the evaluator as the same unhealthy state.
 
-    The scan is pruned to the ``fold_id="live"`` Delta partitions and then to the one
-    ``power_fcst_init_time``, and every column is reduced to a scalar inside Polars, so only the
-    aggregates cross back into Python. The ``pl.len()`` is safe from the 32-bit row-count
-    wraparound documented in ``CLAUDE.md``: it counts one slot's rows (~1M at V1 scale, ~86M at
-    V2), not the whole table.
+    ``experiment_name`` scopes the read to the promoted model's own rows. It matters because
+    ``write_power_forecasts`` replaces one ``(experiment_name, fold_id)`` partition at a time, so
+    promoting a champion from a *different* experiment leaves the outgoing experiment's rows for
+    the same slot in place: without this filter the check would aggregate live rows from two
+    experiments and report faults sourced entirely from dead ones. ``None`` (an unreadable
+    ``meta.json``) falls back to every live experiment, which is the same reading as before the
+    filter existed.
+
+    The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
+    then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside
+    Polars, so only the aggregates cross back into Python. The ``pl.len()`` is safe from the
+    32-bit row-count wraparound documented in ``CLAUDE.md``: it counts one slot's rows (~1M at V1
+    scale, ~86M at V2), not the whole table.
     """
     if not delta_table_exists(power_forecasts_path, storage_options):
         return _EMPTY_LIVE_FORECAST_ROWS
@@ -534,14 +592,19 @@ def _read_live_forecast_rows(
         pl.col("fold_id") == _LIVE_FOLD_ID,
         pl.col("power_fcst_init_time") == power_fcst_init_time,
     )
+    if experiment_name is not None:
+        slot = slot.filter(pl.col("experiment_name") == experiment_name)
+
+    # A null `power_fcst` makes the left operand true, so under Kleene logic the row is counted
+    # once and `is_finite()`'s own null on that row never leaks into the sum.
+    nonfinite_power = pl.col("power_fcst").is_null() | ~pl.col("power_fcst").is_finite()
+    hindcast = pl.col("valid_time") <= pl.lit(power_fcst_init_time)
     summary = slot.select(
         n_rows=pl.len(),
-        # A null `power_fcst` makes the left operand true, so under Kleene logic the row is
-        # counted once and `is_finite()`'s own null on that row never leaks into the sum.
-        n_nonfinite_power=(
-            pl.col("power_fcst").is_null() | ~pl.col("power_fcst").is_finite()
-        ).sum(),
-        n_hindcast=(pl.col("valid_time") <= pl.lit(power_fcst_init_time)).sum(),
+        # The union, not the sum: a row that is both must not be counted twice.
+        n_invalid=(nonfinite_power | hindcast).sum(),
+        n_nonfinite_power=nonfinite_power.sum(),
+        n_hindcast=hindcast.sum(),
         n_ensemble_members=pl.col("ensemble_member").n_unique(),
         time_series_ids=pl.col("time_series_id").unique().implode(),
         latest_valid_time=pl.max("valid_time"),
@@ -551,6 +614,7 @@ def _read_live_forecast_rows(
     row = summary.row(0, named=True)
     return LiveForecastRows(
         n_rows=int(row["n_rows"]),
+        n_invalid=int(row["n_invalid"] or 0),
         n_nonfinite_power=int(row["n_nonfinite_power"] or 0),
         n_hindcast=int(row["n_hindcast"] or 0),
         n_ensemble_members=int(row["n_ensemble_members"]),
@@ -571,22 +635,27 @@ def _nwp_init_times_on_disk(settings: Settings) -> list[datetime]:
     return _available_nwp_init_times(settings)
 
 
-def _trained_time_series_ids(production_model_path: str) -> tuple[int, ...] | None:
-    """The promoted model's trained population, or ``None`` if it cannot be read.
+def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts:
+    """Read the promoted model's experiment name and trained population from its ``meta.json``.
 
-    ``None`` (rather than an empty tuple) keeps "we don't know which series to expect" distinct
-    from "the model was trained on nothing", so an unreadable ``meta.json`` weakens the check
-    instead of turning it permanently yellow.
+    One read for both, because both come from the same file that ``BaseForecaster.save`` wrote.
+    Any absence or malformation degrades to ``_UNKNOWN_PROMOTED_MODEL`` rather than raising: the
+    model directory is populated out-of-band (by the ``promoted_model`` asset on a laptop, by the
+    image build on the box), so the check must cope with it being absent.
     """
     meta_path = Path(production_model_path) / "meta.json"
     if not meta_path.exists():
-        return None
+        return _UNKNOWN_PROMOTED_MODEL
     try:
-        ids = json.loads(meta_path.read_text()).get("trained_time_series_ids")
-        return None if ids is None else tuple(int(i) for i in ids)
+        meta = json.loads(meta_path.read_text())
+        ids = meta.get("trained_time_series_ids")
+        return PromotedModelFacts(
+            experiment_name=meta.get("model_params", {}).get("experiment_name"),
+            trained_time_series_ids=None if ids is None else tuple(int(i) for i in ids),
+        )
     except OSError, ValueError, TypeError, AttributeError:
-        logger.exception(f"Could not read trained time series ids from {meta_path}")
-        return None
+        logger.exception(f"Could not read the promoted model's meta.json at {meta_path}")
+        return _UNKNOWN_PROMOTED_MODEL
 
 
 def _describe_live_forecast_health(result: LiveForecastHealthResult) -> str:
@@ -600,6 +669,11 @@ def _describe_live_forecast_health(result: LiveForecastHealthResult) -> str:
         problems.append(f"{rows.n_nonfinite_power} rows have a null/NaN/infinite power_fcst")
     if rows.n_hindcast:
         problems.append(f"{rows.n_hindcast} rows target a valid_time at or before the init time")
+    if result.horizon_is_truncated:
+        problems.append(
+            f"the forecast reaches only {result.horizon_hours:.1f}h ahead, short of the "
+            f"{_MIN_HORIZON_HOURS:.0f}h floor"
+        )
     if result.missing_time_series_ids:
         listed = result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED]
         suffix = "" if len(listed) == len(result.missing_time_series_ids) else ", …"
@@ -609,52 +683,55 @@ def _describe_live_forecast_health(result: LiveForecastHealthResult) -> str:
         problems.append("no NWP run is available at or before this slot")
     elif result.nwp.n_missed:
         problems.append(
-            f"{result.nwp.n_missed} daily NWP run(s) missed "
+            f"the NWP feed is {result.nwp.n_missed} daily run(s) behind "
             f"(freshest on disk {result.nwp.latest_init_time}, "
             f"expected {result.nwp.expected_latest_init_time})"
         )
     if not problems:
         return (
             f"{rows.n_rows} valid forecast rows for {slot} across {rows.n_time_series} time "
-            f"series and {rows.n_ensemble_members} ensemble members; no NWP runs missed."
+            f"series and {_plural(rows.n_ensemble_members, 'ensemble member')}; the NWP feed is "
+            "up to date."
         )
     return f"Live forecast for {slot} is degraded: " + "; ".join(problems) + "."
 
 
+def _plural(count: int, noun: str) -> str:
+    """``"3 ensemble members"`` / ``"1 ensemble member"`` — regular plurals only."""
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
+
+
 def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str, Any]:
-    """Render the evaluation as the check's Dagster UI metadata."""
+    """Render the evaluation as the check's Dagster UI metadata.
+
+    Every numeric entry is *omitted* rather than replaced by explanatory text when its value is
+    unknown, so each key keeps one type across runs and Dagster can plot it over time. The
+    description always spells out what was unknown and why.
+    """
     rows = result.rows
-    return {
+    metadata: dict[str, Any] = {
         "power_fcst_init_time": result.power_fcst_init_time.isoformat(),
         "n_rows": rows.n_rows,
         "n_invalid_rows": rows.n_invalid,
         "n_nonfinite_power": rows.n_nonfinite_power,
         "n_hindcast_rows": rows.n_hindcast,
         "n_time_series": rows.n_time_series,
-        "n_time_series_expected": (
-            result.n_expected_time_series
-            if result.n_expected_time_series is not None
-            else MetadataValue.text("unknown — no promoted model meta.json")
-        ),
         "n_time_series_missing": len(result.missing_time_series_ids),
         "missing_time_series_ids": str(
             list(result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED])
         ),
         "n_ensemble_members": rows.n_ensemble_members,
-        "forecast_horizon_hours": (
-            round(result.horizon_hours, 1)
-            if result.horizon_hours is not None
-            else MetadataValue.text("no rows")
-        ),
-        "n_missed_nwp_runs": (
-            result.nwp.n_missed
-            if result.nwp.n_missed is not None
-            else MetadataValue.text("unknown — no NWP run at or before this slot")
-        ),
         "nwp_init_time_on_disk": str(result.nwp.latest_init_time),
         "nwp_init_time_expected": result.nwp.expected_latest_init_time.isoformat(),
         "nwp_init_time_on_rows": str(rows.nwp_init_time),
     }
+    if result.n_expected_time_series is not None:
+        metadata["n_time_series_expected"] = result.n_expected_time_series
+    if result.horizon_hours is not None:
+        metadata["forecast_horizon_hours"] = round(result.horizon_hours, 1)
+    if result.nwp.n_missed is not None:
+        metadata["n_missed_nwp_runs"] = result.nwp.n_missed
+    return metadata
 
 
 def _to_live_forecast_check_result(result: LiveForecastHealthResult) -> AssetCheckResult:
@@ -691,13 +768,17 @@ def _evaluate_live_forecasts(context: AssetCheckExecutionContext) -> AssetCheckR
     """
     settings = Settings()
     power_fcst_init_time = _checked_power_fcst_init_time(context, datetime.now(timezone.utc))
+    promoted = _read_promoted_model_facts(settings.production_model_path)
     result = evaluate_live_forecast_health(
         _read_live_forecast_rows(
-            settings.power_forecasts_data_path, settings.storage_options, power_fcst_init_time
+            settings.power_forecasts_data_path,
+            settings.storage_options,
+            power_fcst_init_time,
+            promoted.experiment_name,
         ),
         _nwp_init_times_on_disk(settings),
         power_fcst_init_time=power_fcst_init_time,
-        expected_time_series_ids=_trained_time_series_ids(settings.production_model_path),
+        expected_time_series_ids=promoted.trained_time_series_ids,
     )
     return _to_live_forecast_check_result(result)
 

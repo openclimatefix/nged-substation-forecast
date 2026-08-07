@@ -46,8 +46,15 @@ _TRAINED_CELL = 10
 _UNTRAINED_CELL = 20
 _MEMBERS = (0, 1, 2)
 
-_VALID_TIMES = [_POWER_FCST_INIT_TIME + timedelta(minutes=30 * i) for i in range(1, 5)]
-"""00:30 .. 02:00, after ``_POWER_FCST_INIT_TIME``."""
+_VALID_TIMES = [
+    _POWER_FCST_INIT_TIME + offset
+    for offset in (timedelta(minutes=30), timedelta(days=1), timedelta(days=7), timedelta(days=13))
+]
+"""Four valid times after ``_POWER_FCST_INIT_TIME``, spread across the forecast horizon.
+
+They span days rather than the first two hours so that the forecast this fixture produces has a
+realistic *reach*, which ``live_forecasts_are_healthy`` checks: a slot whose rows stop a couple of
+hours ahead is an undeliverable forecast however well-formed each row is."""
 
 
 def _nwp_records(cell: int, init_time: datetime, members: tuple[int, ...]) -> list[dict]:
