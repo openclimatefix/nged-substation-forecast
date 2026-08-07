@@ -173,6 +173,17 @@ nulls in the three de-accumulated variables is *expected* and is not a fault —
 nulls is rejected at ingest by `Nwp.validate`, which means the day's run simply does not land: the
 symptom you will actually see is a **missed run**, not corrupt data.
 
+**Reading the NWP completeness check.** `nwp_run_is_complete` also runs inside `ecmwf_ens`, also
+non-blocking WARN, and asks the other question: did the whole run arrive? Its description names
+the missing ensemble members and the missing lead times in hours, and its metadata carries the
+observed-versus-expected member, step, cell and row counts. **The run has already landed when this
+warns** — a short run is kept, because partial NWP forecasts better than falling back on
+yesterday's run. So there is nothing to clean up; the action is to chase Dynamical.org, and to
+re-materialise the partition once the upstream run is republished. Every materialisation also
+publishes `n_ensemble_members`, `n_valid_times`, `n_h3_cells` and the `valid_time` range as
+metadata, so the Dagster UI timeline shows slow drift in the upstream dataset before it becomes a
+warning.
+
 **When a daily NWP run is missing.** We ingest one ECMWF run per day (the 00Z run, downloaded at
 08:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
 forecasting. Raw age is not a fault signal; a missed *run* is. If one or two runs are missed,

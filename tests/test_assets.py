@@ -18,7 +18,14 @@ import shapely
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.weather_schemas import Nwp
-from dagster import DagsterInstance, build_asset_context, materialize
+from dagster import (
+    AssetCheckEvaluation,
+    AssetCheckSeverity,
+    DagsterInstance,
+    ExecuteInProcessResult,
+    build_asset_context,
+    materialize,
+)
 from dynamical_data.ecmwf_ens.download import NwpRunNotYetAvailable
 from nged_data.storage import NoNewData, _ProcessedFileListing
 
@@ -206,6 +213,17 @@ def test_h3_grid_weights_materialises_and_writes_parquet(
 # --- ecmwf_ens -----------------------------------------------------------------------------------
 
 
+def _check_evaluations(result: ExecuteInProcessResult) -> dict[str, AssetCheckEvaluation]:
+    """The run's asset-check evaluations, keyed by check name.
+
+    ``ecmwf_ens`` emits two independent checks, so tests look theirs up by name rather than
+    relying on the order Dagster happens to report them in.
+    """
+    return {
+        evaluation.check_name: evaluation for evaluation in result.get_asset_check_evaluations()
+    }
+
+
 def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
     ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to the
@@ -239,9 +257,21 @@ def test_ecmwf_ens_materialises_and_appends_nwp(env: Path, monkeypatch: pytest.M
     written = pl.read_delta(Settings().nwp_data_path)
     assert written.height == 4
     # The clean run emits a passing data-quality check.
-    (evaluation,) = result.get_asset_check_evaluations()
-    assert evaluation.check_name == "nwp_has_no_unexpected_nulls"
-    assert evaluation.passed
+    assert _check_evaluations(result)["nwp_has_no_unexpected_nulls"].passed
+    # The run's observed shape is published on every materialisation, so drift stays visible in the
+    # Dagster UI timeline even when both checks pass.
+    (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
+    assert {
+        "n_rows",
+        "n_ensemble_members",
+        "n_valid_times",
+        "n_h3_cells",
+        "valid_time_min",
+        "valid_time_max",
+    } <= set(materialisation.metadata)
+    assert materialisation.metadata["n_ensemble_members"].value == 4
+    assert materialisation.metadata["n_valid_times"].value == 4
+    assert materialisation.metadata["n_h3_cells"].value == 4
 
 
 def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
@@ -272,10 +302,43 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
     )
     assert result.success  # tolerated — the run is NOT failed
     assert pl.read_delta(Settings().nwp_data_path).height == 3  # data was persisted
-    (evaluation,) = result.get_asset_check_evaluations()
-    assert evaluation.check_name == "nwp_has_no_unexpected_nulls"
+    evaluation = _check_evaluations(result)["nwp_has_no_unexpected_nulls"]
     assert not evaluation.passed  # WARN: the scatter is surfaced
     assert evaluation.metadata["n_scattered_null_cells"].value == 1
+
+
+def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
+    env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A short run (the stub frame carries 4 members x 4 steps x 4 cells, not the full ECMWF ENS
+    grid) is landed anyway and surfaced as a WARN — an incomplete upstream run is absent input, so
+    we keep the rows that arrived rather than discarding the whole partition."""
+    from contracts.settings import Settings
+
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
+    monkeypatch.setattr(assets, "download_ecmwf_ens_data", lambda ds: object())
+    monkeypatch.setattr(
+        assets,
+        "convert_nwp_xarray_dataset_to_polars_dataframe",
+        lambda ds, h3_grid: _make_nwp(init_time),
+    )
+
+    result = materialize(
+        [ecmwf_ens], partition_key="2024-12-01", instance=DagsterInstance.ephemeral()
+    )
+    assert result.success  # WARN, not a failure: the partial run is NOT thrown away
+    assert pl.read_delta(Settings().nwp_data_path).height == 4  # data was persisted
+
+    evaluation = _check_evaluations(result)["nwp_run_is_complete"]
+    assert not evaluation.passed
+    assert evaluation.severity == AssetCheckSeverity.WARN
+    # The single-cell H3 grid weights fixture is where the cell expectation comes from.
+    assert evaluation.metadata["expected_n_h3_cells"].value == 1
+    assert evaluation.metadata["n_h3_cells"].value == 4
+    # The stub frame carries members 0-3, so 4-50 of the 51 ECMWF ENS members are named as absent.
+    assert evaluation.metadata["missing_ensemble_members"].value == list(range(4, 51))
 
 
 def test_ecmwf_ens_retries_when_run_not_yet_available(
@@ -333,10 +396,11 @@ def test_definitions_resolve(env: Path) -> None:
     }
     assert "h3_grid_weights" in ecmwf_parents
 
-    # The power-data freshness check and the NWP data-quality check are both registered.
+    # The power-data freshness check and both NWP per-run checks are registered.
     check_keys = {key.name for key in asset_graph.asset_check_keys}
     assert "power_data_is_fresh" in check_keys
     assert "nwp_has_no_unexpected_nulls" in check_keys
+    assert "nwp_run_is_complete" in check_keys
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
     for job_name, expected_asset in [

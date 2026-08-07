@@ -10,7 +10,12 @@ from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
-from contracts.weather_schemas import NwpQualityReport, assess_nwp_quality
+from contracts.weather_schemas import (
+    NwpQualityReport,
+    NwpRunCompletenessReport,
+    assess_nwp_quality,
+    assess_nwp_run_completeness,
+)
 from dagster import (
     AssetCheckResult,
     AssetCheckSeverity,
@@ -181,6 +186,14 @@ so there is nothing to re-scan (and re-scanning the whole ~5.9B-row NWP table wo
 2**32 row-count ceiling). This differs from ``power_data_is_fresh``, whose freshness genuinely
 drifts over time and so must re-read the table on a schedule."""
 
+_NWP_COMPLETENESS_CHECK_NAME: Final[str] = "nwp_run_is_complete"
+"""Name of the per-run NWP completeness check emitted by ``ecmwf_ens`` (see
+``assess_nwp_run_completeness``).
+
+Separate from ``nwp_has_no_unexpected_nulls`` because the two answer different questions with
+different remedies: that one asks whether the rows we got are usable, this one asks whether we got
+all the rows. Computed in-asset from the frame in memory, for the same reason."""
+
 _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
     columns=[
         TableColumn("variable", "string"),
@@ -196,7 +209,10 @@ _NWP_NULL_SLICES_SCHEMA: Final[TableSchema] = TableSchema(
 @asset(
     partitions_def=ecmwf_ens_partitions,
     deps=["h3_grid_weights"],
-    check_specs=[AssetCheckSpec(name=_NWP_QUALITY_CHECK_NAME, asset="ecmwf_ens")],
+    check_specs=[
+        AssetCheckSpec(name=_NWP_QUALITY_CHECK_NAME, asset="ecmwf_ens", blocking=False),
+        AssetCheckSpec(name=_NWP_COMPLETENESS_CHECK_NAME, asset="ecmwf_ens", blocking=False),
+    ],
     # The `pool="ECMWF"` works in conjunction with the Dagster instance configuration
     # (e.g., in `dagster.yaml`) to limit the number of times this asset can be run
     # concurrently. This is crucial because downloading ECMWF data is memory-intensive.
@@ -243,17 +259,61 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     write_nwp(nwp, nwp_data_path, storage_options)
     context.log.info(f"Saved NWP data to Delta table at {nwp_data_path}.")
 
-    # Non-fatal data-quality check: surface the tolerated scattered nulls (known upstream ECMWF ENS
-    # corruption) that Nwp.validate deliberately let through. A structural gap would have failed the
-    # validate above, so this only ever WARNs about scatter.
+    # Two non-fatal per-run checks. The first surfaces the tolerated scattered nulls (known upstream
+    # ECMWF ENS corruption) that Nwp.validate deliberately let through. The second asks whether the
+    # run is *whole*; a short run is the upstream provider misbehaving, so we keep the rows that did
+    # arrive and WARN rather than discarding the run.
     quality = assess_nwp_quality(nwp)
+    completeness = assess_nwp_run_completeness(
+        nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
+    )
     return MaterializeResult(
         metadata={
             "n_rows": len(nwp),
             "path": nwp_data_path,
             "init_time": str(nwp_init_time),
+            **_nwp_run_shape_metadata(completeness),
         },
-        check_results=[_nwp_quality_check_result(quality)],
+        check_results=[
+            _nwp_quality_check_result(quality),
+            _nwp_completeness_check_result(completeness),
+        ],
+    )
+
+
+def _nwp_run_shape_metadata(report: NwpRunCompletenessReport) -> dict[str, MetadataValue]:
+    """The run's observed shape, published on *every* materialisation so drift is visible in the
+    Dagster UI timeline even on the runs where the completeness check passes."""
+    return {
+        "n_ensemble_members": MetadataValue.int(report.n_ensemble_members),
+        "n_valid_times": MetadataValue.int(report.n_valid_times),
+        "n_h3_cells": MetadataValue.int(report.n_h3_cells),
+        "valid_time_min": MetadataValue.text(str(report.valid_time_min)),
+        "valid_time_max": MetadataValue.text(str(report.valid_time_max)),
+    }
+
+
+def _nwp_completeness_check_result(report: NwpRunCompletenessReport) -> AssetCheckResult:
+    """Wrap an :class:`NwpRunCompletenessReport` into a WARN-severity Dagster check result."""
+    return AssetCheckResult(
+        check_name=_NWP_COMPLETENESS_CHECK_NAME,
+        # WARN, never fail: an incomplete upstream run is absent input, not malformed input, and
+        # partial NWP still forecasts far better than yesterday's run would. See
+        # https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/.
+        passed=report.is_complete,
+        severity=AssetCheckSeverity.WARN,
+        description=report.describe(),
+        metadata={
+            "n_ensemble_members": report.n_ensemble_members,
+            "n_valid_times": report.n_valid_times,
+            "n_h3_cells": report.n_h3_cells,
+            "expected_n_h3_cells": report.expected_n_h3_cells,
+            "n_rows": report.n_rows,
+            "expected_n_rows": report.expected_n_rows,
+            "missing_ensemble_members": list(report.missing_ensemble_members),
+            "missing_lead_time_hours": list(report.missing_lead_time_hours),
+            "n_missing_h3_cells": report.missing_h3_cell_count,
+        },
     )
 
 
