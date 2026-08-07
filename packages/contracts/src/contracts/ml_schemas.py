@@ -101,12 +101,9 @@ class AllFeatures(pt.Model):
         dtype=pl.Int16,
         allow_missing=True,
         description=(
-            "Offset of the local time zone from UTC, in minutes (0 or 60 for GB). Minutes "
-            "represent every offset an inhabited time zone has used since standardisation, so "
-            "sub-hour zones stay distinct: India's +5:30 is 330 and Nepal's +5:45 is 345. Int16 "
-            "spans the real extremes, -720 (Etc/GMT+12) to +840 (Pacific/Kiritimati). The feature "
-            "engineer raises rather than rounding if an offset is not a whole number of minutes, "
-            "which only pre-standardisation local mean time is."
+            "Offset of the local time zone from UTC, in minutes (0 or 60 for GB). Minutes keep "
+            "sub-hour zones distinct: India's +5:30 is 330 and Nepal's +5:45 is 345. Int16 spans "
+            "the real extremes, -720 (Etc/GMT+12) to +840 (Pacific/Kiritimati)."
         ),
     )
     local_time_of_day_sin: float | None = _FEATURE_DTYPE

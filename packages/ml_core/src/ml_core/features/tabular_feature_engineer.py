@@ -22,7 +22,6 @@ Nullify Leaky Lags Rationale:
 
 import math
 from datetime import datetime
-from typing import Final
 
 import patito as pt
 import polars as pl
@@ -40,9 +39,6 @@ from ml_core.features._nwp import (
 from ml_core.features._parsed_features import STATIC_FEATURE_REGISTRY, ParsedFeatures
 from ml_core.features.feature_engineer import FeatureEngineer
 from weather_utils import select_analysis_proxy
-
-_SECONDS_PER_MINUTE: Final[int] = 60
-"""Seconds in a minute, used to convert a UTC offset from seconds to minutes."""
 
 
 def _attach_nearest_nwp_cell(
@@ -336,39 +332,17 @@ def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: i
 
 
 def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
-    """Returns the local offset from UTC in minutes, raising on a sub-minute offset.
+    """Returns the local offset from UTC in minutes.
 
-    Minutes represent every offset any inhabited time zone has used since standardisation, so the
-    feature is faithful rather than approximate: India's +5:30 is ``330`` and Nepal's +5:45 is
-    ``345``, two distinct values, and Australia's +9:30 (``570``) does not collide with +9:00
-    (``540``). A mixed-offset deployment is therefore representable. ``Int16`` is ample — the real
-    extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
+    Minutes represent every offset in scope exactly, so sub-hour zones stay distinct rather than
+    collapsing into one another: India's +5:30 is ``330`` and Nepal's +5:45 is ``345``, and
+    Australia's +9:30 (``570``) does not collide with +9:00 (``540``). ``Int16`` is ample — the
+    real extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
 
-    Minutes are not quite the whole story, which is why the guard is here. IANA carries local mean
-    time for the era before each zone standardised, and LMT offsets are not whole minutes:
-    ``Europe/London`` ran on UTC−0:01:15 — −75 seconds — until 1847. A plain division would floor
-    that to −2 minutes, so widening from hours to minutes narrows the assumption without
-    eliminating it. Rather than leave a smaller silent floor, we divide only when the division is
-    exact: ``replace_strict`` is passed no ``default``, so a non-zero residue raises
-    ``InvalidOperationError`` when the frame is collected. Because the residue is provably zero,
-    adding it back leaves the value unchanged; it is added rather than computed as a column of its
-    own so that projection pushdown cannot keep the offset while pruning the check.
-
-    Why it raises rather than degrading. The time zone is a constant in our own source, so the way
-    to reach a sub-minute offset is to change that constant — a code change, which makes this a
-    contract violation (our own bug) rather than the outside world misbehaving, the one category
-    the inherent-stability rules reserve raising for. A ``valid_time`` before 1848 also reaches it,
-    and nothing bounds ``PowerTimeSeries.time`` at the Patito boundary, so a corrupt feed could in
-    principle deliver one — but such a row is already silently poisoning every other local-time
-    feature, and no timestamp in the era we forecast can fire the guard.
-
-    If a feature set does not request ``local_utc_offset_minutes``, Polars prunes the expression
-    and the check does not run. That is harmless, because a column nobody asked for cannot be
-    silently wrong, but it does mean the guard protects the feature rather than the pipeline.
-
-    The check stays inside the Polars expression, so it forces no extra ``.collect()`` and no
-    Python round-trip over the data: a modulo and a hash lookup per row, a few nanoseconds against
-    the ~36 ns per row the surrounding time-zone conversion already costs.
+    Whole minutes depend on the era bound on ``PowerTimeSeries.time`` (issue #466). The only
+    offsets that are *not* whole minutes are IANA's pre-standardisation local mean time —
+    ``Europe/London`` ran on UTC−0:01:15 until 1847 — and a timestamp that old is malformed input,
+    which belongs at the contract boundary rather than being defended against here.
 
     Args:
         local_time: An expression yielding a time-zone-aware datetime in the local time zone.
@@ -379,13 +353,8 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
     See the portability review for the wider picture,
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/adapting-to-another-geography/>.
     """
-    offset_seconds = (
-        local_time.dt.base_utc_offset() + local_time.dt.dst_offset()
-    ).dt.total_seconds()
-    zero_residue = (offset_seconds % _SECONDS_PER_MINUTE).replace_strict(
-        {0: 0}, return_dtype=pl.Int16
-    )
-    return (offset_seconds // _SECONDS_PER_MINUTE + zero_residue).cast(pl.Int16)
+    offset = local_time.dt.base_utc_offset() + local_time.dt.dst_offset()
+    return offset.dt.total_minutes().cast(pl.Int16)
 
 
 def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:

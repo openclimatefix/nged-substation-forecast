@@ -339,26 +339,6 @@ def test_local_utc_offset_minutes_is_faithful(time_zone: str, month: int, expect
     assert result["offset"].dtype == pl.Int16
 
 
-def test_apply_local_time_features_raises_on_sub_minute_offset():
-    """A sub-minute offset raises rather than being floored, through the production entry point.
-
-    Minutes cover every offset an inhabited zone has used since standardisation, but not the local
-    mean time IANA carries for the era before it: ``Europe/London`` ran on UTC-0:01:15 until 1847,
-    which a plain division would floor to -2 minutes. ``_apply_local_time_features`` hard-codes
-    ``Europe/London``, so a pre-1848 timestamp is both the only input that reaches the guard and
-    the only way to pin the guard to the function production actually calls.
-    """
-    lf = pl.LazyFrame(
-        {"valid_time": [datetime(1840, 6, 1, 12, 0, tzinfo=timezone.utc)]}
-    ).with_columns(pl.col("valid_time").cast(pl.Datetime("us", "UTC")))
-
-    # Match on the message: `InvalidOperationError` is also what a *different* failure earlier in
-    # the same expression raises (e.g. `base_utc_offset` on a tz-naive column), so without this
-    # the test could pass for the wrong reason.
-    with pytest.raises(pl.exceptions.InvalidOperationError, match="incomplete mapping"):
-        _apply_local_time_features(lf).collect()
-
-
 def test_parsed_features_from_selected_features():
     selected = {
         "power_lag_24h",

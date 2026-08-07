@@ -75,7 +75,7 @@ about how it used to work, what a change replaced, or which issue changed it —
 in git, in the PR and in the issue tracker, and repeating it here turns every page into a running
 changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage
 to describe the new behaviour rather than appending a note about what changed. This is the
-"comments must reflect current state only" rule under Code Style, applied to prose.
+"comments and docs must reflect current state only" rule under Code Style, applied to prose.
 
 ## How planning works
 

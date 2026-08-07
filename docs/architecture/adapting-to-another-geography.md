@@ -1246,18 +1246,18 @@ All of it sits in a thin layer, and most of it sits in `contracts`.
 | H3 resolution 5 (~253 km² per cell) chosen for GB, and reached for via a **private** import from the ingest package | `defs/assets.py:40,141` | The NWP grid resolution currently lives inside `nged_data`; see the `PowerIngest` note [below](#how-we-would-structure-it). |
 | `nged_s3_bucket_url` / `_access_key` / `_secret` are **required** settings with no defaults | `contracts/settings.py` | `Settings()` raises for any deployment with no NGED bucket. |
 
-One thing this exercise did change is the UTC-offset feature, which is **not** a British assumption.
+The UTC-offset feature is **not** one of these British assumptions.
 `local_utc_offset_minutes` holds the local offset from UTC in minutes, in an `Int16`, so every
-offset an inhabited time zone uses is represented exactly: India's +5:30 is `330` and Nepal's +5:45
-is `345`, two distinct values rather than one merged bucket, and Australia's +9:30 (`570`) stays
-distinct from +9:00 (`540`). A mixed-offset deployment is therefore representable, and the column
-name states its own units.
+offset in scope is represented exactly and sub-hour zones stay distinct: India's +5:30 is `330` and
+Nepal's +5:45 is `345`, and Australia's +9:30 (`570`) does not collide with +9:00 (`540`). A
+mixed-offset deployment is representable, and the column name states its own units.
 
-Minutes stop just short of covering IANA in full, because IANA carries local mean time for the era
-before each zone standardised, and LMT offsets are not whole minutes — `Europe/London` ran on
-UTC−0:01:15 until 1847. `_local_utc_offset_minutes` divides only when the division is exact and
-raises otherwise, so that residue is explicit rather than quietly floored. In practice only a
-pre-1848 timestamp can reach it.
+The one thing an adapted deployment would need to revisit is the era bound on
+`PowerTimeSeries.time` ([issue
+#466](https://github.com/openclimatefix/nged-substation-forecast/issues/466)), which is what
+guarantees the offset is a whole number of minutes. Zones standardised at different dates, and IANA
+carries local mean time for the era before each one did: `Europe/London` runs on UTC−0:01:15 until
+1847, where `Asia/Kolkata` carries local mean time until 1906.
 
 ### What is hard-wired to half-hourly
 
