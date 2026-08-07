@@ -491,7 +491,9 @@ Five scheduling notes specific to this page:
 ### Weather-abnormality (climatology z-score) features
 
 Give the booster a sense of whether the *forecast* weather is abnormal — a heatwave, an
-unusually warm spring, a storm — by feeding it, per weather variable, a standardised anomaly
+unusually warm spring, a storm, and (in
+[the long-window variant](#the-long-window-variant-drought-and-sustained-heat-state) below) a
+drought — by feeding it, per weather variable, a standardised anomaly
 `z = (x − μ) / σ` against a climatological norm for that calendar time. This promotes the
 [deferred feature-grammar note](#explicitly-deferred-not-quick-or-not-skill)'s
 weather-abnormality idea to a concrete experiment. The inductive-bias case is the one the
@@ -566,6 +568,148 @@ norm, and is not what this item builds.)
 [wind power-curve proxy](#linearised-physics-features-for-solar-and-wind)'s cut-out masking
 already encodes "storm" for wind, and raw pressure and wind speed cover the rest — so the first
 experiment carries a *temperature* anomaly only.
+
+#### The long-window variant: drought and sustained-heat state
+
+Everything above z-scores an *instantaneous* forecast value against its norm for that calendar
+moment. A second family of features asks a different question: how abnormal has the recent
+*accumulated* weather been? Total precipitation over the past 30 or 90 days as a fraction of the
+climatological norm for that window, and the equivalent accumulated-temperature (or degree-day)
+anomaly, carry state that no instantaneous feature can hold. Great Britain's summer of 2026 is the
+regime in which the two diverge sharply: a single 25 °C afternoon tells the model nothing about
+whether the preceding quarter contained
+[the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
+
+This is also the corner of the feature space where the GB brief and the
+[India assessment](../architecture/adapting-to-another-geography.md#the-two-pilot-discoms-delhi-and-jaipur)
+converge, which is worth knowing before deciding how much to invest here. Everything below is a
+mild refinement in a rainy maritime climate and a first-order effect in an arid one — Rajasthan
+sits on the margin of the Thar desert, where soiling between monsoons is severe *and* unusually
+observable, because a sharp washing signal is what identifies a reversible cleanliness factor at
+all. Building these features for Great Britain is therefore cheaper than it looks on the GB
+business case alone.
+
+**Where the signal plausibly is**, in roughly descending order of confidence:
+
+- **PV soiling** — the mechanism this project has already worked out in most detail, which is why
+  it leads. Dust, pollen and bird droppings accumulate on panel glass and a decent fall of rain
+  washes most of it off.
+  [Differentiable physics → Soiling](../techniques/differentiable-physics.md#soiling) makes the
+  central point for us: Britain's *long-run average* effect is small, but the loss tracks **time
+  since the last washing rainfall** rather than any climate mean, so a multi-month dry spell is
+  exactly the regime in which it stops being small — and that page says the correction is worth
+  adding for Great Britain, not only for dustier climates. The tabular feature is the state
+  variable of that model, `d_t`, taken directly: time since precipitation last exceeded a washing
+  threshold. Two things follow. It needs **no new data source** — `precipitation_surface` is
+  already among the ECMWF ENS variables we download, so the rainfall history sits in the archive
+  (though reconstructing a dry spell longer than one 15-day run still means stitching across
+  archived runs, and so inherits the availability-cut caveat below) — and it is the one member of
+  this family that needs no climatological normalisation at all, because "37 days since washing
+  rain" is already interpretable in absolute terms. The
+  [assessment of running this codebase over India](../architecture/adapting-to-another-geography.md#the-short-answer)
+  reaches the same conclusion from the opposite direction, and is worth reading alongside this
+  bullet: it argues that a reversible cleanliness factor is something "we should probably add for
+  Britain anyway", precisely because Britain's rainy *average* hides real dry-spell episodes, and
+  concludes that work done here would pay off in both countries. Note the division of labour with
+  capacity estimation, which absorbs the long-run
+  *average* soiling bias into the effective-capacity estimate
+  ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
+  that leaves precisely the time-varying part for a feature to explain, and this is the cheap
+  XGBoost-era stand-in for the differentiable-physics treatment.
+- **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most
+  of that population is demand. The Tier-2
+  [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
+  roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
+  thing: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
+  ground and building-fabric temperatures that a three-day EWM cannot represent.
+- **Agricultural irrigation pumping.** Drought raises it, and the trial area sits in the EMids
+  licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
+  rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
+  needs confirming against NGED's own customer mix before anyone leans on it. Note how much easier
+  the same load is to model elsewhere: the
+  [India assessment](../architecture/adapting-to-another-geography.md#the-short-answer) calls
+  agricultural pumping "the happier case" there, because Indian agricultural feeders are largely
+  segregated and run to a published supply schedule, so a large unmetered load is partly known in
+  advance. GB offers no such segregation, which is exactly why this stays an inference from
+  weather rather than a measured quantity.
+- **Hydro** — physically the cleanest mechanism of the four, and the only one where a 90-day
+  rainfall total approaches being a *primary* driver rather than a correction. It is listed last
+  anyway, because NGED's network barely has any. It has **no v1 exposure**: `Hydro` is a valid
+  `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
+  hydro series. Nor does v2 rescue it. NGED's own
+  [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
+  (May 2026) lists **41 connected hydro sites totalling 25.7 MW** across all four licence areas —
+  South Wales 13.7 MW over 10 sites, South West 6.2 MW over 18, East Midlands 5.3 MW over 8, West
+  Midlands 0.5 MW over 5. For scale, the same register shows **5,669 MW of connected solar** and
+  1,416 MW of wind on that network, so hydro is under half a percent of the embedded solar
+  capacity.
+
+    Two details from the register matter more than the headline total. First, it confirms the
+    physics is the *right* physics: 39 of the 44 hydro entries are `Hydro - Run of river` and 29
+    of the 41 connected sites join at 0.4 kV, so this is overwhelmingly small run-of-river with no
+    storage — the most rainfall-sensitive kind there is, output tracking catchment flow almost
+    directly. Second, it kills the feature's usefulness for hydro *specifically*: those 41 sites
+    are spread across **32 distinct primary substations**, so no primary is hydro-dominated and
+    every one of these schemes arrives diluted into a much larger net-demand signal rather than as
+    its own series. The largest connected schemes are Llyn Brianne (5.45 MW, Dyfed), Elan Valley
+    (4.0 MW, Powys), Chatsworth (3.7 MW, Derbyshire), Mary Tavy (2.6 MW, Devon) and Ystradffin
+    (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol scheme accepted to connect
+    in the South Wales area — but its target energisation date is 2037, well beyond any horizon
+    this roadmap plans for.
+
+**Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
+you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
+90-day accumulator moves slowly, so the
+[leaderboard fold](../ml_experimentation/cross-validation-folds.md#current-state-a-single-fold)'s
+training window — 2024-04-01 to 2025-06-30, bounded below by the start of the ENS archive —
+contains a *handful* of independent observations of it per series: one summer and one winter, not a
+distribution. A per-series booster will still happily split on it, and what it fits will largely be
+that particular year's idiosyncrasies, aliased with the seasonal `local_time_of_year_sin`/`_cos`
+features and with any level drift over the same months. The instantaneous z-scores do not have this
+problem, because a heatwave anomaly recurs many times within a single year.
+
+The *validation* side is the opposite, and it is what makes this worth running rather than merely
+worth describing. The same fold validates on 2025-07-01 to 2026-06-30, which contains summer 2025
+(the UK's warmest on record) and spring 2026 (the warmest on record for England and Wales). This is
+a forward-chained split holding out genuinely extreme regimes, so the leaderboard *can* register a
+result here. What it cannot do is separate "the idea is wrong" from "one summer of training data
+was not enough to fit it" — so a loss is weak evidence rather than a verdict, and should be
+recorded as such in MLflow rather than closing the question.
+
+Two things follow for how to judge it. Expect a small or negative NMAE move, and pair the
+leaderboard number with an out-of-band check of whether the model still behaves sensibly when the
+accumulator is pushed past the values the training window held — the same "sane extrapolation in
+weather regimes the training year never saw" criterion the
+[monotone constraints](#monotone-constraints-for-the-generation-models) item is judged on. Note
+that this does not trade away principle 8 ("*every experiment is scored identically*"): the
+leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
+*additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
+measurable only once [ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the
+training history from one summer to several.
+
+**Anchor it to init time, and source it from ERA5.** Compute the accumulator once at
+`power_fcst_init_time` and broadcast it across every horizon in the run, exactly like the
+[init-time-anchored features](#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model)
+and for the same reason: an init-time anchor is never leaky and never null at any horizon. (A
+target-time-anchored variant, whose window slides with `valid_time`, is a genuinely different
+feature — over a 14-day horizon it moves a 30-day window by nearly half its length — and can be
+tried separately if the init-time version earns it.) The anchoring also settles where the data
+comes from: a window reaching 90 days into the past cannot come from the forecast NWP trajectory at
+all, and stitching it together from archived ENS runs would ride the same uncut freshest-run join
+the residual-lag features flag. The clean source is the **ERA5 ingest** this item already depends
+on, which supplies the accumulation and its climatological norm from one table and one
+publication-time availability cut. Nothing here needs live data at forecast time beyond the ~5-day
+ERA5T latency, which is immaterial to a 90-day total.
+
+**Scope the first long-window experiment to precipitation.** The accumulated-*heat* variant is
+tempting to reach for first as a cheap control, on the grounds that it is just a longer
+effective-temperature EWM — but that is wrong, and for the reason this section has already given.
+The Tier-2 effective temperature is computed from the NWP trajectory itself, and
+`_apply_rolling_mean_feature` groups by `nwp_init_time` precisely so that a window cannot span
+runs, so with a 15-day ENS run there is no multi-week EWM to configure: the heat accumulator
+carries the same ERA5 dependency as the precipitation one. The genuinely cheap control is to
+lengthen the EWM only as far as the trajectory allows (~7–10 days), which is a weaker experiment
+and should be labelled as one.
 
 ## Tier 4 — structural model changes (weeks)
 
