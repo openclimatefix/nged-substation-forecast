@@ -11,6 +11,7 @@ from contracts.power_schemas import PowerTimeSeries
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.weather_schemas import (
+    ECMWF_ENS_H3_RESOLUTION,
     NwpQualityReport,
     NwpRunCompletenessReport,
     assess_nwp_quality,
@@ -42,7 +43,6 @@ from dynamical_data.ecmwf_ens.download import (
 )
 from geo.great_britain.load import load_gb_boundary
 from geo.h3 import compute_h3_grid_weights_for_boundary
-from nged_data.read_nged_json import _H3_RESOLUTION
 from nged_data.storage import (
     NoNewData,
     UpsertMetadataStats,
@@ -154,7 +154,7 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
     settings = Settings()
     boundary = load_gb_boundary()
     weights = compute_h3_grid_weights_for_boundary(
-        boundary, nwp_grid_size_degrees=0.25, h3_res=_H3_RESOLUTION
+        boundary, nwp_grid_size_degrees=0.25, h3_res=ECMWF_ENS_H3_RESOLUTION
     )
 
     # Save to parquet

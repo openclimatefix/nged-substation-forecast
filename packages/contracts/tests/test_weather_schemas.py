@@ -2,16 +2,8 @@ from typing import get_args
 
 from contracts.weather_schemas import (
     Nwp,
-    NwpMetaData,
     WeatherFeature,
 )
-
-
-def test_nwp_metadata_load():
-    # The load method defaults to the correct path in metadata/
-    metadata = NwpMetaData.load()
-    assert metadata.height >= 1
-    assert "ECMWF_ENS_0_25_degree" in metadata["nwp_model_id"].to_list()
 
 
 def test_weather_feature_literal_matches_model_fields():

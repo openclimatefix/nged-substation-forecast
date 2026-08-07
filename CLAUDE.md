@@ -13,7 +13,7 @@ uv run ruff check .            # check
 uv run ruff check . --fix      # fix
 uv run ruff format .           # format
 uv run ty check                # type checking
-uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md  # markdown lint
+uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md  # markdown lint
 
 # Testing
 uv run pytest                                # all tests

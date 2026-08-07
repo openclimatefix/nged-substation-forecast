@@ -185,8 +185,9 @@ re-running the partition after Dynamical republishes the run would append a *sec
 alongside the short one. `Nwp.validate` checks uniqueness only within the in-memory frame, so the
 duplicate primary keys would land silently and every later `Nwp.scan_delta` read would fan out. If
 a short run genuinely needs replacing, that needs a partition-replace path in `delta_store.nwp`,
-which does not exist today. (Materialising a *missed* partition, below, is a different case and is
-safe: nothing landed for it.)
+which does not exist today — tracked in
+[issue #476](https://github.com/openclimatefix/nged-substation-forecast/issues/476). (Materialising
+a *missed* partition, below, is a different case and is safe: nothing landed for it.)
 
 Every materialisation also publishes `n_ensemble_members`, `n_valid_times`, `n_h3_cells` and the
 `valid_time` range as metadata, so the Dagster UI timeline shows slow drift in the upstream dataset

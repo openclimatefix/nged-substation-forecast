@@ -16,21 +16,17 @@ from contracts.settings import PROJECT_ROOT, Settings, _find_project_root
 def test_project_root_is_the_workspace_root():
     """In this dev checkout, PROJECT_ROOT holds the workspace marker and the resource files.
 
-    Also guards the repo layout itself: if ``conf/`` or ``metadata/`` move, the
-    PROJECT_ROOT-relative Settings defaults break, and this is the test that should fail.
+    Also guards the repo layout itself: if ``conf/`` moves, the PROJECT_ROOT-relative Settings
+    defaults break, and this is the test that should fail.
     """
     assert (PROJECT_ROOT / "uv.lock").is_file()
     assert (PROJECT_ROOT / "conf" / "cv" / "default.yaml").is_file()
-    assert (PROJECT_ROOT / "metadata" / "nwp_metadata.csv").is_file()
 
 
 def test_settings_defaults_anchor_at_project_root():
     """The repo-resource Settings defaults are PROJECT_ROOT-relative (not venv-relative)."""
     assert Settings.model_fields["cv_config_path"].default == (
         PROJECT_ROOT / "conf" / "cv" / "default.yaml"
-    )
-    assert Settings.model_fields["nwp_metadata_csv_path"].default == (
-        PROJECT_ROOT / "metadata" / "nwp_metadata.csv"
     )
 
 

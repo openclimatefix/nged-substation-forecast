@@ -60,41 +60,13 @@ Lead-0 is included: it is a real step, distinguished only by the de-accumulated 
 legitimately null there (see `Nwp.deaccumulated_var_names`).
 """
 
-
-class NwpMetaData(pt.Model):
-    """Metadata about numerical weather prediction models."""
-
-    nwp_model_id: str = pt.Field(
-        dtype=NWP_MODEL_ID_DTYPE,
-        description="Primary key for joining with NWP data (e.g. 'ECMWF_ENS_0_25_degree').",
-        unique=True,
-    )
-
-    provider: str = pt.Field(
-        dtype=pl.Enum(["ECMWF"]),
-        description="NWP data provider (currently always 'ECMWF').",
-    )
-
-    h3_resolution: int = pt.Field(
-        dtype=pl.Int8,
-        description="H3 spatial resolution used for this NWP model's grid.",
-    )
-
-    is_ensemble: bool = pt.Field(description="Whether this NWP model produces ensemble forecasts.")
-
-    @classmethod
-    def load(cls, csv_path: str | Path | None = None) -> pt.DataFrame[Self]:
-        """Load NWP metadata from a static CSV file.
-
-        Args:
-            csv_path: Path to the metadata CSV; defaults to ``get_settings().nwp_metadata_csv_path``
-                (resolved lazily so importing this module needs no ``.env``).
-        """
-        if csv_path is None:
-            csv_path = get_settings().nwp_metadata_csv_path
-        df = pl.read_csv(csv_path)
-        # Patito's .cast() will handle the conversion to the Enum type defined in the model
-        return pt.DataFrame(df).set_model(cls).cast().validate()
+ECMWF_ENS_H3_RESOLUTION: Final[int] = 5
+"""The H3 spatial resolution the `ecmwf_ens` ingest pipeline grids ECMWF ENS data to, and the
+resolution `power_time_series_and_metadata` computes for every time series so the two line up on
+one grid. Every NWP model shares this one resolution today; per-model resolution (so a future NWP
+source can use a different one) is tracked in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/114>.
+"""
 
 
 class Nwp(pt.Model):
@@ -115,7 +87,7 @@ class Nwp(pt.Model):
 
     nwp_model_id: str = pt.Field(
         dtype=NWP_MODEL_ID_DTYPE,
-        description="The primary key for joining with NwpMetaData (e.g. 'ECMWF_ENS_0_25_degree').",
+        description="Which NWP model produced this row (e.g. 'ECMWF_ENS_0_25_degree').",
     )
 
     init_time: datetime = pt.Field(
@@ -143,7 +115,7 @@ class Nwp(pt.Model):
 
     h3_index: int = pt.Field(
         dtype=pl.UInt64,
-        description="H3 cell index. The H3 resolution for the nwp_model_id is stored in NwpMetaData.",
+        description="H3 cell index, at `ECMWF_ENS_H3_RESOLUTION` (every NWP model shares it today).",
     )
 
     temperature_2m: float = pt.Field(

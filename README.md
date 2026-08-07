@@ -38,7 +38,7 @@ The essentials:
 - **Fix linting**: `uv run ruff check . --fix`
 - **Format code**: `uv run ruff format .`
 - **Type checking**: `uv run ty check`
-- **Markdown linting**: `uv run pymarkdown scan -r docs README.md CLAUDE.md metadata/README.md packages/*/README.md`
+- **Markdown linting**: `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md`
 
 Markdown (README.md files, docs/*.md, and Python docstrings) is linted automatically by the
 pre-commit hook, but when developing code or docs it's a good idea to run the markdown lint
