@@ -14,25 +14,29 @@ from patito.exceptions import (
 UTC_DATETIME_DTYPE = pl.Datetime(time_unit="us", time_zone="UTC")
 
 MIN_PLAUSIBLE_DATETIME: Final[datetime] = datetime(2000, 1, 1, tzinfo=UTC)
-"""The earliest timestamp any datetime column in any contract may carry.
+"""The earliest timestamp a bounded datetime column may carry (inclusive).
+
+A column is bounded when its model's ``validate`` passes it to :func:`check_datetime_bounds`; the
+constant says nothing about columns that have not opted in.
 
 NGED telemetry cannot predate the instrumentation that produced it, and the ECMWF archive we
 ingest begins later still, so no legitimate row is older than this. The bound is also deliberately
 far later than 1847: ``Europe/London`` ran on local mean time at UTC−0:01:15 until then, so a
 pre-1848 timestamp produces a sub-minute UTC offset and a nonsensical value for every local-time
-feature. Ruling those timestamps out at the contract boundary is what lets the local-time features
-in ``ml_core`` express the UTC offset in whole minutes.
+feature. Enforcing this bound is what guarantees the local-time features in ``ml_core`` never see
+a sub-minute UTC offset.
 """
 
 MAX_PLAUSIBLE_DATETIME: Final[datetime] = datetime(2100, 1, 1, tzinfo=UTC)
-"""The latest timestamp any datetime column in any contract may carry.
+"""The latest timestamp a bounded datetime column may carry (inclusive).
 
 This is a fixed date rather than an offset from the current time, so validation never depends on
 the wall clock: a frame that validated when it was written still validates when it is read back
-years later, and tests need no clock control. A fixed far-future bound still catches the failure
-this check exists for — the classic epoch-unit mix-up, where Unix milliseconds read as seconds land
-tens of thousands of years in the future. It deliberately does not catch a small clock skew that
-ships tomorrow's data as today's; that is a monitoring concern, not a contract one.
+years later, and tests need no clock control. A fixed far-future bound still catches an epoch-unit
+mix-up, where Unix milliseconds read as seconds land tens of thousands of years in the future —
+the plausible failure on any path that converts a numeric timestamp rather than parsing an ISO-8601
+string. It deliberately does not catch a small clock skew that ships tomorrow's data as today's;
+that is a monitoring concern, not a contract one.
 """
 
 

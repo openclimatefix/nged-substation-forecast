@@ -348,7 +348,7 @@ numeric field works exactly as documented, which is what makes this so easy to m
 `contracts.common.check_datetime_bounds` is the shared helper, and `MIN_PLAUSIBLE_DATETIME` /
 `MAX_PLAUSIBLE_DATETIME` are the shared bounds; `PowerTimeSeries.validate` and `Nwp.validate` are
 the worked examples. A `constraints=` Polars expression on the field also works, but its failure
-message is the generic "N rows do not match custom constraints", so prefer the explicit check when
+message is the generic "1 row does not match custom constraints", so prefer the explicit check when
 you want the error to say which bound was broken.
 
 ### Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`

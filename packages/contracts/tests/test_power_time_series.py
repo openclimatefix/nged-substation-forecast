@@ -86,8 +86,12 @@ def test_power_time_series_invalid_data(data, expected_error):
         df.cast().validate()
 
 
-def _one_row(time: datetime) -> pt.DataFrame:
-    """A single otherwise-valid PowerTimeSeries row at the given time."""
+def _one_row(time: datetime) -> pt.DataFrame[PowerTimeSeries]:
+    """A single PowerTimeSeries row at the given time, valid in every respect except `time`.
+
+    Every `time` passed in below is on :00 or :30, so the only rule an out-of-range case can break
+    is the range rule — the assertion cannot be satisfied by the alignment check firing instead.
+    """
     return pt.DataFrame({"time_series_id": [123], "time": [time], "power": [10.0]}).set_model(
         PowerTimeSeries
     )
@@ -102,9 +106,9 @@ def _one_row(time: datetime) -> pt.DataFrame:
             datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc),
             "before MIN_PLAUSIBLE_DATETIME",
         ),
-        # One microsecond below the lower bound: the bound itself is inclusive.
+        # The last half-hour before the lower bound: the bound itself is inclusive, this is not.
         (
-            datetime(1999, 12, 31, 23, 59, 59, 999_999, tzinfo=timezone.utc),
+            datetime(1999, 12, 31, 23, 30, tzinfo=timezone.utc),
             "before MIN_PLAUSIBLE_DATETIME",
         ),
         # Far future — how a Unix-epoch value in milliseconds read as seconds shows up.
