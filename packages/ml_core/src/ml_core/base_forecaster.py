@@ -8,6 +8,7 @@ import mlflow
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
+from mlflow.exceptions import MlflowException
 from pydantic import BaseModel
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
@@ -28,8 +29,15 @@ A run holding exactly *one* model file is what the fix rests on: logging a secon
 artifact alongside this archive would reopen the merge problem for that artifact.
 """
 
-_UNPACK_DIR_NAME: Final[str] = "unpacked_model"
-"""Sub-directory the downloaded archive is extracted into, next to the archive itself."""
+_ARCHIVE_COMPRESSLEVEL: Final[int] = 1
+"""gzip level used for the model archive — the fastest, not ``tarfile``'s default of 9.
+
+Measured on 40 real XGBoost boosters (500 estimators, depth 6, 24 features; 77 MB of ``.ubj``):
+level 1 takes 0.7 s for a 2.7x reduction, level 9 takes 14.9 s for 3.5x. Level 9 would put ~15
+minutes of pure CPU on every ``trained_cv_model`` materialisation at V2 scale (~2,500 series)
+to save a fifth of the bytes. Boosters are already dense, and the archive is transient — it
+exists to be one replaceable object, not to be small — so the fastest level is the right trade.
+"""
 
 
 def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
@@ -42,7 +50,7 @@ def _archive_model_dir(model_dir: Path, archive_path: Path) -> None:
         model_dir: The directory a subclass's ``save`` just wrote.
         archive_path: Where to write the ``.tar.gz`` (must not be inside ``model_dir``).
     """
-    with tarfile.open(archive_path, "w:gz") as tar:
+    with tarfile.open(archive_path, "w:gz", compresslevel=_ARCHIVE_COMPRESSLEVEL) as tar:
         for item in sorted(model_dir.iterdir()):
             tar.add(item, arcname=item.name)
 
@@ -51,8 +59,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
     Shared by ``BaseForecaster.load_from_mlflow`` and
-    ``ml_core._production_helpers.fetch_model_artifacts`` — the two consumers of a run's saved
-    model — so the archive layout is defined in exactly one place.
+    ``ml_core._production_helpers.fetch_model_artifacts``, the two readers of a run's saved
+    model, so the archive layout is defined in exactly one place.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.
@@ -60,19 +68,33 @@ def _download_and_unpack_model(run_id: str, work_dir: Path) -> Path:
     Args:
         run_id: The MLflow run the model was saved under.
         work_dir: A scratch directory (typically a ``TemporaryDirectory``) to download and
-            extract into.
+            extract into. Needs room for the archive *and* its unpacked contents.
 
     Returns:
         The directory holding the unpacked model, ready to hand to a subclass's ``load``. It
         contains only what the archive held, so a stale file from an earlier, larger model
         cannot appear in it.
+
+    Raises:
+        MlflowException: The run holds no model archive — either nothing was ever saved to it,
+            or it was written before the model became a single archive artifact, in which case
+            the fold must be re-trained.
     """
-    archive_path = Path(
-        mlflow.artifacts.download_artifacts(
-            run_id=run_id, artifact_path=_MLFLOW_MODEL_ARTIFACT, dst_path=str(work_dir)
+    try:
+        archive_path = Path(
+            mlflow.artifacts.download_artifacts(
+                run_id=run_id, artifact_path=_MLFLOW_MODEL_ARTIFACT, dst_path=str(work_dir)
+            )
         )
-    )
-    model_dir = work_dir / _UNPACK_DIR_NAME
+    except MlflowException as error:
+        raise MlflowException(
+            f"MLflow run {run_id} has no {_MLFLOW_MODEL_ARTIFACT} artifact. Either no model was "
+            "ever saved to this run, or it was saved before the model became a single archive "
+            "artifact — re-materialise `trained_cv_model` for this fold to rewrite it."
+        ) from error
+    # Unpack beside the archive rather than over it: download_artifacts has already claimed the
+    # archive's own name inside work_dir.
+    model_dir = work_dir / "unpacked_model"
     model_dir.mkdir()
     with tarfile.open(archive_path, "r:gz") as tar:
         tar.extractall(model_dir, filter="data")

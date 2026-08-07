@@ -76,8 +76,18 @@ Two properties are worth keeping in mind when reading the code:
   the archive removes the accumulation, but the population contract stands on its own (the
   train==predict invariant; see `BaseForecaster.trained_time_series_ids`).
 
-The cost is losing per-file browsing of model artifacts in the MLflow UI, which is negligible for
-a directory of opaque model blobs.
+Two costs come with this. The first is losing per-file browsing of model artifacts in the MLflow
+UI, which is negligible for a directory of opaque model blobs. The second is that both sides now
+hold the model twice at once in their temporary directory — the model directory plus the archive
+when saving, the archive plus its unpacked contents when loading — so a machine running these
+assets needs roughly twice the model's size in free temp space. At V2 scale (~2,500 series) that
+is a few GB, which matters mainly if `TMPDIR` is a memory-backed filesystem inside a container.
+
+The archive is written at gzip level 1 rather than `tarfile`'s default of 9. Measured on 40 real
+boosters (77 MB of `.ubj`), level 1 takes 0.7 s for a 2.7x reduction and level 9 takes 14.9 s for
+3.5x, so the default would spend about fifteen minutes of CPU per fold at V2 scale to save a
+fifth of the bytes. Boosters are already dense and the archive is transient — it exists to be one
+replaceable object, not to be small.
 
 ### Why there is no local cache
 

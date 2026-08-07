@@ -1,8 +1,8 @@
 """Tests for the MLflow model-artifact plumbing, against file-based MLflow.
 
-Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the third consumer of the same
-archive layout, ``ml_core._production_helpers.fetch_model_artifacts`` — they are tested together
-here because they share one on-the-wire format and one fake forecaster.
+Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the third function that touches
+the same archive layout, ``ml_core._production_helpers.fetch_model_artifacts`` — they are tested
+together here because they share one on-the-wire format and one fake forecaster.
 
 That fake (rather than a concrete model) keeps the tests focused on the shared behaviour —
 archive upload/download — and free of any model-library dependency. It writes one file per
@@ -19,6 +19,7 @@ import patito as pt
 import pytest
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
+from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 from ml_core._production_helpers import fetch_model_artifacts
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -144,6 +145,11 @@ def test_the_model_is_stored_as_a_single_archive_artifact(saved_run: str) -> Non
 
     This is the property that makes a re-upload replace rather than merge (issue #470): MLflow
     overwrites a same-name single artifact but merges a directory upload.
+
+    The assertion covers the run's *whole* artifact listing, which is deliberately stricter than
+    the invariant: nothing else logs artifacts to a fold run today, and a second artifact turning
+    up here is worth a deliberate look rather than a silent pass, since any *per-model* file
+    logged alongside the archive would reopen the merge problem for that file.
     """
     assert _artifact_file_paths(saved_run) == ["model.tar.gz"]
 
@@ -193,6 +199,21 @@ def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
         "payload.txt",
         "promotion.json",
     ]
+
+
+def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) -> None:
+    """A run holding no model archive fails with an actionable message, not MLflow's raw one.
+
+    The case that matters is a run written before the model became a single archive artifact:
+    MLflow's own error says only that the path was not found, which gives an operator
+    re-materialising an old fold nothing to act on. (``saved_run`` is depended on for the
+    tracking URI it sets up, not for the model it holds.)
+    """
+    with mlflow.start_run(experiment_id=mlflow.create_experiment("empty_run")) as run:
+        empty_run_id = run.info.run_id
+
+    with pytest.raises(MlflowException, match="re-materialise `trained_cv_model`"):
+        _FakeForecaster.load_from_mlflow(empty_run_id)
 
 
 def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
