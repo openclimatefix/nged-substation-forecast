@@ -91,7 +91,8 @@ clear a far higher bar of prior plausibility than a safe one before it is worth 
 wild ideas are the first to be cut, and they are exactly where the large wins live, because an idea
 everybody already expects to work is rarely worth much. Cheap failure is what makes a
 low-probability, high-payoff attempt rational. That is why the corresponding design principle is expressed as a
-*cost* rule — [an experiment must be cheap to try, and cheap to abandon](design-principles.md) —
+*cost* rule — [an experiment must be cheap to try, and cheap to
+abandon](design-principles.md#4-an-experiment-must-be-cheap-to-try-and-cheap-to-abandon) —
 rather than as a speed one.
 
 **And an idea is not scored just once.** Because H1 claims graceful degradation, a serious

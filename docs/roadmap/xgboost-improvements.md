@@ -578,7 +578,7 @@ climatological norm for that window, and the equivalent accumulated-temperature 
 anomaly, carry state that no instantaneous feature can hold. Great Britain's summer of 2026 is the
 regime in which the two diverge sharply: a single 25 °C afternoon tells the model nothing about
 whether the preceding quarter contained
-[the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#industry-best-practices-we-have-not-yet-absorbed).
+[the driest July England and Wales have recorded since their series began in 1836](../design-philosophy/design-principles.md#input-drift-detection).
 
 This is also the corner of the feature space where the GB brief and the
 [India assessment](../architecture/adapting-to-another-geography.md#the-two-pilot-discoms-delhi-and-jaipur)
@@ -681,7 +681,8 @@ leaderboard number with an out-of-band check of whether the model still behaves 
 accumulator is pushed past the values the training window held — the same "sane extrapolation in
 weather regimes the training year never saw" criterion the
 [monotone constraints](#monotone-constraints-for-the-generation-models) item is judged on. Note
-that this does not trade away principle 8 ("*every experiment is scored identically*"): the
+that this does not trade away [principle 8 ("*every experiment is scored
+identically*")](../design-philosophy/design-principles.md#8-every-experiment-is-scored-identically): the
 leaderboard measurement is unchanged and stays comparable, and the extrapolation check is an
 *additional* acceptance criterion rather than a substitute score. The feature becomes cleanly
 measurable only once [ERA5 pre-training](#explicitly-deferred-not-quick-or-not-skill) extends the
