@@ -70,6 +70,13 @@ if it leaves a sentence without a clear subject/verb. Prefer "We split storage a
 buckets so that..." over "Two buckets, not one — split so that...". The full form is more
 readable and no less concise in practice.
 
+**Write about the present, not the past.** The docs describe how the code works *now*. Don't write
+about how it used to work, what a change replaced, or which issue changed it — that history lives
+in git, in the PR and in the issue tracker, and repeating it here turns every page into a running
+changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage
+to describe the new behaviour rather than appending a note about what changed. This is the
+"comments must reflect current state only" rule under Code Style, applied to prose.
+
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
@@ -226,8 +233,8 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Prefer small functions.** Extract private helpers (`_name`) rather than letting a function body grow long, even if that means more parameters. A well-named helper with a clear docstring beats a long inline block. Eight parameters is acceptable when each is distinct and the division of labour is clear.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
-- **Comments must reflect current state only** — never reference previous iterations of the
-  code or deleted files.
+- **Comments and docs must reflect current state only** — never reference previous iterations of
+  the code or deleted files. See "Write about the present, not the past" under Docs.
 - **Code links only to durable docs** — `docs/design-philosophy/`, `docs/background/`, `docs/techniques/`,
   `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never link from code *or* docs to `plans/`
   files, and never from code to `docs/roadmap/` pages or to any
