@@ -107,9 +107,9 @@ class Settings(BaseSettings):
     # all, which is exactly what "the whole system must be exercisable on one laptop" forbids:
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#6-the-whole-system-must-be-exercisable-on-one-laptop
     #
-    # Absence is therefore caught at the point of *use* (`get_nged_s3_store`) rather than at
-    # construction. A deployment that wants the old fail-fast-at-startup behaviour calls
-    # `require_nged_source_credentials()` explicitly.
+    # Absence is therefore caught at the point of *use* (`get_nged_s3_store`), which also confines
+    # a mis-wired secret to the one schedule that needs it: inference reads our own Delta tables and
+    # a baked-in model, so failing it over an ingest credential would stop the forecast.
     nged_s3_bucket_url: str = Field(
         default="",
         description=(
@@ -129,9 +129,12 @@ class Settings(BaseSettings):
     def require_nged_source_credentials(self) -> None:
         """Raise ``ValueError`` unless all three NGED source-bucket credentials are set.
 
-        Call this to fail fast where the *absence* of ingest credentials should be fatal even
-        before anything tries to ingest — a container's start-up check is the motivating case, so
-        a deployment with mis-wired secrets dies immediately rather than at its first hourly pull.
+        Call this immediately before doing something that reads NGED's bucket, so the failure names
+        the missing configuration instead of surfacing as an opaque auth error from ``obstore``.
+
+        Do *not* call it from process start-up or module import to fail a deployment fast: inference
+        needs none of these credentials, so that would stop the forecast over a missing ingest
+        secret. See the [AWS runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
 
         Raises:
             ValueError: Naming exactly which of the three environment variables are unset.

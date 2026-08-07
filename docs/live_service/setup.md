@@ -113,9 +113,10 @@ NGED_S3_BUCKET_SECRET=<secret>
 Leave them unset and `Settings` still builds: the ingest asset raises an error naming the unset
 variables when it runs, while every other asset, the test suite, training and the dashboards carry
 on. That keeps a laptop, a CI runner and a training job free of third-party credentials they never
-use ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)).
-A deployment that does ingest can turn a mis-wired secret into an immediate start-up failure by
-calling `Settings().require_nged_source_credentials()` from its entry point.
+use ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
+and it confines a mis-wired secret to the one schedule that needs it —
+[Step 8 of the AWS runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment
+should *not* promote that into a start-up failure.
 
 The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
 `SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty
