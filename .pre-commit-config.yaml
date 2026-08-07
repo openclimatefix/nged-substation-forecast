@@ -5,12 +5,11 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-      # 500 KB (the hook's default) is below what a Vega/Altair chart exported as SVG comes to:
-      # docs/example_power_forecast.svg is 571 KB, because a plot of half-hourly data carries one
-      # path point per reading. The guard is here to catch a data file committed by accident, and
-      # 1 MB still does that.
+      # A Vega/Altair chart exported straight to SVG trips the hook's 500 KB default, because a
+      # plot of half-hourly data carries one path point per reading. Run the export through
+      # `npx svgo@4 --multipass --precision=1` before committing it — that is how
+      # docs/example_power_forecast.svg came down from 571 KB to 296 KB, with no visible change.
       - id: check-added-large-files
-        args: [--maxkb=1024]
 
   - repo: local
     hooks:
