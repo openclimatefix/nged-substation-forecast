@@ -5,13 +5,16 @@ The JSON is expected to have a structure where metadata fields are at the top le
 and a 'data' field contains an array of time series data points.
 """
 
+import logging
 import re
-from typing import Final
+from typing import Final, NamedTuple
 
 import patito as pt
 import polars as pl
 import polars_h3
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+
+log = logging.getLogger(__name__)
 
 # TODO: When we move to using multiple NWPs (at different resolutions), we should use a high
 # H3 resolution for TimeSeriesMetadata, say res 9, and then use `polars_h3.cell_to_parent` to
@@ -21,6 +24,17 @@ from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 # For now, to keep things simple, we're just fixing the H3 resolution to 5 for the ECMWF NWP and for
 # the NGED locations.
 _H3_RESOLUTION: Final[int] = 5
+
+
+class ExtractedPowerTimeSeries(NamedTuple):
+    """Result of parsing ``PowerTimeSeries`` rows out of one NGED JSON file.
+
+    ``n_dropped`` counts rows dropped by ``PowerTimeSeries.drop_implausible_rows`` for a malformed
+    ``time`` — see that method's docstring for why ingestion degrades rather than raising.
+    """
+
+    dataframe: pt.DataFrame[PowerTimeSeries]
+    n_dropped: int
 
 
 def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMetadata]:
@@ -45,9 +59,7 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
     return pt.DataFrame(metadata_df).set_model(TimeSeriesMetadata).drop().cast().validate()
 
 
-def _extract_power_time_series(
-    df: pl.DataFrame, time_series_id: int
-) -> pt.DataFrame[PowerTimeSeries]:
+def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> ExtractedPowerTimeSeries:
     """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
     If NGED's meter reported no values, then the `data` field in the JSON will be Null (or, less
@@ -82,7 +94,16 @@ def _extract_power_time_series(
     time_series_df = pt.DataFrame(time_series_df).set_model(PowerTimeSeries).drop().cast()
     time_series_df = time_series_df.sort(by=PowerTimeSeries.columns_to_sort_by)
 
-    return PowerTimeSeries.validate(time_series_df)
+    time_series_df, n_dropped = PowerTimeSeries.drop_implausible_rows(time_series_df)
+    if n_dropped > 0:
+        log.warning(
+            f"Dropped {n_dropped} row(s) with a malformed `time` for {time_series_id=}: outside"
+            " the plausible datetime range or not aligned to :00/:30."
+        )
+
+    return ExtractedPowerTimeSeries(
+        dataframe=PowerTimeSeries.validate(time_series_df), n_dropped=n_dropped
+    )
 
 
 def _camel_to_snake(camel_str: str) -> str:

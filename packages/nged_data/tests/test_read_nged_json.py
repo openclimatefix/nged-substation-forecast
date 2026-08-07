@@ -29,10 +29,12 @@ def test_nged_json_to_metadata_df_and_time_series_df(
     df = pl.read_json(json_bytes)
     metadata_df = _extract_time_series_metadata(df)
     time_series_id = metadata_df["time_series_id"].item()
-    time_series_df = _extract_power_time_series(df, time_series_id)
+    extracted = _extract_power_time_series(df, time_series_id)
+    time_series_df = extracted.dataframe
 
     TimeSeriesMetadata.validate(metadata_df)
     PowerTimeSeries.validate(time_series_df)
+    assert extracted.n_dropped == 0
 
     assert not metadata_df.is_empty()
     assert not time_series_df.is_empty()
@@ -52,6 +54,27 @@ def test_nged_json_to_metadata_df_and_time_series_df_invalid_json():
     df = pl.read_json(invalid_json)
     with pytest.raises((pt.exceptions.DataFrameValidationError, pl.exceptions.ColumnNotFoundError)):
         _extract_time_series_metadata(df)
+
+
+def test_extract_power_time_series_drops_malformed_time_rows():
+    """A row with an implausible or misaligned `time` is dropped and counted, not raised on."""
+    raw_json = b"""
+    {
+        "data": [
+            {"endTime": "1840-06-01T00:30:00Z", "value": 1.0},
+            {"endTime": "2026-01-01T00:15:00Z", "value": 2.0},
+            {"endTime": "2026-01-01T00:30:00Z", "value": 3.0}
+        ]
+    }
+    """
+    df = pl.read_json(raw_json)
+
+    extracted = _extract_power_time_series(df, time_series_id=42)
+
+    assert extracted.n_dropped == 2
+    assert extracted.dataframe.height == 1
+    assert extracted.dataframe["power"].to_list() == [3.0]
+    PowerTimeSeries.validate(extracted.dataframe)
 
 
 def test_nged_json_to_metadata_df_and_time_series_df_invalid_data_types():

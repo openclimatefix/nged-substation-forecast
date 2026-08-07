@@ -93,12 +93,23 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     )
 
     try:
-        new_metadata, new_power_ts = download_and_parse_files(store, list_of_new_json_files)
+        downloaded = download_and_parse_files(store, list_of_new_json_files)
     except NoNewData:
         context.add_output_metadata(
             UpsertMetadataStats(metadata_n_new_TimeSeriesIDs=0, metadata_n_updated_TimeSeriesIDs=0)
         )
         return
+    new_metadata, new_power_ts = downloaded.metadata, downloaded.power_time_series
+
+    if downloaded.n_implausible_power_rows_dropped > 0:
+        context.log.warning(
+            f"Dropped {downloaded.n_implausible_power_rows_dropped} PowerTimeSeries row(s) with a"
+            " malformed `time` during ingestion (outside the plausible datetime range or not"
+            " aligned to :00/:30)."
+        )
+    context.add_output_metadata(
+        {"n_implausible_power_rows_dropped": downloaded.n_implausible_power_rows_dropped}
+    )
 
     # Save TimeSeriesMetadata:
     upsert_metadata_stats = upsert_metadata(new_metadata, metadata_path, storage_options)

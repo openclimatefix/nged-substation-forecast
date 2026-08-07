@@ -331,6 +331,33 @@ def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: i
     return lf.join(rolled, on=join_keys, how="left")
 
 
+def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
+    """Returns the local offset from UTC in minutes.
+
+    Minutes represent every offset in scope exactly, so sub-hour zones stay distinct rather than
+    collapsing into one another: India's +5:30 is ``330`` and Nepal's +5:45 is ``345``, and
+    Australia's +9:30 (``570``) does not collide with +9:00 (``540``). ``Int16`` is ample — the
+    real extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
+
+    Whole minutes depend on the era bound that issue #466 puts on ``PowerTimeSeries.time``. A
+    handful of IANA offsets are not whole minutes — mean solar time before a zone standardised,
+    such as ``Europe/London`` at UTC−0:01:15 until 1847, and Liberia's UTC−0:44:30, which stood as
+    legal time until 1972 — and this truncates them. A timestamp from that era is malformed input,
+    which belongs at the contract boundary rather than being defended against here.
+
+    Args:
+        local_time: An expression yielding a time-zone-aware datetime in the local time zone.
+
+    Returns:
+        An ``Int16`` expression holding the offset from UTC in minutes.
+
+    See the portability review for the wider picture,
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/adapting-to-another-geography/>.
+    """
+    offset = local_time.dt.base_utc_offset() + local_time.dt.dst_offset()
+    return offset.dt.total_minutes().cast(pl.Int16)
+
+
 def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
     """Applies local time features (time of day, day of week, time of year) to the LazyFrame.
 
@@ -350,14 +377,7 @@ def _apply_local_time_features(lf: pl.LazyFrame) -> pl.LazyFrame:
         .dt.convert_time_zone("Europe/London")
     )
 
-    lf = lf.with_columns(
-        local_utc_offset=(
-            (
-                pl.col("local_time").dt.base_utc_offset() + pl.col("local_time").dt.dst_offset()
-            ).dt.total_seconds()
-            // 3600
-        ).cast(pl.Int8)
-    )
+    lf = lf.with_columns(local_utc_offset_minutes=_local_utc_offset_minutes(pl.col("local_time")))
 
     local_hour_float = pl.col("local_time").dt.hour() + pl.col("local_time").dt.minute() / 60.0
     local_year_fraction = pl.col("local_time").dt.ordinal_day() / 366.0
