@@ -70,6 +70,13 @@ if it leaves a sentence without a clear subject/verb. Prefer "We split storage a
 buckets so that..." over "Two buckets, not one — split so that...". The full form is more
 readable and no less concise in practice.
 
+**Write about the present, not the past.** The docs describe how the code works *now*. Don't write
+about how it used to work, what a change replaced, or which issue changed it — that history lives
+in git, in the PR and in the issue tracker, and repeating it here turns every page into a running
+changelog and makes the docs unreadable. When a change invalidates a passage, rewrite the passage
+to describe the new behaviour rather than appending a note about what changed. This is the
+"comments and docs must reflect current state only" rule under Code Style, applied to prose.
+
 ## How planning works
 
 Full description and a "which place do I use?" table: `docs/documentation-guide.md`. In brief:
@@ -226,8 +233,8 @@ Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer
 - **Patito** for all DataFrame schema definitions and validation. Use Patito type annotations (`pt.DataFrame[Schema]`, `pt.LazyFrame[Schema]`) whenever a function consumes or returns data that conforms to an existing schema — whether the function is public or private. Don't invent a new schema just to annotate a private helper; if no existing schema fits, use plain `pl.DataFrame` / `pl.LazyFrame`.
 - **Prefer small functions.** Extract private helpers (`_name`) rather than letting a function body grow long, even if that means more parameters. A well-named helper with a clear docstring beats a long inline block. Eight parameters is acceptable when each is distinct and the division of labour is clear.
 - **Ruff**: 100-char line length, double quotes, Google-style docstrings.
-- **Comments must reflect current state only** — never reference previous iterations of the
-  code or deleted files.
+- **Comments and docs must reflect current state only** — never reference previous iterations of
+  the code or deleted files. See "Write about the present, not the past" under Docs.
 - **Code links only to durable docs** — `docs/design-philosophy/`, `docs/background/`, `docs/techniques/`,
   `docs/architecture/`, `docs/ml_experimentation/`, `docs/live_service/`. Never link from code *or* docs to `plans/`
   files, and never from code to `docs/roadmap/` pages or to any
@@ -490,6 +497,27 @@ code block or multiple paragraphs — spot-check with `uv run mkdocs build --str
 the rendered HTML rather than trusting the linter alone. See also the nested-sub-bullet indent
 gotcha (4 spaces, not 2) tracked in memory — same root cause class: Python-Markdown's list
 parsing is stricter than CommonMark and stricter than `pymarkdown`'s default checks.
+
+### MkDocs Gotcha: a wrapped link whose continuation line starts with `#` renders as a heading
+
+CommonMark requires a space after `#` for a line to start an ATX heading (`#5` is just text,
+`# 5` is a heading). Python-Markdown does not enforce that space, so any line that happens to
+start with `#` — for any reason — is parsed as a heading. A markdown link wrapped across the
+80-ish-character line length this repo's prose otherwise isn't held to can put the `#123](url)`
+half of `[issue #123](url)` at the start of a line, and Python-Markdown reads it as a heading
+rather than as the second half of a link. The rendered page gets a stray `<h1>`/`<h2>` containing
+the raw URL, the link text before the wrap point left dangling as plain text, and the paragraph
+split in two. Neither `pymarkdown scan` nor `mkdocs build --strict` catches this — both pass on a
+source file that renders visibly broken.
+
+**How to apply:** when a link's markdown source wraps across a line break, make sure the
+continuation line does not begin with `#`; keep `[text](url)` together on one line, or wrap
+before `[` rather than inside it. This is the same root cause as the list-continuation gotcha
+above — Python-Markdown is stricter/weirder than CommonMark in ways the linters don't catch — so
+it generalises to a standing rule, not just this one wrapping case: **any docs PR that touches
+links should run `uv run mkdocs build --strict` and then actually read the generated HTML under
+`site/`**, not just trust a clean `pymarkdown scan` plus a successful `mkdocs build`. Both of
+those can pass on rendering that is visibly wrong; only reading the HTML catches it.
 
 ## This is a young project
 
