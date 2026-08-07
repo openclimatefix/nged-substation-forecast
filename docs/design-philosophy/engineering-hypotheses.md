@@ -36,12 +36,9 @@ that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-
 intervention is ever needed outside normal working hours — the posture that makes
 next-business-day recovery honest.
 
-> **An early observation, which does not score.** Since its first AWS run at 18:00 UTC on 15 July
-> 2026, v0.1 has served 91 consecutive 6-hourly forecast slots with zero interventions. That is a
-> precondition for H1 rather than evidence for it: the scoring window opens at v1.0, three weeks is
-> short, v0.1 is only 32 time series, and v0.1 detects little enough that "no observed failures" is
-> a weaker claim than "no failures". Recorded, with those caveats, in the
-> [intervention log](../live_service/intervention-log.md#v01-on-aws-from-2026-07-15).
+Pre-v1.0 periods are recorded in the
+[intervention log](../live_service/intervention-log.md#periods-covered), with their caveats, and do
+not score.
 
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
 two things: that a forecast is emitted at all, and that it still beats `nged_incumbent` at rungs 0–2
@@ -238,7 +235,8 @@ nobody. A number that resolves itself is a better outcome, and pre-registering o
 confidence in a way that prose cannot.
 
 **It forces the measurement artefacts to exist in advance.** Most of these tests need something
-built before they can be scored: a baseline forecaster, a scenario suite, an intervention log.
+built before they can be scored: a baseline forecaster and a scenario suite, plus the
+[intervention log](../live_service/intervention-log.md), which is the one already in place.
 Writing the hypothesis first is what puts those on the roadmap early enough to be useful.
 
 The commitment this entails is real: a hypothesis without a number is an aim wearing a lab coat.
