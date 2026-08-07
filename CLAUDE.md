@@ -498,6 +498,27 @@ the rendered HTML rather than trusting the linter alone. See also the nested-sub
 gotcha (4 spaces, not 2) tracked in memory — same root cause class: Python-Markdown's list
 parsing is stricter than CommonMark and stricter than `pymarkdown`'s default checks.
 
+### MkDocs Gotcha: a wrapped link whose continuation line starts with `#` renders as a heading
+
+CommonMark requires a space after `#` for a line to start an ATX heading (`#5` is just text,
+`# 5` is a heading). Python-Markdown does not enforce that space, so any line that happens to
+start with `#` — for any reason — is parsed as a heading. A markdown link wrapped across the
+80-ish-character line length this repo's prose otherwise isn't held to can put the `#123](url)`
+half of `[issue #123](url)` at the start of a line, and Python-Markdown reads it as a heading
+rather than as the second half of a link. The rendered page gets a stray `<h1>`/`<h2>` containing
+the raw URL, the link text before the wrap point left dangling as plain text, and the paragraph
+split in two. Neither `pymarkdown scan` nor `mkdocs build --strict` catches this — both pass on a
+source file that renders visibly broken.
+
+**How to apply:** when a link's markdown source wraps across a line break, make sure the
+continuation line does not begin with `#`; keep `[text](url)` together on one line, or wrap
+before `[` rather than inside it. This is the same root cause as the list-continuation gotcha
+above — Python-Markdown is stricter/weirder than CommonMark in ways the linters don't catch — so
+it generalises to a standing rule, not just this one wrapping case: **any docs PR that touches
+links should run `uv run mkdocs build --strict` and then actually read the generated HTML under
+`site/`**, not just trust a clean `pymarkdown scan` plus a successful `mkdocs build`. Both of
+those can pass on rendering that is visibly wrong; only reading the HTML catches it.
+
 ## This is a young project
 
 The project is a new, green-field project. No one else is using this code yet. Which means:

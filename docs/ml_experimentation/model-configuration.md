@@ -89,11 +89,11 @@ DST). Electricity demand follows human behaviour, which tracks local time not UT
 |---|---|
 | `local_time_of_day_sin` | Sine of fraction of day (24 h period) |
 | `local_time_of_day_cos` | Cosine of fraction of day (24 h period) |
-| `local_time_of_year_sin` | Sine of fraction of year (365.25 day period) |
-| `local_time_of_year_cos` | Cosine of fraction of year (365.25 day period) |
+| `local_time_of_year_sin` | Sine of fraction of year (ordinal day of year over a fixed 366-day period, so a given calendar date lands at the same fraction whether or not it falls in a leap year) |
+| `local_time_of_year_cos` | Cosine of fraction of year (see `local_time_of_year_sin`) |
 | `local_day_of_week_sin` | Sine of day-of-week (7 day period) |
 | `local_day_of_week_cos` | Cosine of day-of-week (7 day period) |
-| `local_day_of_week` | Integer day-of-week (0 = Monday) |
+| `local_day_of_week` | Day-of-week name as a categorical (`Monday`–`Sunday`) |
 | `local_utc_offset_minutes` | UTC offset in minutes (0 or 60 for GB; 330 for India's +5:30) |
 
 ### Static derived features
