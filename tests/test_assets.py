@@ -291,8 +291,16 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     monkeypatch.setattr(assets, "open_ecmwf_ens_run", _raise_not_available)
 
-    with pytest.raises(RetryRequested) as exc_info:
-        ecmwf_ens(build_asset_context(partition_key="2024-05-01"))
+    # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()` (see
+    # `docs/architecture/testing.md`) and is used as a context manager here for the same reason
+    # `dagster_instance` is a fixture: entering it makes disposal happen deterministically at
+    # `__exit__`, rather than depending on `__del__` running via garbage collection, which the
+    # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
+    with (
+        build_asset_context(partition_key="2024-05-01") as context,
+        pytest.raises(RetryRequested) as exc_info,
+    ):
+        ecmwf_ens(context)
 
     assert exc_info.value.max_retries == _ECMWF_ENS_MAX_RETRIES
     assert exc_info.value.seconds_to_wait == _ECMWF_ENS_RETRY_DELAY_SECONDS

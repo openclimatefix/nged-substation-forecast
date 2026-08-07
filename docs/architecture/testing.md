@@ -67,6 +67,26 @@ row counts wrapping past 2³² rows.
   frame as well. `scripts/run_baseline_experiment.py` is the worked example. Measured with an
   `atexit` probe counting storages whose held connection is still open at exit, after one real
   `materialize`: 2 open with a bare call, 0 with the context manager, on both paths.
+- **`build_asset_context()` (and the other `build_*_context()` direct-invocation helpers) needs
+  the same treatment when called without an explicit `instance=`.** Its docstring says it
+  "Defaults to `DagsterInstance.ephemeral()`" — built internally and owned by an `ExitStack` that
+  only closes on `__exit__`, or otherwise on `__del__`. Called bare and passed straight into an
+  asset (`some_asset(build_asset_context(...))`), nothing ever calls `__exit__`, so disposal
+  depends on `__del__` running — and inside a `pytest.raises(...) as exc_info:` block, the
+  captured traceback keeps the asset's frame (and the context argument in it) referenced past the
+  end of that `with` block, so `__del__` doesn't fire until *something* triggers a GC pass, which
+  is exactly the non-deterministic timing this page keeps warning about. Enter it as a context
+  manager instead: `with build_asset_context(...) as context, pytest.raises(...) as exc_info:`.
+  `tests/test_assets.py::test_ecmwf_ens_retries_when_run_not_yet_available` is the worked example
+  — before the fix, probing immediately after that one test's teardown, with **no forced
+  `gc.collect()`**, found 2 open connections; after, 0, every time.
+- **`materialize()` and `JobDefinition.execute_in_process()` do *not* need this.** Called without
+  `instance=`, both build their default ephemeral instance behind their own internal `with
+  ephemeral_instance_if_missing(instance):`, entered and exited inside the call, before the
+  function returns — so disposal there is already deterministic regardless of how the caller uses
+  the return value. The distinguishing question for any Dagster helper that can default-construct
+  an instance is whether *the helper itself* opens and closes the `with` block, or hands you an
+  object that expects *you* to.
 
 ## Warnings are errors
 
