@@ -160,6 +160,53 @@ def test_changed_forecaster_class_is_rejected() -> None:
         _reject_changed_identity("exp", stored, _identity_of())
 
 
+def test_a_reserialised_config_is_not_a_change() -> None:
+    """The comparison is on the parsed JSON, so key order and formatting are not a config change.
+
+    Otherwise a stored tag written by an older serialisation of the same values — a field added
+    with a default, or reordered in the model class — would falsely make the experiment
+    un-re-registerable, and would do it while naming no differing field at all.
+    """
+    requested = _identity_of(n_estimators=7)
+    reserialised = json.dumps(dict(reversed(list(json.loads(requested["config"]).items()))))
+
+    _reject_changed_identity("exp", _as_stored({**requested, "config": reserialised}), requested)
+
+
+def test_a_reordered_feature_set_is_reported_as_an_ordering_difference() -> None:
+    """A tag whose feature list is merely in a different order must not read as changed values.
+
+    That is what an experiment registered before the config serialised its feature set canonically
+    looks like. It is still rejected — MLflow's write-once params mean the stored record cannot be
+    brought into line — but the error must say what actually differs.
+    """
+    requested = _identity_of()
+    stored_config = json.loads(requested["config"])
+    stored_config["selected_features"] = list(reversed(stored_config["selected_features"]))
+    stored = _as_stored({**requested, "config": json.dumps(stored_config)})
+
+    with pytest.raises(ExperimentIdentityChangedError) as excinfo:
+        _reject_changed_identity("exp", stored, requested)
+
+    message = str(excinfo.value)
+    assert "config.selected_features: the same 24 values, in a different order" in message
+    # The feature names themselves are not dumped twice over.
+    assert "power_lag_24h" not in message
+
+
+def test_a_field_absent_on_one_side_is_reported_not_swallowed() -> None:
+    """``None`` and "field missing" are different, and neither may produce a blank explanation."""
+    requested = _identity_of()
+    stored_config = json.loads(requested["config"])
+    del stored_config["ml_flow_experiment_id"]  # its value on the requested side is null
+    stored = _as_stored({**requested, "config": json.dumps(stored_config)})
+
+    with pytest.raises(ExperimentIdentityChangedError) as excinfo:
+        _reject_changed_identity("exp", stored, requested)
+
+    assert "config.ml_flow_experiment_id: <absent> -> None" in str(excinfo.value)
+
+
 def test_flattened_config_params_are_order_stable() -> None:
     """The write-once MLflow params must not vary with feature-set iteration order either."""
     _, config = _resolve_forecaster_config(_BASE_CONFIG, {}, "exp")

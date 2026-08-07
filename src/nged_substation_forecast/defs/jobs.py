@@ -139,15 +139,56 @@ def _identity_tags(
     }
 
 
-def _describe_config_change(stored_json: str, requested_json: str) -> list[str]:
-    """Return one ``field: registered -> requested`` line per differing config field."""
+_ABSENT: Final[object] = object()
+"""Sentinel for a config field present on only one side of an identity comparison.
+
+A sentinel rather than ``None``, so a field that is genuinely ``null`` on one side and missing on
+the other is reported as the difference it is.
+"""
+
+
+def _render_value(value: object) -> str:
+    """Render one config value for the rejection message."""
+    return "<absent>" if value is _ABSENT else repr(value)
+
+
+def _describe_value_change(stored: object, requested: object) -> str:
+    """Describe how one config field's value differs.
+
+    A list of strings that differs only in order gets its own phrasing rather than two near-identical
+    dumps: that is what a ``set``-valued field looks like when the stored tag was written by a
+    registration that did not yet serialise it canonically, and printing both orderings in full
+    would read as a change to the values themselves.
+    """
+    if (
+        isinstance(stored, list)
+        and isinstance(requested, list)
+        and all(isinstance(item, str) for item in (*stored, *requested))
+        and sorted(stored) == sorted(requested)
+    ):
+        return f"the same {len(stored)} values, in a different order"
+    return f"{_render_value(stored)} -> {_render_value(requested)}"
+
+
+def _config_differences(stored_json: str, requested_json: str) -> list[str]:
+    """Return one line per differing config field, or nothing if the two configs agree.
+
+    Compares the *parsed* JSON, not the raw strings, so a difference in key order or JSON
+    formatting is not mistaken for a config change.
+    """
     stored: dict[str, Any] = json.loads(stored_json)
     requested: dict[str, Any] = json.loads(requested_json)
     return [
-        f"  config.{field}: {stored.get(field, '<absent>')!r} -> {requested.get(field, '<absent>')!r}"
+        f"  config.{field}: "
+        f"{_describe_value_change(stored.get(field, _ABSENT), requested.get(field, _ABSENT))}"
         for field in sorted(stored.keys() | requested.keys())
-        if stored.get(field) != requested.get(field)
+        if stored.get(field, _ABSENT) != requested.get(field, _ABSENT)
     ]
+
+
+def _target_difference(tag: IdentityTagType, stored: str, requested: str) -> list[str]:
+    """Return the difference line for a class-target tag, or nothing if it is unchanged."""
+    return [] if stored == requested else [f"  {tag}: {stored!r} -> {requested!r}"]
 
 
 def _reject_changed_identity(
@@ -167,6 +208,9 @@ def _reject_changed_identity(
     experiment ``get_or_create_experiment`` creates as its self-healing fallback, which this
     registration is entitled to complete.
 
+    The decision to reject *is* the list of differences to report, so the error can never claim a
+    change it cannot then name.
+
     Args:
         experiment_name: The MLflow experiment name, for the error message.
         stored_tags: The existing experiment's tags (empty for a brand-new experiment).
@@ -175,22 +219,18 @@ def _reject_changed_identity(
     Raises:
         ExperimentIdentityChangedError: If any identity tag is already set to a different value.
     """
-    changed = [
-        tag
-        for tag in IDENTITY_TAGS
-        if tag in stored_tags and stored_tags[tag] != requested_tags[tag]
-    ]
-    if not changed:
-        return
     differences = [
         line
-        for tag in changed
+        for tag in IDENTITY_TAGS
+        if tag in stored_tags
         for line in (
-            _describe_config_change(stored_tags[tag], requested_tags[tag])
+            _config_differences(stored_tags[tag], requested_tags[tag])
             if tag == "config"
-            else [f"  {tag}: {stored_tags[tag]!r} -> {requested_tags[tag]!r}"]
+            else _target_difference(tag, stored_tags[tag], requested_tags[tag])
         )
     ]
+    if not differences:
+        return
     raise ExperimentIdentityChangedError(
         f"MLflow experiment {experiment_name!r} is already registered with a different"
         " configuration. An experiment's identity is its configuration — every fold must be"
@@ -249,6 +289,10 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
     # experiment tagged with a config that its params contradict. The check above should make such
     # a rejection unreachable, but an experiment registered before that check existed may already
     # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
+    # log_params is not itself atomic — a batch containing one conflicting key still writes the
+    # batch's other keys before raising — so this bounds the damage to the params rather than
+    # eliminating it. Reaching that requires an experiment whose tags failed to write on an earlier
+    # registration, which is why the tags are the last thing written.
     parent_run_id = get_or_create_parent_run(experiment_id)
     with mlflow.start_run(run_id=parent_run_id):
         mlflow.log_params(flatten_config(forecaster_config))

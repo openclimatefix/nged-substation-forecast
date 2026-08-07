@@ -161,6 +161,14 @@ def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
         raise_on_error=False,
     )
     assert not result.success
+    # Assert *why* it failed, so the test cannot pass on an unrelated error. Dagster wraps the op's
+    # exception in a DagsterExecutionStepExecutionError, so the original is the `cause`.
+    failure = result.failure_data_for_node("register_experiment")
+    assert failure is not None and failure.error is not None
+    cause = failure.error.cause
+    assert cause is not None
+    assert cause.cls_name == "ExperimentIdentityChangedError"
+    assert "config.n_estimators: 7 -> 300" in cause.message
 
     experiment_after = mlflow.get_experiment_by_name("exp_changed")
     assert experiment_after is not None
