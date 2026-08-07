@@ -59,13 +59,14 @@ row counts wrapping past 2³² rows.
   *after* pytest's summary line, owned by no test. The fixture enters the instance as a context
   manager, so `dispose()` runs when the test ends.
 - **In a script, use the context manager directly** — `with DagsterInstance.ephemeral() as
-  instance:` — rather than a bare call, so `dispose()` also runs when a step raises. A script's
-  happy path is already safe, because the local is reclaimed when the function returns; the case
-  that leaks is an *unhandled exception*, whose traceback keeps the raising frame, and therefore
-  the instance, alive until the interpreter exits.
-  `scripts/run_baseline_experiment.py` is the worked example. Measured with an `atexit` probe
-  counting storages whose held connection is still open at exit: on the error path, 2 open before
-  the context manager and 0 after.
+  instance:` — rather than a bare call. Letting the local go out of scope is *not* enough: once the
+  instance has actually run a job, Dagster's own caches retain it (a `RunDomain`, and the
+  partition-loading contexts that hold it as `dynamic_partitions_store`), so it survives to
+  interpreter shutdown with both connections open even on a completely successful run. The context
+  manager also covers the failure path, where an unhandled exception's traceback pins the raising
+  frame as well. `scripts/run_baseline_experiment.py` is the worked example. Measured with an
+  `atexit` probe counting storages whose held connection is still open at exit, after one real
+  `materialize`: 2 open with a bare call, 0 with the context manager, on both paths.
 
 ## Warnings are errors
 

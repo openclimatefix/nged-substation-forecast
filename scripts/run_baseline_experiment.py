@@ -157,13 +157,10 @@ def main() -> None:
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
-    # Use the instance as a context manager rather than a bare ``DagsterInstance.ephemeral()``:
-    # ``__exit__`` calls ``dispose()``, which closes the two SQLite connections that the in-memory
-    # run storage and event-log storage hold open for the instance's lifetime. That matters most on
-    # the *error* path — an unhandled exception's traceback keeps this frame, and so the instance,
-    # alive until the interpreter exits, which is where SQLAlchemy's connection-pool finaliser can
-    # run against an already-closed database and print a bare ``Exception during reset or similar``
-    # traceback. See the ``dagster_instance`` fixture note in docs/architecture/testing.md.
+    # Context manager, not a bare ``DagsterInstance.ephemeral()``: ``__exit__`` calls ``dispose()``,
+    # closing the two SQLite connections the in-memory run and event-log storages hold open. Letting
+    # the local fall out of scope does not do this — Dagster caches retain a used instance until the
+    # interpreter exits. Rationale and measurements: docs/architecture/testing.md.
     with DagsterInstance.ephemeral() as instance:
         _run_pipeline(instance)
 
