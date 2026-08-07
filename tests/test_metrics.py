@@ -13,7 +13,6 @@ Tests at two tiers:
 """
 
 import os
-import shutil
 import socket
 import subprocess
 import time
@@ -179,14 +178,12 @@ def _base_env(
     nged_path.mkdir()
     forecasts_path = tmp_path / "power_forecasts"
     metrics_path = tmp_path / "forecast_metrics"
-    cache_path = tmp_path / "cache"
     effective_capacity_path = tmp_path / "effective_capacity"
 
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
-    monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(cache_path))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     monkeypatch.setenv("FORECAST_METRICS_DATA_PATH", str(metrics_path))
     # Point at a temp path so metrics never reads the repo's real effective_capacity table; the
@@ -202,7 +199,6 @@ def _base_env(
     return {
         "forecasts": forecasts_path,
         "metrics": metrics_path,
-        "cache": cache_path,
         "effective_capacity": effective_capacity_path,
     }
 
@@ -745,10 +741,7 @@ def test_full_stack_real_mlflow_server(tmp_path: Path, monkeypatch: pytest.Monke
             [trained_cv_model], partition_key=PARTITION_KEY, instance=instance
         ).success
 
-        # Delete local cache to force artifact re-download on the next step (§4.5 cache miss).
-        shutil.rmtree(paths["cache"], ignore_errors=True)
-
-        # Predict — downloads artifacts from the real server on cache miss.
+        # Predict — downloads artifacts from the real server (load_from_mlflow has no local cache).
         assert materialize(
             [cv_power_forecasts], partition_key=PARTITION_KEY, instance=instance
         ).success

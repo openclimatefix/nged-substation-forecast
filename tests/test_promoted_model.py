@@ -34,17 +34,11 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("MLFLOW_ALLOW_FILE_STORE", "true")
     monkeypatch.setenv("MLFLOW_TRACKING_URI", tracking_uri)
     monkeypatch.setenv("PRODUCTION_MODEL_PATH", str(tmp_path / "production_model"))
-    monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(tmp_path / "cache"))
     mlflow.set_tracking_uri(tracking_uri)
-    return {
-        "production_model_path": str(tmp_path / "production_model"),
-        "model_cache_base_path": str(tmp_path / "cache"),
-    }
+    return {"production_model_path": str(tmp_path / "production_model")}
 
 
-def _save_trained_model_to_mlflow(
-    env: dict[str, str], experiment_name: str, n_estimators: int
-) -> str:
+def _save_trained_model_to_mlflow(experiment_name: str, n_estimators: int) -> str:
     """Train a tiny real ``XGBoostForecaster`` on synthetic data and save it to a new MLflow run.
 
     Bypasses the full CV/feature-engineering pipeline (tested elsewhere) — the point here is a
@@ -77,12 +71,12 @@ def _save_trained_model_to_mlflow(
         # Tag as a fold run, matching what trained_cv_model does via get_or_create_fold_run — so
         # list_promotable_runs (and the promotable_model_runs asset) picks this run up.
         mlflow.set_tags({"cv_role": "fold", "fold_id": "test_fold"})
-    forecaster.save_to_mlflow(run_id, cache_base_path=Path(env["model_cache_base_path"]))
+    forecaster.save_to_mlflow(run_id)
     return run_id
 
 
 def test_promoted_model_promotes_and_populates_directory(env: dict[str, str]) -> None:
-    run_id = _save_trained_model_to_mlflow(env, "promo_test", n_estimators=5)
+    run_id = _save_trained_model_to_mlflow("promo_test", n_estimators=5)
 
     instance = DagsterInstance.ephemeral()
     result = materialize(
@@ -110,8 +104,8 @@ def test_promoted_model_promotes_and_populates_directory(env: dict[str, str]) ->
 
 
 def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
-    first_run_id = _save_trained_model_to_mlflow(env, "promo_test_v1", n_estimators=5)
-    second_run_id = _save_trained_model_to_mlflow(env, "promo_test_v2", n_estimators=7)
+    first_run_id = _save_trained_model_to_mlflow("promo_test_v1", n_estimators=5)
+    second_run_id = _save_trained_model_to_mlflow("promo_test_v2", n_estimators=7)
 
     model_dir = Path(env["production_model_path"])
 
@@ -141,7 +135,7 @@ def test_re_promotion_replaces_the_model(env: dict[str, str]) -> None:
 
 
 def test_promotable_model_runs_lists_fold_run_candidates(env: dict[str, str]) -> None:
-    run_id = _save_trained_model_to_mlflow(env, "candidates_test", n_estimators=5)
+    run_id = _save_trained_model_to_mlflow("candidates_test", n_estimators=5)
 
     result = materialize([promotable_model_runs], instance=DagsterInstance.ephemeral())
     assert result.success

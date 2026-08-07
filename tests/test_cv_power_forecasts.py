@@ -126,7 +126,6 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
-    monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(tmp_path / "cache"))
     monkeypatch.setenv("POWER_FORECASTS_DATA_PATH", str(forecasts_path))
     mlflow.set_tracking_uri(tracking_uri)
 

@@ -199,17 +199,22 @@ there is no tracking server on the hot path to break, and the model simply freez
 OCF's scheduled expert interventions — under a vendor-develops / operator-runs split, that is a
 feature, not a limitation.
 
-This is deliberately simpler than reusing `BaseForecaster.load_from_mlflow`'s cache (the
+This is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at runtime (the
 mechanism the CV pipeline already uses — see
-[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-write-invalidated-local-cache)):
-v0.1 has no MLflow dependency to cache against in the first place.
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache)):
+v0.1 has no MLflow tracking server to reach from the runtime container in the first place, so
+there is nothing to cache or fail over from.
 
 **Future work:** once production wants to pick up a new champion without a rebuild + redeploy
 (e.g. after the [XGBoost quick wins](../roadmap/xgboost-improvements.md) start landing
-regularly), switch to fetching the champion model from MLflow dynamically — at that point
-`load_from_mlflow`'s local-disk cache becomes the production-resilience mechanism again (serving
-from disk on a cache hit so the live service survives an MLflow outage), exactly as it does for
-CV today.
+regularly), switch to fetching the champion model from MLflow dynamically. At that point the live
+service would need some way to keep serving through an MLflow outage — `load_from_mlflow` used to
+carry a local-disk cache for exactly that, but it was removed (issue #469) because it had no
+consumer: v0.1 never called it, and the CV pipeline's own use of it turned out to be actively
+harmful (a reused MLflow run made the cache key non-unique for its contents — see the linked
+section above). Re-adding a cache for this future consumer is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472) and should be
+scoped to production's actual availability needs rather than resurrecting the old one.
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
@@ -497,7 +502,7 @@ runtime needs MLflow.)
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
 experimentation: training runs log their models, configs, and metrics to it, and the champion
 is *chosen* from an MLflow leaderboard (see
-[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-write-invalidated-local-cache)
+[ML orchestration: model artifacts](ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache)
 for the design, and [ML experimentation](../ml_experimentation/index.md) for the day-to-day
 workflow). The boundary this rejection draws is between ML R&D and production: research uses
 MLflow constantly, while production's hot path never touches it. MLflow's job ends at the
@@ -507,8 +512,10 @@ into the image.
 The idea may still return in a stronger form: the **future work** note at the end of
 [Bake the model into the image at build time](#bake-the-model-into-the-image-at-build-time) —
 the section describing the accepted design this one lost to — describes fetching the champion
-dynamically once redeploys become frequent, with `load_from_mlflow`'s local-disk cache as the
-production-resilience mechanism.
+dynamically once redeploys become frequent, at which point a production-resilience mechanism for
+serving through an MLflow outage would need to be designed (tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472)) rather than
+reused from `load_from_mlflow`'s old, now-removed cache.
 
 ## See also
 

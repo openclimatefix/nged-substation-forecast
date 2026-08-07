@@ -105,9 +105,7 @@ MLflow experiment and partition keys rather than creating duplicates.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id, cache_base_path=…)`, which also clears that run's entry
-   in the local model cache so the freshly trained model is the one `cv_power_forecasts` loads
-   back.
+   `forecaster.save_to_mlflow(fold_run_id)`.
 9. Records the training run on the fold run as **tags**: the training window (`train_start`,
    `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
 
@@ -143,9 +141,10 @@ Experiment "xgboost_smoke_test"
 
 **What the asset does:**
 
-1. Loads the fold's model back from MLflow (via the local-disk cache) and reads its
-   `trained_time_series_ids` — the population it scores (the train==predict invariant). Raises if
-   the loaded model has no trained series.
+1. Loads the fold's model back from MLflow (a fresh download each time — no local cache, see
+   [ML orchestration: model artifacts](../architecture/ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache))
+   and reads its `trained_time_series_ids` — the population it scores (the train==predict
+   invariant). Raises if the loaded model has no trained series.
 2. Forecasts the **inclusive validation window** across **all ~51 NWP ensemble members** (the
    probabilistic leaderboard metrics are meaningless on a single member).
 3. Bounds memory by predicting **one `init_time` chunk at a time** (`_PREDICT_INIT_CHUNK`, 14 days):

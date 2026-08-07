@@ -133,7 +133,7 @@ def _write_eligible(path: str, time_series_ids: tuple[int, ...] = (1, 2)) -> Non
 
 
 @pytest.fixture
-def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     tracking_uri = f"file://{tmp_path / 'mlruns'}"
     nged_path = tmp_path / "NGED"
     nged_path.mkdir()
@@ -142,14 +142,12 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("NGED_DATA_PATH", str(nged_path))
     monkeypatch.setenv("NWP_DATA_PATH", str(tmp_path / "NWP"))
     monkeypatch.setenv("ELIGIBLE_TIME_SERIES_DATA_PATH", str(tmp_path / "eligible"))
-    monkeypatch.setenv("MODEL_CACHE_BASE_PATH", str(tmp_path / "cache"))
     mlflow.set_tracking_uri(tracking_uri)
 
     _write_power(str(nged_path / "power_time_series.delta"))
     _write_nwp(str(tmp_path / "NWP"))
     _write_metadata(nged_path / "metadata.parquet")
     _write_eligible(str(tmp_path / "eligible"))
-    return {"cache": str(tmp_path / "cache")}
 
 
 def _register(instance: DagsterInstance) -> None:
@@ -171,7 +169,7 @@ def _register(instance: DagsterInstance) -> None:
     assert result.success
 
 
-def test_load_engineering_inputs_filters_ensemble_members(env: dict[str, str]) -> None:
+def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     """``ensemble_members`` narrows NWP at the scan; ``None`` keeps every member.
 
     This is the lever that keeps training (control member only) from fanning every forecast row out
@@ -193,7 +191,7 @@ def test_load_engineering_inputs_filters_ensemble_members(env: dict[str, str]) -
 
 
 def test_load_engineering_inputs_prunes_nwp_to_requested_cells_and_init_window(
-    env: dict[str, str],
+    env: None,
 ) -> None:
     """NWP is pruned to the requested series' H3 cells and the window's ``init_time`` partitions."""
     settings = Settings()
@@ -222,7 +220,7 @@ def _fold_run(client: MlflowClient) -> Run:
     return fold_runs[0]
 
 
-def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> None:
+def test_trained_cv_model_trains_and_saves_to_mlflow(env: None) -> None:
     instance = DagsterInstance.ephemeral()
     _register(instance)
 
@@ -240,12 +238,12 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(env: dict[str, str]) -> Non
 
     # The model round-trips from MLflow, and only the in-window ts1 was trained (ts2's data is all
     # past train_end, so the inclusive-window filter excludes it).
-    loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id, Path(env["cache"]))
+    loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
-    env: dict[str, str],
+    env: None,
 ) -> None:
     """The same ``(experiment, fold)`` partition materialises twice, updating the counters.
 
@@ -265,12 +263,12 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
 
     client = MlflowClient()
     first_run_id = _fold_run(client).info.run_id
-    # Populate the local model cache, as materialising cv_power_forecasts would.
-    XGBoostForecaster.load_from_mlflow(first_run_id, Path(env["cache"]))
-    assert (Path(env["cache"]) / first_run_id / "model").exists()
+    assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
     # Second pass: coverage has extended, so ts2 is now eligible too — the exact input change
-    # that used to be rejected.
+    # that used to be rejected. ts2's data is still all past train_end (see the module
+    # docstring), so it stays excluded by the training-window filter and the trained population
+    # is unchanged; only the *eligible* count grows, which is what this test needs to change.
     _write_eligible(eligible_path, (1, 2))
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
 
@@ -280,12 +278,11 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     assert fold_run.info.run_id == first_run_id
     assert fold_run.data.tags["n_eligible_time_series"] == "2"
 
-    # Re-training invalidated the run's stale local model cache, so the next load re-downloads
-    # the freshly trained artifacts rather than serving the previous model.
-    assert not (Path(env["cache"]) / first_run_id).exists()
+    # The model still loads cleanly from the reused run after the second training pass.
+    assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
 
-def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: dict[str, str]) -> None:
+def test_trained_cv_model_fails_loudly_when_no_eligible_series(env: None) -> None:
     """With no eligible series for the fold, the asset must fail loudly, not silently succeed."""
     # Replace the eligible table so this fold has no rows (only an unrelated fold), mirroring an
     # un-materialised / coverage-excluded fold in production.

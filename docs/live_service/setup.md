@@ -30,7 +30,7 @@ The single most important idea is that there are **three** roots, not one:
 |---|---|---|---|
 | Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
 | Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecast`, `effective_capacity`, …) |
-| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | Trained-model cache, the promoted production model, plot HTML |
+| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The promoted production model, plot HTML |
 
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
 > hard-codes the five NGED-facing delivery tables (see the "derive from root" convention just
@@ -45,10 +45,6 @@ upload — as MLflow does internally). The real reason is that **nothing under `
 is part of the S3-backed data plane**. Each item belongs to the laptop/CV workflow or to the
 container image, not to shared storage:
 
-- **Trained-model cache** — a local-disk *cache* keyed by MLflow run id, filled by
-  `BaseForecaster.load_from_mlflow` to avoid re-downloading artifacts. A cache is node-local by
-  definition, and only the CV pipeline (which runs on a laptop) uses it; production inference never
-  touches it.
 - **Promoted production model** — distributed via the **container image**, not shared storage: the
   v0.1 deployment bakes the champion into the image at build time and loads it with a plain disk
   `load()` (see

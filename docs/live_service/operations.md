@@ -9,10 +9,10 @@ leaderboard. **Inference** (step 3) is automatic — once a model is promoted, t
 keeps producing forecasts from it with no further action, as long as Dagster's daemon is running.
 
 Production inference has **zero dependency on MLflow at runtime**: the promoted model is a plain
-directory on disk, loaded with a plain `save`/`load` round trip — no run id, tracking-server call,
-or cache lookup on the hot path. See
+directory on disk, loaded with a plain `save`/`load` round trip — no run id or tracking-server call
+on the hot path. See
 [roadmap: Production model artifacts](../roadmap/live-service.md#production-model-artifacts) for
-why this was chosen over reusing the CV pipeline's MLflow-cache mechanism.
+why this was chosen over fetching the champion model from MLflow dynamically at runtime.
 
 ---
 
