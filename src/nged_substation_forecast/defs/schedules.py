@@ -33,9 +33,13 @@ has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
 separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
 deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
 because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
-is already on disk, and records how stale that input was. Making the ordering a precondition
-would convert one failed ingest into a missing forecast, which is the failure mode the whole
-design exists to avoid. See ``docs/design-philosophy/inherent-stability.md``, rule 11."""
+telemetry is already on disk. Making the ordering a precondition would convert one failed
+ingest into a missing forecast, which is the failure mode the whole design exists to avoid.
+
+(The NWP run used is stamped on every forecast row as ``nwp_init_time``; telemetry staleness is
+not yet recorded on the forecast — see issue #424.) Rule: "never make one production job's run
+status a precondition for another's" —
+<https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>."""
 
 ecmwf_ens_job = define_asset_job(
     "ecmwf_ens_job",

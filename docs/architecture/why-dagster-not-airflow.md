@@ -200,7 +200,7 @@ around the Dagster UI and would need rewriting.
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
 | Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`) | power ingest, `ecmwf_ens` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | ECS executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
-| Data-arrival sensors (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | firing the *ingest* jobs only when there is new data to fetch, to avoid booting Fargate for a no-op | Asset-triggered DAGs, event-driven scheduling | Parity, arguably cleaner in Airflow |
+| Data-arrival sensors (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest jobs | Asset-triggered DAGs, event-driven scheduling | Parity |
 
 The asset-checks row is worth one extra sentence, because the gap there is architectural rather
 than cosmetic: non-blocking WARN checks are the *mechanism* by which this service stays
