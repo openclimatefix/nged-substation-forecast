@@ -7,7 +7,13 @@ from typing import ClassVar, Final, Self
 import patito as pt
 import polars as pl
 
-from .common import UTC_DATETIME_DTYPE, _get_time_series_id_dtype
+from .common import (
+    MAX_PLAUSIBLE_DATETIME,
+    MIN_PLAUSIBLE_DATETIME,
+    UTC_DATETIME_DTYPE,
+    _get_time_series_id_dtype,
+    check_datetime_bounds,
+)
 
 
 class PowerTimeSeries(pt.Model):
@@ -15,7 +21,12 @@ class PowerTimeSeries(pt.Model):
 
     time: datetime = pt.Field(
         dtype=UTC_DATETIME_DTYPE,
-        description="End time of the 30-minute observation period (all NGED data is already half-hourly).",
+        description=(
+            "End time of the 30-minute observation period (all NGED data is already half-hourly)."
+            f" Must fall between {MIN_PLAUSIBLE_DATETIME:%Y-%m-%d} and"
+            f" {MAX_PLAUSIBLE_DATETIME:%Y-%m-%d} (enforced by `validate`, not by the field, because"
+            " Patito ignores `ge`/`le` on datetime fields — see `check_datetime_bounds`)."
+        ),
     )
 
     power: float = pt.Field(
@@ -34,7 +45,7 @@ class PowerTimeSeries(pt.Model):
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
     ) -> pt.DataFrame[Self]:
-        """Validate the given dataframe, ensuring time is at :00 or :30 and uniqueness."""
+        """Validate the given dataframe, ensuring time is plausible, at :00 or :30, and unique."""
         validated_df = super().validate(
             dataframe=dataframe,
             columns=columns,
@@ -42,6 +53,9 @@ class PowerTimeSeries(pt.Model):
             allow_superfluous_columns=allow_superfluous_columns,
             drop_superfluous_columns=drop_superfluous_columns,
         )
+
+        # Validate time falls in the plausible range (Patito ignores `ge`/`le` on datetime fields)
+        check_datetime_bounds(validated_df, "time")
 
         # Validate time is at :00 or :30
         minutes = validated_df["time"].dt.minute()

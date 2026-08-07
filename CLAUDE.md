@@ -335,6 +335,22 @@ result = pl.DataFrame._from_pydf(patito_df._df).cast({"foo": pl.Categorical})
 Patito use and is correct. Expression/Series casts like `pl.col("foo").cast(pl.Int8)` are always
 plain Polars and unaffected.)
 
+### Patito Gotcha: `ge`/`le` are silently ignored on a datetime field
+
+`pt.Field(ge=..., le=...)` enforces nothing on a `datetime` column. Patito builds its bounds checks
+by reading the `minimum`/`maximum` keywords out of the Pydantic JSON schema, and JSON Schema
+defines those keywords for numbers only — so a datetime field's `Ge`/`Le` metadata never reaches
+the JSON schema, Patito finds no keyword to turn into a filter, and `validate()` accepts every
+year. There is no warning and no error; the constraint simply does not exist. (`ge`/`le` on a
+numeric field works exactly as documented, which is what makes this so easy to miss.)
+
+**How to apply:** bound a datetime column from the model's `validate` override, not from the field.
+`contracts.common.check_datetime_bounds` is the shared helper, and `MIN_PLAUSIBLE_DATETIME` /
+`MAX_PLAUSIBLE_DATETIME` are the shared bounds; `PowerTimeSeries.validate` and `Nwp.validate` are
+the worked examples. A `constraints=` Polars expression on the field also works, but its failure
+message is the generic "N rows do not match custom constraints", so prefer the explicit check when
+you want the error to say which bound was broken.
+
 ### Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 
 delta-rs stores all Arrow dictionary-encoded columns (`Categorical`, `Enum`) as plain `String` in
