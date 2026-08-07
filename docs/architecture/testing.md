@@ -57,8 +57,15 @@ row counts wrapping past 2³² rows.
   survives to interpreter shutdown, where SQLAlchemy's connection-pool finaliser can run after
   SQLite has closed the database and print a bare `Exception during reset or similar` traceback
   *after* pytest's summary line, owned by no test. The fixture enters the instance as a context
-  manager, so `dispose()` runs when the test ends. Outside the test suite the equivalent is
-  `with DagsterInstance.ephemeral() as instance:`.
+  manager, so `dispose()` runs when the test ends.
+- **In a script, use the context manager directly** — `with DagsterInstance.ephemeral() as
+  instance:` — rather than a bare call, so `dispose()` also runs when a step raises. A script's
+  happy path is already safe, because the local is reclaimed when the function returns; the case
+  that leaks is an *unhandled exception*, whose traceback keeps the raising frame, and therefore
+  the instance, alive until the interpreter exits.
+  `scripts/run_baseline_experiment.py` is the worked example. Measured with an `atexit` probe
+  counting storages whose held connection is still open at exit: on the error path, 2 open before
+  the context manager and 0 after.
 
 ## Warnings are errors
 

@@ -118,11 +118,8 @@ def _report_metrics() -> None:
         print(f"  {key:<40} {metrics_dict[key]:.4f}")
 
 
-def main() -> None:
-    settings = Settings()
-    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
-    instance = DagsterInstance.ephemeral()
-
+def _run_pipeline(instance: DagsterInstance) -> None:
+    """Run the five pipeline steps against ``instance``, asserting each one succeeded."""
     print(f"[1/5] Registering experiment {EXPERIMENT_NAME} ({len(SELECTED_FEATURES)} features)...")
     _register(instance)
 
@@ -154,6 +151,21 @@ def main() -> None:
         ),
         instance=instance,
     ).success, "metrics failed"
+
+
+def main() -> None:
+    settings = Settings()
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+
+    # Use the instance as a context manager rather than a bare ``DagsterInstance.ephemeral()``:
+    # ``__exit__`` calls ``dispose()``, which closes the two SQLite connections that the in-memory
+    # run storage and event-log storage hold open for the instance's lifetime. That matters most on
+    # the *error* path — an unhandled exception's traceback keeps this frame, and so the instance,
+    # alive until the interpreter exits, which is where SQLAlchemy's connection-pool finaliser can
+    # run against an already-closed database and print a bare ``Exception during reset or similar``
+    # traceback. See the ``dagster_instance`` fixture note in docs/architecture/testing.md.
+    with DagsterInstance.ephemeral() as instance:
+        _run_pipeline(instance)
 
     _report_metrics()
     print("\nDone. Now run: uv run python scripts/export_forecasts_for_alex.py")
