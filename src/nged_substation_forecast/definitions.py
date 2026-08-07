@@ -22,7 +22,7 @@ init_sentry(get_settings())
 
 defs = Definitions(
     assets=all_assets,
-    asset_checks=[checks.power_data_is_fresh],
+    asset_checks=[checks.power_data_is_fresh, checks.live_forecasts_are_healthy],
     jobs=[jobs.register_experiment_job],
     schedules=[
         schedules.power_time_series_and_metadata_schedule,

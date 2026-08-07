@@ -112,9 +112,9 @@ the Sentry missed-check-in monitor, which never alarmed.
 
 Three caveats, without which the number would be worth less than it looks:
 
-- **"Zero observed failures" is a weaker claim than "zero failures".** v0.1 implements very little
-  failure detection — the asset check on `live_forecasts` that reports missed NWP runs is still
-  open as [#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424). What is
+- **"Zero observed failures" is a weaker claim than "zero failures".** v0.1 implemented very little
+  failure detection: `live_forecasts_are_healthy` — the check that reads each slot's rows back and
+  reports missed NWP runs — landed in v0.2, after this window closed. What is
   genuinely verified is that every scheduled slot produced output, not that nothing degraded
   quietly on the way. A silently-stale input is precisely the failure mode this stack is built to
   make visible, and at v0.1 it would not yet be visible.
