@@ -1253,7 +1253,7 @@ Nepal's +5:45 is `345`, and Australia's +9:30 (`570`) does not collide with +9:0
 mixed-offset deployment is representable, and the column name states its own units.
 
 The one thing an adapted deployment would need to revisit is the era bound that
-[issue 466](https://github.com/openclimatefix/nged-substation-forecast/issues/466) puts on
+[issue #466](https://github.com/openclimatefix/nged-substation-forecast/issues/466) puts on
 `PowerTimeSeries.time`, which is what keeps the offset a whole number of minutes. A handful of IANA
 offsets are not. Each zone leaves mean solar time at its own date, so the era that needs excluding
 differs by geography: `Europe/London` runs on UTC−0:01:15 until 1847, whereas `Asia/Kolkata` runs

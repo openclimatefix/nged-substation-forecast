@@ -89,7 +89,7 @@ DST). Electricity demand follows human behaviour, which tracks local time not UT
 |---|---|
 | `local_time_of_day_sin` | Sine of fraction of day (24 h period) |
 | `local_time_of_day_cos` | Cosine of fraction of day (24 h period) |
-| `local_time_of_year_sin` | Sine of fraction of year (ordinal day of year over a fixed 366-day period, so a given calendar date lands at the same fraction whether or not it falls in a leap year) |
+| `local_time_of_year_sin` | Sine of fraction of year (ordinal day of year divided by 366, so a given calendar date's fraction shifts by one day's worth after 29 February in a leap year) |
 | `local_time_of_year_cos` | Cosine of fraction of year (see `local_time_of_year_sin`) |
 | `local_day_of_week_sin` | Sine of day-of-week (7 day period) |
 | `local_day_of_week_cos` | Cosine of day-of-week (7 day period) |
