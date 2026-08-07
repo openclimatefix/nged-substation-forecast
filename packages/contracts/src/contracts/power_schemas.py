@@ -113,7 +113,7 @@ class PowerTimeSeries(pt.Model):
         Returns:
             ``(survivors, n_dropped)``. ``survivors`` keeps ``dataframe``'s row order.
         """
-        survivors, _out_of_range = split_by_datetime_plausibility(dataframe, "time")
+        survivors, _ = split_by_datetime_plausibility(dataframe, "time")
         # `dt.minute()` is null for a null `time` and `.filter()` drops a row on a null predicate,
         # so this also drops the null `time`s the non-nullable schema forbids.
         survivors = survivors.filter(pl.col("time").dt.minute().is_in([0, 30]))

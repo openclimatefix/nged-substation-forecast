@@ -28,11 +28,9 @@
 # build args become OCI labels purely for traceability (inspect with `docker inspect`).
 #
 # The smoke test choices:
-#   - Dummy NGED creds: `Settings` requires NGED_S3_BUCKET_* at import (several modules
-#     instantiate Settings() at import time), so the code location fails to import without them.
-#     They must be PRESENT but need not be real or reachable — passing dummies proves the image
-#     needs only their *presence* at import, never valid credentials and never the network. The
-#     deployed task gets the real values as secrets (runbook Step 8).
+#   - No credentials at all: inference reads the model baked into the image, so the smoke test
+#     passes with an empty environment. The deployed task still gets the NGED source-bucket
+#     values as secrets (runbook Step 8), because the hourly ingest schedule needs them.
 #   - --network=none: proves runtime inference needs no network at all — the whole point of
 #     baking the model in.
 #   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
@@ -89,15 +87,12 @@ docker build \
 
 echo
 echo "==> Smoke-testing ${IMAGE} with zero network access (partition ${PARTITION_KEY})"
-# Dummy NGED creds: Settings requires them at import, but they need only be PRESENT — never real,
-# never reachable. --network=none proves runtime inference needs no network at all.
+# No credentials of any kind, and --network=none: together they prove runtime inference needs
+# neither.
 LOG_FILE="$(mktemp)"
 trap 'rm -f "$LOG_FILE"' EXIT
 set +e
 docker run --network=none --platform linux/arm64 \
-  -e NGED_S3_BUCKET_URL=https://example.com/outbound/ \
-  -e NGED_S3_BUCKET_ACCESS_KEY=dummy \
-  -e NGED_S3_BUCKET_SECRET=dummy \
   "$IMAGE" \
   job execute -m nged_substation_forecast.definitions -j live_forecasts_job \
   --tags "{\"dagster/partition\": \"${PARTITION_KEY}\"}" \

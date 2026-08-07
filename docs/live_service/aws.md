@@ -322,7 +322,7 @@ telemetry from NGED's bucket. Without them that schedule fails every hour — lo
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
 carries on. `Settings` deliberately does *not* require them at construction, so that a laptop, a
 test run or a training job needs no third-party credentials
-([why](../architecture/../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)).
+([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)).
 To turn a mis-wired secret into an immediate start-up failure instead of an hourly one, call
 `Settings().require_nged_source_credentials()` from the container's entry point.
 

@@ -460,9 +460,10 @@ def count_missed_nwp_runs(
 ) -> MissedNwpRuns:
     """Count the daily NWP runs missing between the freshest run on disk and the freshest expected.
 
-    Pure and deterministic — no Dagster, Delta or clock access. Counting *runs* rather than hours
-    of age (module docstring) is what makes this count zero in every healthy slot, whichever slot
-    it is.
+    Pure and deterministic — no Dagster, Delta or clock access. We count missed *runs* rather than
+    hours of age because we ingest one ECMWF run per day but forecast four times a day, so healthy
+    NWP is anywhere from 12 to 30 hours old. Counting runs reads zero in every healthy slot,
+    whichever slot it is; counting hours would not (see the module docstring).
 
     Args:
         available_init_times: The ``init_time``s genuinely present in the NWP Delta table. Runs

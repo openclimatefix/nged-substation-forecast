@@ -30,13 +30,20 @@ root Dagster application in one step.
 ## Step 2 — Create your `.env`
 
 Configuration is read from a `.env` file in the repository root (and from environment variables,
-which win over `.env`). Copy the committed template and fill in the three required NGED credentials:
+which win over `.env`). Copy the committed template:
 
 ```bash
 cp .env.example .env
 ```
 
-Then edit `.env` and set the three `NGED_S3_BUCKET_*` values from the prerequisites:
+Every setting has a working default, so you can stop there: with an untouched `.env` all data and
+artifacts live under `<repo>/data` as plain files on disk, and the test suite, a training run and
+the dashboards all work.
+
+To ingest NGED telemetry you also need the three `NGED_S3_BUCKET_*` values from the prerequisites.
+They authenticate reads of NGED's own bucket, so nothing else needs them — without them the
+`power_time_series_and_metadata` asset raises an error naming the ones that are unset, and the rest
+of the system carries on:
 
 ```dotenv
 NGED_S3_BUCKET_URL=<nged source bucket url>
@@ -44,10 +51,9 @@ NGED_S3_BUCKET_ACCESS_KEY=<key>
 NGED_S3_BUCKET_SECRET=<secret>
 ```
 
-Those three are the only values you must set. Every other setting has a working default, so with
-nothing else in `.env` all data and artifacts live under `<repo>/data` as plain files on disk. The
-[Configuration reference](live_service/setup.md) explains the full menu — the three storage roots,
-the derive-from-root convention, and the credentials you would add to move the data tables to S3.
+The [Configuration reference](live_service/setup.md) explains the full menu — the three storage
+roots, the derive-from-root convention, and the credentials you would add to move the data tables
+to S3.
 
 `.env` is git-ignored; never commit real credentials.
 

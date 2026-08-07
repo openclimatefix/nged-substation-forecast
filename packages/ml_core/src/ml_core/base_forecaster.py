@@ -224,12 +224,11 @@ class BaseForecaster(ABC):
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
           model's files leaves none of them behind. Merging instead of replacing is how a dropped
           time series' weights survive a re-train (issue #197); ``XGBoostForecaster.save`` clears
-          with ``shutil.rmtree(path, ignore_errors=True)``. ``save_to_mlflow`` relies on this: it
-          archives whatever ``path`` holds, so a stale file here would be uploaded as part of the
-          model.
+          with ``shutil.rmtree(path, ignore_errors=True)``.
 
-        Callers should therefore treat ``path`` as owned by the model, not as a directory to
-        deposit files into.
+        The clearing requirement makes ``path`` the model's to own while it saves, so anything a
+        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
+        ``_production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
         """
         pass
 

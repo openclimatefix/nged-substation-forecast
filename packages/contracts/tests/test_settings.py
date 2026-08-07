@@ -230,3 +230,15 @@ def test_require_nged_source_credentials_passes_when_all_three_are_set():
         nged_s3_bucket_access_key="key",
         nged_s3_bucket_secret="secret",
     ).require_nged_source_credentials()
+
+
+def test_get_nged_s3_store_refuses_to_build_a_store_without_credentials():
+    """Pins the *wiring*, not just the check.
+
+    Moving the credential check out of construction only helps if something still performs it
+    before the credentials are used. Every test that reaches ingest monkeypatches
+    ``get_nged_s3_store`` wholesale, so without this test the one line that calls
+    ``require_nged_source_credentials`` could be deleted and the suite would stay green.
+    """
+    with pytest.raises(ValueError, match="NGED_S3_BUCKET_URL"):
+        Settings().get_nged_s3_store()

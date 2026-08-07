@@ -163,6 +163,9 @@ def test_power_time_series_empty_frame_passes_bounds_check() -> None:
 _OK = datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
 """A plausible, aligned `time` — the row that must survive every case below."""
 
+_OK2 = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+"""A second survivor, distinct from `_OK` so that assertions on survivor order can fail."""
+
 _OUT_OF_RANGE = datetime(1840, 6, 1, 0, 30, tzinfo=timezone.utc)
 _MISALIGNED = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
 
@@ -183,10 +186,10 @@ def _frame(times: list[datetime | None]) -> pl.DataFrame:
 @pytest.mark.parametrize(
     "times, expected_survivors",
     [
-        pytest.param([_OK, _OK], [_OK, _OK], id="all_well_formed"),
+        pytest.param([_OK2, _OK], [_OK2, _OK], id="all_well_formed"),
         pytest.param([_OUT_OF_RANGE, _OK], [_OK], id="out_of_range_time"),
         pytest.param([_MISALIGNED, _OK], [_OK], id="misaligned_time"),
-        pytest.param([_OUT_OF_RANGE, _MISALIGNED, _OK], [_OK], id="both_kinds_in_one_pass"),
+        pytest.param([_OK2, _OUT_OF_RANGE, _MISALIGNED, _OK], [_OK2, _OK], id="both_kinds_in_one"),
         # A null `time` is malformed this early (the schema declares it non-nullable) and must be
         # dropped *and counted*, never silently vanish from the row accounting: `dt.minute()` is
         # null for a null `time`, and `.filter()` drops a row on a null predicate.
@@ -197,10 +200,11 @@ def _frame(times: list[datetime | None]) -> pl.DataFrame:
 def test_drop_implausible_rows(
     times: list[datetime | None], expected_survivors: list[datetime]
 ) -> None:
-    """Malformed `time`s are dropped and counted; well-formed rows survive in order.
+    """Malformed `time`s are dropped and counted; well-formed rows survive, in order.
 
-    Row accounting is asserted on every case — survivors plus dropped must always equal the input
-    — so no row can go missing without being reported.
+    `n_dropped` is asserted against the case's own arithmetic on every case, so a row cannot go
+    missing without being reported. (Asserting `survivors.height + n_dropped == df.height` instead
+    would be a tautology: that difference is how `n_dropped` is computed.)
     """
     df = _frame(times)
 
@@ -208,7 +212,6 @@ def test_drop_implausible_rows(
 
     assert survivors["time"].to_list() == expected_survivors
     assert n_dropped == len(times) - len(expected_survivors)
-    assert survivors.height + n_dropped == df.height
 
 
 def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
