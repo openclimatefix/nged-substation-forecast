@@ -8,6 +8,9 @@ on:
       - 'docs/**'      # Only run if you change the docs
       - 'mkdocs.yml'
       - 'src/**'       # Or if you change the source code (for mkdocstrings)
+  # Lets us re-deploy by hand from the Actions tab. GitHub drops queued events during an Actions
+  # outage and never backfills them, so a merge that lands mid-outage silently never publishes.
+  workflow_dispatch:
 
 # This permission is required so the action can push the built HTML to the gh-pages branch
 permissions:
