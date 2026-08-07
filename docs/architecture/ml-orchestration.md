@@ -91,18 +91,18 @@ replaceable object, not to be small.
 
 ### Why there is no local cache
 
-An earlier version cached downloads on disk keyed by MLflow run ID. That was removed
-(issue #469) because it was actively harmful rather than merely unused: a CV fold run is **reused**
-across re-materialisations of its partition (see "Cross-process run resolution" above), so the
-same run ID can legitimately hold a different model after re-training, which made the cache key
-non-unique for its contents. Keeping the cache honest under that reuse required write-side
-invalidation in `save_to_mlflow` — machinery that existed purely to compensate for the cache, not
-to serve any consumer, since production inference never used it: the champion model is baked
-directly into the container image at build time and loaded via the subclass's own `load`, with no
-MLflow call on the runtime path at all for v0.1. Re-adding a cache, if a future consumer needs to
-keep serving through an MLflow outage, is tracked in
-[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472) and should be
-scoped to that consumer's actual invalidation needs rather than resurrecting this one.
+`load_from_mlflow` downloads on every call. The obvious cache — keyed by the MLflow run ID, which
+looks immutable — is unsound here, because a CV fold run is **reused** across re-materialisations
+of its partition (see "Cross-process run resolution" above), so the same run ID can legitimately
+hold a different model after re-training. The key would not be unique for its contents, and
+keeping such a cache honest would need write-side invalidation in `save_to_mlflow`: machinery
+serving no consumer, because production inference makes no MLflow call on the runtime path at all
+for v0.1 — the champion model is baked directly into the container image at build time and loaded
+via the subclass's own `load`.
+
+If a future consumer does need to keep serving through an MLflow outage, adding a cache scoped to
+that consumer's own invalidation needs is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Idempotent writes and concurrency
 

@@ -253,13 +253,11 @@ there is nothing to cache or fail over from.
 **Future work:** once production wants to pick up a new champion without a rebuild + redeploy
 (e.g. after the [XGBoost quick wins](../roadmap/xgboost-improvements.md) start landing
 regularly), switch to fetching the champion model from MLflow dynamically. At that point the live
-service would need some way to keep serving through an MLflow outage — `load_from_mlflow` used to
-carry a local-disk cache for exactly that, but it was removed (issue #469) because it had no
-consumer: v0.1 never called it, and the CV pipeline's own use of it turned out to be actively
-harmful (a reused MLflow run made the cache key non-unique for its contents — see the linked
-section above). Re-adding a cache for this future consumer is tracked in
-[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472) and should be
-scoped to production's actual availability needs rather than resurrecting the old one.
+service would need some way to keep serving through an MLflow outage. `load_from_mlflow` supplies
+none — it downloads on every call, for the reasons in
+[Why there is no local cache](ml-orchestration.md#why-there-is-no-local-cache) — so that mechanism
+has to be designed against production's own availability needs. Tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
@@ -559,8 +557,8 @@ The idea may still return in a stronger form: the **future work** note at the en
 the section describing the accepted design this one lost to — describes fetching the champion
 dynamically once redeploys become frequent, at which point a production-resilience mechanism for
 serving through an MLflow outage would need to be designed (tracked in
-[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472)) rather than
-reused from `load_from_mlflow`'s old, now-removed cache.
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472));
+`load_from_mlflow` does not supply one.
 
 ## See also
 

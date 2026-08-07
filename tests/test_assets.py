@@ -18,6 +18,7 @@ import pytest
 import shapely
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
+from contracts.settings import Settings
 from contracts.weather_schemas import Nwp
 from dagster import (
     AssetCheckEvaluation,
@@ -269,8 +270,6 @@ def test_ecmwf_ens_materialises_and_appends_nwp(
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
     ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to the
     NWP Delta table via ``write_nwp``."""
-    from contracts.settings import Settings
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     # After 2024-11-12, when categorical_precipitation_type_surface became a non-null Nwp variable.
     init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
@@ -320,8 +319,6 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
 ) -> None:
     """Scattered per-pixel nulls in a de-accumulated variable (the known upstream ECMWF ENS
     corruption) are tolerated: the run still materialises, and the data-quality check WARNs."""
-    from contracts.settings import Settings
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
 
@@ -355,8 +352,6 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     ``_make_nwp`` builds 4 rows carrying 4 distinct members, valid_times and cells (a diagonal, not
     a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
     """
-    from contracts.settings import Settings
-
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(2024, 12, 1, tzinfo=timezone.utc)
     monkeypatch.setattr(assets, "open_ecmwf_ens_run", lambda *, nwp_init_time, h3_grid: object())
@@ -386,7 +381,6 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 ) -> None:
     """``NwpRunNotYetAvailable`` → ``RetryRequested`` with the asset's configured retry budget,
     so a not-yet-published run waits rather than failing outright."""
-    from contracts.settings import Settings
     from dagster import RetryRequested
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
