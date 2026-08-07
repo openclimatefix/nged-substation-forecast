@@ -582,8 +582,28 @@ whether the preceding quarter contained
 
 **Where the signal plausibly is**, in roughly descending order of confidence:
 
-- **Sustained-heat demand** — the leading case for the v1 population, because most of that
-  population is demand. The Tier-2
+- **PV soiling** — the mechanism this project has already worked out in most detail, which is why
+  it leads. Dust, pollen and bird droppings accumulate on panel glass and a decent fall of rain
+  washes most of it off.
+  [Differentiable physics → Soiling](../techniques/differentiable-physics.md#soiling) makes the
+  central point for us: Britain's *long-run average* effect is small, but the loss tracks **time
+  since the last washing rainfall** rather than any climate mean, so a multi-month dry spell is
+  exactly the regime in which it stops being small — and that page says the correction is worth
+  adding for Great Britain, not only for dustier climates. The tabular feature is the state
+  variable of that model, `d_t`, taken directly: time since precipitation last exceeded a washing
+  threshold. Two things follow. It needs **no new data source** — `precipitation_surface` is
+  already among the ECMWF ENS variables we download, so the rainfall history sits in the archive
+  (though reconstructing a dry spell longer than one 15-day run still means stitching across
+  archived runs, and so inherits the availability-cut caveat below) — and it is the one member of
+  this family that needs no climatological normalisation at all, because "37 days since washing
+  rain" is already interpretable in absolute terms. Note the division of labour with capacity
+  estimation, which absorbs the long-run
+  *average* soiling bias into the effective-capacity estimate
+  ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)):
+  that leaves precisely the time-varying part for a feature to explain, and this is the cheap
+  XGBoost-era stand-in for the differentiable-physics treatment.
+- **Sustained-heat demand** — the largest case by *magnitude* for the v1 population, because most
+  of that population is demand. The Tier-2
   [effective temperature](#effective-smoothed-temperature-and-degree-day-features) smooths over
   roughly 1–3 days, which is building thermal inertia. A multi-week heat regime is a different
   thing: acclimatisation, cooling equipment bought partway through a hot summer and then kept, and
@@ -592,20 +612,29 @@ whether the preceding quarter contained
   licence area, which includes arable Lincolnshire. Treat that second clause as an assumption
   rather than a finding: nothing in the metadata carries a land-use or customer-mix field, so it
   needs confirming against NGED's own customer mix before anyone leans on it.
-- **PV soiling.** A long dry spell lets dust and pollen build up on panels and rain washes them
-  clean. Note that this partly overlaps work already assigned elsewhere: the capacity model absorbs
-  *average* soiling bias into the effective-capacity estimate
-  ([honest caveats of the convex route](capacity-estimation.md#honest-caveats-of-the-convex-route)),
-  so only the time-*varying* part is left for a feature to explain. That residue is small enough
-  that it will most likely sit under the noise floor, and a "days since meaningful rain" feature is
-  in any case a different construct from the accumulate-and-normalise family described here.
-- **Hydro.** Run-of-river output is set by catchment wetness — an accumulation over weeks to
-  months — far more than by the rain falling during the forecast window, so this is physically the
-  cleanest case of the four, and the one where a 90-day rainfall total approaches being a *primary*
-  driver rather than a correction. It is listed last because it has **no v1 exposure at all**:
-  `Hydro` is a valid `time_series_type` in the contract, but the
-  [32-series trial area](../index.md#scope) contains no hydro series, so the mechanism is
-  untestable until v2 widens the population.
+- **Hydro** — physically the cleanest mechanism of the four and the one where a 90-day rainfall
+  total approaches being a *primary* driver rather than a correction, but listed last because
+  there is so little of it on NGED's network. It has **no v1 exposure at all**: `Hydro` is a valid
+  `time_series_type` in the contract, but the [32-series trial area](../index.md#scope) contains no
+  hydro series. It does not gain much at v2 either. Wales has 170 MW of hydro across 380 sites
+  ([Energy Generation in Wales 2023](https://www.gov.wales/sites/default/files/publications/2025-02/energy-generation-in-wales-2023.pdf)),
+  but three-quarters of that sits in six large schemes in North and Mid Wales — SP Manweb
+  territory, not NGED's. In particular the 56 MW Rheidol scheme, the largest in England and Wales,
+  connects in the SP Energy Networks area. NGED's Welsh share is roughly 10–15 MW spread over
+  ~100–170 sites (South East and South West Wales, plus part of Powys), the largest being the
+  1.8 MW Ystradffn scheme in Carmarthenshire; the South West adds Mary Tavy (2.6 MW) and a handful
+  of other Dartmoor and Exmoor schemes, and the two Midlands areas add almost nothing.
+
+    The nuance runs in the feature's favour, though. What NGED has is overwhelmingly *sub-MW
+    run-of-river with no storage*, which is the **most** rainfall-sensitive kind — output tracks
+    catchment flow almost directly — whereas the large schemes inflating the Welsh totals are
+    reservoir and pumped storage, and far less weather-coupled. So the hydro NGED does have is
+    exactly the hydro this feature suits; there is simply not much of it, and most of it will
+    arrive embedded in primary-substation net demand rather than as its own time series. Settle
+    this against NGED's
+    [Embedded Capacity Register](https://connecteddata.nationalgrid.co.uk/dataset/embedded-capacity-register)
+    — every resource ≥50 kW with its generation type, updated monthly — rather than against the
+    figures quoted here, which are national statistics apportioned to licence areas by hand.
 
 **Why this sits behind the instantaneous z-scores, and what the leaderboard will actually tell
 you.** The obstacle is not the feature, it is the effective sample size *on the training side*. A
