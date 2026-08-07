@@ -4,6 +4,7 @@ import patito as pt
 import polars as pl
 import pytest
 from pydantic import ValidationError
+from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from ml_core.features._lags import _apply_power_lag, _nullify_leaky_lags
 from ml_core.features._nwp import _upsample_nwp_to_half_hourly
@@ -324,11 +325,11 @@ def test_apply_local_time_features_dst_transitions():
         ("Asia/Kolkata", 1, 330),  # UTC+5:30.
         ("Asia/Kathmandu", 1, 345),  # UTC+5:45 — distinct from India's +5:30, not merged into it.
         ("Australia/Adelaide", 6, 570),  # UTC+9:30 — distinct from UTC+9:00 (540).
-        ("America/St_Johns", 1, -210),  # UTC-3:30 — the case a floored division moved to -4 hours.
+        ("America/St_Johns", 1, -210),  # UTC-3:30 — negative and sub-hour.
     ],
 )
 def test_local_utc_offset_minutes_is_faithful(time_zone: str, month: int, expected_minutes: int):
-    """Every offset an inhabited zone uses is represented exactly, sub-hour zones included."""
+    """Every offset in scope is represented exactly, sub-hour and negative zones included."""
     lf = pl.LazyFrame(
         {"valid_time": [datetime(2023, month, 10, 12, 0, tzinfo=timezone.utc)]}
     ).with_columns(local_time=pl.col("valid_time").dt.convert_time_zone(time_zone))
@@ -336,7 +337,8 @@ def test_local_utc_offset_minutes_is_faithful(time_zone: str, month: int, expect
     result = lf.select(offset=_local_utc_offset_minutes(pl.col("local_time"))).collect()
 
     assert result["offset"].to_list() == [expected_minutes]
-    assert result["offset"].dtype == pl.Int16
+    # Pin the produced dtype to the contract, not to a literal, so the two cannot drift apart.
+    assert result["offset"].dtype == AllFeatures.dtypes["local_utc_offset_minutes"] == pl.Int16
 
 
 def test_parsed_features_from_selected_features():

@@ -1252,12 +1252,13 @@ offset in scope is represented exactly and sub-hour zones stay distinct: India's
 Nepal's +5:45 is `345`, and Australia's +9:30 (`570`) does not collide with +9:00 (`540`). A
 mixed-offset deployment is representable, and the column name states its own units.
 
-The one thing an adapted deployment would need to revisit is the era bound on
-`PowerTimeSeries.time` ([issue
-#466](https://github.com/openclimatefix/nged-substation-forecast/issues/466)), which is what
-guarantees the offset is a whole number of minutes. Zones standardised at different dates, and IANA
-carries local mean time for the era before each one did: `Europe/London` runs on UTC−0:01:15 until
-1847, where `Asia/Kolkata` carries local mean time until 1906.
+The one thing an adapted deployment would need to revisit is the era bound that
+[issue 466](https://github.com/openclimatefix/nged-substation-forecast/issues/466) puts on
+`PowerTimeSeries.time`, which is what keeps the offset a whole number of minutes. A handful of IANA
+offsets are not. Each zone leaves mean solar time at its own date, so the era that needs excluding
+differs by geography: `Europe/London` runs on UTC−0:01:15 until 1847, whereas `Asia/Kolkata` runs
+on mean-time offsets of +5:53:20 and +5:21:10 until 1906. Nor is it only the deep past — Liberia
+kept UTC−0:44:30 as legal time until 1972.
 
 ### What is hard-wired to half-hourly
 

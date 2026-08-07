@@ -339,9 +339,10 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
     Australia's +9:30 (``570``) does not collide with +9:00 (``540``). ``Int16`` is ample — the
     real extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
 
-    Whole minutes depend on the era bound on ``PowerTimeSeries.time`` (issue #466). The only
-    offsets that are *not* whole minutes are IANA's pre-standardisation local mean time —
-    ``Europe/London`` ran on UTC−0:01:15 until 1847 — and a timestamp that old is malformed input,
+    Whole minutes depend on the era bound that issue #466 puts on ``PowerTimeSeries.time``. A
+    handful of IANA offsets are not whole minutes — mean solar time before a zone standardised,
+    such as ``Europe/London`` at UTC−0:01:15 until 1847, and Liberia's UTC−0:44:30, which stood as
+    legal time until 1972 — and this truncates them. A timestamp from that era is malformed input,
     which belongs at the contract boundary rather than being defended against here.
 
     Args:
