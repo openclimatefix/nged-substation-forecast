@@ -8,6 +8,34 @@
 > bid. Nothing here is a commitment, and no current design decision should be taken "so that India
 > would be easier later" — see [Why we are not doing any of this now](#why-we-are-not-doing-any-of-this-now).
 
+## If you read this page before 2026-08-07, read only this
+
+Six things changed. Everything else on the page stands. We are targeting ENTICE 3.0's **problem
+statement 2** (hyperlocal AI forecasting for DISCOMs); the storage problem statement is not ours.
+
+1. **The money is much smaller than this page assumed** — up to USD 100,000, as *convertible*
+   funding rather than a grant, and possibly split between winners. The page was scoped like an
+   NGED-sized contract. → [What the award actually buys](#what-the-award-actually-buys)
+2. **Rooftop PV *is* metered — monthly.** This falsifies the hardest constraint in the old brief.
+   Biggest single improvement to our position — *if* the reads are generation rather than net
+   export, and *if* they map to a substation. → [What the monthly PV totals buy
+   us](#what-the-monthly-pv-totals-buy-us)
+3. **Scale is one or two DISCOMs, not a country**, and the site count is open by a factor of
+   several hundred — ~100,000 distribution transformers, or a few *hundred* substations. On the latter
+   answer, the whole scale section of this page evaporates. → [How many sites, and at which
+   voltage?](#how-many-sites-and-at-which-voltage)
+4. **The pilot partners are named: BRPL (Delhi) and JVVNL (Jaipur).** Delhi has no *rostered* load
+   shedding, which shrinks our most-feared confounder to a Rajasthan problem (it does still have
+   unplanned outages). The two states also sit at opposite ends of the rooftop hosting-capacity
+   range. → [The two pilot DISCOMs](#the-two-pilot-discoms-delhi-and-jaipur)
+5. **They believe they know where most rooftop PV is installed**, as this page predicted from the
+   regulations alone — though a register records *sanctioned* capacity, not working capacity.
+   → [India does record domestic PV capacity](#india-does-record-domestic-pv-capacity)
+6. **The "ask these three questions" list is now five**, led by the site-count question and by
+   whether the monthly PV figure is *generation* or *net export* — a distinction that decides
+   whether we have an anchor at all. → [Questions we should ask
+   them](#questions-we-should-ask-them)
+
 This page exists in the same spirit as
 [Why Dagster, not Airflow?](why-dagster-not-airflow.md): a question was asked, we did the analysis,
 and the reasoning is worth keeping auditable even though the answer is "not now".
