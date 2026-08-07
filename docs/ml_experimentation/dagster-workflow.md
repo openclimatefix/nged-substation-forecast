@@ -72,16 +72,31 @@ verify the full pipeline is wired up before committing to a potentially long `fu
 
 1. Loads `base_model_config` with OmegaConf and merges `config_overrides` onto `model_params`.
 2. Instantiates the `BaseForecasterConfig` subclass via Hydra.
-3. Creates the MLflow experiment (or resolves the existing one if the name already exists) and
-   stamps four tags onto it: the resolved config as JSON (`config`), the fully-qualified Python
-   class path of the forecaster (`forecaster_target`), the class path of the config class
-   (`config_target`), and your `description`.
+3. Creates the MLflow experiment (or resolves the existing one if the name already exists), and
+   rejects the registration outright if that name is already registered under a *different*
+   config — see "An experiment's identity is its config" below.
 4. Creates the experiment's parent run (`cv_summary`) and logs the config as flattened params.
-5. Adds dynamic partition keys (`"{experiment_name}__{fold_id}"`) to the `cv_experiment_folds`
+5. Stamps four tags onto the experiment: the resolved config as JSON (`config`), the
+   fully-qualified Python class path of the forecaster (`forecaster_target`), the class path of
+   the config class (`config_target`), and your `description`.
+6. Adds dynamic partition keys (`"{experiment_name}__{fold_id}"`) to the `cv_experiment_folds`
    partition set, one per fold included in the `run_mode`.
 
-The job is **idempotent**: re-running it with the same `experiment_name` resolves the existing
-MLflow experiment and partition keys rather than creating duplicates.
+The job is **idempotent** for a given config: re-running it with the same `experiment_name`
+resolves the existing MLflow experiment and partition keys rather than creating duplicates. You
+may freely re-run it to edit the `description` or to add the other run mode's folds.
+
+### An experiment's identity is its config
+
+Re-running the job with the same `experiment_name` but a **changed** config is refused, with an
+error naming the fields that differ. Register the new config under a new `experiment_name`.
+
+Every fold of an experiment must be trained and scored under one config, or the experiment's
+leaderboard row silently mixes two different models: folds already materialised cannot be
+un-trained, and `trained_cv_model` reads the config back from the experiment's `config` tag (see
+"Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that tag
+mid-flight would change what later folds train on. The refusal happens before anything is
+written, so a rejected re-registration leaves the experiment exactly as it was.
 
 ## Step 6 — Materialise `trained_cv_model`
 
@@ -307,7 +322,9 @@ source for the experiment's config.
 
 1. **Immutability.** The YAML on disk is mutable — someone could edit it between registering
    the experiment and training fold 2. Reading from MLflow guarantees every fold of the same
-   experiment trains on exactly the config that was registered, no matter when it runs.
+   experiment trains on exactly the config that was registered, no matter when it runs. The tag
+   is immutable in turn: re-registering the experiment name under a changed config is refused
+   rather than re-pointing it (see step 5 above).
 
 2. **Process independence.** Each `trained_cv_model` materialisation is a separate Dagster
    process. There is no live handle to pass between the job and the asset; the MLflow experiment

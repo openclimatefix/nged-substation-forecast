@@ -7,7 +7,7 @@ import mlflow
 import patito as pt
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 
@@ -36,6 +36,15 @@ class BaseForecasterConfig(BaseModel):
     Model identity (name and version) lives on the ``BaseForecaster`` class itself as
     ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not
     the experiment config.
+
+    **Serialisation must be canonical.** A config is compared and stored as its serialised form:
+    ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
+    ``config`` tag and compares a re-registration against it, and logs ``flatten_config(...)`` as
+    write-once MLflow params. Python's per-process string hash randomisation means a ``set``
+    iterates in a different order in every process, so a set dumped straight to a list would make
+    two dumps of the *same* config differ — a re-registration would then look like a config change
+    and its param write would be rejected. ``selected_features`` is therefore serialised sorted. A
+    subclass that adds a set-valued (or otherwise unordered) field must do the same.
     """
 
     selected_features: set[str]
@@ -44,6 +53,11 @@ class BaseForecasterConfig(BaseModel):
     weather_source: str = ""
     training_strategy: str = ""
     random_seed: int = 0
+
+    @field_serializer("selected_features")
+    def _serialise_selected_features(self, selected_features: set[str]) -> list[str]:
+        """Serialise the feature set sorted, so two dumps of the same config always match."""
+        return sorted(selected_features)
 
 
 class BaseForecaster(ABC):
