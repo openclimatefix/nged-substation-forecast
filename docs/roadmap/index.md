@@ -87,9 +87,9 @@ AWS — see [Live service](live-service.md).
 - Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
   ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) — every
   production asset has a check except the one NGED consume
-- Start the [intervention log](../design-philosophy/engineering-hypotheses.md#the-intervention-log)
-  ([#435](https://github.com/openclimatefix/nged-substation-forecast/issues/435)); its measurement
-  window opens at v1.0, but it cannot be reconstructed retrospectively
+- Start the [intervention log](../live_service/intervention-log.md) ✅ (started with the v0.1 AWS
+  period; its measurement window opens at v1.0, but it cannot be reconstructed retrospectively,
+  which is why it exists now)
 
 ---
 

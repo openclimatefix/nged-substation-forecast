@@ -36,6 +36,13 @@ that at ≥90% so a single fluke cannot falsify the claim on its own. "Zero out-
 intervention is ever needed outside normal working hours — the posture that makes
 next-business-day recovery honest.
 
+> **An early observation, which does not score.** Since its first AWS run at 18:00 UTC on 15 July
+> 2026, v0.1 has served 91 consecutive 6-hourly forecast slots with zero interventions. That is a
+> precondition for H1 rather than evidence for it: the scoring window opens at v1.0, three weeks is
+> short, v0.1 is only 32 time series, and v0.1 detects little enough that "no observed failures" is
+> a weaker claim than "no failures". Recorded, with those caveats, in the
+> [intervention log](../live_service/intervention-log.md#v01-on-aws-from-2026-07-15).
+
 **T1.2 — Graceful degradation.** Run the failure-scenario suite across every time series and check
 two things: that a forecast is emitted at all, and that it still beats `nged_incumbent` at rungs 0–2
 of the [degradation ladder](inherent-stability.md#the-degradation-ladder). Blocked on
@@ -250,7 +257,10 @@ Three rules keep that measurement honest.
 
 The artefact is deliberately cheap — an append-only log with the date, the trigger, a cause
 category, the human-minutes spent, and whether a runbook already existed — so there is no excuse for
-not keeping it.
+not keeping it. It lives at
+[Live Service → Intervention log](../live_service/intervention-log.md), and the
+[operations runbook](../live_service/operations.md#degraded-input-data-nwp-feed-down-or-telemetry-stalled)
+tells the operator to append to it.
 
 But its **measurement window opens at v1.0**. Interventions during v0.2–v0.9, while the system is
 being actively rebuilt, are development churn, and counting them would spuriously falsify the
