@@ -28,13 +28,14 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
 )
 """Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
 has landed by the time ``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
-``live_forecasts`` depends on ``power_time_series_and_metadata`` (``defs/production_assets.py``)
-but the two run as separate jobs on separate schedules, so nothing actually enforces the
-ordering; this offset is a cheap mitigation, not a guarantee.
 
-TODO: explore a more rigorous fix — e.g. a run-status sensor that only fires
-``live_forecasts_job`` once that hour's ``power_time_series_and_metadata_job`` has actually
-succeeded, rather than assuming a fixed offset is always enough."""
+``live_forecasts`` declares ``power_time_series_and_metadata`` as a dep, but the two run as
+separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
+deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
+because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
+is already on disk, and records how stale that input was. Making the ordering a precondition
+would convert one failed ingest into a missing forecast, which is the failure mode the whole
+design exists to avoid. See ``docs/design-philosophy/inherent-stability.md``, rule 11."""
 
 ecmwf_ens_job = define_asset_job(
     "ecmwf_ens_job",
@@ -69,5 +70,6 @@ live_forecasts_job = define_asset_job(
 live_forecasts_schedule = build_schedule_from_partitioned_job(live_forecasts_job)
 """Ticks at 00/06/12/18 UTC, materialising the just-completed window with default run config
 (``availability_mode="live"``) — the schedule is always live; replays are manual, launched from
-the UI with ``availability_mode="replay"``. See ``power_time_series_and_metadata_schedule``'s
-docstring above for how the two schedules' relative timing is (loosely) coordinated."""
+the UI with ``availability_mode="replay"``. This slot fires on the clock regardless of whether
+the ingest jobs succeeded; see ``power_time_series_and_metadata_schedule``'s docstring above for
+why the two schedules are deliberately not ordered against each other."""

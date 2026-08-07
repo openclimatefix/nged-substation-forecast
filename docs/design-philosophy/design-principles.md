@@ -73,7 +73,7 @@ principle behind it is a claim we are merely hoping comes true.
    check in the repo is non-blocking `WARN`; there is deliberately no `ERROR`-severity check
    anywhere. *Serves:* [Hypothesis 1: a service that mostly runs
    itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself). *Detail:* [Inherent
-   Stability](inherent-stability.md), whose [ten rules](inherent-stability.md#the-rules) are the
+   Stability](inherent-stability.md), whose [eleven rules](inherent-stability.md#the-rules) are the
    fine-grained form of this principle together with the complexity-offline and strict-contracts
    principles.
 
@@ -400,6 +400,42 @@ principle behind it is a claim we are merely hoping comes true.
     [An established industry pattern](../architecture/forecast-delivery.md#an-established-industry-pattern),
     [When would a REST API earn its keep?](../architecture/forecast-delivery.md#when-would-a-rest-api-earn-its-keep),
     [Considered but rejected designs](../architecture/production-deployment.md#considered-but-rejected-designs).
+
+14. **Production jobs are coupled through data at rest, never through run status.** Each scheduled
+    production job reads whatever is on disk at the moment it runs, and records how stale that input
+    turned out to be. No production job asks whether the job that produces its input succeeded, or
+    ran at all.
+    The common alternative is a chain of scheduled jobs — A at 06:00, B at 06:15, C at 06:30 — in
+    which B's real input is *the event of A having run*. That design has no way to distinguish "A
+    failed" from "A is still running" from "A had nothing to do", so one bad morning upstream takes
+    out every job downstream of it for the rest of the day, and recovery means replaying the chain in
+    order.
+    Ours cannot propagate a failure because there is no channel for it to propagate down.
+    `live_forecasts` does not care whether `ecmwf_ens` succeeded in the last 24 hours, or whether
+    this hour's telemetry pull ran: it selects the freshest NWP run genuinely present as of its own
+    init time and stamps the row with how old that was. A failed ingest makes the 06:00 forecast
+    slightly staler. It cannot make it late, and it cannot make it absent.
+    Note the deliberate asymmetry with the *lineage* graph, which is a different thing from a runtime
+    precondition. Dagster still knows that `live_forecasts` depends on `ecmwf_ens` and
+    `power_time_series_and_metadata`; that edge is what lets a developer materialise one asset on a
+    laptop and have its inputs built for them, and what makes the graph legible in the UI. What we
+    decline is letting that edge become a gate in production.
+    *Without it:* one failed 06:00 ingest suppresses the 06:00 forecast, and then the 12:00 and 18:00
+    ones behind it; NGED receive nothing at all rather than something slightly stale, which
+    [inverts the whole degradation ladder](inherent-stability.md#the-degradation-ladder); and someone
+    has to re-run the chain in order, out of hours, to catch up — the precise out-of-hours
+    intervention that
+    [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts will never be
+    needed.
+    *Decided:* the three production jobs run on three independent schedules with no run-status
+    coupling between them, and the `:55` offset on the telemetry pull is an optimisation for
+    freshness, not a precondition — if it is missed, the forecast still runs. `promoted_model` was
+    deliberately *removed* from `live_forecasts`' deps once it became clear the model arrives by
+    filesystem path rather than by data flow: declaring the edge bought nothing at runtime and
+    created a permanently un-materialised parent on the production box, which has no MLflow and never
+    runs promotion. *Serves:*
+    [Hypothesis 1: a service that mostly runs itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
+    *Detail:* [Inherent Stability](inherent-stability.md#the-rules), rule 11.
 
 ## Deliberately absent
 
