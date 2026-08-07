@@ -352,11 +352,13 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     the ``eligible_time_series`` asset, and the observed power + gridded NWP over the fold's
     **inclusive** training window. Features are engineered through the forecaster's own
     ``FeatureEngineer`` (so the spatial NWP mapping and feature pipeline are a model concern), the
-    model is trained, and its artifacts are uploaded to the fold's MLflow run alongside the
-    training params.
+    model is trained, and its artifacts are uploaded to the fold's MLflow run alongside a record of
+    the training window and population.
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
-    across processes and idempotent under Dagster retries.
+    across processes and idempotent under Dagster retries. Because that run is *reused* on every
+    re-materialisation, the training window and population go in tags rather than MLflow params
+    (which are write-once and would reject a changed value).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -415,15 +417,28 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
     forecaster.save_to_mlflow(fold_run_id)
-    training_params = {
-        "fold_id": fold_id,
-        "train_start": train_start.isoformat(),
-        "train_end": train_end.isoformat(),
-        "n_eligible_time_series": len(eligible_ids),
-        "n_trained_time_series": n_trained,
-    }
     with mlflow.start_run(run_id=fold_run_id):
-        mlflow.log_params(training_params)
+        # MLflow params are immutable and the fold run is reused on every re-materialisation, so
+        # nothing here that can legitimately change between materialisations may be a param.
+        # `fold_id` is already set as a tag at run creation (get_or_create_fold_run, which is also
+        # what resolves the run) — no need to duplicate it here as a param too.
+        #
+        # The training window comes from the CV config, which is edited between materialisations
+        # as the archive grows (a fold's train_end is extended). The eligible/trained counters are
+        # outputs of *this* materialisation, not identifying inputs — the eligible population
+        # grows as power coverage extends, and can also shrink. All four are tags rather than
+        # metrics: MLflow resolves a metric's "latest" value as the max over
+        # (step, timestamp, value), not the newest write, so a metric would under-report a
+        # genuinely *shrunk* count if two materialisations ever landed the same timestamp/step.
+        # Tags are last-write-wins, which is the semantic actually wanted here.
+        mlflow.set_tags(
+            {
+                "train_start": train_start.isoformat(),
+                "train_end": train_end.isoformat(),
+                "n_eligible_time_series": str(len(eligible_ids)),
+                "n_trained_time_series": str(n_trained),
+            }
+        )
         # Provenance: the code + data versions that produced this fold's model — the load-bearing
         # stamp, since a fold can be trained days after registration on a different SHA. Tags (not
         # params) because provenance overwrites cleanly on re-materialise; these are the three
@@ -460,9 +475,9 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
 def cv_power_forecasts(context: AssetExecutionContext) -> None:
     """Predict the validation window for one ``(experiment, fold)`` partition and persist forecasts.
 
-    Loads the model ``trained_cv_model`` saved for this fold back from MLflow (via the local-disk
-    cache), then forecasts the fold's **inclusive** validation window across **all** NWP ensemble
-    members — the probabilistic leaderboard metrics are meaningless on a single member. The scored
+    Loads the model ``trained_cv_model`` saved for this fold back from MLflow, then forecasts the
+    fold's **inclusive** validation window across **all** NWP ensemble members — the probabilistic
+    leaderboard metrics are meaningless on a single member. The scored
     population is the model's own ``trained_time_series_ids`` (the train==predict invariant), so a
     fold is always scored on exactly the population it was trained on even if power coverage has
     drifted since training.
@@ -497,7 +512,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-    forecaster = forecaster_cls.load_from_mlflow(fold_run_id, Path(settings.model_cache_base_path))
+    forecaster = forecaster_cls.load_from_mlflow(fold_run_id)
     trained_ids = forecaster.trained_time_series_ids
     if not trained_ids:
         raise ValueError(

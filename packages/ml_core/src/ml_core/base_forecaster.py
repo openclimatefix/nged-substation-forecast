@@ -68,8 +68,8 @@ class BaseForecaster(ABC):
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
-    methods, shared by all subclasses, wrap that disk format with MLflow's artifact store and a
-    local-disk cache, so the same trained model can be shared across machines and served offline.
+    methods, shared by all subclasses, wrap that disk format with MLflow's artifact store, so the
+    same trained model can be shared across machines by round-tripping through a run.
     """
 
     MODEL_NAME: ClassVar[str]
@@ -144,33 +144,38 @@ class BaseForecaster(ABC):
                 mlflow.log_artifacts(tmp_dir, artifact_path=_MLFLOW_ARTIFACT_PATH)
 
     @classmethod
-    def load_from_mlflow(cls, run_id: str, cache_base_path: Path) -> Self:
-        """Load a trained model for ``run_id``, serving from the local cache when possible.
+    def load_from_mlflow(cls, run_id: str) -> Self:
+        """Download a trained model's artifacts from an MLflow run and load it.
 
-        On a cache hit (``{cache_base_path}/{run_id}/model`` already exists) the model is loaded
-        straight from disk and MLflow is never contacted — this is what lets the live service keep
-        serving during an MLflow outage. On a cache miss the artifacts are downloaded from the run
-        into the cache, then loaded. The cache key is the immutable run ID, so a cached model never
-        goes stale. The caller sets the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+        Downloads into a temporary directory and loads from there — there is no local-disk cache.
+        An earlier version of this method cached downloads on disk keyed by run ID, but a CV fold
+        run is **reused** across re-materialisations (``get_or_create_fold_run`` resolves the
+        same run for every re-run of a fold's partition), so the same ``run_id`` can legitimately
+        hold a different model after re-training. That made the cache key non-unique for its
+        contents, which required write-side invalidation just to keep the cache honest — machinery
+        that existed purely to compensate for the cache, not to serve any consumer: production
+        inference never used this cache (issue #469). See
+        <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#model-artifacts-mlflow-artifact-store-no-local-cache>
+        for the full rationale. Re-adding a cache, if a future consumer needs to serve through an
+        MLflow outage, is tracked in issue #472 and should be scoped to that consumer's actual
+        invalidation needs rather than resurrecting this one.
+
+        The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
+        beforehand.
 
         Args:
             run_id: The MLflow run the model was saved under.
-            cache_base_path: Root of the local cache; the model lives at
-                ``{cache_base_path}/{run_id}``.
 
         Returns:
             The reconstructed, trained forecaster.
         """
-        run_cache_dir = cache_base_path / run_id
-        model_dir = run_cache_dir / _MLFLOW_ARTIFACT_PATH
-        if not model_dir.exists():
-            run_cache_dir.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory() as tmp_dir:
             mlflow.artifacts.download_artifacts(
                 run_id=run_id,
                 artifact_path=_MLFLOW_ARTIFACT_PATH,
-                dst_path=str(run_cache_dir),
+                dst_path=tmp_dir,
             )
-        return cls.load(model_dir)
+            return cls.load(Path(tmp_dir) / _MLFLOW_ARTIFACT_PATH)
 
     @abstractmethod
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:

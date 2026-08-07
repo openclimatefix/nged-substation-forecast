@@ -14,7 +14,7 @@ reasoning stays auditable. The step-by-step *how-to* is
 | **Dagster partition key** | `"{experiment_name}__{fold_id}"` on a `DynamicPartitionsDefinition`. Encodes both dimensions; unique by construction because MLflow enforces unique experiment names. |
 | **MLflow experiment** | One per `experiment_name`; carries the resolved config as tags and holds all of the experiment's runs. |
 | **MLflow parent run** | One per experiment (`cv_summary`, tagged `cv_role=parent`). Holds the flattened config params and the mean-across-folds aggregate metrics — the row the leaderboard sorts on. |
-| **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training params, per-fold metrics, and the trained model artifacts. |
+| **MLflow fold run** | One per fold, nested under the parent (tagged `cv_role=fold`, `fold_id=…`). Holds per-fold training tags (`train_start`, `train_end`, `n_eligible_time_series`, `n_trained_time_series` — tags, not params, because the run is reused on every re-materialisation), per-fold metrics, and the trained model artifacts. |
 
 ## Cross-process run resolution: discover by tag, never pass handles
 
@@ -41,21 +41,25 @@ The complementary decision — the resolved config is stamped onto the MLflow ex
 registration and read back by the assets, never re-read from YAML — is explained in
 [Running an experiment end-to-end](../ml_experimentation/dagster-workflow.md).
 
-## Model artifacts: MLflow artifact store + immutable local cache
+## Model artifacts: MLflow artifact store, no local cache
 
 Trained models live in MLflow's artifact store, wrapped by two concrete `BaseForecaster`
 methods (`save_to_mlflow` / `load_from_mlflow`) that delegate to each subclass's own disk
-`save`/`load` — subclasses stay MLflow-free. `load_from_mlflow` serves from a local cache at
-`{model_cache_base_path}/{run_id}/model`; the cache key is the **immutable run ID**, so a
-cached model never goes stale and never needs invalidation.
+`save`/`load` — subclasses stay MLflow-free. `load_from_mlflow` downloads straight into a
+temporary directory and loads from there; there is no local-disk cache.
 
-Today this pair is used by the CV/experiment pipeline: `cv_power_forecasts` loads a fold's
-freshly trained model back from MLflow (a separate Dagster process) via this cache. Production
-inference does **not** use it for v0.1 — the champion model is baked directly into the
-container image at build time and loaded via the subclass's own `load`, with no MLflow call on
-the runtime path at all. Once production instead fetches its champion model from MLflow
-dynamically, `load_from_mlflow`'s cache becomes the mechanism that lets it keep serving through
-an MLflow outage — but that is future work, not the v0.1 design.
+An earlier version cached downloads on disk keyed by MLflow run ID. That was removed (issue
+#469) because it was actively harmful rather than merely unused: a CV fold run is **reused**
+across re-materialisations of its partition (see "Cross-process run resolution" above), so the
+same run ID can legitimately hold a different model after re-training, which made the cache key
+non-unique for its contents. Keeping the cache honest under that reuse required write-side
+invalidation in `save_to_mlflow` — machinery that existed purely to compensate for the cache, not
+to serve any consumer, since production inference never used it: the champion model is baked
+directly into the container image at build time and loaded via the subclass's own `load`, with no
+MLflow call on the runtime path at all for v0.1. Re-adding a cache, if a future consumer needs to
+keep serving through an MLflow outage, is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472) and should be
+scoped to that consumer's actual invalidation needs rather than resurrecting this one.
 
 ## Idempotent writes and concurrency
 

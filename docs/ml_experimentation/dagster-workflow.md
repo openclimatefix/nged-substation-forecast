@@ -106,8 +106,20 @@ MLflow experiment and partition keys rather than creating duplicates.
    then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
    `forecaster.save_to_mlflow(fold_run_id)`.
-9. Logs training params (`fold_id`, `train_start`, `train_end`, `n_eligible_time_series`,
-   `n_trained_time_series`) to the fold run.
+9. Records the training run on the fold run as **tags**: the training window (`train_start`,
+   `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
+
+A fold run is reused on every re-materialisation of its partition and MLflow params are
+write-once, so nothing that can legitimately change between materialisations may be a param. The
+training window comes from the CV config (which is edited as the archive grows) and the counters
+are outputs of the materialisation (the eligible population grows — and can shrink — with power
+coverage), so both would make a re-materialisation fail with "Changing param values is not
+allowed" if logged as params. Tags, not metrics: MLflow resolves a metric's "latest" value as the
+max over `(step, timestamp, value)` rather than the newest write, which would under-report a
+shrunk count landing on the same timestamp/step as a prior larger one; tags are last-write-wins,
+which is the semantic actually wanted. `fold_id` itself is already a tag from run creation
+(`get_or_create_fold_run`, which is also what resolves the run by it), so it is not logged again
+here.
 
 The MLflow run structure after training looks like this:
 
@@ -115,8 +127,8 @@ The MLflow run structure after training looks like this:
 Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
-    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
-            params: train_start, train_end, n_eligible_time_series, n_trained_time_series
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end,
+                           n_eligible_time_series, n_trained_time_series}
             artifacts: model/   ← trained model binary files
 ```
 
@@ -129,9 +141,10 @@ Experiment "xgboost_smoke_test"
 
 **What the asset does:**
 
-1. Loads the fold's model back from MLflow (via the local-disk cache) and reads its
-   `trained_time_series_ids` — the population it scores (the train==predict invariant). Raises if
-   the loaded model has no trained series.
+1. Loads the fold's model back from MLflow (a fresh download each time — no local cache, see
+   [ML orchestration: model artifacts](../architecture/ml-orchestration.md#model-artifacts-mlflow-artifact-store-no-local-cache))
+   and reads its `trained_time_series_ids` — the population it scores (the train==predict
+   invariant). Raises if the loaded model has no trained series.
 2. Forecasts the **inclusive validation window** across **all ~51 NWP ensemble members** (the
    probabilistic leaderboard metrics are meaningless on a single member).
 3. Bounds memory by predicting **one `init_time` chunk at a time** (`_PREDICT_INIT_CHUNK`, 14 days):
@@ -141,7 +154,7 @@ Experiment "xgboost_smoke_test"
 4. Writes to the `power_forecasts` Delta table keyed by `(experiment_name, fold_id)`: the **first**
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
-5. Logs `val_start`/`val_end` params and `n_forecast_rows`/`n_forecast_time_series`/
+5. Logs `val_start`/`val_end` tags and `n_forecast_rows`/`n_forecast_time_series`/
    `n_ensemble_members` metrics to the fold run.
 
 ---
@@ -229,8 +242,7 @@ Experiment "xgboost_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
     │   params: n_estimators=100, learning_rate=0.05, …
     │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
-    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test}
-            params: train_start, train_end, …
+    └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end, …}
             metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
             artifacts: model/
 ```
